@@ -29,9 +29,7 @@ import {
   Calendar,
   Search,
   ExternalLink,
-  FileJson,
   FileSpreadsheet,
-  TrendingUp,
 } from "lucide-react"
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns"
 import { toast } from "sonner"
@@ -42,10 +40,19 @@ interface ReportOrder {
   items: Array<{
     serviceType: string
     topic: string | null
+    targetUrl?: string | null
+    anchorText?: string | null
     website: { id: string; url: string } | null
+    publications?: Array<{
+      id: string
+      publishedUrl?: string
+      publishedAt?: string
+    }>
   }>
-  totalAmount: number | null
+  amount?: number | null
+  totalAmount?: number | null
   createdAt: string
+  updatedAt: string
   events: Array<{
     eventType: string
     createdAt: string
@@ -98,6 +105,16 @@ function ReportsTableSkeleton() {
   )
 }
 
+function getFirstPublishedUrl(order: ReportOrder): string | null {
+  const pub = order.items?.[0]?.publications?.[0]
+  return pub?.publishedUrl || null
+}
+
+function getFirstPublishedDate(order: ReportOrder): string | null {
+  const pub = order.items?.[0]?.publications?.[0]
+  return pub?.publishedAt || null
+}
+
 export default function ReportsPage() {
   const [dateRange, setDateRange] = useState("30")
   const [searchQuery, setSearchQuery] = useState("")
@@ -138,7 +155,7 @@ export default function ReportsPage() {
   }, [ordersData, dateRange, statusFilter, searchQuery])
 
   const publishedOrders = filteredOrders.filter((o: ReportOrder) => 
-    o.status === "PUBLISHED" || o.status === "COMPLETED" || o.status === "VERIFIED"
+    ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status)
   )
 
   const stats = useMemo(() => {
@@ -146,24 +163,30 @@ export default function ReportsPage() {
     return {
       totalOrders: orders.length,
       published: orders.filter((o: ReportOrder) => ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status)).length,
-      totalSpend: orders.reduce((sum: number, o: ReportOrder) => sum + (o.totalAmount || 0), 0),
+      totalSpend: orders.reduce((sum: number, o: ReportOrder) => sum + (Number(o.amount || o.totalAmount || 0)), 0),
       avgOrderValue: orders.length > 0 
-        ? orders.reduce((sum: number, o: ReportOrder) => sum + (o.totalAmount || 0), 0) / orders.length 
+        ? orders.reduce((sum: number, o: ReportOrder) => sum + (Number(o.amount || o.totalAmount || 0)), 0) / orders.length 
         : 0,
     }
   }, [filteredOrders])
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Website", "Service", "Status", "Target URL", "Published Date", "Price"]
-    const rows = publishedOrders.map((order: ReportOrder) => [
-      order.id,
-      order.items?.[0]?.website?.url || "",
-      order.items?.[0]?.serviceType?.replace(/_/g, " ") || "",
-      order.status,
-      order.items?.[0]?.topic || "",
-      format(new Date(order.createdAt), "yyyy-MM-dd"),
-      order.totalAmount?.toFixed(2) || "",
-    ])
+    const headers = ["Order ID", "Published URL", "Target URL", "Anchor Text", "Service", "Status", "Publish Date", "Price"]
+    const rows = publishedOrders.map((order: ReportOrder) => {
+      const item = order.items?.[0]
+      const publishedUrl = getFirstPublishedUrl(order)
+      const publishedDate = getFirstPublishedDate(order)
+      return [
+        order.id,
+        publishedUrl || "",
+        item?.targetUrl || item?.topic || "",
+        item?.anchorText || "",
+        item?.serviceType?.replace(/_/g, " ") || "",
+        order.status,
+        publishedDate ? format(new Date(publishedDate), "yyyy-MM-dd") : "",
+        (Number(order.amount || order.totalAmount || 0)).toFixed(2),
+      ]
+    })
 
     const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
     const blob = new Blob([csv], { type: "text/csv" })
@@ -176,12 +199,13 @@ export default function ReportsPage() {
     toast.success("Report exported to CSV")
   }
 
-  const exportToXLSX = () => {
-    toast.info("XLSX export would require a library like exceljs or xlsx")
-  }
-
-  const exportToPDF = () => {
-    toast.info("PDF export would require a library like jspdf or react-pdf")
+  const exportReport = async (orderId: string) => {
+    try {
+      await api.reporting.generateOrderReport(orderId)
+      toast.success("Report generation started. Check your reports tab.")
+    } catch {
+      toast.error("Failed to start report generation")
+    }
   }
 
   if (isLoading) {
@@ -213,15 +237,15 @@ export default function ReportsPage() {
           <p className="text-muted-foreground">View and export your order reports</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportToPDF}>
-            <FileText className="mr-2 h-4 w-4" />
-            PDF
-          </Button>
           <Button variant="outline" onClick={exportToCSV}>
             <Download className="mr-2 h-4 w-4" />
             CSV
           </Button>
-          <Button variant="outline" onClick={exportToXLSX}>
+          <Button variant="outline" disabled>
+            <FileText className="mr-2 h-4 w-4" />
+            PDF
+          </Button>
+          <Button variant="outline" disabled>
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             XLSX
           </Button>
@@ -336,55 +360,66 @@ export default function ReportsPage() {
                     <TableHead>Publisher</TableHead>
                     <TableHead>Publish Date</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Campaign Progress</TableHead>
+                    <TableHead className="text-right">Price</TableHead>
+                    <TableHead className="text-right" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {publishedOrders.map((order: ReportOrder) => (
-                    <TableRow key={order.id}>
-                      <TableCell>
-                        {order.items?.[0]?.website?.url ? (
-                          <a
-                            href={order.items[0].website.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-primary hover:underline"
-                          >
-                            {new URL(order.items[0].website.url).hostname}
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {order.items?.[0]?.topic ? (
-                          <span className="text-sm truncate max-w-[200px] block">
-                            {order.items[0].topic}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm text-muted-foreground">—</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">{order.items?.[0]?.website?.id || "—"}</span>
-                      </TableCell>
-                      <TableCell>
-                        {format(new Date(order.createdAt), "PP")}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="capitalize">
-                          {order.status.replace(/_/g, " ").toLowerCase()}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <span className="text-sm font-medium">100%</span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {publishedOrders.map((order: ReportOrder) => {
+                    const item = order.items?.[0]
+                    const publishedUrl = getFirstPublishedUrl(order)
+                    const publishedDate = getFirstPublishedDate(order)
+                    return (
+                      <TableRow key={order.id}>
+                        <TableCell>
+                          {publishedUrl ? (
+                            <a
+                              href={publishedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-primary hover:underline"
+                            >
+                              {new URL(publishedUrl).hostname}
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item?.targetUrl || item?.topic ? (
+                            <span className="text-sm truncate max-w-[200px] block">
+                              {item.targetUrl || item.topic}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{item?.anchorText || "—"}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm">{item?.website?.url ? new URL(item.website.url).hostname : "—"}</span>
+                        </TableCell>
+                        <TableCell>
+                          {publishedDate ? format(new Date(publishedDate), "PP") : format(new Date(order.createdAt), "PP")}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="capitalize">
+                            {order.status.replace(/_/g, " ").toLowerCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-mono text-sm">
+                          ${(Number(order.amount || order.totalAmount || 0)).toFixed(2)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="sm" onClick={() => exportReport(order.id)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
