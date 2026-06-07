@@ -23,7 +23,7 @@ export class MarketplaceService {
   // =============================================================================
 
   async searchListings(dto: SearchListingsDto) {
-    const { query, category, type, tags, country, language, minPrice, maxPrice, minDR, minTraffic, maxTurnaroundDays, sortBy, page = 1, limit = 20 } = dto
+    const { query, category, type, tags, country, language, minPrice, maxPrice, minDR, maxDR, minTraffic, maxTurnaroundDays, sortBy, page = 1, limit = 20 } = dto
 
     const where: any = {
       status: ListingStatus.APPROVED,
@@ -51,8 +51,10 @@ export class MarketplaceService {
       if (maxPrice !== undefined) where.price.lte = maxPrice
     }
 
-    if (minDR !== undefined) {
-      where.domainRating = { gte: minDR }
+    if (minDR !== undefined || maxDR !== undefined) {
+      where.domainRating = {}
+      if (minDR !== undefined) where.domainRating.gte = minDR
+      if (maxDR !== undefined) where.domainRating.lte = maxDR
     }
 
     if (minTraffic !== undefined) {

@@ -80,10 +80,8 @@ export class MarketplaceService {
     return this.client.get<SearchResult>("/marketplace/listings", { params: filters as Record<string, any> })
   }
 
-  getListing(slug: string, userId?: string): Promise<MarketplaceListing> {
-    return this.client.get<MarketplaceListing>(`/marketplace/listings/${slug}`, {
-      params: { userId } as Record<string, string | undefined>,
-    })
+  getListing(slug: string): Promise<MarketplaceListing> {
+    return this.client.get<MarketplaceListing>(`/marketplace/listings/${slug}`)
   }
 
   getCategories(): Promise<Category[]> {
@@ -108,68 +106,66 @@ export class MarketplaceService {
     return this.client.get("/marketplace/stats")
   }
 
-  getRecommendations(userId: string, params?: { listingId?: string; type?: string; limit?: number }): Promise<MarketplaceListing[]> {
+  getRecommendations(params?: { listingId?: string; type?: string; limit?: number }): Promise<MarketplaceListing[]> {
     return this.client.get("/marketplace/recommendations", {
-      params: { userId, ...params } as Record<string, string | number | undefined>,
+      params: params as Record<string, string | number | undefined>,
     })
   }
 
-  getFavorites(userId: string): Promise<Array<{ id: string; listing: MarketplaceListing; addedAt: string }>> {
-    return this.client.get(`/marketplace/favorites`, { params: { userId } })
+  getFavorites(): Promise<Array<{ id: string; listing: MarketplaceListing; addedAt: string }>> {
+    return this.client.get("/marketplace/favorites")
   }
 
-  addFavorite(userId: string, listingId: string): Promise<any> {
-    return this.client.post("/marketplace/favorites", { json: { userId, listingId } })
+  addFavorite(listingId: string): Promise<any> {
+    return this.client.post("/marketplace/favorites", { json: { listingId } })
   }
 
-  removeFavorite(userId: string, listingId: string): Promise<any> {
-    return this.client.delete(`/marketplace/favorites/${listingId}`, { params: { userId } })
+  removeFavorite(listingId: string): Promise<any> {
+    return this.client.delete(`/marketplace/favorites/${listingId}`)
   }
 
-  getSavedLists(userId: string): Promise<Array<{
+  getSavedLists(): Promise<Array<{
     id: string
     name: string
     slug: string
     isPublic: boolean
     items: Array<{ id: string; listing: MarketplaceListing; note?: string; addedAt: string }>
   }>> {
-    return this.client.get("/marketplace/saved-lists", { params: { userId } })
+    return this.client.get("/marketplace/saved-lists")
   }
 
-  createSavedList(userId: string, data: { name: string; slug?: string; isPublic?: boolean }): Promise<any> {
-    return this.client.post("/marketplace/saved-lists", { json: { userId, ...data } })
+  createSavedList(data: { name: string; slug?: string; isPublic?: boolean }): Promise<any> {
+    return this.client.post("/marketplace/saved-lists", { json: data })
   }
 
-  addToSavedList(userId: string, listId: string, listingId: string, note?: string): Promise<any> {
+  addToSavedList(listId: string, listingId: string, note?: string): Promise<any> {
     return this.client.post(`/marketplace/saved-lists/${listId}/items`, {
-      json: { userId, listingId, note },
+      json: { listingId, note },
     })
   }
 
-  removeFromSavedList(userId: string, listId: string, listingId: string): Promise<any> {
-    return this.client.delete(`/marketplace/saved-lists/${listId}/items/${listingId}`, { params: { userId } })
+  removeFromSavedList(listId: string, listingId: string): Promise<any> {
+    return this.client.delete(`/marketplace/saved-lists/${listId}/items/${listingId}`)
   }
 
-  createReview(userId: string, data: { listingId: string; rating: number; title?: string; content: string }): Promise<any> {
-    return this.client.post("/marketplace/reviews", { json: { userId, ...data } })
+  createReview(data: { listingId: string; rating: number; title?: string; content: string }): Promise<any> {
+    return this.client.post("/marketplace/reviews", { json: data })
   }
 
-  getPublisherListings(publisherId: string, userId?: string): Promise<MarketplaceListing[]> {
-    return this.client.get(`/marketplace/publisher/${publisherId}/listings`, {
-      params: { userId } as Record<string, string | undefined>,
-    })
+  getPublisherListings(publisherId: string): Promise<MarketplaceListing[]> {
+    return this.client.get(`/marketplace/publisher/${publisherId}/listings`)
   }
 
-  createListing(userId: string, organizationId: string, data: any): Promise<any> {
-    return this.client.post("/marketplace/listings", { json: { userId, organizationId, ...data } })
+  createListing(data: any): Promise<any> {
+    return this.client.post("/marketplace/listings", { json: data })
   }
 
-  updateListing(userId: string, organizationId: string, listingId: string, data: any): Promise<any> {
-    return this.client.put(`/marketplace/listings/${listingId}`, { json: { userId, organizationId, ...data } })
+  updateListing(listingId: string, data: any): Promise<any> {
+    return this.client.put(`/marketplace/listings/${listingId}`, { json: data })
   }
 
-  deleteListing(userId: string, organizationId: string, listingId: string): Promise<any> {
-    return this.client.delete(`/marketplace/listings/${listingId}`, { json: { userId, organizationId } })
+  deleteListing(listingId: string): Promise<any> {
+    return this.client.delete(`/marketplace/listings/${listingId}`)
   }
 
   searchPublishers(params?: { category?: string; language?: string; country?: string; search?: string }): Promise<Array<{ id: string; name: string; websiteUrl: string; domainRating: number }>> {
