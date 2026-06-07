@@ -3,6 +3,28 @@ import { connection } from "../redis"
 import { QUEUES } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
 
+async function verifyLinkOnPage(targetUrl: string, anchorText?: string): Promise<boolean> {
+  const response = await fetch(targetUrl, {
+    signal: AbortSignal.timeout(15000),
+    headers: { "User-Agent": "GuestPost-Verification/1.0" },
+  })
+  if (!response.ok) {
+    console.warn(`[VERIFICATION] HTTP ${response.status} fetching ${targetUrl}`)
+    return false
+  }
+  const html = await response.text()
+  if (!anchorText) return true
+  const lowerHtml = html.toLowerCase()
+  const lowerAnchor = anchorText.toLowerCase()
+  if (lowerHtml.includes(lowerAnchor)) return true
+  const anchorRegex = new RegExp(`>\\s*${escapeRegex(lowerAnchor)}\\s*<`, "i")
+  return anchorRegex.test(html)
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+
 export function createVerificationWorker() {
   const worker = new Worker(
     QUEUES.VERIFICATION,
@@ -11,29 +33,30 @@ export function createVerificationWorker() {
 
       switch (job.name) {
         case "verify-link": {
+          if (!targetUrl) {
+            throw new Error("Missing targetUrl in verification job data")
+          }
+
           console.log(`[VERIFICATION] Verifying link for order ${orderId} at ${targetUrl}`)
-          // In production: Use a proper web crawler/scraper to verify the link
-          // For now, we will simulate the check
-          const isVerified = true // Math.random() > 0.1
-          
+          const isVerified = await verifyLinkOnPage(targetUrl, anchorText)
+
           if (isVerified) {
             await prisma.order.update({
               where: { id: orderId },
-              data: {
-                status: "VERIFIED",
-              },
+              data: { status: "VERIFIED" },
             })
-            console.log(`[VERIFICATION] Link verified successfully for order ${orderId}`)
+            console.log(`[VERIFICATION] Link verified for order ${orderId}${anchorText ? ` (anchor: "${anchorText}")` : ""}`)
           } else {
-            console.log(`[VERIFICATION] Link verification failed for order ${orderId}`)
+            console.warn(`[VERIFICATION] Link NOT found on ${targetUrl} for order ${orderId}${anchorText ? ` (anchor: "${anchorText}")` : ""}`)
           }
-          break
+
+          return { verified: isVerified, orderId }
         }
         default:
           console.warn(`[VERIFICATION] Unknown job: ${job.name}`)
       }
 
-      return { verified: true, orderId }
+      return { verified: false, orderId }
     },
     { connection },
   )

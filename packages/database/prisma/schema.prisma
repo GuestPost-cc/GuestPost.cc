@@ -187,6 +187,8 @@ model Session {
   userId    String
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Account {
@@ -207,6 +209,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([providerId, accountId])
+  @@index([userId])
 }
 
 model Verification {
@@ -252,6 +255,7 @@ model Membership {
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([userId, organizationId])
+  @@index([organizationId])
 }
 
 model PublisherMembership {
@@ -266,6 +270,7 @@ model PublisherMembership {
   publisher Publisher @relation(fields: [publisherId], references: [id])
 
   @@unique([userId, publisherId])
+  @@index([publisherId])
 }
 
 model StaffMembership {
@@ -286,6 +291,8 @@ model Team {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
 }
 
 model Publisher {
@@ -305,6 +312,8 @@ model Publisher {
   settlements         Settlement[]
   marketplaceListings MarketplaceListing[]
   profile             PublisherProfile?
+
+  @@index([organizationId])
 }
 
 model Website {
@@ -324,6 +333,9 @@ model Website {
   orders     Order[]
   orderItems OrderItem[]
   marketplaceListings MarketplaceListing[]
+
+  @@index([publisherId])
+  @@index([isActive])
 }
 
 model Order {
@@ -361,6 +373,13 @@ model Order {
   items        OrderItem[]
   events       OrderEvent[]
   settlements  Settlement[]
+
+  @@index([organizationId, status])
+  @@index([customerId, status])
+  @@index([assigneeId])
+  @@index([websiteId])
+  @@index([campaignId])
+  @@index([createdAt])
 }
 
 model Campaign {
@@ -374,6 +393,8 @@ model Campaign {
 
   organization Organization @relation(fields: [organizationId], references: [id])
   orders       Order[]
+
+  @@index([organizationId])
 }
 
 model Service {
@@ -402,6 +423,10 @@ model OrderItem {
   order       Order         @relation(fields: [orderId], references: [id])
   website     Website?      @relation(fields: [websiteId], references: [id])
   publications Publication[]
+
+  @@index([orderId])
+  @@index([publisherId])
+  @@index([websiteId])
 }
 
 model OrderEvent {
@@ -415,6 +440,9 @@ model OrderEvent {
 
   order Order @relation(fields: [orderId], references: [id])
   actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([orderId, createdAt])
+  @@index([actorId])
 }
 
 model Publication {
@@ -433,6 +461,10 @@ model Publication {
 
   orderItem OrderItem @relation(fields: [orderItemId], references: [id])
   verifiedByUser User? @relation("PublicationVerifier", fields: [verifiedBy], references: [id])
+
+  @@index([orderItemId])
+  @@index([verifiedBy])
+  @@index([verificationStatus])
 }
 
 model Settlement {
@@ -450,6 +482,10 @@ model Settlement {
 
   order     Order     @relation(fields: [orderId], references: [id])
   publisher Publisher @relation(fields: [publisherId], references: [id])
+
+  @@index([orderId])
+  @@index([publisherId, status])
+  @@index([status])
 }
 
 model PublisherBalance {
@@ -478,6 +514,10 @@ model Withdrawal {
 
   publisher   Publisher @relation(fields: [publisherId], references: [id])
   approvedByUser User?  @relation("WithdrawalApprover", fields: [approvedBy], references: [id])
+
+  @@index([publisherId, status])
+  @@index([approvedBy])
+  @@index([status])
 }
 
 model ApiKey {
@@ -492,6 +532,8 @@ model ApiKey {
   updatedAt      DateTime @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
 }
 
 model ContentOrder {
@@ -517,6 +559,8 @@ model Revision {
   updatedAt DateTime @updatedAt
 
   order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
 }
 
 model Report {
@@ -530,6 +574,8 @@ model Report {
   updatedAt DateTime @updatedAt
 
   order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
 }
 
 model Wallet {
@@ -544,6 +590,9 @@ model Wallet {
 
   organization  Organization? @relation(fields: [organizationId], references: [id])
   transactions  Transaction[]
+
+  @@index([organizationId])
+  @@index([userId])
 }
 
 model Transaction {
@@ -559,6 +608,11 @@ model Transaction {
 
   wallet Wallet? @relation(fields: [walletId], references: [id])
   order  Order?  @relation(fields: [orderId], references: [id])
+
+  @@index([walletId])
+  @@index([orderId])
+  @@index([type])
+  @@index([createdAt])
 }
 
 model Ticket {
@@ -574,6 +628,10 @@ model Ticket {
   organization Organization  @relation(fields: [organizationId], references: [id])
   user         User          @relation(fields: [userId], references: [id])
   messages     TicketMessage[]
+
+  @@index([organizationId, status])
+  @@index([userId])
+  @@index([status])
 }
 
 model TicketMessage {
@@ -586,6 +644,8 @@ model TicketMessage {
 
   user   User   @relation(fields: [userId], references: [id])
   ticket Ticket @relation(fields: [ticketId], references: [id])
+
+  @@index([ticketId])
 }
 
 model Notification {
@@ -599,6 +659,10 @@ model Notification {
 
   user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([userId, read, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([read])
 }
 
 model AuditLog {
@@ -615,6 +679,11 @@ model AuditLog {
 
   user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId, action, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([action])
 }
 
 // =============================================================================
@@ -868,6 +937,7 @@ model MarketplaceSavedListItem {
   listing MarketplaceListing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@unique([listId, listingId])
+  @@index([listingId])
 }
 
 model MarketplaceListingView {
