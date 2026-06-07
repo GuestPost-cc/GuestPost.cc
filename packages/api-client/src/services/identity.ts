@@ -1,5 +1,34 @@
 import { HttpClient } from "../client"
 
+export type OrganizationMember = {
+  id: string
+  userId: string
+  name: string | null
+  email: string
+  image: string | null
+  role: "OWNER" | "MEMBER"
+  banned: boolean
+  joinedAt: string
+}
+
+export type OrganizationDetail = {
+  id: string
+  name: string
+  slug: string
+  plan: string
+  createdAt: string
+  memberCount: number
+  teamCount: number
+  myRole: "OWNER" | "MEMBER"
+}
+
+export type Team = {
+  id: string
+  name: string
+  organizationId: string
+  createdAt: string
+}
+
 export class IdentityService {
   constructor(private client: HttpClient) {}
 
@@ -15,16 +44,32 @@ export class IdentityService {
     return this.client.get<Array<{ id: string; name: string; slug: string; role: string }>>("/identity/organizations")
   }
 
+  getOrganization(orgId: string) {
+    return this.client.get<OrganizationDetail>(`/identity/organizations/${orgId}`)
+  }
+
   inviteMember(orgId: string, data: { email: string; role: string }) {
     return this.client.post(`/identity/organizations/${orgId}/invite`, { json: data })
+  }
+
+  removeMember(orgId: string, userId: string) {
+    return this.client.delete(`/identity/organizations/${orgId}/members/${userId}`)
+  }
+
+  listMembers(orgId: string) {
+    return this.client.get<OrganizationMember[]>(`/identity/organizations/${orgId}/members`)
   }
 
   createTeam(orgId: string, data: { name: string }) {
     return this.client.post<{ id: string; name: string }>(`/identity/organizations/${orgId}/teams`, { json: data })
   }
 
+  deleteTeam(orgId: string, teamId: string) {
+    return this.client.delete(`/identity/organizations/${orgId}/teams/${teamId}`)
+  }
+
   listTeams(orgId: string) {
-    return this.client.get(`/identity/organizations/${orgId}/teams`)
+    return this.client.get<Team[]>(`/identity/organizations/${orgId}/teams`)
   }
 
   updateProfile(data: { name: string }) {

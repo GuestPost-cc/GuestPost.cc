@@ -85,13 +85,19 @@ export class AdminService {
     const PUBLISHER_ROLES = ["PUBLISHER_OWNER"] as const
 
     if ((CUSTOMER_ROLES as readonly string[]).includes(role)) {
-      const targetType = { userId, role: role as any }
       let membership = await this.prisma.membership.findFirst({ where: { userId } })
       if (!membership) {
-        const org = await this.prisma.organization.findFirst()
-        if (!org) throw new BadRequestException("No organization exists to assign membership")
-        membership = await this.prisma.membership.create({
-          data: { userId, organizationId: org.id, role: role as any },
+        const orgName = `Org for ${u.email}`
+        const orgSlug = `org-${userId.slice(0, 8)}`
+        const org = await this.prisma.organization.create({
+          data: {
+            name: orgName,
+            slug: orgSlug,
+            memberships: { create: { userId, role: role as any } },
+          },
+        })
+        membership = await this.prisma.membership.findFirstOrThrow({
+          where: { userId, organizationId: org.id },
         })
       } else {
         membership = await this.prisma.membership.update({

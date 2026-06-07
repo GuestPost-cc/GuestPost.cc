@@ -119,7 +119,7 @@ export default function FinancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {settlementsData?.map((settlement: any) => (
+              {settlementsData?.items?.map((settlement: any) => (
                 <TableRow key={settlement.id}>
                   <TableCell className="font-mono text-xs">{settlement.id.slice(0, 8)}</TableCell>
                   <TableCell>{settlement.orderId.slice(0, 8)}</TableCell>
@@ -171,7 +171,7 @@ export default function FinancePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {withdrawalsData?.map((withdrawal: any) => (
+              {withdrawalsData?.items?.map((withdrawal: any) => (
                 <TableRow key={withdrawal.id}>
                   <TableCell>{withdrawal.publisher.name || withdrawal.publisher.email}</TableCell>
                   <TableCell>{withdrawal.amount} {withdrawal.currency}</TableCell>

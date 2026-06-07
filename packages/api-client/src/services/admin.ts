@@ -1,5 +1,12 @@
 import type { OrderStatus, SettlementStatus, WithdrawalStatus } from "@guestpost/shared"
-import { HttpClient } from "../client"
+import { HttpClient, type RequestOptions } from "../client"
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  take: number
+  skip: number
+}
 
 export interface AdminUserResponse {
   id: string
@@ -83,16 +90,20 @@ export class AdminService {
     return this.client.get(`/admin/orders/${id}`)
   }
 
-  listSettlements() {
-    return this.client.get<AdminSettlementResponse[]>("/admin/settlements")
+  listSettlements(take?: number, skip?: number) {
+    return this.client.get<PaginatedResponse<AdminSettlementResponse>>("/admin/settlements", {
+      params: { take, skip },
+    } as RequestOptions)
   }
 
   approveSettlement(id: string) {
     return this.client.post(`/admin/settlements/${id}/approve`)
   }
 
-  listWithdrawals() {
-    return this.client.get<AdminWithdrawalResponse[]>("/admin/withdrawals")
+  listWithdrawals(take?: number, skip?: number) {
+    return this.client.get<PaginatedResponse<AdminWithdrawalResponse>>("/admin/withdrawals", {
+      params: { take, skip },
+    } as RequestOptions)
   }
 
   approveWithdrawal(id: string) {

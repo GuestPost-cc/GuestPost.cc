@@ -70,8 +70,12 @@ export class AdminController {
   }
 
   @Get("settlements")
-  listSettlements() {
-    return this.settlements.listSettlements()
+  listSettlements(
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+  ) {
+    const { take: t, skip: s } = parsePagination(take, skip)
+    return this.settlements.listSettlements(undefined, t, s)
   }
 
   @Get("settlements/:id")
@@ -80,8 +84,12 @@ export class AdminController {
   }
 
   @Get("withdrawals")
-  listWithdrawals() {
-    return this.payouts.listWithdrawals()
+  listWithdrawals(
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+  ) {
+    const { take: t, skip: s } = parsePagination(take, skip)
+    return this.payouts.listWithdrawals(undefined, t, s)
   }
 
   @Patch("withdrawals/:id/approve")

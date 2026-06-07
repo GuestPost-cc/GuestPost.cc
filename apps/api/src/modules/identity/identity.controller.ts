@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, UseGuards, ForbiddenException, BadRequestException } from "@nestjs/common"
+import { Controller, Get, Post, Delete, Body, Param, UseGuards, ForbiddenException, BadRequestException } from "@nestjs/common"
 import { IdentityService } from "./identity.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
@@ -82,7 +82,20 @@ export class IdentityController {
     return this.identity.inviteMember(orgId, user.id, body.email, body.role)
   }
 
+  @Delete("organizations/:id/members/:userId")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER")
+  removeMember(
+    @Param("id") orgId: string,
+    @Param("userId") targetUserId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.identity.removeMember(orgId, user.id, targetUserId)
+  }
+
   @Post("organizations/:id/teams")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER")
   createTeam(
     @Param("id") orgId: string,
     @CurrentUser() user: any,
@@ -92,7 +105,32 @@ export class IdentityController {
   }
 
   @Get("organizations/:id/teams")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER", "MEMBER")
   listTeams(@Param("id") orgId: string, @CurrentUser() user: any) {
     return this.identity.listTeams(orgId, user.id)
+  }
+
+  @Delete("organizations/:id/teams/:teamId")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER")
+  deleteTeam(
+    @Param("id") orgId: string,
+    @Param("teamId") teamId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.identity.deleteTeam(orgId, user.id, teamId)
+  }
+
+  @Get("organizations/:id")
+  getOrganization(@Param("id") orgId: string, @CurrentUser() user: any) {
+    return this.identity.getOrganization(orgId, user.id)
+  }
+
+  @Get("organizations/:id/members")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER", "MEMBER")
+  listMembers(@Param("id") orgId: string, @CurrentUser() user: any) {
+    return this.identity.listMembers(orgId, user.id)
   }
 }

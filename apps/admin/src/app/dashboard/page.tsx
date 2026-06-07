@@ -332,8 +332,8 @@ export default function DashboardPage() {
     stats.gmv = completedOrders?.reduce((sum, o) => sum + (o.amount ?? 0), 0) ?? 0
     stats.revenue = Math.round(stats.gmv * 0.3)
     stats.pendingVerifications =
-      settlements?.filter((s) => s.status === "PENDING" || s.status === "UNDER_REVIEW").length ?? 0
-    stats.pendingWithdrawals = withdrawals?.filter((w) => w.status === "PENDING").length ?? 0
+      settlements?.items?.filter((s) => s.status === "PENDING" || s.status === "UNDER_REVIEW").length ?? 0
+    stats.pendingWithdrawals = withdrawals?.items?.filter((w) => w.status === "PENDING").length ?? 0
   }
 
   return (

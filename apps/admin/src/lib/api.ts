@@ -18,7 +18,7 @@ export { setToken, clearToken, getToken }
 /** Fetch helper that throws on non-ok responses. Calls getApiUrl() at fetch time. */
 export async function adminFetch(path: string) {
   const token = getToken()
-  const res = await fetch(`${getApiUrl()}/api/v1${path}`, {
+  const res = await fetch(`${getApiUrl()}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     credentials: "include",
   })
