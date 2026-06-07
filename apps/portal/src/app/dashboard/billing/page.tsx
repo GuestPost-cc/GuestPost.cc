@@ -146,8 +146,11 @@ export default function BillingPage() {
     .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
 
   const depositMutation = useMutation({
-    mutationFn: (amount: number) => api.billing.deposit({ amount }),
-    onSuccess: (data) => {
+    mutationFn: (amount: number) => {
+      if (!walletData?.id) throw new Error("Wallet not loaded")
+      return api.billing.deposit({ walletId: walletData.id, amount })
+    },
+    onSuccess: () => {
       toast.success(`Deposited $${depositAmount} successfully!`)
       queryClient.invalidateQueries({ queryKey: ["wallet"] })
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
