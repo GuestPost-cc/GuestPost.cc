@@ -53,6 +53,10 @@ export class OrdersService {
     return this.client.get<OrderResponse>(`/orders/${id}`)
   }
 
+  updateStatus(id: string, status: OrderStatus, metadata?: Record<string, unknown>) {
+    return this.transitionStatus(id, status, metadata)
+  }
+
   transitionStatus(id: string, status: OrderStatus, metadata?: Record<string, unknown>) {
     return this.client.patch<OrderResponse>(`/orders/${id}/status`, {
       json: { status, ...(metadata ? { metadata } : {}) } as Record<string, unknown>,
@@ -61,5 +65,9 @@ export class OrdersService {
 
   getEvents(id: string) {
     return this.client.get<Array<{ id: string; eventType: OrderEventType; createdAt: string }>>(`/orders/${id}/events`)
+  }
+
+  submitPayment(id: string) {
+    return this.client.post<OrderResponse>(`/orders/${id}/submit-payment`)
   }
 }

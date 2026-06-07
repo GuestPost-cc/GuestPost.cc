@@ -180,9 +180,11 @@ export class OrdersService {
     return order
   }
 
-  async listOrders(organizationId: string) {
+  async listOrders(organizationId: string, campaignId?: string) {
+    const where: any = { organizationId }
+    if (campaignId) where.campaignId = campaignId
     return this.prisma.order.findMany({
-      where: { organizationId },
+      where,
       orderBy: { createdAt: "desc" },
       include: {
         items: true,

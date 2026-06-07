@@ -20,9 +20,12 @@ export class OrdersController {
   }
 
   @Get()
-  list(@CurrentUser() user: any) {
+  list(
+    @Query("campaignId") campaignId?: string,
+    @CurrentUser() user?: any,
+  ) {
     if (user.userType === "PUBLISHER") return this.orders.listPublisherOrders(user.publisherId)
-    return this.orders.listOrders(user.organizationId)
+    return this.orders.listOrders(user.organizationId, campaignId)
   }
 
   @Get(":id")
@@ -31,6 +34,8 @@ export class OrdersController {
   }
 
   @Patch(":id/status")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER", "MEMBER")
   transition(
     @Param("id") id: string,
     @Body() body: TransitionOrderDto,
