@@ -1,31 +1,32 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from "@nestjs/common"
+import { Controller, Get, Post, Param, UseGuards } from "@nestjs/common"
 import { ReportingService } from "./reporting.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 
-@Controller("reporting")
+@Controller("reports")
 @UseGuards(MemberRolesGuard)
-@MemberRoles("OWNER", "MEMBER")
+@MemberRoles("OWNER", "MEMBER", "VIEWER")
 export class ReportingController {
   constructor(private readonly reporting: ReportingService) {}
 
-  @Post("orders/:id/export")
-  exportReport(
-    @Param("id") orderId: string,
-    @Body() body: { format?: "pdf" | "csv" },
-    @CurrentUser() user: any,
-  ) {
-    return this.reporting.generateOrderReport(orderId, user.organizationId, body.format ?? "pdf")
+  @Get("orders/:id")
+  getOrderReport(@Param("id") orderId: string, @CurrentUser() user: any) {
+    return this.reporting.getOrderReport(orderId, user.organizationId)
+  }
+
+  @Get("campaigns/:id")
+  getCampaignReport(@Param("id") campaignId: string, @CurrentUser() user: any) {
+    return this.reporting.getCampaignReport(campaignId, user.organizationId)
+  }
+
+  @Post("orders/:id/generate")
+  generateOrderReport(@Param("id") orderId: string, @CurrentUser() user: any) {
+    return this.reporting.generateOrderReport(orderId, user.organizationId, "pdf")
   }
 
   @Get()
   listReports(@CurrentUser() user: any) {
     return this.reporting.listReports(user.organizationId)
-  }
-
-  @Get(":id")
-  getReport(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.reporting.getReport(id, user.organizationId)
   }
 }
