@@ -30,8 +30,11 @@ interface Campaign {
   id: string
   name: string
   status: string
+  description?: string
+  organizationId: string
   createdAt: string
-  updatedAt: string
+  updatedAt?: string
+  orderCount?: number
 }
 
 interface Order {
@@ -72,14 +75,14 @@ function CampaignDetailSkeleton() {
 export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
 
-  const { data: campaignsData, isLoading: campaignsLoading } = useQuery<Campaign[]>({
+  const { data: campaignsData, isLoading: campaignsLoading } = useQuery({
     queryKey: ["campaigns"],
-    queryFn: () => api.campaigns.listCampaigns() as Promise<Campaign[]>,
+    queryFn: () => api.campaigns.listCampaigns(),
   })
 
-  const { data: ordersData, isLoading: ordersLoading } = useQuery<Order[]>({
+  const { data: ordersData, isLoading: ordersLoading } = useQuery({
     queryKey: ["orders"],
-    queryFn: () => api.orders.list() as Promise<Order[]>,
+    queryFn: () => api.orders.list(),
   })
 
   const isLoading = campaignsLoading || ordersLoading

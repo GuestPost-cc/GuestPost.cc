@@ -61,8 +61,11 @@ interface Campaign {
   id: string
   name: string
   status: string
+  description?: string
+  organizationId: string
   createdAt: string
-  updatedAt: string
+  updatedAt?: string
+  orderCount?: number
 }
 
 const statusColors: Record<string, string> = {
@@ -94,11 +97,12 @@ export default function CampaignsPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [showCreateCampaign, setShowCreateCampaign] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
 
-  const { data: campaignsData, isLoading } = useQuery<Campaign[]>({
+  const { data: campaignsData, isLoading } = useQuery({
     queryKey: ["campaigns"],
-    queryFn: () => api.campaigns.listCampaigns() as Promise<Campaign[]>,
+    queryFn: () => api.campaigns.listCampaigns(),
   })
 
   const { data: ordersData } = useQuery({
@@ -120,6 +124,19 @@ export default function CampaignsPage() {
     },
     onError: () => {
       toast.error("Failed to create campaign")
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.campaigns.deleteCampaign(id),
+    onSuccess: () => {
+      toast.success("Campaign deleted successfully")
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] })
+      queryClient.invalidateQueries({ queryKey: ["orders"] })
+      setShowDeleteConfirm(null)
+    },
+    onError: () => {
+      toast.error("Failed to delete campaign")
     },
   })
 
@@ -259,7 +276,10 @@ export default function CampaignsPage() {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
+                        <DropdownMenuItem
+                          className="text-destructive"
+                          onClick={() => setShowDeleteConfirm(campaign.id)}
+                        >
                           <Trash2 className="mr-2 h-4 w-4" />
                           Delete
                         </DropdownMenuItem>
@@ -303,6 +323,29 @@ export default function CampaignsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!showDeleteConfirm} onOpenChange={(open) => !open && setShowDeleteConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Campaign</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this campaign? Orders linked to this campaign will remain but will no longer be grouped. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => showDeleteConfirm && deleteMutation.mutate(showDeleteConfirm)}
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete Campaign"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
