@@ -1,0 +1,34 @@
+{
+  "name": "guestpost-platform",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "services:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d",
+    "services:down": "docker compose -f infrastructure/docker/docker-compose.yml down",
+    "dev:all": "pnpm services:up && pnpm build && concurrently --names 'api,worker,site,portal,pub,admin' --prefix-colors 'blue,green,yellow,magenta,cyan,red' 'cd apps/api && node dist/main.js' 'cd apps/worker && node dist/index.js' 'cd apps/website && npx next dev --port 3000' 'cd apps/portal && npx next dev --port 3001' 'cd apps/publisher && npx next dev --port 3002' 'cd apps/admin && npx next dev --port 3003'",
+    "dev:all:seed": "pnpm dev:all && pnpm seed:users",
+    "dev:website": "turbo dev --filter @guestpost/website",
+    "dev:portal": "turbo dev --filter @guestpost/portal",
+    "dev:api": "turbo dev --filter @guestpost/api",
+    "dev:publisher": "turbo dev --filter @guestpost/publisher",
+    "dev:admin": "turbo dev --filter @guestpost/admin",
+    "dev:worker": "turbo dev --filter @guestpost/worker",
+    "seed:admin": "pnpm tsx scripts/seed-admin.ts",
+    "seed:users": "pnpm tsx scripts/seed-users.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@11.5.1",
+  "devDependencies": {
+    "concurrently": "^10.0.3",
+    "tsx": "^4.22.4",
+    "turbo": "^2.9.16"
+  },
+  "dependencies": {
+    "next": "^16.2.7"
+  }
+}

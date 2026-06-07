@@ -1,0 +1,979 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserType {
+  CUSTOMER
+  PUBLISHER
+  STAFF
+}
+
+enum CustomerRole {
+  OWNER
+  MEMBER
+}
+
+enum PublisherRole {
+  PUBLISHER_OWNER
+}
+
+enum StaffRole {
+  SUPER_ADMIN
+  OPERATIONS
+  FINANCE
+}
+
+// Deprecated: kept for migration compatibility, will be removed
+enum UserRole {
+  OWNER
+  MANAGER
+  SEO_SPECIALIST
+  CLIENT_VIEWER
+  PUBLISHER
+  ADMIN
+}
+
+// Deprecated: kept for migration compatibility, will be removed
+enum MemberRole {
+  OWNER
+  MANAGER
+  SEO_SPECIALIST
+  CLIENT_VIEWER
+}
+
+enum OrderStatus {
+  DRAFT
+  PENDING_PAYMENT
+  PAID
+  SUBMITTED
+  ACCEPTED
+  ASSIGNED
+  CONTENT_REQUESTED
+  CONTENT_CREATION
+  CONTENT_READY
+  REVIEW
+  UNDER_REVIEW
+  OUTREACH
+  PUBLISHED
+  VERIFIED
+  DELIVERED
+  SETTLED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+  REJECTED
+  DISPUTED
+}
+
+enum ServiceType {
+  GUEST_POST
+  NICHE_EDIT
+  EDITORIAL_LINK
+  OUTREACH_LINK
+  LOCAL_CITATION
+  FOUNDATION_LINK
+  BLOG_ARTICLE
+  SEO_CONTENT
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  REFUNDED
+  FAILED
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_ON_CUSTOMER
+  RESOLVED
+  CLOSED
+}
+
+enum OrderEventType {
+  ORDER_CREATED
+  PAYMENT_RECEIVED
+  ASSIGNED
+  CONTENT_SUBMITTED
+  CONTENT_APPROVED
+  PUBLISHED
+  VERIFIED
+  UNDER_REVIEW
+  SETTLED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+  DISPUTED
+  REJECTED
+}
+
+enum SettlementStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  PAID
+  DISPUTED
+  CANCELLED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
+enum PublisherTier {
+  NEW
+  TRUSTED
+  VERIFIED
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  DISPUTED
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  name          String?
+  image         String?
+  userType      UserType  @default(CUSTOMER)
+  role          UserRole  @default(SEO_SPECIALIST)
+  banned        Boolean   @default(false)
+  banReason     String?
+  banExpires    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  memberships          Membership[]
+  publisherMemberships PublisherMembership[]
+  staffMemberships     StaffMembership[]
+  ownedOrders          Order[]            @relation("OrderCustomer")
+  assignedOrders       Order[]            @relation("OrderAssignee")
+  orderEvents          OrderEvent[]
+  publications         Publication[]       @relation("PublicationVerifier")
+  approvedWithdrawals  Withdrawal[]        @relation("WithdrawalApprover")
+  tickets              Ticket[]
+  messages             TicketMessage[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  sessions             Session[]
+  accounts             Account[]
+  marketplaceReviews   MarketplaceReview[]
+  marketplaceFavorites MarketplaceFavorite[]
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                        String    @id @default(cuid())
+  accountId                 String
+  providerId                String
+  userId                    String
+  accessToken               String?
+  refreshToken              String?
+  idToken                   String?
+  accessTokenExpiresAt      DateTime?
+  refreshTokenExpiresAt     DateTime?
+  scope                     String?
+  password                  String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  plan      String   @default("free")
+  settings  Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships    Membership[]
+  teams          Team[]
+  publishers     Publisher[]
+  campaigns      Campaign[]
+  wallets        Wallet[]
+  orders         Order[]
+  tickets        Ticket[]
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  apiKeys        ApiKey[]
+  marketplaceListings MarketplaceListing[]
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  role           CustomerRole @default(MEMBER)
+  userId         String
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([userId, organizationId])
+}
+
+model PublisherMembership {
+  id          String        @id @default(cuid())
+  role        PublisherRole @default(PUBLISHER_OWNER)
+  userId      String
+  publisherId String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id])
+  publisher Publisher @relation(fields: [publisherId], references: [id])
+
+  @@unique([userId, publisherId])
+}
+
+model StaffMembership {
+  id        String    @id @default(cuid())
+  role      StaffRole @default(OPERATIONS)
+  userId    String    @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Team {
+  id             String   @id @default(cuid())
+  name           String
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+model Publisher {
+  id             String       @id @default(cuid())
+  name           String
+  email          String?
+  organizationId String
+  tier           PublisherTier @default(NEW)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization        Organization         @relation(fields: [organizationId], references: [id])
+  websites            Website[]
+  publisherMemberships PublisherMembership[]
+  balance             PublisherBalance?
+  withdrawals         Withdrawal[]
+  settlements         Settlement[]
+  marketplaceListings MarketplaceListing[]
+  profile             PublisherProfile?
+}
+
+model Website {
+  id          String   @id @default(cuid())
+  url         String   @unique
+  name        String?
+  category    String?
+  language    String?
+  country     String?
+  metrics     Json?
+  isActive    Boolean  @default(true)
+  publisherId String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  publisher  Publisher   @relation(fields: [publisherId], references: [id])
+  orders     Order[]
+  orderItems OrderItem[]
+  marketplaceListings MarketplaceListing[]
+}
+
+model Order {
+  id             String        @id @default(cuid())
+  type           ServiceType
+  status         OrderStatus   @default(DRAFT)
+  amount         Decimal?
+  currency       String        @default("USD")
+  paymentStatus  PaymentStatus @default(PENDING)
+  title          String?
+  instructions   String?
+  targetUrl      String?
+  anchorText     String?
+  publishedUrl   String?
+  publishedAt    DateTime?
+  verifiedAt     DateTime?
+  deliveredAt    DateTime?
+  customerId     String
+  assigneeId     String?
+  websiteId      String?
+  organizationId String
+  campaignId     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  customer     User          @relation("OrderCustomer", fields: [customerId], references: [id])
+  assignee     User?         @relation("OrderAssignee", fields: [assigneeId], references: [id])
+  website      Website?      @relation(fields: [websiteId], references: [id])
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  campaign     Campaign?     @relation(fields: [campaignId], references: [id])
+  contentOrder ContentOrder?
+  revisions    Revision[]
+  reports      Report[]
+  transactions Transaction[]
+  items        OrderItem[]
+  events       OrderEvent[]
+  settlements  Settlement[]
+}
+
+model Campaign {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  status         String   @default("ACTIVE")
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  orders       Order[]
+}
+
+model Service {
+  id        String      @id @default(cuid())
+  type      ServiceType
+  name      String
+  price     Decimal
+  currency  String      @default("USD")
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model OrderItem {
+  id          String      @id @default(cuid())
+  orderId     String
+  websiteId   String?
+  publisherId String?
+  targetUrl   String?
+  anchorText  String?
+  price       Decimal?
+  status      OrderStatus @default(PENDING_PAYMENT)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  order       Order         @relation(fields: [orderId], references: [id])
+  website     Website?      @relation(fields: [websiteId], references: [id])
+  publications Publication[]
+}
+
+model OrderEvent {
+  id        String         @id @default(cuid())
+  orderId   String
+  eventType OrderEventType
+  actorId   String?
+  message   String?
+  metadata  Json?
+  createdAt DateTime       @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+  actor User? @relation(fields: [actorId], references: [id])
+}
+
+model Publication {
+  id                 String             @id @default(cuid())
+  orderItemId        String
+  publishedUrl       String?
+  targetUrl          String?
+  anchorText         String?
+  publicationDate    DateTime?
+  verificationStatus VerificationStatus @default(PENDING)
+  verifiedBy         String?
+  verifiedAt         DateTime?
+  screenshotUrl      String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
+  verifiedByUser User? @relation("PublicationVerifier", fields: [verifiedBy], references: [id])
+}
+
+model Settlement {
+  id              String           @id @default(cuid())
+  orderId         String
+  publisherId     String
+  grossAmount     Decimal
+  platformFee     Decimal          @default(0)
+  publisherAmount Decimal
+  status          SettlementStatus @default(PENDING)
+  reviewEndsAt    DateTime?
+  settledAt       DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  order     Order     @relation(fields: [orderId], references: [id])
+  publisher Publisher @relation(fields: [publisherId], references: [id])
+}
+
+model PublisherBalance {
+  id                 String  @id @default(cuid())
+  publisherId        String  @unique
+  pendingBalance     Decimal @default(0)
+  approvedBalance    Decimal @default(0)
+  withdrawableBalance Decimal @default(0)
+  lifetimeEarnings   Decimal @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  publisher Publisher @relation(fields: [publisherId], references: [id])
+}
+
+model Withdrawal {
+  id          String           @id @default(cuid())
+  publisherId String
+  amount      Decimal
+  method      String           @default("bank_transfer")
+  status      WithdrawalStatus @default(PENDING)
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  publisher   Publisher @relation(fields: [publisherId], references: [id])
+  approvedByUser User?  @relation("WithdrawalApprover", fields: [approvedBy], references: [id])
+}
+
+model ApiKey {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  keyHash        String   @unique
+  permissions    Json     @default("[]")
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+model ContentOrder {
+  id          String   @id @default(cuid())
+  title       String
+  brief       String?
+  status      String   @default("PENDING")
+  deliverable String?
+  orderId     String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model Revision {
+  id        String   @id @default(cuid())
+  notes     String?
+  files     Json?
+  status    String   @default("REQUESTED")
+  orderId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model Report {
+  id        String   @id @default(cuid())
+  type      String
+  data      Json?
+  format    String   @default("pdf")
+  exportedAt DateTime?
+  orderId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+model Wallet {
+  id                String   @id @default(cuid())
+  availableBalance  Decimal  @default(0)
+  reservedBalance   Decimal  @default(0)
+  currency          String   @default("USD")
+  organizationId    String?
+  userId            String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization  Organization? @relation(fields: [organizationId], references: [id])
+  transactions  Transaction[]
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  amount      Decimal
+  currency    String   @default("USD")
+  type        String
+  reference   String?
+  description String?
+  walletId    String?
+  orderId     String?
+  createdAt   DateTime @default(now())
+
+  wallet Wallet? @relation(fields: [walletId], references: [id])
+  order  Order?  @relation(fields: [orderId], references: [id])
+}
+
+model Ticket {
+  id             String       @id @default(cuid())
+  subject        String
+  description    String?
+  status         TicketStatus @default(OPEN)
+  organizationId String
+  userId         String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  messages     TicketMessage[]
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  content   String
+  files     Json?
+  userId    String
+  ticketId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+}
+
+model Notification {
+  id             String   @id @default(cuid())
+  type           String
+  message        String
+  read           Boolean  @default(false)
+  userId         String
+  organizationId String
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  action         String
+  entityType     String
+  entityId       String?
+  metadata       Json?
+  userId         String
+  organizationId String
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id])
+}
+
+// =============================================================================
+// MARKETPLACE MODELS
+// =============================================================================
+
+enum ListingType {
+  INTERNAL_SERVICE
+  PUBLISHER_WEBSITE
+  GUEST_POST
+  NICHE_EDIT
+  EDITORIAL_LINK
+  DIGITAL_PR
+  SPONSORED_CONTENT
+  OUTREACH_LINK
+  LOCAL_CITATION
+  FOUNDATION_LINK
+  BLOG_ARTICLE
+  SEO_CONTENT
+}
+
+enum ListingStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+  PAUSED
+  ARCHIVED
+}
+
+enum ListingFulfillmentType {
+  INTERNAL
+  PUBLISHER
+  HYBRID
+}
+
+model MarketplaceCategory {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  icon        String?
+  parentId    String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  parent   MarketplaceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children MarketplaceCategory[] @relation("CategoryHierarchy")
+  listings MarketplaceListing[]
+
+  @@index([slug])
+  @@index([parentId])
+}
+
+model MarketplaceTag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  listings MarketplaceListingTag[]
+}
+
+model MarketplaceListing {
+  id                String              @id @default(cuid())
+  title             String
+  slug              String              @unique
+  description       String
+  shortDescription  String?
+  type              ListingType
+  status            ListingStatus       @default(DRAFT)
+  fulfillmentType   ListingFulfillmentType @default(PUBLISHER)
+  
+  // Pricing
+  price             Decimal
+  currency          String              @default("USD")
+  priceType         String              @default("fixed") // fixed, starting_at, range, negotiable
+  minPrice          Decimal?
+  maxPrice          Decimal?
+  
+  // Metrics
+  domainRating      Int?
+  domainAuthority   Int?
+  traffic           Int?
+  referringDomains  Int?
+  spamScore         Int?
+  
+  // Location & Language
+  country           String?
+  language          String?
+  countries         String[]            @default([])
+  languages         String[]            @default([])
+  
+  // Features
+  turnaroundDays    Int?
+  revisionRounds   Int                  @default(2)
+  warrantyDays      Int?
+  featured          Boolean              @default(false)
+  verified          Boolean              @default(false)
+  allowGuestPost    Boolean              @default(true)
+  allowNicheEdit    Boolean              @default(true)
+  doFollowOnly      Boolean              @default(false)
+  
+  // URLs
+  websiteUrl        String?
+  sampleUrl         String?
+  signupUrl         String?
+  
+  // Metrics data (JSON for flexibility)
+  metricsData       Json?
+  trafficData       Json?
+  semrushData       Json?
+  
+  // Publisher reference (for PUBLISHER type)
+  publisherId       String?
+  websiteId         String?
+  
+  // Organization reference (for INTERNAL and publisher listings)
+  organizationId    String?
+  
+  // Timestamps
+  publishedAt       DateTime?
+  expiresAt         DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  publisher         Publisher?          @relation(fields: [publisherId], references: [id])
+  website           Website?           @relation(fields: [websiteId], references: [id])
+  organization       Organization?       @relation(fields: [organizationId], references: [id])
+  category          MarketplaceCategory? @relation(fields: [categoryId], references: [id])
+  
+  tags              MarketplaceListingTag[]
+  images            MarketplaceListingImage[]
+  pricingTiers      MarketplacePricingTier[]
+  reviews           MarketplaceReview[]
+  favorites         MarketplaceFavorite[]
+  savedLists        MarketplaceSavedListItem[]
+  views             MarketplaceListingView[]
+  clicks            MarketplaceListingClick[]
+  
+  categoryId        String?
+
+  @@index([slug])
+  @@index([type])
+  @@index([status])
+  @@index([publisherId])
+  @@index([categoryId])
+  @@index([featured])
+  @@index([createdAt])
+  @@index([price])
+}
+
+model MarketplaceListingTag {
+  listingId String
+  tagId    String
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  tag      MarketplaceTag    @relation(fields: [tagId], references: [id])
+
+  @@id([listingId, tagId])
+}
+
+model MarketplaceListingImage {
+  id        String   @id @default(cuid())
+  listingId String
+  url       String
+  alt       String?
+  isPrimary Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+}
+
+model MarketplacePricingTier {
+  id          String   @id @default(cuid())
+  listingId   String
+  name        String
+  price       Decimal
+  description String?
+  features    String[]
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+}
+
+model MarketplaceReview {
+  id          String    @id @default(cuid())
+  listingId   String
+  userId      String
+  rating      Int
+  title       String?
+  content     String
+  response    String?
+  respondedAt DateTime?
+  status      String    @default("APPROVED") // APPROVED, PENDING, SPAM, FLAGGED
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  user    User              @relation(fields: [userId], references: [id])
+
+  @@index([listingId])
+  @@index([userId])
+}
+
+model MarketplaceFavorite {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+
+  user    User              @relation(fields: [userId], references: [id])
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+}
+
+model MarketplaceSavedList {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  slug      String
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items MarketplaceSavedListItem[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+model MarketplaceSavedListItem {
+  id        String   @id @default(cuid())
+  listId    String
+  listingId String
+  note      String?
+  addedAt   DateTime @default(now())
+
+  list    MarketplaceSavedList   @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listing MarketplaceListing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, listingId])
+}
+
+model MarketplaceListingView {
+  id        String   @id @default(cuid())
+  listingId String
+  userId    String?
+  sessionId String?
+  ipAddress String?
+  userAgent String?
+  referrer  String?
+  createdAt DateTime @default(now())
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([createdAt])
+  @@index([userId])
+}
+
+model MarketplaceListingClick {
+  id        String   @id @default(cuid())
+  listingId String
+  userId    String?
+  sessionId String?
+  ipAddress String?
+  action    String   @default("view") // view, click, cta_click, favorite, share
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId])
+  @@index([createdAt])
+  @@index([action])
+}
+
+model MarketplaceSearchHistory {
+  id          String   @id @default(cuid())
+  userId      String?
+  query       String
+  filters     Json?
+  resultCount Int?
+  clickedId   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([query])
+}
+
+// AI Recommendations
+model MarketplaceRecommendation {
+  id          String   @id @default(cuid())
+  userId      String
+  listingId   String
+  type        String   // similar, recommended, frequently_bought, trending, because_you_viewed
+  score       Float
+  reason      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([listingId])
+  @@index([type])
+}
+
+// Publisher Profiles for Marketplace
+model PublisherProfile {
+  id           String   @id @default(cuid())
+  publisherId  String   @unique
+  bio          String?
+  stats        Json?    // aggregated stats
+  responseTime Int?     // avg response time in hours
+  completionRate Float?  // order completion rate
+  rating       Float?
+  totalReviews Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  publisher Publisher @relation(fields: [publisherId], references: [id])
+}
+
+// Fraud Detection
+model MarketplaceFlag {
+  id        String   @id @default(cuid())
+  type      String   // duplicate_domain, fake_traffic, spam_reviews, suspicious_pattern, mass_listing
+  severity  String   // low, medium, high, critical
+  status    String   @default("OPEN") // OPEN, REVIEWING, RESOLVED, DISMISSED
+  data      Json?
+  resolvedBy String?
+  resolvedAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([type])
+  @@index([status])
+  @@index([severity])
+}
+
+// Fulfillment Rules
+model ListingFulfillmentRule {
+  id          String   @id @default(cuid())
+  listingId   String
+  type        String   // auto_assign, manual_review, price_threshold
+  config      Json
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([listingId])
+}

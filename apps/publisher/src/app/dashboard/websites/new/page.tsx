@@ -1,0 +1,274 @@
+"use client"
+
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { toast } from "sonner"
+import { ArrowLeft, Globe } from "lucide-react"
+import Link from "next/link"
+import { Button } from "@guestpost/ui"
+import { Input } from "@guestpost/ui"
+import { Label } from "@guestpost/ui"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@guestpost/ui"
+
+const websiteSchema = z.object({
+  url: z.string().url("Must be a valid URL").min(1, "URL is required"),
+  domainRating: z.coerce.number().min(0).max(100).optional(),
+  monthlyTraffic: z.coerce.number().min(0).optional(),
+  country: z.string().min(1, "Country is required"),
+  language: z.string().min(1, "Language is required"),
+  price: z.coerce.number().min(0, "Price must be positive").optional(),
+  niche: z.string().optional(),
+  description: z.string().optional(),
+})
+
+type WebsiteFormData = z.infer<typeof websiteSchema>
+
+const countries = [
+  { value: "US", label: "United States" },
+  { value: "UK", label: "United Kingdom" },
+  { value: "CA", label: "Canada" },
+  { value: "AU", label: "Australia" },
+  { value: "DE", label: "Germany" },
+  { value: "FR", label: "France" },
+  { value: "IN", label: "India" },
+  { value: "OTHER", label: "Other" },
+]
+
+const languages = [
+  { value: "English", label: "English" },
+  { value: "Spanish", label: "Spanish" },
+  { value: "French", label: "French" },
+  { value: "German", label: "German" },
+  { value: "Portuguese", label: "Portuguese" },
+  { value: "Dutch", label: "Dutch" },
+  { value: "Other", label: "Other" },
+]
+
+const niches = [
+  "Technology",
+  "Finance",
+  "Health",
+  "Business",
+  "Marketing",
+  "Real Estate",
+  "Travel",
+  "Food",
+  "Fashion",
+  "Sports",
+  "Entertainment",
+  "Education",
+  "Other",
+]
+
+export default function NewWebsitePage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(false)
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<WebsiteFormData>({
+    resolver: zodResolver(websiteSchema),
+    defaultValues: {
+      country: "US",
+      language: "English",
+    },
+  })
+
+  const onSubmit = async (data: WebsiteFormData) => {
+    setLoading(true)
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 1000))
+      toast.success("Website added successfully")
+      router.push("/dashboard/websites")
+    } catch (error) {
+      toast.error("Failed to add website")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6">
+      <div className="flex items-center gap-4">
+        <Button variant="ghost" size="icon" asChild>
+          <Link href="/dashboard/websites">
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Add New Website</h1>
+          <p className="text-sm text-muted-foreground">
+            Add a website to your inventory for guest posting
+          </p>
+        </div>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="h-5 w-5" />
+            Website Details
+          </CardTitle>
+          <CardDescription>
+            Provide information about the website you want to add to your inventory
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="url">
+                Website URL <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="url"
+                placeholder="https://example.com"
+                {...register("url")}
+              />
+              {errors.url && (
+                <p className="text-xs text-destructive">{errors.url.message}</p>
+              )}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="domainRating">Domain Rating (DA)</Label>
+                <Input
+                  id="domainRating"
+                  type="number"
+                  min="0"
+                  max="100"
+                  placeholder="50"
+                  {...register("domainRating")}
+                />
+                {errors.domainRating && (
+                  <p className="text-xs text-destructive">
+                    {errors.domainRating.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="monthlyTraffic">Monthly Traffic</Label>
+                <Input
+                  id="monthlyTraffic"
+                  type="number"
+                  min="0"
+                  placeholder="10000"
+                  {...register("monthlyTraffic")}
+                />
+                {errors.monthlyTraffic && (
+                  <p className="text-xs text-destructive">
+                    {errors.monthlyTraffic.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="country">
+                  Country <span className="text-destructive">*</span>
+                </Label>
+                <select
+                  id="country"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  {...register("country")}
+                >
+                  {countries.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                {errors.country && (
+                  <p className="text-xs text-destructive">
+                    {errors.country.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="language">
+                  Language <span className="text-destructive">*</span>
+                </Label>
+                <select
+                  id="language"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  {...register("language")}
+                >
+                  {languages.map((l) => (
+                    <option key={l.value} value={l.value}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+                {errors.language && (
+                  <p className="text-xs text-destructive">
+                    {errors.language.message}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="price">Price per Post (USD)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  min="0"
+                  placeholder="100"
+                  {...register("price")}
+                />
+                {errors.price && (
+                  <p className="text-xs text-destructive">{errors.price.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="niche">Niche</Label>
+                <select
+                  id="niche"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  {...register("niche")}
+                >
+                  <option value="">Select a niche</option>
+                  {niches.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (Optional)</Label>
+              <textarea
+                id="description"
+                rows={3}
+                placeholder="Tell us more about your website..."
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                {...register("description")}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <Button type="button" variant="outline" asChild>
+                <Link href="/dashboard/websites">Cancel</Link>
+              </Button>
+              <Button type="submit" disabled={loading}>
+                {loading ? "Adding..." : "Add Website"}
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}

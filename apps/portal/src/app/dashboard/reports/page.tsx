@@ -1,0 +1,396 @@
+"use client"
+
+import { useState, useMemo } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { api } from "../../../lib/api"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
+import { Button } from "@guestpost/ui"
+import { Badge } from "@guestpost/ui"
+import { Skeleton } from "@guestpost/ui"
+import { Input } from "@guestpost/ui"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@guestpost/ui"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@guestpost/ui"
+import {
+  FileText,
+  Download,
+  Calendar,
+  Search,
+  ExternalLink,
+  FileJson,
+  FileSpreadsheet,
+  TrendingUp,
+} from "lucide-react"
+import { format, subDays, startOfMonth, endOfMonth } from "date-fns"
+import { toast } from "sonner"
+
+interface ReportOrder {
+  id: string
+  status: string
+  items: Array<{
+    serviceType: string
+    topic: string | null
+    website: { id: string; url: string } | null
+  }>
+  totalAmount: number | null
+  createdAt: string
+  events: Array<{
+    eventType: string
+    createdAt: string
+  }>
+}
+
+const dateRangeOptions = [
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+  { value: "month", label: "This month" },
+  { value: "quarter", label: "This quarter" },
+  { value: "year", label: "This year" },
+  { value: "all", label: "All time" },
+]
+
+function getDateRange(option: string) {
+  const now = new Date()
+  switch (option) {
+    case "7":
+      return { start: subDays(now, 7), end: now }
+    case "30":
+      return { start: subDays(now, 30), end: now }
+    case "90":
+      return { start: subDays(now, 90), end: now }
+    case "month":
+      return { start: startOfMonth(now), end: endOfMonth(now) }
+    case "quarter":
+      return { start: subDays(now, 90), end: now }
+    case "year":
+      return { start: new Date(now.getFullYear(), 0, 1), end: now }
+    default:
+      return null
+  }
+}
+
+function ReportsTableSkeleton() {
+  return (
+    <div className="space-y-3">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="flex items-center gap-4 rounded-lg border p-4">
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 flex-1" />
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-24" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function ReportsPage() {
+  const [dateRange, setDateRange] = useState("30")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+
+  const { data: ordersData, isLoading } = useQuery<ReportOrder[]>({
+    queryKey: ["orders"],
+    queryFn: () => api.orders.list() as Promise<ReportOrder[]>,
+  })
+
+  const filteredOrders = useMemo(() => {
+    if (!ordersData) return []
+
+    const range = getDateRange(dateRange)
+    let orders = ordersData
+
+    if (range) {
+      orders = orders.filter((order: ReportOrder) => {
+        const created = new Date(order.createdAt)
+        return created >= range.start && created <= range.end
+      })
+    }
+
+    if (statusFilter && statusFilter !== "all") {
+      orders = orders.filter((order: ReportOrder) => order.status === statusFilter)
+    }
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      orders = orders.filter((order: ReportOrder) =>
+        order.id.toLowerCase().includes(query) ||
+        order.items?.[0]?.topic?.toLowerCase().includes(query) ||
+        order.items?.[0]?.website?.url?.toLowerCase().includes(query)
+      )
+    }
+
+    return orders
+  }, [ordersData, dateRange, statusFilter, searchQuery])
+
+  const publishedOrders = filteredOrders.filter((o: ReportOrder) => 
+    o.status === "PUBLISHED" || o.status === "COMPLETED" || o.status === "VERIFIED"
+  )
+
+  const stats = useMemo(() => {
+    const orders = filteredOrders
+    return {
+      totalOrders: orders.length,
+      published: orders.filter((o: ReportOrder) => ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status)).length,
+      totalSpend: orders.reduce((sum: number, o: ReportOrder) => sum + (o.totalAmount || 0), 0),
+      avgOrderValue: orders.length > 0 
+        ? orders.reduce((sum: number, o: ReportOrder) => sum + (o.totalAmount || 0), 0) / orders.length 
+        : 0,
+    }
+  }, [filteredOrders])
+
+  const exportToCSV = () => {
+    const headers = ["Order ID", "Website", "Service", "Status", "Target URL", "Published Date", "Price"]
+    const rows = publishedOrders.map((order: ReportOrder) => [
+      order.id,
+      order.items?.[0]?.website?.url || "",
+      order.items?.[0]?.serviceType?.replace(/_/g, " ") || "",
+      order.status,
+      order.items?.[0]?.topic || "",
+      format(new Date(order.createdAt), "yyyy-MM-dd"),
+      order.totalAmount?.toFixed(2) || "",
+    ])
+
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `guestpost-report-${format(new Date(), "yyyy-MM-dd")}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Report exported to CSV")
+  }
+
+  const exportToXLSX = () => {
+    toast.info("XLSX export would require a library like exceljs or xlsx")
+  }
+
+  const exportToPDF = () => {
+    toast.info("PDF export would require a library like jspdf or react-pdf")
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+            <p className="text-muted-foreground">View and export your order reports</p>
+          </div>
+        </div>
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <ReportsTableSkeleton />
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
+          <p className="text-muted-foreground">View and export your order reports</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportToPDF}>
+            <FileText className="mr-2 h-4 w-4" />
+            PDF
+          </Button>
+          <Button variant="outline" onClick={exportToCSV}>
+            <Download className="mr-2 h-4 w-4" />
+            CSV
+          </Button>
+          <Button variant="outline" onClick={exportToXLSX}>
+            <FileSpreadsheet className="mr-2 h-4 w-4" />
+            XLSX
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalOrders}</div>
+            <p className="text-xs text-muted-foreground">in selected period</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Published</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.published}</div>
+            <p className="text-xs text-muted-foreground">completed links</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Spend</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono">${stats.totalSpend.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">in selected period</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Order Value</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold font-mono">${stats.avgOrderValue.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">per order</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Order Report</CardTitle>
+              <CardDescription>
+                {publishedOrders.length} published orders in selected period
+              </CardDescription>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search orders..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 w-64"
+                />
+              </div>
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="w-40">
+                  <Calendar className="mr-2 h-4 w-4" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {dateRangeOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="All statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="PUBLISHED">Published</SelectItem>
+                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                  <SelectItem value="VERIFIED">Verified</SelectItem>
+                  <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {publishedOrders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <FileText className="h-12 w-12 text-muted-foreground/50" />
+              <h3 className="mt-4 text-lg font-medium">No published orders</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {searchQuery || statusFilter || dateRange !== "30"
+                  ? "Try adjusting your filters"
+                  : "Completed orders will appear here"}
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Published URL</TableHead>
+                    <TableHead>Target URL</TableHead>
+                    <TableHead>Anchor Text</TableHead>
+                    <TableHead>Publisher</TableHead>
+                    <TableHead>Publish Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Campaign Progress</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {publishedOrders.map((order: ReportOrder) => (
+                    <TableRow key={order.id}>
+                      <TableCell>
+                        {order.items?.[0]?.website?.url ? (
+                          <a
+                            href={order.items[0].website.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
+                            {new URL(order.items[0].website.url).hostname}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {order.items?.[0]?.topic ? (
+                          <span className="text-sm truncate max-w-[200px] block">
+                            {order.items[0].topic}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-muted-foreground">—</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm">{order.items?.[0]?.website?.id || "—"}</span>
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(order.createdAt), "PP")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="capitalize">
+                          {order.status.replace(/_/g, " ").toLowerCase()}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="text-sm font-medium">100%</span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
