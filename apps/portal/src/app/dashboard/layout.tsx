@@ -18,6 +18,7 @@ import {
   Store,
   Heart,
   Bookmark,
+  Building2,
 } from "lucide-react"
 import { useState } from "react"
 import { Button } from "@guestpost/ui"
@@ -40,6 +41,7 @@ const navItems = [
   { href: "/dashboard/marketplace/saved-lists", label: "Saved Lists", icon: Bookmark },
   { href: "/dashboard/reports", label: "Reports", icon: LayoutDashboard },
   { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
+  { href: "/dashboard/settings/organization", label: "Organization", icon: Building2 },
   { href: "/dashboard/support", label: "Support", icon: HeadphonesIcon },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
@@ -110,7 +112,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             })}
           </nav>
           
-          <div className="border-t p-4">
+          <div className="border-t p-4 space-y-2">
+            {user.organizationId && (
+              <div className="px-3 py-1.5">
+                <p className="text-xs text-muted-foreground">Organization</p>
+                <p className="text-sm font-medium truncate">{user.name ?? "Organization"}</p>
+              </div>
+            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-accent">

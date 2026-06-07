@@ -55,7 +55,7 @@ export default function SavedListsPage() {
     if (!user?.id) return
     setLoading(true)
     try {
-      const data = await api.marketplace.getSavedLists(user.id)
+      const data = await api.marketplace.getSavedLists()
       const listsData = data || []
       setLists(listsData as SavedList[])
       if (listsData.length > 0 && !selectedList) {
@@ -72,7 +72,7 @@ export default function SavedListsPage() {
     if (!user?.id || !newListName.trim()) return
     setCreating(true)
     try {
-      const newList = await api.marketplace.createSavedList(user.id, { name: newListName.trim() })
+      const newList = await api.marketplace.createSavedList({ name: newListName.trim() })
       if (newList) {
         setLists((prev) => [...prev, { ...(newList as SavedList), items: [] }])
         setSelectedList({ ...(newList as SavedList), items: [] })
@@ -89,7 +89,7 @@ export default function SavedListsPage() {
   async function deleteList(listId: string) {
     if (!user?.id) return
     try {
-      await api.marketplace.removeFromSavedList(user.id, listId, "")
+      await api.marketplace.removeFromSavedList(listId, "")
       setLists((prev) => prev.filter((l) => l.id !== listId))
       if (selectedList?.id === listId) {
         setSelectedList(lists.find((l) => l.id !== listId) || null)
@@ -102,7 +102,7 @@ export default function SavedListsPage() {
   async function removeFromList(listId: string, listingId: string) {
     if (!user?.id) return
     try {
-      await api.marketplace.removeFromSavedList(user.id, listId, listingId)
+      await api.marketplace.removeFromSavedList(listId, listingId)
       setLists((prev) =>
         prev.map((l) =>
           l.id === listId ? { ...l, items: l.items.filter((i) => i.listing.id !== listingId) } : l

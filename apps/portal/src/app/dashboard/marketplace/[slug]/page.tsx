@@ -86,7 +86,7 @@ export default function ListingDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const listing = await api.marketplace.getListing(params.slug as string, user?.id)
+      const listing = await api.marketplace.getListing(params.slug as string)
       setListing(listing as Listing)
     } catch (err: any) {
       setError(err.message || "Failed to load listing")
@@ -100,9 +100,9 @@ export default function ListingDetailPage() {
     setFavoriting(true)
     try {
       if (listing.isFavorited) {
-        await api.marketplace.removeFavorite(user.id, listing.id)
+        await api.marketplace.removeFavorite(listing.id)
       } else {
-        await api.marketplace.addFavorite(user.id, listing.id)
+        await api.marketplace.addFavorite(listing.id)
       }
       setListing((l: any) => ({ ...l, isFavorited: !l.isFavorited }))
     } catch (err) {
@@ -271,11 +271,30 @@ export default function ListingDetailPage() {
                 </div>
               )}
             </div>
-            <Button className="w-full" size="lg">
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => {
+                if (!listing) return
+                const params = new URLSearchParams({
+                  listing: listing.slug,
+                  type: listing.type,
+                })
+                if (listing.publisher?.id) params.set("publisherId", listing.publisher.id)
+                router.push(`/dashboard/orders/new?${params.toString()}`)
+              }}
+            >
               Order Now
             </Button>
-            <Button variant="outline" className="w-full">
-              Contact Publisher
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                navigator.clipboard.writeText(window.location.href)
+              }}
+            >
+              <Share2 className="mr-2 h-4 w-4" />
+              Share
             </Button>
           </div>
 

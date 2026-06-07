@@ -43,7 +43,7 @@ export default function FavoritesPage() {
     if (!user?.id) return
     setLoading(true)
     try {
-      const data = await api.marketplace.getFavorites(user.id)
+      const data = await api.marketplace.getFavorites()
       setFavorites(data || [])
     } catch (err) {
       console.error("Failed to load favorites:", err)
@@ -55,7 +55,7 @@ export default function FavoritesPage() {
   async function removeFavorite(listingId: string) {
     if (!user?.id) return
     try {
-      await api.marketplace.removeFavorite(user.id, listingId)
+      await api.marketplace.removeFavorite(listingId)
       setFavorites((prev) => prev.filter((f) => f.listing.id !== listingId))
     } catch (err) {
       console.error("Failed to remove favorite:", err)
