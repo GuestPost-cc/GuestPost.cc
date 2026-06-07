@@ -809,6 +809,13 @@ export default function NewOrderPage() {
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           )}
+
+          {currentStep === 4 && (
+            <Button onClick={handleNext} disabled={!canProceed()}>
+              Continue to Submit
+              <ChevronRight className="ml-2 h-4 w-4" />
+            </Button>
+          )}
         </div>
       )}
     </div>

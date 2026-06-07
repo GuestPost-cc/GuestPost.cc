@@ -211,7 +211,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   })
 
   const requestRevisionMutation = useMutation({
-    mutationFn: () => api.campaigns.requestRevision(resolvedParams.id, { message: revisionMessage }),
+    mutationFn: () => api.campaigns.requestRevision(resolvedParams.id, { notes: revisionMessage }),
     onSuccess: () => {
       toast.success("Revision request submitted")
       queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })

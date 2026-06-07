@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo } from "react"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { Button } from "@guestpost/ui"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
@@ -141,6 +141,8 @@ function OrdersTableSkeleton() {
 interface Order {
   id: string
   status: string
+  campaignId?: string
+  campaign?: { id: string; name: string }
   items: Array<{
     id: string
     serviceType: string
@@ -166,6 +168,19 @@ export default function OrdersPage() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [showCancelDialog, setShowCancelDialog] = useState<Order | null>(null)
+
+  const cancelMutation = useMutation({
+    mutationFn: (id: string) => api.orders.updateStatus(id, "CANCELLED") as Promise<any>,
+    onSuccess: () => {
+      toast.success("Order cancelled successfully")
+      queryClient.invalidateQueries({ queryKey: ["orders"] })
+      setShowCancelDialog(null)
+    },
+    onError: () => {
+      toast.error("Failed to cancel order")
+    },
+  })
 
   const { data: ordersData, isLoading } = useQuery<Order[]>({
     queryKey: ["orders"],
@@ -232,6 +247,15 @@ export default function OrdersPage() {
           {row.original.items?.[0]?.website?.url 
             ? new URL(row.original.items[0].website.url).hostname 
             : "—"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "campaign",
+      header: "Campaign",
+      cell: ({ row }) => (
+        <span className="text-sm">
+          {row.original.campaign?.name || "—"}
         </span>
       ),
     },
@@ -336,9 +360,7 @@ export default function OrdersPage() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   className="text-destructive"
-                  onClick={() => {
-                    setSelectedOrder(row.original)
-                  }}
+                  onClick={() => setShowCancelDialog(row.original)}
                 >
                   <XCircle className="mr-2 h-4 w-4" />
                   Cancel Order
@@ -630,6 +652,29 @@ export default function OrdersPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!showCancelDialog} onOpenChange={(open) => !open && setShowCancelDialog(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Order</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel order #{showCancelDialog?.id.slice(0, 8)}? This action cannot be undone. Any reserved funds will be released back to your wallet.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowCancelDialog(null)}>
+              Keep Order
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={cancelMutation.isPending}
+              onClick={() => showCancelDialog && cancelMutation.mutate(showCancelDialog.id)}
+            >
+              {cancelMutation.isPending ? "Cancelling..." : "Cancel Order"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
