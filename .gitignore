@@ -12,3 +12,4 @@ packages/database/.env
 # AI context and analysis (local only, not for CI)
 .ai/
 graphify-out/
+.opencode
