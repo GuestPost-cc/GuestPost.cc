@@ -18,9 +18,11 @@ export class SettlementsService {
     private readonly audit: AuditService,
   ) {}
 
-  async createSettlement(orderId: string, organizationId: string, userId: string) {
+  async createSettlement(orderId: string, organizationId: string | null, userId: string) {
+    const where: any = { id: orderId }
+    if (organizationId) where.organizationId = organizationId
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, organizationId },
+      where,
       include: { website: true },
     })
     if (!order) throw new NotFoundException("Order not found")
@@ -69,7 +71,7 @@ export class SettlementsService {
       entityId: settlement.id,
       metadata: { orderId, grossAmount, platformFee, publisherAmount, reviewDays },
       userId,
-      organizationId,
+      organizationId: organizationId ?? order.organizationId,
     })
 
     return settlement
@@ -132,13 +134,19 @@ export class SettlementsService {
     })
   }
 
-  async listSettlements(organizationId?: string) {
+  async listSettlements(organizationId?: string, take = 50, skip = 0) {
     const where = organizationId ? { order: { organizationId } } : {}
-    return this.prisma.settlement.findMany({
-      where,
-      include: { order: true, publisher: true },
-      orderBy: { createdAt: "desc" },
-    })
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.settlement.findMany({
+        where,
+        include: { order: true, publisher: true },
+        orderBy: { createdAt: "desc" },
+        take,
+        skip,
+      }),
+      this.prisma.settlement.count({ where }),
+    ])
+    return { items, total, take, skip }
   }
 
   async getSettlement(id: string) {

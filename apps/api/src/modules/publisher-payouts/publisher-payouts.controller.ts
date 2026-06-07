@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, UseGuards } from "@nestjs/common"
+import { Controller, Get, Post, Param, Body, Query, UseGuards } from "@nestjs/common"
 import { PublisherPayoutsService } from "./publisher-payouts.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
@@ -22,8 +22,14 @@ export class PublisherPayoutsController {
   }
 
   @Get("withdrawals")
-  listWithdrawals(@CurrentUser() user: any) {
-    return this.payouts.listWithdrawals(user.publisherId)
+  listWithdrawals(
+    @CurrentUser() user: any,
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+  ) {
+    const t = Math.min(Math.max(parseInt(take ?? "50", 10) || 50, 1), 100)
+    const s = Math.max(0, parseInt(skip ?? "0", 10) || 0)
+    return this.payouts.listWithdrawals(user.publisherId, t, s)
   }
 
   @UseGuards(StaffRolesGuard)

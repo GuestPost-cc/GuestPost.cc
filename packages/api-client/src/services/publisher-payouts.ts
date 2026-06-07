@@ -1,5 +1,12 @@
 import type { WithdrawalStatus } from "@guestpost/shared"
-import { HttpClient } from "../client"
+import { HttpClient, type RequestOptions } from "../client"
+
+export interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  take: number
+  skip: number
+}
 
 export interface PublisherBalanceResponse {
   id: string
@@ -34,7 +41,9 @@ export class PublisherPayoutsService {
     })
   }
 
-  listWithdrawals() {
-    return this.client.get<WithdrawalResponse[]>("/publishers/withdrawals")
+  listWithdrawals(take?: number, skip?: number) {
+    return this.client.get<PaginatedResponse<WithdrawalResponse>>("/publishers/withdrawals", {
+      params: { take, skip },
+    } as RequestOptions)
   }
 }

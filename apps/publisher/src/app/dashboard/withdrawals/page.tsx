@@ -103,10 +103,11 @@ export default function WithdrawalsPage() {
     enabled: !!user?.publisherId,
   })
 
-  const { data: withdrawals = mockWithdrawals, isLoading: withdrawalsLoading } = useQuery({
+  const { data: withdrawalsRaw, isLoading: withdrawalsLoading } = useQuery({
     queryKey: ["publisher-withdrawals"],
     queryFn: () => api.publisherPayouts.listWithdrawals(),
   })
+  const withdrawals = withdrawalsRaw?.items ?? mockWithdrawals
 
   const requestMutation = useMutation({
     mutationFn: (data: { amount: number; note?: string }) =>

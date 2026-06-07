@@ -114,8 +114,8 @@ export default function EarningsPage() {
   const { data: transactions = [], isLoading: txnLoading } = useQuery({
     queryKey: ["publisher-transactions"],
     queryFn: async () => {
-      const withdrawals = await api.publisherPayouts.listWithdrawals() as any[]
-      return withdrawals.map((w: any) => ({
+      const withdrawals = await api.publisherPayouts.listWithdrawals()
+      return (withdrawals.items ?? []).map((w: any) => ({
         id: w.id,
         type: "PAYOUT",
         amount: w.amount,

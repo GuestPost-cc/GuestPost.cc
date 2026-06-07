@@ -187,12 +187,18 @@ export class PublisherPayoutsService {
     return result
   }
 
-  async listWithdrawals(publisherId?: string) {
+  async listWithdrawals(publisherId?: string, take = 50, skip = 0) {
     const where = publisherId ? { publisherId } : {}
-    return this.prisma.withdrawal.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: { publisher: true },
-    })
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.withdrawal.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { publisher: true },
+        take,
+        skip,
+      }),
+      this.prisma.withdrawal.count({ where }),
+    ])
+    return { items, total, take, skip }
   }
 }
