@@ -145,6 +145,48 @@ export class CampaignsService {
     })
   }
 
+  async getCampaign(id: string, organizationId: string) {
+    const campaign = await this.prisma.campaign.findFirst({
+      where: { id, organizationId },
+      include: { _count: { select: { orders: true } } },
+    })
+    if (!campaign) throw new NotFoundException("Campaign not found")
+    return {
+      ...campaign,
+      orderCount: campaign._count.orders,
+    }
+  }
+
+  async listCampaignOrders(campaignId: string, organizationId: string) {
+    const campaign = await this.prisma.campaign.findFirst({
+      where: { id: campaignId, organizationId },
+    })
+    if (!campaign) throw new NotFoundException("Campaign not found")
+
+    return this.prisma.order.findMany({
+      where: { campaignId, organizationId },
+      orderBy: { createdAt: "desc" },
+      include: { items: true, website: true, settlements: true },
+    })
+  }
+
+  async deleteCampaign(id: string, organizationId: string, userId: string) {
+    const campaign = await this.prisma.campaign.findFirst({
+      where: { id, organizationId },
+    })
+    if (!campaign) throw new NotFoundException("Campaign not found")
+
+    await this.prisma.campaign.delete({ where: { id } })
+    await this.audit.log({
+      action: "CAMPAIGN_DELETED",
+      entityType: "Campaign",
+      entityId: id,
+      metadata: { name: campaign.name },
+      userId,
+      organizationId,
+    })
+  }
+
   async listPublisherOrders(publisherId: string) {
     return this.prisma.order.findMany({
       where: {

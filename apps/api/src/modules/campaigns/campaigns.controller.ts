@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards } from "@nestjs/common"
+import { Controller, Get, Post, Body, Param, Patch, Delete, UseGuards } from "@nestjs/common"
 import { CampaignsService } from "./campaigns.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { CreateOrderDto } from "./dto/create-order.dto"
@@ -56,6 +56,8 @@ export class CampaignsController {
   }
 
   @Post("orders/:id/revisions")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER", "MEMBER")
   requestRevision(
     @Param("id") id: string,
     @Body() body: { notes: string },
@@ -81,5 +83,22 @@ export class CampaignsController {
   @Get()
   listCampaigns(@CurrentUser() user: any) {
     return this.campaigns.listCampaigns(user.organizationId)
+  }
+
+  @Get(":id")
+  getCampaign(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.campaigns.getCampaign(id, user.organizationId)
+  }
+
+  @Get(":id/orders")
+  listCampaignOrders(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.campaigns.listCampaignOrders(id, user.organizationId)
+  }
+
+  @Delete(":id")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER")
+  deleteCampaign(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.campaigns.deleteCampaign(id, user.organizationId, user.id)
   }
 }
