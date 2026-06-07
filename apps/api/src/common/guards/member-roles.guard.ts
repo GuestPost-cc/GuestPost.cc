@@ -13,7 +13,11 @@ export class MemberRolesGuard implements CanActivate {
     ])
     if (!requiredRoles) return true
 
-    const { user } = context.switchToHttp().getRequest()
+    const user = context.switchToHttp().getRequest().user
+
+    if (!user) {
+      throw new ForbiddenException("Authentication required")
+    }
 
     let userRole: string | null = null
     if (user.userType === "CUSTOMER") {

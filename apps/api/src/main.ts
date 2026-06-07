@@ -12,7 +12,46 @@ import { toNodeHandler, auth } from "@guestpost/auth"
 import { AppModule } from "./app.module"
 import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter"
 
+const REQUIRED_ENV_VARS = [
+  "DATABASE_URL",
+  "REDIS_URL",
+  "JWT_SECRET",
+] as const
+
+const PRODUCTION_ONLY_VARS = [
+  "SMTP_HOST",
+  "EMAIL_FROM",
+] as const
+
+function validateEnv(): void {
+  const missing: string[] = []
+  for (const key of REQUIRED_ENV_VARS) {
+    if (!process.env[key]) missing.push(key)
+  }
+  if (missing.length > 0) {
+    console.error(`FATAL: Missing required environment variables: ${missing.join(", ")}`)
+    process.exit(1)
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    for (const key of PRODUCTION_ONLY_VARS) {
+      if (!process.env[key]) {
+        console.warn(`WARN: Production recommended variable "${key}" is not set`)
+      }
+    }
+    if (process.env.JWT_SECRET === "dev-jwt-secret-change-in-production" || process.env.JWT_SECRET === "generate_a_random_secret_with_openssl_rand_base64_32") {
+      console.error("FATAL: JWT_SECRET is set to an insecure default value. Generate a unique secret for production.")
+      process.exit(1)
+    }
+    if (!/^[0-9a-zA-Z!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]{32,}$/.test(process.env.JWT_SECRET ?? "")) {
+      console.warn("WARN: JWT_SECRET appears weak. Use a randomly generated 32+ character string.")
+    }
+  }
+}
+
 async function bootstrap() {
+  validateEnv()
+
   const server = express()
 
   server.set("trust proxy", 1)
@@ -29,36 +68,148 @@ async function bootstrap() {
         baseUri: ["'self'"],
       },
     },
+    crossOriginEmbedderPolicy: process.env.NODE_ENV === "production",
+    crossOriginOpenerPolicy: { policy: "same-origin" },
+    crossOriginResourcePolicy: { policy: "same-origin" },
+    referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+    hsts: {
+      maxAge: 31536000,
+      includeSubDomains: true,
+      preload: true,
+    },
+    noSniff: true,
+    xssFilter: true,
     frameguard: { action: "deny" },
   }))
 
-  if (process.env.NODE_ENV === "production") {
-    const authLimiter = rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: Number(process.env.AUTH_RATE_LIMIT_MAX) || 20,
-      standardHeaders: true,
-      legacyHeaders: false,
-      message: { statusCode: 429, message: "Too many auth attempts, try again later" },
-    })
-    server.use("/api/v1/auth/sign-in", authLimiter)
-    server.use("/api/v1/auth/sign-up", authLimiter)
+  // Health check - before rate limiting
+  server.get("/api/v1/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() })
+  })
 
-    const billingLimiter = rateLimit({
-      windowMs: 1 * 60 * 1000,
-      max: 10,
-      standardHeaders: true,
-      legacyHeaders: false,
-      message: { statusCode: 429, message: "Too many billing requests, try again later" },
-    })
-    server.use("/api/v1/billing", billingLimiter)
+  // ── Environment-aware rate limiting ──────────────────────────────────────
 
-    server.use(rateLimit({
-      windowMs: 15 * 60 * 1000,
-      max: 100,
-      standardHeaders: true,
-      legacyHeaders: false,
-    }))
+  function hasAuthCredentials(req: express.Request): boolean {
+    if (req.headers.authorization?.startsWith("Bearer ")) return true
+    const cookie = req.headers.cookie
+    if (typeof cookie === "string" && cookie.includes("guestpost-session")) return true
+    return false
   }
+
+  interface EnvLimits {
+    auth: { signIn: number; signUp: number; magicLink: number; resetPassword: number }
+    marketplaceAnon: number
+    marketplaceAuth: number
+    generalAnon: number
+    generalAuth: number
+    admin: number
+    billing: number
+  }
+
+  function getEnvLimits(): EnvLimits {
+    const env = process.env.NODE_ENV || "development"
+
+    const defaults: Record<string, EnvLimits> = {
+      development: {
+        auth: { signIn: 100, signUp: 50, magicLink: 50, resetPassword: 50 },
+        marketplaceAnon: 1000,
+        marketplaceAuth: 1000,
+        generalAnon: 5000,
+        generalAuth: 5000,
+        admin: 5000,
+        billing: 10,
+      },
+      staging: {
+        auth: { signIn: 10, signUp: 5, magicLink: 5, resetPassword: 5 },
+        marketplaceAnon: 120,
+        marketplaceAuth: 120,
+        generalAnon: 300,
+        generalAuth: 300,
+        admin: 300,
+        billing: 10,
+      },
+      production: {
+        auth: { signIn: 5, signUp: 5, magicLink: 5, resetPassword: 5 },
+        marketplaceAnon: 60,
+        marketplaceAuth: 300,
+        generalAnon: 60,
+        generalAuth: 300,
+        admin: 300,
+        billing: 10,
+      },
+    }
+
+    const d = defaults[env] ?? defaults.development
+
+    return {
+      auth: {
+        signIn: Number(process.env.AUTH_RATE_LIMIT_LOGIN_MAX) || d.auth.signIn,
+        signUp: Number(process.env.AUTH_RATE_LIMIT_REGISTER_MAX) || d.auth.signUp,
+        magicLink: Number(process.env.AUTH_RATE_LIMIT_MAGIC_LINK_MAX) || d.auth.magicLink,
+        resetPassword: Number(process.env.AUTH_RATE_LIMIT_RESET_MAX) || d.auth.resetPassword,
+      },
+      marketplaceAnon: Number(process.env.MARKETPLACE_RATE_LIMIT_ANON_MAX) || d.marketplaceAnon,
+      marketplaceAuth: Number(process.env.MARKETPLACE_RATE_LIMIT_AUTH_MAX) || d.marketplaceAuth,
+      generalAnon: Number(process.env.PUBLIC_RATE_LIMIT_MAX) || d.generalAnon,
+      generalAuth: Number(process.env.AUTHENTICATED_RATE_LIMIT_MAX) || d.generalAuth,
+      admin: Number(process.env.ADMIN_RATE_LIMIT_MAX) || d.admin,
+      billing: Number(process.env.BILLING_RATE_LIMIT_MAX) || d.billing,
+    }
+  }
+
+  function createLimiter(max: number, message?: string) {
+    return rateLimit({
+      windowMs: 60 * 1000,
+      max,
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { statusCode: 429, message: message ?? "Too many requests, try again later" },
+    })
+  }
+
+  function createTieredLimiters(anonMax: number, authMax: number, message?: string) {
+    const anon = rateLimit({
+      windowMs: 60 * 1000,
+      max: anonMax,
+      skip: (req: express.Request) => hasAuthCredentials(req),
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { statusCode: 429, message: message ?? "Too many requests, try again later" },
+    })
+    const authed = rateLimit({
+      windowMs: 60 * 1000,
+      max: authMax,
+      skip: (req: express.Request) => !hasAuthCredentials(req),
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { statusCode: 429, message: message ?? "Too many requests, try again later" },
+    })
+    return [anon, authed]
+  }
+
+  const envLimits = getEnvLimits()
+
+  // Auth endpoints — one limiter per path, same limit for all users
+  server.use("/api/v1/auth/sign-in", createLimiter(envLimits.auth.signIn, "Too many auth attempts, try again later"))
+  server.use("/api/v1/auth/sign-up", createLimiter(envLimits.auth.signUp, "Too many auth attempts, try again later"))
+  server.use("/api/v1/auth/magic-link", createLimiter(envLimits.auth.magicLink, "Too many auth attempts, try again later"))
+  server.use("/api/v1/auth/reset-password", createLimiter(envLimits.auth.resetPassword, "Too many auth attempts, try again later"))
+
+  // Billing
+  server.use("/api/v1/billing", createLimiter(envLimits.billing, "Too many billing requests, try again later"))
+
+  // Marketplace — two-tier (anon vs authenticated)
+  server.use("/api/v1/marketplace/listings", ...createTieredLimiters(envLimits.marketplaceAnon, envLimits.marketplaceAuth))
+  server.use("/api/v1/marketplace/categories", ...createTieredLimiters(envLimits.marketplaceAnon, envLimits.marketplaceAuth))
+  server.use("/api/v1/marketplace/tags", ...createTieredLimiters(envLimits.marketplaceAnon, envLimits.marketplaceAuth))
+  server.use("/api/v1/marketplace/stats", ...createTieredLimiters(envLimits.marketplaceAnon, envLimits.marketplaceAuth))
+  server.use("/api/v1/marketplace/services", ...createTieredLimiters(envLimits.marketplaceAnon, envLimits.marketplaceAuth))
+
+  // Admin
+  server.use("/api/v1/admin", createLimiter(envLimits.admin, "Too many admin requests, try again later"))
+
+  // Global fallback — two-tier, catches all unmatched routes
+  server.use(...createTieredLimiters(envLimits.generalAnon, envLimits.generalAuth))
 
   const configuredOrigins = process.env.CORS_ORIGIN?.split(",") ?? [
     "http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003",
