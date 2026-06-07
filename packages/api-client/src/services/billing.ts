@@ -7,8 +7,8 @@ export class BillingService {
     return this.client.get<{ id: string; balance: number; currency: string }>("/billing/wallet")
   }
 
-  deposit(data: { amount: number; paymentMethodId?: string }) {
-    return this.client.post<{ transactionId: string; newBalance: number }>("/billing/wallet/deposit", { json: data })
+  deposit(data: { walletId: string; amount: number; paymentMethodId?: string }) {
+    return this.client.post<{ transactionId: string; newBalance: number }>(`/billing/wallet/${data.walletId}/deposit`, { json: { amount: data.amount } })
   }
 
   withdraw(data: { amount: number }) {
