@@ -1,12 +1,17 @@
 import { Worker } from "bullmq"
 import { connection } from "../redis"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
 
 export function createNotificationWorker() {
   const worker = new Worker(
     QUEUES.NOTIFICATION,
     async (job) => {
+      if (!verifyJobPayload(job.data)) {
+        console.error(`[NOTIFICATION] Job ${job.id} has missing/invalid signature — rejecting`)
+        throw new Error("Invalid job signature")
+      }
+
       const { userId, organizationId, type, message } = job.data
 
       switch (job.name) {

@@ -1,12 +1,39 @@
 export const ORDER_STATUS_LABELS: Record<string, string> = {
-  PENDING: "Pending",
-  ASSIGNED: "Assigned",
+  DRAFT: "Draft",
+  PENDING_PAYMENT: "Pending Payment",
+  PAID: "Paid",
+  SUBMITTED: "Submitted",
+  ACCEPTED: "Accepted",
+  CONTENT_REQUESTED: "Content Requested",
   CONTENT_CREATION: "Content Creation",
-  OUTREACH: "Outreach",
+  CONTENT_READY: "Content Ready",
+  CUSTOMER_REVIEW: "Customer Review",
+  APPROVED: "Approved",
   PUBLISHED: "Published",
   VERIFIED: "Verified",
   DELIVERED: "Delivered",
+  SETTLED: "Settled",
+  COMPLETED: "Completed",
   CANCELLED: "Cancelled",
+  REFUNDED: "Refunded",
+  DISPUTED: "Disputed",
+}
+
+export const SETTLEMENT_STATUS_LABELS: Record<string, string> = {
+  PENDING: "Pending",
+  UNDER_REVIEW: "Under Review",
+  CUSTOMER_APPROVED: "Customer Approved",
+  ADMIN_APPROVED: "Admin Approved",
+  RELEASED: "Released",
+  CANCELLED: "Cancelled",
+}
+
+export const DISPUTE_STATUS_LABELS: Record<string, string> = {
+  OPEN: "Open",
+  UNDER_REVIEW: "Under Review",
+  RESOLVED_REFUNDED: "Resolved — Refunded",
+  RESOLVED_REJECTED: "Resolved — Rejected",
+  RESOLVED_RESTORED: "Resolved — Restored",
 }
 
 export const SERVICE_TYPE_LABELS: Record<string, string> = {
@@ -21,13 +48,21 @@ export const SERVICE_TYPE_LABELS: Record<string, string> = {
 }
 
 export const ORDER_STATUS_FLOW: string[] = [
-  "PENDING",
-  "ASSIGNED",
+  "DRAFT",
+  "PENDING_PAYMENT",
+  "PAID",
+  "SUBMITTED",
+  "ACCEPTED",
+  "CONTENT_REQUESTED",
   "CONTENT_CREATION",
-  "OUTREACH",
+  "CONTENT_READY",
+  "CUSTOMER_REVIEW",
+  "APPROVED",
   "PUBLISHED",
   "VERIFIED",
   "DELIVERED",
+  "SETTLED",
+  "COMPLETED",
 ]
 
 export const CURRENCIES = ["USD", "EUR", "GBP"] as const

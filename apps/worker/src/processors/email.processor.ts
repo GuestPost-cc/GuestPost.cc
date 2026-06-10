@@ -1,6 +1,6 @@
 import { Worker } from "bullmq"
 import { connection } from "../redis"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import * as nodemailer from "nodemailer"
 
 const transporter = nodemailer.createTransport({
@@ -13,11 +13,47 @@ const transporter = nodemailer.createTransport({
   } : undefined,
 })
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const MAX_SUBJECT_LENGTH = 500
+const MAX_HTML_LENGTH = 500_000
+
+// Optional comma-separated recipient-domain allowlist (e.g. staging: only company domains)
+const allowedDomains = (process.env.EMAIL_ALLOWED_RECIPIENT_DOMAINS ?? "")
+  .split(",")
+  .map((d) => d.trim().toLowerCase())
+  .filter(Boolean)
+
+function validateEmailJob(to: unknown, subject: unknown, html: unknown): string | null {
+  if (typeof to !== "string" || !EMAIL_REGEX.test(to)) return `Invalid recipient: ${to}`
+  if (allowedDomains.length > 0) {
+    const domain = to.split("@")[1]?.toLowerCase()
+    if (!domain || !allowedDomains.includes(domain)) return `Recipient domain not allowed: ${to}`
+  }
+  if (subject != null && (typeof subject !== "string" || subject.length > MAX_SUBJECT_LENGTH)) {
+    return "Subject missing or too long"
+  }
+  if (html != null && (typeof html !== "string" || html.length > MAX_HTML_LENGTH)) {
+    return "HTML body too large"
+  }
+  return null
+}
+
 export function createEmailWorker() {
   const worker = new Worker(
     QUEUES.EMAIL,
     async (job) => {
+      if (!verifyJobPayload(job.data)) {
+        console.error(`[EMAIL] Job ${job.id} has missing/invalid signature — rejecting`)
+        throw new Error("Invalid job signature")
+      }
+
       const { to, subject, html } = job.data
+
+      const validationError = validateEmailJob(to, subject, html)
+      if (validationError) {
+        console.error(`[EMAIL] Job ${job.id} rejected: ${validationError}`)
+        throw new Error(validationError)
+      }
 
       let finalSubject = subject
       let finalHtml = html

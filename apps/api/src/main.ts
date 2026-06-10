@@ -1,5 +1,10 @@
 import { config } from "dotenv"
-config({ path: require("path").resolve(__dirname, "../../../.env.development") })
+// Dev env file loads ONLY under explicit NODE_ENV=development. Unset NODE_ENV
+// (staging, CI) fails closed: nothing is loaded and validateEnv() exits on
+// missing required vars, forcing explicit configuration.
+if (process.env.NODE_ENV === "development") {
+  config({ path: require("path").resolve(__dirname, "../../../.env.development") })
+}
 import { NestFactory } from "@nestjs/core"
 import { ExpressAdapter } from "@nestjs/platform-express"
 import { ValidationPipe } from "@nestjs/common"
@@ -38,6 +43,10 @@ function validateEnv(): void {
       if (!process.env[key]) {
         console.warn(`WARN: Production recommended variable "${key}" is not set`)
       }
+    }
+    if (!process.env.QUEUE_SIGNING_SECRET) {
+      console.error("FATAL: QUEUE_SIGNING_SECRET is required in production (do not reuse JWT_SECRET)")
+      process.exit(1)
     }
     if (process.env.JWT_SECRET === "dev-jwt-secret-change-in-production" || process.env.JWT_SECRET === "generate_a_random_secret_with_openssl_rand_base64_32") {
       console.error("FATAL: JWT_SECRET is set to an insecure default value. Generate a unique secret for production.")
@@ -195,8 +204,18 @@ async function bootstrap() {
   server.use("/api/v1/auth/magic-link", createLimiter(envLimits.auth.magicLink, "Too many auth attempts, try again later"))
   server.use("/api/v1/auth/reset-password", createLimiter(envLimits.auth.resetPassword, "Too many auth attempts, try again later"))
 
-  // Billing
-  server.use("/api/v1/billing", createLimiter(envLimits.billing, "Too many billing requests, try again later"))
+  // Billing — webhook exempt from rate limit (Stripe retries on failure; protected by signature verification instead)
+  server.use(
+    "/api/v1/billing",
+    rateLimit({
+      windowMs: 60 * 1000,
+      max: envLimits.billing,
+      skip: (req: express.Request) => req.path.startsWith("/webhook"),
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { statusCode: 429, message: "Too many billing requests, try again later" },
+    }),
+  )
 
   // Marketplace — two-tier (anon vs authenticated)
   server.use("/api/v1/marketplace/listings", ...createTieredLimiters(envLimits.marketplaceAnon, envLimits.marketplaceAuth))
@@ -228,7 +247,10 @@ async function bootstrap() {
   // Better Auth handler must be before body parsers so it can read raw bodies
   server.use("/api/v1/auth", toNodeHandler(auth))
 
-  server.use(express.json({ limit: "1mb" }))
+  server.use(express.json({
+    limit: "1mb",
+    verify: (req: any, _res: express.Response, buf: Buffer) => { req.rawBody = buf },
+  }))
   server.use(express.urlencoded({ extended: true, limit: "1mb" }))
   server.use(cookieParser())
 
