@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from "@nestjs/common"
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
@@ -31,8 +31,11 @@ export class PublisherPayoutsService {
     return balance
   }
 
-  async requestWithdrawal(publisherId: string, amount: number, method: string, userId: string) {
-    const balance = await this.getBalance(publisherId)
+  async requestWithdrawal(publisherId: string, amount: number, method: string, userId: string, idempotencyKey?: string) {
+    const membership = await this.prisma.publisherMembership.findFirst({
+      where: { userId, publisherId },
+    })
+    if (!membership) throw new ForbiddenException("You do not own this publisher account")
 
     const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
     if (!publisher) throw new NotFoundException("Publisher not found")
@@ -40,16 +43,33 @@ export class PublisherPayoutsService {
     const holdDays = TIER_WITHDRAWAL_HOLDS[publisher.tier] ?? 7
     const queuedAt = new Date(Date.now() + holdDays * 24 * 60 * 60 * 1000)
 
-    const withdrawable = Number(balance.withdrawableBalance)
-    if (withdrawable < amount) {
-      throw new BadRequestException(
-        `Insufficient withdrawable balance. Available: ${withdrawable}, requested: ${amount}`,
-      )
-    }
-
     return this.prisma.$transaction(async (tx: any) => {
+      // Idempotency: check for existing withdrawal with same reference
+      if (idempotencyKey) {
+        const existing = await tx.withdrawal.findFirst({
+          where: { id: idempotencyKey, publisherId },
+        })
+        if (existing) return existing
+      }
+
+      const balance = await tx.publisherBalance.findUnique({
+        where: { publisherId },
+      })
+      if (!balance) throw new NotFoundException("Publisher balance not found")
+
+      const withdrawable = Number(balance.withdrawableBalance)
+      if (withdrawable < amount) {
+        throw new BadRequestException(
+          `Insufficient withdrawable balance. Available: ${withdrawable}, requested: ${amount}`,
+        )
+      }
+
+      // Use idempotencyKey as withdrawal id for dedup
+      const withdrawalId = idempotencyKey ?? undefined
+
       const withdrawal = await tx.withdrawal.create({
         data: {
+          id: withdrawalId,
           publisherId,
           amount,
           method,
@@ -57,12 +77,16 @@ export class PublisherPayoutsService {
         },
       })
 
-      await tx.publisherBalance.update({
-        where: { publisherId },
+      const updated = await tx.publisherBalance.updateMany({
+        where: { publisherId, version: balance.version },
         data: {
           withdrawableBalance: { decrement: amount },
+          version: { increment: 1 },
         },
       })
+      if (updated.count === 0) {
+        throw new ConflictException("Publisher balance was modified by another request. Retry.")
+      }
 
       await this.audit.log({
         action: "WITHDRAWAL_REQUESTED",
@@ -105,14 +129,24 @@ export class PublisherPayoutsService {
       return updated
     })
 
-    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: approvedBy, // Ideally the publisher owner
-      organizationId: withdrawal.publisher.organizationId,
-      type: "WITHDRAWAL_APPROVED",
-      message: `Withdrawal of ${withdrawal.amount} has been approved.`,
-    })
+    await this.notifyPublisherMembers(withdrawal.publisherId, withdrawal.publisher.organizationId, "WITHDRAWAL_APPROVED", `Withdrawal of ${withdrawal.amount} has been approved.`)
 
     return result
+  }
+
+  private async notifyPublisherMembers(publisherId: string, organizationId: string, type: string, message: string) {
+    const memberships = await this.prisma.publisherMembership.findMany({
+      where: { publisherId },
+      select: { userId: true },
+    })
+    for (const m of memberships) {
+      await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+        userId: m.userId,
+        organizationId,
+        type,
+        message,
+      })
+    }
   }
 
   async markWithdrawalPaid(id: string, approvedBy: string) {
@@ -130,6 +164,20 @@ export class PublisherPayoutsService {
         where: { id },
         data: { status: "COMPLETED", approvedBy, approvedAt: new Date() },
       })
+
+      // Update lifetimePaid
+      const balance = await tx.publisherBalance.findUnique({
+        where: { publisherId: withdrawal.publisherId },
+      })
+      if (balance) {
+        await tx.publisherBalance.updateMany({
+          where: { publisherId: withdrawal.publisherId, version: balance.version },
+          data: {
+            lifetimePaid: { increment: Number(withdrawal.amount) },
+            version: { increment: 1 },
+          },
+        })
+      }
 
       await this.audit.log({
         action: "WITHDRAWAL_COMPLETED",
@@ -160,10 +208,21 @@ export class PublisherPayoutsService {
         data: { status: "REJECTED", approvedBy, approvedAt: new Date() },
       })
 
-      await tx.publisherBalance.update({
+      const balance = await tx.publisherBalance.findUnique({
         where: { publisherId: withdrawal.publisherId },
-        data: { withdrawableBalance: { increment: Number(withdrawal.amount) } },
       })
+      if (balance) {
+        const restored = await tx.publisherBalance.updateMany({
+          where: { publisherId: withdrawal.publisherId, version: balance.version },
+          data: {
+            withdrawableBalance: { increment: Number(withdrawal.amount) },
+            version: { increment: 1 },
+          },
+        })
+        if (restored.count === 0) {
+          throw new ConflictException("Publisher balance was modified by another request. Retry.")
+        }
+      }
 
       await this.audit.log({
         action: "WITHDRAWAL_REJECTED",
@@ -177,12 +236,7 @@ export class PublisherPayoutsService {
       return updated
     })
 
-    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: approvedBy, // Ideally publisher owner
-      organizationId: withdrawal.publisher.organizationId,
-      type: "WITHDRAWAL_REJECTED",
-      message: `Withdrawal of ${withdrawal.amount} was rejected.`,
-    })
+    await this.notifyPublisherMembers(withdrawal.publisherId, withdrawal.publisher.organizationId, "WITHDRAWAL_REJECTED", `Withdrawal of ${withdrawal.amount} was rejected.`)
 
     return result
   }
