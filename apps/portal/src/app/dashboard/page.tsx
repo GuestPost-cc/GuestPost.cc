@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { api } from "../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import {
@@ -154,17 +154,17 @@ function KPICardsSkeleton() {
 }
 
 export default function DashboardPage() {
-  const { data: walletData, isLoading: walletLoading } = useQuery({
+  const { data: walletData, isLoading: walletLoading, error: walletError, refetch: refetchWallet } = useQuery({
     queryKey: ["wallet"],
     queryFn: () => api.billing.getWallet(),
   })
 
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
+  const { data: ordersData, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
     queryKey: ["orders"],
     queryFn: () => api.orders.list(),
   })
 
-  const { data: campaignsData, isLoading: campaignsLoading } = useQuery({
+  const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns(),
   })
@@ -176,13 +176,33 @@ export default function DashboardPage() {
   const underReviewOrders = orders.filter((o: any) => o.status === "UNDER_REVIEW").length
   const completedOrders = orders.filter((o: any) => o.status === "COMPLETED").length
 
+  const reservedBalance = orders
+    .filter((o: any) => !["COMPLETED", "CANCELLED", "REFUNDED"].includes(o.status))
+    .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
+
+  const now = new Date()
+  const currentMonth = now.getMonth()
+  const currentYear = now.getFullYear()
+  const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
+  const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear
+
   const monthlySpend = orders
     .filter((o: any) => {
       const created = new Date(o.createdAt)
-      const now = new Date()
-      return created.getMonth() === now.getMonth() && created.getFullYear() === now.getFullYear()
+      return created.getMonth() === currentMonth && created.getFullYear() === currentYear
     })
     .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
+
+  const lastMonthSpend = orders
+    .filter((o: any) => {
+      const created = new Date(o.createdAt)
+      return created.getMonth() === lastMonth && created.getFullYear() === lastMonthYear
+    })
+    .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
+
+  const spendTrend = lastMonthSpend > 0
+    ? Math.round(((monthlySpend - lastMonthSpend) / lastMonthSpend) * 100)
+    : monthlySpend > 0 ? 100 : 0
 
   const monthlyData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date()
@@ -225,6 +245,12 @@ export default function DashboardPage() {
   const recentOrders = [...orders]
     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 5)
+
+  const dashboardError = walletError || ordersError || campaignsError
+
+  if (dashboardError) {
+    return <ErrorState title="Failed to load dashboard" description={(dashboardError as Error).message} onRetry={() => { refetchWallet(); refetchOrders(); refetchCampaigns(); }} />
+  }
 
   const isLoading = walletLoading || ordersLoading || campaignsLoading
 
@@ -272,13 +298,13 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KPICard
           title="Wallet Balance"
-          value={`$${(walletData?.balance || 0).toFixed(2)}`}
+          value={`$${Number(walletData?.availableBalance ?? 0).toFixed(2)}`}
           description="Available funds"
           icon={Wallet}
         />
         <KPICard
           title="Reserved"
-          value="$0.00"
+          value={`$${reservedBalance.toFixed(2)}`}
           description="In progress orders"
           icon={PiggyBank}
         />
@@ -305,7 +331,7 @@ export default function DashboardPage() {
           value={`$${monthlySpend.toFixed(2)}`}
           description={format(new Date(), "MMMM yyyy")}
           icon={CreditCard}
-          trend={12}
+          trend={spendTrend}
           trendLabel="vs last month"
         />
       </div>

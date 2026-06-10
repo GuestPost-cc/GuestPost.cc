@@ -1,7 +1,7 @@
 "use client"
 
 import { use } from "react"
-import { useQuery, useMutation } from "@tanstack/react-query"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
@@ -11,11 +11,10 @@ import { ArrowLeft, AlertCircle, Wallet, ExternalLink } from "lucide-react"
 import { format } from "date-fns"
 import Link from "next/link"
 import { toast } from "sonner"
-import { useState } from "react"
 
 export default function CheckoutPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
-  const [isProcessing, setIsProcessing] = useState(false)
+  const queryClient = useQueryClient()
 
   const { data: order, isLoading: orderLoading } = useQuery({
     queryKey: ["order", resolvedParams.id],
@@ -27,18 +26,16 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
     queryFn: () => api.billing.getWallet(),
   })
 
-  const proceedToPayment = async () => {
-    setIsProcessing(true)
-    try {
-      const result = await api.orders.submitPayment(resolvedParams.id)
+  const { mutate: proceedToPayment, isPending: isProcessing } = useMutation({
+    mutationFn: () => api.orders.submitPayment(resolvedParams.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] })
+      queryClient.invalidateQueries({ queryKey: ["wallet"] })
       toast.success("Payment submitted successfully")
       window.location.href = `/dashboard/orders/${resolvedParams.id}`
-    } catch (err: any) {
-      toast.error(err?.message || "Payment failed")
-    } finally {
-      setIsProcessing(false)
-    }
-  }
+    },
+    onError: (err: any) => toast.error(err?.message || "Payment failed"),
+  })
 
   if (orderLoading || walletLoading) {
     return (
@@ -71,7 +68,7 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
   }
 
   const amount = order.totalAmount || 0
-  const balance = (wallet as any)?.availableBalance ?? (wallet as any)?.balance ?? 0
+  const balance = Number((wallet as any)?.availableBalance ?? 0)
   const hasSufficientBalance = balance >= amount
 
   return (
@@ -176,8 +173,8 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
             </Button>
             <Button
               className="flex-1"
-              disabled={!hasSufficientBalance || isProcessing || order.status !== "DRAFT"}
-              onClick={proceedToPayment}
+              disabled={!hasSufficientBalance || isProcessing || order?.status !== "DRAFT"}
+              onClick={() => proceedToPayment()}
             >
               {isProcessing ? "Processing..." : "Pay Now"}
             </Button>

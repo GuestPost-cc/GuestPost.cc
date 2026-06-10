@@ -1,6 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
@@ -8,7 +11,7 @@ import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
   Table,
   TableBody,
@@ -44,40 +47,35 @@ import { toast } from "sonner"
 
 interface WalletData {
   id: string
-  balance: number
+  availableBalance: string | number
+  reservedBalance: string | number
   currency: string
 }
 
 interface Transaction {
   id: string
   type: string
-  amount: number
-  status: string
+  amount: string | number
   createdAt: string
-  description?: string
+  description?: string | null
 }
 
 const transactionIcons: Record<string, React.ElementType> = {
   DEPOSIT: ArrowUpCircle,
-  ORDER_PAYMENT: ArrowDownCircle,
+  PURCHASE: ArrowDownCircle,
+  RESERVATION: ArrowDownCircle,
+  RELEASE: ArrowUpCircle,
   REFUND: RefreshCw,
   WITHDRAWAL: ArrowDownCircle,
-  ADJUSTMENT: RefreshCw,
 }
 
 const transactionColors: Record<string, string> = {
   DEPOSIT: "text-emerald-500",
-  ORDER_PAYMENT: "text-red-500",
+  PURCHASE: "text-red-500",
+  RESERVATION: "text-amber-500",
+  RELEASE: "text-blue-500",
   REFUND: "text-blue-500",
   WITHDRAWAL: "text-red-500",
-  ADJUSTMENT: "text-purple-500",
-}
-
-const statusColors: Record<string, string> = {
-  PENDING: "bg-amber-100 text-amber-700",
-  COMPLETED: "bg-green-100 text-green-700",
-  FAILED: "bg-red-100 text-red-700",
-  CANCELLED: "bg-gray-100 text-gray-500",
 }
 
 function WalletSkeleton() {
@@ -123,20 +121,35 @@ function TransactionsSkeleton() {
 export default function BillingPage() {
   const queryClient = useQueryClient()
   const [showDepositDialog, setShowDepositDialog] = useState(false)
-  const [depositAmount, setDepositAmount] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
 
-  const { data: walletData, isLoading: walletLoading } = useQuery<WalletData>({
-    queryKey: ["wallet"],
-    queryFn: () => api.billing.getWallet() as Promise<WalletData>,
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(
+      z.object({
+        amount: z.coerce.number().positive("Amount must be positive"),
+      })
+    ),
+    defaultValues: { amount: 0 },
   })
 
-  const { data: transactionsData, isLoading: transactionsLoading } = useQuery<Transaction[]>({
+  const { data: walletData, isLoading: walletLoading, error: walletError, refetch: refetchWallet } = useQuery<WalletData>({
+    queryKey: ["wallet"],
+    queryFn: () => api.billing.getWallet(),
+  })
+
+  const { data: transactionsData, isLoading: transactionsLoading, error: transactionsError, refetch: refetchTransactions } = useQuery<Transaction[]>({
     queryKey: ["transactions"],
     queryFn: () => api.billing.listTransactions() as Promise<Transaction[]>,
   })
 
-  const { data: ordersData } = useQuery({
+  const { data: ordersData, error: ordersError, refetch: refetchOrders } = useQuery({
     queryKey: ["orders"],
     queryFn: () => api.orders.list() as Promise<any[]>,
   })
@@ -150,26 +163,17 @@ export default function BillingPage() {
       if (!walletData?.id) throw new Error("Wallet not loaded")
       return api.billing.deposit({ walletId: walletData.id, amount })
     },
-    onSuccess: () => {
-      toast.success(`Deposited $${depositAmount} successfully!`)
+    onSuccess: (_data, variables) => {
+      toast.success(`Deposited $${variables.toFixed(2)} successfully!`)
       queryClient.invalidateQueries({ queryKey: ["wallet"] })
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
       setShowDepositDialog(false)
-      setDepositAmount("")
+      reset()
     },
     onError: () => {
       toast.error("Failed to process deposit")
     },
   })
-
-  const handleDeposit = () => {
-    const amount = parseFloat(depositAmount)
-    if (isNaN(amount) || amount <= 0) {
-      toast.error("Please enter a valid amount")
-      return
-    }
-    depositMutation.mutate(amount)
-  }
 
   const filteredTransactions = (transactionsData ?? []).filter((tx: Transaction) => {
     if (!searchQuery) return true
@@ -182,12 +186,18 @@ export default function BillingPage() {
   })
 
   const totalDeposits = (transactionsData ?? [])
-    .filter((tx: Transaction) => tx.type === "DEPOSIT" && tx.status === "COMPLETED")
-    .reduce((sum: number, tx: Transaction) => sum + tx.amount, 0)
+    .filter((tx: Transaction) => tx.type === "DEPOSIT")
+    .reduce((sum: number, tx: Transaction) => sum + Number(tx.amount), 0)
 
   const totalSpent = (transactionsData ?? [])
-    .filter((tx: Transaction) => tx.type === "ORDER_PAYMENT" && tx.status === "COMPLETED")
-    .reduce((sum: number, tx: Transaction) => sum + Math.abs(tx.amount), 0)
+    .filter((tx: Transaction) => tx.type === "PURCHASE")
+    .reduce((sum: number, tx: Transaction) => sum + Math.abs(Number(tx.amount)), 0)
+
+  const billingError = walletError || transactionsError || ordersError
+
+  if (billingError) {
+    return <ErrorState title="Failed to load billing" description={(billingError as Error).message} onRetry={() => { refetchWallet(); refetchTransactions(); refetchOrders(); }} />
+  }
 
   if (walletLoading) {
     return (
@@ -232,7 +242,7 @@ export default function BillingPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold font-mono">
-              ${(walletData?.balance || 0).toFixed(2)}
+              ${Number(walletData?.availableBalance ?? 0).toFixed(2)}
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               {walletData?.currency || "USD"}
@@ -311,7 +321,7 @@ export default function BillingPage() {
               {filteredTransactions.map((tx: Transaction) => {
                 const Icon = transactionIcons[tx.type] || RefreshCw
                 const colorClass = transactionColors[tx.type] || "text-muted-foreground"
-                const isNegative = tx.type === "ORDER_PAYMENT" || tx.type === "WITHDRAWAL"
+                const isNegative = Number(tx.amount) < 0
 
                 return (
                   <div
@@ -333,11 +343,8 @@ export default function BillingPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge className={`${statusColors[tx.status] || "bg-gray-100 text-gray-700"} capitalize`}>
-                        {tx.status.toLowerCase()}
-                      </Badge>
                       <span className={`font-mono font-medium ${isNegative ? "text-red-500" : "text-emerald-500"}`}>
-                        {isNegative ? "-" : "+"}${Math.abs(tx.amount).toFixed(2)}
+                        {isNegative ? "-" : "+"}${Math.abs(Number(tx.amount)).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -355,7 +362,7 @@ export default function BillingPage() {
               <CardTitle>Invoices</CardTitle>
               <CardDescription>Your billing invoices</CardDescription>
             </div>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => toast.info("No invoices to download yet")}>
               <Download className="mr-2 h-4 w-4" />
               Download All
             </Button>
@@ -373,61 +380,63 @@ export default function BillingPage() {
 
       <Dialog open={showDepositDialog} onOpenChange={setShowDepositDialog}>
         <DialogContent className="sm:max-w-[400px]">
-          <DialogHeader>
-            <DialogTitle>Deposit Funds</DialogTitle>
-            <DialogDescription>
-              Add funds to your wallet. This will redirect to our secure payment provider.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount (USD)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  min="1"
-                  placeholder="0.00"
-                  value={depositAmount}
-                  onChange={(e) => setDepositAmount(e.target.value)}
-                  className="pl-7"
-                />
+          <form onSubmit={handleSubmit((data) => depositMutation.mutate(data.amount))}>
+            <DialogHeader>
+              <DialogTitle>Deposit Funds</DialogTitle>
+              <DialogDescription>
+                Add funds to your wallet. This will redirect to our secure payment provider.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount (USD)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    placeholder="0.00"
+                    {...register("amount", { valueAsNumber: true })}
+                    className="pl-7"
+                  />
+                </div>
+                {errors.amount?.message && (
+                  <p className="text-sm text-destructive">{errors.amount.message}</p>
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {[50, 100, 250, 500, 1000, 2500].map((amount) => (
+                  <Button
+                    key={amount}
+                    variant={watch("amount") === amount ? "default" : "outline"}
+                    size="sm"
+                    type="button"
+                    onClick={() => setValue("amount", amount, { shouldValidate: true })}
+                  >
+                    ${amount}
+                  </Button>
+                ))}
+              </div>
+
+              <div className="rounded-lg bg-muted p-4 text-sm">
+                <p className="font-medium">Secure payment powered by Stripe</p>
+                <p className="mt-1 text-muted-foreground">
+                  Your payment information is encrypted and never stored on our servers.
+                </p>
               </div>
             </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {[50, 100, 250, 500, 1000, 2500].map((amount) => (
-                <Button
-                  key={amount}
-                  variant={depositAmount === amount.toString() ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setDepositAmount(amount.toString())}
-                >
-                  ${amount}
-                </Button>
-              ))}
-            </div>
-
-            <div className="rounded-lg bg-muted p-4 text-sm">
-              <p className="font-medium">Secure payment powered by Stripe</p>
-              <p className="mt-1 text-muted-foreground">
-                Your payment information is encrypted and never stored on our servers.
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDepositDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleDeposit}
-              disabled={!depositAmount || parseFloat(depositAmount) <= 0 || depositMutation.isPending}
-            >
-              {depositMutation.isPending ? "Processing..." : "Continue to Payment"}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setShowDepositDialog(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={depositMutation.isPending}>
+                {depositMutation.isPending ? "Processing..." : "Continue to Payment"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

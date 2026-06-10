@@ -1,10 +1,18 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useQuery, useMutation } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
 import { Separator } from "@guestpost/ui"
+import { Switch } from "@guestpost/ui"
+import { Button } from "@guestpost/ui"
+import { Input } from "@guestpost/ui"
+import { Label } from "@guestpost/ui"
 import {
   User,
   Shield,
@@ -15,8 +23,16 @@ import {
   Sun,
   Moon,
   Monitor,
+  Loader2,
 } from "lucide-react"
 import { useTheme } from "next-themes"
+import { toast } from "sonner"
+
+const profileSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+})
+
+type ProfileForm = z.infer<typeof profileSchema>
 
 const themeOptions = [
   { value: "system", label: "System", icon: Monitor },
@@ -24,14 +40,69 @@ const themeOptions = [
   { value: "dark", label: "Dark", icon: Moon },
 ]
 
-export default function SettingsPage() {
-  const { user } = useAuth()
-  const { theme, setTheme } = useTheme()
+const NOTIF_STORAGE_KEY = "notification-preferences"
 
-  const { data: walletData } = useQuery({
+interface NotificationPrefs {
+  emailOrders: boolean
+  emailEarnings: boolean
+  emailMarketing: boolean
+}
+
+function loadNotificationPrefs(): NotificationPrefs {
+  if (typeof window === "undefined") {
+    return { emailOrders: true, emailEarnings: true, emailMarketing: false }
+  }
+  const stored = localStorage.getItem(NOTIF_STORAGE_KEY)
+  if (stored) {
+    try {
+      return JSON.parse(stored)
+    } catch {}
+  }
+  return { emailOrders: true, emailEarnings: true, emailMarketing: false }
+}
+
+export default function SettingsPage() {
+  const { user, refresh } = useAuth()
+  const { theme, setTheme } = useTheme()
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(loadNotificationPrefs)
+
+  const { data: walletData, error, refetch } = useQuery({
     queryKey: ["wallet"],
     queryFn: () => api.billing.getWallet(),
   })
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ProfileForm>({
+    resolver: zodResolver(profileSchema),
+    values: { name: user?.name || "" },
+  })
+
+  const profileMutation = useMutation({
+    mutationFn: (data: ProfileForm) => api.identity.updateProfile({ name: data.name }),
+    onSuccess: () => {
+      toast.success("Profile updated successfully")
+      refresh()
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  const notifMutation = useMutation({
+    mutationFn: (prefs: NotificationPrefs) => {
+      localStorage.setItem(NOTIF_STORAGE_KEY, JSON.stringify(prefs))
+      return Promise.resolve()
+    },
+    onSuccess: () => toast.success("Notification preferences saved"),
+    onError: () => toast.error("Failed to save preferences"),
+  })
+
+  const onProfileSubmit = (data: ProfileForm) => {
+    profileMutation.mutate(data)
+  }
+
+  if (error) return <ErrorState title="Failed to load settings" description={(error as Error).message} onRetry={() => refetch()} />
 
   return (
     <div className="space-y-8">
@@ -52,17 +123,25 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent>
+            <form onSubmit={handleSubmit(onProfileSubmit)} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Name</Label>
+                <Input id="name" {...register("name")} />
+                {errors.name?.message && (
+                  <p className="text-sm text-destructive">{errors.name.message}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input id="email" value={user?.email || ""} disabled />
+              </div>
+              <Button type="submit" disabled={profileMutation.isPending}>
+                {profileMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save
+              </Button>
+            </form>
+            <Separator className="my-4" />
             <dl className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Name</dt>
-                <dd className="font-medium">{user?.name || "—"}</dd>
-              </div>
-              <Separator />
-              <div className="flex justify-between">
-                <dt className="text-muted-foreground">Email</dt>
-                <dd className="font-medium">{user?.email}</dd>
-              </div>
-              <Separator />
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Account Type</dt>
                 <dd className="font-medium capitalize">{user?.userType?.toLowerCase()}</dd>
@@ -73,6 +152,65 @@ export default function SettingsPage() {
                 <dd className="font-medium">{user?.emailVerified ? "Yes" : "No"}</dd>
               </div>
             </dl>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5 text-muted-foreground" />
+              <div>
+                <CardTitle className="text-base">Notifications</CardTitle>
+                <CardDescription>Manage your email notification preferences</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="emailOrders" className="font-medium">Order Updates</Label>
+                  <p className="text-sm text-muted-foreground">Receive emails about order status changes</p>
+                </div>
+                <Switch
+                  id="emailOrders"
+                  checked={notifPrefs.emailOrders}
+                  onCheckedChange={(checked) => setNotifPrefs((prev) => ({ ...prev, emailOrders: checked }))}
+                />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="emailEarnings" className="font-medium">Earnings Reports</Label>
+                  <p className="text-sm text-muted-foreground">Receive weekly earnings summaries</p>
+                </div>
+                <Switch
+                  id="emailEarnings"
+                  checked={notifPrefs.emailEarnings}
+                  onCheckedChange={(checked) => setNotifPrefs((prev) => ({ ...prev, emailEarnings: checked }))}
+                />
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label htmlFor="emailMarketing" className="font-medium">Marketing</Label>
+                  <p className="text-sm text-muted-foreground">Receive promotional offers and updates</p>
+                </div>
+                <Switch
+                  id="emailMarketing"
+                  checked={notifPrefs.emailMarketing}
+                  onCheckedChange={(checked) => setNotifPrefs((prev) => ({ ...prev, emailMarketing: checked }))}
+                />
+              </div>
+              <Button
+                onClick={() => notifMutation.mutate(notifPrefs)}
+                disabled={notifMutation.isPending}
+                className="mt-2"
+              >
+                {notifMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Preferences
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -138,7 +276,7 @@ export default function SettingsPage() {
                   <Separator />
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Wallet Balance</dt>
-                    <dd className="font-mono font-medium">${(walletData?.balance ?? 0).toFixed(2)}</dd>
+                    <dd className="font-mono font-medium">${Number(walletData?.availableBalance ?? 0).toFixed(2)}</dd>
                   </div>
                 </>
               )}

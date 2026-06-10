@@ -1,4 +1,4 @@
-import { IsNumber, IsPositive, Max, Min } from "class-validator"
+import { IsNumber, IsPositive, IsOptional, IsString, Max, Min } from "class-validator"
 
 export class WithdrawDto {
   @IsNumber()
@@ -6,4 +6,8 @@ export class WithdrawDto {
   @Min(1)
   @Max(1000000)
   amount: number
+
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string
 }

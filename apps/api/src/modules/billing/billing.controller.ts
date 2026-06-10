@@ -1,10 +1,13 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Headers, Req, RawBodyRequest } from "@nestjs/common"
+import { Controller, Get, Post, Body, Param, UseGuards, Headers, Req, RawBodyRequest, BadRequestException, ForbiddenException } from "@nestjs/common"
 import { BillingService } from "./billing.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { DepositDto } from "./dto/deposit.dto"
 import { WithdrawDto } from "./dto/withdraw.dto"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import { ActorType } from "../../common/decorators/actor-type.decorator"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { Public } from "../../common/decorators/public.decorator"
 import { Request } from "express"
 
 @Controller("billing")
@@ -12,39 +15,59 @@ export class BillingController {
   constructor(private readonly billing: BillingService) {}
 
   @Get("wallet")
+  @UseGuards(ActorTypeGuard)
+  @ActorType("CUSTOMER")
   getWallet(@CurrentUser() user: any) {
     return this.billing.getWallet(user.organizationId ?? null, user.id)
   }
 
   @Post("wallet/:id/deposit")
-  @UseGuards(MemberRolesGuard)
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
   @MemberRoles("OWNER")
   deposit(@Param("id") walletId: string, @Body() body: DepositDto, @CurrentUser() user: any) {
+    // Direct balance manipulation — dev/test convenience only.
+    // Production deposits must go through Stripe checkout + webhook.
+    if (process.env.NODE_ENV === "production") {
+      throw new ForbiddenException("Direct deposits are disabled — use the checkout flow")
+    }
     return this.billing.deposit(walletId, body.amount, user, body.reference)
   }
 
   @Post("wallet/:id/checkout")
-  @UseGuards(MemberRolesGuard)
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
   @MemberRoles("OWNER")
   createCheckoutSession(@Param("id") walletId: string, @Body() body: DepositDto, @CurrentUser() user: any) {
     return this.billing.createCheckoutSession(walletId, body.amount, user)
   }
 
+  @Public()
   @Post("webhook/stripe")
   async stripeWebhook(@Headers("stripe-signature") signature: string, @Req() req: RawBodyRequest<Request>) {
-    // In dummy mode, we can accept any payload, but NestJS needs raw body for real Stripe
     const payload = req.rawBody || Buffer.from(JSON.stringify(req.body))
-    return this.billing.handleWebhook(signature || "dummy", payload)
+    if (!signature) {
+      throw new BadRequestException("Missing stripe-signature header")
+    }
+    // Placeholder signatures are never accepted — Stripe signature verification
+    // in handleWebhook is the single gate in every environment
+    if (signature === "dummy") {
+      throw new BadRequestException("Invalid webhook signature")
+    }
+    return this.billing.handleWebhook(signature, payload)
   }
 
   @Post("wallet/:id/withdraw")
-  @UseGuards(MemberRolesGuard)
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
   @MemberRoles("OWNER")
   withdraw(@Param("id") walletId: string, @Body() body: WithdrawDto, @CurrentUser() user: any) {
-    return this.billing.withdraw(walletId, body.amount, user)
+    return this.billing.withdraw(walletId, body.amount, user, body.idempotencyKey)
   }
 
   @Get("transactions")
+  @UseGuards(ActorTypeGuard)
+  @ActorType("CUSTOMER")
   listTransactions(@CurrentUser() user: any) {
     return this.billing.listTransactions(user.organizationId ?? null, user.id)
   }

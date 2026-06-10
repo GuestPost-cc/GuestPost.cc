@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Logger } from "@nestjs/common"
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Logger, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { Decimal } from "@prisma/client/runtime/library"
@@ -18,19 +18,23 @@ export class BillingService {
       this.stripe = new Stripe(stripeKey, { apiVersion: "2025-01-27.acacia" as any })
       this.logger.log("Stripe initialized")
     } else {
-      this.logger.warn("Stripe secret key not found, running in dummy mode")
+      this.logger.warn("Stripe secret key not found — set STRIPE_SECRET_KEY in .env.development")
     }
+  }
+
+  private assertWalletOwned(wallet: { organizationId: string | null; userId: string | null }, user: { id: string; organizationId?: string | null }) {
+    const owned = (
+      (wallet.organizationId && wallet.organizationId === user.organizationId) ||
+      (!wallet.organizationId && wallet.userId === user.id)
+    )
+    if (!owned) throw new ForbiddenException("Wallet does not belong to this account")
   }
 
   async createCheckoutSession(walletId: string, amount: number, user: any) {
     const wallet = await this.prisma.wallet.findUnique({ where: { id: walletId } })
     if (!wallet) throw new NotFoundException("Wallet not found")
 
-    const owned = (
-      (wallet.organizationId && wallet.organizationId === user.organizationId) ||
-      (!wallet.organizationId && wallet.userId === user.id)
-    )
-    if (!owned) throw new ForbiddenException("Wallet does not belong to this account")
+    this.assertWalletOwned(wallet, user)
 
     if (this.stripe) {
       const session = await this.stripe.checkout.sessions.create({
@@ -60,21 +64,14 @@ export class BillingService {
       })
       return { url: session.url }
     } else {
-      // Dummy mode
-      this.logger.log(`Dummy checkout session created for wallet ${walletId}, amount ${amount}`)
-      return { url: `/dummy-checkout?walletId=${walletId}&amount=${amount}` }
+      throw new BadRequestException("Payment service not configured — set STRIPE_SECRET_KEY in .env.development")
     }
   }
 
   async handleWebhook(signature: string, payload: Buffer) {
     if (!this.stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
-      // In dummy mode, we might want to manually trigger this or ignore it
-      // Since it's dummy mode, let's accept a JSON payload directly if signature is "dummy"
-      const data = JSON.parse(payload.toString("utf8"))
-      if (data.type === "checkout.session.completed") {
-        await this.processSuccessfulPayment(data.data.object)
-      }
-      return { received: true, dummy: true }
+      this.logger.error("Stripe webhook received without STRIPE_WEBHOOK_SECRET set")
+      throw new BadRequestException("Webhook not configured — set STRIPE_WEBHOOK_SECRET in .env.development (run `stripe listen --forward-to localhost:4000/api/v1/billing/webhook/stripe`)")
     }
 
     let event: any
@@ -96,24 +93,38 @@ export class BillingService {
     const walletId = session.metadata?.walletId || session.client_reference_id
     if (!walletId) return
 
-    const amount = parseInt(session.metadata?.amount || "0", 10)
-    if (!amount) return
-
-    // Prevent double processing by checking if reference already exists
-    const existingTx = await this.prisma.transaction.findFirst({
-      where: { reference: session.id },
-    })
-
-    if (existingTx) {
-      this.logger.warn(`Transaction for session ${session.id} already processed`)
+    // Amount from Stripe authoritative source (amount_total is in cents)
+    const amount = Math.round((session.amount_total ?? 0) / 100)
+    if (amount <= 0) {
+      this.logger.warn(`Invalid amount ${amount} in webhook session ${session.id}`)
       return
     }
 
+    const orgId = session.metadata?.organizationId || "system"
+
     await this.prisma.$transaction(async (tx: any) => {
-      await tx.wallet.update({
-        where: { id: walletId },
-        data: { availableBalance: { increment: amount } },
+      // Idempotency: unique constraint on Transaction.reference prevents duplicates
+      // Even if two webhooks arrive concurrently, only one tx.reference = session.id commits
+      const existingTx = await tx.transaction.findFirst({
+        where: { reference: session.id },
       })
+      if (existingTx) {
+        this.logger.warn(`Transaction for session ${session.id} already processed`)
+        return
+      }
+
+      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const updated = await tx.wallet.updateMany({
+        where: { id: walletId, version: wallet.version },
+        data: {
+          availableBalance: { increment: amount },
+          version: { increment: 1 },
+        },
+      })
+      if (updated.count === 0) {
+        throw new ConflictException("Wallet was modified by another request. Retry.")
+      }
+
       await tx.transaction.create({
         data: {
           walletId,
@@ -124,8 +135,6 @@ export class BillingService {
         },
       })
     })
-
-    const orgId = session.metadata?.organizationId || "system"
 
     await this.audit.log({
       action: "WALLET_DEPOSIT",
@@ -138,26 +147,28 @@ export class BillingService {
   }
 
   async getWallet(organizationId: string | null, userId: string) {
-    const where = organizationId ? { organizationId } : { userId }
-    let wallet = await this.prisma.wallet.findFirst({
-      where,
-      include: { transactions: { orderBy: { createdAt: "desc" }, take: 50 } },
-    })
+    const include = { transactions: { orderBy: { createdAt: "desc" as const }, take: 50 } }
 
+    if (organizationId) {
+      // @@unique([organizationId]) makes upsert race-safe
+      return this.prisma.wallet.upsert({
+        where: { organizationId },
+        create: { availableBalance: 0, reservedBalance: 0, currency: "USD", organizationId, userId },
+        update: {},
+        include,
+      })
+    }
+
+    // userId has no unique constraint — fall back to find/create with conflict retry
+    let wallet = await this.prisma.wallet.findFirst({ where: { userId }, include })
     if (!wallet) {
       try {
-        const data = organizationId
-          ? { availableBalance: 0, reservedBalance: 0, currency: "USD", organizationId, userId }
-          : { availableBalance: 0, reservedBalance: 0, currency: "USD", userId }
         wallet = await this.prisma.wallet.create({
-          data,
-          include: { transactions: { orderBy: { createdAt: "desc" }, take: 50 } },
+          data: { availableBalance: 0, reservedBalance: 0, currency: "USD", userId },
+          include,
         })
       } catch (err) {
-        wallet = await this.prisma.wallet.findFirst({
-          where,
-          include: { transactions: { orderBy: { createdAt: "desc" }, take: 50 } },
-        })
+        wallet = await this.prisma.wallet.findFirst({ where: { userId }, include })
         if (!wallet) throw err
       }
     }
@@ -166,18 +177,31 @@ export class BillingService {
 
   async deposit(walletId: string, amount: number, user: any, reference?: string) {
     const result = await this.prisma.$transaction(async (tx: any) => {
-      const wallet = await tx.wallet.findUnique({ where: { id: walletId } })
-      if (!wallet) throw new NotFoundException("Wallet not found")
-      const owned = (
-        (wallet.organizationId && wallet.organizationId === user.organizationId) ||
-        (!wallet.organizationId && wallet.userId === user.id)
-      )
-      if (!owned) throw new ForbiddenException("Wallet does not belong to this account")
+      if (reference) {
+        const existing = await tx.transaction.findFirst({
+          where: { reference, type: "DEPOSIT" },
+        })
+        if (existing) {
+          this.logger.warn(`Duplicate deposit detected: ${reference}`)
+          throw new BadRequestException("Deposit with this reference already exists")
+        }
+      }
+      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      this.assertWalletOwned(wallet, user)
 
-      const updated = await tx.wallet.update({
-        where: { id: walletId },
-        data: { availableBalance: { increment: amount } },
+      const updated = await tx.wallet.updateMany({
+        where: { id: walletId, version: wallet.version },
+        data: {
+          availableBalance: { increment: amount },
+          version: { increment: 1 },
+        },
       })
+      if (updated.count === 0) {
+        throw new ConflictException("Wallet was modified by another request. Retry.")
+      }
+
+      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+
       await tx.transaction.create({
         data: {
           walletId,
@@ -187,7 +211,7 @@ export class BillingService {
           description: `Deposit of ${amount}`,
         },
       })
-      return updated
+      return fresh
     })
 
     await this.audit.log({
@@ -202,37 +226,49 @@ export class BillingService {
     return result
   }
 
-  async withdraw(walletId: string, amount: number, user: any) {
+  async withdraw(walletId: string, amount: number, user: any, idempotencyKey?: string) {
     const result = await this.prisma.$transaction(async (tx: any) => {
-      const wallet = await tx.wallet.findUnique({ where: { id: walletId } })
-      if (!wallet) throw new NotFoundException("Wallet not found")
-      const owned = (
-        (wallet.organizationId && wallet.organizationId === user.organizationId) ||
-        (!wallet.organizationId && wallet.userId === user.id)
-      )
-      if (!owned) throw new ForbiddenException("Wallet does not belong to this account")
+      if (idempotencyKey) {
+        const existing = await tx.transaction.findFirst({
+          where: { reference: idempotencyKey, type: "WITHDRAWAL" },
+        })
+        if (existing) {
+          this.logger.warn(`Duplicate withdrawal detected: ${idempotencyKey}`)
+          throw new BadRequestException("Withdrawal with this idempotency key already exists")
+        }
+      }
+      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      this.assertWalletOwned(wallet, user)
 
-      const current = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
-      const available = new Decimal(current.availableBalance)
+      const available = new Decimal(wallet.availableBalance)
       if (available.lessThan(amount)) {
         throw new BadRequestException("Insufficient available balance")
       }
 
-      const updated = await tx.wallet.update({
-        where: { id: walletId },
-        data: { availableBalance: { decrement: amount } },
+      const updated = await tx.wallet.updateMany({
+        where: { id: walletId, version: wallet.version },
+        data: {
+          availableBalance: { decrement: amount },
+          version: { increment: 1 },
+        },
       })
+      if (updated.count === 0) {
+        throw new ConflictException("Wallet was modified by another request. Retry.")
+      }
+
+      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
 
       await tx.transaction.create({
         data: {
           walletId,
           amount: -amount,
           type: "WITHDRAWAL",
+          reference: idempotencyKey ?? null,
           description: `Withdrawal of ${amount}`,
         },
       })
 
-      return updated
+      return fresh
     })
 
     await this.audit.log({
@@ -260,26 +296,27 @@ export class BillingService {
 
   async reserve(walletId: string, amount: number, orderId: string, user: any) {
     return this.prisma.$transaction(async (tx: any) => {
-      const wallet = await tx.wallet.findUnique({ where: { id: walletId } })
-      if (!wallet) throw new NotFoundException("Wallet not found")
-      const owned = (
-        (wallet.organizationId && wallet.organizationId === user.organizationId) ||
-        (!wallet.organizationId && wallet.userId === user.id)
-      )
-      if (!owned) throw new ForbiddenException("Wallet does not belong to this account")
+      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      this.assertWalletOwned(wallet, user)
 
       const available = new Decimal(wallet.availableBalance)
       if (available.lessThan(amount)) {
         throw new BadRequestException("Insufficient available balance to reserve")
       }
 
-      const updated = await tx.wallet.update({
-        where: { id: walletId },
+      const updated = await tx.wallet.updateMany({
+        where: { id: walletId, version: wallet.version },
         data: {
           availableBalance: { decrement: amount },
           reservedBalance: { increment: amount },
+          version: { increment: 1 },
         },
       })
+      if (updated.count === 0) {
+        throw new ConflictException("Wallet was modified by another request. Retry.")
+      }
+
+      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
 
       await tx.transaction.create({
         data: {
@@ -291,68 +328,32 @@ export class BillingService {
         },
       })
 
-      return updated
-    })
-  }
-
-  async release(walletId: string, amount: number, orderId: string, user: any) {
-    return this.prisma.$transaction(async (tx: any) => {
-      const wallet = await tx.wallet.findUnique({ where: { id: walletId } })
-      if (!wallet) throw new NotFoundException("Wallet not found")
-      const owned = (
-        (wallet.organizationId && wallet.organizationId === user.organizationId) ||
-        (!wallet.organizationId && wallet.userId === user.id)
-      )
-      if (!owned) throw new ForbiddenException("Wallet does not belong to this account")
-
-      const reserved = new Decimal(wallet.reservedBalance)
-      if (reserved.lessThan(amount)) {
-        throw new BadRequestException("Insufficient reserved balance to release")
-      }
-
-      const updated = await tx.wallet.update({
-        where: { id: walletId },
-        data: {
-          reservedBalance: { decrement: amount },
-          availableBalance: { increment: amount },
-        },
-      })
-
-      await tx.transaction.create({
-        data: {
-          walletId,
-          amount,
-          type: "RELEASE",
-          orderId,
-          description: `Release of ${amount} reservation for order ${orderId}`,
-        },
-      })
-
-      return updated
+      return fresh
     })
   }
 
   async payFromReserved(walletId: string, amount: number, orderId: string, user: any) {
     return this.prisma.$transaction(async (tx: any) => {
-      const wallet = await tx.wallet.findUnique({ where: { id: walletId } })
-      if (!wallet) throw new NotFoundException("Wallet not found")
-      const owned = (
-        (wallet.organizationId && wallet.organizationId === user.organizationId) ||
-        (!wallet.organizationId && wallet.userId === user.id)
-      )
-      if (!owned) throw new ForbiddenException("Wallet does not belong to this account")
+      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      this.assertWalletOwned(wallet, user)
 
       const reserved = new Decimal(wallet.reservedBalance)
       if (reserved.lessThan(amount)) {
         throw new BadRequestException("Insufficient reserved balance")
       }
 
-      const updated = await tx.wallet.update({
-        where: { id: walletId },
+      const updated = await tx.wallet.updateMany({
+        where: { id: walletId, version: wallet.version },
         data: {
           reservedBalance: { decrement: amount },
+          version: { increment: 1 },
         },
       })
+      if (updated.count === 0) {
+        throw new ConflictException("Wallet was modified by another request. Retry.")
+      }
+
+      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
 
       await tx.transaction.create({
         data: {
@@ -364,7 +365,63 @@ export class BillingService {
         },
       })
 
-      return updated
+      return fresh
     })
+  }
+
+  async refund(walletId: string, amount: number, orderId: string, user: any) {
+    const result = await this.prisma.$transaction(async (tx: any) => {
+      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      this.assertWalletOwned(wallet, user)
+
+      // Idempotency check using unique reference — database-level @@unique prevents race
+      const existingRefund = await tx.transaction.findFirst({
+        where: { orderId, type: "REFUND" },
+      })
+      if (existingRefund) {
+        throw new BadRequestException("Order already refunded")
+      }
+
+      // Refund is for CAPTURED payments only (callers enforce paymentStatus=PAID).
+      // Capture already consumed this order's reservation, so reservedBalance must
+      // NOT be touched here — any reserved funds belong to other orders. The full
+      // amount returns from the platform to availableBalance.
+      const updated = await tx.wallet.updateMany({
+        where: { id: walletId, version: wallet.version },
+        data: {
+          availableBalance: { increment: amount },
+          version: { increment: 1 },
+        },
+      })
+      if (updated.count === 0) {
+        throw new ConflictException("Concurrent wallet modification")
+      }
+
+      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+
+      await tx.transaction.create({
+        data: {
+          walletId,
+          amount,
+          type: "REFUND",
+          orderId,
+          reference: `refund-${orderId}`,
+          description: `Refund of ${amount} for order ${orderId}`,
+        },
+      })
+
+      return fresh
+    })
+
+    await this.audit.log({
+      action: "WALLET_REFUND",
+      entityType: "Wallet",
+      entityId: walletId,
+      metadata: { amount, orderId },
+      userId: user.id,
+      organizationId: user.organizationId,
+    })
+
+    return result
   }
 }
