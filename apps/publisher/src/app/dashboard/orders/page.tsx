@@ -18,6 +18,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
+import { ErrorState } from "@guestpost/ui"
 import { Skeleton } from "@guestpost/ui"
 import { Card, CardContent } from "@guestpost/ui"
 import {
@@ -33,96 +34,65 @@ type OrderStatus =
   | "DRAFT"
   | "PENDING_PAYMENT"
   | "PAID"
-  | "ASSIGNED"
+  | "SUBMITTED"
+  | "ACCEPTED"
+  | "CONTENT_REQUESTED"
   | "CONTENT_CREATION"
-  | "OUTREACH"
+  | "CONTENT_READY"
+  | "CUSTOMER_REVIEW"
+  | "APPROVED"
   | "PUBLISHED"
   | "VERIFIED"
+  | "DELIVERED"
+  | "SETTLED"
   | "COMPLETED"
   | "CANCELLED"
   | "REFUNDED"
-  | "UNDER_REVIEW"
+  | "DISPUTED"
 
 const statusConfig: Record<
   OrderStatus,
   { label: string; icon: React.ElementType; variant: "default" | "secondary" | "destructive" | "success" | "warning" | "info" }
 > = {
+  DRAFT: { label: "Draft", icon: FileText, variant: "secondary" },
   PENDING_PAYMENT: { label: "Pending Payment", icon: Clock, variant: "warning" },
   PAID: { label: "Paid", icon: Clock, variant: "info" },
-  ASSIGNED: { label: "Assigned", icon: AlertCircle, variant: "info" },
+  SUBMITTED: { label: "Awaiting Acceptance", icon: AlertCircle, variant: "info" },
+  ACCEPTED: { label: "Accepted", icon: CheckCircle, variant: "info" },
+  CONTENT_REQUESTED: { label: "Content Requested", icon: FileText, variant: "info" },
   CONTENT_CREATION: { label: "In Progress", icon: FileText, variant: "info" },
-  OUTREACH: { label: "Outreach", icon: Send, variant: "info" },
-  UNDER_REVIEW: { label: "Under Review", icon: Clock, variant: "warning" },
+  CONTENT_READY: { label: "Content Ready", icon: FileText, variant: "info" },
+  CUSTOMER_REVIEW: { label: "Customer Review", icon: Clock, variant: "warning" },
+  APPROVED: { label: "Approved", icon: CheckCircle, variant: "info" },
   PUBLISHED: { label: "Published", icon: CheckCircle, variant: "success" },
   VERIFIED: { label: "Verified", icon: CheckCircle, variant: "success" },
+  DELIVERED: { label: "Delivered", icon: CheckCircle, variant: "success" },
+  SETTLED: { label: "Settled", icon: CheckCircle, variant: "success" },
   COMPLETED: { label: "Completed", icon: CheckCircle, variant: "success" },
-  DRAFT: { label: "Draft", icon: FileText, variant: "secondary" },
   CANCELLED: { label: "Cancelled", icon: AlertCircle, variant: "destructive" },
   REFUNDED: { label: "Refunded", icon: AlertCircle, variant: "destructive" },
+  DISPUTED: { label: "Disputed", icon: AlertCircle, variant: "destructive" },
 }
 
-const mockOrders = [
-  {
-    id: "ord_1",
-    status: "CONTENT_CREATION" as OrderStatus,
-    customerName: "Acme Corp",
-    serviceType: "GUEST_POST",
-    website: "techdaily.example.com",
-    price: 150,
-    dueDate: "2026-06-15",
-    createdAt: "2026-06-01",
-  },
-  {
-    id: "ord_2",
-    status: "PUBLISHED" as OrderStatus,
-    customerName: "TechStart Inc",
-    serviceType: "EDITORIAL_LINK",
-    website: "financeworld.example.com",
-    price: 200,
-    dueDate: "2026-06-10",
-    createdAt: "2026-05-25",
-  },
-  {
-    id: "ord_3",
-    status: "ASSIGNED" as OrderStatus,
-    customerName: "Growth Labs",
-    serviceType: "NICHE_EDIT",
-    website: "healthyliving.example.com",
-    price: 120,
-    dueDate: "2026-06-20",
-    createdAt: "2026-06-03",
-  },
-  {
-    id: "ord_4",
-    status: "OUTREACH" as OrderStatus,
-    customerName: "DigitalFirst",
-    serviceType: "GUEST_POST",
-    website: "techdaily.example.com",
-    price: 175,
-    dueDate: "2026-06-18",
-    createdAt: "2026-06-02",
-  },
-]
-
 const WORKFLOW_STEPS = [
-  { status: "ASSIGNED", label: "Accept" },
-  { status: "CONTENT_CREATION", label: "Create Content" },
-  { status: "OUTREACH", label: "Submit" },
-  { status: "PUBLISHED", label: "Publish" },
-  { status: "COMPLETED", label: "Complete" },
+  { statuses: ["SUBMITTED"], label: "Accept" },
+  { statuses: ["ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY"], label: "Create Content" },
+  { statuses: ["CUSTOMER_REVIEW", "APPROVED"], label: "Review" },
+  { statuses: ["PUBLISHED", "VERIFIED"], label: "Publish" },
+  { statuses: ["DELIVERED", "SETTLED", "COMPLETED"], label: "Complete" },
 ]
 
 function getWorkflowStep(status: OrderStatus): number {
-  const stepIndex = WORKFLOW_STEPS.findIndex((s) => s.status === status)
+  const stepIndex = WORKFLOW_STEPS.findIndex((s) => s.statuses.includes(status))
   return stepIndex === -1 ? 0 : stepIndex
 }
 
 function OrderCard({
   order,
 }: {
-  order: (typeof mockOrders)[0]
+  order: any
 }) {
-  const config = statusConfig[order.status]
+  const config = statusConfig[order.status as OrderStatus] || statusConfig.DRAFT
   const Icon = config.icon
   const currentStep = getWorkflowStep(order.status)
 
@@ -161,7 +131,7 @@ function OrderCard({
           <p className="mb-2 text-xs text-muted-foreground">Workflow Progress</p>
           <div className="flex items-center gap-1">
             {WORKFLOW_STEPS.map((step, index) => (
-              <div key={step.status} className="flex items-center">
+              <div key={step.label} className="flex items-center">
                 <div
                   className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
                     index <= currentStep
@@ -183,7 +153,7 @@ function OrderCard({
           </div>
           <div className="mt-1 flex justify-between text-xs text-muted-foreground">
             {WORKFLOW_STEPS.map((step) => (
-              <span key={step.status}>{step.label}</span>
+              <span key={step.label}>{step.label}</span>
             ))}
           </div>
         </div>
@@ -208,7 +178,7 @@ export default function OrdersPage() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "ALL">("ALL")
 
-  const { data: orders = mockOrders, isLoading, refetch } = useQuery({
+  const { data: orders = [], isLoading, refetch, error } = useQuery({
     queryKey: ["publisher-orders"],
     queryFn: () => api.orders.list(),
   })
@@ -216,6 +186,15 @@ export default function OrdersPage() {
   const filteredOrders = orders.filter(
     (order: any) => statusFilter === "ALL" || order.status === statusFilter
   )
+
+  if (error)
+    return (
+      <ErrorState
+        title="Failed to load orders"
+        description={(error as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
 
   if (isLoading) {
     return (

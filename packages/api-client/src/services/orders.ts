@@ -70,4 +70,30 @@ export class OrdersService {
   submitPayment(id: string) {
     return this.client.post<OrderResponse>(`/orders/${id}/submit-payment`)
   }
+
+  cancel(id: string) {
+    return this.client.post<OrderResponse>(`/orders/${id}/cancel`)
+  }
+
+  // ─── Publisher fulfillment actions ───────────────────────
+
+  accept(id: string) {
+    return this.client.post<OrderResponse>(`/orders/${id}/accept`)
+  }
+
+  submitContent(id: string, content?: string) {
+    return this.client.post<OrderResponse>(`/orders/${id}/submit-content`, { json: { content } })
+  }
+
+  markContentReady(id: string) {
+    return this.client.post<OrderResponse>(`/orders/${id}/mark-content-ready`)
+  }
+
+  submitForReview(id: string) {
+    return this.client.post<OrderResponse>(`/orders/${id}/submit-for-review`)
+  }
+
+  markPublished(id: string, url: string) {
+    return this.client.post<OrderResponse>(`/orders/${id}/mark-published`, { json: { url } })
+  }
 }

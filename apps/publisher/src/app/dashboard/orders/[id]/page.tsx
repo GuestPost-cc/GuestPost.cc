@@ -1,6 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { useParams, useRouter } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
@@ -22,6 +25,7 @@ import {
 } from "lucide-react"
 import { Button } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
+import { ErrorState } from "@guestpost/ui"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
@@ -43,31 +47,6 @@ const statusConfig: Record<
   UNDER_REVIEW: { label: "Under Review", icon: Clock, color: "text-amber-500" },
   CANCELLED: { label: "Cancelled", icon: XCircle, color: "text-destructive" },
   REJECTED: { label: "Rejected", icon: XCircle, color: "text-destructive" },
-}
-
-const mockOrderDetails = {
-  id: "ord_abc123",
-  status: "CONTENT_CREATION",
-  items: [
-    {
-      id: "item_1",
-      serviceType: "GUEST_POST",
-      topic: "The Future of AI in Digital Marketing",
-      instructions: "Write an informative article about AI tools for marketing teams. Include examples and statistics.",
-      budget: 150,
-      website: { id: "ws_1", url: "techdaily.example.com" },
-    },
-  ],
-  totalAmount: 150,
-  currency: "USD",
-  createdAt: "2026-06-01T10:00:00Z",
-  updatedAt: "2026-06-03T14:30:00Z",
-  events: [
-    { id: "ev_1", eventType: "ORDER_CREATED", createdAt: "2026-06-01T10:00:00Z" },
-    { id: "ev_2", eventType: "PAYMENT_RECEIVED", createdAt: "2026-06-01T10:05:00Z" },
-    { id: "ev_3", eventType: "ASSIGNED", createdAt: "2026-06-01T12:00:00Z" },
-    { id: "ev_4", eventType: "CONTENT_SUBMITTED", createdAt: "2026-06-03T14:30:00Z" },
-  ],
 }
 
 function TimelineItem({
@@ -109,28 +88,70 @@ export default function OrderDetailPage() {
   const router = useRouter()
   const orderId = params.id as string
   const queryClient = useQueryClient()
-  const [submitting, setSubmitting] = useState(false)
-  const [content, setContent] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
+  const [publishedUrl, setPublishedUrl] = useState("")
 
-  const { data: order = mockOrderDetails, isLoading } = useQuery({
+  const contentSchema = z.object({
+    content: z.string().min(1, "Content is required"),
+  })
+
+  type ContentFormData = z.infer<typeof contentSchema>
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<ContentFormData>({
+    resolver: zodResolver(contentSchema),
+  })
+
+  const { data: order, isLoading, error } = useQuery({
     queryKey: ["order", orderId],
     queryFn: () => api.orders.getById(orderId),
   })
 
-  const { data: events = [] } = useQuery({
+  const { data: events = [], error: eventsError } = useQuery({
     queryKey: ["order-events", orderId],
     queryFn: () => api.orders.getEvents(orderId),
   })
 
-  const transitionMutation = useMutation({
-    mutationFn: (status: string) => api.orders.transitionStatus(orderId, status as any),
+  const acceptMutation = useMutation({
+    mutationFn: () => api.orders.accept(orderId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["order", orderId] })
-      toast.success("Status updated")
+      toast.success("Order accepted")
     },
     onError: () => {
-      toast.error("Failed to update status")
+      toast.error("Failed to accept order")
+    },
+  })
+
+  const markPublishedMutation = useMutation({
+    mutationFn: (url: string) => api.orders.markPublished(orderId, url),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["order", orderId] })
+      toast.success("Order marked as published")
+    },
+    onError: () => {
+      toast.error("Failed to mark as published")
+    },
+  })
+
+  const contentSubmitMutation = useMutation({
+    mutationFn: async (data: ContentFormData) => {
+      await api.orders.submitContent(orderId, data.content)
+      await api.orders.markContentReady(orderId)
+      await api.orders.submitForReview(orderId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["order", orderId] })
+      toast.success("Content submitted successfully")
+      reset()
+      setAttachments([])
+    },
+    onError: () => {
+      toast.error("Failed to submit content")
     },
   })
 
@@ -140,19 +161,19 @@ export default function OrderDetailPage() {
     }
   }
 
-  const handleContentSubmit = async () => {
-    setSubmitting(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-      toast.success("Content submitted successfully")
-      setContent("")
-      setAttachments([])
-    } catch (error) {
-      toast.error("Failed to submit content")
-    } finally {
-      setSubmitting(false)
-    }
+  const handleContentSubmit = (data: ContentFormData) => {
+    contentSubmitMutation.mutate(data)
   }
+
+  const orderError = error ?? eventsError
+  if (orderError)
+    return (
+      <ErrorState
+        title="Failed to load order"
+        description={(orderError as Error).message}
+        onRetry={() => queryClient.invalidateQueries({ queryKey: ["order", orderId] })}
+      />
+    )
 
   if (isLoading) {
     return (
@@ -164,9 +185,19 @@ export default function OrderDetailPage() {
     )
   }
 
+  if (!order) {
+    return (
+      <ErrorState
+        title="Order not found"
+        description="The requested order could not be found."
+      />
+    )
+  }
+
   const currentStatus = order.status
-  const canSubmitContent = currentStatus === "CONTENT_CREATION"
-  const canMarkPublished = currentStatus === "OUTREACH" || currentStatus === "UNDER_REVIEW"
+  const canAccept = currentStatus === "SUBMITTED"
+  const canSubmitContent = currentStatus === "ACCEPTED" || currentStatus === "CONTENT_REQUESTED"
+  const canMarkPublished = currentStatus === "APPROVED"
 
   return (
     <div className="space-y-6">
@@ -249,6 +280,26 @@ export default function OrderDetailPage() {
             </CardContent>
           </Card>
 
+          {canAccept && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Accept Order</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Accept this order to start working on the content.
+                </p>
+                <Button
+                  onClick={() => acceptMutation.mutate()}
+                  disabled={acceptMutation.isPending}
+                >
+                  <CheckCircle className="mr-2 h-4 w-4" />
+                  {acceptMutation.isPending ? "Accepting..." : "Accept Order"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {canSubmitContent && (
             <Card>
               <CardHeader>
@@ -267,9 +318,9 @@ export default function OrderDetailPage() {
                     id="content"
                     rows={10}
                     placeholder="Paste your article content here..."
-                    value={content}
-                    onChange={(e) => setContent(e.target.value)}
+                    {...register("content")}
                   />
+                  {errors.content && <p className="text-sm text-destructive">{errors.content.message}</p>}
                 </div>
 
                 <div className="space-y-2">
@@ -294,10 +345,10 @@ export default function OrderDetailPage() {
                 </div>
 
                 <Button
-                  onClick={handleContentSubmit}
-                  disabled={submitting || !content.trim()}
+                  onClick={handleFormSubmit(handleContentSubmit)}
+                  disabled={contentSubmitMutation.isPending}
                 >
-                  {submitting ? "Submitting..." : "Submit for Review"}
+                  {contentSubmitMutation.isPending ? "Submitting..." : "Submit for Review"}
                 </Button>
               </CardContent>
             </Card>
@@ -308,13 +359,23 @@ export default function OrderDetailPage() {
               <CardHeader>
                 <CardTitle className="text-base">Mark as Published</CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="mb-4 text-sm text-muted-foreground">
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
                   Confirm that the guest post has been published on the target website.
                 </p>
+                <div className="space-y-2">
+                  <Label htmlFor="publishedUrl">Published URL</Label>
+                  <Input
+                    id="publishedUrl"
+                    type="url"
+                    placeholder="https://example.com/your-guest-post"
+                    value={publishedUrl}
+                    onChange={(e) => setPublishedUrl(e.target.value)}
+                  />
+                </div>
                 <Button
-                  onClick={() => transitionMutation.mutate("PUBLISHED")}
-                  disabled={transitionMutation.isPending}
+                  onClick={() => markPublishedMutation.mutate(publishedUrl)}
+                  disabled={markPublishedMutation.isPending || !publishedUrl}
                 >
                   <ExternalLink className="mr-2 h-4 w-4" />
                   Mark as Published
@@ -353,12 +414,30 @@ export default function OrderDetailPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               <Button variant="outline" className="w-full justify-start" asChild>
-                <Link href="/dashboard/orders">
+                <Link href={`/dashboard/support?new=true&subject=Order%20${orderId}`}>
                   <MessageSquare className="mr-2 h-4 w-4" />
                   Contact Support
                 </Link>
               </Button>
-              <Button variant="outline" className="w-full justify-start">
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                onClick={() => {
+                  const invoice = {
+                    orderId,
+                    amount: order?.totalAmount,
+                    date: order?.createdAt,
+                  }
+                  const blob = new Blob([JSON.stringify(invoice, null, 2)], { type: "application/json" })
+                  const url = URL.createObjectURL(blob)
+                  const a = document.createElement("a")
+                  a.href = url
+                  a.download = `invoice-${orderId.slice(0, 8)}.json`
+                  a.click()
+                  URL.revokeObjectURL(url)
+                  toast.success("Invoice downloaded")
+                }}
+              >
                 <Download className="mr-2 h-4 w-4" />
                 Download Invoice
               </Button>

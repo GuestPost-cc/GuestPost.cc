@@ -34,23 +34,20 @@ const kpiConfig = [
   { key: "lifetime", label: "Lifetime Earnings", icon: TrendingUp, color: "text-purple-500" },
 ]
 
-const mockChartData = [
-  { month: "Jan", earnings: 2400 },
-  { month: "Feb", earnings: 1398 },
-  { month: "Mar", earnings: 9800 },
-  { month: "Apr", earnings: 3908 },
-  { month: "May", earnings: 4800 },
-  { month: "Jun", earnings: 3800 },
-]
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-const mockOrdersData = [
-  { month: "Jan", orders: 12 },
-  { month: "Feb", orders: 19 },
-  { month: "Mar", orders: 8 },
-  { month: "Apr", orders: 24 },
-  { month: "May", orders: 32 },
-  { month: "Jun", orders: 18 },
-]
+function aggregateMonthlyData(orders: any[], field: string) {
+  const data: Record<string, number> = {}
+  for (const o of orders) {
+    const d = new Date(o.createdAt)
+    const key = MONTHS[d.getMonth()]
+    data[key] = (data[key] || 0) + (Number(o[field]) || 0)
+  }
+  return MONTHS.filter((m) => data[m] !== undefined).map((month) => ({
+    month,
+    [field]: data[month] || 0,
+  }))
+}
 
 function KPICard({
   label,
@@ -140,14 +137,23 @@ export default function DashboardPage() {
     )
   }
 
+  const chartData = aggregateMonthlyData(orders, "totalAmount")
+  const ordersChartData = aggregateMonthlyData(orders, "totalAmount").map((d, i) => ({
+    ...d,
+    orders: orders.filter((o) => new Date(o.createdAt).getMonth() === i).length,
+  }))
+
   const pendingOrders = orders.filter(
-    (o) => o.status === "PENDING_PAYMENT" || o.status === "PAID" || o.status === "ASSIGNED"
+    (o) => o.status === "PENDING_PAYMENT" || o.status === "PAID" || o.status === "SUBMITTED"
   ).length
   const activeOrders = orders.filter(
     (o) =>
+      o.status === "ACCEPTED" ||
+      o.status === "CONTENT_REQUESTED" ||
       o.status === "CONTENT_CREATION" ||
-      o.status === "OUTREACH" ||
-      o.status === "UNDER_REVIEW"
+      o.status === "CONTENT_READY" ||
+      o.status === "CUSTOMER_REVIEW" ||
+      o.status === "APPROVED"
   ).length
 
   const withdrawable = balance
@@ -208,7 +214,7 @@ export default function DashboardPage() {
         <ChartCard title="Earnings Overview">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={mockChartData}>
+              <AreaChart data={chartData.length > 0 ? chartData : [{ month: "No data", earnings: 0 }]}>
                 <defs>
                   <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="currentColor" stopOpacity={0.1} />
@@ -241,7 +247,7 @@ export default function DashboardPage() {
         <ChartCard title="Orders Volume">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockOrdersData}>
+              <BarChart data={ordersChartData.length > 0 ? ordersChartData : [{ month: "No data", orders: 0 }]}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" className="text-xs" tick={{ fontSize: 12 }} />
                 <YAxis className="text-xs" tick={{ fontSize: 12 }} />
