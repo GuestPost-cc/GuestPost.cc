@@ -3,10 +3,13 @@ import { ReportingService } from "./reporting.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import { ActorType } from "../../common/decorators/actor-type.decorator"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 
 @Controller("reports")
-@UseGuards(MemberRolesGuard)
-@MemberRoles("OWNER", "MEMBER", "VIEWER")
+@UseGuards(ActorTypeGuard, MemberRolesGuard)
+@ActorType("CUSTOMER")
+@MemberRoles("OWNER", "MEMBER")
 export class ReportingController {
   constructor(private readonly reporting: ReportingService) {}
 

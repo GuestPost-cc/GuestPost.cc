@@ -1,0 +1,37 @@
+# Connected project metadata for bedrock.
+
+version: 4
+ontology_model: 2
+
+project:
+  name: guestpost-platform
+  slug: guestpost-platform
+  repo_root: .
+  profile_hint: hybrid
+
+knowledge:
+  vault_mode: local
+  pointer_path: ./bedrock
+  real_path: /Users/shohan/Desktop/GuestPost/guestpost-platform/bedrock
+  ignore_file: ./.agentknowledgeignore
+  memory_root: ./bedrock/Memory/PROJECT.md
+  work_root: ./bedrock/Work
+  views_root: ./bedrock/Views
+  site_root: ./bedrock/Views/site
+  graph_root: ./bedrock/Views/graph
+  obsidian_mode: lightweight
+
+onboarding:
+  status: pending
+
+sync:
+  bootstrap_on_connect: true
+  import_evidence_on_sync: true
+  graph_import_optional: true
+  compact_memory_on_ship: true
+
+hooks:
+  cursor_hooks_file: ./.cursor/hooks.json
+  project_sync_command: bedrock update --project .
+  graph_sync_command: bedrock graphify-sync --project .
+framework_version: "0.4.16"

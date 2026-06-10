@@ -1,0 +1,37 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/guestpost-platform && bedrock refresh-system --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+          }
+        ]
+      }
+    ]
+  }
+}

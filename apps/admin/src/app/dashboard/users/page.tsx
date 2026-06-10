@@ -202,7 +202,29 @@ function UsersPageContent() {
 
   const banMutation = useMutation({
     mutationFn: async (userId: string) => {
-      return api.admin.updateUserRole(userId, "BANNED")
+      const { getToken, getApiUrl } = await import("../../../lib/api")
+      const token = getToken()
+      const res = await fetch(`${getApiUrl()}/admin/users/${userId}/ban`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ banned: true }),
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const fallback = await fetch(`${getApiUrl()}/admin/users/${userId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ banned: true }),
+          credentials: "include",
+        })
+        if (!fallback.ok) throw new Error(await fallback.text())
+      }
     },
     onSuccess: () => {
       toast.success("User suspended")
@@ -213,7 +235,29 @@ function UsersPageContent() {
 
   const restoreMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      return api.admin.updateUserRole(userId, role)
+      const { getToken, getApiUrl } = await import("../../../lib/api")
+      const token = getToken()
+      const res = await fetch(`${getApiUrl()}/admin/users/${userId}/ban`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ banned: false }),
+        credentials: "include",
+      })
+      if (!res.ok) {
+        const fallback = await fetch(`${getApiUrl()}/admin/users/${userId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ banned: false }),
+          credentials: "include",
+        })
+        if (!fallback.ok) throw new Error(await fallback.text())
+      }
     },
     onSuccess: () => {
       toast.success("User restored")

@@ -1,6 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../../lib/api"
 import { useAuth } from "../../../../../lib/auth"
@@ -191,20 +194,24 @@ function InviteMemberForm({
   onSubmit: (data: { email: string; role: string }) => void
   isLoading: boolean
 }) {
-  const [email, setEmail] = useState("")
-  const [role, setRole] = useState("MEMBER")
-  const [error, setError] = useState("")
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    if (!email.trim()) { setError("Email is required"); return }
-    if (!role) { setError("Role is required"); return }
-    onSubmit({ email: email.trim(), role })
-  }
+  const {
+    register,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(
+      z.object({
+        email: z.string().email("Invalid email address"),
+        role: z.string().min(1, "Role is required"),
+      })
+    ),
+    defaultValues: { email: "", role: "MEMBER" },
+  })
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit((data) => onSubmit({ email: data.email.trim(), role: data.role }))}>
       <DialogHeader className="mb-4">
         <DialogTitle>Invite Member</DialogTitle>
         <DialogDescription>Send an invitation to join this organization.</DialogDescription>
@@ -218,16 +225,18 @@ function InviteMemberForm({
               id="email"
               type="email"
               placeholder="colleague@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              {...register("email")}
               className="pl-9"
               autoFocus
             />
           </div>
+          {errors.email?.message && (
+            <p className="text-sm text-destructive">{errors.email.message}</p>
+          )}
         </div>
         <div className="space-y-2">
           <Label htmlFor="role">Role</Label>
-          <Select value={role} onValueChange={setRole}>
+          <Select value={watch("role")} onValueChange={(v) => setValue("role", v)}>
             <SelectTrigger id="role">
               <SelectValue />
             </SelectTrigger>
@@ -236,8 +245,10 @@ function InviteMemberForm({
               <SelectItem value="MEMBER">Member</SelectItem>
             </SelectContent>
           </Select>
+          {errors.role?.message && (
+            <p className="text-sm text-destructive">{errors.role.message}</p>
+          )}
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
       <DialogFooter className="mt-6">
         <DialogClose asChild>

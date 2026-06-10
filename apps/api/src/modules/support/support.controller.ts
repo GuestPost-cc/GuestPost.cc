@@ -3,9 +3,12 @@ import { SupportService } from "./support.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import { ActorType } from "../../common/decorators/actor-type.decorator"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 
 @Controller("support")
-@UseGuards(MemberRolesGuard)
+@UseGuards(ActorTypeGuard, MemberRolesGuard)
+@ActorType("CUSTOMER")
 @MemberRoles("OWNER", "MEMBER")
 export class SupportController {
   constructor(private readonly support: SupportService) {}

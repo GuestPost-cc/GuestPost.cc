@@ -1,0 +1,4 @@
+{"ts":"2026-06-09T00:13:59Z","type":"project_start","tool":"git","slug":"guestpost-platform","summary":"Project started (first commit: 2026-06-07, 16 total commits)"}
+{"ts":"2026-06-09T00:13:59Z","type":"integration_cursor","tool":"cli","slug":"guestpost-platform","summary":"cursor integration detected"}
+{"ts":"2026-06-09T00:13:59Z","type":"integration_claude","tool":"cli","slug":"guestpost-platform","summary":"claude integration detected"}
+{"ts":"2026-06-09T00:13:59Z","type":"backfill","tool":"cli","slug":"guestpost-platform","summary":"History backfill: 16 commits, 0 releases, 2 integrations"}

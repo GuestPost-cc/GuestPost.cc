@@ -2,9 +2,12 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { api } from "../../../../lib/api"
+import { useAuth } from "../../../../lib/auth"
 import { toast } from "sonner"
 import { ArrowLeft, Globe } from "lucide-react"
 import Link from "next/link"
@@ -65,7 +68,8 @@ const niches = [
 
 export default function NewWebsitePage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   const {
     register,
@@ -79,17 +83,29 @@ export default function NewWebsitePage() {
     },
   })
 
-  const onSubmit = async (data: WebsiteFormData) => {
-    setLoading(true)
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+  const addMutation = useMutation({
+    mutationFn: (data: WebsiteFormData) =>
+      api.publishers.addWebsite(user?.publisherId ?? "current", {
+        url: data.url,
+        category: data.niche,
+        language: data.language,
+        country: data.country,
+        domainRating: data.domainRating,
+        monthlyTraffic: data.monthlyTraffic,
+        price: data.price,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
       toast.success("Website added successfully")
       router.push("/dashboard/websites")
-    } catch (error) {
+    },
+    onError: () => {
       toast.error("Failed to add website")
-    } finally {
-      setLoading(false)
-    }
+    },
+  })
+
+  const onSubmit = (data: WebsiteFormData) => {
+    addMutation.mutate(data)
   }
 
   return (
@@ -262,8 +278,8 @@ export default function NewWebsitePage() {
               <Button type="button" variant="outline" asChild>
                 <Link href="/dashboard/websites">Cancel</Link>
               </Button>
-              <Button type="submit" disabled={loading}>
-                {loading ? "Adding..." : "Add Website"}
+              <Button type="submit" disabled={addMutation.isPending}>
+                {addMutation.isPending ? "Adding..." : "Add Website"}
               </Button>
             </div>
           </form>

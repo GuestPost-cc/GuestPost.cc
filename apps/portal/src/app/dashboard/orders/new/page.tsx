@@ -10,7 +10,7 @@ import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
 import { Textarea } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
   Select,
   SelectContent,
@@ -219,13 +219,17 @@ function PublisherSelection({
   const [page, setPage] = useState(0)
   const pageSize = 6
 
-  const { data: publishersData, isLoading } = useQuery({
+  const { data: publishersData, isLoading, error: publishersError, refetch: refetchPublishers } = useQuery({
     queryKey: ["marketplace", search, categoryFilter],
     queryFn: () => api.marketplace.searchPublishers({
       search: search || undefined,
       category: categoryFilter !== "all" ? categoryFilter : undefined,
     }) as Promise<Publisher[]>,
   })
+
+  if (publishersError) {
+    return <ErrorState title="Failed to load publishers" description={(publishersError as Error).message} onRetry={() => refetchPublishers()} />
+  }
 
   const publishers = publishersData ?? []
   const totalPages = Math.ceil(publishers.length / pageSize)
@@ -441,10 +445,14 @@ function ContentRequirements({ data, onUpdate }: { data: Partial<OrderFormData>;
 }
 
 function ReviewStep({ data }: { data: Partial<OrderFormData> }) {
-  const { data: campaignsData } = useQuery({
+  const { data: campaignsData, error: campaignsError, refetch: refetchCampaigns } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns() as Promise<any[]>,
   })
+
+  if (campaignsError) {
+    return <ErrorState title="Failed to load campaigns" description={(campaignsError as Error).message} onRetry={() => refetchCampaigns()} />
+  }
 
   const campaign = campaignsData?.find((c: any) => c.id === data.campaignId)
 
@@ -569,7 +577,7 @@ export default function NewOrderPage() {
   const [submitSuccess, setSubmitSuccess] = useState(false)
   const [submitError, setSubmitError] = useState("")
 
-  const { data: campaignsData } = useQuery({
+  const { data: campaignsData, error: campaignsError, refetch: refetchCampaigns } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns(),
   })
@@ -662,6 +670,10 @@ export default function NewOrderPage() {
         targetUrl: formData.targetUrl,
       }],
     })
+  }
+
+  if (campaignsError) {
+    return <ErrorState title="Failed to load campaigns" description={(campaignsError as Error).message} onRetry={() => refetchCampaigns()} />
   }
 
   if (submitSuccess) {

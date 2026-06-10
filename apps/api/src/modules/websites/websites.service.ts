@@ -83,6 +83,10 @@ export class WebsitesService {
   }
 
   async updateWebsite(publisherId: string, organizationId: string, id: string, dto: UpdateWebsiteDto, user: any) {
+    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    if (!publisher || publisher.organizationId !== organizationId) {
+      throw new NotFoundException("Publisher not found")
+    }
     const website = await this.prisma.website.findFirst({
       where: { id, publisherId },
     })
@@ -139,6 +143,10 @@ export class WebsitesService {
   }
 
   async getWebsites(publisherId: string, organizationId: string) {
+    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    if (!publisher || publisher.organizationId !== organizationId) {
+      throw new NotFoundException("Publisher not found")
+    }
     return this.prisma.website.findMany({
       where: { publisherId },
       include: {
@@ -151,6 +159,10 @@ export class WebsitesService {
   }
 
   async deleteWebsite(publisherId: string, organizationId: string, id: string, user: any) {
+    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    if (!publisher || publisher.organizationId !== organizationId) {
+      throw new NotFoundException("Publisher not found")
+    }
     const website = await this.prisma.website.findFirst({
       where: { id, publisherId },
     })
@@ -183,6 +195,10 @@ export class WebsitesService {
   }
 
   async submitForReview(publisherId: string, organizationId: string, id: string, user: any) {
+    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    if (!publisher || publisher.organizationId !== organizationId) {
+      throw new NotFoundException("Publisher not found")
+    }
     const website = await this.prisma.website.findFirst({
       where: { id, publisherId },
     })

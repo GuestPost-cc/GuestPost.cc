@@ -6,7 +6,7 @@ import { api } from "../../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import {
   Table,
@@ -120,7 +120,7 @@ export default function ReportsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
 
-  const { data: ordersData, isLoading } = useQuery<ReportOrder[]>({
+  const { data: ordersData, isLoading, error, refetch } = useQuery<ReportOrder[]>({
     queryKey: ["orders"],
     queryFn: () => api.orders.list() as Promise<ReportOrder[]>,
   })
@@ -199,6 +199,69 @@ export default function ReportsPage() {
     toast.success("Report exported to CSV")
   }
 
+  const exportToPDF = () => {
+    const win = window.open("", "_blank")
+    if (!win) { toast.error("Pop-up blocked"); return }
+    const rows = publishedOrders.map((order: ReportOrder) => {
+      const item = order.items?.[0]
+      const publishedUrl = getFirstPublishedUrl(order)
+      const publishedDate = getFirstPublishedDate(order)
+      return `<tr>
+        <td>${publishedUrl || "—"}</td>
+        <td>${item?.targetUrl || item?.topic || "—"}</td>
+        <td>${item?.anchorText || "—"}</td>
+        <td>${order.status}</td>
+        <td>${publishedDate ? format(new Date(publishedDate), "PP") : "—"}</td>
+        <td style="text-align:right">$${(Number(order.amount || order.totalAmount || 0)).toFixed(2)}</td>
+      </tr>`
+    }).join("")
+    win.document.write(`<!DOCTYPE html><html><head><title>GuestPost Report</title><style>body{font-family:system-ui,sans-serif;padding:2rem}h1{font-size:1.5rem;margin-bottom:0.5rem}p{margin-bottom:2rem;color:#666}table{width:100%;border-collapse:collapse}th{background:#f5f5f5;text-align:left;padding:8px;font-size:0.875rem;border:1px solid #ddd}td{padding:8px;border:1px solid #ddd;font-size:0.875rem}@media print{body{padding:0.5in}}</style></head><body><h1>GuestPost Order Report</h1><p>Generated ${format(new Date(), "PPpp")} — ${publishedOrders.length} orders</p><table><thead><tr><th>Published URL</th><th>Target URL</th><th>Anchor Text</th><th>Status</th><th>Publish Date</th><th style="text-align:right">Price</th></tr></thead><tbody>${rows}</tbody></table><script>window.print()</script></body></html>`)
+    win.document.close()
+    toast.success("Report opened for PDF export")
+  }
+
+  const exportToXLSX = () => {
+    const headers = ["Order ID", "Published URL", "Target URL", "Anchor Text", "Service", "Status", "Publish Date", "Price"]
+    const rows = publishedOrders.map((order: ReportOrder) => {
+      const item = order.items?.[0]
+      const publishedUrl = getFirstPublishedUrl(order)
+      const publishedDate = getFirstPublishedDate(order)
+      return [
+        order.id,
+        publishedUrl || "",
+        item?.targetUrl || item?.topic || "",
+        item?.anchorText || "",
+        item?.serviceType?.replace(/_/g, " ") || "",
+        order.status,
+        publishedDate ? format(new Date(publishedDate), "yyyy-MM-dd") : "",
+        (Number(order.amount || order.totalAmount || 0)).toFixed(2),
+      ]
+    })
+    const xls = [
+      '<?xml version="1.0"?>',
+      '<?mso-application progid="Excel.Sheet"?>',
+      '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">',
+      '<Worksheet ss:Name="Report">',
+      '<Table>',
+      ...headers.map(h => `<Column ss:AutoFitWidth="1"/>`),
+      '<Row>',
+      ...headers.map(h => `<Cell><Data ss:Type="String">${h}</Data></Cell>`),
+      '</Row>',
+      ...rows.map(row => `<Row>${row.map(cell => `<Cell><Data ss:Type="String">${String(cell).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</Data></Cell>`).join("")}</Row>`),
+      '</Table>',
+      '</Worksheet>',
+      '</Workbook>',
+    ].join("\n")
+    const blob = new Blob([xls], { type: "application/vnd.ms-excel" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `guestpost-report-${format(new Date(), "yyyy-MM-dd")}.xls`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Report exported to XLS (Excel)")
+  }
+
   const exportReport = async (orderId: string) => {
     try {
       await api.reporting.generateOrderReport(orderId)
@@ -207,6 +270,8 @@ export default function ReportsPage() {
       toast.error("Failed to start report generation")
     }
   }
+
+  if (error) return <ErrorState title="Failed to load reports" description={(error as Error).message} onRetry={() => refetch()} />
 
   if (isLoading) {
     return (
@@ -241,11 +306,11 @@ export default function ReportsPage() {
             <Download className="mr-2 h-4 w-4" />
             CSV
           </Button>
-          <Button variant="outline" disabled>
+          <Button variant="outline" onClick={exportToPDF}>
             <FileText className="mr-2 h-4 w-4" />
             PDF
           </Button>
-          <Button variant="outline" disabled>
+          <Button variant="outline" onClick={exportToXLSX}>
             <FileSpreadsheet className="mr-2 h-4 w-4" />
             XLSX
           </Button>

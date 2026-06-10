@@ -1,0 +1,66 @@
+name: PR
+
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_ENV: test
+  DATABASE_URL: postgresql://guestpost:guestpost@localhost:5432/guestpost_test
+  REDIS_URL: redis://localhost:6379
+  JWT_SECRET: test-secret-for-ci-only
+  BETTER_AUTH_URL: http://localhost:3000
+  CORS_ORIGIN: http://localhost:3000
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: guestpost
+          POSTGRES_PASSWORD: guestpost
+          POSTGRES_DB: guestpost_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run build --filter=@guestpost/shared --filter=@guestpost/database --filter=@guestpost/auth
+        name: Build dependencies
+
+      - run: pnpm -F @guestpost/database exec prisma migrate deploy
+        name: Run DB migrations
+
+      - run: pnpm run typecheck
+        name: TypeScript check
+
+      - run: pnpm -F @guestpost/api test
+        name: Run tests

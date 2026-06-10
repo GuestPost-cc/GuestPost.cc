@@ -6,7 +6,7 @@ import { api } from "../../../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
 import { Textarea } from "@guestpost/ui"
@@ -192,7 +192,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [revisionMessage, setRevisionMessage] = useState("")
 
-  const { data: order, isLoading, error } = useQuery<OrderDetail>({
+  const { data: order, isLoading, error, refetch } = useQuery<OrderDetail>({
     queryKey: ["order", resolvedParams.id],
     queryFn: () => api.orders.getById(resolvedParams.id) as Promise<OrderDetail>,
   })
@@ -237,7 +237,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     )
   }
 
-  if (error || !order) {
+  if (error) {
+    return <ErrorState title="Failed to load order" description={(error as Error).message} onRetry={() => refetch()} />
+  }
+
+  if (!order) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <AlertCircle className="h-12 w-12 text-destructive" />

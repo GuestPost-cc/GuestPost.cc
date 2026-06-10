@@ -13,3 +13,15 @@ packages/database/.env
 .ai/
 graphify-out/
 .opencode
+
+# bedrock: noisy auto-generated content excluded from git
+# Curated knowledge (Memory/, Work/, History/, Evidence/imports/) IS tracked.
+bedrock/Evidence/raw/
+bedrock/Views/site/
+bedrock/Views/graph/*.json
+bedrock/Views/graph/*.md
+bedrock/Views/graph/*.canvas
+bedrock/Outputs/absorb-manifest.md
+bedrock/.obsidian/workspace
+bedrock/.obsidian/workspace.json
+bedrock/.obsidian/workspaces.json

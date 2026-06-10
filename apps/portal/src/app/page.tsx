@@ -103,7 +103,7 @@ function LoginContent() {
             )}
           </p>
           <p className="text-center text-sm text-muted-foreground">
-            <a href="http://localhost:3000" className="underline underline-offset-4 hover:text-primary">
+            <a href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"} className="underline underline-offset-4 hover:text-primary">
               Back to homepage
             </a>
           </p>

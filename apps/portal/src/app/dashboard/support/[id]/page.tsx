@@ -1,6 +1,9 @@
 "use client"
 
-import { use, useState } from "react"
+import { use } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
@@ -10,7 +13,7 @@ import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
 import { Textarea } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
   ArrowLeft,
   Send,
@@ -80,10 +83,21 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const resolvedParams = use(params)
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const [replyContent, setReplyContent] = useState("")
-  const [isSending, setIsSending] = useState(false)
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(
+      z.object({
+        content: z.string().min(1, "Message is required"),
+      })
+    ),
+    defaultValues: { content: "" },
+  })
 
-  const { data: ticket, isLoading, error } = useQuery<TicketDetail>({
+  const { data: ticket, isLoading, error, refetch } = useQuery<TicketDetail>({
     queryKey: ["ticket", resolvedParams.id],
     queryFn: () => api.support.getTicket(resolvedParams.id) as Promise<TicketDetail>,
   })
@@ -94,13 +108,10 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       toast.success("Reply sent successfully")
       queryClient.invalidateQueries({ queryKey: ["ticket", resolvedParams.id] })
       queryClient.invalidateQueries({ queryKey: ["tickets"] })
-      setReplyContent("")
+      reset()
     },
     onError: () => {
       toast.error("Failed to send reply")
-    },
-    onSettled: () => {
-      setIsSending(false)
     },
   })
 
@@ -115,15 +126,6 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       toast.error("Failed to update status")
     },
   })
-
-  const handleSendReply = () => {
-    if (!replyContent.trim()) {
-      toast.error("Please enter a message")
-      return
-    }
-    setIsSending(true)
-    addMessageMutation.mutate({ content: replyContent })
-  }
 
   const handleCloseTicket = () => {
     updateStatusMutation.mutate("CLOSED")
@@ -143,7 +145,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     )
   }
 
-  if (error || !ticket) {
+  if (error) {
+    return <ErrorState title="Failed to load ticket" description={(error as Error).message} onRetry={() => refetch()} />
+  }
+
+  if (!ticket) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <AlertCircle className="h-12 w-12 text-destructive" />
@@ -254,28 +260,32 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
               {ticket.status !== "CLOSED" && ticket.status !== "RESOLVED" && (
                 <div className="mt-6 border-t pt-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="reply">Your Reply</Label>
-                      <Textarea
-                        id="reply"
-                        rows={4}
-                        value={replyContent}
-                        onChange={(e) => setReplyContent(e.target.value)}
-                        placeholder="Type your message here..."
-                      />
+                  <form onSubmit={handleSubmit((data) => addMessageMutation.mutate(data))}>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="reply">Your Reply</Label>
+                        <Textarea
+                          id="reply"
+                          rows={4}
+                          {...register("content")}
+                          placeholder="Type your message here..."
+                        />
+                        {errors.content?.message && (
+                          <p className="text-sm text-destructive">{errors.content.message}</p>
+                        )}
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          type="submit"
+                          disabled={addMessageMutation.isPending}
+                        >
+                          {addMessageMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          <Send className="mr-2 h-4 w-4" />
+                          Send Reply
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={handleSendReply}
-                        disabled={!replyContent.trim() || isSending}
-                      >
-                        {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        <Send className="mr-2 h-4 w-4" />
-                        Send Reply
-                      </Button>
-                    </div>
-                  </div>
+                  </form>
                 </div>
               )}
 

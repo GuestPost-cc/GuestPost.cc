@@ -3,9 +3,10 @@ import { AdminController } from "./admin.controller"
 import { AdminService } from "./admin.service"
 import { SettlementsModule } from "../settlements/settlements.module"
 import { PublisherPayoutsModule } from "../publisher-payouts/publisher-payouts.module"
+import { OrdersModule } from "../orders/orders.module"
 
 @Module({
-  imports: [SettlementsModule, PublisherPayoutsModule],
+  imports: [SettlementsModule, PublisherPayoutsModule, OrdersModule],
   controllers: [AdminController],
   providers: [AdminService],
 })

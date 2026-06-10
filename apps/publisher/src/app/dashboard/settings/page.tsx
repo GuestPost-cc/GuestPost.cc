@@ -1,38 +1,31 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery, useMutation } from "@tanstack/react-query"
+import { useState, useEffect } from "react"
+import { useMutation, useQuery } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { toast } from "sonner"
 import {
   User,
-  Mail,
-  Building2,
   CreditCard,
   Shield,
   Bell,
   Save,
   RefreshCw,
-  Check,
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@guestpost/ui"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, ErrorState } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
 import { Separator } from "@guestpost/ui"
 import { Switch } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
 
 export default function SettingsPage() {
   const { user } = useAuth()
-  const [saving, setSaving] = useState<string | null>(null)
 
   const [profile, setProfile] = useState({
     name: user?.name ?? "",
     email: user?.email ?? "",
-    company: "",
-    website: "",
   })
 
   const [payment, setPayment] = useState({
@@ -51,41 +44,70 @@ export default function SettingsPage() {
     pushEarnings: true,
   })
 
-  const handleSaveProfile = async () => {
-    setSaving("profile")
+  const { data: profileData, error, refetch } = useQuery({
+    queryKey: ["publisher-settings"],
+    queryFn: () => api.identity.me(),
+    enabled: !!user?.id,
+  })
+
+  useEffect(() => {
+    if (!profileData) return
+    setProfile(prev => ({ ...prev, name: (profileData as any).name ?? prev.name }))
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+      const meta = (profileData as any).metadata ? JSON.parse((profileData as any).metadata) : {}
+      if (meta.payment) setPayment(prev => ({ ...prev, ...meta.payment }))
+      if (meta.emailOrders !== undefined) setNotifications(prev => ({ ...prev, ...meta }))
+    } catch {}
+  }, [profileData])
+
+  const profileMutation = useMutation({
+    mutationFn: (data: { name: string }) => api.identity.updateProfile(data),
+    onSuccess: () => {
       toast.success("Profile updated successfully")
-    } catch (error) {
+    },
+    onError: () => {
       toast.error("Failed to update profile")
-    } finally {
-      setSaving(null)
-    }
-  }
+    },
+  })
 
-  const handleSavePayment = async () => {
-    setSaving("payment")
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+  const paymentMutation = useMutation({
+    mutationFn: () => api.identity.updateProfile({
+      name: user?.name ?? "",
+      metadata: JSON.stringify({ payment }),
+    } as any),
+    onSuccess: () => {
       toast.success("Payment information updated")
-    } catch (error) {
+    },
+    onError: () => {
       toast.error("Failed to update payment info")
-    } finally {
-      setSaving(null)
-    }
-  }
+    },
+  })
 
-  const handleSaveNotifications = async () => {
-    setSaving("notifications")
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
+  const notificationsMutation = useMutation({
+    mutationFn: () => api.identity.updateProfile({
+      name: user?.name ?? "",
+      metadata: JSON.stringify(notifications),
+    } as any),
+    onSuccess: () => {
       toast.success("Notification preferences updated")
-    } catch (error) {
+    },
+    onError: () => {
       toast.error("Failed to update notifications")
-    } finally {
-      setSaving(null)
-    }
-  }
+    },
+  })
+
+  const handleSaveProfile = () => profileMutation.mutate({ name: profile.name })
+  const handleSavePayment = () => paymentMutation.mutate()
+  const handleSaveNotifications = () => notificationsMutation.mutate()
+
+  if (error)
+    return (
+      <ErrorState
+        title="Failed to load settings"
+        description={(error as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -107,60 +129,34 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                value={profile.name}
-                onChange={(e) =>
-                  setProfile({ ...profile, name: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                type="email"
-                value={profile.email}
-                onChange={(e) =>
-                  setProfile({ ...profile, email: e.target.value })
-                }
-                disabled
-              />
-              <p className="text-xs text-muted-foreground">
-                Contact support to change your email
-              </p>
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="name">Full Name</Label>
+            <Input
+              id="name"
+              value={profile.name}
+              onChange={(e) =>
+                setProfile({ ...profile, name: e.target.value })
+              }
+            />
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="company">Company Name</Label>
-              <Input
-                id="company"
-                placeholder="Your company"
-                value={profile.company}
-                onChange={(e) =>
-                  setProfile({ ...profile, company: e.target.value })
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="website">Website</Label>
-              <Input
-                id="website"
-                placeholder="https://example.com"
-                value={profile.website}
-                onChange={(e) =>
-                  setProfile({ ...profile, website: e.target.value })
-                }
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="email">Email Address</Label>
+            <Input
+              id="email"
+              type="email"
+              value={profile.email}
+              onChange={(e) =>
+                setProfile({ ...profile, email: e.target.value })
+              }
+              disabled
+            />
+            <p className="text-xs text-muted-foreground">
+              Contact support to change your email
+            </p>
           </div>
           <div className="flex justify-end">
-            <Button onClick={handleSaveProfile} disabled={saving === "profile"}>
-              {saving === "profile" ? (
+            <Button onClick={handleSaveProfile} disabled={profileMutation.isPending}>
+              {profileMutation.isPending ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
@@ -267,8 +263,8 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={handleSavePayment} disabled={saving === "payment"}>
-              {saving === "payment" ? (
+            <Button onClick={handleSavePayment} disabled={paymentMutation.isPending}>
+              {paymentMutation.isPending ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                   Saving...
@@ -381,9 +377,9 @@ export default function SettingsPage() {
           <div className="flex justify-end">
             <Button
               onClick={handleSaveNotifications}
-              disabled={saving === "notifications"}
+              disabled={notificationsMutation.isPending}
             >
-              {saving === "notifications" ? (
+              {notificationsMutation.isPending ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
                   Saving...

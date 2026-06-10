@@ -10,31 +10,31 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@guestpost/api-client": "workspace:*",
     "@guestpost/shared": "workspace:*",
     "@guestpost/ui": "workspace:*",
-    "@guestpost/api-client": "workspace:*",
+    "@hookform/resolvers": "^3.0.0",
     "@tanstack/react-query": "^5.0.0",
     "@tanstack/react-table": "^8.0.0",
-    "react-hook-form": "^7.0.0",
-    "@hookform/resolvers": "^3.0.0",
-    "zod": "^3.0.0",
-    "sonner": "^1.0.0",
-    "date-fns": "^3.0.0",
-    "recharts": "^2.0.0",
-    "next-themes": "^0.4.0",
     "better-auth": "^1.0.0",
+    "date-fns": "^3.0.0",
+    "lucide-react": "^0.468.0",
     "next": "^15.0.0",
+    "next-themes": "^0.4.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "lucide-react": "^0.468.0"
+    "react-hook-form": "^7.0.0",
+    "recharts": "^2.0.0",
+    "sonner": "^1.0.0",
+    "zod": "^3.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.0",
-    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.0",
     "postcss": "^8.4.0",
-    "autoprefixer": "^10.4.0"
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.7.0"
   }
 }

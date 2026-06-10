@@ -1,6 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../../lib/api"
 import { useAuth } from "../../../../../lib/auth"
@@ -174,18 +177,21 @@ function CreateTeamForm({
   onSubmit: (name: string) => void
   isLoading: boolean
 }) {
-  const [name, setName] = useState("")
-  const [error, setError] = useState("")
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    if (!name.trim()) { setError("Team name is required"); return }
-    onSubmit(name.trim())
-  }
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(
+      z.object({
+        name: z.string().min(1, "Name is required"),
+      })
+    ),
+    defaultValues: { name: "" },
+  })
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit((data) => onSubmit(data.name.trim()))}>
       <DialogHeader className="mb-4">
         <DialogTitle>Create Team</DialogTitle>
         <DialogDescription>Add a new team to organize your members.</DialogDescription>
@@ -196,12 +202,13 @@ function CreateTeamForm({
           <Input
             id="team-name"
             placeholder="e.g. Outreach Team"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
+            {...register("name")}
             autoFocus
           />
         </div>
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {errors.name?.message && (
+          <p className="text-sm text-destructive">{errors.name.message}</p>
+        )}
       </div>
       <DialogFooter className="mt-6">
         <DialogClose asChild>

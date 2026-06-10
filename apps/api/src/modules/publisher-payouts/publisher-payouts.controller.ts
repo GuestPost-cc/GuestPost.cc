@@ -1,26 +1,34 @@
 import { Controller, Get, Post, Param, Body, Query, UseGuards } from "@nestjs/common"
 import { PublisherPayoutsService } from "./publisher-payouts.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
+import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
 
 @Controller("publisher-payouts")
 export class PublisherPayoutsController {
   constructor(private readonly payouts: PublisherPayoutsService) {}
 
-  @Get("balance/:publisherId")
-  getBalance(@Param("publisherId") publisherId: string) {
-    return this.payouts.getBalance(publisherId)
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
+  @Get("balance")
+  getBalance(@CurrentUser() user: any) {
+    return this.payouts.getBalance(user.publisherId)
   }
 
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
   @Post("withdrawals")
   requestWithdrawal(
-    @Body() body: { publisherId: string; amount: number; method: string },
+    @Body() body: { amount: number; method: string; idempotencyKey?: string },
     @CurrentUser() user: any,
   ) {
-    return this.payouts.requestWithdrawal(body.publisherId, body.amount, body.method, user.id)
+    return this.payouts.requestWithdrawal(user.publisherId, body.amount, body.method, user.id, body.idempotencyKey)
   }
 
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
   @Get("withdrawals")
   listWithdrawals(
     @CurrentUser() user: any,

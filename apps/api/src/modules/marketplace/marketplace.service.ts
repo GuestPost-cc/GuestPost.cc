@@ -343,7 +343,32 @@ export class MarketplaceService {
       throw new NotFoundException("Listing not found")
     }
 
-    // Check if user already reviewed
+    const listingPublisherId = listing.publisherId
+    if (!listingPublisherId) {
+      throw new BadRequestException("Listing has no publisher")
+    }
+
+    // Prevent self-review: publisher cannot review own listing
+    const publisherMembership = await this.prisma.publisherMembership.findFirst({
+      where: { userId, publisherId: listingPublisherId },
+    })
+    if (publisherMembership) {
+      throw new ForbiddenException("You cannot review your own listing")
+    }
+
+    // Verify customer completed an order with this publisher
+    const completedOrder = await this.prisma.order.findFirst({
+      where: {
+        customerId: userId,
+        website: { publisherId: listingPublisherId },
+        status: "COMPLETED",
+      },
+    })
+    if (!completedOrder) {
+      throw new ForbiddenException("You must complete an order before reviewing")
+    }
+
+    // Prevent duplicate review
     const existing = await this.prisma.marketplaceReview.findFirst({
       where: { listingId: dto.listingId, userId },
     })

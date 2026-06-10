@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
 import { Button } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import { EmptyState } from "@guestpost/ui"
 import { Heart, Star, ExternalLink } from "lucide-react"
 
@@ -32,41 +32,26 @@ interface FavoriteListing {
 export default function FavoritesPage() {
   const { user } = useAuth()
   const router = useRouter()
-  const [favorites, setFavorites] = useState<FavoriteListing[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    if (user?.id) loadFavorites()
-  }, [user?.id])
+  const { data: favorites = [], isLoading, error, refetch } = useQuery<FavoriteListing[]>({
+    queryKey: ["favorites"],
+    queryFn: () => api.marketplace.getFavorites(),
+    enabled: !!user?.id,
+  })
 
-  async function loadFavorites() {
-    if (!user?.id) return
-    setLoading(true)
-    try {
-      const data = await api.marketplace.getFavorites()
-      setFavorites(data || [])
-    } catch (err) {
-      console.error("Failed to load favorites:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function removeFavorite(listingId: string) {
-    if (!user?.id) return
-    try {
-      await api.marketplace.removeFavorite(listingId)
-      setFavorites((prev) => prev.filter((f) => f.listing.id !== listingId))
-    } catch (err) {
-      console.error("Failed to remove favorite:", err)
-    }
-  }
+  const { mutate: removeFavorite } = useMutation({
+    mutationFn: (listingId: string) => api.marketplace.removeFavorite(listingId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites"] }),
+  })
 
   function formatPrice(price: number, currency: string = "USD") {
     return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(price)
   }
 
-  if (loading) {
+  if (error) return <ErrorState title="Failed to load favorites" description={(error as Error).message} onRetry={() => refetch()} />
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div>

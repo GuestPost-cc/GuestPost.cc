@@ -6,7 +6,7 @@ import { api } from "../../../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
   Table,
   TableBody,
@@ -75,15 +75,21 @@ function CampaignDetailSkeleton() {
 export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
 
-  const { data: campaignsData, isLoading: campaignsLoading } = useQuery({
+  const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns(),
   })
 
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
+  const { data: ordersData, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
     queryKey: ["orders"],
     queryFn: () => api.orders.list(),
   })
+
+  const campaignDetailError = campaignsError || ordersError
+
+  if (campaignDetailError) {
+    return <ErrorState title="Failed to load campaign" description={(campaignDetailError as Error).message} onRetry={() => { refetchCampaigns(); refetchOrders(); }} />
+  }
 
   const isLoading = campaignsLoading || ordersLoading
 

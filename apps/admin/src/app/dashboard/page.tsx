@@ -1,8 +1,8 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../lib/api"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
+import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
 import { Skeleton } from "@guestpost/ui"
 import {
   Table,
@@ -126,37 +126,30 @@ function KPICards({ stats, loading }: { stats: Stats | undefined; loading: boole
         title="Revenue"
         value={stats ? `$${stats.revenue.toLocaleString()}` : "—"}
         icon={DollarSign}
-        trend={12}
-        trendSuffix="%"
         loading={loading}
       />
       <StatCard
         title="GMV"
         value={stats ? `$${stats.gmv.toLocaleString()}` : "—"}
         icon={ShoppingCart}
-        trend={8}
-        trendSuffix="%"
         loading={loading}
       />
       <StatCard
         title="Active Orders"
         value={stats?.activeOrders ?? "—"}
         icon={Clock}
-        trend={-3}
         loading={loading}
       />
       <StatCard
         title="Publishers"
         value={stats?.publishers ?? "—"}
         icon={Users}
-        trend={5}
         loading={loading}
       />
       <StatCard
         title="Customers"
         value={stats?.customers ?? "—"}
         icon={Building2}
-        trend={12}
         loading={loading}
       />
       <StatCard
@@ -280,41 +273,46 @@ function ActivityFeed() {
 }
 
 export default function DashboardPage() {
-  const { data: users, isLoading: usersLoading } = useQuery({
+  const queryClient = useQueryClient()
+
+  const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ["admin", "users"],
     queryFn: () => api.admin.listUsers(),
     retry: 1,
   })
 
-  const { data: orders, isLoading: ordersLoading } = useQuery({
+  const { data: orders, isLoading: ordersLoading, error: ordersError } = useQuery({
     queryKey: ["admin", "orders"],
     queryFn: () => api.admin.listOrders(),
     retry: 1,
   })
 
-  const { data: settlements, isLoading: settlementsLoading } = useQuery({
+  const { data: settlements, isLoading: settlementsLoading, error: settlementsError } = useQuery({
     queryKey: ["admin", "settlements"],
     queryFn: () => api.admin.listSettlements(),
     retry: 1,
   })
 
-  const { data: withdrawals, isLoading: withdrawalsLoading } = useQuery({
+  const { data: withdrawals, isLoading: withdrawalsLoading, error: withdrawalsError } = useQuery({
     queryKey: ["admin", "withdrawals"],
     queryFn: () => api.admin.listWithdrawals(),
     retry: 1,
   })
 
   const isLoading = usersLoading || ordersLoading || settlementsLoading || withdrawalsLoading
+  const queryError = usersError || ordersError || settlementsError || withdrawalsError
 
-  const stats: Stats = {
-    revenue: 0,
-    gmv: 0,
-    activeOrders: 0,
-    publishers: 0,
-    customers: 0,
-    pendingVerifications: 0,
-    pendingWithdrawals: 0,
+  if (queryError) {
+    return (
+      <ErrorState
+        title="Failed to load dashboard"
+        description={queryError instanceof Error ? queryError.message : "An unexpected error occurred"}
+        onRetry={() => queryClient.invalidateQueries({ queryKey: ["admin"] })}
+      />
+    )
   }
+
+  let stats: Stats | undefined
 
   if (!isLoading) {
     const customers = users?.filter((u) => u.userType === "CUSTOMER") ?? []
@@ -326,14 +324,18 @@ export default function DashboardPage() {
       ["PENDING_PAYMENT", "ASSIGNED", "CONTENT_CREATION", "OUTREACH"].includes(o.status),
     )
 
-    stats.publishers = publishers.length
-    stats.customers = customers.length
-    stats.activeOrders = pendingOrders?.length ?? 0
-    stats.gmv = completedOrders?.reduce((sum, o) => sum + (o.amount ?? 0), 0) ?? 0
-    stats.revenue = Math.round(stats.gmv * 0.3)
-    stats.pendingVerifications =
-      settlements?.items?.filter((s) => s.status === "PENDING" || s.status === "UNDER_REVIEW").length ?? 0
-    stats.pendingWithdrawals = withdrawals?.items?.filter((w) => w.status === "PENDING").length ?? 0
+    const gmv = completedOrders?.reduce((sum, o) => sum + (o.amount ?? 0), 0) ?? 0
+
+    stats = {
+      publishers: publishers.length,
+      customers: customers.length,
+      activeOrders: pendingOrders?.length ?? 0,
+      gmv,
+      revenue: Math.round(gmv * 0.3),
+      pendingVerifications:
+        settlements?.items?.filter((s) => s.status === "PENDING" || s.status === "UNDER_REVIEW").length ?? 0,
+      pendingWithdrawals: withdrawals?.items?.filter((w) => w.status === "PENDING").length ?? 0,
+    }
   }
 
   return (

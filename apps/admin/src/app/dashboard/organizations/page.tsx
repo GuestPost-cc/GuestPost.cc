@@ -98,6 +98,7 @@ function CreateOrgDialog({
     handleSubmit,
     reset,
     watch,
+    setValue,
     formState: { errors },
   } = useForm<z.infer<typeof createOrgSchema>>({
     resolver: zodResolver(createOrgSchema),
@@ -108,7 +109,18 @@ function CreateOrgDialog({
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createOrgSchema>) => {
-      return adminFetch("/admin/organizations")
+      const token = (await import("../../../lib/api")).getToken()
+      const res = await fetch(`${(await import("../../../lib/api")).getApiUrl()}/admin/organizations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+        credentials: "include",
+      })
+      if (!res.ok) throw new Error(await res.text())
+      return res.json()
     },
     onSuccess: () => {
       toast.success("Organization created")
@@ -152,7 +164,7 @@ function CreateOrgDialog({
             <Label htmlFor="plan">Plan</Label>
             <Select
               defaultValue="FREE"
-              onValueChange={(v) => {}}
+              onValueChange={(v) => setValue("plan", v)}
             >
               <SelectTrigger className="mt-1">
                 <SelectValue />
@@ -189,6 +201,9 @@ function CreateOrgDialog({
 function OrgRowActions({ org }: { org: Organization }) {
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editName, setEditName] = useState(org.name)
+  const [editPlan, setEditPlan] = useState(org.plan ?? "FREE")
+  const [editSaving, setEditSaving] = useState(false)
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -235,11 +250,11 @@ function OrgRowActions({ org }: { org: Organization }) {
           <div className="space-y-3">
             <div>
               <Label>Name</Label>
-              <Input defaultValue={org.name} className="mt-1" />
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="mt-1" />
             </div>
             <div>
               <Label>Plan</Label>
-              <Select defaultValue={org.plan ?? "FREE"}>
+              <Select value={editPlan} onValueChange={setEditPlan}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -256,7 +271,35 @@ function OrgRowActions({ org }: { org: Organization }) {
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={() => setDialogOpen(false)}>Save</Button>
+            <Button
+              onClick={async () => {
+                setEditSaving(true)
+                try {
+                  const { getToken, getApiUrl } = await import("../../../lib/api")
+                  const token = getToken()
+                  const res = await fetch(`${getApiUrl()}/admin/organizations/${org.id}`, {
+                    method: "PATCH",
+                    headers: {
+                      "Content-Type": "application/json",
+                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    },
+                    body: JSON.stringify({ name: editName, plan: editPlan }),
+                    credentials: "include",
+                  })
+                  if (!res.ok) throw new Error(await res.text())
+                  toast.success("Organization updated")
+                  queryClient.invalidateQueries({ queryKey: ["admin", "organizations"] })
+                  setDialogOpen(false)
+                } catch {
+                  toast.error("Failed to update organization")
+                } finally {
+                  setEditSaving(false)
+                }
+              }}
+              disabled={editSaving}
+            >
+              {editSaving ? "Saving..." : "Save"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

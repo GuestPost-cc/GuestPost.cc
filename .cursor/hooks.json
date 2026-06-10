@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "description": "Repo-local hooks for bedrock. Hooks stay thin: detect meaningful changes and trigger lightweight capture/update, never rebuild the full ontology.",
+  "hooks": [
+    {
+      "name": "project-knowledge-sync",
+      "event": "post-write",
+      "command": "bedrock update --summary-file /Users/shohan/Desktop/GuestPost/guestpost-platform/.cursor/knowledge-sync.last.json --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+    },
+    {
+      "name": "project-knowledge-session-start",
+      "event": "session-start",
+      "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/guestpost-platform && bedrock refresh-system --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+    },
+    {
+      "name": "project-knowledge-stop",
+      "event": "stop",
+      "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+    },
+    {
+      "name": "project-knowledge-pre-compact",
+      "event": "preCompact",
+      "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+    }
+  ]
+}

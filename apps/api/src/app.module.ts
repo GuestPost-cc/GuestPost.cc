@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { PrismaModule } from "./common/prisma.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { ActiveContextModule } from "./modules/active-context/active-context.module";
 import { IdentityModule } from "./modules/identity/identity.module";
 import { MarketplaceModule } from "./modules/marketplace/marketplace.module";
 import { CampaignsModule } from "./modules/campaigns/campaigns.module";
@@ -20,6 +21,7 @@ import { WebsitesModule } from "./modules/websites/websites.module";
   imports: [
     PrismaModule,
     AuditModule,
+    ActiveContextModule,
     AuthModule,
     QueueModule,
     IdentityModule,

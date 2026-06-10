@@ -1,20 +1,24 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards, ForbiddenException, BadRequestException } from "@nestjs/common"
+import { Controller, Get, Post, Delete, Body, Param, UseGuards } from "@nestjs/common"
 import { IdentityService } from "./identity.service"
+import { ActiveContextService } from "../active-context/active-context.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
-import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import { ActorType } from "../../common/decorators/actor-type.decorator"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { CreateOrganizationDto } from "./dto/create-organization.dto"
 import { InviteMemberDto } from "./dto/invite-member.dto"
 import { CreateTeamDto } from "./dto/create-team.dto"
 import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
 
 @Controller("identity")
 export class IdentityController {
   constructor(
     private readonly identity: IdentityService,
     private readonly prisma: PrismaService,
+    private readonly activeContext: ActiveContextService,
+    private readonly audit: AuditService,
   ) {}
 
   @Get("me")
@@ -27,33 +31,68 @@ export class IdentityController {
     }
   }
 
-  @Post("me/set-staff")
-  async setStaffRole(
-    @CurrentUser() user: any,
-    @Body("role") role: string,
-  ) {
-    if (process.env.NODE_ENV === "production" && !process.env.ALLOW_SELF_STAFF_ROLE) {
-      throw new ForbiddenException("Self-service staff role assignment is disabled")
-    }
-    const validRoles = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
-    if (!validRoles.includes(role)) {
-      throw new BadRequestException(`Invalid staff role: ${role}`)
-    }
-    const existing = await this.prisma.staffMembership.findUnique({
-      where: { userId: user.id },
-    })
-    if (existing) {
-      throw new ForbiddenException("Staff role already assigned")
-    }
-    await this.prisma.staffMembership.create({
-      data: { userId: user.id, role: role as any },
-    })
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { userType: "STAFF" },
-    })
-    return { message: `Staff role set to ${role}` }
+  // ─── Active Context ─────────────────────────────────────
+
+  @Get("context")
+  getContext(@CurrentUser() user: any) {
+    return this.activeContext.get(user.id)
   }
+
+  @Get("organizations")
+  listOrganizations(@CurrentUser() user: any) {
+    return this.identity.listOrganizations(user.id)
+  }
+
+  @Get("publishers")
+  listPublishers(@CurrentUser() user: any) {
+    return this.activeContext.listPublishers(user.id)
+  }
+
+  @Post("switch-organization")
+  @UseGuards(ActorTypeGuard)
+  @ActorType("CUSTOMER")
+  async switchOrganization(
+    @Body("organizationId") organizationId: string,
+    @CurrentUser() user: any,
+  ) {
+    const prevOrgId = user.organizationId
+    const ctx = await this.activeContext.setActiveOrganization(user.id, organizationId)
+
+    await this.audit.log({
+      action: "ORGANIZATION_SWITCHED",
+      entityType: "ActiveContext",
+      entityId: ctx.id,
+      metadata: { from: prevOrgId, to: organizationId },
+      userId: user.id,
+      organizationId: organizationId,
+    })
+
+    return ctx
+  }
+
+  @Post("switch-publisher")
+  @UseGuards(ActorTypeGuard)
+  @ActorType("PUBLISHER")
+  async switchPublisher(
+    @Body("publisherId") publisherId: string,
+    @CurrentUser() user: any,
+  ) {
+    const prevPubId = user.publisherId
+    const ctx = await this.activeContext.setActivePublisher(user.id, publisherId)
+
+    await this.audit.log({
+      action: "PUBLISHER_SWITCHED",
+      entityType: "ActiveContext",
+      entityId: ctx.id,
+      metadata: { from: prevPubId, to: publisherId },
+      userId: user.id,
+      organizationId: user.organizationId ?? "SYSTEM",
+    })
+
+    return ctx
+  }
+
+  // ─── Organization CRUD ──────────────────────────────────
 
   @Post("organizations")
   createOrganization(
@@ -64,11 +103,6 @@ export class IdentityController {
       ...body,
       ownerId: user.id,
     })
-  }
-
-  @Get("organizations")
-  listOrganizations(@CurrentUser() user: any) {
-    return this.identity.listOrganizations(user.id)
   }
 
   @Post("organizations/:id/invite")
@@ -122,6 +156,8 @@ export class IdentityController {
     return this.identity.deleteTeam(orgId, user.id, teamId)
   }
 
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER", "MEMBER")
   @Get("organizations/:id")
   getOrganization(@Param("id") orgId: string, @CurrentUser() user: any) {
     return this.identity.getOrganization(orgId, user.id)

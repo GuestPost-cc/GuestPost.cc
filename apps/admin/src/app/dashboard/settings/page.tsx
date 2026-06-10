@@ -1,11 +1,51 @@
 "use client"
 
 import { useState } from "react"
-import { Button } from "@guestpost/ui"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
+import { Button, Input, Label, Switch } from "@guestpost/ui"
+import { toast } from "sonner"
+import { Save, RefreshCw, User } from "lucide-react"
+
+const profileSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+})
+
+type ProfileForm = z.infer<typeof profileSchema>
 
 export default function SettingsPage() {
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const { user } = useAuth()
+  const queryClient = useQueryClient()
+
+  const { data: profileData } = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: () => api.identity.me(),
+    enabled: !!user?.id,
+  })
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<ProfileForm>({
+    resolver: zodResolver(profileSchema),
+    values: { name: profileData?.name ?? user?.name ?? "" },
+  })
+
+  const profileMutation = useMutation({
+    mutationFn: (data: { name: string }) => api.identity.updateProfile(data),
+    onSuccess: () => {
+      toast.success("Profile updated")
+      queryClient.invalidateQueries({ queryKey: ["admin-settings"] })
+    },
+    onError: () => toast.error("Failed to update profile"),
+  })
+
+  const [maintenanceMode, setMaintenanceMode] = useState(false)
 
   return (
     <div>
@@ -31,22 +71,43 @@ export default function SettingsPage() {
         </div>
 
         <div className="rounded-lg border p-6">
-          <h2 className="mb-4 text-lg font-semibold">Account Details</h2>
-          <p className="mb-4 text-sm text-muted-foreground">
-            Manage your account settings. For now, edit your profile through the identity API.
-          </p>
-          <div className="grid gap-3">
-            <input
-              type="email" placeholder="New email" value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="flex h-10 rounded-md border bg-background px-3 py-2 text-sm"
+          <h2 className="mb-4 text-lg font-semibold">Profile</h2>
+          <form onSubmit={handleSubmit((data) => profileMutation.mutate(data))} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Display Name</Label>
+              <Input id="name" {...register("name")} />
+              {errors.name && (
+                <p className="text-sm text-destructive">{errors.name.message}</p>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" value={user?.email ?? ""} disabled />
+            </div>
+            <Button type="submit" disabled={profileMutation.isPending}>
+              {profileMutation.isPending ? (
+                <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+              ) : (
+                <><Save className="mr-2 h-4 w-4" /> Save Changes</>
+              )}
+            </Button>
+          </form>
+        </div>
+
+        <div className="rounded-lg border p-6">
+          <h2 className="mb-4 text-lg font-semibold">Platform Settings</h2>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="maintenance-mode">Maintenance Mode</Label>
+              <p className="text-sm text-muted-foreground">
+                When enabled, only admins can access the platform
+              </p>
+            </div>
+            <Switch
+              id="maintenance-mode"
+              checked={maintenanceMode}
+              onCheckedChange={setMaintenanceMode}
             />
-            <input
-              type="password" placeholder="New password" value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="flex h-10 rounded-md border bg-background px-3 py-2 text-sm"
-            />
-            <Button disabled>Save Changes</Button>
           </div>
         </div>
       </div>

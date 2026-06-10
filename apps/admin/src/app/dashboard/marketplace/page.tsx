@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
+import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
@@ -83,7 +83,7 @@ export default function AdminMarketplacePage() {
   const [typeFilter, setTypeFilter] = useState("all")
   const [page, setPage] = useState(1)
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error: listingsError } = useQuery({
     queryKey: ["admin-marketplace-listings", page, statusFilter, typeFilter],
     queryFn: async () => {
       const params: any = { page, limit: 20 }
@@ -94,13 +94,28 @@ export default function AdminMarketplacePage() {
     },
   })
 
-  const { data: stats } = useQuery({
+  const { data: stats, error: statsError } = useQuery({
     queryKey: ["admin-marketplace-stats"],
     queryFn: async () => {
       const res = await api.admin.getMarketplaceStats()
       return res
     },
   })
+
+  const queryError = listingsError || statsError
+
+  if (queryError) {
+    return (
+      <ErrorState
+        title="Failed to load marketplace"
+        description={queryError instanceof Error ? queryError.message : "An unexpected error occurred"}
+        onRetry={() => {
+          queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+          queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
+        }}
+      />
+    )
+  }
 
   const updateStatus = useMutation({
     mutationFn: ({ id, status }: { id: string; status: string }) =>

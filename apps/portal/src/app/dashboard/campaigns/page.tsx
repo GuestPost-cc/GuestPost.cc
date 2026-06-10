@@ -9,7 +9,7 @@ import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
   Table,
   TableBody,
@@ -100,12 +100,12 @@ export default function CampaignsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
 
-  const { data: campaignsData, isLoading } = useQuery({
+  const { data: campaignsData, isLoading, error: campaignsError, refetch: refetchCampaigns } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns(),
   })
 
-  const { data: ordersData } = useQuery({
+  const { data: ordersData, error: ordersError, refetch: refetchOrders } = useQuery({
     queryKey: ["orders"],
     queryFn: () => api.orders.list() as Promise<any[]>,
   })
@@ -151,6 +151,12 @@ export default function CampaignsPage() {
 
   const getOrderCount = (campaignId: string) => {
     return ordersData?.filter((order: any) => order.campaignId === campaignId).length ?? 0
+  }
+
+  const campaignsErrorCombined = campaignsError || ordersError
+
+  if (campaignsErrorCombined) {
+    return <ErrorState title="Failed to load campaigns" description={(campaignsErrorCombined as Error).message} onRetry={() => { refetchCampaigns(); refetchOrders(); }} />
   }
 
   if (isLoading) {

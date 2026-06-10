@@ -48,9 +48,18 @@ export class IdentityService {
   }
 
   async listOrganizations(userId: string) {
-    return this.prisma.organization.findMany({
-      where: { memberships: { some: { userId } } },
+    const memberships = await this.prisma.membership.findMany({
+      where: { userId },
+      include: { organization: { select: { id: true, name: true, slug: true } } },
     })
+    const activeCtx = await this.prisma.activeContext.findUnique({ where: { userId } })
+    return memberships.map((m) => ({
+      id: m.organization.id,
+      name: m.organization.name,
+      slug: m.organization.slug,
+      role: m.role,
+      isActive: m.organization.id === activeCtx?.activeOrganizationId,
+    }))
   }
 
   async inviteMember(organizationId: string, callerUserId: string, email: string, role: CustomerRole) {

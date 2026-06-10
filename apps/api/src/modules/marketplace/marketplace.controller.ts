@@ -1,7 +1,11 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from "@nestjs/common"
 import { MarketplaceService } from "./marketplace.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
-import { Public } from "../auth/public.decorator"
+import { Public } from "../../common/decorators/public.decorator"
+import { ActorType } from "../../common/decorators/actor-type.decorator"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { MemberRoles } from "../../common/decorators/member-roles.decorator"
+import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { 
   SearchListingsDto, 
   CreateListingDto, 
@@ -88,32 +92,50 @@ export class MarketplaceController {
   // PROTECTED ENDPOINTS - USER SPECIFIC
   // =============================================================================
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
   @Get("favorites")
   async getFavorites(@CurrentUser() user: any) {
     return this.marketplaceService.getFavorites(user.id)
   }
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
   @Post("favorites")
   async addFavorite(@Body() body: CreateFavoriteDto, @CurrentUser() user: any) {
     return this.marketplaceService.addFavorite(user.id, body.listingId)
   }
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
   @Delete("favorites/:listingId")
   async removeFavorite(@Param("listingId") listingId: string, @CurrentUser() user: any) {
     await this.marketplaceService.removeFavorite(user.id, listingId)
     return { success: true }
   }
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
   @Get("saved-lists")
   async getSavedLists(@CurrentUser() user: any) {
     return this.marketplaceService.getSavedLists(user.id)
   }
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
   @Post("saved-lists")
   async createSavedList(@Body() body: CreateSavedListDto, @CurrentUser() user: any) {
     return this.marketplaceService.createSavedList(user.id, body)
   }
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
   @Post("saved-lists/:listId/items")
   async addToSavedList(
     @Param("listId") listId: string, 
@@ -123,6 +145,9 @@ export class MarketplaceController {
     return this.marketplaceService.addToSavedList(user.id, listId, body)
   }
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
   @Delete("saved-lists/:listId/items/:listingId")
   async removeFromSavedList(
     @Param("listId") listId: string, 
@@ -133,6 +158,9 @@ export class MarketplaceController {
     return { success: true }
   }
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
   @Post("reviews")
   async createReview(@Body() body: CreateReviewDto, @CurrentUser() user: any) {
     return this.marketplaceService.createReview(user.id, body)
@@ -150,11 +178,17 @@ export class MarketplaceController {
   // PROTECTED ENDPOINTS - ORGANIZATION/PUBLISHER MANAGEMENT
   // =============================================================================
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
   @Post("listings")
   async createListing(@Body() body: CreateListingDto, @CurrentUser() user: any) {
     return this.marketplaceService.createListing(user.id, user.organizationId, body)
   }
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
   @Put("listings/:id")
   async updateListing(
     @Param("id") id: string, 
@@ -164,6 +198,9 @@ export class MarketplaceController {
     return this.marketplaceService.updateListing(user.id, user.organizationId, id, body)
   }
 
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
   @Delete("listings/:id")
   async deleteListing(@Param("id") id: string, @CurrentUser() user: any) {
     await this.marketplaceService.deleteListing(user.id, user.organizationId, id)

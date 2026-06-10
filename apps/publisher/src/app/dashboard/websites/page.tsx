@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -28,6 +29,7 @@ import {
   TableCell,
 } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
+import { ErrorState } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
@@ -70,42 +72,6 @@ interface Website {
   niche?: string
   status: "ACTIVE" | "ARCHIVED" | "PENDING"
 }
-
-const mockWebsites: Website[] = [
-  {
-    id: "1",
-    url: "techdaily.example.com",
-    domainRating: 72,
-    monthlyTraffic: 45000,
-    country: "US",
-    language: "English",
-    price: 150,
-    niche: "Technology",
-    status: "ACTIVE",
-  },
-  {
-    id: "2",
-    url: "financeworld.example.com",
-    domainRating: 65,
-    monthlyTraffic: 32000,
-    country: "UK",
-    language: "English",
-    price: 200,
-    niche: "Finance",
-    status: "ACTIVE",
-  },
-  {
-    id: "3",
-    url: "healthyliving.example.com",
-    domainRating: 58,
-    monthlyTraffic: 28000,
-    country: "CA",
-    language: "English",
-    price: 120,
-    niche: "Health",
-    status: "ACTIVE",
-  },
-]
 
 function WebsiteForm({
   onSubmit,
@@ -251,11 +217,14 @@ export default function WebsitesPage() {
   const [editingWebsite, setEditingWebsite] = useState<Website | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const publisherId = user?.publisherId
 
-  const { data: websites = [], isLoading } = useQuery({
-    queryKey: ["publisher-websites"],
+  const { data: websites = [], isLoading, error } = useQuery({
+    queryKey: ["publisher-websites", publisherId],
     queryFn: async () => {
-      const sites = await api.publishers.getWebsites("current") as any[]
+      if (!publisherId) return []
+      const sites = await api.publishers.getWebsites(publisherId) as any[]
       return sites.map((s: any) => ({
         id: s.id,
         url: s.url || "",
@@ -273,7 +242,8 @@ export default function WebsitesPage() {
 
   const addMutation = useMutation({
     mutationFn: async (data: WebsiteFormData) => {
-      return api.publishers.addWebsite("current", {
+      if (!publisherId) throw new Error("Not authenticated")
+      return api.publishers.addWebsite(publisherId, {
         url: data.url,
         category: data.niche,
         language: data.language,
@@ -294,7 +264,8 @@ export default function WebsitesPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: WebsiteFormData }) => {
-      return api.publishers.updateWebsite("current", id, {
+      if (!publisherId) throw new Error("Not authenticated")
+      return api.publishers.updateWebsite(publisherId, id, {
         url: data.url,
         category: data.niche,
         language: data.language,
@@ -316,7 +287,8 @@ export default function WebsitesPage() {
 
   const submitMutation = useMutation({
     mutationFn: async (id: string) => {
-      return api.publishers.submitForReview("current", id)
+      if (!publisherId) throw new Error("Not authenticated")
+      return api.publishers.submitForReview(publisherId, id)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
@@ -329,7 +301,8 @@ export default function WebsitesPage() {
 
   const archiveMutation = useMutation({
     mutationFn: async (id: string) => {
-      return api.publishers.deleteWebsite("current", id)
+      if (!publisherId) throw new Error("Not authenticated")
+      return api.publishers.deleteWebsite(publisherId, id)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
@@ -347,6 +320,15 @@ export default function WebsitesPage() {
     const matchesArchived = showArchived ? true : site.status === "ACTIVE"
     return matchesSearch && matchesArchived
   })
+
+  if (error)
+    return (
+      <ErrorState
+        title="Failed to load websites"
+        description={(error as Error).message}
+        onRetry={() => queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })}
+      />
+    )
 
   if (isLoading) {
     return (

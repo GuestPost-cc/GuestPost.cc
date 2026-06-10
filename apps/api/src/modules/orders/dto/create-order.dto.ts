@@ -16,9 +16,6 @@ class OrderItemDto {
   @IsOptional()
   @MaxLength(200)
   anchorText?: string
-
-  @IsOptional()
-  price?: number
 }
 
 export class CreateOrderDto {
@@ -38,6 +35,10 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   campaignId?: string
+
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string
 
   @IsArray()
   @IsOptional()

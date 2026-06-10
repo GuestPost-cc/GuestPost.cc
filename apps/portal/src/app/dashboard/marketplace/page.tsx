@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useMemo } from "react"
 import Link from "next/link"
+import { useQuery } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { cn } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import { Star, Filter, Grid, List, Search, SlidersHorizontal, ExternalLink, Check } from "lucide-react"
 import { useAuth } from "../../../lib/auth"
 
@@ -44,9 +45,6 @@ interface Category {
 
 export default function MarketplacePage() {
   const { user } = useAuth()
-  const [listings, setListings] = useState<Listing[]>([])
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [selectedType, setSelectedType] = useState("all")
@@ -63,59 +61,45 @@ export default function MarketplacePage() {
     language: "",
     maxTurnaroundDays: "",
   })
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 })
+  const [page, setPage] = useState(1)
 
-  useEffect(() => {
-    loadCategories()
-  }, [])
+  const { data: categories = [], error: categoriesError, refetch: refetchCategories } = useQuery<Category[]>({
+    queryKey: ["marketplace-categories"],
+    queryFn: () => api.marketplace.getCategories(),
+  })
 
-  useEffect(() => {
-    loadListings()
-  }, [searchQuery, selectedCategory, selectedType, sortBy, filters, pagination.page])
+  const searchParams = useMemo(() => {
+    const params: any = { page, limit: 20, sortBy }
+    if (searchQuery) params.query = searchQuery
+    if (selectedCategory !== "all") params.category = selectedCategory
+    if (selectedType !== "all") params.type = selectedType
+    if (filters.minDR) params.minDR = Number(filters.minDR)
+    if (filters.maxDR) params.maxDR = Number(filters.maxDR)
+    if (filters.minPrice) params.minPrice = Number(filters.minPrice)
+    if (filters.maxPrice) params.maxPrice = Number(filters.maxPrice)
+    if (filters.minTraffic) params.minTraffic = Number(filters.minTraffic)
+    if (filters.country) params.country = filters.country
+    if (filters.language) params.language = filters.language
+    if (filters.maxTurnaroundDays) params.maxTurnaroundDays = Number(filters.maxTurnaroundDays)
+    return params
+  }, [searchQuery, selectedCategory, selectedType, sortBy, filters, page])
 
-  async function loadCategories() {
-    try {
-      const res = await api.marketplace.getCategories()
-      setCategories(res || [])
-    } catch (err) {
-      console.error("Failed to load categories:", err)
-    }
-  }
+  const { data: searchResult, isLoading, error: searchError, refetch: refetchSearch } = useQuery({
+    queryKey: ["marketplace-listings", searchParams],
+    queryFn: () => api.marketplace.searchListings(searchParams),
+  })
 
-  async function loadListings() {
-    setLoading(true)
-    try {
-      const params: any = {
-        page: pagination.page,
-        limit: 20,
-        sortBy,
-      }
-      if (searchQuery) params.query = searchQuery
-      if (selectedCategory !== "all") params.category = selectedCategory
-      if (selectedType !== "all") params.type = selectedType
-      if (filters.minDR) params.minDR = Number(filters.minDR)
-      if (filters.maxDR) params.maxDR = Number(filters.maxDR)
-      if (filters.minPrice) params.minPrice = Number(filters.minPrice)
-      if (filters.maxPrice) params.maxPrice = Number(filters.maxPrice)
-      if (filters.minTraffic) params.minTraffic = Number(filters.minTraffic)
-      if (filters.country) params.country = filters.country
-      if (filters.language) params.language = filters.language
-      if (filters.maxTurnaroundDays) params.maxTurnaroundDays = Number(filters.maxTurnaroundDays)
-
-      const result = await api.marketplace.searchListings(params)
-      setListings(result?.listings || [])
-      if (result?.pagination) {
-        setPagination(prev => ({ ...prev, ...result.pagination }))
-      }
-    } catch (err) {
-      console.error("Failed to load listings:", err)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const listings: Listing[] = searchResult?.listings || []
+  const pagination = searchResult?.pagination || { page: 1, limit: 20, total: 0, totalPages: 0 }
 
   function formatPrice(price: number, currency: string = "USD") {
     return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(price)
+  }
+
+  const marketplaceError = categoriesError || searchError
+
+  if (marketplaceError) {
+    return <ErrorState title="Failed to load marketplace" description={(marketplaceError as Error).message} onRetry={() => { refetchCategories(); refetchSearch(); }} />
   }
 
   function resetFilters() {
@@ -300,7 +284,7 @@ export default function MarketplacePage() {
         </div>
       )}
 
-      {loading ? (
+      {isLoading ? (
         <div className={cn(
           "grid gap-6",
           viewMode === "grid" ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
@@ -399,7 +383,7 @@ export default function MarketplacePage() {
               <Button
                 variant="outline"
                 disabled={pagination.page === 1}
-                onClick={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
               >
                 Previous
               </Button>
@@ -409,7 +393,7 @@ export default function MarketplacePage() {
               <Button
                 variant="outline"
                 disabled={pagination.page === pagination.totalPages}
-                onClick={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
+                onClick={() => setPage(p => p + 1)}
               >
                 Next
               </Button>

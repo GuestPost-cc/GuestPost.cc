@@ -1,4 +1,4 @@
-import type { OrderStatus, SettlementStatus, WithdrawalStatus } from "@guestpost/shared"
+import type { OrderStatus, SettlementStatus, WithdrawalStatus, TicketStatus } from "@guestpost/shared"
 import { HttpClient, type RequestOptions } from "../client"
 
 export interface PaginatedResponse<T> {
@@ -184,5 +184,110 @@ export class AdminService {
 
   resolveFlag(flagId: string, resolution: string) {
     return this.client.post(`/admin/marketplace/flags/${flagId}/resolve`, { json: { resolution } })
+  }
+
+  // -- Publishers --
+  listPublishers(params?: { search?: string; status?: string; page?: number; limit?: number }) {
+    return this.client.get<{
+      items: Array<{
+        id: string
+        name: string | null
+        email: string
+        publisherRole: string | null
+        websiteCount: number
+        activeOrderCount: number
+        totalEarnings: number
+        banned: boolean
+        createdAt: string
+      }>
+      total: number
+      page: number
+      limit: number
+      totalPages: number
+    }>("/admin/publishers", { params: params as Record<string, string | number | undefined> })
+  }
+
+  approvePublisher(publisherId: string) {
+    return this.client.post(`/admin/publishers/${publisherId}/approve`)
+  }
+
+  rejectPublisher(publisherId: string, reason?: string) {
+    return this.client.post(`/admin/publishers/${publisherId}/reject`, { json: reason ? { reason } : {} })
+  }
+
+  suspendPublisher(publisherId: string) {
+    return this.client.post(`/admin/publishers/${publisherId}/suspend`)
+  }
+
+  restorePublisher(publisherId: string) {
+    return this.client.post(`/admin/publishers/${publisherId}/restore`)
+  }
+
+  // -- Support --
+  listTickets(params?: { status?: string; priority?: string; search?: string; page?: number; limit?: number }) {
+    return this.client.get<{
+      items: Array<{
+        id: string
+        subject: string
+        status: TicketStatus
+        priority: string
+        customer: { id: string; name: string | null; email: string }
+        assignee: { id: string; name: string | null } | null
+        messageCount: number
+        createdAt: string
+        updatedAt: string
+      }>
+      total: number
+      page: number
+      limit: number
+      totalPages: number
+    }>("/admin/support/tickets", { params: params as Record<string, string | number | undefined> })
+  }
+
+  getTicketDetail(id: string) {
+    return this.client.get<{
+      id: string
+      subject: string
+      status: TicketStatus
+      priority: string
+      customer: { id: string; name: string | null; email: string }
+      assignee: { id: string; name: string | null } | null
+      messages: Array<{ id: string; content: string; author: string; authorType: string; createdAt: string }>
+      createdAt: string
+      updatedAt: string
+    }>(`/admin/support/tickets/${id}`)
+  }
+
+  assignTicket(ticketId: string, assigneeId: string) {
+    return this.client.patch(`/admin/support/tickets/${ticketId}/assign`, { json: { assigneeId } })
+  }
+
+  updateTicketStatus(ticketId: string, status: TicketStatus) {
+    return this.client.patch(`/admin/support/tickets/${ticketId}/status`, { json: { status } })
+  }
+
+  addTicketMessage(ticketId: string, data: { content: string }) {
+    return this.client.post(`/admin/support/tickets/${ticketId}/messages`, { json: data })
+  }
+
+  // -- Audit Logs --
+  listAuditLogs(params?: { actorId?: string; action?: string; entity?: string; entityId?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) {
+    return this.client.get<{
+      items: Array<{
+        id: string
+        action: string
+        entity: string
+        entityId: string
+        actorId: string
+        actorName: string | null
+        metadata: Record<string, unknown> | null
+        ipAddress: string | null
+        createdAt: string
+      }>
+      total: number
+      page: number
+      limit: number
+      totalPages: number
+    }>("/admin/audit-logs", { params: params as Record<string, string | number | undefined> })
   }
 }

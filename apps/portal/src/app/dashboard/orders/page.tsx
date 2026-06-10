@@ -353,9 +353,11 @@ export default function OrdersPage() {
             </DropdownMenuItem>
             {row.original.status !== "COMPLETED" && row.original.status !== "CANCELLED" && (
               <>
-                <DropdownMenuItem>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Request Revision
+                <DropdownMenuItem asChild>
+                  <Link href={`/dashboard/orders/${row.original.id}`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Request Revision
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 

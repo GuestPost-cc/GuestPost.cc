@@ -4,17 +4,20 @@ import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useMemo } from "react"
 import { cn } from "@guestpost/ui"
-import { LayoutDashboard, Users, Building, ShoppingCart, Landmark, Settings, LogOut, Store } from "lucide-react"
+import { LayoutDashboard, Users, Building, ShoppingCart, Landmark, Settings, LogOut, Store, Newspaper, HeadphonesIcon, ScrollText } from "lucide-react"
 import { useAuth } from "../../lib/auth"
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/users", label: "Users", icon: Users },
+  { href: "/dashboard/publishers", label: "Publishers", icon: Newspaper },
   { href: "/dashboard/organizations", label: "Organizations", icon: Building },
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
   { href: "/dashboard/marketplace", label: "Marketplace", icon: Store },
   { href: "/dashboard/finance", label: "Finance", icon: Landmark, adminOnly: true },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings, adminOnly: true },
+  { href: "/dashboard/support", label: "Support", icon: HeadphonesIcon },
+  { href: "/dashboard/audit-logs", label: "Audit Logs", icon: ScrollText, adminOnly: true },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

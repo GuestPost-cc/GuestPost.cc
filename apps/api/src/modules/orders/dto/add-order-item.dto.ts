@@ -14,7 +14,4 @@ export class AddOrderItemDto {
   @IsOptional()
   @MaxLength(200)
   anchorText?: string
-
-  @IsOptional()
-  price?: number
 }

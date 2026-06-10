@@ -10,7 +10,7 @@ import { Label } from "@guestpost/ui"
 import { Textarea } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
   Table,
   TableBody,
@@ -209,7 +209,7 @@ export default function SupportPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
 
-  const { data: ticketsData, isLoading } = useQuery<Ticket[]>({
+  const { data: ticketsData, isLoading, error, refetch } = useQuery<Ticket[]>({
     queryKey: ["tickets"],
     queryFn: () => api.support.listTickets() as Promise<Ticket[]>,
   })
@@ -229,6 +229,8 @@ export default function SupportPage() {
   const openTickets = (ticketsData ?? []).filter((t: Ticket) => 
     ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER"].includes(t.status)
   ).length
+
+  if (error) return <ErrorState title="Failed to load support tickets" description={(error as Error).message} onRetry={() => refetch()} />
 
   if (isLoading) {
     return (

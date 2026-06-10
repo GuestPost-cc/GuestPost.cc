@@ -1,21 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { Button } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
-import { Separator } from "@guestpost/ui"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@guestpost/ui"
 import { Avatar, AvatarFallback } from "@guestpost/ui"
 import {
   Star,
-  Check,
   Heart,
   Share2,
-  Bookmark,
   ExternalLink,
   ArrowLeft,
   Clock,
@@ -72,51 +70,30 @@ export default function ListingDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { user } = useAuth()
-  const [listing, setListing] = useState<Listing | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
   const [activeImage, setActiveImage] = useState(0)
-  const [favoriting, setFavoriting] = useState(false)
 
-  useEffect(() => {
-    loadListing()
-  }, [params.slug])
+  const { data: listing, isLoading, error, refetch } = useQuery<Listing>({
+    queryKey: ["listing", params.slug],
+    queryFn: () => api.marketplace.getListing(params.slug as string).then(r => r as unknown as Listing),
+    enabled: !!params.slug,
+  })
 
-  async function loadListing() {
-    setLoading(true)
-    setError(null)
-    try {
-      const listing = await api.marketplace.getListing(params.slug as string)
-      setListing(listing as Listing)
-    } catch (err: any) {
-      setError(err.message || "Failed to load listing")
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function toggleFavorite() {
-    if (!user || !listing) return
-    setFavoriting(true)
-    try {
-      if (listing.isFavorited) {
-        await api.marketplace.removeFavorite(listing.id)
-      } else {
-        await api.marketplace.addFavorite(listing.id)
-      }
-      setListing((l: any) => ({ ...l, isFavorited: !l.isFavorited }))
-    } catch (err) {
-      console.error("Failed to toggle favorite:", err)
-    } finally {
-      setFavoriting(false)
-    }
-  }
+  const { mutate: toggleFavorite, isPending: favoriting } = useMutation({
+    mutationFn: () => {
+      if (!listing) throw new Error("No listing loaded")
+      return listing.isFavorited
+        ? api.marketplace.removeFavorite(listing.id)
+        : api.marketplace.addFavorite(listing.id)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["listing", params.slug] }),
+  })
 
   function formatPrice(price: number, currency: string = "USD") {
     return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(price)
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center gap-4">
@@ -137,12 +114,16 @@ export default function ListingDetailPage() {
     )
   }
 
-  if (error || !listing) {
+  if (error) {
+    return <ErrorState title="Failed to load listing" description={(error as Error).message} onRetry={() => refetch()} />
+  }
+
+  if (!listing) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-semibold mb-2">Listing Not Found</h2>
-        <p className="text-muted-foreground mb-4">{error || "This listing doesn't exist or has been removed."}</p>
+        <p className="text-muted-foreground mb-4">This listing doesn't exist or has been removed.</p>
         <Button asChild>
           <Link href="/dashboard/marketplace">Back to Marketplace</Link>
         </Button>
@@ -160,7 +141,7 @@ export default function ListingDetailPage() {
           Back to Marketplace
         </Button>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={toggleFavorite} disabled={favoriting}>
+            <Button variant="outline" size="sm" onClick={() => toggleFavorite()} disabled={favoriting}>
             <Heart className={`h-4 w-4 mr-2 ${listing.isFavorited ? "fill-red-500 text-red-500" : ""}`} />
             {listing.isFavorited ? "Saved" : "Save"}
           </Button>

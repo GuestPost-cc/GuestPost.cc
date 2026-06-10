@@ -4,32 +4,43 @@ import { useState, Suspense } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@guestpost/ui"
 import { useAuth } from "../lib/auth"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 
 function LoginContent() {
   const { signIn, signUp } = useAuth()
   const router = useRouter()
   const [isSignUp, setIsSignUp] = useState(false)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
   const [name, setName] = useState("")
   const [error, setError] = useState("")
-  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const loginSchema = z.object({
+    email: z.string().email("Valid email required"),
+    password: z.string().min(6, "At least 6 characters"),
+  })
+
+  type LoginFormData = z.infer<typeof loginSchema>
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+  })
+
+  const onSubmit = async (data: LoginFormData) => {
     setError("")
-    setSubmitting(true)
     try {
       if (isSignUp) {
-        await signUp(email, password, name)
+        await signUp(data.email, data.password, name)
       } else {
-        await signIn(email, password)
+        await signIn(data.email, data.password)
       }
       router.push("/dashboard")
     } catch (err: any) {
       setError(err.message ?? "Something went wrong")
-    } finally {
-      setSubmitting(false)
     }
   }
 
@@ -45,7 +56,7 @@ function LoginContent() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="grid gap-4">
+        <form onSubmit={handleFormSubmit(onSubmit)} className="grid gap-4">
           {isSignUp && (
             <input
               type="text"
@@ -59,22 +70,22 @@ function LoginContent() {
           <input
             type="email"
             placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            {...register("email")}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             required
           />
+          {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
           <input
             type="password"
             placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            {...register("password")}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             required
           />
+          {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
+          <Button type="submit" className="w-full" disabled={isSubmitting}>
+            {isSubmitting ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
           </Button>
         </form>
 
@@ -95,7 +106,7 @@ function LoginContent() {
             )}
           </p>
           <p className="text-center text-sm text-muted-foreground">
-            <a href="http://localhost:3000" className="underline underline-offset-4 hover:text-primary">
+            <a href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"} className="underline underline-offset-4 hover:text-primary">
               Back to homepage
             </a>
           </p>

@@ -1,6 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
@@ -16,7 +19,7 @@ import {
   CreditCard,
   Building2,
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
+import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
 import { Skeleton } from "@guestpost/ui"
@@ -52,62 +55,38 @@ const statusConfig: Record<
   REJECTED: { label: "Rejected", icon: XCircle, variant: "destructive" },
 }
 
-const mockWithdrawals = [
-  {
-    id: "wd_1",
-    amount: 250,
-    currency: "USD",
-    status: "COMPLETED" as WithdrawalStatus,
-    note: "Monthly payout",
-    createdAt: "2026-05-15T10:00:00Z",
-    processedAt: "2026-05-17T14:00:00Z",
-  },
-  {
-    id: "wd_2",
-    amount: 350,
-    currency: "USD",
-    status: "COMPLETED" as WithdrawalStatus,
-    note: "Monthly payout",
-    createdAt: "2026-04-15T10:00:00Z",
-    processedAt: "2026-04-17T14:00:00Z",
-  },
-  {
-    id: "wd_3",
-    amount: 180,
-    currency: "USD",
-    status: "PENDING" as WithdrawalStatus,
-    note: "Custom withdrawal",
-    createdAt: "2026-06-01T08:00:00Z",
-    processedAt: null,
-  },
-  {
-    id: "wd_4",
-    amount: 500,
-    currency: "USD",
-    status: "APPROVED" as WithdrawalStatus,
-    note: "Quarterly payout",
-    createdAt: "2026-05-28T10:00:00Z",
-    processedAt: null,
-  },
-]
-
 export default function WithdrawalsPage() {
   const { user } = useAuth()
   const [showRequestDialog, setShowRequestDialog] = useState(false)
-  const [amount, setAmount] = useState("")
-  const [note, setNote] = useState("")
 
-  const { data: balance, isLoading, refetch } = useQuery({
+  const requestSchema = z.object({
+    amount: z.coerce.number().positive("Amount must be positive"),
+    note: z.string().optional(),
+  })
+
+  type RequestFormData = z.infer<typeof requestSchema>
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<RequestFormData>({
+    resolver: zodResolver(requestSchema),
+  })
+
+  const { data: balance, isLoading, refetch, error } = useQuery({
     queryKey: ["publisher-balance", user?.publisherId],
     queryFn: () => api.publisherPayouts.getBalance(user!.publisherId!),
     enabled: !!user?.publisherId,
   })
 
-  const { data: withdrawalsRaw, isLoading: withdrawalsLoading } = useQuery({
+  const { data: withdrawalsRaw, isLoading: withdrawalsLoading, error: withdrawalsError } = useQuery({
     queryKey: ["publisher-withdrawals"],
     queryFn: () => api.publisherPayouts.listWithdrawals(),
   })
-  const withdrawals = withdrawalsRaw?.items ?? mockWithdrawals
+  const withdrawals = withdrawalsRaw?.items ?? []
 
   const requestMutation = useMutation({
     mutationFn: (data: { amount: number; note?: string }) =>
@@ -115,8 +94,7 @@ export default function WithdrawalsPage() {
     onSuccess: () => {
       toast.success("Withdrawal requested successfully")
       setShowRequestDialog(false)
-      setAmount("")
-      setNote("")
+      reset()
       refetch()
     },
     onError: () => {
@@ -124,20 +102,25 @@ export default function WithdrawalsPage() {
     },
   })
 
-  const handleRequest = () => {
-    const amountNum = parseFloat(amount)
-    if (isNaN(amountNum) || amountNum <= 0) {
-      toast.error("Please enter a valid amount")
-      return
-    }
-    if (balance && amountNum > balance.withdrawableAmount) {
+  const handleRequest = (data: RequestFormData) => {
+    if (balance && data.amount > balance.withdrawableAmount) {
       toast.error("Amount exceeds withdrawable balance")
       return
     }
-    requestMutation.mutate({ amount: amountNum, note: note || undefined })
+    requestMutation.mutate({ amount: data.amount, note: data.note || undefined })
   }
 
   const withdrawableAmount = balance ? Number(balance.withdrawableAmount) : 0
+
+  const withdrawError = error ?? withdrawalsError
+  if (withdrawError)
+    return (
+      <ErrorState
+        title="Failed to load withdrawals"
+        description={(withdrawError as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
 
   return (
     <div className="space-y-6">
@@ -291,12 +274,13 @@ export default function WithdrawalsPage() {
               <Input
                 id="amount"
                 type="number"
+                step="any"
                 min="1"
                 max={withdrawableAmount}
                 placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                {...register("amount")}
               />
+              {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
               <div className="flex gap-2 pt-2">
                 {[100, 250, 500].map((val) => (
                   <Button
@@ -304,7 +288,7 @@ export default function WithdrawalsPage() {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setAmount(String(val))}
+                    onClick={() => setValue("amount", val)}
                     disabled={val > withdrawableAmount}
                   >
                     ${val}
@@ -314,7 +298,7 @@ export default function WithdrawalsPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setAmount(String(withdrawableAmount))}
+                  onClick={() => setValue("amount", withdrawableAmount)}
                 >
                   Max
                 </Button>
@@ -325,8 +309,7 @@ export default function WithdrawalsPage() {
               <Input
                 id="note"
                 placeholder="Add a note..."
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
+                {...register("note")}
               />
             </div>
           </div>
@@ -338,12 +321,8 @@ export default function WithdrawalsPage() {
               Cancel
             </Button>
             <Button
-              onClick={handleRequest}
-              disabled={
-                requestMutation.isPending ||
-                !amount ||
-                parseFloat(amount) <= 0
-              }
+              onClick={handleFormSubmit(handleRequest)}
+              disabled={requestMutation.isPending}
             >
               {requestMutation.isPending ? "Processing..." : "Request Withdrawal"}
             </Button>

@@ -2,14 +2,15 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, ErrorState } from "@guestpost/ui"
 import { EmptyState } from "@guestpost/ui"
-import { Bookmark, Plus, Star, ExternalLink, Trash2, X } from "lucide-react"
+import { Bookmark, Plus, ExternalLink, Trash2 } from "lucide-react"
 
 interface SavedListItem {
   id: string
@@ -40,89 +41,47 @@ interface SavedList {
 
 export default function SavedListsPage() {
   const { user } = useAuth()
-  const [lists, setLists] = useState<SavedList[]>([])
-  const [loading, setLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [createOpen, setCreateOpen] = useState(false)
   const [newListName, setNewListName] = useState("")
-  const [creating, setCreating] = useState(false)
-  const [selectedList, setSelectedList] = useState<SavedList | null>(null)
+  const [selectedListId, setSelectedListId] = useState<string | null>(null)
+
+  const { data: lists = [], isLoading, error, refetch } = useQuery<SavedList[]>({
+    queryKey: ["saved-lists"],
+    queryFn: () => api.marketplace.getSavedLists(),
+    enabled: !!user?.id,
+  })
 
   useEffect(() => {
-    if (user?.id) loadLists()
-  }, [user?.id])
-
-  async function loadLists() {
-    if (!user?.id) return
-    setLoading(true)
-    try {
-      const data = await api.marketplace.getSavedLists()
-      const listsData = data || []
-      setLists(listsData as SavedList[])
-      if (listsData.length > 0 && !selectedList) {
-        setSelectedList(listsData[0] as SavedList)
-      }
-    } catch (err) {
-      console.error("Failed to load saved lists:", err)
-    } finally {
-      setLoading(false)
+    if (lists.length > 0 && !selectedListId) {
+      setSelectedListId(lists[0].id)
     }
-  }
+  }, [lists])
 
-  async function createList() {
-    if (!user?.id || !newListName.trim()) return
-    setCreating(true)
-    try {
-      const newList = await api.marketplace.createSavedList({ name: newListName.trim() })
-      if (newList) {
-        setLists((prev) => [...prev, { ...(newList as SavedList), items: [] }])
-        setSelectedList({ ...(newList as SavedList), items: [] })
-      }
+  const selectedList = lists.find(l => l.id === selectedListId) || null
+
+  const { mutate: createList, isPending: creating } = useMutation({
+    mutationFn: () => api.marketplace.createSavedList({ name: newListName.trim() }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["saved-lists"] })
       setNewListName("")
       setCreateOpen(false)
-    } catch (err) {
-      console.error("Failed to create list:", err)
-    } finally {
-      setCreating(false)
-    }
-  }
+    },
+  })
 
-  async function deleteList(listId: string) {
-    if (!user?.id) return
-    try {
-      await api.marketplace.removeFromSavedList(listId, "")
-      setLists((prev) => prev.filter((l) => l.id !== listId))
-      if (selectedList?.id === listId) {
-        setSelectedList(lists.find((l) => l.id !== listId) || null)
-      }
-    } catch (err) {
-      console.error("Failed to delete list:", err)
-    }
-  }
-
-  async function removeFromList(listId: string, listingId: string) {
-    if (!user?.id) return
-    try {
-      await api.marketplace.removeFromSavedList(listId, listingId)
-      setLists((prev) =>
-        prev.map((l) =>
-          l.id === listId ? { ...l, items: l.items.filter((i) => i.listing.id !== listingId) } : l
-        )
-      )
-      if (selectedList?.id === listId) {
-        setSelectedList((prev) =>
-          prev ? { ...prev, items: prev.items.filter((i) => i.listing.id !== listingId) } : null
-        )
-      }
-    } catch (err) {
-      console.error("Failed to remove from list:", err)
-    }
-  }
+  const { mutate: removeFromList } = useMutation({
+    mutationFn: ({ listId, listingId }: { listId: string; listingId: string }) =>
+      api.marketplace.removeFromSavedList(listId, listingId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["saved-lists"] }),
+  })
 
   function formatPrice(price: number, currency: string = "USD") {
     return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(price)
   }
 
-  if (loading) {
+  if (error) return <ErrorState title="Failed to load saved lists" description={(error as Error).message} onRetry={() => refetch()} />
+
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -163,7 +122,7 @@ export default function SavedListsPage() {
                   onChange={(e) => setNewListName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && createList()}
                 />
-                <Button onClick={createList} disabled={creating || !newListName.trim()} className="w-full">
+                <Button onClick={() => createList()} disabled={creating || !newListName.trim()} className="w-full">
                   {creating ? "Creating..." : "Create List"}
                 </Button>
               </div>
@@ -208,7 +167,7 @@ export default function SavedListsPage() {
                 onChange={(e) => setNewListName(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && createList()}
               />
-              <Button onClick={createList} disabled={creating || !newListName.trim()} className="w-full">
+              <Button onClick={() => createList()} disabled={creating || !newListName.trim()} className="w-full">
                 {creating ? "Creating..." : "Create List"}
               </Button>
             </div>
@@ -224,7 +183,7 @@ export default function SavedListsPage() {
               className={`p-4 border rounded-lg cursor-pointer transition-all ${
                 selectedList?.id === list.id ? "border-primary bg-primary/5" : "hover:border-primary/50"
               }`}
-              onClick={() => setSelectedList(list)}
+               onClick={() => setSelectedListId(list.id)}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -284,7 +243,7 @@ export default function SavedListsPage() {
                     <div className="flex flex-col items-end justify-between">
                       <span className="font-bold">{formatPrice(item.listing.price, item.listing.currency)}</span>
                       <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => removeFromList(selectedList.id, item.listing.id)}>
+                        <Button variant="ghost" size="sm" onClick={() => removeFromList({ listId: selectedList.id, listingId: item.listing.id })}>
                           <Trash2 className="h-4 w-4" />
                         </Button>
                         <Button size="sm" asChild>

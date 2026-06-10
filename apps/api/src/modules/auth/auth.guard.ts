@@ -2,11 +2,15 @@ import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Forbi
 import { Reflector } from "@nestjs/core"
 import { auth } from "@guestpost/auth"
 import { prisma } from "@guestpost/database"
-import { IS_PUBLIC_KEY } from "./public.decorator"
+import { IS_PUBLIC_KEY } from "../../common/decorators/public.decorator"
+import { ActiveContextService } from "../active-context/active-context.service"
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private reflector: Reflector,
+    private readonly activeContext: ActiveContextService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -23,52 +27,80 @@ export class AuthGuard implements CanActivate {
     if (!session) throw new UnauthorizedException()
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } })
+    if (!user) throw new UnauthorizedException("User not found")
+    if (user.banned) throw new ForbiddenException("Account is banned")
 
-    if (!user) {
-      throw new UnauthorizedException("User not found")
-    }
-
-    if (user.banned) {
-      throw new ForbiddenException("Account is banned")
-    }
-
-    let organizationId: string | null = null
-    let customerRole: string | null = null
-    let publisherId: string | null = null
-    let publisherRole: string | null = null
-    let staffRole: string | null = null
+    let activeOrganizationId: string | null = null
+    let activePublisherId: string | null = null
+    let publisherOrgId: string | null = null
 
     if (user.userType === "CUSTOMER") {
-      const membership = await prisma.membership.findFirst({
-        where: { userId: user.id },
-        orderBy: { createdAt: "asc" },
-      })
-      organizationId = membership?.organizationId ?? null
-      customerRole = membership?.role ?? null
+      const ctx = await this.activeContext.getOrCreate(user.id)
+      activeOrganizationId = ctx.activeOrganizationId
+
+      if (activeOrganizationId) {
+        const membership = await prisma.membership.findUnique({
+          where: { userId_organizationId: { userId: user.id, organizationId: activeOrganizationId } },
+        })
+        if (!membership) {
+          await this.activeContext.clearOrganization(user.id)
+          activeOrganizationId = null
+        }
+      }
+
+      if (!activeOrganizationId) {
+        const fallback = await prisma.membership.findFirst({
+          where: { userId: user.id },
+          orderBy: { createdAt: "asc" },
+        })
+        if (fallback) {
+          activeOrganizationId = fallback.organizationId
+          await this.activeContext.setActiveOrganization(user.id, fallback.organizationId)
+        }
+      }
     } else if (user.userType === "PUBLISHER") {
-      const pubMembership = await prisma.publisherMembership.findFirst({
-        where: { userId: user.id },
-        include: { publisher: true },
-        orderBy: { createdAt: "asc" },
-      })
-      publisherId = pubMembership?.publisherId ?? null
-      publisherRole = pubMembership?.role ?? null
-      organizationId = pubMembership?.publisher?.organizationId ?? null
-    } else if (user.userType === "STAFF") {
-      const staffMembership = await prisma.staffMembership.findUnique({
-        where: { userId: user.id },
-      })
-      staffRole = staffMembership?.role ?? null
+      const ctx = await this.activeContext.getOrCreate(user.id)
+      activePublisherId = ctx.activePublisherId
+
+      if (activePublisherId) {
+        const membership = await prisma.publisherMembership.findFirst({
+          where: { userId: user.id, publisherId: activePublisherId },
+        })
+        if (!membership) {
+          await this.activeContext.clearPublisher(user.id)
+          activePublisherId = null
+        }
+      }
+
+      if (!activePublisherId) {
+        const fallback = await prisma.publisherMembership.findFirst({
+          where: { userId: user.id },
+          orderBy: { createdAt: "asc" },
+        })
+        if (fallback) {
+          activePublisherId = fallback.publisherId
+          await this.activeContext.setActivePublisher(user.id, fallback.publisherId)
+        }
+      }
+
+      if (activePublisherId) {
+        const publisher = await prisma.publisher.findUnique({ where: { id: activePublisherId } })
+        publisherOrgId = publisher?.organizationId ?? null
+      }
     }
+
+    const roles = await this.activeContext.resolveRoles(
+      user.id,
+      activeOrganizationId,
+      activePublisherId,
+    )
 
     request.user = {
       ...user,
-      organizationId,
-      customerRole,
-      memberRole: customerRole,
-      publisherId,
-      publisherRole,
-      staffRole,
+      organizationId: activeOrganizationId,
+      publisherId: activePublisherId,
+      publisherOrganizationId: publisherOrgId,
+      ...roles,
     }
     request.session = session.session
     return true

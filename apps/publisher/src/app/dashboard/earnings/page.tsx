@@ -1,6 +1,9 @@
 "use client"
 
 import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 import { useQuery, useMutation } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
@@ -16,7 +19,7 @@ import {
   Download,
   Filter,
 } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
+import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
 import { Skeleton } from "@guestpost/ui"
@@ -48,33 +51,6 @@ const tabs: { value: TabValue; label: string; icon: React.ElementType }[] = [
   { value: "paid", label: "Paid Out", icon: TrendingUp },
 ]
 
-const mockTransactions = [
-  {
-    id: "txn_1",
-    type: "ORDER_PAYMENT",
-    amount: 150,
-    status: "PENDING",
-    description: "Guest Post - techdaily.example.com",
-    createdAt: "2026-06-01T10:00:00Z",
-  },
-  {
-    id: "txn_2",
-    type: "ORDER_PAYMENT",
-    amount: 200,
-    status: "APPROVED",
-    description: "Editorial Link - financeworld.example.com",
-    createdAt: "2026-05-28T14:00:00Z",
-  },
-  {
-    id: "txn_3",
-    type: "PAYOUT",
-    amount: 350,
-    status: "PAID",
-    description: "Withdrawal to Bank Account",
-    createdAt: "2026-05-20T09:00:00Z",
-  },
-]
-
 function KPICard({
   label,
   value,
@@ -103,15 +79,30 @@ export default function EarningsPage() {
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<TabValue>("pending")
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false)
-  const [withdrawAmount, setWithdrawAmount] = useState("")
 
-  const { data: balance, isLoading, refetch } = useQuery({
+  const withdrawSchema = z.object({
+    amount: z.coerce.number().positive("Amount must be positive"),
+  })
+
+  type WithdrawFormData = z.infer<typeof withdrawSchema>
+
+  const {
+    register,
+    handleSubmit: handleFormSubmit,
+    setValue,
+    formState: { errors },
+    reset,
+  } = useForm<WithdrawFormData>({
+    resolver: zodResolver(withdrawSchema),
+  })
+
+  const { data: balance, isLoading, refetch, error } = useQuery({
     queryKey: ["publisher-balance", user?.publisherId],
     queryFn: () => api.publisherPayouts.getBalance(user!.publisherId!),
     enabled: !!user?.publisherId,
   })
 
-  const { data: transactions = [], isLoading: txnLoading } = useQuery({
+  const { data: transactions = [], isLoading: txnLoading, error: txnError } = useQuery({
     queryKey: ["publisher-transactions"],
     queryFn: async () => {
       const withdrawals = await api.publisherPayouts.listWithdrawals()
@@ -132,7 +123,7 @@ export default function EarningsPage() {
     onSuccess: () => {
       toast.success("Withdrawal requested successfully")
       setShowWithdrawDialog(false)
-      setWithdrawAmount("")
+      reset()
       refetch()
     },
     onError: () => {
@@ -140,17 +131,35 @@ export default function EarningsPage() {
     },
   })
 
-  const handleWithdraw = () => {
-    const amount = parseFloat(withdrawAmount)
-    if (isNaN(amount) || amount <= 0) {
-      toast.error("Please enter a valid amount")
-      return
-    }
-    if (balance && amount > balance.withdrawableAmount) {
+  const handleWithdraw = (data: WithdrawFormData) => {
+    if (balance && data.amount > balance.withdrawableAmount) {
       toast.error("Amount exceeds withdrawable balance")
       return
     }
-    withdrawMutation.mutate(amount)
+    withdrawMutation.mutate(data.amount)
+  }
+
+  const handleExport = (txns: any[]) => {
+    const csv = [
+      ["Date", "Description", "Type", "Status", "Amount"].join(","),
+      ...txns.map((t: any) =>
+        [
+          new Date(t.createdAt).toISOString().split("T")[0],
+          `"${(t.description || "").replace(/"/g, '""')}"`,
+          t.type,
+          t.status,
+          t.amount,
+        ].join(","),
+      ),
+    ].join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `earnings-export-${new Date().toISOString().split("T")[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success("Earnings exported")
   }
 
   const filteredTransactions = transactions.filter((txn: any) => {
@@ -172,6 +181,16 @@ export default function EarningsPage() {
   const approvedAmount = balance ? Number(balance.approvedAmount) : 0
   const withdrawableAmount = balance ? Number(balance.withdrawableAmount) : 0
   const lifetimeAmount = balance ? Number(balance.lifetimeEarned) : 0
+
+  const balanceError = error ?? txnError
+  if (balanceError)
+    return (
+      <ErrorState
+        title="Failed to load earnings"
+        description={(balanceError as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
 
   return (
     <div className="space-y-6">
@@ -225,7 +244,7 @@ export default function EarningsPage() {
         <CardHeader className="pb-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Transaction History</CardTitle>
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" onClick={() => handleExport(transactions)}>
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
@@ -335,12 +354,13 @@ export default function EarningsPage() {
               <Input
                 id="amount"
                 type="number"
+                step="any"
                 min="1"
                 max={withdrawableAmount}
                 placeholder="0.00"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
+                {...register("amount")}
               />
+              {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
             </div>
             <div className="flex gap-2">
               {[50, 100, 250, 500].map((amount) => (
@@ -349,7 +369,7 @@ export default function EarningsPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => setWithdrawAmount(String(amount))}
+                  onClick={() => setValue("amount", amount)}
                   disabled={amount > withdrawableAmount}
                 >
                   ${amount}
@@ -359,7 +379,7 @@ export default function EarningsPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setWithdrawAmount(String(withdrawableAmount))}
+                onClick={() => setValue("amount", withdrawableAmount)}
               >
                 Max
               </Button>
@@ -373,12 +393,8 @@ export default function EarningsPage() {
               Cancel
             </Button>
             <Button
-              onClick={handleWithdraw}
-              disabled={
-                withdrawMutation.isPending ||
-                !withdrawAmount ||
-                parseFloat(withdrawAmount) <= 0
-              }
+              onClick={handleFormSubmit(handleWithdraw)}
+              disabled={withdrawMutation.isPending}
             >
               {withdrawMutation.isPending ? "Processing..." : "Request Withdrawal"}
             </Button>
