@@ -4,7 +4,7 @@ import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { QUEUES } from "@guestpost/shared"
 import { Decimal } from "@prisma/client/runtime/library"
-import { resolvePlatformFeeFraction } from "../../common/platform-fee"
+import { resolvePlatformFeeFraction, splitPlatformFee } from "../../common/platform-fee"
 
 @Injectable()
 export class SettlementsService {
@@ -30,9 +30,11 @@ export class SettlementsService {
     const publisherId = item?.website?.publisherId
     if (!publisherId) throw new BadRequestException("No publisher found for this order")
 
+    if (!order.amount || new Decimal(order.amount).lessThanOrEqualTo(0)) {
+      throw new BadRequestException("Order has no amount to settle")
+    }
     const feeFraction = await resolvePlatformFeeFraction(this.prisma)
-    const platformFee = Number(order.amount) * feeFraction
-    const publisherAmount = Number(order.amount) - platformFee
+    const { fee: platformFee, net: publisherAmount } = splitPlatformFee(order.amount, feeFraction)
 
     const reviewDays = Math.max(Number(process.env.SETTLEMENT_REVIEW_DAYS ?? 7), 0)
     const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
@@ -71,7 +73,7 @@ export class SettlementsService {
           eventType: "SETTLEMENT_CREATED",
           actorId: userId,
           message: `Settlement created — customer amount: ${order.amount}, publisher amount: ${publisherAmount}`,
-          metadata: { settlementId: settlement.id, publisherAmount, platformFee },
+          metadata: { settlementId: settlement.id, publisherAmount: publisherAmount.toNumber(), platformFee: platformFee.toNumber() },
         },
       })
 
@@ -79,10 +81,10 @@ export class SettlementsService {
         action: "SETTLEMENT_CREATED",
         entityType: "Settlement",
         entityId: settlement.id,
-        metadata: { orderId, publisherAmount, platformFee },
+        metadata: { orderId, publisherAmount: publisherAmount.toNumber(), platformFee: platformFee.toNumber() },
         userId,
         organizationId: order.organizationId,
-      })
+      }, tx)
 
       return settlement
     })
@@ -408,12 +410,20 @@ export class SettlementsService {
       where: { publisherId: settlement.publisherId },
     })
 
+    const publisherAmount = new Decimal(settlement.publisherAmount)
+    // Outstanding clawback debt is repaid before anything reaches
+    // withdrawable — the publisher owes the platform from a prior refund.
+    const debt = balance ? new Decimal(balance.debtBalance ?? 0) : new Decimal(0)
+    const debtApplied = Decimal.min(debt, publisherAmount)
+    const credited = publisherAmount.minus(debtApplied)
+
     if (balance) {
       const updated = await tx.publisherBalance.updateMany({
         where: { publisherId: settlement.publisherId, version: balance.version },
         data: {
-          withdrawableBalance: { increment: Number(settlement.publisherAmount) },
-          lifetimeEarnings: { increment: Number(settlement.publisherAmount) },
+          withdrawableBalance: { increment: credited },
+          debtBalance: { decrement: debtApplied },
+          lifetimeEarnings: { increment: publisherAmount },
           version: { increment: 1 },
         },
       })
@@ -424,8 +434,8 @@ export class SettlementsService {
       await tx.publisherBalance.create({
         data: {
           publisherId: settlement.publisherId,
-          withdrawableBalance: Number(settlement.publisherAmount),
-          lifetimeEarnings: Number(settlement.publisherAmount),
+          withdrawableBalance: publisherAmount,
+          lifetimeEarnings: publisherAmount,
         },
       })
     }
@@ -437,14 +447,27 @@ export class SettlementsService {
 
     await tx.transaction.create({
       data: {
-        amount: Number(settlement.publisherAmount),
+        amount: publisherAmount,
         type: "SETTLEMENT_RELEASE",
         orderId: settlement.orderId,
         publisherId: settlement.publisherId,
         settlementId,
-        description: `Settlement release of ${settlement.publisherAmount} for order ${settlement.orderId}`,
+        description: `Settlement release of ${publisherAmount.toFixed(2)} for order ${settlement.orderId}`,
       },
     })
+
+    if (debtApplied.greaterThan(0)) {
+      await tx.transaction.create({
+        data: {
+          amount: debtApplied.negated(),
+          type: "DEBT_REPAYMENT",
+          orderId: settlement.orderId,
+          publisherId: settlement.publisherId,
+          settlementId,
+          description: `Debt repayment of ${debtApplied.toFixed(2)} netted from settlement release`,
+        },
+      })
+    }
 
     await tx.orderEvent.create({
       data: {

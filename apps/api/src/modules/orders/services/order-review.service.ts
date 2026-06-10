@@ -3,7 +3,7 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
 import { QUEUES } from "@guestpost/shared"
-import { resolvePlatformFeeFraction } from "../../../common/platform-fee"
+import { resolvePlatformFeeFraction, splitPlatformFee } from "../../../common/platform-fee"
 
 @Injectable()
 export class OrderReviewService {
@@ -137,59 +137,93 @@ export class OrderReviewService {
       throw new ForbiddenException("Only organization owner or order creator can confirm delivery")
     }
 
-    const updated = await this.transition(orderId, order.version, { status: "DELIVERED", deliveredAt: new Date() })
+    // Delivery transition and settlement/revenue creation commit atomically —
+    // a crash in between would leave a DELIVERED order with no settlement and
+    // nothing to retry it.
+    const updated = await this.prisma.$transaction(async (tx: any) => {
+      const r = await tx.order.updateMany({
+        where: { id: orderId, version: order.version },
+        data: { status: "DELIVERED", deliveredAt: new Date(), version: { increment: 1 } },
+      })
+      if (r.count === 0) {
+        throw new ConflictException("Order was modified by another request. Retry.")
+      }
+      const fresh = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
 
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId,
-        eventType: "DELIVERY_CONFIRMED",
-        actorId: userId,
-        message: `Delivery confirmed by customer`,
-      },
-    })
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "DELIVERY_CONFIRMED",
+          actorId: userId,
+          message: `Delivery confirmed by customer`,
+        },
+      })
 
-    // Auto-create settlement
-    await this.createSettlementForOrder(orderId, organizationId)
+      await this.createSettlementForOrder(tx, orderId)
 
-    await this.audit.log({
-      action: "DELIVERY_CONFIRMED",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: {},
-      userId,
-      organizationId,
+      await this.audit.log({
+        action: "DELIVERY_CONFIRMED",
+        entityType: "Order",
+        entityId: orderId,
+        metadata: {},
+        userId,
+        organizationId,
+      }, tx)
+
+      return fresh
     })
 
     return updated
   }
 
-  private async createSettlementForOrder(orderId: string, organizationId: string) {
-    const existingSettlement = await this.prisma.settlement.findFirst({ where: { orderId } })
+  private async createSettlementForOrder(tx: any, orderId: string) {
+    const existingSettlement = await tx.settlement.findFirst({
+      where: { orderId, status: { not: "CANCELLED" } },
+    })
     if (existingSettlement) return
 
-    const order = await this.prisma.order.findUnique({
+    const order = await tx.order.findUnique({
       where: { id: orderId },
       include: { website: true },
     })
-    if (!order) return
+    if (!order || !order.amount) return
 
-    const publisher = await this.prisma.publisher.findFirst({
+    // Platform-owned websites: record platform revenue, skip settlement
+    if (order.website?.ownershipType === "PLATFORM") {
+      const existingRevenue = await tx.platformRevenue.findUnique({ where: { orderId } })
+      if (existingRevenue) return
+
+      const feeFraction = await resolvePlatformFeeFraction(tx)
+      const { fee: platformFee, net: netRevenue } = splitPlatformFee(order.amount, feeFraction)
+
+      await tx.platformRevenue.create({
+        data: {
+          orderId,
+          amount: order.amount,
+          platformFee,
+          netRevenue,
+          recordedAt: new Date(),
+        },
+      })
+      return
+    }
+
+    // Publisher-owned websites: create settlement for publisher payout
+    const publisher = await tx.publisher.findFirst({
       where: { websites: { some: { id: order.websiteId ?? undefined } } },
     })
     if (!publisher) return
 
-    const grossAmount = order.amount ? Number(order.amount) : 0
-    const feeFraction = await resolvePlatformFeeFraction(this.prisma)
-    const platformFee = grossAmount * feeFraction
-    const publisherAmount = grossAmount - platformFee
-    const reviewDays = 5
+    const feeFraction = await resolvePlatformFeeFraction(tx)
+    const { fee: platformFee, net: publisherAmount } = splitPlatformFee(order.amount, feeFraction)
+    const reviewDays = Math.max(Number(process.env.SETTLEMENT_REVIEW_DAYS ?? 7), 0)
     const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
 
-    await this.prisma.settlement.create({
+    await tx.settlement.create({
       data: {
         orderId,
         publisherId: publisher.id,
-        grossAmount,
+        grossAmount: order.amount,
         platformFee,
         publisherAmount,
         status: "PENDING",

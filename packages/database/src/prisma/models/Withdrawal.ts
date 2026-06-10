@@ -42,6 +42,9 @@ export type WithdrawalMinAggregateOutputType = {
   amount: runtime.Decimal | null
   method: string | null
   status: $Enums.WithdrawalStatus | null
+  availableAt: Date | null
+  idempotencyKey: string | null
+  payoutMethodId: string | null
   approvedBy: string | null
   approvedAt: Date | null
   version: number | null
@@ -55,6 +58,9 @@ export type WithdrawalMaxAggregateOutputType = {
   amount: runtime.Decimal | null
   method: string | null
   status: $Enums.WithdrawalStatus | null
+  availableAt: Date | null
+  idempotencyKey: string | null
+  payoutMethodId: string | null
   approvedBy: string | null
   approvedAt: Date | null
   version: number | null
@@ -68,6 +74,9 @@ export type WithdrawalCountAggregateOutputType = {
   amount: number
   method: number
   status: number
+  availableAt: number
+  idempotencyKey: number
+  payoutMethodId: number
   approvedBy: number
   approvedAt: number
   version: number
@@ -93,6 +102,9 @@ export type WithdrawalMinAggregateInputType = {
   amount?: true
   method?: true
   status?: true
+  availableAt?: true
+  idempotencyKey?: true
+  payoutMethodId?: true
   approvedBy?: true
   approvedAt?: true
   version?: true
@@ -106,6 +118,9 @@ export type WithdrawalMaxAggregateInputType = {
   amount?: true
   method?: true
   status?: true
+  availableAt?: true
+  idempotencyKey?: true
+  payoutMethodId?: true
   approvedBy?: true
   approvedAt?: true
   version?: true
@@ -119,6 +134,9 @@ export type WithdrawalCountAggregateInputType = {
   amount?: true
   method?: true
   status?: true
+  availableAt?: true
+  idempotencyKey?: true
+  payoutMethodId?: true
   approvedBy?: true
   approvedAt?: true
   version?: true
@@ -219,6 +237,9 @@ export type WithdrawalGroupByOutputType = {
   amount: runtime.Decimal
   method: string
   status: $Enums.WithdrawalStatus
+  availableAt: Date | null
+  idempotencyKey: string | null
+  payoutMethodId: string | null
   approvedBy: string | null
   approvedAt: Date | null
   version: number
@@ -255,6 +276,9 @@ export type WithdrawalWhereInput = {
   amount?: Prisma.DecimalFilter<"Withdrawal"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFilter<"Withdrawal"> | string
   status?: Prisma.EnumWithdrawalStatusFilter<"Withdrawal"> | $Enums.WithdrawalStatus
+  availableAt?: Prisma.DateTimeNullableFilter<"Withdrawal"> | Date | string | null
+  idempotencyKey?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
+  payoutMethodId?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
   approvedBy?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
   approvedAt?: Prisma.DateTimeNullableFilter<"Withdrawal"> | Date | string | null
   version?: Prisma.IntFilter<"Withdrawal"> | number
@@ -262,6 +286,7 @@ export type WithdrawalWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"Withdrawal"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
   approvedByUser?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
+  payoutMethod?: Prisma.XOR<Prisma.PayoutMethodNullableScalarRelationFilter, Prisma.PayoutMethodWhereInput> | null
 }
 
 export type WithdrawalOrderByWithRelationInput = {
@@ -270,6 +295,9 @@ export type WithdrawalOrderByWithRelationInput = {
   amount?: Prisma.SortOrder
   method?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  availableAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  payoutMethodId?: Prisma.SortOrderInput | Prisma.SortOrder
   approvedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   version?: Prisma.SortOrder
@@ -277,10 +305,12 @@ export type WithdrawalOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   publisher?: Prisma.PublisherOrderByWithRelationInput
   approvedByUser?: Prisma.UserOrderByWithRelationInput
+  payoutMethod?: Prisma.PayoutMethodOrderByWithRelationInput
 }
 
 export type WithdrawalWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  publisherId_idempotencyKey?: Prisma.WithdrawalPublisherIdIdempotencyKeyCompoundUniqueInput
   AND?: Prisma.WithdrawalWhereInput | Prisma.WithdrawalWhereInput[]
   OR?: Prisma.WithdrawalWhereInput[]
   NOT?: Prisma.WithdrawalWhereInput | Prisma.WithdrawalWhereInput[]
@@ -288,6 +318,9 @@ export type WithdrawalWhereUniqueInput = Prisma.AtLeast<{
   amount?: Prisma.DecimalFilter<"Withdrawal"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFilter<"Withdrawal"> | string
   status?: Prisma.EnumWithdrawalStatusFilter<"Withdrawal"> | $Enums.WithdrawalStatus
+  availableAt?: Prisma.DateTimeNullableFilter<"Withdrawal"> | Date | string | null
+  idempotencyKey?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
+  payoutMethodId?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
   approvedBy?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
   approvedAt?: Prisma.DateTimeNullableFilter<"Withdrawal"> | Date | string | null
   version?: Prisma.IntFilter<"Withdrawal"> | number
@@ -295,7 +328,8 @@ export type WithdrawalWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"Withdrawal"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
   approvedByUser?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
-}, "id">
+  payoutMethod?: Prisma.XOR<Prisma.PayoutMethodNullableScalarRelationFilter, Prisma.PayoutMethodWhereInput> | null
+}, "id" | "publisherId_idempotencyKey">
 
 export type WithdrawalOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -303,6 +337,9 @@ export type WithdrawalOrderByWithAggregationInput = {
   amount?: Prisma.SortOrder
   method?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  availableAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  payoutMethodId?: Prisma.SortOrderInput | Prisma.SortOrder
   approvedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   version?: Prisma.SortOrder
@@ -324,6 +361,9 @@ export type WithdrawalScalarWhereWithAggregatesInput = {
   amount?: Prisma.DecimalWithAggregatesFilter<"Withdrawal"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringWithAggregatesFilter<"Withdrawal"> | string
   status?: Prisma.EnumWithdrawalStatusWithAggregatesFilter<"Withdrawal"> | $Enums.WithdrawalStatus
+  availableAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Withdrawal"> | Date | string | null
+  idempotencyKey?: Prisma.StringNullableWithAggregatesFilter<"Withdrawal"> | string | null
+  payoutMethodId?: Prisma.StringNullableWithAggregatesFilter<"Withdrawal"> | string | null
   approvedBy?: Prisma.StringNullableWithAggregatesFilter<"Withdrawal"> | string | null
   approvedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Withdrawal"> | Date | string | null
   version?: Prisma.IntWithAggregatesFilter<"Withdrawal"> | number
@@ -336,12 +376,15 @@ export type WithdrawalCreateInput = {
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: string
   status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
   approvedAt?: Date | string | null
   version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher: Prisma.PublisherCreateNestedOneWithoutWithdrawalsInput
   approvedByUser?: Prisma.UserCreateNestedOneWithoutApprovedWithdrawalsInput
+  payoutMethod?: Prisma.PayoutMethodCreateNestedOneWithoutWithdrawalsInput
 }
 
 export type WithdrawalUncheckedCreateInput = {
@@ -350,6 +393,9 @@ export type WithdrawalUncheckedCreateInput = {
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: string
   status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
+  payoutMethodId?: string | null
   approvedBy?: string | null
   approvedAt?: Date | string | null
   version?: number
@@ -362,12 +408,15 @@ export type WithdrawalUpdateInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutWithdrawalsNestedInput
   approvedByUser?: Prisma.UserUpdateOneWithoutApprovedWithdrawalsNestedInput
+  payoutMethod?: Prisma.PayoutMethodUpdateOneWithoutWithdrawalsNestedInput
 }
 
 export type WithdrawalUncheckedUpdateInput = {
@@ -376,6 +425,9 @@ export type WithdrawalUncheckedUpdateInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payoutMethodId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
@@ -389,6 +441,9 @@ export type WithdrawalCreateManyInput = {
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: string
   status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
+  payoutMethodId?: string | null
   approvedBy?: string | null
   approvedAt?: Date | string | null
   version?: number
@@ -401,6 +456,8 @@ export type WithdrawalUpdateManyMutationInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -413,6 +470,9 @@ export type WithdrawalUncheckedUpdateManyInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payoutMethodId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
@@ -430,12 +490,20 @@ export type WithdrawalOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
+export type WithdrawalPublisherIdIdempotencyKeyCompoundUniqueInput = {
+  publisherId: string
+  idempotencyKey: string
+}
+
 export type WithdrawalCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   publisherId?: Prisma.SortOrder
   amount?: Prisma.SortOrder
   method?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  availableAt?: Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrder
+  payoutMethodId?: Prisma.SortOrder
   approvedBy?: Prisma.SortOrder
   approvedAt?: Prisma.SortOrder
   version?: Prisma.SortOrder
@@ -454,6 +522,9 @@ export type WithdrawalMaxOrderByAggregateInput = {
   amount?: Prisma.SortOrder
   method?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  availableAt?: Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrder
+  payoutMethodId?: Prisma.SortOrder
   approvedBy?: Prisma.SortOrder
   approvedAt?: Prisma.SortOrder
   version?: Prisma.SortOrder
@@ -467,6 +538,9 @@ export type WithdrawalMinOrderByAggregateInput = {
   amount?: Prisma.SortOrder
   method?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  availableAt?: Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrder
+  payoutMethodId?: Prisma.SortOrder
   approvedBy?: Prisma.SortOrder
   approvedAt?: Prisma.SortOrder
   version?: Prisma.SortOrder
@@ -567,16 +641,61 @@ export type EnumWithdrawalStatusFieldUpdateOperationsInput = {
   set?: $Enums.WithdrawalStatus
 }
 
+export type WithdrawalCreateNestedManyWithoutPayoutMethodInput = {
+  create?: Prisma.XOR<Prisma.WithdrawalCreateWithoutPayoutMethodInput, Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput> | Prisma.WithdrawalCreateWithoutPayoutMethodInput[] | Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput[]
+  connectOrCreate?: Prisma.WithdrawalCreateOrConnectWithoutPayoutMethodInput | Prisma.WithdrawalCreateOrConnectWithoutPayoutMethodInput[]
+  createMany?: Prisma.WithdrawalCreateManyPayoutMethodInputEnvelope
+  connect?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+}
+
+export type WithdrawalUncheckedCreateNestedManyWithoutPayoutMethodInput = {
+  create?: Prisma.XOR<Prisma.WithdrawalCreateWithoutPayoutMethodInput, Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput> | Prisma.WithdrawalCreateWithoutPayoutMethodInput[] | Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput[]
+  connectOrCreate?: Prisma.WithdrawalCreateOrConnectWithoutPayoutMethodInput | Prisma.WithdrawalCreateOrConnectWithoutPayoutMethodInput[]
+  createMany?: Prisma.WithdrawalCreateManyPayoutMethodInputEnvelope
+  connect?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+}
+
+export type WithdrawalUpdateManyWithoutPayoutMethodNestedInput = {
+  create?: Prisma.XOR<Prisma.WithdrawalCreateWithoutPayoutMethodInput, Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput> | Prisma.WithdrawalCreateWithoutPayoutMethodInput[] | Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput[]
+  connectOrCreate?: Prisma.WithdrawalCreateOrConnectWithoutPayoutMethodInput | Prisma.WithdrawalCreateOrConnectWithoutPayoutMethodInput[]
+  upsert?: Prisma.WithdrawalUpsertWithWhereUniqueWithoutPayoutMethodInput | Prisma.WithdrawalUpsertWithWhereUniqueWithoutPayoutMethodInput[]
+  createMany?: Prisma.WithdrawalCreateManyPayoutMethodInputEnvelope
+  set?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+  disconnect?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+  delete?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+  connect?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+  update?: Prisma.WithdrawalUpdateWithWhereUniqueWithoutPayoutMethodInput | Prisma.WithdrawalUpdateWithWhereUniqueWithoutPayoutMethodInput[]
+  updateMany?: Prisma.WithdrawalUpdateManyWithWhereWithoutPayoutMethodInput | Prisma.WithdrawalUpdateManyWithWhereWithoutPayoutMethodInput[]
+  deleteMany?: Prisma.WithdrawalScalarWhereInput | Prisma.WithdrawalScalarWhereInput[]
+}
+
+export type WithdrawalUncheckedUpdateManyWithoutPayoutMethodNestedInput = {
+  create?: Prisma.XOR<Prisma.WithdrawalCreateWithoutPayoutMethodInput, Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput> | Prisma.WithdrawalCreateWithoutPayoutMethodInput[] | Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput[]
+  connectOrCreate?: Prisma.WithdrawalCreateOrConnectWithoutPayoutMethodInput | Prisma.WithdrawalCreateOrConnectWithoutPayoutMethodInput[]
+  upsert?: Prisma.WithdrawalUpsertWithWhereUniqueWithoutPayoutMethodInput | Prisma.WithdrawalUpsertWithWhereUniqueWithoutPayoutMethodInput[]
+  createMany?: Prisma.WithdrawalCreateManyPayoutMethodInputEnvelope
+  set?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+  disconnect?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+  delete?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+  connect?: Prisma.WithdrawalWhereUniqueInput | Prisma.WithdrawalWhereUniqueInput[]
+  update?: Prisma.WithdrawalUpdateWithWhereUniqueWithoutPayoutMethodInput | Prisma.WithdrawalUpdateWithWhereUniqueWithoutPayoutMethodInput[]
+  updateMany?: Prisma.WithdrawalUpdateManyWithWhereWithoutPayoutMethodInput | Prisma.WithdrawalUpdateManyWithWhereWithoutPayoutMethodInput[]
+  deleteMany?: Prisma.WithdrawalScalarWhereInput | Prisma.WithdrawalScalarWhereInput[]
+}
+
 export type WithdrawalCreateWithoutApprovedByUserInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: string
   status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
   approvedAt?: Date | string | null
   version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher: Prisma.PublisherCreateNestedOneWithoutWithdrawalsInput
+  payoutMethod?: Prisma.PayoutMethodCreateNestedOneWithoutWithdrawalsInput
 }
 
 export type WithdrawalUncheckedCreateWithoutApprovedByUserInput = {
@@ -585,6 +704,9 @@ export type WithdrawalUncheckedCreateWithoutApprovedByUserInput = {
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: string
   status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
+  payoutMethodId?: string | null
   approvedAt?: Date | string | null
   version?: number
   createdAt?: Date | string
@@ -626,6 +748,9 @@ export type WithdrawalScalarWhereInput = {
   amount?: Prisma.DecimalFilter<"Withdrawal"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFilter<"Withdrawal"> | string
   status?: Prisma.EnumWithdrawalStatusFilter<"Withdrawal"> | $Enums.WithdrawalStatus
+  availableAt?: Prisma.DateTimeNullableFilter<"Withdrawal"> | Date | string | null
+  idempotencyKey?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
+  payoutMethodId?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
   approvedBy?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
   approvedAt?: Prisma.DateTimeNullableFilter<"Withdrawal"> | Date | string | null
   version?: Prisma.IntFilter<"Withdrawal"> | number
@@ -638,11 +763,14 @@ export type WithdrawalCreateWithoutPublisherInput = {
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: string
   status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
   approvedAt?: Date | string | null
   version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   approvedByUser?: Prisma.UserCreateNestedOneWithoutApprovedWithdrawalsInput
+  payoutMethod?: Prisma.PayoutMethodCreateNestedOneWithoutWithdrawalsInput
 }
 
 export type WithdrawalUncheckedCreateWithoutPublisherInput = {
@@ -650,6 +778,9 @@ export type WithdrawalUncheckedCreateWithoutPublisherInput = {
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: string
   status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
+  payoutMethodId?: string | null
   approvedBy?: string | null
   approvedAt?: Date | string | null
   version?: number
@@ -683,12 +814,71 @@ export type WithdrawalUpdateManyWithWhereWithoutPublisherInput = {
   data: Prisma.XOR<Prisma.WithdrawalUpdateManyMutationInput, Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherInput>
 }
 
+export type WithdrawalCreateWithoutPayoutMethodInput = {
+  id?: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  method?: string
+  status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
+  approvedAt?: Date | string | null
+  version?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  publisher: Prisma.PublisherCreateNestedOneWithoutWithdrawalsInput
+  approvedByUser?: Prisma.UserCreateNestedOneWithoutApprovedWithdrawalsInput
+}
+
+export type WithdrawalUncheckedCreateWithoutPayoutMethodInput = {
+  id?: string
+  publisherId: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  method?: string
+  status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
+  approvedBy?: string | null
+  approvedAt?: Date | string | null
+  version?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type WithdrawalCreateOrConnectWithoutPayoutMethodInput = {
+  where: Prisma.WithdrawalWhereUniqueInput
+  create: Prisma.XOR<Prisma.WithdrawalCreateWithoutPayoutMethodInput, Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput>
+}
+
+export type WithdrawalCreateManyPayoutMethodInputEnvelope = {
+  data: Prisma.WithdrawalCreateManyPayoutMethodInput | Prisma.WithdrawalCreateManyPayoutMethodInput[]
+  skipDuplicates?: boolean
+}
+
+export type WithdrawalUpsertWithWhereUniqueWithoutPayoutMethodInput = {
+  where: Prisma.WithdrawalWhereUniqueInput
+  update: Prisma.XOR<Prisma.WithdrawalUpdateWithoutPayoutMethodInput, Prisma.WithdrawalUncheckedUpdateWithoutPayoutMethodInput>
+  create: Prisma.XOR<Prisma.WithdrawalCreateWithoutPayoutMethodInput, Prisma.WithdrawalUncheckedCreateWithoutPayoutMethodInput>
+}
+
+export type WithdrawalUpdateWithWhereUniqueWithoutPayoutMethodInput = {
+  where: Prisma.WithdrawalWhereUniqueInput
+  data: Prisma.XOR<Prisma.WithdrawalUpdateWithoutPayoutMethodInput, Prisma.WithdrawalUncheckedUpdateWithoutPayoutMethodInput>
+}
+
+export type WithdrawalUpdateManyWithWhereWithoutPayoutMethodInput = {
+  where: Prisma.WithdrawalScalarWhereInput
+  data: Prisma.XOR<Prisma.WithdrawalUpdateManyMutationInput, Prisma.WithdrawalUncheckedUpdateManyWithoutPayoutMethodInput>
+}
+
 export type WithdrawalCreateManyApprovedByUserInput = {
   id?: string
   publisherId: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: string
   status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
+  payoutMethodId?: string | null
   approvedAt?: Date | string | null
   version?: number
   createdAt?: Date | string
@@ -700,11 +890,14 @@ export type WithdrawalUpdateWithoutApprovedByUserInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutWithdrawalsNestedInput
+  payoutMethod?: Prisma.PayoutMethodUpdateOneWithoutWithdrawalsNestedInput
 }
 
 export type WithdrawalUncheckedUpdateWithoutApprovedByUserInput = {
@@ -713,6 +906,9 @@ export type WithdrawalUncheckedUpdateWithoutApprovedByUserInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payoutMethodId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -725,6 +921,9 @@ export type WithdrawalUncheckedUpdateManyWithoutApprovedByUserInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payoutMethodId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -736,6 +935,9 @@ export type WithdrawalCreateManyPublisherInput = {
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: string
   status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
+  payoutMethodId?: string | null
   approvedBy?: string | null
   approvedAt?: Date | string | null
   version?: number
@@ -748,11 +950,14 @@ export type WithdrawalUpdateWithoutPublisherInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvedByUser?: Prisma.UserUpdateOneWithoutApprovedWithdrawalsNestedInput
+  payoutMethod?: Prisma.PayoutMethodUpdateOneWithoutWithdrawalsNestedInput
 }
 
 export type WithdrawalUncheckedUpdateWithoutPublisherInput = {
@@ -760,6 +965,9 @@ export type WithdrawalUncheckedUpdateWithoutPublisherInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payoutMethodId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
@@ -772,6 +980,69 @@ export type WithdrawalUncheckedUpdateManyWithoutPublisherInput = {
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  payoutMethodId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type WithdrawalCreateManyPayoutMethodInput = {
+  id?: string
+  publisherId: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  method?: string
+  status?: $Enums.WithdrawalStatus
+  availableAt?: Date | string | null
+  idempotencyKey?: string | null
+  approvedBy?: string | null
+  approvedAt?: Date | string | null
+  version?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type WithdrawalUpdateWithoutPayoutMethodInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  method?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  publisher?: Prisma.PublisherUpdateOneRequiredWithoutWithdrawalsNestedInput
+  approvedByUser?: Prisma.UserUpdateOneWithoutApprovedWithdrawalsNestedInput
+}
+
+export type WithdrawalUncheckedUpdateWithoutPayoutMethodInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  publisherId?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  method?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type WithdrawalUncheckedUpdateManyWithoutPayoutMethodInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  publisherId?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  method?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
+  availableAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
@@ -787,6 +1058,9 @@ export type WithdrawalSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   amount?: boolean
   method?: boolean
   status?: boolean
+  availableAt?: boolean
+  idempotencyKey?: boolean
+  payoutMethodId?: boolean
   approvedBy?: boolean
   approvedAt?: boolean
   version?: boolean
@@ -794,6 +1068,7 @@ export type WithdrawalSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   approvedByUser?: boolean | Prisma.Withdrawal$approvedByUserArgs<ExtArgs>
+  payoutMethod?: boolean | Prisma.Withdrawal$payoutMethodArgs<ExtArgs>
 }, ExtArgs["result"]["withdrawal"]>
 
 export type WithdrawalSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -802,6 +1077,9 @@ export type WithdrawalSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   amount?: boolean
   method?: boolean
   status?: boolean
+  availableAt?: boolean
+  idempotencyKey?: boolean
+  payoutMethodId?: boolean
   approvedBy?: boolean
   approvedAt?: boolean
   version?: boolean
@@ -809,6 +1087,7 @@ export type WithdrawalSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   approvedByUser?: boolean | Prisma.Withdrawal$approvedByUserArgs<ExtArgs>
+  payoutMethod?: boolean | Prisma.Withdrawal$payoutMethodArgs<ExtArgs>
 }, ExtArgs["result"]["withdrawal"]>
 
 export type WithdrawalSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -817,6 +1096,9 @@ export type WithdrawalSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   amount?: boolean
   method?: boolean
   status?: boolean
+  availableAt?: boolean
+  idempotencyKey?: boolean
+  payoutMethodId?: boolean
   approvedBy?: boolean
   approvedAt?: boolean
   version?: boolean
@@ -824,6 +1106,7 @@ export type WithdrawalSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   approvedByUser?: boolean | Prisma.Withdrawal$approvedByUserArgs<ExtArgs>
+  payoutMethod?: boolean | Prisma.Withdrawal$payoutMethodArgs<ExtArgs>
 }, ExtArgs["result"]["withdrawal"]>
 
 export type WithdrawalSelectScalar = {
@@ -832,6 +1115,9 @@ export type WithdrawalSelectScalar = {
   amount?: boolean
   method?: boolean
   status?: boolean
+  availableAt?: boolean
+  idempotencyKey?: boolean
+  payoutMethodId?: boolean
   approvedBy?: boolean
   approvedAt?: boolean
   version?: boolean
@@ -839,18 +1125,21 @@ export type WithdrawalSelectScalar = {
   updatedAt?: boolean
 }
 
-export type WithdrawalOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "amount" | "method" | "status" | "approvedBy" | "approvedAt" | "version" | "createdAt" | "updatedAt", ExtArgs["result"]["withdrawal"]>
+export type WithdrawalOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "amount" | "method" | "status" | "availableAt" | "idempotencyKey" | "payoutMethodId" | "approvedBy" | "approvedAt" | "version" | "createdAt" | "updatedAt", ExtArgs["result"]["withdrawal"]>
 export type WithdrawalInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   approvedByUser?: boolean | Prisma.Withdrawal$approvedByUserArgs<ExtArgs>
+  payoutMethod?: boolean | Prisma.Withdrawal$payoutMethodArgs<ExtArgs>
 }
 export type WithdrawalIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   approvedByUser?: boolean | Prisma.Withdrawal$approvedByUserArgs<ExtArgs>
+  payoutMethod?: boolean | Prisma.Withdrawal$payoutMethodArgs<ExtArgs>
 }
 export type WithdrawalIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   approvedByUser?: boolean | Prisma.Withdrawal$approvedByUserArgs<ExtArgs>
+  payoutMethod?: boolean | Prisma.Withdrawal$payoutMethodArgs<ExtArgs>
 }
 
 export type $WithdrawalPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -858,6 +1147,7 @@ export type $WithdrawalPayload<ExtArgs extends runtime.Types.Extensions.Internal
   objects: {
     publisher: Prisma.$PublisherPayload<ExtArgs>
     approvedByUser: Prisma.$UserPayload<ExtArgs> | null
+    payoutMethod: Prisma.$PayoutMethodPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -865,6 +1155,9 @@ export type $WithdrawalPayload<ExtArgs extends runtime.Types.Extensions.Internal
     amount: runtime.Decimal
     method: string
     status: $Enums.WithdrawalStatus
+    availableAt: Date | null
+    idempotencyKey: string | null
+    payoutMethodId: string | null
     approvedBy: string | null
     approvedAt: Date | null
     version: number
@@ -1266,6 +1559,7 @@ export interface Prisma__WithdrawalClient<T, Null = never, ExtArgs extends runti
   readonly [Symbol.toStringTag]: "PrismaPromise"
   publisher<T extends Prisma.PublisherDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PublisherDefaultArgs<ExtArgs>>): Prisma.Prisma__PublisherClient<runtime.Types.Result.GetResult<Prisma.$PublisherPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   approvedByUser<T extends Prisma.Withdrawal$approvedByUserArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Withdrawal$approvedByUserArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  payoutMethod<T extends Prisma.Withdrawal$payoutMethodArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Withdrawal$payoutMethodArgs<ExtArgs>>): Prisma.Prisma__PayoutMethodClient<runtime.Types.Result.GetResult<Prisma.$PayoutMethodPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1300,6 +1594,9 @@ export interface WithdrawalFieldRefs {
   readonly amount: Prisma.FieldRef<"Withdrawal", 'Decimal'>
   readonly method: Prisma.FieldRef<"Withdrawal", 'String'>
   readonly status: Prisma.FieldRef<"Withdrawal", 'WithdrawalStatus'>
+  readonly availableAt: Prisma.FieldRef<"Withdrawal", 'DateTime'>
+  readonly idempotencyKey: Prisma.FieldRef<"Withdrawal", 'String'>
+  readonly payoutMethodId: Prisma.FieldRef<"Withdrawal", 'String'>
   readonly approvedBy: Prisma.FieldRef<"Withdrawal", 'String'>
   readonly approvedAt: Prisma.FieldRef<"Withdrawal", 'DateTime'>
   readonly version: Prisma.FieldRef<"Withdrawal", 'Int'>
@@ -1717,6 +2014,25 @@ export type Withdrawal$approvedByUserArgs<ExtArgs extends runtime.Types.Extensio
    */
   include?: Prisma.UserInclude<ExtArgs> | null
   where?: Prisma.UserWhereInput
+}
+
+/**
+ * Withdrawal.payoutMethod
+ */
+export type Withdrawal$payoutMethodArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PayoutMethod
+   */
+  select?: Prisma.PayoutMethodSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PayoutMethod
+   */
+  omit?: Prisma.PayoutMethodOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PayoutMethodInclude<ExtArgs> | null
+  where?: Prisma.PayoutMethodWhereInput
 }
 
 /**

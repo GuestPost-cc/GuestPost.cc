@@ -28,7 +28,7 @@ export type ContentOrderMinAggregateOutputType = {
   id: string | null
   title: string | null
   brief: string | null
-  status: string | null
+  status: $Enums.ContentOrderStatus | null
   deliverable: string | null
   orderId: string | null
   createdAt: Date | null
@@ -39,7 +39,7 @@ export type ContentOrderMaxAggregateOutputType = {
   id: string | null
   title: string | null
   brief: string | null
-  status: string | null
+  status: $Enums.ContentOrderStatus | null
   deliverable: string | null
   orderId: string | null
   createdAt: Date | null
@@ -169,7 +169,7 @@ export type ContentOrderGroupByOutputType = {
   id: string
   title: string
   brief: string | null
-  status: string
+  status: $Enums.ContentOrderStatus
   deliverable: string | null
   orderId: string
   createdAt: Date
@@ -201,7 +201,7 @@ export type ContentOrderWhereInput = {
   id?: Prisma.StringFilter<"ContentOrder"> | string
   title?: Prisma.StringFilter<"ContentOrder"> | string
   brief?: Prisma.StringNullableFilter<"ContentOrder"> | string | null
-  status?: Prisma.StringFilter<"ContentOrder"> | string
+  status?: Prisma.EnumContentOrderStatusFilter<"ContentOrder"> | $Enums.ContentOrderStatus
   deliverable?: Prisma.StringNullableFilter<"ContentOrder"> | string | null
   orderId?: Prisma.StringFilter<"ContentOrder"> | string
   createdAt?: Prisma.DateTimeFilter<"ContentOrder"> | Date | string
@@ -229,7 +229,7 @@ export type ContentOrderWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.ContentOrderWhereInput | Prisma.ContentOrderWhereInput[]
   title?: Prisma.StringFilter<"ContentOrder"> | string
   brief?: Prisma.StringNullableFilter<"ContentOrder"> | string | null
-  status?: Prisma.StringFilter<"ContentOrder"> | string
+  status?: Prisma.EnumContentOrderStatusFilter<"ContentOrder"> | $Enums.ContentOrderStatus
   deliverable?: Prisma.StringNullableFilter<"ContentOrder"> | string | null
   createdAt?: Prisma.DateTimeFilter<"ContentOrder"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"ContentOrder"> | Date | string
@@ -257,7 +257,7 @@ export type ContentOrderScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"ContentOrder"> | string
   title?: Prisma.StringWithAggregatesFilter<"ContentOrder"> | string
   brief?: Prisma.StringNullableWithAggregatesFilter<"ContentOrder"> | string | null
-  status?: Prisma.StringWithAggregatesFilter<"ContentOrder"> | string
+  status?: Prisma.EnumContentOrderStatusWithAggregatesFilter<"ContentOrder"> | $Enums.ContentOrderStatus
   deliverable?: Prisma.StringNullableWithAggregatesFilter<"ContentOrder"> | string | null
   orderId?: Prisma.StringWithAggregatesFilter<"ContentOrder"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"ContentOrder"> | Date | string
@@ -268,7 +268,7 @@ export type ContentOrderCreateInput = {
   id?: string
   title: string
   brief?: string | null
-  status?: string
+  status?: $Enums.ContentOrderStatus
   deliverable?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -279,7 +279,7 @@ export type ContentOrderUncheckedCreateInput = {
   id?: string
   title: string
   brief?: string | null
-  status?: string
+  status?: $Enums.ContentOrderStatus
   deliverable?: string | null
   orderId: string
   createdAt?: Date | string
@@ -290,7 +290,7 @@ export type ContentOrderUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   brief?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumContentOrderStatusFieldUpdateOperationsInput | $Enums.ContentOrderStatus
   deliverable?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -301,7 +301,7 @@ export type ContentOrderUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   brief?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumContentOrderStatusFieldUpdateOperationsInput | $Enums.ContentOrderStatus
   deliverable?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -312,7 +312,7 @@ export type ContentOrderCreateManyInput = {
   id?: string
   title: string
   brief?: string | null
-  status?: string
+  status?: $Enums.ContentOrderStatus
   deliverable?: string | null
   orderId: string
   createdAt?: Date | string
@@ -323,7 +323,7 @@ export type ContentOrderUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   brief?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumContentOrderStatusFieldUpdateOperationsInput | $Enums.ContentOrderStatus
   deliverable?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -333,7 +333,7 @@ export type ContentOrderUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   brief?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumContentOrderStatusFieldUpdateOperationsInput | $Enums.ContentOrderStatus
   deliverable?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -410,11 +410,15 @@ export type ContentOrderUncheckedUpdateOneWithoutOrderNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ContentOrderUpdateToOneWithWhereWithoutOrderInput, Prisma.ContentOrderUpdateWithoutOrderInput>, Prisma.ContentOrderUncheckedUpdateWithoutOrderInput>
 }
 
+export type EnumContentOrderStatusFieldUpdateOperationsInput = {
+  set?: $Enums.ContentOrderStatus
+}
+
 export type ContentOrderCreateWithoutOrderInput = {
   id?: string
   title: string
   brief?: string | null
-  status?: string
+  status?: $Enums.ContentOrderStatus
   deliverable?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -424,7 +428,7 @@ export type ContentOrderUncheckedCreateWithoutOrderInput = {
   id?: string
   title: string
   brief?: string | null
-  status?: string
+  status?: $Enums.ContentOrderStatus
   deliverable?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -450,7 +454,7 @@ export type ContentOrderUpdateWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   brief?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumContentOrderStatusFieldUpdateOperationsInput | $Enums.ContentOrderStatus
   deliverable?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -460,7 +464,7 @@ export type ContentOrderUncheckedUpdateWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   title?: Prisma.StringFieldUpdateOperationsInput | string
   brief?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumContentOrderStatusFieldUpdateOperationsInput | $Enums.ContentOrderStatus
   deliverable?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -535,7 +539,7 @@ export type $ContentOrderPayload<ExtArgs extends runtime.Types.Extensions.Intern
     id: string
     title: string
     brief: string | null
-    status: string
+    status: $Enums.ContentOrderStatus
     deliverable: string | null
     orderId: string
     createdAt: Date
@@ -967,7 +971,7 @@ export interface ContentOrderFieldRefs {
   readonly id: Prisma.FieldRef<"ContentOrder", 'String'>
   readonly title: Prisma.FieldRef<"ContentOrder", 'String'>
   readonly brief: Prisma.FieldRef<"ContentOrder", 'String'>
-  readonly status: Prisma.FieldRef<"ContentOrder", 'String'>
+  readonly status: Prisma.FieldRef<"ContentOrder", 'ContentOrderStatus'>
   readonly deliverable: Prisma.FieldRef<"ContentOrder", 'String'>
   readonly orderId: Prisma.FieldRef<"ContentOrder", 'String'>
   readonly createdAt: Prisma.FieldRef<"ContentOrder", 'DateTime'>

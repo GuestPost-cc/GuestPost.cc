@@ -46,7 +46,7 @@ export class BillingService {
               product_data: {
                 name: "Wallet Deposit",
               },
-              unit_amount: amount * 100, // Amount in cents
+              unit_amount: Math.round(amount * 100), // Amount in cents (Stripe requires integer)
             },
             quantity: 1,
           },
@@ -84,23 +84,65 @@ export class BillingService {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as any
       await this.processSuccessfulPayment(session)
+    } else if (event.type === "charge.dispute.created") {
+      await this.handleChargeback(event.data.object as any)
     }
 
     return { received: true }
+  }
+
+  // Cardholder opened a chargeback at their bank. Money will be pulled by
+  // Stripe regardless — this must never pass silently: audit + alert every
+  // staff member so finance can respond within the evidence window.
+  private async handleChargeback(dispute: any) {
+    this.logger.error(
+      `Stripe chargeback received: dispute ${dispute.id}, charge ${dispute.charge}, amount ${dispute.amount} ${dispute.currency}`,
+    )
+
+    await this.audit.log({
+      action: "STRIPE_CHARGEBACK_RECEIVED",
+      entityType: "StripeDispute",
+      entityId: dispute.id,
+      metadata: {
+        charge: dispute.charge,
+        amount: dispute.amount,
+        currency: dispute.currency,
+        reason: dispute.reason,
+        status: dispute.status,
+        paymentIntent: dispute.payment_intent ?? null,
+      },
+      userId: null,
+      organizationId: null,
+    })
+
+    const staff = await this.prisma.staffMembership.findMany({ select: { userId: true } })
+    for (const s of staff) {
+      await this.prisma.notification.create({
+        data: {
+          userId: s.userId,
+          organizationId: null,
+          type: "STRIPE_CHARGEBACK",
+          message: `Chargeback ${dispute.id} for ${(dispute.amount / 100).toFixed(2)} ${String(dispute.currency).toUpperCase()} — respond in Stripe dashboard`,
+        },
+      }).catch((err: any) => this.logger.error(`Failed to notify staff ${s.userId} of chargeback: ${err}`))
+    }
   }
 
   private async processSuccessfulPayment(session: any) {
     const walletId = session.metadata?.walletId || session.client_reference_id
     if (!walletId) return
 
-    // Amount from Stripe authoritative source (amount_total is in cents)
-    const amount = Math.round((session.amount_total ?? 0) / 100)
-    if (amount <= 0) {
-      this.logger.warn(`Invalid amount ${amount} in webhook session ${session.id}`)
+    // Amount from Stripe authoritative source (amount_total is in cents).
+    // Exact Decimal division — Math.round(cents/100) would round $10.50 to
+    // $11 and mint money on every non-whole-dollar deposit.
+    const amountCents = session.amount_total ?? 0
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      this.logger.warn(`Invalid amount_total ${amountCents} in webhook session ${session.id}`)
       return
     }
+    const amount = new Decimal(amountCents).div(100)
 
-    const orgId = session.metadata?.organizationId || "system"
+    const orgId = session.metadata?.organizationId || null
 
     await this.prisma.$transaction(async (tx: any) => {
       // Idempotency: unique constraint on Transaction.reference prevents duplicates
@@ -131,7 +173,7 @@ export class BillingService {
           amount,
           type: "DEPOSIT",
           reference: session.id,
-          description: `Stripe deposit of ${amount}`,
+          description: `Stripe deposit of ${amount.toFixed(2)}`,
         },
       })
     })
@@ -140,8 +182,8 @@ export class BillingService {
       action: "WALLET_DEPOSIT",
       entityType: "Wallet",
       entityId: walletId,
-      metadata: { amount, reference: session.id, method: "stripe" },
-      userId: session.metadata?.userId || "system",
+      metadata: { amount: amount.toNumber(), reference: session.id, method: "stripe" },
+      userId: session.metadata?.userId || null,
       organizationId: orgId,
     })
   }

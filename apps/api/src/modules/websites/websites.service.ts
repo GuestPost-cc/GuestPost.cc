@@ -3,6 +3,7 @@ import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
 import { ListingStatus, ListingType, ListingFulfillmentType } from "@guestpost/database"
+import { normalizeDomain } from "../../common/domain"
 
 @Injectable()
 export class WebsitesService {
@@ -23,17 +24,21 @@ export class WebsitesService {
       throw new ForbiddenException("Publisher does not belong to this organization")
     }
 
-    const existingWebsite = await this.prisma.website.findUnique({
-      where: { url: dto.url },
+    // Dedupe on the normalized domain, not the raw URL — www/trailing-slash
+    // variants of an existing site must not create a second listing.
+    const domain = normalizeDomain(dto.url)
+    const existingWebsite = await this.prisma.website.findFirst({
+      where: { OR: [{ url: dto.url }, { domain }] },
     })
 
     if (existingWebsite) {
-      throw new BadRequestException("Website already exists")
+      throw new BadRequestException(`Website with this domain already exists (${existingWebsite.url})`)
     }
 
     const website = await this.prisma.website.create({
       data: {
         url: dto.url,
+        domain,
         country: dto.country,
         language: dto.language,
         category: dto.category,
@@ -95,10 +100,22 @@ export class WebsitesService {
       throw new NotFoundException("Website not found")
     }
 
+    let domain = website.domain
+    if (dto.url && dto.url !== website.url) {
+      domain = normalizeDomain(dto.url)
+      const duplicate = await this.prisma.website.findFirst({
+        where: { id: { not: id }, OR: [{ url: dto.url }, { domain }] },
+      })
+      if (duplicate) {
+        throw new BadRequestException(`Website with this domain already exists (${duplicate.url})`)
+      }
+    }
+
     const updated = await this.prisma.website.update({
       where: { id },
       data: {
         url: dto.url,
+        domain,
         country: dto.country,
         language: dto.language,
         category: dto.category,

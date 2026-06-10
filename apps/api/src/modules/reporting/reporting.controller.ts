@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, UseGuards } from "@nestjs/common"
+import { Controller, Get, Post, Param, Query, UseGuards } from "@nestjs/common"
 import { ReportingService } from "./reporting.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
@@ -29,7 +29,13 @@ export class ReportingController {
   }
 
   @Get()
-  listReports(@CurrentUser() user: any) {
-    return this.reporting.listReports(user.organizationId)
+  listReports(
+    @CurrentUser() user: any,
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+  ) {
+    const t = Math.min(Math.max(parseInt(take ?? "50", 10) || 50, 1), 100)
+    const s = Math.max(0, parseInt(skip ?? "0", 10) || 0)
+    return this.reporting.listReports(user.organizationId, t, s)
   }
 }

@@ -413,10 +413,12 @@ export const ModelName = {
   SettlementApproval: 'SettlementApproval',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
+  PayoutMethod: 'PayoutMethod',
   ApiKey: 'ApiKey',
   ContentOrder: 'ContentOrder',
   Revision: 'Revision',
   Report: 'Report',
+  PlatformRevenue: 'PlatformRevenue',
   Wallet: 'Wallet',
   Transaction: 'Transaction',
   Ticket: 'Ticket',
@@ -456,7 +458,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "service" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "publisherBalance" | "withdrawal" | "apiKey" | "contentOrder" | "revision" | "report" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplacePricingTier" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings"
+    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "service" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "publisherBalance" | "withdrawal" | "payoutMethod" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplacePricingTier" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2162,6 +2164,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    PayoutMethod: {
+      payload: Prisma.$PayoutMethodPayload<ExtArgs>
+      fields: Prisma.PayoutMethodFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PayoutMethodFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PayoutMethodFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload>
+        }
+        findFirst: {
+          args: Prisma.PayoutMethodFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PayoutMethodFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload>
+        }
+        findMany: {
+          args: Prisma.PayoutMethodFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload>[]
+        }
+        create: {
+          args: Prisma.PayoutMethodCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload>
+        }
+        createMany: {
+          args: Prisma.PayoutMethodCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PayoutMethodCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload>[]
+        }
+        delete: {
+          args: Prisma.PayoutMethodDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload>
+        }
+        update: {
+          args: Prisma.PayoutMethodUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload>
+        }
+        deleteMany: {
+          args: Prisma.PayoutMethodDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PayoutMethodUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PayoutMethodUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload>[]
+        }
+        upsert: {
+          args: Prisma.PayoutMethodUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PayoutMethodPayload>
+        }
+        aggregate: {
+          args: Prisma.PayoutMethodAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePayoutMethod>
+        }
+        groupBy: {
+          args: Prisma.PayoutMethodGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PayoutMethodGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PayoutMethodCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PayoutMethodCountAggregateOutputType> | number
+        }
+      }
+    }
     ApiKey: {
       payload: Prisma.$ApiKeyPayload<ExtArgs>
       fields: Prisma.ApiKeyFieldRefs
@@ -2455,6 +2531,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.ReportCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.ReportCountAggregateOutputType> | number
+        }
+      }
+    }
+    PlatformRevenue: {
+      payload: Prisma.$PlatformRevenuePayload<ExtArgs>
+      fields: Prisma.PlatformRevenueFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.PlatformRevenueFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.PlatformRevenueFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload>
+        }
+        findFirst: {
+          args: Prisma.PlatformRevenueFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.PlatformRevenueFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload>
+        }
+        findMany: {
+          args: Prisma.PlatformRevenueFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload>[]
+        }
+        create: {
+          args: Prisma.PlatformRevenueCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload>
+        }
+        createMany: {
+          args: Prisma.PlatformRevenueCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.PlatformRevenueCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload>[]
+        }
+        delete: {
+          args: Prisma.PlatformRevenueDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload>
+        }
+        update: {
+          args: Prisma.PlatformRevenueUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload>
+        }
+        deleteMany: {
+          args: Prisma.PlatformRevenueDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.PlatformRevenueUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.PlatformRevenueUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload>[]
+        }
+        upsert: {
+          args: Prisma.PlatformRevenueUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$PlatformRevenuePayload>
+        }
+        aggregate: {
+          args: Prisma.PlatformRevenueAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregatePlatformRevenue>
+        }
+        groupBy: {
+          args: Prisma.PlatformRevenueGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlatformRevenueGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.PlatformRevenueCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.PlatformRevenueCountAggregateOutputType> | number
         }
       }
     }
@@ -4421,6 +4571,7 @@ export type PublisherScalarFieldEnum = (typeof PublisherScalarFieldEnum)[keyof t
 export const WebsiteScalarFieldEnum = {
   id: 'id',
   url: 'url',
+  domain: 'domain',
   name: 'name',
   category: 'category',
   language: 'language',
@@ -4428,6 +4579,7 @@ export const WebsiteScalarFieldEnum = {
   metrics: 'metrics',
   isActive: 'isActive',
   publisherId: 'publisherId',
+  ownershipType: 'ownershipType',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -4547,6 +4699,7 @@ export const OrderDisputeScalarFieldEnum = {
   raisedBy: 'raisedBy',
   reason: 'reason',
   status: 'status',
+  previousStatus: 'previousStatus',
   resolvedBy: 'resolvedBy',
   resolvedAt: 'resolvedAt',
   resolution: 'resolution',
@@ -4593,6 +4746,7 @@ export const PublisherBalanceScalarFieldEnum = {
   pendingBalance: 'pendingBalance',
   approvedBalance: 'approvedBalance',
   withdrawableBalance: 'withdrawableBalance',
+  debtBalance: 'debtBalance',
   lifetimeEarnings: 'lifetimeEarnings',
   lifetimePaid: 'lifetimePaid',
   version: 'version',
@@ -4609,6 +4763,9 @@ export const WithdrawalScalarFieldEnum = {
   amount: 'amount',
   method: 'method',
   status: 'status',
+  availableAt: 'availableAt',
+  idempotencyKey: 'idempotencyKey',
+  payoutMethodId: 'payoutMethodId',
   approvedBy: 'approvedBy',
   approvedAt: 'approvedAt',
   version: 'version',
@@ -4617,6 +4774,21 @@ export const WithdrawalScalarFieldEnum = {
 } as const
 
 export type WithdrawalScalarFieldEnum = (typeof WithdrawalScalarFieldEnum)[keyof typeof WithdrawalScalarFieldEnum]
+
+
+export const PayoutMethodScalarFieldEnum = {
+  id: 'id',
+  publisherId: 'publisherId',
+  type: 'type',
+  label: 'label',
+  details: 'details',
+  isDefault: 'isDefault',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PayoutMethodScalarFieldEnum = (typeof PayoutMethodScalarFieldEnum)[keyof typeof PayoutMethodScalarFieldEnum]
 
 
 export const ApiKeyScalarFieldEnum = {
@@ -4673,6 +4845,20 @@ export const ReportScalarFieldEnum = {
 } as const
 
 export type ReportScalarFieldEnum = (typeof ReportScalarFieldEnum)[keyof typeof ReportScalarFieldEnum]
+
+
+export const PlatformRevenueScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  amount: 'amount',
+  platformFee: 'platformFee',
+  netRevenue: 'netRevenue',
+  recordedAt: 'recordedAt',
+  reversedAt: 'reversedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type PlatformRevenueScalarFieldEnum = (typeof PlatformRevenueScalarFieldEnum)[keyof typeof PlatformRevenueScalarFieldEnum]
 
 
 export const WalletScalarFieldEnum = {
@@ -5220,6 +5406,20 @@ export type ListEnumPublisherTierFieldRefInput<$PrismaModel> = FieldRefInputType
 
 
 /**
+ * Reference to a field of type 'WebsiteOwnershipType'
+ */
+export type EnumWebsiteOwnershipTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WebsiteOwnershipType'>
+    
+
+
+/**
+ * Reference to a field of type 'WebsiteOwnershipType[]'
+ */
+export type ListEnumWebsiteOwnershipTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WebsiteOwnershipType[]'>
+    
+
+
+/**
  * Reference to a field of type 'ServiceType'
  */
 export type EnumServiceTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ServiceType'>
@@ -5286,6 +5486,20 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'CampaignStatus'
+ */
+export type EnumCampaignStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CampaignStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'CampaignStatus[]'
+ */
+export type ListEnumCampaignStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CampaignStatus[]'>
     
 
 
@@ -5370,6 +5584,34 @@ export type EnumWithdrawalStatusFieldRefInput<$PrismaModel> = FieldRefInputType<
  * Reference to a field of type 'WithdrawalStatus[]'
  */
 export type ListEnumWithdrawalStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WithdrawalStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ContentOrderStatus'
+ */
+export type EnumContentOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentOrderStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'ContentOrderStatus[]'
+ */
+export type ListEnumContentOrderStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ContentOrderStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'RevisionStatus'
+ */
+export type EnumRevisionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RevisionStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'RevisionStatus[]'
+ */
+export type ListEnumRevisionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RevisionStatus[]'>
     
 
 
@@ -5566,10 +5808,12 @@ export type GlobalOmitConfig = {
   settlementApproval?: Prisma.SettlementApprovalOmit
   publisherBalance?: Prisma.PublisherBalanceOmit
   withdrawal?: Prisma.WithdrawalOmit
+  payoutMethod?: Prisma.PayoutMethodOmit
   apiKey?: Prisma.ApiKeyOmit
   contentOrder?: Prisma.ContentOrderOmit
   revision?: Prisma.RevisionOmit
   report?: Prisma.ReportOmit
+  platformRevenue?: Prisma.PlatformRevenueOmit
   wallet?: Prisma.WalletOmit
   transaction?: Prisma.TransactionOmit
   ticket?: Prisma.TicketOmit

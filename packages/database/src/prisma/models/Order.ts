@@ -405,6 +405,7 @@ export type OrderWhereInput = {
   events?: Prisma.OrderEventListRelationFilter
   settlements?: Prisma.SettlementListRelationFilter
   dispute?: Prisma.XOR<Prisma.OrderDisputeNullableScalarRelationFilter, Prisma.OrderDisputeWhereInput> | null
+  platformRevenue?: Prisma.XOR<Prisma.PlatformRevenueNullableScalarRelationFilter, Prisma.PlatformRevenueWhereInput> | null
 }
 
 export type OrderOrderByWithRelationInput = {
@@ -447,6 +448,7 @@ export type OrderOrderByWithRelationInput = {
   events?: Prisma.OrderEventOrderByRelationAggregateInput
   settlements?: Prisma.SettlementOrderByRelationAggregateInput
   dispute?: Prisma.OrderDisputeOrderByWithRelationInput
+  platformRevenue?: Prisma.PlatformRevenueOrderByWithRelationInput
 }
 
 export type OrderWhereUniqueInput = Prisma.AtLeast<{
@@ -492,6 +494,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   events?: Prisma.OrderEventListRelationFilter
   settlements?: Prisma.SettlementListRelationFilter
   dispute?: Prisma.XOR<Prisma.OrderDisputeNullableScalarRelationFilter, Prisma.OrderDisputeWhereInput> | null
+  platformRevenue?: Prisma.XOR<Prisma.PlatformRevenueNullableScalarRelationFilter, Prisma.PlatformRevenueWhereInput> | null
 }, "id" | "idempotencyKey">
 
 export type OrderOrderByWithAggregationInput = {
@@ -595,6 +598,7 @@ export type OrderCreateInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateInput = {
@@ -632,6 +636,7 @@ export type OrderUncheckedCreateInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUpdateInput = {
@@ -669,6 +674,7 @@ export type OrderUpdateInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateInput = {
@@ -706,6 +712,7 @@ export type OrderUncheckedUpdateInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateManyInput = {
@@ -1245,6 +1252,20 @@ export type OrderUpdateOneRequiredWithoutReportsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutReportsInput, Prisma.OrderUpdateWithoutReportsInput>, Prisma.OrderUncheckedUpdateWithoutReportsInput>
 }
 
+export type OrderCreateNestedOneWithoutPlatformRevenueInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutPlatformRevenueInput, Prisma.OrderUncheckedCreateWithoutPlatformRevenueInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutPlatformRevenueInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
+export type OrderUpdateOneRequiredWithoutPlatformRevenueNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutPlatformRevenueInput, Prisma.OrderUncheckedCreateWithoutPlatformRevenueInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutPlatformRevenueInput
+  upsert?: Prisma.OrderUpsertWithoutPlatformRevenueInput
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutPlatformRevenueInput, Prisma.OrderUpdateWithoutPlatformRevenueInput>, Prisma.OrderUncheckedUpdateWithoutPlatformRevenueInput>
+}
+
 export type OrderCreateNestedOneWithoutTransactionsInput = {
   create?: Prisma.XOR<Prisma.OrderCreateWithoutTransactionsInput, Prisma.OrderUncheckedCreateWithoutTransactionsInput>
   connectOrCreate?: Prisma.OrderCreateOrConnectWithoutTransactionsInput
@@ -1295,6 +1316,7 @@ export type OrderCreateWithoutCustomerInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutCustomerInput = {
@@ -1331,6 +1353,7 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutCustomerInput = {
@@ -1377,6 +1400,7 @@ export type OrderCreateWithoutAssigneeInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutAssigneeInput = {
@@ -1413,6 +1437,7 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutAssigneeInput = {
@@ -1523,6 +1548,7 @@ export type OrderCreateWithoutOrganizationInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutOrganizationInput = {
@@ -1559,6 +1585,7 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutOrganizationInput = {
@@ -1621,6 +1648,7 @@ export type OrderCreateWithoutWebsiteInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutWebsiteInput = {
@@ -1657,6 +1685,7 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutWebsiteInput = {
@@ -1719,6 +1748,7 @@ export type OrderCreateWithoutCampaignInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutCampaignInput = {
@@ -1755,6 +1785,7 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutCampaignInput = {
@@ -1817,6 +1848,7 @@ export type OrderCreateWithoutItemsInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutItemsInput = {
@@ -1853,6 +1885,7 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutItemsInput = {
@@ -1905,6 +1938,7 @@ export type OrderUpdateWithoutItemsInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutItemsInput = {
@@ -1941,6 +1975,7 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutEventsInput = {
@@ -1977,6 +2012,7 @@ export type OrderCreateWithoutEventsInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutEventsInput = {
@@ -2013,6 +2049,7 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutEventsInput = {
@@ -2065,6 +2102,7 @@ export type OrderUpdateWithoutEventsInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutEventsInput = {
@@ -2101,6 +2139,7 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutDisputeInput = {
@@ -2137,6 +2176,7 @@ export type OrderCreateWithoutDisputeInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutDisputeInput = {
@@ -2173,6 +2213,7 @@ export type OrderUncheckedCreateWithoutDisputeInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutDisputeInput = {
@@ -2225,6 +2266,7 @@ export type OrderUpdateWithoutDisputeInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutDisputeInput = {
@@ -2261,6 +2303,7 @@ export type OrderUncheckedUpdateWithoutDisputeInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutSettlementsInput = {
@@ -2297,6 +2340,7 @@ export type OrderCreateWithoutSettlementsInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutSettlementsInput = {
@@ -2333,6 +2377,7 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutSettlementsInput = {
@@ -2385,6 +2430,7 @@ export type OrderUpdateWithoutSettlementsInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutSettlementsInput = {
@@ -2421,6 +2467,7 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutContentOrderInput = {
@@ -2457,6 +2504,7 @@ export type OrderCreateWithoutContentOrderInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutContentOrderInput = {
@@ -2493,6 +2541,7 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutContentOrderInput = {
@@ -2545,6 +2594,7 @@ export type OrderUpdateWithoutContentOrderInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutContentOrderInput = {
@@ -2581,6 +2631,7 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutRevisionsInput = {
@@ -2617,6 +2668,7 @@ export type OrderCreateWithoutRevisionsInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutRevisionsInput = {
@@ -2653,6 +2705,7 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutRevisionsInput = {
@@ -2705,6 +2758,7 @@ export type OrderUpdateWithoutRevisionsInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutRevisionsInput = {
@@ -2741,6 +2795,7 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutReportsInput = {
@@ -2777,6 +2832,7 @@ export type OrderCreateWithoutReportsInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutReportsInput = {
@@ -2813,6 +2869,7 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutReportsInput = {
@@ -2865,6 +2922,7 @@ export type OrderUpdateWithoutReportsInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutReportsInput = {
@@ -2896,6 +2954,171 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
+}
+
+export type OrderCreateWithoutPlatformRevenueInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
+  version?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
+  assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
+  campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
+  contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+}
+
+export type OrderUncheckedCreateWithoutPlatformRevenueInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  customerId: string
+  assigneeId?: string | null
+  websiteId?: string | null
+  organizationId: string
+  campaignId?: string | null
+  idempotencyKey?: string | null
+  version?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+}
+
+export type OrderCreateOrConnectWithoutPlatformRevenueInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutPlatformRevenueInput, Prisma.OrderUncheckedCreateWithoutPlatformRevenueInput>
+}
+
+export type OrderUpsertWithoutPlatformRevenueInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutPlatformRevenueInput, Prisma.OrderUncheckedUpdateWithoutPlatformRevenueInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutPlatformRevenueInput, Prisma.OrderUncheckedCreateWithoutPlatformRevenueInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutPlatformRevenueInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutPlatformRevenueInput, Prisma.OrderUncheckedUpdateWithoutPlatformRevenueInput>
+}
+
+export type OrderUpdateWithoutPlatformRevenueInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
+  assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
+  campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
+  contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutPlatformRevenueInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  customerId?: Prisma.StringFieldUpdateOperationsInput | string
+  assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
@@ -2937,6 +3160,7 @@ export type OrderCreateWithoutTransactionsInput = {
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutTransactionsInput = {
@@ -2973,6 +3197,7 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
   dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutTransactionsInput = {
@@ -3025,6 +3250,7 @@ export type OrderUpdateWithoutTransactionsInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutTransactionsInput = {
@@ -3061,6 +3287,7 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateManyCustomerInput = {
@@ -3153,6 +3380,7 @@ export type OrderUpdateWithoutCustomerInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutCustomerInput = {
@@ -3189,6 +3417,7 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutCustomerInput = {
@@ -3253,6 +3482,7 @@ export type OrderUpdateWithoutAssigneeInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutAssigneeInput = {
@@ -3289,6 +3519,7 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutAssigneeInput = {
@@ -3381,6 +3612,7 @@ export type OrderUpdateWithoutOrganizationInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutOrganizationInput = {
@@ -3417,6 +3649,7 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutOrganizationInput = {
@@ -3509,6 +3742,7 @@ export type OrderUpdateWithoutWebsiteInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutWebsiteInput = {
@@ -3545,6 +3779,7 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutWebsiteInput = {
@@ -3637,6 +3872,7 @@ export type OrderUpdateWithoutCampaignInput = {
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutCampaignInput = {
@@ -3673,6 +3909,7 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
   dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutCampaignInput = {
@@ -3819,6 +4056,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   events?: boolean | Prisma.Order$eventsArgs<ExtArgs>
   settlements?: boolean | Prisma.Order$settlementsArgs<ExtArgs>
   dispute?: boolean | Prisma.Order$disputeArgs<ExtArgs>
+  platformRevenue?: boolean | Prisma.Order$platformRevenueArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["order"]>
 
@@ -3934,6 +4172,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   events?: boolean | Prisma.Order$eventsArgs<ExtArgs>
   settlements?: boolean | Prisma.Order$settlementsArgs<ExtArgs>
   dispute?: boolean | Prisma.Order$disputeArgs<ExtArgs>
+  platformRevenue?: boolean | Prisma.Order$platformRevenueArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3967,6 +4206,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     events: Prisma.$OrderEventPayload<ExtArgs>[]
     settlements: Prisma.$SettlementPayload<ExtArgs>[]
     dispute: Prisma.$OrderDisputePayload<ExtArgs> | null
+    platformRevenue: Prisma.$PlatformRevenuePayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -4402,6 +4642,7 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   events<T extends Prisma.Order$eventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   settlements<T extends Prisma.Order$settlementsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$settlementsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   dispute<T extends Prisma.Order$disputeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$disputeArgs<ExtArgs>>): Prisma.Prisma__OrderDisputeClient<runtime.Types.Result.GetResult<Prisma.$OrderDisputePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  platformRevenue<T extends Prisma.Order$platformRevenueArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$platformRevenueArgs<ExtArgs>>): Prisma.Prisma__PlatformRevenueClient<runtime.Types.Result.GetResult<Prisma.$PlatformRevenuePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -5089,6 +5330,25 @@ export type Order$disputeArgs<ExtArgs extends runtime.Types.Extensions.InternalA
    */
   include?: Prisma.OrderDisputeInclude<ExtArgs> | null
   where?: Prisma.OrderDisputeWhereInput
+}
+
+/**
+ * Order.platformRevenue
+ */
+export type Order$platformRevenueArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PlatformRevenue
+   */
+  select?: Prisma.PlatformRevenueSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PlatformRevenue
+   */
+  omit?: Prisma.PlatformRevenueOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PlatformRevenueInclude<ExtArgs> | null
+  where?: Prisma.PlatformRevenueWhereInput
 }
 
 /**

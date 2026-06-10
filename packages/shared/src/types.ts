@@ -46,6 +46,9 @@ export type PaymentStatus = "PENDING" | "PAID" | "REFUNDED" | "FAILED"
 export type TicketStatus = "OPEN" | "IN_PROGRESS" | "WAITING_ON_CUSTOMER" | "RESOLVED" | "CLOSED"
 
 export type CampaignStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED"
+export type ContentOrderStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
+export type RevisionStatus = "REQUESTED" | "PENDING" | "APPROVED" | "REJECTED" | "CHANGES_REQUESTED" | "DRAFT"
+export type WebsiteOwnershipType = "PUBLISHER" | "PLATFORM"
 
 export type OrderEventType =
   | "ORDER_CREATED"

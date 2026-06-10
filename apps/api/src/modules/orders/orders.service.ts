@@ -1,7 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
+import { Injectable, BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
+import { RefundService } from "./services/refund.service"
 import { QUEUES } from "@guestpost/shared"
 
 @Injectable()
@@ -10,6 +11,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    private readonly refund: RefundService,
   ) {}
 
   async createOrder(data: {
@@ -24,6 +26,17 @@ export class OrdersService {
     anchorText?: string
     items?: Array<{ websiteId?: string; targetUrl?: string; anchorText?: string }>
   }, userId: string) {
+    // INVARIANT: one website per order. Settlement, refund clawback, and
+    // publisher fulfillment all resolve a single publisher from the order's
+    // website — items on different websites would pay the wrong publisher.
+    // Multi-website purchases are modeled as multiple orders in a campaign.
+    const websiteIds = new Set((data.items ?? []).map((i) => i.websiteId ?? null))
+    if (websiteIds.size > 1) {
+      throw new BadRequestException(
+        "All items in an order must target the same website. Create separate orders (within one campaign) for multiple websites.",
+      )
+    }
+
     return this.prisma.$transaction(async (tx: any) => {
       if (data.idempotencyKey) {
         const existing = await tx.order.findUnique({
@@ -113,6 +126,18 @@ export class OrdersService {
       throw new BadRequestException("Can only add items to draft orders")
     }
 
+    // One-website-per-order invariant (see createOrder)
+    const existingItems = await this.prisma.orderItem.findMany({
+      where: { orderId },
+      select: { websiteId: true },
+    })
+    const existingWebsiteId = order.websiteId ?? existingItems.find((i) => i.websiteId)?.websiteId ?? null
+    if (existingItems.length > 0 && (data.websiteId ?? null) !== existingWebsiteId) {
+      throw new BadRequestException(
+        "All items in an order must target the same website. Create a separate order for a different website.",
+      )
+    }
+
     let price: number
     if (data.websiteId) {
       const listing = await this.prisma.marketplaceListing.findFirst({
@@ -142,7 +167,18 @@ export class OrdersService {
     })
 
     const total = await this.prisma.orderItem.aggregate({ where: { orderId }, _sum: { price: true } })
-    await this.prisma.order.update({ where: { id: orderId }, data: { amount: total._sum.price ?? 0 } })
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        amount: total._sum.price ?? 0,
+        // First website item must back-fill the order-level website link —
+        // publisher fulfillment matches on order.website.publisherId, so an
+        // order without it can never be accepted.
+        ...(data.websiteId && !order.websiteId
+          ? { websiteId: data.websiteId, targetUrl: order.targetUrl ?? data.targetUrl, anchorText: order.anchorText ?? data.anchorText }
+          : {}),
+      },
+    })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -168,23 +204,38 @@ export class OrdersService {
     await this.prisma.orderItem.delete({ where: { id: itemId } })
 
     const total = await this.prisma.orderItem.aggregate({ where: { orderId }, _sum: { price: true } })
-    await this.prisma.order.update({ where: { id: orderId }, data: { amount: total._sum.price ?? 0 } })
+    const remaining = await this.prisma.orderItem.findFirst({
+      where: { orderId, websiteId: { not: null } },
+      select: { websiteId: true },
+    })
+    await this.prisma.order.update({
+      where: { id: orderId },
+      data: { amount: total._sum.price ?? 0, websiteId: remaining?.websiteId ?? null },
+    })
 
     return { success: true }
   }
 
   async cancelOrder(orderId: string, organizationId: string, userId: string) {
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, organizationId } })
+    if (!order) throw new NotFoundException("Order not found")
+
+    const cancellableStatuses = ["DRAFT", "PENDING_PAYMENT", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW", "APPROVED", "PUBLISHED", "VERIFIED"]
+    if (!cancellableStatuses.includes(order.status)) {
+      throw new BadRequestException(`Order cannot be cancelled in ${order.status} status`)
+    }
+
+    const amount = order.amount ? Number(order.amount) : 0
+
+    // PAID orders: delegate to RefundService for canonical refund path
+    // (settlement cancel + clawback + wallet credit + transaction + event + audit)
+    if (order.paymentStatus === "PAID") {
+      await this.refund.refundOrder(orderId, "Order cancelled by customer", userId)
+      return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
+    }
+
+    // NON-PAID orders: release reservation + cancel order
     return this.prisma.$transaction(async (tx: any) => {
-      const order = await tx.order.findFirst({ where: { id: orderId, organizationId } })
-      if (!order) throw new NotFoundException("Order not found")
-
-      const cancellableStatuses = ["DRAFT", "PENDING_PAYMENT", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW", "APPROVED", "PUBLISHED", "VERIFIED"]
-      if (!cancellableStatuses.includes(order.status)) {
-        throw new BadRequestException(`Order cannot be cancelled in ${order.status} status`)
-      }
-
-      const amount = order.amount ? Number(order.amount) : 0
-
       // Release reserved funds if any
       if (order.paymentStatus === "PENDING" && order.status === "PENDING_PAYMENT") {
         const wallet = await tx.wallet.findFirst({ where: { organizationId } })
@@ -203,61 +254,11 @@ export class OrdersService {
         }
       }
 
-      // Refund captured payments back to wallet
-      if (order.paymentStatus === "PAID" && amount > 0) {
-        // Cancel any active settlement so the publisher is not paid after the
-        // customer is refunded. Cancellable statuses end before SETTLED, so a
-        // RELEASED settlement (clawback case) cannot occur here.
-        const activeSettlement = await tx.settlement.findFirst({
-          where: { orderId, status: { notIn: ["CANCELLED", "RELEASED"] } },
-        })
-        if (activeSettlement) {
-          const cancelled = await tx.settlement.updateMany({
-            where: { id: activeSettlement.id, version: activeSettlement.version },
-            data: { status: "CANCELLED", version: { increment: 1 } },
-          })
-          if (cancelled.count === 0) {
-            throw new ConflictException("Settlement was modified by another request. Retry.")
-          }
-        }
-
-        const existingRefund = await tx.transaction.findFirst({
-          where: { orderId, type: "REFUND" },
-        })
-        if (!existingRefund) {
-          const wallet = await tx.wallet.findFirst({ where: { organizationId } })
-          if (!wallet) throw new BadRequestException("No wallet found for refund")
-
-          const refunded = await tx.wallet.updateMany({
-            where: { id: wallet.id, version: wallet.version },
-            data: {
-              availableBalance: { increment: amount },
-              version: { increment: 1 },
-            },
-          })
-          if (refunded.count === 0) {
-            throw new ConflictException("Wallet was modified by another request. Retry.")
-          }
-
-          await tx.transaction.create({
-            data: {
-              walletId: wallet.id,
-              amount,
-              type: "REFUND",
-              orderId,
-              reference: `refund-${orderId}`,
-              description: `Refund of ${amount} for cancelled order ${orderId}`,
-            },
-          })
-        }
-      }
-
       const cancelled = await tx.order.updateMany({
         where: { id: orderId, version: order.version },
         data: {
           status: "CANCELLED",
           version: { increment: 1 },
-          ...(order.paymentStatus === "PAID" ? { paymentStatus: "REFUNDED" } : {}),
         },
       })
       if (cancelled.count === 0) {
@@ -305,27 +306,40 @@ export class OrdersService {
     return order
   }
 
-  async listOrders(organizationId: string, campaignId?: string) {
+  async listOrders(organizationId: string, campaignId?: string, take = 50, skip = 0) {
     const where: any = { organizationId }
     if (campaignId) where.campaignId = campaignId
-    return this.prisma.order.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        items: true,
-        website: true,
-        campaign: true,
-        settlements: { include: { approvals: true } },
-        dispute: true,
-      },
-    })
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take,
+        skip,
+        include: {
+          items: true,
+          website: true,
+          campaign: true,
+          settlements: { include: { approvals: true } },
+          dispute: true,
+        },
+      }),
+      this.prisma.order.count({ where }),
+    ])
+    return { items, total, take, skip }
   }
 
-  async listPublisherOrders(publisherId: string) {
-    return this.prisma.order.findMany({
-      where: { website: { publisherId } },
-      orderBy: { createdAt: "desc" },
-      include: { items: true, website: true, campaign: true, settlements: { include: { approvals: true } }, dispute: true },
-    })
+  async listPublisherOrders(publisherId: string, take = 50, skip = 0) {
+    const where = { website: { publisherId } }
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take,
+        skip,
+        include: { items: true, website: true, campaign: true, settlements: { include: { approvals: true } }, dispute: true },
+      }),
+      this.prisma.order.count({ where }),
+    ])
+    return { items, total, take, skip }
   }
 }

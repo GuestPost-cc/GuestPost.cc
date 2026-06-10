@@ -28,7 +28,7 @@ export type CampaignMinAggregateOutputType = {
   id: string | null
   name: string | null
   description: string | null
-  status: string | null
+  status: $Enums.CampaignStatus | null
   organizationId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -38,7 +38,7 @@ export type CampaignMaxAggregateOutputType = {
   id: string | null
   name: string | null
   description: string | null
-  status: string | null
+  status: $Enums.CampaignStatus | null
   organizationId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -163,7 +163,7 @@ export type CampaignGroupByOutputType = {
   id: string
   name: string
   description: string | null
-  status: string
+  status: $Enums.CampaignStatus
   organizationId: string
   createdAt: Date
   updatedAt: Date
@@ -194,7 +194,7 @@ export type CampaignWhereInput = {
   id?: Prisma.StringFilter<"Campaign"> | string
   name?: Prisma.StringFilter<"Campaign"> | string
   description?: Prisma.StringNullableFilter<"Campaign"> | string | null
-  status?: Prisma.StringFilter<"Campaign"> | string
+  status?: Prisma.EnumCampaignStatusFilter<"Campaign"> | $Enums.CampaignStatus
   organizationId?: Prisma.StringFilter<"Campaign"> | string
   createdAt?: Prisma.DateTimeFilter<"Campaign"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Campaign"> | Date | string
@@ -221,7 +221,7 @@ export type CampaignWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.CampaignWhereInput | Prisma.CampaignWhereInput[]
   name?: Prisma.StringFilter<"Campaign"> | string
   description?: Prisma.StringNullableFilter<"Campaign"> | string | null
-  status?: Prisma.StringFilter<"Campaign"> | string
+  status?: Prisma.EnumCampaignStatusFilter<"Campaign"> | $Enums.CampaignStatus
   organizationId?: Prisma.StringFilter<"Campaign"> | string
   createdAt?: Prisma.DateTimeFilter<"Campaign"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Campaign"> | Date | string
@@ -249,7 +249,7 @@ export type CampaignScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"Campaign"> | string
   name?: Prisma.StringWithAggregatesFilter<"Campaign"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"Campaign"> | string | null
-  status?: Prisma.StringWithAggregatesFilter<"Campaign"> | string
+  status?: Prisma.EnumCampaignStatusWithAggregatesFilter<"Campaign"> | $Enums.CampaignStatus
   organizationId?: Prisma.StringWithAggregatesFilter<"Campaign"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Campaign"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Campaign"> | Date | string
@@ -259,7 +259,7 @@ export type CampaignCreateInput = {
   id?: string
   name: string
   description?: string | null
-  status?: string
+  status?: $Enums.CampaignStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   organization: Prisma.OrganizationCreateNestedOneWithoutCampaignsInput
@@ -270,7 +270,7 @@ export type CampaignUncheckedCreateInput = {
   id?: string
   name: string
   description?: string | null
-  status?: string
+  status?: $Enums.CampaignStatus
   organizationId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -281,7 +281,7 @@ export type CampaignUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumCampaignStatusFieldUpdateOperationsInput | $Enums.CampaignStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutCampaignsNestedInput
@@ -292,7 +292,7 @@ export type CampaignUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumCampaignStatusFieldUpdateOperationsInput | $Enums.CampaignStatus
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -303,7 +303,7 @@ export type CampaignCreateManyInput = {
   id?: string
   name: string
   description?: string | null
-  status?: string
+  status?: $Enums.CampaignStatus
   organizationId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -313,7 +313,7 @@ export type CampaignUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumCampaignStatusFieldUpdateOperationsInput | $Enums.CampaignStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -322,7 +322,7 @@ export type CampaignUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumCampaignStatusFieldUpdateOperationsInput | $Enums.CampaignStatus
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -431,11 +431,15 @@ export type CampaignUpdateOneWithoutOrdersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.CampaignUpdateToOneWithWhereWithoutOrdersInput, Prisma.CampaignUpdateWithoutOrdersInput>, Prisma.CampaignUncheckedUpdateWithoutOrdersInput>
 }
 
+export type EnumCampaignStatusFieldUpdateOperationsInput = {
+  set?: $Enums.CampaignStatus
+}
+
 export type CampaignCreateWithoutOrganizationInput = {
   id?: string
   name: string
   description?: string | null
-  status?: string
+  status?: $Enums.CampaignStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderCreateNestedManyWithoutCampaignInput
@@ -445,7 +449,7 @@ export type CampaignUncheckedCreateWithoutOrganizationInput = {
   id?: string
   name: string
   description?: string | null
-  status?: string
+  status?: $Enums.CampaignStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutCampaignInput
@@ -484,7 +488,7 @@ export type CampaignScalarWhereInput = {
   id?: Prisma.StringFilter<"Campaign"> | string
   name?: Prisma.StringFilter<"Campaign"> | string
   description?: Prisma.StringNullableFilter<"Campaign"> | string | null
-  status?: Prisma.StringFilter<"Campaign"> | string
+  status?: Prisma.EnumCampaignStatusFilter<"Campaign"> | $Enums.CampaignStatus
   organizationId?: Prisma.StringFilter<"Campaign"> | string
   createdAt?: Prisma.DateTimeFilter<"Campaign"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Campaign"> | Date | string
@@ -494,7 +498,7 @@ export type CampaignCreateWithoutOrdersInput = {
   id?: string
   name: string
   description?: string | null
-  status?: string
+  status?: $Enums.CampaignStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   organization: Prisma.OrganizationCreateNestedOneWithoutCampaignsInput
@@ -504,7 +508,7 @@ export type CampaignUncheckedCreateWithoutOrdersInput = {
   id?: string
   name: string
   description?: string | null
-  status?: string
+  status?: $Enums.CampaignStatus
   organizationId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -530,7 +534,7 @@ export type CampaignUpdateWithoutOrdersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumCampaignStatusFieldUpdateOperationsInput | $Enums.CampaignStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutCampaignsNestedInput
@@ -540,7 +544,7 @@ export type CampaignUncheckedUpdateWithoutOrdersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumCampaignStatusFieldUpdateOperationsInput | $Enums.CampaignStatus
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -550,7 +554,7 @@ export type CampaignCreateManyOrganizationInput = {
   id?: string
   name: string
   description?: string | null
-  status?: string
+  status?: $Enums.CampaignStatus
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -559,7 +563,7 @@ export type CampaignUpdateWithoutOrganizationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumCampaignStatusFieldUpdateOperationsInput | $Enums.CampaignStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUpdateManyWithoutCampaignNestedInput
@@ -569,7 +573,7 @@ export type CampaignUncheckedUpdateWithoutOrganizationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumCampaignStatusFieldUpdateOperationsInput | $Enums.CampaignStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutCampaignNestedInput
@@ -579,7 +583,7 @@ export type CampaignUncheckedUpdateManyWithoutOrganizationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumCampaignStatusFieldUpdateOperationsInput | $Enums.CampaignStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -683,7 +687,7 @@ export type $CampaignPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     id: string
     name: string
     description: string | null
-    status: string
+    status: $Enums.CampaignStatus
     organizationId: string
     createdAt: Date
     updatedAt: Date
@@ -1115,7 +1119,7 @@ export interface CampaignFieldRefs {
   readonly id: Prisma.FieldRef<"Campaign", 'String'>
   readonly name: Prisma.FieldRef<"Campaign", 'String'>
   readonly description: Prisma.FieldRef<"Campaign", 'String'>
-  readonly status: Prisma.FieldRef<"Campaign", 'String'>
+  readonly status: Prisma.FieldRef<"Campaign", 'CampaignStatus'>
   readonly organizationId: Prisma.FieldRef<"Campaign", 'String'>
   readonly createdAt: Prisma.FieldRef<"Campaign", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Campaign", 'DateTime'>

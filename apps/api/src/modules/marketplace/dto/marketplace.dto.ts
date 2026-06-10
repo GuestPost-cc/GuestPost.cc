@@ -1,6 +1,7 @@
 import { Type } from "class-transformer"
 import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, IsEnum, IsUrl, Min, Max, MinLength, MaxLength } from "class-validator"
 import { ListingType, ListingStatus } from "@guestpost/database"
+import { WebsiteOwnershipType } from "@guestpost/shared"
 
 export class SearchListingsDto {
   @IsOptional()
@@ -81,6 +82,10 @@ export class SearchListingsDto {
   @Min(1)
   @Max(50)
   limit?: number = 20
+
+  @IsOptional()
+  @IsString()
+  ownershipType?: WebsiteOwnershipType
 }
 
 export class CreateListingDto {

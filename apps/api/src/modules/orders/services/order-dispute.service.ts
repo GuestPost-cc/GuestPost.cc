@@ -43,6 +43,8 @@ export class OrderDisputeService {
         raisedBy: userId,
         reason,
         status: "OPEN",
+        // RESTORE/REJECT resolutions return the order to exactly this status
+        previousStatus: order.status as any,
       },
     })
 
@@ -81,11 +83,12 @@ export class OrderDisputeService {
     }
 
     const order = dispute.order
+    // Stored at dispute open; fall back to PUBLISHED only for pre-migration
+    // disputes that never recorded it.
+    const restoreStatus =
+      order.status === "DISPUTED" ? (dispute.previousStatus ?? "PUBLISHED") : order.status
 
     if (action === "RESTORE") {
-      // Restore to previous status before dispute
-      const previousStatus = order.status === "DISPUTED" ? "PUBLISHED" : order.status
-
       await this.prisma.orderDispute.update({
         where: { id: disputeId },
         data: {
@@ -96,11 +99,16 @@ export class OrderDisputeService {
         },
       })
 
-      await this.transitionOrder(order.id, order.version, { status: previousStatus as any })
+      await this.transitionOrder(order.id, order.version, { status: restoreStatus as any })
     } else if (action === "REFUND") {
       // Refund first — if it fails, the dispute stays open instead of being
-      // marked resolved with the customer never refunded
-      await this.refund.refundOrder(order.id, `Dispute resolved with refund: ${resolution}`, userId)
+      // marked resolved with the customer never refunded. If the order was
+      // ALREADY refunded (a prior resolution attempt crashed after the refund
+      // committed), skip straight to resolving — otherwise the dispute is
+      // permanently stuck behind the duplicate-refund guard.
+      if (order.paymentStatus !== "REFUNDED") {
+        await this.refund.refundOrder(order.id, `Dispute resolved with refund: ${resolution}`, userId)
+      }
 
       await this.prisma.orderDispute.update({
         where: { id: disputeId },
@@ -123,8 +131,7 @@ export class OrderDisputeService {
       })
 
       // Restore order to pre-dispute state
-      const previousStatus = order.status === "DISPUTED" ? "PUBLISHED" : order.status
-      await this.transitionOrder(order.id, order.version, { status: previousStatus as any })
+      await this.transitionOrder(order.id, order.version, { status: restoreStatus as any })
     }
 
     await this.prisma.orderEvent.create({

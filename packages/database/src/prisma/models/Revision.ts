@@ -27,7 +27,7 @@ export type AggregateRevision = {
 export type RevisionMinAggregateOutputType = {
   id: string | null
   notes: string | null
-  status: string | null
+  status: $Enums.RevisionStatus | null
   orderId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -36,7 +36,7 @@ export type RevisionMinAggregateOutputType = {
 export type RevisionMaxAggregateOutputType = {
   id: string | null
   notes: string | null
-  status: string | null
+  status: $Enums.RevisionStatus | null
   orderId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -159,7 +159,7 @@ export type RevisionGroupByOutputType = {
   id: string
   notes: string | null
   files: runtime.JsonValue | null
-  status: string
+  status: $Enums.RevisionStatus
   orderId: string
   createdAt: Date
   updatedAt: Date
@@ -190,7 +190,7 @@ export type RevisionWhereInput = {
   id?: Prisma.StringFilter<"Revision"> | string
   notes?: Prisma.StringNullableFilter<"Revision"> | string | null
   files?: Prisma.JsonNullableFilter<"Revision">
-  status?: Prisma.StringFilter<"Revision"> | string
+  status?: Prisma.EnumRevisionStatusFilter<"Revision"> | $Enums.RevisionStatus
   orderId?: Prisma.StringFilter<"Revision"> | string
   createdAt?: Prisma.DateTimeFilter<"Revision"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Revision"> | Date | string
@@ -215,7 +215,7 @@ export type RevisionWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.RevisionWhereInput | Prisma.RevisionWhereInput[]
   notes?: Prisma.StringNullableFilter<"Revision"> | string | null
   files?: Prisma.JsonNullableFilter<"Revision">
-  status?: Prisma.StringFilter<"Revision"> | string
+  status?: Prisma.EnumRevisionStatusFilter<"Revision"> | $Enums.RevisionStatus
   orderId?: Prisma.StringFilter<"Revision"> | string
   createdAt?: Prisma.DateTimeFilter<"Revision"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Revision"> | Date | string
@@ -242,7 +242,7 @@ export type RevisionScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"Revision"> | string
   notes?: Prisma.StringNullableWithAggregatesFilter<"Revision"> | string | null
   files?: Prisma.JsonNullableWithAggregatesFilter<"Revision">
-  status?: Prisma.StringWithAggregatesFilter<"Revision"> | string
+  status?: Prisma.EnumRevisionStatusWithAggregatesFilter<"Revision"> | $Enums.RevisionStatus
   orderId?: Prisma.StringWithAggregatesFilter<"Revision"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Revision"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Revision"> | Date | string
@@ -252,7 +252,7 @@ export type RevisionCreateInput = {
   id?: string
   notes?: string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: string
+  status?: $Enums.RevisionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutRevisionsInput
@@ -262,7 +262,7 @@ export type RevisionUncheckedCreateInput = {
   id?: string
   notes?: string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: string
+  status?: $Enums.RevisionStatus
   orderId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -272,7 +272,7 @@ export type RevisionUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumRevisionStatusFieldUpdateOperationsInput | $Enums.RevisionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutRevisionsNestedInput
@@ -282,7 +282,7 @@ export type RevisionUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumRevisionStatusFieldUpdateOperationsInput | $Enums.RevisionStatus
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -292,7 +292,7 @@ export type RevisionCreateManyInput = {
   id?: string
   notes?: string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: string
+  status?: $Enums.RevisionStatus
   orderId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -302,7 +302,7 @@ export type RevisionUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumRevisionStatusFieldUpdateOperationsInput | $Enums.RevisionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -311,7 +311,7 @@ export type RevisionUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumRevisionStatusFieldUpdateOperationsInput | $Enums.RevisionStatus
   orderId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -397,11 +397,15 @@ export type RevisionUncheckedUpdateManyWithoutOrderNestedInput = {
   deleteMany?: Prisma.RevisionScalarWhereInput | Prisma.RevisionScalarWhereInput[]
 }
 
+export type EnumRevisionStatusFieldUpdateOperationsInput = {
+  set?: $Enums.RevisionStatus
+}
+
 export type RevisionCreateWithoutOrderInput = {
   id?: string
   notes?: string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: string
+  status?: $Enums.RevisionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -410,7 +414,7 @@ export type RevisionUncheckedCreateWithoutOrderInput = {
   id?: string
   notes?: string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: string
+  status?: $Enums.RevisionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -448,7 +452,7 @@ export type RevisionScalarWhereInput = {
   id?: Prisma.StringFilter<"Revision"> | string
   notes?: Prisma.StringNullableFilter<"Revision"> | string | null
   files?: Prisma.JsonNullableFilter<"Revision">
-  status?: Prisma.StringFilter<"Revision"> | string
+  status?: Prisma.EnumRevisionStatusFilter<"Revision"> | $Enums.RevisionStatus
   orderId?: Prisma.StringFilter<"Revision"> | string
   createdAt?: Prisma.DateTimeFilter<"Revision"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Revision"> | Date | string
@@ -458,7 +462,7 @@ export type RevisionCreateManyOrderInput = {
   id?: string
   notes?: string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: string
+  status?: $Enums.RevisionStatus
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -467,7 +471,7 @@ export type RevisionUpdateWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumRevisionStatusFieldUpdateOperationsInput | $Enums.RevisionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -476,7 +480,7 @@ export type RevisionUncheckedUpdateWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumRevisionStatusFieldUpdateOperationsInput | $Enums.RevisionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -485,7 +489,7 @@ export type RevisionUncheckedUpdateManyWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   files?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  status?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumRevisionStatusFieldUpdateOperationsInput | $Enums.RevisionStatus
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -555,7 +559,7 @@ export type $RevisionPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     id: string
     notes: string | null
     files: runtime.JsonValue | null
-    status: string
+    status: $Enums.RevisionStatus
     orderId: string
     createdAt: Date
     updatedAt: Date
@@ -986,7 +990,7 @@ export interface RevisionFieldRefs {
   readonly id: Prisma.FieldRef<"Revision", 'String'>
   readonly notes: Prisma.FieldRef<"Revision", 'String'>
   readonly files: Prisma.FieldRef<"Revision", 'Json'>
-  readonly status: Prisma.FieldRef<"Revision", 'String'>
+  readonly status: Prisma.FieldRef<"Revision", 'RevisionStatus'>
   readonly orderId: Prisma.FieldRef<"Revision", 'String'>
   readonly createdAt: Prisma.FieldRef<"Revision", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Revision", 'DateTime'>

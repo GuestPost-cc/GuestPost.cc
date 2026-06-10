@@ -40,10 +40,14 @@ export class OrdersController {
   @Get()
   list(
     @Query("campaignId") campaignId?: string,
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
     @CurrentUser() user?: any,
   ) {
-    if (user.userType === "PUBLISHER") return this.orders.listPublisherOrders(user.publisherId)
-    return this.orders.listOrders(user.organizationId, campaignId)
+    const t = Math.min(Math.max(parseInt(take ?? "50", 10) || 50, 1), 100)
+    const s = Math.max(0, parseInt(skip ?? "0", 10) || 0)
+    if (user.userType === "PUBLISHER") return this.orders.listPublisherOrders(user.publisherId, t, s)
+    return this.orders.listOrders(user.organizationId, campaignId, t, s)
   }
 
   @Get(":id")

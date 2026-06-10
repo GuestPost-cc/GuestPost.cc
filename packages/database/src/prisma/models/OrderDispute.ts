@@ -30,6 +30,7 @@ export type OrderDisputeMinAggregateOutputType = {
   raisedBy: string | null
   reason: string | null
   status: $Enums.DisputeStatus | null
+  previousStatus: $Enums.OrderStatus | null
   resolvedBy: string | null
   resolvedAt: Date | null
   resolution: string | null
@@ -43,6 +44,7 @@ export type OrderDisputeMaxAggregateOutputType = {
   raisedBy: string | null
   reason: string | null
   status: $Enums.DisputeStatus | null
+  previousStatus: $Enums.OrderStatus | null
   resolvedBy: string | null
   resolvedAt: Date | null
   resolution: string | null
@@ -56,6 +58,7 @@ export type OrderDisputeCountAggregateOutputType = {
   raisedBy: number
   reason: number
   status: number
+  previousStatus: number
   resolvedBy: number
   resolvedAt: number
   resolution: number
@@ -71,6 +74,7 @@ export type OrderDisputeMinAggregateInputType = {
   raisedBy?: true
   reason?: true
   status?: true
+  previousStatus?: true
   resolvedBy?: true
   resolvedAt?: true
   resolution?: true
@@ -84,6 +88,7 @@ export type OrderDisputeMaxAggregateInputType = {
   raisedBy?: true
   reason?: true
   status?: true
+  previousStatus?: true
   resolvedBy?: true
   resolvedAt?: true
   resolution?: true
@@ -97,6 +102,7 @@ export type OrderDisputeCountAggregateInputType = {
   raisedBy?: true
   reason?: true
   status?: true
+  previousStatus?: true
   resolvedBy?: true
   resolvedAt?: true
   resolution?: true
@@ -183,6 +189,7 @@ export type OrderDisputeGroupByOutputType = {
   raisedBy: string
   reason: string
   status: $Enums.DisputeStatus
+  previousStatus: $Enums.OrderStatus | null
   resolvedBy: string | null
   resolvedAt: Date | null
   resolution: string | null
@@ -217,6 +224,7 @@ export type OrderDisputeWhereInput = {
   raisedBy?: Prisma.StringFilter<"OrderDispute"> | string
   reason?: Prisma.StringFilter<"OrderDispute"> | string
   status?: Prisma.EnumDisputeStatusFilter<"OrderDispute"> | $Enums.DisputeStatus
+  previousStatus?: Prisma.EnumOrderStatusNullableFilter<"OrderDispute"> | $Enums.OrderStatus | null
   resolvedBy?: Prisma.StringNullableFilter<"OrderDispute"> | string | null
   resolvedAt?: Prisma.DateTimeNullableFilter<"OrderDispute"> | Date | string | null
   resolution?: Prisma.StringNullableFilter<"OrderDispute"> | string | null
@@ -231,6 +239,7 @@ export type OrderDisputeOrderByWithRelationInput = {
   raisedBy?: Prisma.SortOrder
   reason?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  previousStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   resolvedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   resolvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   resolution?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -248,6 +257,7 @@ export type OrderDisputeWhereUniqueInput = Prisma.AtLeast<{
   raisedBy?: Prisma.StringFilter<"OrderDispute"> | string
   reason?: Prisma.StringFilter<"OrderDispute"> | string
   status?: Prisma.EnumDisputeStatusFilter<"OrderDispute"> | $Enums.DisputeStatus
+  previousStatus?: Prisma.EnumOrderStatusNullableFilter<"OrderDispute"> | $Enums.OrderStatus | null
   resolvedBy?: Prisma.StringNullableFilter<"OrderDispute"> | string | null
   resolvedAt?: Prisma.DateTimeNullableFilter<"OrderDispute"> | Date | string | null
   resolution?: Prisma.StringNullableFilter<"OrderDispute"> | string | null
@@ -262,6 +272,7 @@ export type OrderDisputeOrderByWithAggregationInput = {
   raisedBy?: Prisma.SortOrder
   reason?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  previousStatus?: Prisma.SortOrderInput | Prisma.SortOrder
   resolvedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   resolvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   resolution?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -281,6 +292,7 @@ export type OrderDisputeScalarWhereWithAggregatesInput = {
   raisedBy?: Prisma.StringWithAggregatesFilter<"OrderDispute"> | string
   reason?: Prisma.StringWithAggregatesFilter<"OrderDispute"> | string
   status?: Prisma.EnumDisputeStatusWithAggregatesFilter<"OrderDispute"> | $Enums.DisputeStatus
+  previousStatus?: Prisma.EnumOrderStatusNullableWithAggregatesFilter<"OrderDispute"> | $Enums.OrderStatus | null
   resolvedBy?: Prisma.StringNullableWithAggregatesFilter<"OrderDispute"> | string | null
   resolvedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"OrderDispute"> | Date | string | null
   resolution?: Prisma.StringNullableWithAggregatesFilter<"OrderDispute"> | string | null
@@ -293,6 +305,7 @@ export type OrderDisputeCreateInput = {
   raisedBy: string
   reason: string
   status?: $Enums.DisputeStatus
+  previousStatus?: $Enums.OrderStatus | null
   resolvedBy?: string | null
   resolvedAt?: Date | string | null
   resolution?: string | null
@@ -307,6 +320,7 @@ export type OrderDisputeUncheckedCreateInput = {
   raisedBy: string
   reason: string
   status?: $Enums.DisputeStatus
+  previousStatus?: $Enums.OrderStatus | null
   resolvedBy?: string | null
   resolvedAt?: Date | string | null
   resolution?: string | null
@@ -319,6 +333,7 @@ export type OrderDisputeUpdateInput = {
   raisedBy?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
+  previousStatus?: Prisma.NullableEnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus | null
   resolvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -333,6 +348,7 @@ export type OrderDisputeUncheckedUpdateInput = {
   raisedBy?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
+  previousStatus?: Prisma.NullableEnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus | null
   resolvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -346,6 +362,7 @@ export type OrderDisputeCreateManyInput = {
   raisedBy: string
   reason: string
   status?: $Enums.DisputeStatus
+  previousStatus?: $Enums.OrderStatus | null
   resolvedBy?: string | null
   resolvedAt?: Date | string | null
   resolution?: string | null
@@ -358,6 +375,7 @@ export type OrderDisputeUpdateManyMutationInput = {
   raisedBy?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
+  previousStatus?: Prisma.NullableEnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus | null
   resolvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -371,6 +389,7 @@ export type OrderDisputeUncheckedUpdateManyInput = {
   raisedBy?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
+  previousStatus?: Prisma.NullableEnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus | null
   resolvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -389,6 +408,7 @@ export type OrderDisputeCountOrderByAggregateInput = {
   raisedBy?: Prisma.SortOrder
   reason?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  previousStatus?: Prisma.SortOrder
   resolvedBy?: Prisma.SortOrder
   resolvedAt?: Prisma.SortOrder
   resolution?: Prisma.SortOrder
@@ -402,6 +422,7 @@ export type OrderDisputeMaxOrderByAggregateInput = {
   raisedBy?: Prisma.SortOrder
   reason?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  previousStatus?: Prisma.SortOrder
   resolvedBy?: Prisma.SortOrder
   resolvedAt?: Prisma.SortOrder
   resolution?: Prisma.SortOrder
@@ -415,6 +436,7 @@ export type OrderDisputeMinOrderByAggregateInput = {
   raisedBy?: Prisma.SortOrder
   reason?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  previousStatus?: Prisma.SortOrder
   resolvedBy?: Prisma.SortOrder
   resolvedAt?: Prisma.SortOrder
   resolution?: Prisma.SortOrder
@@ -458,11 +480,16 @@ export type EnumDisputeStatusFieldUpdateOperationsInput = {
   set?: $Enums.DisputeStatus
 }
 
+export type NullableEnumOrderStatusFieldUpdateOperationsInput = {
+  set?: $Enums.OrderStatus | null
+}
+
 export type OrderDisputeCreateWithoutOrderInput = {
   id?: string
   raisedBy: string
   reason: string
   status?: $Enums.DisputeStatus
+  previousStatus?: $Enums.OrderStatus | null
   resolvedBy?: string | null
   resolvedAt?: Date | string | null
   resolution?: string | null
@@ -475,6 +502,7 @@ export type OrderDisputeUncheckedCreateWithoutOrderInput = {
   raisedBy: string
   reason: string
   status?: $Enums.DisputeStatus
+  previousStatus?: $Enums.OrderStatus | null
   resolvedBy?: string | null
   resolvedAt?: Date | string | null
   resolution?: string | null
@@ -503,6 +531,7 @@ export type OrderDisputeUpdateWithoutOrderInput = {
   raisedBy?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
+  previousStatus?: Prisma.NullableEnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus | null
   resolvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -515,6 +544,7 @@ export type OrderDisputeUncheckedUpdateWithoutOrderInput = {
   raisedBy?: Prisma.StringFieldUpdateOperationsInput | string
   reason?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumDisputeStatusFieldUpdateOperationsInput | $Enums.DisputeStatus
+  previousStatus?: Prisma.NullableEnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus | null
   resolvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resolvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resolution?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -530,6 +560,7 @@ export type OrderDisputeSelect<ExtArgs extends runtime.Types.Extensions.Internal
   raisedBy?: boolean
   reason?: boolean
   status?: boolean
+  previousStatus?: boolean
   resolvedBy?: boolean
   resolvedAt?: boolean
   resolution?: boolean
@@ -544,6 +575,7 @@ export type OrderDisputeSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   raisedBy?: boolean
   reason?: boolean
   status?: boolean
+  previousStatus?: boolean
   resolvedBy?: boolean
   resolvedAt?: boolean
   resolution?: boolean
@@ -558,6 +590,7 @@ export type OrderDisputeSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   raisedBy?: boolean
   reason?: boolean
   status?: boolean
+  previousStatus?: boolean
   resolvedBy?: boolean
   resolvedAt?: boolean
   resolution?: boolean
@@ -572,6 +605,7 @@ export type OrderDisputeSelectScalar = {
   raisedBy?: boolean
   reason?: boolean
   status?: boolean
+  previousStatus?: boolean
   resolvedBy?: boolean
   resolvedAt?: boolean
   resolution?: boolean
@@ -579,7 +613,7 @@ export type OrderDisputeSelectScalar = {
   updatedAt?: boolean
 }
 
-export type OrderDisputeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "raisedBy" | "reason" | "status" | "resolvedBy" | "resolvedAt" | "resolution" | "createdAt" | "updatedAt", ExtArgs["result"]["orderDispute"]>
+export type OrderDisputeOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "raisedBy" | "reason" | "status" | "previousStatus" | "resolvedBy" | "resolvedAt" | "resolution" | "createdAt" | "updatedAt", ExtArgs["result"]["orderDispute"]>
 export type OrderDisputeInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
 }
@@ -601,6 +635,7 @@ export type $OrderDisputePayload<ExtArgs extends runtime.Types.Extensions.Intern
     raisedBy: string
     reason: string
     status: $Enums.DisputeStatus
+    previousStatus: $Enums.OrderStatus | null
     resolvedBy: string | null
     resolvedAt: Date | null
     resolution: string | null
@@ -1035,6 +1070,7 @@ export interface OrderDisputeFieldRefs {
   readonly raisedBy: Prisma.FieldRef<"OrderDispute", 'String'>
   readonly reason: Prisma.FieldRef<"OrderDispute", 'String'>
   readonly status: Prisma.FieldRef<"OrderDispute", 'DisputeStatus'>
+  readonly previousStatus: Prisma.FieldRef<"OrderDispute", 'OrderStatus'>
   readonly resolvedBy: Prisma.FieldRef<"OrderDispute", 'String'>
   readonly resolvedAt: Prisma.FieldRef<"OrderDispute", 'DateTime'>
   readonly resolution: Prisma.FieldRef<"OrderDispute", 'String'>

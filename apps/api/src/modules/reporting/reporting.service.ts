@@ -23,10 +23,14 @@ export class ReportingService {
         events: { orderBy: { createdAt: "desc" } },
         website: true,
         campaign: true,
+        platformRevenue: true,
       },
     })
     if (!order) throw new NotFoundException("Order not found")
-    return order
+    return {
+      ...order,
+      ownershipType: (order.website as any)?.ownershipType ?? "PUBLISHER",
+    }
   }
 
   async getCampaignReport(campaignId: string, organizationId: string) {
@@ -37,15 +41,25 @@ export class ReportingService {
           include: {
             items: { include: { website: true, publications: true } },
             events: { orderBy: { createdAt: "desc" }, take: 1 },
+            website: { select: { ownershipType: true } },
           },
         },
       },
     })
     if (!campaign) throw new NotFoundException("Campaign not found")
+
+    const orders = campaign.orders as any[]
+    const platformOrders = orders.filter((o: any) => o.website?.ownershipType === "PLATFORM")
+    const publisherOrders = orders.filter((o: any) => o.website?.ownershipType !== "PLATFORM")
+
     return {
       ...campaign,
-      totalSpend: campaign.orders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0),
-      publishedCount: campaign.orders.filter((o: any) => ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status)).length,
+      totalSpend: orders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0),
+      publishedCount: orders.filter((o: any) => ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status)).length,
+      platformOrderCount: platformOrders.length,
+      publisherOrderCount: publisherOrders.length,
+      platformSpend: platformOrders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0),
+      publisherSpend: publisherOrders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0),
     }
   }
 
@@ -63,12 +77,19 @@ export class ReportingService {
     return { message: "Report generation started" }
   }
 
-  async listReports(organizationId: string) {
-    return this.prisma.report.findMany({
-      where: { order: { organizationId } },
-      include: { order: true },
-      orderBy: { createdAt: "desc" },
-    })
+  async listReports(organizationId: string, take = 50, skip = 0) {
+    const where = { order: { organizationId } }
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.report.findMany({
+        where,
+        include: { order: true },
+        orderBy: { createdAt: "desc" },
+        take,
+        skip,
+      }),
+      this.prisma.report.count({ where }),
+    ])
+    return { items, total, take, skip }
   }
 
   async getReport(id: string, organizationId: string) {

@@ -86,7 +86,7 @@ export class IdentityController {
       entityId: ctx.id,
       metadata: { from: prevPubId, to: publisherId },
       userId: user.id,
-      organizationId: user.organizationId ?? "SYSTEM",
+      organizationId: user.organizationId ?? null,
     })
 
     return ctx

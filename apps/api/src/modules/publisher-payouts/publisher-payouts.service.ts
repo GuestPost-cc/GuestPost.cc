@@ -31,23 +31,115 @@ export class PublisherPayoutsService {
     return balance
   }
 
-  async requestWithdrawal(publisherId: string, amount: number, method: string, userId: string, idempotencyKey?: string) {
+  // ─── PAYOUT METHODS ─────────────────────────────────────────
+
+  private async assertPublisherMember(userId: string, publisherId: string) {
     const membership = await this.prisma.publisherMembership.findFirst({
       where: { userId, publisherId },
     })
     if (!membership) throw new ForbiddenException("You do not own this publisher account")
+  }
+
+  async createPayoutMethod(publisherId: string, userId: string, dto: { type: string; label: string; details: Record<string, unknown>; isDefault?: boolean }) {
+    await this.assertPublisherMember(userId, publisherId)
+    const allowed = ["bank_transfer", "paypal", "wise"]
+    if (!allowed.includes(dto.type)) {
+      throw new BadRequestException(`Payout method type must be one of: ${allowed.join(", ")}`)
+    }
+
+    return this.prisma.$transaction(async (tx: any) => {
+      if (dto.isDefault) {
+        await tx.payoutMethod.updateMany({
+          where: { publisherId, isDefault: true },
+          data: { isDefault: false },
+        })
+      }
+      const method = await tx.payoutMethod.create({
+        data: {
+          publisherId,
+          type: dto.type,
+          label: dto.label,
+          details: dto.details as any,
+          isDefault: dto.isDefault ?? false,
+        },
+      })
+      await this.audit.log({
+        action: "PAYOUT_METHOD_CREATED",
+        entityType: "PayoutMethod",
+        entityId: method.id,
+        metadata: { publisherId, type: dto.type, label: dto.label },
+        userId,
+        organizationId: null,
+      }, tx)
+      return method
+    })
+  }
+
+  async listPayoutMethods(publisherId: string, userId: string) {
+    await this.assertPublisherMember(userId, publisherId)
+    return this.prisma.payoutMethod.findMany({
+      where: { publisherId, isActive: true },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+    })
+  }
+
+  async deactivatePayoutMethod(publisherId: string, userId: string, id: string) {
+    await this.assertPublisherMember(userId, publisherId)
+    const method = await this.prisma.payoutMethod.findFirst({ where: { id, publisherId } })
+    if (!method) throw new NotFoundException("Payout method not found")
+
+    const updated = await this.prisma.payoutMethod.update({
+      where: { id },
+      data: { isActive: false, isDefault: false },
+    })
+    await this.audit.log({
+      action: "PAYOUT_METHOD_DEACTIVATED",
+      entityType: "PayoutMethod",
+      entityId: id,
+      metadata: { publisherId },
+      userId,
+      organizationId: null,
+    })
+    return updated
+  }
+
+  // ─── WITHDRAWALS ────────────────────────────────────────────
+
+  async requestWithdrawal(
+    publisherId: string,
+    amount: number,
+    method: string,
+    userId: string,
+    idempotencyKey?: string,
+    payoutMethodId?: string,
+  ) {
+    await this.assertPublisherMember(userId, publisherId)
 
     const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
     if (!publisher) throw new NotFoundException("Publisher not found")
 
-    const holdDays = TIER_WITHDRAWAL_HOLDS[publisher.tier] ?? 7
-    const queuedAt = new Date(Date.now() + holdDays * 24 * 60 * 60 * 1000)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new BadRequestException("Withdrawal amount must be positive")
+    }
 
-    return this.prisma.$transaction(async (tx: any) => {
-      // Idempotency: check for existing withdrawal with same reference
+    if (payoutMethodId) {
+      const payoutMethod = await this.prisma.payoutMethod.findFirst({
+        where: { id: payoutMethodId, publisherId, isActive: true },
+      })
+      if (!payoutMethod) throw new BadRequestException("Payout method not found or inactive")
+    }
+
+    // Tier hold: fraud window before staff may approve the payout.
+    const holdDays = TIER_WITHDRAWAL_HOLDS[publisher.tier] ?? 7
+    const availableAt = new Date(Date.now() + holdDays * 24 * 60 * 60 * 1000)
+
+    const withdrawal = await this.prisma.$transaction(async (tx: any) => {
+      // Idempotency: scoped per publisher via @@unique([publisherId, idempotencyKey]).
+      // Never used as the row's PK — a colliding client key must not be able
+      // to address another publisher's withdrawal.
       if (idempotencyKey) {
         const existing = await tx.withdrawal.findFirst({
-          where: { id: idempotencyKey, publisherId },
+          where: { publisherId, idempotencyKey },
         })
         if (existing) return existing
       }
@@ -57,25 +149,34 @@ export class PublisherPayoutsService {
       })
       if (!balance) throw new NotFoundException("Publisher balance not found")
 
-      const withdrawable = Number(balance.withdrawableBalance)
-      if (withdrawable < amount) {
+      const withdrawable = new Decimal(balance.withdrawableBalance)
+      if (withdrawable.lessThan(amount)) {
         throw new BadRequestException(
           `Insufficient withdrawable balance. Available: ${withdrawable}, requested: ${amount}`,
         )
       }
 
-      // Use idempotencyKey as withdrawal id for dedup
-      const withdrawalId = idempotencyKey ?? undefined
-
-      const withdrawal = await tx.withdrawal.create({
-        data: {
-          id: withdrawalId,
-          publisherId,
-          amount,
-          method,
-          status: "PENDING",
-        },
-      })
+      let created: any
+      try {
+        created = await tx.withdrawal.create({
+          data: {
+            publisherId,
+            amount,
+            method,
+            status: "PENDING",
+            availableAt,
+            idempotencyKey: idempotencyKey ?? null,
+            payoutMethodId: payoutMethodId ?? null,
+          },
+        })
+      } catch (err: any) {
+        if (err?.code === "P2002") {
+          // Concurrent duplicate with same idempotency key
+          const existing = await tx.withdrawal.findFirst({ where: { publisherId, idempotencyKey } })
+          if (existing) return existing
+        }
+        throw err
+      }
 
       const updated = await tx.publisherBalance.updateMany({
         where: { publisherId, version: balance.version },
@@ -88,17 +189,31 @@ export class PublisherPayoutsService {
         throw new ConflictException("Publisher balance was modified by another request. Retry.")
       }
 
+      // Ledger row at REQUEST time — this is when the balance moves. A
+      // rejection writes the offsetting WITHDRAWAL_REVERSAL.
+      await tx.transaction.create({
+        data: {
+          amount: new Decimal(amount).negated(),
+          type: "WITHDRAWAL",
+          publisherId,
+          reference: `withdrawal-${created.id}`,
+          description: `Withdrawal request of ${amount} via ${method}`,
+        },
+      })
+
       await this.audit.log({
         action: "WITHDRAWAL_REQUESTED",
         entityType: "Withdrawal",
-        entityId: withdrawal.id,
-        metadata: { publisherId, amount, method, holdDays, queuedAt: queuedAt.toISOString() },
+        entityId: created.id,
+        metadata: { publisherId, amount, method, holdDays, availableAt: availableAt.toISOString() },
         userId,
         organizationId: publisher.organizationId,
-      })
+      }, tx)
 
-      return withdrawal
+      return created
     })
+
+    return withdrawal
   }
 
   async approveWithdrawal(id: string, approvedBy: string) {
@@ -109,6 +224,13 @@ export class PublisherPayoutsService {
     if (!withdrawal) throw new NotFoundException("Withdrawal not found")
     if (withdrawal.status !== "PENDING") {
       throw new BadRequestException("Withdrawal is not pending")
+    }
+
+    // Tier hold is a hard gate, not advisory metadata.
+    if (withdrawal.availableAt && withdrawal.availableAt.getTime() > Date.now()) {
+      throw new BadRequestException(
+        `Withdrawal is in its ${withdrawal.publisher.tier} tier hold until ${withdrawal.availableAt.toISOString()}`,
+      )
     }
 
     const result = await this.prisma.$transaction(async (tx: any) => {
@@ -129,7 +251,7 @@ export class PublisherPayoutsService {
         metadata: { publisherId: withdrawal.publisherId, amount: Number(withdrawal.amount) },
         userId: approvedBy,
         organizationId: withdrawal.publisher.organizationId,
-      })
+      }, tx)
 
       return updated
     })
@@ -175,7 +297,8 @@ export class PublisherPayoutsService {
       }
       const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
 
-      // Update lifetimePaid
+      // The WITHDRAWAL ledger row was written at request time (when the
+      // balance moved) — only lifetimePaid changes here.
       const balance = await tx.publisherBalance.findUnique({
         where: { publisherId: withdrawal.publisherId },
       })
@@ -196,7 +319,7 @@ export class PublisherPayoutsService {
         metadata: { publisherId: withdrawal.publisherId, amount: Number(withdrawal.amount) },
         userId: approvedBy,
         organizationId: withdrawal.publisher.organizationId,
-      })
+      }, tx)
 
       return updated
     })
@@ -239,6 +362,17 @@ export class PublisherPayoutsService {
         }
       }
 
+      // Offsetting ledger row for the WITHDRAWAL written at request time
+      await tx.transaction.create({
+        data: {
+          amount: withdrawal.amount,
+          type: "WITHDRAWAL_REVERSAL",
+          publisherId: withdrawal.publisherId,
+          reference: `withdrawal-reject-${id}`,
+          description: `Withdrawal ${id} rejected — funds restored`,
+        },
+      })
+
       await this.audit.log({
         action: "WITHDRAWAL_REJECTED",
         entityType: "Withdrawal",
@@ -246,7 +380,7 @@ export class PublisherPayoutsService {
         metadata: { publisherId: withdrawal.publisherId, amount: Number(withdrawal.amount) },
         userId: approvedBy,
         organizationId: withdrawal.publisher.organizationId,
-      })
+      }, tx)
 
       return updated
     })
@@ -262,7 +396,7 @@ export class PublisherPayoutsService {
       this.prisma.withdrawal.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        include: { publisher: true },
+        include: { publisher: true, payoutMethod: { select: { id: true, type: true, label: true } } },
         take,
         skip,
       }),

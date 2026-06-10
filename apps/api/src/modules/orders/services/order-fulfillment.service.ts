@@ -13,11 +13,11 @@ export class OrderFulfillmentService {
   ) {}
 
   // Optimistic-lock status transition: the row only changes if its version
-  // still matches what the caller read, preventing lost updates / concurrent
-  // state corruption. Returns the fresh row.
-  private async transition(orderId: string, fromVersion: number, data: any) {
+  // AND current status still match what the caller read, preventing lost
+  // updates / concurrent state corruption. Returns the fresh row.
+  private async transition(orderId: string, fromVersion: number, expectedStatus: string, data: any) {
     const r = await this.prisma.order.updateMany({
-      where: { id: orderId, version: fromVersion },
+      where: { id: orderId, version: fromVersion, status: expectedStatus as any },
       data: { ...data, version: { increment: 1 } },
     })
     if (r.count === 0) {
@@ -33,7 +33,7 @@ export class OrderFulfillmentService {
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "SUBMITTED") throw new BadRequestException("Order must be SUBMITTED to accept")
 
-    const updated = await this.transition(orderId, order.version, { status: "ACCEPTED", assigneeId: userId })
+    const updated = await this.transition(orderId, order.version, "SUBMITTED", { status: "ACCEPTED", assigneeId: userId })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -65,7 +65,7 @@ export class OrderFulfillmentService {
       throw new BadRequestException("Order must be ACCEPTED or CONTENT_REQUESTED to submit content")
     }
 
-    const updated = await this.transition(orderId, order.version, { status: "CONTENT_CREATION" })
+    const updated = await this.transition(orderId, order.version, order.status, { status: "CONTENT_CREATION" })
 
     // Upsert content order
     await this.prisma.contentOrder.upsert({
@@ -96,7 +96,7 @@ export class OrderFulfillmentService {
       throw new BadRequestException("Order must be in CONTENT_CREATION to mark content ready")
     }
 
-    const updated = await this.transition(orderId, order.version, { status: "CONTENT_READY" })
+    const updated = await this.transition(orderId, order.version, "CONTENT_CREATION", { status: "CONTENT_READY" })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -119,7 +119,7 @@ export class OrderFulfillmentService {
       throw new BadRequestException("Content must be ready before submitting for review")
     }
 
-    const updated = await this.transition(orderId, order.version, { status: "CUSTOMER_REVIEW" })
+    const updated = await this.transition(orderId, order.version, "CONTENT_READY", { status: "CUSTOMER_REVIEW" })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -157,7 +157,7 @@ export class OrderFulfillmentService {
       throw new BadRequestException("publishedUrl must use http or https")
     }
 
-    const updated = await this.transition(orderId, order.version, { status: "PUBLISHED", publishedUrl, publishedAt: new Date() })
+    const updated = await this.transition(orderId, order.version, "APPROVED", { status: "PUBLISHED", publishedUrl, publishedAt: new Date() })
 
     await this.prisma.orderEvent.create({
       data: {

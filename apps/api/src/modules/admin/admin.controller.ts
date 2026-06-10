@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Post, Delete, Body, Query, UseGuards, BadRequestException } from "@nestjs/common"
+import { Controller, Get, Param, Patch, Post, Put, Delete, Body, Query, UseGuards, BadRequestException } from "@nestjs/common"
 import { AdminService } from "./admin.service"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
@@ -7,7 +7,10 @@ import { SettlementsService } from "../settlements/settlements.service"
 import { PublisherPayoutsService } from "../publisher-payouts/publisher-payouts.service"
 import { OrdersService } from "../orders/orders.service"
 import { OrderDisputeService } from "../orders/services/order-dispute.service"
+import { OrderOperationsService } from "../orders/services/order-operations.service"
 import { SettlementReasonDto } from "../settlements/dto/settlement-reason.dto"
+import { CreatePlatformWebsiteDto, UpdatePlatformWebsiteDto } from "./dto/create-platform-website.dto"
+import { ReconciliationService } from "./reconciliation.service"
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max)
 const parsePagination = (take?: string, skip?: string) => ({
@@ -25,7 +28,16 @@ export class AdminController {
     private readonly payouts: PublisherPayoutsService,
     private readonly orders: OrdersService,
     private readonly dispute: OrderDisputeService,
+    private readonly ops: OrderOperationsService,
+    private readonly reconciliation: ReconciliationService,
   ) {}
+
+  // Financial drift detector — balances vs transaction history, stuck orders
+  @Get("reconciliation")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  runReconciliation() {
+    return this.reconciliation.run()
+  }
 
   @Get("users")
   listUsers(
@@ -102,6 +114,49 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN")
   forceCancelOrder(@Param("id") id: string, @Body("reason") reason: string, @CurrentUser() user: any) {
     return this.admin.forceCancelOrder(id, reason, user.id)
+  }
+
+  // ─── OPERATIONS FULFILLMENT ─────────────────────────
+
+  @Get("orders/platform")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  listPlatformOrders(
+    @Query("status") status?: string,
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+  ) {
+    const p = parsePagination(take, skip)
+    return this.admin.listPlatformOrders(status, p.take, p.skip)
+  }
+
+  @Post("orders/:id/accept")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  acceptPlatformOrder(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.ops.acceptOrder(id, user.id)
+  }
+
+  @Post("orders/:id/submit-content")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  submitPlatformContent(@Param("id") id: string, @Body("content") content: string, @CurrentUser() user: any) {
+    return this.ops.submitContent(id, user.id, content)
+  }
+
+  @Post("orders/:id/mark-content-ready")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  markPlatformContentReady(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.ops.markContentReady(id, user.id)
+  }
+
+  @Post("orders/:id/submit-for-review")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  submitPlatformForReview(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.ops.submitForReview(id, user.id)
+  }
+
+  @Post("orders/:id/mark-published")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  markPlatformPublished(@Param("id") id: string, @Body("url") url: string, @CurrentUser() user: any) {
+    return this.ops.markPublished(id, user.id, url)
   }
 
   @StaffRoles("SUPER_ADMIN", "FINANCE")
@@ -215,5 +270,44 @@ export class AdminController {
   @Delete("marketplace/listings/:id")
   deleteListing(@Param("id") id: string, @CurrentUser() user: any) {
     return this.admin.deleteListing(id, user)
+  }
+
+  // ─── WEBSITE MANAGEMENT ────────────────────────────
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Post("websites")
+  createWebsite(@Body() body: CreatePlatformWebsiteDto, @CurrentUser() user: any) {
+    return this.admin.createPlatformWebsite(body, user)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Put("websites/:id")
+  updateWebsite(@Param("id") id: string, @Body() body: UpdatePlatformWebsiteDto, @CurrentUser() user: any) {
+    return this.admin.updatePlatformWebsite(id, body, user)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @Get("websites")
+  listWebsites(@Query("ownershipType") ownershipType?: string, @Query() pagination?: any) {
+    const p = parsePagination(pagination?.take, pagination?.skip)
+    return this.admin.listWebsites(ownershipType, p.take, p.skip)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @Get("websites/:id")
+  getWebsite(@Param("id") id: string) {
+    return this.admin.getWebsite(id)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Patch("websites/:id/pause")
+  pauseWebsite(@Param("id") id: string, @Body("paused") paused: boolean, @CurrentUser() user: any) {
+    return this.admin.pauseWebsite(id, paused, user)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Delete("websites/:id")
+  deleteWebsite(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.admin.deleteWebsite(id, user)
   }
 }

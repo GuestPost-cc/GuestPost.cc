@@ -56,6 +56,34 @@ enum MemberRole {
   CLIENT_VIEWER
 }
 
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum ContentOrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RevisionStatus {
+  REQUESTED
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
+  DRAFT
+}
+
+enum WebsiteOwnershipType {
+  PUBLISHER
+  PLATFORM
+}
+
 enum OrderStatus {
   DRAFT
   PENDING_PAYMENT
@@ -340,6 +368,7 @@ model Publisher {
   publisherMemberships PublisherMembership[]
   balance             PublisherBalance?
   withdrawals         Withdrawal[]
+  payoutMethods       PayoutMethod[]
   settlements         Settlement[]
   marketplaceListings MarketplaceListing[]
   profile             PublisherProfile?
@@ -350,25 +379,31 @@ model Publisher {
 }
 
 model Website {
-  id          String   @id @default(cuid())
-  url         String   @unique
-  name        String?
-  category    String?
-  language    String?
-  country     String?
-  metrics     Json?
-  isActive    Boolean  @default(true)
-  publisherId String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String                @id @default(cuid())
+  url             String                @unique
+  // Normalized hostname (lowercase, www-stripped) — dedupe key; URL
+  // uniqueness alone is bypassed by www/trailing-slash variants.
+  domain          String?
+  name            String?
+  category        String?
+  language        String?
+  country         String?
+  metrics         Json?
+  isActive        Boolean               @default(true)
+  publisherId     String?
+  ownershipType   WebsiteOwnershipType   @default(PUBLISHER)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
-  publisher  Publisher   @relation(fields: [publisherId], references: [id])
+  publisher  Publisher?  @relation(fields: [publisherId], references: [id])
   orders     Order[]
   orderItems OrderItem[]
   marketplaceListings MarketplaceListing[]
 
   @@index([publisherId])
   @@index([isActive])
+  @@index([ownershipType])
+  @@index([domain])
 }
 
 model Order {
@@ -412,6 +447,7 @@ model Order {
   events       OrderEvent[]
   settlements  Settlement[]
   dispute      OrderDispute?
+  platformRevenue PlatformRevenue?
 
   @@unique([idempotencyKey])
   @@index([organizationId, status])
@@ -426,7 +462,7 @@ model Campaign {
   id             String   @id @default(cuid())
   name           String
   description    String?
-  status         String   @default("ACTIVE")
+  status         CampaignStatus   @default(ACTIVE)
   organizationId String
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -514,6 +550,9 @@ model OrderDispute {
   raisedBy   String
   reason     String
   status     DisputeStatus @default(OPEN)
+  // Order status at dispute open — RESTORE/REJECT resolutions return the
+  // order to this exact status, not a hardcoded guess.
+  previousStatus OrderStatus?
   resolvedBy String?
   resolvedAt DateTime?
   resolution String?
@@ -572,6 +611,9 @@ model PublisherBalance {
   pendingBalance     Decimal @default(0)
   approvedBalance    Decimal @default(0)
   withdrawableBalance Decimal @default(0)
+  // Owed back to the platform (refund clawback exceeded withdrawable).
+  // Netted against future settlement releases before crediting withdrawable.
+  debtBalance        Decimal @default(0)
   lifetimeEarnings   Decimal @default(0)
   lifetimePaid       Decimal @default(0)
   version            Int     @default(0)
@@ -587,6 +629,11 @@ model Withdrawal {
   amount      Decimal
   method      String           @default("bank_transfer")
   status      WithdrawalStatus @default(PENDING)
+  // Tier-based hold: approval is rejected before this timestamp.
+  availableAt DateTime?
+  // Client-supplied dedup key — scoped per publisher, never used as PK.
+  idempotencyKey String?
+  payoutMethodId String?
   approvedBy  String?
   approvedAt  DateTime?
   version     Int              @default(0)
@@ -595,10 +642,30 @@ model Withdrawal {
 
   publisher   Publisher @relation(fields: [publisherId], references: [id])
   approvedByUser User?  @relation("WithdrawalApprover", fields: [approvedBy], references: [id])
+  payoutMethod PayoutMethod? @relation(fields: [payoutMethodId], references: [id])
 
+  @@unique([publisherId, idempotencyKey])
   @@index([publisherId, status])
   @@index([approvedBy])
   @@index([status])
+  @@index([payoutMethodId])
+}
+
+model PayoutMethod {
+  id          String   @id @default(cuid())
+  publisherId String
+  type        String   // bank_transfer, paypal, wise
+  label       String
+  details     Json
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  publisher   Publisher    @relation(fields: [publisherId], references: [id])
+  withdrawals Withdrawal[]
+
+  @@index([publisherId])
 }
 
 model ApiKey {
@@ -621,7 +688,7 @@ model ContentOrder {
   id          String   @id @default(cuid())
   title       String
   brief       String?
-  status      String   @default("PENDING")
+  status      ContentOrderStatus   @default(PENDING)
   deliverable String?
   orderId     String   @unique
   createdAt   DateTime @default(now())
@@ -634,7 +701,7 @@ model Revision {
   id        String   @id @default(cuid())
   notes     String?
   files     Json?
-  status    String   @default("REQUESTED")
+  status    RevisionStatus   @default(REQUESTED)
   orderId   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -657,6 +724,23 @@ model Report {
   order Order @relation(fields: [orderId], references: [id])
 
   @@index([orderId])
+}
+
+model PlatformRevenue {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  amount      Decimal
+  platformFee Decimal   @default(0)
+  netRevenue  Decimal
+  recordedAt  DateTime  @default(now())
+  // Set on refund instead of deleting the row — financial records are
+  // never destroyed. Revenue queries must filter reversedAt: null.
+  reversedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([recordedAt])
 }
 
 model Wallet {
@@ -682,7 +766,10 @@ enum TransactionType {
   PURCHASE
   REFUND
   WITHDRAWAL
+  WITHDRAWAL_REVERSAL
   SETTLEMENT_RELEASE
+  SETTLEMENT_CLAWBACK
+  DEBT_REPAYMENT
   RESERVATION
 }
 
@@ -752,11 +839,12 @@ model Notification {
   message        String
   read           Boolean  @default(false)
   userId         String
-  organizationId String
+  // Nullable: staff/system notifications (e.g. chargeback alerts) have no org.
+  organizationId String?
   createdAt      DateTime @default(now())
 
-  user         User         @relation(fields: [userId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User          @relation(fields: [userId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
 
   @@index([userId, read, createdAt])
   @@index([organizationId, createdAt])
@@ -769,14 +857,17 @@ model AuditLog {
   entityType     String
   entityId       String?
   metadata       Json?
-  userId         String
-  organizationId String
+  // Nullable: system/webhook actions and platform-scope actions have no
+  // real user/org. Sentinel strings ("SYSTEM") violated the FK and were
+  // silently dropped by the audit service — never reintroduce them.
+  userId         String?
+  organizationId String?
   ipAddress      String?
   userAgent      String?
   createdAt      DateTime @default(now())
 
-  user         User         @relation(fields: [userId], references: [id])
-  organization Organization @relation(fields: [organizationId], references: [id])
+  user         User?         @relation(fields: [userId], references: [id])
+  organization Organization? @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId, action, createdAt])
   @@index([entityType, entityId])

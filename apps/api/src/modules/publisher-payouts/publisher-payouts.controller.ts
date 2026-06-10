@@ -21,10 +21,34 @@ export class PublisherPayoutsController {
   @MemberRoles("PUBLISHER_OWNER")
   @Post("withdrawals")
   requestWithdrawal(
-    @Body() body: { amount: number; method: string; idempotencyKey?: string },
+    @Body() body: { amount: number; method: string; idempotencyKey?: string; payoutMethodId?: string },
     @CurrentUser() user: any,
   ) {
-    return this.payouts.requestWithdrawal(user.publisherId, body.amount, body.method, user.id, body.idempotencyKey)
+    return this.payouts.requestWithdrawal(user.publisherId, body.amount, body.method, user.id, body.idempotencyKey, body.payoutMethodId)
+  }
+
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
+  @Get("payout-methods")
+  listPayoutMethods(@CurrentUser() user: any) {
+    return this.payouts.listPayoutMethods(user.publisherId, user.id)
+  }
+
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("payout-methods")
+  createPayoutMethod(
+    @Body() body: { type: string; label: string; details: Record<string, unknown>; isDefault?: boolean },
+    @CurrentUser() user: any,
+  ) {
+    return this.payouts.createPayoutMethod(user.publisherId, user.id, body)
+  }
+
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("payout-methods/:id/deactivate")
+  deactivatePayoutMethod(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.payouts.deactivatePayoutMethod(user.publisherId, user.id, id)
   }
 
   @UseGuards(MemberRolesGuard)

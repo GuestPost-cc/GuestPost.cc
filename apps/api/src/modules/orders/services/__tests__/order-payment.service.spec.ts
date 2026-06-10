@@ -1,0 +1,170 @@
+import { BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
+import { OrderPaymentService } from "../order-payment.service"
+import { Decimal } from "@prisma/client/runtime/library"
+
+describe("OrderPaymentService", () => {
+  let service: OrderPaymentService
+  let prismaMock: any
+  let auditMock: any
+  let billingMock: any
+
+  const mockOrder = {
+    id: "order-1",
+    organizationId: "org-1",
+    status: "DRAFT",
+    amount: new Decimal(500),
+    version: 1,
+    type: "GUEST_POST",
+  }
+
+  const mockWallet = {
+    id: "wallet-1",
+    organizationId: "org-1",
+    availableBalance: new Decimal(1000),
+    reservedBalance: new Decimal(0),
+    version: 1,
+  }
+
+  const mockItems = [
+    { id: "item-1", websiteId: "site-1", price: new Decimal(500), status: "PENDING_PAYMENT" },
+  ]
+
+  beforeEach(() => {
+    auditMock = { log: jest.fn().mockResolvedValue(undefined) }
+    billingMock = {
+      reserve: jest.fn().mockResolvedValue(undefined),
+      payFromReserved: jest.fn().mockResolvedValue(undefined),
+    }
+
+    prismaMock = {
+      order: {
+        findFirst: jest.fn(),
+        updateMany: jest.fn(),
+        update: jest.fn(),
+        findUnique: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+      },
+      wallet: {
+        findFirst: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
+      },
+      orderItem: { findMany: jest.fn() },
+      marketplaceListing: { findFirst: jest.fn() },
+      orderEvent: { create: jest.fn() },
+      $transaction: jest.fn(),
+    }
+
+    service = new OrderPaymentService(prismaMock as any, auditMock as any, billingMock as any)
+  })
+
+  describe("submitPayment", () => {
+    it("transitions DRAFT order to PAID+SUBMITTED in one transaction", async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.order.findFirst.mockResolvedValue(mockOrder)
+        prismaMock.wallet.findFirst.mockResolvedValue(mockWallet)
+        prismaMock.orderItem.findMany.mockResolvedValue(mockItems)
+        prismaMock.marketplaceListing.findFirst.mockResolvedValue({ price: new Decimal(500) })
+        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
+        prismaMock.order.updateMany
+          .mockResolvedValue({ count: 1 }) // captured
+        prismaMock.order.findUnique.mockResolvedValue({
+          ...mockOrder,
+          paymentStatus: "PAID",
+          status: "SUBMITTED",
+          version: 2,
+        })
+        return cb(prismaMock)
+      })
+
+      const result = await service.submitPayment("order-1", "user-1", "org-1")
+
+      expect(billingMock.reserve).toHaveBeenCalledWith("wallet-1", 500, "order-1", {
+        id: "user-1",
+        organizationId: "org-1",
+      })
+      expect(billingMock.payFromReserved).toHaveBeenCalledWith("wallet-1", 500, "order-1", {
+        id: "user-1",
+        organizationId: "org-1",
+      })
+      expect(prismaMock.order.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ paymentStatus: "PAID", status: "PAID" }),
+        }),
+      )
+      expect(prismaMock.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: { status: "SUBMITTED" } }),
+      )
+      expect(result.status).toBe("SUBMITTED")
+      expect(auditMock.log).toHaveBeenCalledWith(
+        expect.objectContaining({ action: "PAYMENT_CAPTURED" }),
+      )
+    })
+
+    it("rejects non-DRAFT orders", async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.order.findFirst.mockResolvedValue({ ...mockOrder, status: "SUBMITTED" })
+        return cb(prismaMock)
+      })
+
+      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
+        BadRequestException,
+      )
+    })
+
+    it("rejects orders with zero amount", async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.order.findFirst.mockResolvedValue({ ...mockOrder, amount: new Decimal(0) })
+        return cb(prismaMock)
+      })
+
+      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
+        BadRequestException,
+      )
+    })
+
+    it("rejects insufficient balance", async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.order.findFirst.mockResolvedValue(mockOrder)
+        prismaMock.wallet.findFirst.mockResolvedValue({
+          ...mockWallet,
+          availableBalance: new Decimal(100),
+        })
+        return cb(prismaMock)
+      })
+
+      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
+        BadRequestException,
+      )
+    })
+
+    it("rejects when listing is no longer available", async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.order.findFirst.mockResolvedValue(mockOrder)
+        prismaMock.wallet.findFirst.mockResolvedValue(mockWallet)
+        prismaMock.orderItem.findMany.mockResolvedValue(mockItems)
+        prismaMock.marketplaceListing.findFirst.mockResolvedValue(null)
+        return cb(prismaMock)
+      })
+
+      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
+        BadRequestException,
+      )
+    })
+
+    it("throws ConflictException on order version mismatch", async () => {
+      prismaMock.$transaction.mockImplementation(async (cb: any) => {
+        prismaMock.order.findFirst.mockResolvedValue(mockOrder)
+        prismaMock.wallet.findFirst.mockResolvedValue(mockWallet)
+        prismaMock.orderItem.findMany.mockResolvedValue(mockItems)
+        prismaMock.marketplaceListing.findFirst.mockResolvedValue({ price: new Decimal(500) })
+        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
+        prismaMock.order.updateMany.mockResolvedValue({ count: 0 })
+        return cb(prismaMock)
+      })
+
+      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
+        ConflictException,
+      )
+    })
+  })
+})

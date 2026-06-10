@@ -158,6 +158,11 @@ export type PublisherBalance = Prisma.PublisherBalanceModel
  */
 export type Withdrawal = Prisma.WithdrawalModel
 /**
+ * Model PayoutMethod
+ * 
+ */
+export type PayoutMethod = Prisma.PayoutMethodModel
+/**
  * Model ApiKey
  * 
  */
@@ -177,6 +182,11 @@ export type Revision = Prisma.RevisionModel
  * 
  */
 export type Report = Prisma.ReportModel
+/**
+ * Model PlatformRevenue
+ * 
+ */
+export type PlatformRevenue = Prisma.PlatformRevenueModel
 /**
  * Model Wallet
  * 

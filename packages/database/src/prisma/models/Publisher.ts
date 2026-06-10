@@ -203,6 +203,7 @@ export type PublisherWhereInput = {
   publisherMemberships?: Prisma.PublisherMembershipListRelationFilter
   balance?: Prisma.XOR<Prisma.PublisherBalanceNullableScalarRelationFilter, Prisma.PublisherBalanceWhereInput> | null
   withdrawals?: Prisma.WithdrawalListRelationFilter
+  payoutMethods?: Prisma.PayoutMethodListRelationFilter
   settlements?: Prisma.SettlementListRelationFilter
   marketplaceListings?: Prisma.MarketplaceListingListRelationFilter
   profile?: Prisma.XOR<Prisma.PublisherProfileNullableScalarRelationFilter, Prisma.PublisherProfileWhereInput> | null
@@ -223,6 +224,7 @@ export type PublisherOrderByWithRelationInput = {
   publisherMemberships?: Prisma.PublisherMembershipOrderByRelationAggregateInput
   balance?: Prisma.PublisherBalanceOrderByWithRelationInput
   withdrawals?: Prisma.WithdrawalOrderByRelationAggregateInput
+  payoutMethods?: Prisma.PayoutMethodOrderByRelationAggregateInput
   settlements?: Prisma.SettlementOrderByRelationAggregateInput
   marketplaceListings?: Prisma.MarketplaceListingOrderByRelationAggregateInput
   profile?: Prisma.PublisherProfileOrderByWithRelationInput
@@ -246,6 +248,7 @@ export type PublisherWhereUniqueInput = Prisma.AtLeast<{
   publisherMemberships?: Prisma.PublisherMembershipListRelationFilter
   balance?: Prisma.XOR<Prisma.PublisherBalanceNullableScalarRelationFilter, Prisma.PublisherBalanceWhereInput> | null
   withdrawals?: Prisma.WithdrawalListRelationFilter
+  payoutMethods?: Prisma.PayoutMethodListRelationFilter
   settlements?: Prisma.SettlementListRelationFilter
   marketplaceListings?: Prisma.MarketplaceListingListRelationFilter
   profile?: Prisma.XOR<Prisma.PublisherProfileNullableScalarRelationFilter, Prisma.PublisherProfileWhereInput> | null
@@ -291,6 +294,7 @@ export type PublisherCreateInput = {
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
@@ -310,6 +314,7 @@ export type PublisherUncheckedCreateInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
@@ -329,6 +334,7 @@ export type PublisherUpdateInput = {
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
@@ -348,6 +354,7 @@ export type PublisherUncheckedUpdateInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
@@ -516,10 +523,12 @@ export type PublisherCreateNestedOneWithoutWebsitesInput = {
   connect?: Prisma.PublisherWhereUniqueInput
 }
 
-export type PublisherUpdateOneRequiredWithoutWebsitesNestedInput = {
+export type PublisherUpdateOneWithoutWebsitesNestedInput = {
   create?: Prisma.XOR<Prisma.PublisherCreateWithoutWebsitesInput, Prisma.PublisherUncheckedCreateWithoutWebsitesInput>
   connectOrCreate?: Prisma.PublisherCreateOrConnectWithoutWebsitesInput
   upsert?: Prisma.PublisherUpsertWithoutWebsitesInput
+  disconnect?: Prisma.PublisherWhereInput | boolean
+  delete?: Prisma.PublisherWhereInput | boolean
   connect?: Prisma.PublisherWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.PublisherUpdateToOneWithWhereWithoutWebsitesInput, Prisma.PublisherUpdateWithoutWebsitesInput>, Prisma.PublisherUncheckedUpdateWithoutWebsitesInput>
 }
@@ -564,6 +573,20 @@ export type PublisherUpdateOneRequiredWithoutWithdrawalsNestedInput = {
   upsert?: Prisma.PublisherUpsertWithoutWithdrawalsInput
   connect?: Prisma.PublisherWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.PublisherUpdateToOneWithWhereWithoutWithdrawalsInput, Prisma.PublisherUpdateWithoutWithdrawalsInput>, Prisma.PublisherUncheckedUpdateWithoutWithdrawalsInput>
+}
+
+export type PublisherCreateNestedOneWithoutPayoutMethodsInput = {
+  create?: Prisma.XOR<Prisma.PublisherCreateWithoutPayoutMethodsInput, Prisma.PublisherUncheckedCreateWithoutPayoutMethodsInput>
+  connectOrCreate?: Prisma.PublisherCreateOrConnectWithoutPayoutMethodsInput
+  connect?: Prisma.PublisherWhereUniqueInput
+}
+
+export type PublisherUpdateOneRequiredWithoutPayoutMethodsNestedInput = {
+  create?: Prisma.XOR<Prisma.PublisherCreateWithoutPayoutMethodsInput, Prisma.PublisherUncheckedCreateWithoutPayoutMethodsInput>
+  connectOrCreate?: Prisma.PublisherCreateOrConnectWithoutPayoutMethodsInput
+  upsert?: Prisma.PublisherUpsertWithoutPayoutMethodsInput
+  connect?: Prisma.PublisherWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PublisherUpdateToOneWithWhereWithoutPayoutMethodsInput, Prisma.PublisherUpdateWithoutPayoutMethodsInput>, Prisma.PublisherUncheckedUpdateWithoutPayoutMethodsInput>
 }
 
 export type PublisherCreateNestedOneWithoutTransactionsInput = {
@@ -624,6 +647,7 @@ export type PublisherCreateWithoutActiveContextsInput = {
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
@@ -642,6 +666,7 @@ export type PublisherUncheckedCreateWithoutActiveContextsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
@@ -676,6 +701,7 @@ export type PublisherUpdateWithoutActiveContextsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
@@ -694,6 +720,7 @@ export type PublisherUncheckedUpdateWithoutActiveContextsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
@@ -711,6 +738,7 @@ export type PublisherCreateWithoutOrganizationInput = {
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
@@ -729,6 +757,7 @@ export type PublisherUncheckedCreateWithoutOrganizationInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
@@ -786,6 +815,7 @@ export type PublisherCreateWithoutPublisherMembershipsInput = {
   websites?: Prisma.WebsiteCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
@@ -804,6 +834,7 @@ export type PublisherUncheckedCreateWithoutPublisherMembershipsInput = {
   websites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
@@ -838,6 +869,7 @@ export type PublisherUpdateWithoutPublisherMembershipsInput = {
   websites?: Prisma.WebsiteUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
@@ -856,6 +888,7 @@ export type PublisherUncheckedUpdateWithoutPublisherMembershipsInput = {
   websites?: Prisma.WebsiteUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
@@ -874,6 +907,7 @@ export type PublisherCreateWithoutWebsitesInput = {
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
@@ -892,6 +926,7 @@ export type PublisherUncheckedCreateWithoutWebsitesInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
@@ -926,6 +961,7 @@ export type PublisherUpdateWithoutWebsitesInput = {
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
@@ -944,6 +980,7 @@ export type PublisherUncheckedUpdateWithoutWebsitesInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
@@ -963,6 +1000,7 @@ export type PublisherCreateWithoutSettlementsInput = {
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
@@ -981,6 +1019,7 @@ export type PublisherUncheckedCreateWithoutSettlementsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
@@ -1015,6 +1054,7 @@ export type PublisherUpdateWithoutSettlementsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
@@ -1033,6 +1073,7 @@ export type PublisherUncheckedUpdateWithoutSettlementsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
@@ -1050,6 +1091,7 @@ export type PublisherCreateWithoutBalanceInput = {
   websites?: Prisma.WebsiteCreateNestedManyWithoutPublisherInput
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
@@ -1068,6 +1110,7 @@ export type PublisherUncheckedCreateWithoutBalanceInput = {
   websites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutPublisherInput
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
@@ -1102,6 +1145,7 @@ export type PublisherUpdateWithoutBalanceInput = {
   websites?: Prisma.WebsiteUpdateManyWithoutPublisherNestedInput
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
@@ -1120,6 +1164,7 @@ export type PublisherUncheckedUpdateWithoutBalanceInput = {
   websites?: Prisma.WebsiteUncheckedUpdateManyWithoutPublisherNestedInput
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
@@ -1138,6 +1183,7 @@ export type PublisherCreateWithoutWithdrawalsInput = {
   websites?: Prisma.WebsiteCreateNestedManyWithoutPublisherInput
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
@@ -1156,6 +1202,7 @@ export type PublisherUncheckedCreateWithoutWithdrawalsInput = {
   websites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutPublisherInput
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
@@ -1190,6 +1237,7 @@ export type PublisherUpdateWithoutWithdrawalsInput = {
   websites?: Prisma.WebsiteUpdateManyWithoutPublisherNestedInput
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
@@ -1208,6 +1256,99 @@ export type PublisherUncheckedUpdateWithoutWithdrawalsInput = {
   websites?: Prisma.WebsiteUncheckedUpdateManyWithoutPublisherNestedInput
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
+  profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
+}
+
+export type PublisherCreateWithoutPayoutMethodsInput = {
+  id?: string
+  name: string
+  email?: string | null
+  tier?: $Enums.PublisherTier
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutPublishersInput
+  websites?: Prisma.WebsiteCreateNestedManyWithoutPublisherInput
+  publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
+  balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
+  withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
+  marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
+  profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
+}
+
+export type PublisherUncheckedCreateWithoutPayoutMethodsInput = {
+  id?: string
+  name: string
+  email?: string | null
+  organizationId: string
+  tier?: $Enums.PublisherTier
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  websites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutPublisherInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
+  balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
+  withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
+  profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
+}
+
+export type PublisherCreateOrConnectWithoutPayoutMethodsInput = {
+  where: Prisma.PublisherWhereUniqueInput
+  create: Prisma.XOR<Prisma.PublisherCreateWithoutPayoutMethodsInput, Prisma.PublisherUncheckedCreateWithoutPayoutMethodsInput>
+}
+
+export type PublisherUpsertWithoutPayoutMethodsInput = {
+  update: Prisma.XOR<Prisma.PublisherUpdateWithoutPayoutMethodsInput, Prisma.PublisherUncheckedUpdateWithoutPayoutMethodsInput>
+  create: Prisma.XOR<Prisma.PublisherCreateWithoutPayoutMethodsInput, Prisma.PublisherUncheckedCreateWithoutPayoutMethodsInput>
+  where?: Prisma.PublisherWhereInput
+}
+
+export type PublisherUpdateToOneWithWhereWithoutPayoutMethodsInput = {
+  where?: Prisma.PublisherWhereInput
+  data: Prisma.XOR<Prisma.PublisherUpdateWithoutPayoutMethodsInput, Prisma.PublisherUncheckedUpdateWithoutPayoutMethodsInput>
+}
+
+export type PublisherUpdateWithoutPayoutMethodsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tier?: Prisma.EnumPublisherTierFieldUpdateOperationsInput | $Enums.PublisherTier
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutPublishersNestedInput
+  websites?: Prisma.WebsiteUpdateManyWithoutPublisherNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
+  balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
+  withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
+  profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
+}
+
+export type PublisherUncheckedUpdateWithoutPayoutMethodsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  tier?: Prisma.EnumPublisherTierFieldUpdateOperationsInput | $Enums.PublisherTier
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  websites?: Prisma.WebsiteUncheckedUpdateManyWithoutPublisherNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
+  balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
+  withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
@@ -1227,6 +1368,7 @@ export type PublisherCreateWithoutTransactionsInput = {
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
@@ -1245,6 +1387,7 @@ export type PublisherUncheckedCreateWithoutTransactionsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
@@ -1279,6 +1422,7 @@ export type PublisherUpdateWithoutTransactionsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
@@ -1297,6 +1441,7 @@ export type PublisherUncheckedUpdateWithoutTransactionsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
@@ -1315,6 +1460,7 @@ export type PublisherCreateWithoutMarketplaceListingsInput = {
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
@@ -1333,6 +1479,7 @@ export type PublisherUncheckedCreateWithoutMarketplaceListingsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
@@ -1367,6 +1514,7 @@ export type PublisherUpdateWithoutMarketplaceListingsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
@@ -1385,6 +1533,7 @@ export type PublisherUncheckedUpdateWithoutMarketplaceListingsInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
@@ -1403,6 +1552,7 @@ export type PublisherCreateWithoutProfileInput = {
   publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
@@ -1421,6 +1571,7 @@ export type PublisherUncheckedCreateWithoutProfileInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
   balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
@@ -1455,6 +1606,7 @@ export type PublisherUpdateWithoutProfileInput = {
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
@@ -1473,6 +1625,7 @@ export type PublisherUncheckedUpdateWithoutProfileInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
@@ -1499,6 +1652,7 @@ export type PublisherUpdateWithoutOrganizationInput = {
   publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
@@ -1517,6 +1671,7 @@ export type PublisherUncheckedUpdateWithoutOrganizationInput = {
   publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
   balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
@@ -1542,6 +1697,7 @@ export type PublisherCountOutputType = {
   websites: number
   publisherMemberships: number
   withdrawals: number
+  payoutMethods: number
   settlements: number
   marketplaceListings: number
   transactions: number
@@ -1552,6 +1708,7 @@ export type PublisherCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensi
   websites?: boolean | PublisherCountOutputTypeCountWebsitesArgs
   publisherMemberships?: boolean | PublisherCountOutputTypeCountPublisherMembershipsArgs
   withdrawals?: boolean | PublisherCountOutputTypeCountWithdrawalsArgs
+  payoutMethods?: boolean | PublisherCountOutputTypeCountPayoutMethodsArgs
   settlements?: boolean | PublisherCountOutputTypeCountSettlementsArgs
   marketplaceListings?: boolean | PublisherCountOutputTypeCountMarketplaceListingsArgs
   transactions?: boolean | PublisherCountOutputTypeCountTransactionsArgs
@@ -1587,6 +1744,13 @@ export type PublisherCountOutputTypeCountPublisherMembershipsArgs<ExtArgs extend
  */
 export type PublisherCountOutputTypeCountWithdrawalsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.WithdrawalWhereInput
+}
+
+/**
+ * PublisherCountOutputType without action
+ */
+export type PublisherCountOutputTypeCountPayoutMethodsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.PayoutMethodWhereInput
 }
 
 /**
@@ -1631,6 +1795,7 @@ export type PublisherSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   publisherMemberships?: boolean | Prisma.Publisher$publisherMembershipsArgs<ExtArgs>
   balance?: boolean | Prisma.Publisher$balanceArgs<ExtArgs>
   withdrawals?: boolean | Prisma.Publisher$withdrawalsArgs<ExtArgs>
+  payoutMethods?: boolean | Prisma.Publisher$payoutMethodsArgs<ExtArgs>
   settlements?: boolean | Prisma.Publisher$settlementsArgs<ExtArgs>
   marketplaceListings?: boolean | Prisma.Publisher$marketplaceListingsArgs<ExtArgs>
   profile?: boolean | Prisma.Publisher$profileArgs<ExtArgs>
@@ -1678,6 +1843,7 @@ export type PublisherInclude<ExtArgs extends runtime.Types.Extensions.InternalAr
   publisherMemberships?: boolean | Prisma.Publisher$publisherMembershipsArgs<ExtArgs>
   balance?: boolean | Prisma.Publisher$balanceArgs<ExtArgs>
   withdrawals?: boolean | Prisma.Publisher$withdrawalsArgs<ExtArgs>
+  payoutMethods?: boolean | Prisma.Publisher$payoutMethodsArgs<ExtArgs>
   settlements?: boolean | Prisma.Publisher$settlementsArgs<ExtArgs>
   marketplaceListings?: boolean | Prisma.Publisher$marketplaceListingsArgs<ExtArgs>
   profile?: boolean | Prisma.Publisher$profileArgs<ExtArgs>
@@ -1700,6 +1866,7 @@ export type $PublisherPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     publisherMemberships: Prisma.$PublisherMembershipPayload<ExtArgs>[]
     balance: Prisma.$PublisherBalancePayload<ExtArgs> | null
     withdrawals: Prisma.$WithdrawalPayload<ExtArgs>[]
+    payoutMethods: Prisma.$PayoutMethodPayload<ExtArgs>[]
     settlements: Prisma.$SettlementPayload<ExtArgs>[]
     marketplaceListings: Prisma.$MarketplaceListingPayload<ExtArgs>[]
     profile: Prisma.$PublisherProfilePayload<ExtArgs> | null
@@ -2113,6 +2280,7 @@ export interface Prisma__PublisherClient<T, Null = never, ExtArgs extends runtim
   publisherMemberships<T extends Prisma.Publisher$publisherMembershipsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$publisherMembershipsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PublisherMembershipPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   balance<T extends Prisma.Publisher$balanceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$balanceArgs<ExtArgs>>): Prisma.Prisma__PublisherBalanceClient<runtime.Types.Result.GetResult<Prisma.$PublisherBalancePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   withdrawals<T extends Prisma.Publisher$withdrawalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$withdrawalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WithdrawalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  payoutMethods<T extends Prisma.Publisher$payoutMethodsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$payoutMethodsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PayoutMethodPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   settlements<T extends Prisma.Publisher$settlementsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$settlementsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marketplaceListings<T extends Prisma.Publisher$marketplaceListingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$marketplaceListingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   profile<T extends Prisma.Publisher$profileArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$profileArgs<ExtArgs>>): Prisma.Prisma__PublisherProfileClient<runtime.Types.Result.GetResult<Prisma.$PublisherProfilePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
@@ -2638,6 +2806,30 @@ export type Publisher$withdrawalsArgs<ExtArgs extends runtime.Types.Extensions.I
   take?: number
   skip?: number
   distinct?: Prisma.WithdrawalScalarFieldEnum | Prisma.WithdrawalScalarFieldEnum[]
+}
+
+/**
+ * Publisher.payoutMethods
+ */
+export type Publisher$payoutMethodsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the PayoutMethod
+   */
+  select?: Prisma.PayoutMethodSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the PayoutMethod
+   */
+  omit?: Prisma.PayoutMethodOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PayoutMethodInclude<ExtArgs> | null
+  where?: Prisma.PayoutMethodWhereInput
+  orderBy?: Prisma.PayoutMethodOrderByWithRelationInput | Prisma.PayoutMethodOrderByWithRelationInput[]
+  cursor?: Prisma.PayoutMethodWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.PayoutMethodScalarFieldEnum | Prisma.PayoutMethodScalarFieldEnum[]
 }
 
 /**

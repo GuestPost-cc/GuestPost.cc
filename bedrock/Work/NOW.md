@@ -1,20 +1,18 @@
 # Current Focus
-**Status: Maintenance & hardening** — RBAC audit complete, order workflow redesign implemented.
+**Status: Backend hardening complete (batch 9) — backend-first push before frontend work.**
 
-## Completed
-- Full RBAC audit across 12 controllers (60+ endpoints) — Role Permission Matrix generated
-- ActorTypeGuard, MemberRolesGuard, StaffRolesGuard, OrderOwnershipGuard all in place
-- Business-action order endpoints replace generic PATCH /orders/:id/status (14 action endpoints)
-- Settlement dual-approval (customer→admin→release) with version-based optimistic concurrency
-- Platform fee standardized at 20% (was inconsistent: 10% vs 20%)
-- Stripe webhook dummy mode removed (security fix C1)
-- ActiveContext backfill script created at `scripts/backfill-active-context.ts`
-- Shadow DB migration history fixed — `MarketplaceSavedList`/`MarketplaceSavedListItem` tables now in migration 5; all other missing tables (18) in migration 6
+## Completed (2026-06-11, batch 9 — CTO review fixes)
+- All launch-blocker fixes from full architecture review: privesc, Decimal money math, one-website-per-order, clawback debt model, forceCancel refund delegation, audit-in-tx, chargeback handler, withdrawal holds + ledger rows, dispute previousStatus, atomic delivery+settlement, pagination, price-drift 409, domain dedupe, PayoutMethod, settlement auto-approve sweep, reconciliation endpoint
+- Migrations: `20260611000000_business_logic_hardening`, `20260611010000_sync_enum_drift` (repaired db-push drift — dev DB now zero-drift vs schema)
+- 71 unit tests pass (new: refund branches, withdrawal holds/ledger, fee split, domain normalization)
 
-## Next Steps
-1. Run `prisma migrate dev` to verify shadow DB no longer blocks (may still need `--create-only` or `prisma db push` on existing dev DBs)
-2. Run `pnpm tsx scripts/backfill-active-context.ts` after database is migrated to populate ActiveContext for existing users
-3. End-to-end multi-tenant test: create multi-org user → switch orgs → verify order isolation
-4. Concurrency tests: 10 concurrent settlement approvals → exactly one succeeds
-5. RBAC attack simulation: cross-org access attempts all blocked
-6. Run `apps/worker` through security audit fixes (C2: verification worker auth)
+## Next Steps (backend completion, pre-frontend)
+1. Double-entry ledger design (escrow/revenue accounts) — reconciliation endpoint is interim guard
+2. Real payout rail (Stripe Connect) on top of PayoutMethod
+3. WebsiteVerification (DNS TXT) model + endpoints, required before listing approval
+4. Order accept/delivery deadlines + timeout sweep (SUBMITTED orders currently wait forever)
+5. Integration/concurrency tests against real Postgres (parallel approvals, money-conservation property test)
+6. Run GET /admin/reconciliation after any manual data surgery; legacy pre-batch-9 withdrawals show as expected publisher drift (no WITHDRAWAL tx rows)
+
+## Standing risks
+See `Work/risks.md` — "Still open" section.

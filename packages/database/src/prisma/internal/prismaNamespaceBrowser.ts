@@ -72,10 +72,12 @@ export const ModelName = {
   SettlementApproval: 'SettlementApproval',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
+  PayoutMethod: 'PayoutMethod',
   ApiKey: 'ApiKey',
   ContentOrder: 'ContentOrder',
   Revision: 'Revision',
   Report: 'Report',
+  PlatformRevenue: 'PlatformRevenue',
   Wallet: 'Wallet',
   Transaction: 'Transaction',
   Ticket: 'Ticket',
@@ -266,6 +268,7 @@ export type PublisherScalarFieldEnum = (typeof PublisherScalarFieldEnum)[keyof t
 export const WebsiteScalarFieldEnum = {
   id: 'id',
   url: 'url',
+  domain: 'domain',
   name: 'name',
   category: 'category',
   language: 'language',
@@ -273,6 +276,7 @@ export const WebsiteScalarFieldEnum = {
   metrics: 'metrics',
   isActive: 'isActive',
   publisherId: 'publisherId',
+  ownershipType: 'ownershipType',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -392,6 +396,7 @@ export const OrderDisputeScalarFieldEnum = {
   raisedBy: 'raisedBy',
   reason: 'reason',
   status: 'status',
+  previousStatus: 'previousStatus',
   resolvedBy: 'resolvedBy',
   resolvedAt: 'resolvedAt',
   resolution: 'resolution',
@@ -438,6 +443,7 @@ export const PublisherBalanceScalarFieldEnum = {
   pendingBalance: 'pendingBalance',
   approvedBalance: 'approvedBalance',
   withdrawableBalance: 'withdrawableBalance',
+  debtBalance: 'debtBalance',
   lifetimeEarnings: 'lifetimeEarnings',
   lifetimePaid: 'lifetimePaid',
   version: 'version',
@@ -454,6 +460,9 @@ export const WithdrawalScalarFieldEnum = {
   amount: 'amount',
   method: 'method',
   status: 'status',
+  availableAt: 'availableAt',
+  idempotencyKey: 'idempotencyKey',
+  payoutMethodId: 'payoutMethodId',
   approvedBy: 'approvedBy',
   approvedAt: 'approvedAt',
   version: 'version',
@@ -462,6 +471,21 @@ export const WithdrawalScalarFieldEnum = {
 } as const
 
 export type WithdrawalScalarFieldEnum = (typeof WithdrawalScalarFieldEnum)[keyof typeof WithdrawalScalarFieldEnum]
+
+
+export const PayoutMethodScalarFieldEnum = {
+  id: 'id',
+  publisherId: 'publisherId',
+  type: 'type',
+  label: 'label',
+  details: 'details',
+  isDefault: 'isDefault',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PayoutMethodScalarFieldEnum = (typeof PayoutMethodScalarFieldEnum)[keyof typeof PayoutMethodScalarFieldEnum]
 
 
 export const ApiKeyScalarFieldEnum = {
@@ -518,6 +542,20 @@ export const ReportScalarFieldEnum = {
 } as const
 
 export type ReportScalarFieldEnum = (typeof ReportScalarFieldEnum)[keyof typeof ReportScalarFieldEnum]
+
+
+export const PlatformRevenueScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  amount: 'amount',
+  platformFee: 'platformFee',
+  netRevenue: 'netRevenue',
+  recordedAt: 'recordedAt',
+  reversedAt: 'reversedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type PlatformRevenueScalarFieldEnum = (typeof PlatformRevenueScalarFieldEnum)[keyof typeof PlatformRevenueScalarFieldEnum]
 
 
 export const WalletScalarFieldEnum = {

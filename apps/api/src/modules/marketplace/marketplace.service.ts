@@ -23,7 +23,7 @@ export class MarketplaceService {
   // =============================================================================
 
   async searchListings(dto: SearchListingsDto) {
-    const { query, category, type, tags, country, language, minPrice, maxPrice, minDR, maxDR, minTraffic, maxTurnaroundDays, sortBy, page = 1, limit = 20 } = dto
+    const { query, category, type, tags, country, language, minPrice, maxPrice, minDR, maxDR, minTraffic, maxTurnaroundDays, sortBy, page = 1, limit = 20, ownershipType } = dto
 
     const where: any = {
       status: ListingStatus.APPROVED,
@@ -35,6 +35,10 @@ export class MarketplaceService {
 
     if (type) {
       where.type = type
+    }
+
+    if (ownershipType) {
+      where.website = { ownershipType: ownershipType as any }
     }
 
     if (country) {
@@ -390,12 +394,15 @@ export class MarketplaceService {
       throw new ForbiddenException("You cannot review your own listing")
     }
 
-    // Verify customer completed an order with this publisher
+    // Verify customer completed an order with this publisher. SETTLED is the
+    // actual terminal status (release keeps the order at SETTLED; nothing
+    // sets COMPLETED today) — gating on COMPLETED alone made reviews
+    // impossible for everyone.
     const completedOrder = await this.prisma.order.findFirst({
       where: {
         customerId: userId,
         website: { publisherId: listingPublisherId },
-        status: "COMPLETED",
+        status: { in: ["COMPLETED", "SETTLED", "DELIVERED"] },
       },
     })
     if (!completedOrder) {
@@ -754,7 +761,7 @@ export class MarketplaceService {
         entityId,
         metadata,
         userId,
-        organizationId: organizationId ?? "SYSTEM",
+        organizationId: organizationId ?? null,
       },
     })
   }

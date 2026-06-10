@@ -39,9 +39,10 @@ export function createReportWorker() {
                 publishedUrl: order.publishedUrl,
                 anchorText: order.anchorText,
                 website: order.website?.url,
-                publisher: order.website?.publisherId, // Actually would fetch publisher name if joined
+                publisher: order.website?.publisherId,
+                ownershipType: order.website?.ownershipType,
                 publishedAt: order.publishedAt,
-                campaignProgress: "100%", // Simplified for now
+                campaignProgress: "100%",
               },
             },
           })

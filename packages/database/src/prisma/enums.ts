@@ -76,6 +76,46 @@ export const MemberRole = {
 export type MemberRole = (typeof MemberRole)[keyof typeof MemberRole]
 
 
+export const CampaignStatus = {
+  ACTIVE: 'ACTIVE',
+  PAUSED: 'PAUSED',
+  COMPLETED: 'COMPLETED',
+  ARCHIVED: 'ARCHIVED'
+} as const
+
+export type CampaignStatus = (typeof CampaignStatus)[keyof typeof CampaignStatus]
+
+
+export const ContentOrderStatus = {
+  PENDING: 'PENDING',
+  IN_PROGRESS: 'IN_PROGRESS',
+  COMPLETED: 'COMPLETED',
+  CANCELLED: 'CANCELLED'
+} as const
+
+export type ContentOrderStatus = (typeof ContentOrderStatus)[keyof typeof ContentOrderStatus]
+
+
+export const RevisionStatus = {
+  REQUESTED: 'REQUESTED',
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  CHANGES_REQUESTED: 'CHANGES_REQUESTED',
+  DRAFT: 'DRAFT'
+} as const
+
+export type RevisionStatus = (typeof RevisionStatus)[keyof typeof RevisionStatus]
+
+
+export const WebsiteOwnershipType = {
+  PUBLISHER: 'PUBLISHER',
+  PLATFORM: 'PLATFORM'
+} as const
+
+export type WebsiteOwnershipType = (typeof WebsiteOwnershipType)[keyof typeof WebsiteOwnershipType]
+
+
 export const OrderStatus = {
   DRAFT: 'DRAFT',
   PENDING_PAYMENT: 'PENDING_PAYMENT',
@@ -219,7 +259,10 @@ export const TransactionType = {
   PURCHASE: 'PURCHASE',
   REFUND: 'REFUND',
   WITHDRAWAL: 'WITHDRAWAL',
+  WITHDRAWAL_REVERSAL: 'WITHDRAWAL_REVERSAL',
   SETTLEMENT_RELEASE: 'SETTLEMENT_RELEASE',
+  SETTLEMENT_CLAWBACK: 'SETTLEMENT_CLAWBACK',
+  DEBT_REPAYMENT: 'DEBT_REPAYMENT',
   RESERVATION: 'RESERVATION'
 } as const
 
