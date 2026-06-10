@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from "@nestjs/common"
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
+import { RefundService } from "../orders/services/refund.service"
 import { StaffRole, QUEUES } from "@guestpost/shared"
 import { ListingStatus, ListingType } from "@guestpost/database"
 
@@ -13,6 +14,7 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    private readonly refund: RefundService,
   ) {}
 
   private isSuperAdmin(user?: any): boolean {
@@ -85,7 +87,7 @@ export class AdminService {
     const PUBLISHER_ROLES = ["PUBLISHER_OWNER"] as const
 
     if ((CUSTOMER_ROLES as readonly string[]).includes(role)) {
-      let membership = await this.prisma.membership.findFirst({ where: { userId } })
+      let membership = await this.prisma.membership.findFirst({ where: { userId }, orderBy: { createdAt: "asc" } })
       if (!membership) {
         const orgName = `Org for ${u.email}`
         const orgSlug = `org-${userId.slice(0, 8)}`
@@ -117,9 +119,9 @@ export class AdminService {
     }
 
     if ((PUBLISHER_ROLES as readonly string[]).includes(role)) {
-      let pubMembership = await this.prisma.publisherMembership.findFirst({ where: { userId } })
+      let pubMembership = await this.prisma.publisherMembership.findFirst({ where: { userId }, orderBy: { createdAt: "asc" } })
       if (!pubMembership) {
-        let publisher = await this.prisma.publisher.findFirst()
+        let publisher = await this.prisma.publisher.findFirst({ orderBy: { createdAt: "asc" } })
         if (!publisher) {
           const org = await this.prisma.organization.findFirst()
           if (!org) throw new BadRequestException("No organization exists to associate publisher")
@@ -216,6 +218,98 @@ export class AdminService {
       this.prisma.order.count(),
     ])
     return { users, organizations, orders }
+  }
+
+  async manualVerify(orderId: string, method: string, userId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) throw new NotFoundException("Order not found")
+    if (order.status !== "PUBLISHED") throw new BadRequestException("Order must be in PUBLISHED status to verify")
+
+    return this.prisma.$transaction(async (tx: any) => {
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: "VERIFIED",
+          verifiedAt: new Date(),
+          verifiedBy: userId,
+          verifyMethod: method,
+        },
+      })
+
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "VERIFIED_MANUAL",
+          actorId: userId,
+          message: `Order manually verified by admin via ${method}`,
+          metadata: { verifyMethod: method, verifiedBy: userId },
+        },
+      })
+
+      await this.audit.log({
+        action: "ORDER_MANUAL_VERIFY",
+        entityType: "Order",
+        entityId: orderId,
+        metadata: { fromStatus: order.status, verifyMethod: method },
+        userId,
+        organizationId: order.organizationId,
+      })
+
+      return updated
+    })
+  }
+
+  async refundOrder(orderId: string, reason: string, userId: string) {
+    // Delegates to the single consolidated refund path (duplicate check,
+    // settlement cancellation + clawback, wallet credit, audit)
+    return this.refund.refundOrder(orderId, reason, userId)
+  }
+
+  async forceCancelOrder(orderId: string, reason: string, userId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
+    if (!order) throw new NotFoundException("Order not found")
+    if (order.status === "COMPLETED" || order.status === "CANCELLED") {
+      throw new BadRequestException(`Order cannot be force-cancelled in ${order.status} status`)
+    }
+
+    return this.prisma.$transaction(async (tx: any) => {
+      // Cancel active settlement if any
+      const activeSettlement = await tx.settlement.findFirst({
+        where: { orderId, status: { not: "CANCELLED" } },
+      })
+      if (activeSettlement && activeSettlement.status !== "RELEASED") {
+        await tx.settlement.update({
+          where: { id: activeSettlement.id },
+          data: { status: "CANCELLED" },
+        })
+      }
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: { status: "CANCELLED" },
+      })
+
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "ORDER_CANCELLED",
+          actorId: userId,
+          message: `Order force-cancelled by admin: ${reason}`,
+          metadata: { reason, cancelledBy: userId },
+        },
+      })
+
+      await this.audit.log({
+        action: "ORDER_FORCE_CANCELLED",
+        entityType: "Order",
+        entityId: orderId,
+        metadata: { fromStatus: order.status, reason },
+        userId,
+        organizationId: order.organizationId,
+      })
+
+      return updated
+    })
   }
 
   async listMarketplaceListings(params: {
