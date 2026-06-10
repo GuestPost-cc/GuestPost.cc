@@ -254,6 +254,7 @@ export type UserWhereInput = {
   accounts?: Prisma.AccountListRelationFilter
   marketplaceReviews?: Prisma.MarketplaceReviewListRelationFilter
   marketplaceFavorites?: Prisma.MarketplaceFavoriteListRelationFilter
+  activeContext?: Prisma.XOR<Prisma.ActiveContextNullableScalarRelationFilter, Prisma.ActiveContextWhereInput> | null
 }
 
 export type UserOrderByWithRelationInput = {
@@ -285,6 +286,7 @@ export type UserOrderByWithRelationInput = {
   accounts?: Prisma.AccountOrderByRelationAggregateInput
   marketplaceReviews?: Prisma.MarketplaceReviewOrderByRelationAggregateInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteOrderByRelationAggregateInput
+  activeContext?: Prisma.ActiveContextOrderByWithRelationInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -319,6 +321,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   accounts?: Prisma.AccountListRelationFilter
   marketplaceReviews?: Prisma.MarketplaceReviewListRelationFilter
   marketplaceFavorites?: Prisma.MarketplaceFavoriteListRelationFilter
+  activeContext?: Prisma.XOR<Prisma.ActiveContextNullableScalarRelationFilter, Prisma.ActiveContextWhereInput> | null
 }, "id" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -386,6 +389,7 @@ export type UserCreateInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -417,6 +421,7 @@ export type UserUncheckedCreateInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -448,6 +453,7 @@ export type UserUpdateInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -479,6 +485,7 @@ export type UserUncheckedUpdateInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -635,6 +642,20 @@ export type UserUpdateOneRequiredWithoutAccountsNestedInput = {
   upsert?: Prisma.UserUpsertWithoutAccountsInput
   connect?: Prisma.UserWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAccountsInput, Prisma.UserUpdateWithoutAccountsInput>, Prisma.UserUncheckedUpdateWithoutAccountsInput>
+}
+
+export type UserCreateNestedOneWithoutActiveContextInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutActiveContextInput, Prisma.UserUncheckedCreateWithoutActiveContextInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutActiveContextInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutActiveContextNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutActiveContextInput, Prisma.UserUncheckedCreateWithoutActiveContextInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutActiveContextInput
+  upsert?: Prisma.UserUpsertWithoutActiveContextInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutActiveContextInput, Prisma.UserUpdateWithoutActiveContextInput>, Prisma.UserUncheckedUpdateWithoutActiveContextInput>
 }
 
 export type UserCreateNestedOneWithoutMembershipsInput = {
@@ -869,6 +890,7 @@ export type UserCreateWithoutSessionsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSessionsInput = {
@@ -899,6 +921,7 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSessionsInput = {
@@ -945,6 +968,7 @@ export type UserUpdateWithoutSessionsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -975,6 +999,7 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAccountsInput = {
@@ -1005,6 +1030,7 @@ export type UserCreateWithoutAccountsInput = {
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAccountsInput = {
@@ -1035,6 +1061,7 @@ export type UserUncheckedCreateWithoutAccountsInput = {
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAccountsInput = {
@@ -1081,6 +1108,7 @@ export type UserUpdateWithoutAccountsInput = {
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAccountsInput = {
@@ -1109,6 +1137,147 @@ export type UserUncheckedUpdateWithoutAccountsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
+}
+
+export type UserCreateWithoutActiveContextInput = {
+  id?: string
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  userType?: $Enums.UserType
+  role?: $Enums.UserRole
+  banned?: boolean
+  banReason?: string | null
+  banExpires?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutUserInput
+  staffMemberships?: Prisma.StaffMembershipCreateNestedManyWithoutUserInput
+  ownedOrders?: Prisma.OrderCreateNestedManyWithoutCustomerInput
+  assignedOrders?: Prisma.OrderCreateNestedManyWithoutAssigneeInput
+  orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
+  publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
+  approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
+  messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
+  notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
+  auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutActiveContextInput = {
+  id?: string
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  userType?: $Enums.UserType
+  role?: $Enums.UserRole
+  banned?: boolean
+  banReason?: string | null
+  banExpires?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutUserInput
+  staffMemberships?: Prisma.StaffMembershipUncheckedCreateNestedManyWithoutUserInput
+  ownedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutCustomerInput
+  assignedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssigneeInput
+  orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
+  publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
+  approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
+  messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
+  notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
+  auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutActiveContextInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutActiveContextInput, Prisma.UserUncheckedCreateWithoutActiveContextInput>
+}
+
+export type UserUpsertWithoutActiveContextInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutActiveContextInput, Prisma.UserUncheckedUpdateWithoutActiveContextInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutActiveContextInput, Prisma.UserUncheckedCreateWithoutActiveContextInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutActiveContextInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutActiveContextInput, Prisma.UserUncheckedUpdateWithoutActiveContextInput>
+}
+
+export type UserUpdateWithoutActiveContextInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userType?: Prisma.EnumUserTypeFieldUpdateOperationsInput | $Enums.UserType
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  banned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  banReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  banExpires?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutUserNestedInput
+  staffMemberships?: Prisma.StaffMembershipUpdateManyWithoutUserNestedInput
+  ownedOrders?: Prisma.OrderUpdateManyWithoutCustomerNestedInput
+  assignedOrders?: Prisma.OrderUpdateManyWithoutAssigneeNestedInput
+  orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
+  publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
+  approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
+  messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
+  notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
+  auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutActiveContextInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userType?: Prisma.EnumUserTypeFieldUpdateOperationsInput | $Enums.UserType
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  banned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  banReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  banExpires?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutUserNestedInput
+  staffMemberships?: Prisma.StaffMembershipUncheckedUpdateManyWithoutUserNestedInput
+  ownedOrders?: Prisma.OrderUncheckedUpdateManyWithoutCustomerNestedInput
+  assignedOrders?: Prisma.OrderUncheckedUpdateManyWithoutAssigneeNestedInput
+  orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
+  publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
+  approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
+  messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
+  notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
+  auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -1141,6 +1310,7 @@ export type UserCreateWithoutMembershipsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMembershipsInput = {
@@ -1171,6 +1341,7 @@ export type UserUncheckedCreateWithoutMembershipsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMembershipsInput = {
@@ -1217,6 +1388,7 @@ export type UserUpdateWithoutMembershipsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMembershipsInput = {
@@ -1247,6 +1419,7 @@ export type UserUncheckedUpdateWithoutMembershipsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPublisherMembershipsInput = {
@@ -1277,6 +1450,7 @@ export type UserCreateWithoutPublisherMembershipsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPublisherMembershipsInput = {
@@ -1307,6 +1481,7 @@ export type UserUncheckedCreateWithoutPublisherMembershipsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPublisherMembershipsInput = {
@@ -1353,6 +1528,7 @@ export type UserUpdateWithoutPublisherMembershipsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPublisherMembershipsInput = {
@@ -1383,6 +1559,7 @@ export type UserUncheckedUpdateWithoutPublisherMembershipsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutStaffMembershipsInput = {
@@ -1413,6 +1590,7 @@ export type UserCreateWithoutStaffMembershipsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutStaffMembershipsInput = {
@@ -1443,6 +1621,7 @@ export type UserUncheckedCreateWithoutStaffMembershipsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutStaffMembershipsInput = {
@@ -1489,6 +1668,7 @@ export type UserUpdateWithoutStaffMembershipsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutStaffMembershipsInput = {
@@ -1519,6 +1699,7 @@ export type UserUncheckedUpdateWithoutStaffMembershipsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutOwnedOrdersInput = {
@@ -1549,6 +1730,7 @@ export type UserCreateWithoutOwnedOrdersInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutOwnedOrdersInput = {
@@ -1579,6 +1761,7 @@ export type UserUncheckedCreateWithoutOwnedOrdersInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutOwnedOrdersInput = {
@@ -1614,6 +1797,7 @@ export type UserCreateWithoutAssignedOrdersInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAssignedOrdersInput = {
@@ -1644,6 +1828,7 @@ export type UserUncheckedCreateWithoutAssignedOrdersInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAssignedOrdersInput = {
@@ -1690,6 +1875,7 @@ export type UserUpdateWithoutOwnedOrdersInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOwnedOrdersInput = {
@@ -1720,6 +1906,7 @@ export type UserUncheckedUpdateWithoutOwnedOrdersInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutAssignedOrdersInput = {
@@ -1761,6 +1948,7 @@ export type UserUpdateWithoutAssignedOrdersInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAssignedOrdersInput = {
@@ -1791,6 +1979,7 @@ export type UserUncheckedUpdateWithoutAssignedOrdersInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutOrderEventsInput = {
@@ -1821,6 +2010,7 @@ export type UserCreateWithoutOrderEventsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutOrderEventsInput = {
@@ -1851,6 +2041,7 @@ export type UserUncheckedCreateWithoutOrderEventsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutOrderEventsInput = {
@@ -1897,6 +2088,7 @@ export type UserUpdateWithoutOrderEventsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOrderEventsInput = {
@@ -1927,6 +2119,7 @@ export type UserUncheckedUpdateWithoutOrderEventsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPublicationsInput = {
@@ -1957,6 +2150,7 @@ export type UserCreateWithoutPublicationsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPublicationsInput = {
@@ -1987,6 +2181,7 @@ export type UserUncheckedCreateWithoutPublicationsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPublicationsInput = {
@@ -2033,6 +2228,7 @@ export type UserUpdateWithoutPublicationsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPublicationsInput = {
@@ -2063,6 +2259,7 @@ export type UserUncheckedUpdateWithoutPublicationsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutApprovedWithdrawalsInput = {
@@ -2093,6 +2290,7 @@ export type UserCreateWithoutApprovedWithdrawalsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutApprovedWithdrawalsInput = {
@@ -2123,6 +2321,7 @@ export type UserUncheckedCreateWithoutApprovedWithdrawalsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutApprovedWithdrawalsInput = {
@@ -2169,6 +2368,7 @@ export type UserUpdateWithoutApprovedWithdrawalsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutApprovedWithdrawalsInput = {
@@ -2199,6 +2399,7 @@ export type UserUncheckedUpdateWithoutApprovedWithdrawalsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTicketsInput = {
@@ -2229,6 +2430,7 @@ export type UserCreateWithoutTicketsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTicketsInput = {
@@ -2259,6 +2461,7 @@ export type UserUncheckedCreateWithoutTicketsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTicketsInput = {
@@ -2305,6 +2508,7 @@ export type UserUpdateWithoutTicketsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTicketsInput = {
@@ -2335,6 +2539,7 @@ export type UserUncheckedUpdateWithoutTicketsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMessagesInput = {
@@ -2365,6 +2570,7 @@ export type UserCreateWithoutMessagesInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMessagesInput = {
@@ -2395,6 +2601,7 @@ export type UserUncheckedCreateWithoutMessagesInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMessagesInput = {
@@ -2441,6 +2648,7 @@ export type UserUpdateWithoutMessagesInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMessagesInput = {
@@ -2471,6 +2679,7 @@ export type UserUncheckedUpdateWithoutMessagesInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutNotificationsInput = {
@@ -2501,6 +2710,7 @@ export type UserCreateWithoutNotificationsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutNotificationsInput = {
@@ -2531,6 +2741,7 @@ export type UserUncheckedCreateWithoutNotificationsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutNotificationsInput = {
@@ -2577,6 +2788,7 @@ export type UserUpdateWithoutNotificationsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutNotificationsInput = {
@@ -2607,6 +2819,7 @@ export type UserUncheckedUpdateWithoutNotificationsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAuditLogsInput = {
@@ -2637,6 +2850,7 @@ export type UserCreateWithoutAuditLogsInput = {
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAuditLogsInput = {
@@ -2667,6 +2881,7 @@ export type UserUncheckedCreateWithoutAuditLogsInput = {
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAuditLogsInput = {
@@ -2713,6 +2928,7 @@ export type UserUpdateWithoutAuditLogsInput = {
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAuditLogsInput = {
@@ -2743,6 +2959,7 @@ export type UserUncheckedUpdateWithoutAuditLogsInput = {
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMarketplaceReviewsInput = {
@@ -2773,6 +2990,7 @@ export type UserCreateWithoutMarketplaceReviewsInput = {
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMarketplaceReviewsInput = {
@@ -2803,6 +3021,7 @@ export type UserUncheckedCreateWithoutMarketplaceReviewsInput = {
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMarketplaceReviewsInput = {
@@ -2849,6 +3068,7 @@ export type UserUpdateWithoutMarketplaceReviewsInput = {
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMarketplaceReviewsInput = {
@@ -2879,6 +3099,7 @@ export type UserUncheckedUpdateWithoutMarketplaceReviewsInput = {
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMarketplaceFavoritesInput = {
@@ -2909,6 +3130,7 @@ export type UserCreateWithoutMarketplaceFavoritesInput = {
   sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
   accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMarketplaceFavoritesInput = {
@@ -2939,6 +3161,7 @@ export type UserUncheckedCreateWithoutMarketplaceFavoritesInput = {
   sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
   accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMarketplaceFavoritesInput = {
@@ -2985,6 +3208,7 @@ export type UserUpdateWithoutMarketplaceFavoritesInput = {
   sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
   accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMarketplaceFavoritesInput = {
@@ -3015,6 +3239,7 @@ export type UserUncheckedUpdateWithoutMarketplaceFavoritesInput = {
   sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
   accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
   marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
 }
 
 
@@ -3212,6 +3437,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   marketplaceReviews?: boolean | Prisma.User$marketplaceReviewsArgs<ExtArgs>
   marketplaceFavorites?: boolean | Prisma.User$marketplaceFavoritesArgs<ExtArgs>
+  activeContext?: boolean | Prisma.User$activeContextArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -3278,6 +3504,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   accounts?: boolean | Prisma.User$accountsArgs<ExtArgs>
   marketplaceReviews?: boolean | Prisma.User$marketplaceReviewsArgs<ExtArgs>
   marketplaceFavorites?: boolean | Prisma.User$marketplaceFavoritesArgs<ExtArgs>
+  activeContext?: boolean | Prisma.User$activeContextArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -3302,6 +3529,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     accounts: Prisma.$AccountPayload<ExtArgs>[]
     marketplaceReviews: Prisma.$MarketplaceReviewPayload<ExtArgs>[]
     marketplaceFavorites: Prisma.$MarketplaceFavoritePayload<ExtArgs>[]
+    activeContext: Prisma.$ActiveContextPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3726,6 +3954,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   accounts<T extends Prisma.User$accountsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$accountsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AccountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marketplaceReviews<T extends Prisma.User$marketplaceReviewsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$marketplaceReviewsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceReviewPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marketplaceFavorites<T extends Prisma.User$marketplaceFavoritesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$marketplaceFavoritesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceFavoritePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  activeContext<T extends Prisma.User$activeContextArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$activeContextArgs<ExtArgs>>): Prisma.Prisma__ActiveContextClient<runtime.Types.Result.GetResult<Prisma.$ActiveContextPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -4536,6 +4765,25 @@ export type User$marketplaceFavoritesArgs<ExtArgs extends runtime.Types.Extensio
   take?: number
   skip?: number
   distinct?: Prisma.MarketplaceFavoriteScalarFieldEnum | Prisma.MarketplaceFavoriteScalarFieldEnum[]
+}
+
+/**
+ * User.activeContext
+ */
+export type User$activeContextArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ActiveContext
+   */
+  select?: Prisma.ActiveContextSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ActiveContext
+   */
+  omit?: Prisma.ActiveContextOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ActiveContextInclude<ExtArgs> | null
+  where?: Prisma.ActiveContextWhereInput
 }
 
 /**

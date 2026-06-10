@@ -19,8 +19,43 @@ CREATE INDEX "AuditLog_action_idx" ON "AuditLog"("action");
 -- CreateIndex
 CREATE INDEX "Campaign_organizationId_idx" ON "Campaign"("organizationId");
 
--- CreateIndex
-CREATE INDEX "MarketplaceSavedListItem_listingId_idx" ON "MarketplaceSavedListItem"("listingId");
+-- CreateTable: MarketplaceSavedList (missing from earlier migrations)
+CREATE TABLE IF NOT EXISTS "MarketplaceSavedList" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
+    "isPublic" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "MarketplaceSavedList_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable: MarketplaceSavedListItem (missing from earlier migrations)
+CREATE TABLE IF NOT EXISTS "MarketplaceSavedListItem" (
+    "id" TEXT NOT NULL,
+    "listId" TEXT NOT NULL,
+    "listingId" TEXT NOT NULL,
+    "note" TEXT,
+    "addedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "MarketplaceSavedListItem_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex: MarketplaceSavedList
+CREATE UNIQUE INDEX IF NOT EXISTS "MarketplaceSavedList_userId_slug_key" ON "MarketplaceSavedList"("userId", "slug");
+CREATE INDEX IF NOT EXISTS "MarketplaceSavedList_userId_idx" ON "MarketplaceSavedList"("userId");
+
+-- CreateIndex: MarketplaceSavedListItem
+CREATE UNIQUE INDEX IF NOT EXISTS "MarketplaceSavedListItem_listId_listingId_key" ON "MarketplaceSavedListItem"("listId", "listingId");
+CREATE INDEX IF NOT EXISTS "MarketplaceSavedListItem_listingId_idx" ON "MarketplaceSavedListItem"("listingId");
+
+-- AddForeignKey: MarketplaceSavedList → User
+ALTER TABLE "MarketplaceSavedList" ADD CONSTRAINT "MarketplaceSavedList_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey: MarketplaceSavedListItem → MarketplaceSavedList
+ALTER TABLE "MarketplaceSavedListItem" ADD CONSTRAINT "MarketplaceSavedListItem_listId_fkey" FOREIGN KEY ("listId") REFERENCES "MarketplaceSavedList"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- NOTE: MarketplaceSavedListItem → MarketplaceListing FK is in the consolidation migration
 
 -- CreateIndex
 CREATE INDEX "Membership_organizationId_idx" ON "Membership"("organizationId");

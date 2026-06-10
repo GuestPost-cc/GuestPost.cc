@@ -394,6 +394,7 @@ export const ModelName = {
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification',
+  ActiveContext: 'ActiveContext',
   Organization: 'Organization',
   Membership: 'Membership',
   PublisherMembership: 'PublisherMembership',
@@ -407,7 +408,9 @@ export const ModelName = {
   OrderItem: 'OrderItem',
   OrderEvent: 'OrderEvent',
   Publication: 'Publication',
+  OrderDispute: 'OrderDispute',
   Settlement: 'Settlement',
+  SettlementApproval: 'SettlementApproval',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
   ApiKey: 'ApiKey',
@@ -452,7 +455,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "service" | "orderItem" | "orderEvent" | "publication" | "settlement" | "publisherBalance" | "withdrawal" | "apiKey" | "contentOrder" | "revision" | "report" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplacePricingTier" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule"
+    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "service" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "publisherBalance" | "withdrawal" | "apiKey" | "contentOrder" | "revision" | "report" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplacePricingTier" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -749,6 +752,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.VerificationCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.VerificationCountAggregateOutputType> | number
+        }
+      }
+    }
+    ActiveContext: {
+      payload: Prisma.$ActiveContextPayload<ExtArgs>
+      fields: Prisma.ActiveContextFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ActiveContextFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ActiveContextFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload>
+        }
+        findFirst: {
+          args: Prisma.ActiveContextFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ActiveContextFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload>
+        }
+        findMany: {
+          args: Prisma.ActiveContextFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload>[]
+        }
+        create: {
+          args: Prisma.ActiveContextCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload>
+        }
+        createMany: {
+          args: Prisma.ActiveContextCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ActiveContextCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload>[]
+        }
+        delete: {
+          args: Prisma.ActiveContextDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload>
+        }
+        update: {
+          args: Prisma.ActiveContextUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload>
+        }
+        deleteMany: {
+          args: Prisma.ActiveContextDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ActiveContextUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ActiveContextUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload>[]
+        }
+        upsert: {
+          args: Prisma.ActiveContextUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ActiveContextPayload>
+        }
+        aggregate: {
+          args: Prisma.ActiveContextAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateActiveContext>
+        }
+        groupBy: {
+          args: Prisma.ActiveContextGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ActiveContextGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ActiveContextCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ActiveContextCountAggregateOutputType> | number
         }
       }
     }
@@ -1714,6 +1791,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    OrderDispute: {
+      payload: Prisma.$OrderDisputePayload<ExtArgs>
+      fields: Prisma.OrderDisputeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OrderDisputeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OrderDisputeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload>
+        }
+        findFirst: {
+          args: Prisma.OrderDisputeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OrderDisputeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload>
+        }
+        findMany: {
+          args: Prisma.OrderDisputeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload>[]
+        }
+        create: {
+          args: Prisma.OrderDisputeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload>
+        }
+        createMany: {
+          args: Prisma.OrderDisputeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OrderDisputeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload>[]
+        }
+        delete: {
+          args: Prisma.OrderDisputeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload>
+        }
+        update: {
+          args: Prisma.OrderDisputeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload>
+        }
+        deleteMany: {
+          args: Prisma.OrderDisputeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OrderDisputeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OrderDisputeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload>[]
+        }
+        upsert: {
+          args: Prisma.OrderDisputeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderDisputePayload>
+        }
+        aggregate: {
+          args: Prisma.OrderDisputeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOrderDispute>
+        }
+        groupBy: {
+          args: Prisma.OrderDisputeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderDisputeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OrderDisputeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderDisputeCountAggregateOutputType> | number
+        }
+      }
+    }
     Settlement: {
       payload: Prisma.$SettlementPayload<ExtArgs>
       fields: Prisma.SettlementFieldRefs
@@ -1785,6 +1936,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.SettlementCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.SettlementCountAggregateOutputType> | number
+        }
+      }
+    }
+    SettlementApproval: {
+      payload: Prisma.$SettlementApprovalPayload<ExtArgs>
+      fields: Prisma.SettlementApprovalFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SettlementApprovalFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SettlementApprovalFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload>
+        }
+        findFirst: {
+          args: Prisma.SettlementApprovalFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SettlementApprovalFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload>
+        }
+        findMany: {
+          args: Prisma.SettlementApprovalFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload>[]
+        }
+        create: {
+          args: Prisma.SettlementApprovalCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload>
+        }
+        createMany: {
+          args: Prisma.SettlementApprovalCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SettlementApprovalCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload>[]
+        }
+        delete: {
+          args: Prisma.SettlementApprovalDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload>
+        }
+        update: {
+          args: Prisma.SettlementApprovalUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload>
+        }
+        deleteMany: {
+          args: Prisma.SettlementApprovalDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SettlementApprovalUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SettlementApprovalUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload>[]
+        }
+        upsert: {
+          args: Prisma.SettlementApprovalUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SettlementApprovalPayload>
+        }
+        aggregate: {
+          args: Prisma.SettlementApprovalAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSettlementApproval>
+        }
+        groupBy: {
+          args: Prisma.SettlementApprovalGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SettlementApprovalGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SettlementApprovalCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SettlementApprovalCountAggregateOutputType> | number
         }
       }
     }
@@ -4036,6 +4261,16 @@ export const VerificationScalarFieldEnum = {
 export type VerificationScalarFieldEnum = (typeof VerificationScalarFieldEnum)[keyof typeof VerificationScalarFieldEnum]
 
 
+export const ActiveContextScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  activeOrganizationId: 'activeOrganizationId',
+  activePublisherId: 'activePublisherId'
+} as const
+
+export type ActiveContextScalarFieldEnum = (typeof ActiveContextScalarFieldEnum)[keyof typeof ActiveContextScalarFieldEnum]
+
+
 export const OrganizationScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -4139,12 +4374,16 @@ export const OrderScalarFieldEnum = {
   publishedUrl: 'publishedUrl',
   publishedAt: 'publishedAt',
   verifiedAt: 'verifiedAt',
+  verifiedBy: 'verifiedBy',
+  verifyMethod: 'verifyMethod',
   deliveredAt: 'deliveredAt',
+  revisionCount: 'revisionCount',
   customerId: 'customerId',
   assigneeId: 'assigneeId',
   websiteId: 'websiteId',
   organizationId: 'organizationId',
   campaignId: 'campaignId',
+  idempotencyKey: 'idempotencyKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -4226,6 +4465,22 @@ export const PublicationScalarFieldEnum = {
 export type PublicationScalarFieldEnum = (typeof PublicationScalarFieldEnum)[keyof typeof PublicationScalarFieldEnum]
 
 
+export const OrderDisputeScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  raisedBy: 'raisedBy',
+  reason: 'reason',
+  status: 'status',
+  resolvedBy: 'resolvedBy',
+  resolvedAt: 'resolvedAt',
+  resolution: 'resolution',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OrderDisputeScalarFieldEnum = (typeof OrderDisputeScalarFieldEnum)[keyof typeof OrderDisputeScalarFieldEnum]
+
+
 export const SettlementScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
@@ -4236,11 +4491,24 @@ export const SettlementScalarFieldEnum = {
   status: 'status',
   reviewEndsAt: 'reviewEndsAt',
   settledAt: 'settledAt',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type SettlementScalarFieldEnum = (typeof SettlementScalarFieldEnum)[keyof typeof SettlementScalarFieldEnum]
+
+
+export const SettlementApprovalScalarFieldEnum = {
+  id: 'id',
+  settlementId: 'settlementId',
+  type: 'type',
+  approvedBy: 'approvedBy',
+  roleAtTime: 'roleAtTime',
+  approvedAt: 'approvedAt'
+} as const
+
+export type SettlementApprovalScalarFieldEnum = (typeof SettlementApprovalScalarFieldEnum)[keyof typeof SettlementApprovalScalarFieldEnum]
 
 
 export const PublisherBalanceScalarFieldEnum = {
@@ -4250,6 +4518,8 @@ export const PublisherBalanceScalarFieldEnum = {
   approvedBalance: 'approvedBalance',
   withdrawableBalance: 'withdrawableBalance',
   lifetimeEarnings: 'lifetimeEarnings',
+  lifetimePaid: 'lifetimePaid',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -4335,6 +4605,7 @@ export const WalletScalarFieldEnum = {
   currency: 'currency',
   organizationId: 'organizationId',
   userId: 'userId',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -4351,6 +4622,8 @@ export const TransactionScalarFieldEnum = {
   description: 'description',
   walletId: 'walletId',
   orderId: 'orderId',
+  publisherId: 'publisherId',
+  settlementId: 'settlementId',
   createdAt: 'createdAt'
 } as const
 
@@ -4916,6 +5189,20 @@ export type ListEnumPaymentStatusFieldRefInput<$PrismaModel> = FieldRefInputType
 
 
 /**
+ * Reference to a field of type 'Int'
+ */
+export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+/**
+ * Reference to a field of type 'Int[]'
+ */
+export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
  * Reference to a field of type 'OrderEventType'
  */
 export type EnumOrderEventTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'OrderEventType'>
@@ -4944,6 +5231,20 @@ export type ListEnumVerificationStatusFieldRefInput<$PrismaModel> = FieldRefInpu
 
 
 /**
+ * Reference to a field of type 'DisputeStatus'
+ */
+export type EnumDisputeStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DisputeStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'DisputeStatus[]'
+ */
+export type ListEnumDisputeStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DisputeStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'SettlementStatus'
  */
 export type EnumSettlementStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SettlementStatus'>
@@ -4954,6 +5255,20 @@ export type EnumSettlementStatusFieldRefInput<$PrismaModel> = FieldRefInputType<
  * Reference to a field of type 'SettlementStatus[]'
  */
 export type ListEnumSettlementStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SettlementStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'SettlementApprovalType'
+ */
+export type EnumSettlementApprovalTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SettlementApprovalType'>
+    
+
+
+/**
+ * Reference to a field of type 'SettlementApprovalType[]'
+ */
+export type ListEnumSettlementApprovalTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SettlementApprovalType[]'>
     
 
 
@@ -4982,20 +5297,6 @@ export type EnumTicketStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
  * Reference to a field of type 'TicketStatus[]'
  */
 export type ListEnumTicketStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TicketStatus[]'>
-    
-
-
-/**
- * Reference to a field of type 'Int'
- */
-export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
-    
-
-
-/**
- * Reference to a field of type 'Int[]'
- */
-export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
     
 
 
@@ -5145,6 +5446,7 @@ export type GlobalOmitConfig = {
   session?: Prisma.SessionOmit
   account?: Prisma.AccountOmit
   verification?: Prisma.VerificationOmit
+  activeContext?: Prisma.ActiveContextOmit
   organization?: Prisma.OrganizationOmit
   membership?: Prisma.MembershipOmit
   publisherMembership?: Prisma.PublisherMembershipOmit
@@ -5158,7 +5460,9 @@ export type GlobalOmitConfig = {
   orderItem?: Prisma.OrderItemOmit
   orderEvent?: Prisma.OrderEventOmit
   publication?: Prisma.PublicationOmit
+  orderDispute?: Prisma.OrderDisputeOmit
   settlement?: Prisma.SettlementOmit
+  settlementApproval?: Prisma.SettlementApprovalOmit
   publisherBalance?: Prisma.PublisherBalanceOmit
   withdrawal?: Prisma.WithdrawalOmit
   apiKey?: Prisma.ApiKeyOmit

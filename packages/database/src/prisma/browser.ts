@@ -38,6 +38,11 @@ export type Account = Prisma.AccountModel
  */
 export type Verification = Prisma.VerificationModel
 /**
+ * Model ActiveContext
+ * 
+ */
+export type ActiveContext = Prisma.ActiveContextModel
+/**
  * Model Organization
  * 
  */
@@ -103,10 +108,20 @@ export type OrderEvent = Prisma.OrderEventModel
  */
 export type Publication = Prisma.PublicationModel
 /**
+ * Model OrderDispute
+ * 
+ */
+export type OrderDispute = Prisma.OrderDisputeModel
+/**
  * Model Settlement
  * 
  */
 export type Settlement = Prisma.SettlementModel
+/**
+ * Model SettlementApproval
+ * 
+ */
+export type SettlementApproval = Prisma.SettlementApprovalModel
 /**
  * Model PublisherBalance
  * 

@@ -53,6 +53,7 @@ export const ModelName = {
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification',
+  ActiveContext: 'ActiveContext',
   Organization: 'Organization',
   Membership: 'Membership',
   PublisherMembership: 'PublisherMembership',
@@ -66,7 +67,9 @@ export const ModelName = {
   OrderItem: 'OrderItem',
   OrderEvent: 'OrderEvent',
   Publication: 'Publication',
+  OrderDispute: 'OrderDispute',
   Settlement: 'Settlement',
+  SettlementApproval: 'SettlementApproval',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
   ApiKey: 'ApiKey',
@@ -177,6 +180,16 @@ export const VerificationScalarFieldEnum = {
 export type VerificationScalarFieldEnum = (typeof VerificationScalarFieldEnum)[keyof typeof VerificationScalarFieldEnum]
 
 
+export const ActiveContextScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  activeOrganizationId: 'activeOrganizationId',
+  activePublisherId: 'activePublisherId'
+} as const
+
+export type ActiveContextScalarFieldEnum = (typeof ActiveContextScalarFieldEnum)[keyof typeof ActiveContextScalarFieldEnum]
+
+
 export const OrganizationScalarFieldEnum = {
   id: 'id',
   name: 'name',
@@ -280,12 +293,16 @@ export const OrderScalarFieldEnum = {
   publishedUrl: 'publishedUrl',
   publishedAt: 'publishedAt',
   verifiedAt: 'verifiedAt',
+  verifiedBy: 'verifiedBy',
+  verifyMethod: 'verifyMethod',
   deliveredAt: 'deliveredAt',
+  revisionCount: 'revisionCount',
   customerId: 'customerId',
   assigneeId: 'assigneeId',
   websiteId: 'websiteId',
   organizationId: 'organizationId',
   campaignId: 'campaignId',
+  idempotencyKey: 'idempotencyKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -367,6 +384,22 @@ export const PublicationScalarFieldEnum = {
 export type PublicationScalarFieldEnum = (typeof PublicationScalarFieldEnum)[keyof typeof PublicationScalarFieldEnum]
 
 
+export const OrderDisputeScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  raisedBy: 'raisedBy',
+  reason: 'reason',
+  status: 'status',
+  resolvedBy: 'resolvedBy',
+  resolvedAt: 'resolvedAt',
+  resolution: 'resolution',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OrderDisputeScalarFieldEnum = (typeof OrderDisputeScalarFieldEnum)[keyof typeof OrderDisputeScalarFieldEnum]
+
+
 export const SettlementScalarFieldEnum = {
   id: 'id',
   orderId: 'orderId',
@@ -377,11 +410,24 @@ export const SettlementScalarFieldEnum = {
   status: 'status',
   reviewEndsAt: 'reviewEndsAt',
   settledAt: 'settledAt',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type SettlementScalarFieldEnum = (typeof SettlementScalarFieldEnum)[keyof typeof SettlementScalarFieldEnum]
+
+
+export const SettlementApprovalScalarFieldEnum = {
+  id: 'id',
+  settlementId: 'settlementId',
+  type: 'type',
+  approvedBy: 'approvedBy',
+  roleAtTime: 'roleAtTime',
+  approvedAt: 'approvedAt'
+} as const
+
+export type SettlementApprovalScalarFieldEnum = (typeof SettlementApprovalScalarFieldEnum)[keyof typeof SettlementApprovalScalarFieldEnum]
 
 
 export const PublisherBalanceScalarFieldEnum = {
@@ -391,6 +437,8 @@ export const PublisherBalanceScalarFieldEnum = {
   approvedBalance: 'approvedBalance',
   withdrawableBalance: 'withdrawableBalance',
   lifetimeEarnings: 'lifetimeEarnings',
+  lifetimePaid: 'lifetimePaid',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -476,6 +524,7 @@ export const WalletScalarFieldEnum = {
   currency: 'currency',
   organizationId: 'organizationId',
   userId: 'userId',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -492,6 +541,8 @@ export const TransactionScalarFieldEnum = {
   description: 'description',
   walletId: 'walletId',
   orderId: 'orderId',
+  publisherId: 'publisherId',
+  settlementId: 'settlementId',
   createdAt: 'createdAt'
 } as const
 

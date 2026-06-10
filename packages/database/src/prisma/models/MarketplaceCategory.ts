@@ -510,14 +510,6 @@ export type MarketplaceCategoryUncheckedCreateNestedManyWithoutParentInput = {
   connect?: Prisma.MarketplaceCategoryWhereUniqueInput | Prisma.MarketplaceCategoryWhereUniqueInput[]
 }
 
-export type IntFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type MarketplaceCategoryUpdateOneWithoutChildrenNestedInput = {
   create?: Prisma.XOR<Prisma.MarketplaceCategoryCreateWithoutChildrenInput, Prisma.MarketplaceCategoryUncheckedCreateWithoutChildrenInput>
   connectOrCreate?: Prisma.MarketplaceCategoryCreateOrConnectWithoutChildrenInput

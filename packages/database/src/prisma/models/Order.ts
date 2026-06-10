@@ -28,10 +28,12 @@ export type AggregateOrder = {
 
 export type OrderAvgAggregateOutputType = {
   amount: runtime.Decimal | null
+  revisionCount: number | null
 }
 
 export type OrderSumAggregateOutputType = {
   amount: runtime.Decimal | null
+  revisionCount: number | null
 }
 
 export type OrderMinAggregateOutputType = {
@@ -48,12 +50,16 @@ export type OrderMinAggregateOutputType = {
   publishedUrl: string | null
   publishedAt: Date | null
   verifiedAt: Date | null
+  verifiedBy: string | null
+  verifyMethod: string | null
   deliveredAt: Date | null
+  revisionCount: number | null
   customerId: string | null
   assigneeId: string | null
   websiteId: string | null
   organizationId: string | null
   campaignId: string | null
+  idempotencyKey: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -72,12 +78,16 @@ export type OrderMaxAggregateOutputType = {
   publishedUrl: string | null
   publishedAt: Date | null
   verifiedAt: Date | null
+  verifiedBy: string | null
+  verifyMethod: string | null
   deliveredAt: Date | null
+  revisionCount: number | null
   customerId: string | null
   assigneeId: string | null
   websiteId: string | null
   organizationId: string | null
   campaignId: string | null
+  idempotencyKey: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -96,12 +106,16 @@ export type OrderCountAggregateOutputType = {
   publishedUrl: number
   publishedAt: number
   verifiedAt: number
+  verifiedBy: number
+  verifyMethod: number
   deliveredAt: number
+  revisionCount: number
   customerId: number
   assigneeId: number
   websiteId: number
   organizationId: number
   campaignId: number
+  idempotencyKey: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -110,10 +124,12 @@ export type OrderCountAggregateOutputType = {
 
 export type OrderAvgAggregateInputType = {
   amount?: true
+  revisionCount?: true
 }
 
 export type OrderSumAggregateInputType = {
   amount?: true
+  revisionCount?: true
 }
 
 export type OrderMinAggregateInputType = {
@@ -130,12 +146,16 @@ export type OrderMinAggregateInputType = {
   publishedUrl?: true
   publishedAt?: true
   verifiedAt?: true
+  verifiedBy?: true
+  verifyMethod?: true
   deliveredAt?: true
+  revisionCount?: true
   customerId?: true
   assigneeId?: true
   websiteId?: true
   organizationId?: true
   campaignId?: true
+  idempotencyKey?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -154,12 +174,16 @@ export type OrderMaxAggregateInputType = {
   publishedUrl?: true
   publishedAt?: true
   verifiedAt?: true
+  verifiedBy?: true
+  verifyMethod?: true
   deliveredAt?: true
+  revisionCount?: true
   customerId?: true
   assigneeId?: true
   websiteId?: true
   organizationId?: true
   campaignId?: true
+  idempotencyKey?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -178,12 +202,16 @@ export type OrderCountAggregateInputType = {
   publishedUrl?: true
   publishedAt?: true
   verifiedAt?: true
+  verifiedBy?: true
+  verifyMethod?: true
   deliveredAt?: true
+  revisionCount?: true
   customerId?: true
   assigneeId?: true
   websiteId?: true
   organizationId?: true
   campaignId?: true
+  idempotencyKey?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -289,12 +317,16 @@ export type OrderGroupByOutputType = {
   publishedUrl: string | null
   publishedAt: Date | null
   verifiedAt: Date | null
+  verifiedBy: string | null
+  verifyMethod: string | null
   deliveredAt: Date | null
+  revisionCount: number
   customerId: string
   assigneeId: string | null
   websiteId: string | null
   organizationId: string
   campaignId: string | null
+  idempotencyKey: string | null
   createdAt: Date
   updatedAt: Date
   _count: OrderCountAggregateOutputType | null
@@ -336,12 +368,16 @@ export type OrderWhereInput = {
   publishedUrl?: Prisma.StringNullableFilter<"Order"> | string | null
   publishedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  verifiedBy?: Prisma.StringNullableFilter<"Order"> | string | null
+  verifyMethod?: Prisma.StringNullableFilter<"Order"> | string | null
   deliveredAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  revisionCount?: Prisma.IntFilter<"Order"> | number
   customerId?: Prisma.StringFilter<"Order"> | string
   assigneeId?: Prisma.StringNullableFilter<"Order"> | string | null
   websiteId?: Prisma.StringNullableFilter<"Order"> | string | null
   organizationId?: Prisma.StringFilter<"Order"> | string
   campaignId?: Prisma.StringNullableFilter<"Order"> | string | null
+  idempotencyKey?: Prisma.StringNullableFilter<"Order"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   customer?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -356,6 +392,7 @@ export type OrderWhereInput = {
   items?: Prisma.OrderItemListRelationFilter
   events?: Prisma.OrderEventListRelationFilter
   settlements?: Prisma.SettlementListRelationFilter
+  dispute?: Prisma.XOR<Prisma.OrderDisputeNullableScalarRelationFilter, Prisma.OrderDisputeWhereInput> | null
 }
 
 export type OrderOrderByWithRelationInput = {
@@ -372,12 +409,16 @@ export type OrderOrderByWithRelationInput = {
   publishedUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   publishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   verifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  verifiedBy?: Prisma.SortOrderInput | Prisma.SortOrder
+  verifyMethod?: Prisma.SortOrderInput | Prisma.SortOrder
   deliveredAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
   assigneeId?: Prisma.SortOrderInput | Prisma.SortOrder
   websiteId?: Prisma.SortOrderInput | Prisma.SortOrder
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   customer?: Prisma.UserOrderByWithRelationInput
@@ -392,10 +433,12 @@ export type OrderOrderByWithRelationInput = {
   items?: Prisma.OrderItemOrderByRelationAggregateInput
   events?: Prisma.OrderEventOrderByRelationAggregateInput
   settlements?: Prisma.SettlementOrderByRelationAggregateInput
+  dispute?: Prisma.OrderDisputeOrderByWithRelationInput
 }
 
 export type OrderWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  idempotencyKey?: string
   AND?: Prisma.OrderWhereInput | Prisma.OrderWhereInput[]
   OR?: Prisma.OrderWhereInput[]
   NOT?: Prisma.OrderWhereInput | Prisma.OrderWhereInput[]
@@ -411,7 +454,10 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   publishedUrl?: Prisma.StringNullableFilter<"Order"> | string | null
   publishedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  verifiedBy?: Prisma.StringNullableFilter<"Order"> | string | null
+  verifyMethod?: Prisma.StringNullableFilter<"Order"> | string | null
   deliveredAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  revisionCount?: Prisma.IntFilter<"Order"> | number
   customerId?: Prisma.StringFilter<"Order"> | string
   assigneeId?: Prisma.StringNullableFilter<"Order"> | string | null
   websiteId?: Prisma.StringNullableFilter<"Order"> | string | null
@@ -431,7 +477,8 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   items?: Prisma.OrderItemListRelationFilter
   events?: Prisma.OrderEventListRelationFilter
   settlements?: Prisma.SettlementListRelationFilter
-}, "id">
+  dispute?: Prisma.XOR<Prisma.OrderDisputeNullableScalarRelationFilter, Prisma.OrderDisputeWhereInput> | null
+}, "id" | "idempotencyKey">
 
 export type OrderOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -447,12 +494,16 @@ export type OrderOrderByWithAggregationInput = {
   publishedUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   publishedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   verifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  verifiedBy?: Prisma.SortOrderInput | Prisma.SortOrder
+  verifyMethod?: Prisma.SortOrderInput | Prisma.SortOrder
   deliveredAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
   assigneeId?: Prisma.SortOrderInput | Prisma.SortOrder
   websiteId?: Prisma.SortOrderInput | Prisma.SortOrder
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrderInput | Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.OrderCountOrderByAggregateInput
@@ -479,12 +530,16 @@ export type OrderScalarWhereWithAggregatesInput = {
   publishedUrl?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   publishedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   verifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  verifiedBy?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
+  verifyMethod?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   deliveredAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  revisionCount?: Prisma.IntWithAggregatesFilter<"Order"> | number
   customerId?: Prisma.StringWithAggregatesFilter<"Order"> | string
   assigneeId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   websiteId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   organizationId?: Prisma.StringWithAggregatesFilter<"Order"> | string
   campaignId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
+  idempotencyKey?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
 }
@@ -503,7 +558,11 @@ export type OrderCreateInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -518,6 +577,7 @@ export type OrderCreateInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateInput = {
@@ -534,12 +594,16 @@ export type OrderUncheckedCreateInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -549,6 +613,7 @@ export type OrderUncheckedCreateInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUpdateInput = {
@@ -565,7 +630,11 @@ export type OrderUpdateInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -580,6 +649,7 @@ export type OrderUpdateInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateInput = {
@@ -596,12 +666,16 @@ export type OrderUncheckedUpdateInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -611,6 +685,7 @@ export type OrderUncheckedUpdateInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateManyInput = {
@@ -627,12 +702,16 @@ export type OrderCreateManyInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -651,7 +730,11 @@ export type OrderUpdateManyMutationInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -670,12 +753,16 @@ export type OrderUncheckedUpdateManyInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -704,18 +791,23 @@ export type OrderCountOrderByAggregateInput = {
   publishedUrl?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   verifiedAt?: Prisma.SortOrder
+  verifiedBy?: Prisma.SortOrder
+  verifyMethod?: Prisma.SortOrder
   deliveredAt?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
   assigneeId?: Prisma.SortOrder
   websiteId?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
 export type OrderAvgOrderByAggregateInput = {
   amount?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
 }
 
 export type OrderMaxOrderByAggregateInput = {
@@ -732,12 +824,16 @@ export type OrderMaxOrderByAggregateInput = {
   publishedUrl?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   verifiedAt?: Prisma.SortOrder
+  verifiedBy?: Prisma.SortOrder
+  verifyMethod?: Prisma.SortOrder
   deliveredAt?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
   assigneeId?: Prisma.SortOrder
   websiteId?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -756,18 +852,23 @@ export type OrderMinOrderByAggregateInput = {
   publishedUrl?: Prisma.SortOrder
   publishedAt?: Prisma.SortOrder
   verifiedAt?: Prisma.SortOrder
+  verifiedBy?: Prisma.SortOrder
+  verifyMethod?: Prisma.SortOrder
   deliveredAt?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
   assigneeId?: Prisma.SortOrder
   websiteId?: Prisma.SortOrder
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrder
+  idempotencyKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
 export type OrderSumOrderByAggregateInput = {
   amount?: Prisma.SortOrder
+  revisionCount?: Prisma.SortOrder
 }
 
 export type OrderScalarRelationFilter = {
@@ -968,6 +1069,14 @@ export type EnumPaymentStatusFieldUpdateOperationsInput = {
   set?: $Enums.PaymentStatus
 }
 
+export type IntFieldUpdateOperationsInput = {
+  set?: number
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
 export type OrderCreateNestedManyWithoutCampaignInput = {
   create?: Prisma.XOR<Prisma.OrderCreateWithoutCampaignInput, Prisma.OrderUncheckedCreateWithoutCampaignInput> | Prisma.OrderCreateWithoutCampaignInput[] | Prisma.OrderUncheckedCreateWithoutCampaignInput[]
   connectOrCreate?: Prisma.OrderCreateOrConnectWithoutCampaignInput | Prisma.OrderCreateOrConnectWithoutCampaignInput[]
@@ -1036,6 +1145,20 @@ export type OrderUpdateOneRequiredWithoutEventsNestedInput = {
   upsert?: Prisma.OrderUpsertWithoutEventsInput
   connect?: Prisma.OrderWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutEventsInput, Prisma.OrderUpdateWithoutEventsInput>, Prisma.OrderUncheckedUpdateWithoutEventsInput>
+}
+
+export type OrderCreateNestedOneWithoutDisputeInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutDisputeInput, Prisma.OrderUncheckedCreateWithoutDisputeInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutDisputeInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
+export type OrderUpdateOneRequiredWithoutDisputeNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutDisputeInput, Prisma.OrderUncheckedCreateWithoutDisputeInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutDisputeInput
+  upsert?: Prisma.OrderUpsertWithoutDisputeInput
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutDisputeInput, Prisma.OrderUpdateWithoutDisputeInput>, Prisma.OrderUncheckedUpdateWithoutDisputeInput>
 }
 
 export type OrderCreateNestedOneWithoutSettlementsInput = {
@@ -1124,7 +1247,11 @@ export type OrderCreateWithoutCustomerInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
@@ -1138,6 +1265,7 @@ export type OrderCreateWithoutCustomerInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutCustomerInput = {
@@ -1154,11 +1282,15 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1168,6 +1300,7 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutCustomerInput = {
@@ -1194,7 +1327,11 @@ export type OrderCreateWithoutAssigneeInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1208,6 +1345,7 @@ export type OrderCreateWithoutAssigneeInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutAssigneeInput = {
@@ -1224,11 +1362,15 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1238,6 +1380,7 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutAssigneeInput = {
@@ -1283,12 +1426,16 @@ export type OrderScalarWhereInput = {
   publishedUrl?: Prisma.StringNullableFilter<"Order"> | string | null
   publishedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  verifiedBy?: Prisma.StringNullableFilter<"Order"> | string | null
+  verifyMethod?: Prisma.StringNullableFilter<"Order"> | string | null
   deliveredAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  revisionCount?: Prisma.IntFilter<"Order"> | number
   customerId?: Prisma.StringFilter<"Order"> | string
   assigneeId?: Prisma.StringNullableFilter<"Order"> | string | null
   websiteId?: Prisma.StringNullableFilter<"Order"> | string | null
   organizationId?: Prisma.StringFilter<"Order"> | string
   campaignId?: Prisma.StringNullableFilter<"Order"> | string | null
+  idempotencyKey?: Prisma.StringNullableFilter<"Order"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
 }
@@ -1323,7 +1470,11 @@ export type OrderCreateWithoutOrganizationInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1337,6 +1488,7 @@ export type OrderCreateWithoutOrganizationInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutOrganizationInput = {
@@ -1353,11 +1505,15 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1367,6 +1523,7 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutOrganizationInput = {
@@ -1409,7 +1566,11 @@ export type OrderCreateWithoutWebsiteInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1423,6 +1584,7 @@ export type OrderCreateWithoutWebsiteInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutWebsiteInput = {
@@ -1439,11 +1601,15 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1453,6 +1619,7 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutWebsiteInput = {
@@ -1495,7 +1662,11 @@ export type OrderCreateWithoutCampaignInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1509,6 +1680,7 @@ export type OrderCreateWithoutCampaignInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutCampaignInput = {
@@ -1525,11 +1697,15 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1539,6 +1715,7 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutCampaignInput = {
@@ -1581,7 +1758,11 @@ export type OrderCreateWithoutItemsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1595,6 +1776,7 @@ export type OrderCreateWithoutItemsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutItemsInput = {
@@ -1611,12 +1793,16 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1625,6 +1811,7 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutItemsInput = {
@@ -1657,7 +1844,11 @@ export type OrderUpdateWithoutItemsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -1671,6 +1862,7 @@ export type OrderUpdateWithoutItemsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutItemsInput = {
@@ -1687,12 +1879,16 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -1701,6 +1897,7 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutEventsInput = {
@@ -1717,7 +1914,11 @@ export type OrderCreateWithoutEventsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1731,6 +1932,7 @@ export type OrderCreateWithoutEventsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutEventsInput = {
@@ -1747,12 +1949,16 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1761,6 +1967,7 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutEventsInput = {
@@ -1793,7 +2000,11 @@ export type OrderUpdateWithoutEventsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -1807,6 +2018,7 @@ export type OrderUpdateWithoutEventsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutEventsInput = {
@@ -1823,12 +2035,16 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -1836,6 +2052,163 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+}
+
+export type OrderCreateWithoutDisputeInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
+  assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
+  campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
+  contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+}
+
+export type OrderUncheckedCreateWithoutDisputeInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  customerId: string
+  assigneeId?: string | null
+  websiteId?: string | null
+  organizationId: string
+  campaignId?: string | null
+  idempotencyKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+}
+
+export type OrderCreateOrConnectWithoutDisputeInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutDisputeInput, Prisma.OrderUncheckedCreateWithoutDisputeInput>
+}
+
+export type OrderUpsertWithoutDisputeInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutDisputeInput, Prisma.OrderUncheckedUpdateWithoutDisputeInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutDisputeInput, Prisma.OrderUncheckedCreateWithoutDisputeInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutDisputeInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutDisputeInput, Prisma.OrderUncheckedUpdateWithoutDisputeInput>
+}
+
+export type OrderUpdateWithoutDisputeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
+  assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
+  campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
+  contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutDisputeInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  customerId?: Prisma.StringFieldUpdateOperationsInput | string
+  assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
 }
 
@@ -1853,7 +2226,11 @@ export type OrderCreateWithoutSettlementsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1867,6 +2244,7 @@ export type OrderCreateWithoutSettlementsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutSettlementsInput = {
@@ -1883,12 +2261,16 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1897,6 +2279,7 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutSettlementsInput = {
@@ -1929,7 +2312,11 @@ export type OrderUpdateWithoutSettlementsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -1943,6 +2330,7 @@ export type OrderUpdateWithoutSettlementsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutSettlementsInput = {
@@ -1959,12 +2347,16 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -1973,6 +2365,7 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutContentOrderInput = {
@@ -1989,7 +2382,11 @@ export type OrderCreateWithoutContentOrderInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2003,6 +2400,7 @@ export type OrderCreateWithoutContentOrderInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutContentOrderInput = {
@@ -2019,12 +2417,16 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
@@ -2033,6 +2435,7 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutContentOrderInput = {
@@ -2065,7 +2468,11 @@ export type OrderUpdateWithoutContentOrderInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2079,6 +2486,7 @@ export type OrderUpdateWithoutContentOrderInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutContentOrderInput = {
@@ -2095,12 +2503,16 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
@@ -2109,6 +2521,7 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutRevisionsInput = {
@@ -2125,7 +2538,11 @@ export type OrderCreateWithoutRevisionsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2139,6 +2556,7 @@ export type OrderCreateWithoutRevisionsInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutRevisionsInput = {
@@ -2155,12 +2573,16 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2169,6 +2591,7 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutRevisionsInput = {
@@ -2201,7 +2624,11 @@ export type OrderUpdateWithoutRevisionsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2215,6 +2642,7 @@ export type OrderUpdateWithoutRevisionsInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutRevisionsInput = {
@@ -2231,12 +2659,16 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2245,6 +2677,7 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutReportsInput = {
@@ -2261,7 +2694,11 @@ export type OrderCreateWithoutReportsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2275,6 +2712,7 @@ export type OrderCreateWithoutReportsInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutReportsInput = {
@@ -2291,12 +2729,16 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2305,6 +2747,7 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutReportsInput = {
@@ -2337,7 +2780,11 @@ export type OrderUpdateWithoutReportsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2351,6 +2798,7 @@ export type OrderUpdateWithoutReportsInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutReportsInput = {
@@ -2367,12 +2815,16 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2381,6 +2833,7 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutTransactionsInput = {
@@ -2397,7 +2850,11 @@ export type OrderCreateWithoutTransactionsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2411,6 +2868,7 @@ export type OrderCreateWithoutTransactionsInput = {
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutTransactionsInput = {
@@ -2427,12 +2885,16 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2441,6 +2903,7 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
   events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
   settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutTransactionsInput = {
@@ -2473,7 +2936,11 @@ export type OrderUpdateWithoutTransactionsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2487,6 +2954,7 @@ export type OrderUpdateWithoutTransactionsInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutTransactionsInput = {
@@ -2503,12 +2971,16 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2517,6 +2989,7 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateManyCustomerInput = {
@@ -2533,11 +3006,15 @@ export type OrderCreateManyCustomerInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2556,11 +3033,15 @@ export type OrderCreateManyAssigneeInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   websiteId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2579,7 +3060,11 @@ export type OrderUpdateWithoutCustomerInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
@@ -2593,6 +3078,7 @@ export type OrderUpdateWithoutCustomerInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutCustomerInput = {
@@ -2609,11 +3095,15 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2623,6 +3113,7 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutCustomerInput = {
@@ -2639,11 +3130,15 @@ export type OrderUncheckedUpdateManyWithoutCustomerInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2662,7 +3157,11 @@ export type OrderUpdateWithoutAssigneeInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2676,6 +3175,7 @@ export type OrderUpdateWithoutAssigneeInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutAssigneeInput = {
@@ -2692,11 +3192,15 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2706,6 +3210,7 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutAssigneeInput = {
@@ -2722,11 +3227,15 @@ export type OrderUncheckedUpdateManyWithoutAssigneeInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2745,11 +3254,15 @@ export type OrderCreateManyOrganizationInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2768,7 +3281,11 @@ export type OrderUpdateWithoutOrganizationInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2782,6 +3299,7 @@ export type OrderUpdateWithoutOrganizationInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutOrganizationInput = {
@@ -2798,11 +3316,15 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2812,6 +3334,7 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutOrganizationInput = {
@@ -2828,11 +3351,15 @@ export type OrderUncheckedUpdateManyWithoutOrganizationInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2851,11 +3378,15 @@ export type OrderCreateManyWebsiteInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   organizationId: string
   campaignId?: string | null
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2874,7 +3405,11 @@ export type OrderUpdateWithoutWebsiteInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2888,6 +3423,7 @@ export type OrderUpdateWithoutWebsiteInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutWebsiteInput = {
@@ -2904,11 +3440,15 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2918,6 +3458,7 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutWebsiteInput = {
@@ -2934,11 +3475,15 @@ export type OrderUncheckedUpdateManyWithoutWebsiteInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2957,11 +3502,15 @@ export type OrderCreateManyCampaignInput = {
   publishedUrl?: string | null
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
   deliveredAt?: Date | string | null
+  revisionCount?: number
   customerId: string
   assigneeId?: string | null
   websiteId?: string | null
   organizationId: string
+  idempotencyKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2980,7 +3529,11 @@ export type OrderUpdateWithoutCampaignInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2994,6 +3547,7 @@ export type OrderUpdateWithoutCampaignInput = {
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutCampaignInput = {
@@ -3010,11 +3564,15 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3024,6 +3582,7 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutCampaignInput = {
@@ -3040,11 +3599,15 @@ export type OrderUncheckedUpdateManyWithoutCampaignInput = {
   publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3139,12 +3702,16 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   publishedUrl?: boolean
   publishedAt?: boolean
   verifiedAt?: boolean
+  verifiedBy?: boolean
+  verifyMethod?: boolean
   deliveredAt?: boolean
+  revisionCount?: boolean
   customerId?: boolean
   assigneeId?: boolean
   websiteId?: boolean
   organizationId?: boolean
   campaignId?: boolean
+  idempotencyKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -3159,6 +3726,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   items?: boolean | Prisma.Order$itemsArgs<ExtArgs>
   events?: boolean | Prisma.Order$eventsArgs<ExtArgs>
   settlements?: boolean | Prisma.Order$settlementsArgs<ExtArgs>
+  dispute?: boolean | Prisma.Order$disputeArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["order"]>
 
@@ -3176,12 +3744,16 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   publishedUrl?: boolean
   publishedAt?: boolean
   verifiedAt?: boolean
+  verifiedBy?: boolean
+  verifyMethod?: boolean
   deliveredAt?: boolean
+  revisionCount?: boolean
   customerId?: boolean
   assigneeId?: boolean
   websiteId?: boolean
   organizationId?: boolean
   campaignId?: boolean
+  idempotencyKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -3205,12 +3777,16 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   publishedUrl?: boolean
   publishedAt?: boolean
   verifiedAt?: boolean
+  verifiedBy?: boolean
+  verifyMethod?: boolean
   deliveredAt?: boolean
+  revisionCount?: boolean
   customerId?: boolean
   assigneeId?: boolean
   websiteId?: boolean
   organizationId?: boolean
   campaignId?: boolean
+  idempotencyKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -3234,17 +3810,21 @@ export type OrderSelectScalar = {
   publishedUrl?: boolean
   publishedAt?: boolean
   verifiedAt?: boolean
+  verifiedBy?: boolean
+  verifyMethod?: boolean
   deliveredAt?: boolean
+  revisionCount?: boolean
   customerId?: boolean
   assigneeId?: boolean
   websiteId?: boolean
   organizationId?: boolean
   campaignId?: boolean
+  idempotencyKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "status" | "amount" | "currency" | "paymentStatus" | "title" | "instructions" | "targetUrl" | "anchorText" | "publishedUrl" | "publishedAt" | "verifiedAt" | "deliveredAt" | "customerId" | "assigneeId" | "websiteId" | "organizationId" | "campaignId" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "status" | "amount" | "currency" | "paymentStatus" | "title" | "instructions" | "targetUrl" | "anchorText" | "publishedUrl" | "publishedAt" | "verifiedAt" | "verifiedBy" | "verifyMethod" | "deliveredAt" | "revisionCount" | "customerId" | "assigneeId" | "websiteId" | "organizationId" | "campaignId" | "idempotencyKey" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
@@ -3258,6 +3838,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   items?: boolean | Prisma.Order$itemsArgs<ExtArgs>
   events?: boolean | Prisma.Order$eventsArgs<ExtArgs>
   settlements?: boolean | Prisma.Order$settlementsArgs<ExtArgs>
+  dispute?: boolean | Prisma.Order$disputeArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -3290,6 +3871,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     items: Prisma.$OrderItemPayload<ExtArgs>[]
     events: Prisma.$OrderEventPayload<ExtArgs>[]
     settlements: Prisma.$SettlementPayload<ExtArgs>[]
+    dispute: Prisma.$OrderDisputePayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3305,12 +3887,16 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     publishedUrl: string | null
     publishedAt: Date | null
     verifiedAt: Date | null
+    verifiedBy: string | null
+    verifyMethod: string | null
     deliveredAt: Date | null
+    revisionCount: number
     customerId: string
     assigneeId: string | null
     websiteId: string | null
     organizationId: string
     campaignId: string | null
+    idempotencyKey: string | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["order"]>
@@ -3719,6 +4305,7 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   items<T extends Prisma.Order$itemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$itemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   events<T extends Prisma.Order$eventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   settlements<T extends Prisma.Order$settlementsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$settlementsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SettlementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  dispute<T extends Prisma.Order$disputeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$disputeArgs<ExtArgs>>): Prisma.Prisma__OrderDisputeClient<runtime.Types.Result.GetResult<Prisma.$OrderDisputePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3761,12 +4348,16 @@ export interface OrderFieldRefs {
   readonly publishedUrl: Prisma.FieldRef<"Order", 'String'>
   readonly publishedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly verifiedAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly verifiedBy: Prisma.FieldRef<"Order", 'String'>
+  readonly verifyMethod: Prisma.FieldRef<"Order", 'String'>
   readonly deliveredAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly revisionCount: Prisma.FieldRef<"Order", 'Int'>
   readonly customerId: Prisma.FieldRef<"Order", 'String'>
   readonly assigneeId: Prisma.FieldRef<"Order", 'String'>
   readonly websiteId: Prisma.FieldRef<"Order", 'String'>
   readonly organizationId: Prisma.FieldRef<"Order", 'String'>
   readonly campaignId: Prisma.FieldRef<"Order", 'String'>
+  readonly idempotencyKey: Prisma.FieldRef<"Order", 'String'>
   readonly createdAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Order", 'DateTime'>
 }
@@ -4382,6 +4973,25 @@ export type Order$settlementsArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.SettlementScalarFieldEnum | Prisma.SettlementScalarFieldEnum[]
+}
+
+/**
+ * Order.dispute
+ */
+export type Order$disputeArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OrderDispute
+   */
+  select?: Prisma.OrderDisputeSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OrderDispute
+   */
+  omit?: Prisma.OrderDisputeOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrderDisputeInclude<ExtArgs> | null
+  where?: Prisma.OrderDisputeWhereInput
 }
 
 /**

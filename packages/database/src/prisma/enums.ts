@@ -27,10 +27,22 @@ export type CustomerRole = (typeof CustomerRole)[keyof typeof CustomerRole]
 
 
 export const PublisherRole = {
-  PUBLISHER_OWNER: 'PUBLISHER_OWNER'
+  PUBLISHER_OWNER: 'PUBLISHER_OWNER',
+  PUBLISHER_MEMBER: 'PUBLISHER_MEMBER'
 } as const
 
 export type PublisherRole = (typeof PublisherRole)[keyof typeof PublisherRole]
+
+
+export const DisputeStatus = {
+  OPEN: 'OPEN',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  RESOLVED_REFUNDED: 'RESOLVED_REFUNDED',
+  RESOLVED_REJECTED: 'RESOLVED_REJECTED',
+  RESOLVED_RESTORED: 'RESOLVED_RESTORED'
+} as const
+
+export type DisputeStatus = (typeof DisputeStatus)[keyof typeof DisputeStatus]
 
 
 export const StaffRole = {
@@ -70,13 +82,11 @@ export const OrderStatus = {
   PAID: 'PAID',
   SUBMITTED: 'SUBMITTED',
   ACCEPTED: 'ACCEPTED',
-  ASSIGNED: 'ASSIGNED',
   CONTENT_REQUESTED: 'CONTENT_REQUESTED',
   CONTENT_CREATION: 'CONTENT_CREATION',
   CONTENT_READY: 'CONTENT_READY',
-  REVIEW: 'REVIEW',
-  UNDER_REVIEW: 'UNDER_REVIEW',
-  OUTREACH: 'OUTREACH',
+  CUSTOMER_REVIEW: 'CUSTOMER_REVIEW',
+  APPROVED: 'APPROVED',
   PUBLISHED: 'PUBLISHED',
   VERIFIED: 'VERIFIED',
   DELIVERED: 'DELIVERED',
@@ -84,7 +94,6 @@ export const OrderStatus = {
   COMPLETED: 'COMPLETED',
   CANCELLED: 'CANCELLED',
   REFUNDED: 'REFUNDED',
-  REJECTED: 'REJECTED',
   DISPUTED: 'DISPUTED'
 } as const
 
@@ -128,19 +137,28 @@ export type TicketStatus = (typeof TicketStatus)[keyof typeof TicketStatus]
 
 export const OrderEventType = {
   ORDER_CREATED: 'ORDER_CREATED',
-  PAYMENT_RECEIVED: 'PAYMENT_RECEIVED',
-  ASSIGNED: 'ASSIGNED',
+  ITEM_ADDED: 'ITEM_ADDED',
+  ITEM_REMOVED: 'ITEM_REMOVED',
+  PAYMENT_SUBMITTED: 'PAYMENT_SUBMITTED',
+  PAYMENT_CAPTURED: 'PAYMENT_CAPTURED',
+  ORDER_ACCEPTED: 'ORDER_ACCEPTED',
+  CONTENT_REQUESTED: 'CONTENT_REQUESTED',
   CONTENT_SUBMITTED: 'CONTENT_SUBMITTED',
+  CONTENT_MARKED_READY: 'CONTENT_MARKED_READY',
+  CONTENT_SUBMITTED_FOR_REVIEW: 'CONTENT_SUBMITTED_FOR_REVIEW',
   CONTENT_APPROVED: 'CONTENT_APPROVED',
-  PUBLISHED: 'PUBLISHED',
-  VERIFIED: 'VERIFIED',
-  UNDER_REVIEW: 'UNDER_REVIEW',
+  REVISION_REQUESTED: 'REVISION_REQUESTED',
+  PUBLICATION_MARKED: 'PUBLICATION_MARKED',
+  VERIFIED_AUTO: 'VERIFIED_AUTO',
+  VERIFIED_MANUAL: 'VERIFIED_MANUAL',
+  DELIVERY_CONFIRMED: 'DELIVERY_CONFIRMED',
+  DISPUTE_OPENED: 'DISPUTE_OPENED',
+  DISPUTE_RESOLVED: 'DISPUTE_RESOLVED',
+  ORDER_CANCELLED: 'ORDER_CANCELLED',
+  REFUND_ISSUED: 'REFUND_ISSUED',
+  SETTLEMENT_CREATED: 'SETTLEMENT_CREATED',
   SETTLED: 'SETTLED',
-  COMPLETED: 'COMPLETED',
-  CANCELLED: 'CANCELLED',
-  REFUNDED: 'REFUNDED',
-  DISPUTED: 'DISPUTED',
-  REJECTED: 'REJECTED'
+  REFUNDED: 'REFUNDED'
 } as const
 
 export type OrderEventType = (typeof OrderEventType)[keyof typeof OrderEventType]
@@ -149,9 +167,9 @@ export type OrderEventType = (typeof OrderEventType)[keyof typeof OrderEventType
 export const SettlementStatus = {
   PENDING: 'PENDING',
   UNDER_REVIEW: 'UNDER_REVIEW',
-  APPROVED: 'APPROVED',
-  PAID: 'PAID',
-  DISPUTED: 'DISPUTED',
+  CUSTOMER_APPROVED: 'CUSTOMER_APPROVED',
+  ADMIN_APPROVED: 'ADMIN_APPROVED',
+  RELEASED: 'RELEASED',
   CANCELLED: 'CANCELLED'
 } as const
 
@@ -186,6 +204,14 @@ export const VerificationStatus = {
 } as const
 
 export type VerificationStatus = (typeof VerificationStatus)[keyof typeof VerificationStatus]
+
+
+export const SettlementApprovalType = {
+  CUSTOMER: 'CUSTOMER',
+  ADMIN: 'ADMIN'
+} as const
+
+export type SettlementApprovalType = (typeof SettlementApprovalType)[keyof typeof SettlementApprovalType]
 
 
 export const ListingType = {

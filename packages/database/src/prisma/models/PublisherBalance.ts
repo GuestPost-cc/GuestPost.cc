@@ -31,6 +31,8 @@ export type PublisherBalanceAvgAggregateOutputType = {
   approvedBalance: runtime.Decimal | null
   withdrawableBalance: runtime.Decimal | null
   lifetimeEarnings: runtime.Decimal | null
+  lifetimePaid: runtime.Decimal | null
+  version: number | null
 }
 
 export type PublisherBalanceSumAggregateOutputType = {
@@ -38,6 +40,8 @@ export type PublisherBalanceSumAggregateOutputType = {
   approvedBalance: runtime.Decimal | null
   withdrawableBalance: runtime.Decimal | null
   lifetimeEarnings: runtime.Decimal | null
+  lifetimePaid: runtime.Decimal | null
+  version: number | null
 }
 
 export type PublisherBalanceMinAggregateOutputType = {
@@ -47,6 +51,8 @@ export type PublisherBalanceMinAggregateOutputType = {
   approvedBalance: runtime.Decimal | null
   withdrawableBalance: runtime.Decimal | null
   lifetimeEarnings: runtime.Decimal | null
+  lifetimePaid: runtime.Decimal | null
+  version: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -58,6 +64,8 @@ export type PublisherBalanceMaxAggregateOutputType = {
   approvedBalance: runtime.Decimal | null
   withdrawableBalance: runtime.Decimal | null
   lifetimeEarnings: runtime.Decimal | null
+  lifetimePaid: runtime.Decimal | null
+  version: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -69,6 +77,8 @@ export type PublisherBalanceCountAggregateOutputType = {
   approvedBalance: number
   withdrawableBalance: number
   lifetimeEarnings: number
+  lifetimePaid: number
+  version: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -80,6 +90,8 @@ export type PublisherBalanceAvgAggregateInputType = {
   approvedBalance?: true
   withdrawableBalance?: true
   lifetimeEarnings?: true
+  lifetimePaid?: true
+  version?: true
 }
 
 export type PublisherBalanceSumAggregateInputType = {
@@ -87,6 +99,8 @@ export type PublisherBalanceSumAggregateInputType = {
   approvedBalance?: true
   withdrawableBalance?: true
   lifetimeEarnings?: true
+  lifetimePaid?: true
+  version?: true
 }
 
 export type PublisherBalanceMinAggregateInputType = {
@@ -96,6 +110,8 @@ export type PublisherBalanceMinAggregateInputType = {
   approvedBalance?: true
   withdrawableBalance?: true
   lifetimeEarnings?: true
+  lifetimePaid?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -107,6 +123,8 @@ export type PublisherBalanceMaxAggregateInputType = {
   approvedBalance?: true
   withdrawableBalance?: true
   lifetimeEarnings?: true
+  lifetimePaid?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -118,6 +136,8 @@ export type PublisherBalanceCountAggregateInputType = {
   approvedBalance?: true
   withdrawableBalance?: true
   lifetimeEarnings?: true
+  lifetimePaid?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -216,6 +236,8 @@ export type PublisherBalanceGroupByOutputType = {
   approvedBalance: runtime.Decimal
   withdrawableBalance: runtime.Decimal
   lifetimeEarnings: runtime.Decimal
+  lifetimePaid: runtime.Decimal
+  version: number
   createdAt: Date
   updatedAt: Date
   _count: PublisherBalanceCountAggregateOutputType | null
@@ -250,6 +272,8 @@ export type PublisherBalanceWhereInput = {
   approvedBalance?: Prisma.DecimalFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: Prisma.DecimalFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: Prisma.DecimalFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: Prisma.DecimalFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: Prisma.IntFilter<"PublisherBalance"> | number
   createdAt?: Prisma.DateTimeFilter<"PublisherBalance"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PublisherBalance"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
@@ -262,6 +286,8 @@ export type PublisherBalanceOrderByWithRelationInput = {
   approvedBalance?: Prisma.SortOrder
   withdrawableBalance?: Prisma.SortOrder
   lifetimeEarnings?: Prisma.SortOrder
+  lifetimePaid?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   publisher?: Prisma.PublisherOrderByWithRelationInput
@@ -277,6 +303,8 @@ export type PublisherBalanceWhereUniqueInput = Prisma.AtLeast<{
   approvedBalance?: Prisma.DecimalFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: Prisma.DecimalFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: Prisma.DecimalFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: Prisma.DecimalFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: Prisma.IntFilter<"PublisherBalance"> | number
   createdAt?: Prisma.DateTimeFilter<"PublisherBalance"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PublisherBalance"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
@@ -289,6 +317,8 @@ export type PublisherBalanceOrderByWithAggregationInput = {
   approvedBalance?: Prisma.SortOrder
   withdrawableBalance?: Prisma.SortOrder
   lifetimeEarnings?: Prisma.SortOrder
+  lifetimePaid?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.PublisherBalanceCountOrderByAggregateInput
@@ -308,6 +338,8 @@ export type PublisherBalanceScalarWhereWithAggregatesInput = {
   approvedBalance?: Prisma.DecimalWithAggregatesFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: Prisma.DecimalWithAggregatesFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: Prisma.DecimalWithAggregatesFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: Prisma.DecimalWithAggregatesFilter<"PublisherBalance"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: Prisma.IntWithAggregatesFilter<"PublisherBalance"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"PublisherBalance"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"PublisherBalance"> | Date | string
 }
@@ -318,6 +350,8 @@ export type PublisherBalanceCreateInput = {
   approvedBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher: Prisma.PublisherCreateNestedOneWithoutBalanceInput
@@ -330,6 +364,8 @@ export type PublisherBalanceUncheckedCreateInput = {
   approvedBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -340,6 +376,8 @@ export type PublisherBalanceUpdateInput = {
   approvedBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutBalanceNestedInput
@@ -352,6 +390,8 @@ export type PublisherBalanceUncheckedUpdateInput = {
   approvedBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -363,6 +403,8 @@ export type PublisherBalanceCreateManyInput = {
   approvedBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -373,6 +415,8 @@ export type PublisherBalanceUpdateManyMutationInput = {
   approvedBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -384,6 +428,8 @@ export type PublisherBalanceUncheckedUpdateManyInput = {
   approvedBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -400,6 +446,8 @@ export type PublisherBalanceCountOrderByAggregateInput = {
   approvedBalance?: Prisma.SortOrder
   withdrawableBalance?: Prisma.SortOrder
   lifetimeEarnings?: Prisma.SortOrder
+  lifetimePaid?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -409,6 +457,8 @@ export type PublisherBalanceAvgOrderByAggregateInput = {
   approvedBalance?: Prisma.SortOrder
   withdrawableBalance?: Prisma.SortOrder
   lifetimeEarnings?: Prisma.SortOrder
+  lifetimePaid?: Prisma.SortOrder
+  version?: Prisma.SortOrder
 }
 
 export type PublisherBalanceMaxOrderByAggregateInput = {
@@ -418,6 +468,8 @@ export type PublisherBalanceMaxOrderByAggregateInput = {
   approvedBalance?: Prisma.SortOrder
   withdrawableBalance?: Prisma.SortOrder
   lifetimeEarnings?: Prisma.SortOrder
+  lifetimePaid?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -429,6 +481,8 @@ export type PublisherBalanceMinOrderByAggregateInput = {
   approvedBalance?: Prisma.SortOrder
   withdrawableBalance?: Prisma.SortOrder
   lifetimeEarnings?: Prisma.SortOrder
+  lifetimePaid?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -438,6 +492,8 @@ export type PublisherBalanceSumOrderByAggregateInput = {
   approvedBalance?: Prisma.SortOrder
   withdrawableBalance?: Prisma.SortOrder
   lifetimeEarnings?: Prisma.SortOrder
+  lifetimePaid?: Prisma.SortOrder
+  version?: Prisma.SortOrder
 }
 
 export type PublisherBalanceCreateNestedOneWithoutPublisherInput = {
@@ -478,6 +534,8 @@ export type PublisherBalanceCreateWithoutPublisherInput = {
   approvedBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -488,6 +546,8 @@ export type PublisherBalanceUncheckedCreateWithoutPublisherInput = {
   approvedBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -514,6 +574,8 @@ export type PublisherBalanceUpdateWithoutPublisherInput = {
   approvedBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -524,6 +586,8 @@ export type PublisherBalanceUncheckedUpdateWithoutPublisherInput = {
   approvedBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   withdrawableBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lifetimeEarnings?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  lifetimePaid?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -537,6 +601,8 @@ export type PublisherBalanceSelect<ExtArgs extends runtime.Types.Extensions.Inte
   approvedBalance?: boolean
   withdrawableBalance?: boolean
   lifetimeEarnings?: boolean
+  lifetimePaid?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -549,6 +615,8 @@ export type PublisherBalanceSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   approvedBalance?: boolean
   withdrawableBalance?: boolean
   lifetimeEarnings?: boolean
+  lifetimePaid?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -561,6 +629,8 @@ export type PublisherBalanceSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   approvedBalance?: boolean
   withdrawableBalance?: boolean
   lifetimeEarnings?: boolean
+  lifetimePaid?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -573,11 +643,13 @@ export type PublisherBalanceSelectScalar = {
   approvedBalance?: boolean
   withdrawableBalance?: boolean
   lifetimeEarnings?: boolean
+  lifetimePaid?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type PublisherBalanceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "pendingBalance" | "approvedBalance" | "withdrawableBalance" | "lifetimeEarnings" | "createdAt" | "updatedAt", ExtArgs["result"]["publisherBalance"]>
+export type PublisherBalanceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "pendingBalance" | "approvedBalance" | "withdrawableBalance" | "lifetimeEarnings" | "lifetimePaid" | "version" | "createdAt" | "updatedAt", ExtArgs["result"]["publisherBalance"]>
 export type PublisherBalanceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
 }
@@ -600,6 +672,8 @@ export type $PublisherBalancePayload<ExtArgs extends runtime.Types.Extensions.In
     approvedBalance: runtime.Decimal
     withdrawableBalance: runtime.Decimal
     lifetimeEarnings: runtime.Decimal
+    lifetimePaid: runtime.Decimal
+    version: number
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["publisherBalance"]>
@@ -1032,6 +1106,8 @@ export interface PublisherBalanceFieldRefs {
   readonly approvedBalance: Prisma.FieldRef<"PublisherBalance", 'Decimal'>
   readonly withdrawableBalance: Prisma.FieldRef<"PublisherBalance", 'Decimal'>
   readonly lifetimeEarnings: Prisma.FieldRef<"PublisherBalance", 'Decimal'>
+  readonly lifetimePaid: Prisma.FieldRef<"PublisherBalance", 'Decimal'>
+  readonly version: Prisma.FieldRef<"PublisherBalance", 'Int'>
   readonly createdAt: Prisma.FieldRef<"PublisherBalance", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"PublisherBalance", 'DateTime'>
 }

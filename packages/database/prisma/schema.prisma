@@ -21,6 +21,15 @@ enum CustomerRole {
 
 enum PublisherRole {
   PUBLISHER_OWNER
+  PUBLISHER_MEMBER
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_REFUNDED
+  RESOLVED_REJECTED
+  RESOLVED_RESTORED
 }
 
 enum StaffRole {
@@ -53,13 +62,11 @@ enum OrderStatus {
   PAID
   SUBMITTED
   ACCEPTED
-  ASSIGNED
   CONTENT_REQUESTED
   CONTENT_CREATION
   CONTENT_READY
-  REVIEW
-  UNDER_REVIEW
-  OUTREACH
+  CUSTOMER_REVIEW
+  APPROVED
   PUBLISHED
   VERIFIED
   DELIVERED
@@ -67,7 +74,6 @@ enum OrderStatus {
   COMPLETED
   CANCELLED
   REFUNDED
-  REJECTED
   DISPUTED
 }
 
@@ -99,27 +105,36 @@ enum TicketStatus {
 
 enum OrderEventType {
   ORDER_CREATED
-  PAYMENT_RECEIVED
-  ASSIGNED
+  ITEM_ADDED
+  ITEM_REMOVED
+  PAYMENT_SUBMITTED
+  PAYMENT_CAPTURED
+  ORDER_ACCEPTED
+  CONTENT_REQUESTED
   CONTENT_SUBMITTED
+  CONTENT_MARKED_READY
+  CONTENT_SUBMITTED_FOR_REVIEW
   CONTENT_APPROVED
-  PUBLISHED
-  VERIFIED
-  UNDER_REVIEW
+  REVISION_REQUESTED
+  PUBLICATION_MARKED
+  VERIFIED_AUTO
+  VERIFIED_MANUAL
+  DELIVERY_CONFIRMED
+  DISPUTE_OPENED
+  DISPUTE_RESOLVED
+  ORDER_CANCELLED
+  REFUND_ISSUED
+  SETTLEMENT_CREATED
   SETTLED
-  COMPLETED
-  CANCELLED
   REFUNDED
-  DISPUTED
-  REJECTED
 }
 
 enum SettlementStatus {
   PENDING
   UNDER_REVIEW
-  APPROVED
-  PAID
-  DISPUTED
+  CUSTOMER_APPROVED
+  ADMIN_APPROVED
+  RELEASED
   CANCELLED
 }
 
@@ -174,6 +189,7 @@ model User {
   accounts             Account[]
   marketplaceReviews   MarketplaceReview[]
   marketplaceFavorites MarketplaceFavorite[]
+  activeContext        ActiveContext?
 }
 
 model Session {
@@ -219,6 +235,15 @@ model Verification {
   expiresAt  DateTime
   createdAt  DateTime?
   updatedAt  DateTime?
+}
+
+model ActiveContext {
+  id                  String  @id @default(cuid())
+  userId              String  @unique
+  activeOrganizationId String?
+  activePublisherId    String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Organization {
@@ -312,6 +337,7 @@ model Publisher {
   settlements         Settlement[]
   marketplaceListings MarketplaceListing[]
   profile             PublisherProfile?
+  transactions        Transaction[]
 
   @@index([organizationId])
 }
@@ -339,27 +365,31 @@ model Website {
 }
 
 model Order {
-  id             String        @id @default(cuid())
-  type           ServiceType
-  status         OrderStatus   @default(DRAFT)
-  amount         Decimal?
-  currency       String        @default("USD")
-  paymentStatus  PaymentStatus @default(PENDING)
-  title          String?
-  instructions   String?
-  targetUrl      String?
-  anchorText     String?
-  publishedUrl   String?
-  publishedAt    DateTime?
-  verifiedAt     DateTime?
-  deliveredAt    DateTime?
-  customerId     String
-  assigneeId     String?
-  websiteId      String?
-  organizationId String
-  campaignId     String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                 String        @id @default(cuid())
+  type               ServiceType
+  status             OrderStatus   @default(DRAFT)
+  amount             Decimal?
+  currency           String        @default("USD")
+  paymentStatus      PaymentStatus @default(PENDING)
+  title              String?
+  instructions       String?
+  targetUrl          String?
+  anchorText         String?
+  publishedUrl       String?
+  publishedAt        DateTime?
+  verifiedAt         DateTime?
+  verifiedBy         String?
+  verifyMethod       String?
+  deliveredAt        DateTime?
+  revisionCount      Int           @default(0)
+  customerId         String
+  assigneeId         String?
+  websiteId          String?
+  organizationId     String
+  campaignId         String?
+  idempotencyKey     String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
   customer     User          @relation("OrderCustomer", fields: [customerId], references: [id])
   assignee     User?         @relation("OrderAssignee", fields: [assigneeId], references: [id])
@@ -373,7 +403,9 @@ model Order {
   items        OrderItem[]
   events       OrderEvent[]
   settlements  Settlement[]
+  dispute      OrderDispute?
 
+  @@unique([idempotencyKey])
   @@index([organizationId, status])
   @@index([customerId, status])
   @@index([assigneeId])
@@ -467,6 +499,20 @@ model Publication {
   @@index([verificationStatus])
 }
 
+model OrderDispute {
+  id         String        @id @default(cuid())
+  orderId    String        @unique
+  order      Order         @relation(fields: [orderId], references: [id])
+  raisedBy   String
+  reason     String
+  status     DisputeStatus @default(OPEN)
+  resolvedBy String?
+  resolvedAt DateTime?
+  resolution String?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
 model Settlement {
   id              String           @id @default(cuid())
   orderId         String
@@ -477,15 +523,39 @@ model Settlement {
   status          SettlementStatus @default(PENDING)
   reviewEndsAt    DateTime?
   settledAt       DateTime?
+  version         Int              @default(0)
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  order     Order     @relation(fields: [orderId], references: [id])
-  publisher Publisher @relation(fields: [publisherId], references: [id])
+  order      Order                 @relation(fields: [orderId], references: [id])
+  publisher  Publisher             @relation(fields: [publisherId], references: [id])
+  approvals  SettlementApproval[]
+  transactions Transaction[]
 
+  // NOTE: a partial unique index "Settlement_orderId_active_key" on (orderId)
+  // WHERE status != 'CANCELLED' exists via raw SQL migration — Prisma cannot
+  // express partial indexes. Do not remove it when regenerating migrations.
   @@index([orderId])
   @@index([publisherId, status])
   @@index([status])
+}
+
+enum SettlementApprovalType {
+  CUSTOMER
+  ADMIN
+}
+
+model SettlementApproval {
+  id           String   @id @default(cuid())
+  settlementId String
+  settlement   Settlement @relation(fields: [settlementId], references: [id])
+  type         SettlementApprovalType
+  approvedBy   String
+  roleAtTime   String
+  approvedAt   DateTime @default(now())
+
+  @@unique([settlementId, type])
+  @@index([settlementId])
 }
 
 model PublisherBalance {
@@ -495,6 +565,8 @@ model PublisherBalance {
   approvedBalance    Decimal @default(0)
   withdrawableBalance Decimal @default(0)
   lifetimeEarnings   Decimal @default(0)
+  lifetimePaid       Decimal @default(0)
+  version            Int     @default(0)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
@@ -585,13 +657,14 @@ model Wallet {
   currency          String   @default("USD")
   organizationId    String?
   userId            String?
+  version           Int      @default(0)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
   organization  Organization? @relation(fields: [organizationId], references: [id])
   transactions  Transaction[]
 
-  @@index([organizationId])
+  @@unique([organizationId])
   @@index([userId])
 }
 
@@ -604,15 +677,22 @@ model Transaction {
   description String?
   walletId    String?
   orderId     String?
+  publisherId String?
+  settlementId String?
   createdAt   DateTime @default(now())
 
-  wallet Wallet? @relation(fields: [walletId], references: [id])
-  order  Order?  @relation(fields: [orderId], references: [id])
+  wallet     Wallet?    @relation(fields: [walletId], references: [id])
+  order      Order?     @relation(fields: [orderId], references: [id])
+  publisher  Publisher? @relation(fields: [publisherId], references: [id])
+  settlement Settlement? @relation(fields: [settlementId], references: [id])
 
+  @@unique([reference])
   @@index([walletId])
   @@index([orderId])
   @@index([type])
   @@index([createdAt])
+  @@index([publisherId])
+  @@index([settlementId])
 }
 
 model Ticket {
