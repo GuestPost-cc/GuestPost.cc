@@ -112,10 +112,15 @@ export class PublisherPayoutsService {
     }
 
     const result = await this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.withdrawal.update({
-        where: { id },
+      // Status-guarded write: concurrent approve/reject — only one transition wins
+      const transitioned = await tx.withdrawal.updateMany({
+        where: { id, status: "PENDING" },
         data: { status: "APPROVED", approvedBy, approvedAt: new Date() },
       })
+      if (transitioned.count === 0) {
+        throw new ConflictException("Withdrawal is no longer pending")
+      }
+      const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
 
       await this.audit.log({
         action: "WITHDRAWAL_APPROVED",
@@ -160,10 +165,15 @@ export class PublisherPayoutsService {
     }
 
     return this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.withdrawal.update({
-        where: { id },
+      // Status-guarded write: prevents double mark-paid (double lifetimePaid increment)
+      const transitioned = await tx.withdrawal.updateMany({
+        where: { id, status: "APPROVED" },
         data: { status: "COMPLETED", approvedBy, approvedAt: new Date() },
       })
+      if (transitioned.count === 0) {
+        throw new ConflictException("Withdrawal is not in APPROVED state")
+      }
+      const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
 
       // Update lifetimePaid
       const balance = await tx.publisherBalance.findUnique({
@@ -203,10 +213,15 @@ export class PublisherPayoutsService {
     }
 
     const result = await this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.withdrawal.update({
-        where: { id },
+      // Status-guarded write: prevents double reject (double balance restore)
+      const transitioned = await tx.withdrawal.updateMany({
+        where: { id, status: "PENDING" },
         data: { status: "REJECTED", approvedBy, approvedAt: new Date() },
       })
+      if (transitioned.count === 0) {
+        throw new ConflictException("Withdrawal is no longer pending")
+      }
+      const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
 
       const balance = await tx.publisherBalance.findUnique({
         where: { publisherId: withdrawal.publisherId },

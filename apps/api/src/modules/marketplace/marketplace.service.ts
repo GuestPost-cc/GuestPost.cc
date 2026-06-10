@@ -174,6 +174,17 @@ export class MarketplaceService {
       throw new NotFoundException("Listing not found")
     }
 
+    // Non-APPROVED listings are visible only to a member of the owning publisher.
+    // Everyone else gets 404 — do not reveal existence of draft/rejected/paused/archived.
+    if (listing.status !== ListingStatus.APPROVED) {
+      const isOwner = userId && listing.publisherId
+        ? await this.verifyPublisherAccess(userId, listing.publisherId)
+        : false
+      if (!isOwner) {
+        throw new NotFoundException("Listing not found")
+      }
+    }
+
     // Track view
     await this.prisma.marketplaceListingView.create({
       data: { listingId: listing.id, userId },
@@ -223,7 +234,22 @@ export class MarketplaceService {
     }
   }
 
-  async createListing(userId: string, organizationId: string, dto: CreateListingDto) {
+  // Resolves and authorizes the owning publisher for a listing mutation.
+  // Ownership is keyed on PublisherMembership, NOT organizationId (publishers
+  // have no active organization context, so an org check is unsound here).
+  private async resolveOwnedPublisherId(userId: string, activePublisherId: string | null, dtoPublisherId?: string): Promise<string> {
+    const publisherId = dtoPublisherId ?? activePublisherId
+    if (!publisherId) {
+      throw new BadRequestException("No publisher context for this listing")
+    }
+    const hasAccess = await this.verifyPublisherAccess(userId, publisherId)
+    if (!hasAccess) {
+      throw new ForbiddenException("You don't have access to this publisher")
+    }
+    return publisherId
+  }
+
+  async createListing(userId: string, activePublisherId: string | null, dto: CreateListingDto) {
     const slug = slugify(dto.title)
 
     // Check for duplicate slug
@@ -232,19 +258,19 @@ export class MarketplaceService {
       throw new BadRequestException("A listing with this title already exists")
     }
 
-    // Verify publisher access if publisher listing
-    if (dto.publisherId) {
-      const hasAccess = await this.verifyPublisherAccess(userId, dto.publisherId)
-      if (!hasAccess) {
-        throw new ForbiddenException("You don't have access to this publisher")
-      }
-    }
+    const publisherId = await this.resolveOwnedPublisherId(userId, activePublisherId, dto.publisherId)
+    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    if (!publisher) throw new NotFoundException("Publisher not found")
+
+    const data: any = { ...dto }
+    delete data.tags
 
     const listing = await this.prisma.marketplaceListing.create({
       data: {
-        ...dto,
+        ...data,
         slug,
-        organizationId,
+        publisherId,
+        organizationId: publisher.organizationId,
         status: dto.status || ListingStatus.DRAFT,
         tags: dto.tags ? {
           create: dto.tags.map(tagId => ({ tag: { connect: { id: tagId } } }))
@@ -256,25 +282,30 @@ export class MarketplaceService {
       },
     })
 
-    // Create audit log
-    await this.createAuditLog(userId, organizationId, "LISTING_CREATED", listing.id, { title: listing.title })
+    await this.createAuditLog(userId, publisher.organizationId, "LISTING_CREATED", listing.id, { title: listing.title })
 
     return listing
   }
 
-  async updateListing(userId: string, organizationId: string, listingId: string, dto: UpdateListingDto) {
+  async updateListing(userId: string, activePublisherId: string | null, listingId: string, dto: UpdateListingDto) {
     const listing = await this.prisma.marketplaceListing.findUnique({ where: { id: listingId } })
-    
+
     if (!listing) {
       throw new NotFoundException("Listing not found")
     }
-
-    if (listing.organizationId !== organizationId) {
+    if (!listing.publisherId) {
+      throw new ForbiddenException("You don't have access to this listing")
+    }
+    const hasAccess = await this.verifyPublisherAccess(userId, listing.publisherId)
+    if (!hasAccess) {
       throw new ForbiddenException("You don't have access to this listing")
     }
 
     const updateData: any = { ...dto }
     delete updateData.tags
+    // Ownership fields cannot be reassigned via update
+    delete updateData.publisherId
+    delete updateData.organizationId
 
     const updated = await this.prisma.marketplaceListing.update({
       where: { id: listingId },
@@ -291,19 +322,22 @@ export class MarketplaceService {
       },
     })
 
-    await this.createAuditLog(userId, organizationId, "LISTING_UPDATED", listingId, { changes: Object.keys(dto) })
+    await this.createAuditLog(userId, listing.organizationId, "LISTING_UPDATED", listingId, { changes: Object.keys(dto) })
 
     return updated
   }
 
-  async deleteListing(userId: string, organizationId: string, listingId: string) {
+  async deleteListing(userId: string, activePublisherId: string | null, listingId: string) {
     const listing = await this.prisma.marketplaceListing.findUnique({ where: { id: listingId } })
-    
+
     if (!listing) {
       throw new NotFoundException("Listing not found")
     }
-
-    if (listing.organizationId !== organizationId) {
+    if (!listing.publisherId) {
+      throw new ForbiddenException("You don't have access to this listing")
+    }
+    const hasAccess = await this.verifyPublisherAccess(userId, listing.publisherId)
+    if (!hasAccess) {
       throw new ForbiddenException("You don't have access to this listing")
     }
 
@@ -312,7 +346,7 @@ export class MarketplaceService {
       data: { status: ListingStatus.ARCHIVED },
     })
 
-    await this.createAuditLog(userId, organizationId, "LISTING_DELETED", listingId, { title: listing.title })
+    await this.createAuditLog(userId, listing.organizationId, "LISTING_DELETED", listingId, { title: listing.title })
   }
 
   // =============================================================================
@@ -707,8 +741,8 @@ export class MarketplaceService {
   }
 
   private async createAuditLog(
-    userId: string, 
-    organizationId: string, 
+    userId: string,
+    organizationId: string | null,
     action: string, 
     entityId?: string, 
     metadata?: any
@@ -720,7 +754,7 @@ export class MarketplaceService {
         entityId,
         metadata,
         userId,
-        organizationId,
+        organizationId: organizationId ?? "SYSTEM",
       },
     })
   }

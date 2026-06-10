@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, NotFoundException } from "@nestjs/common"
+import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards, NotFoundException, ForbiddenException } from "@nestjs/common"
 import { WebsitesService } from "./websites.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
@@ -16,13 +16,16 @@ export class WebsitesController {
   ) {}
 
   private resolvePublisherId(publisherIdParam: string, user: any): string {
-    if (publisherIdParam === "current") {
-      if (!user.publisherId) {
-        throw new NotFoundException("No active publisher context")
-      }
-      return user.publisherId
+    if (!user.publisherId) {
+      throw new NotFoundException("No active publisher context")
     }
-    return publisherIdParam
+    // Only the caller's active publisher may be managed. Switching publishers
+    // requires PublisherMembership (validated in /identity/switch-publisher),
+    // so this blocks managing a sibling publisher in the same organization.
+    if (publisherIdParam !== "current" && publisherIdParam !== user.publisherId) {
+      throw new ForbiddenException("You can only manage your active publisher")
+    }
+    return user.publisherId
   }
 
    @MemberRoles("PUBLISHER_OWNER")

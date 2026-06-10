@@ -183,7 +183,7 @@ export class MarketplaceController {
   @MemberRoles("PUBLISHER_OWNER")
   @Post("listings")
   async createListing(@Body() body: CreateListingDto, @CurrentUser() user: any) {
-    return this.marketplaceService.createListing(user.id, user.organizationId, body)
+    return this.marketplaceService.createListing(user.id, user.publisherId, body)
   }
 
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
@@ -195,7 +195,7 @@ export class MarketplaceController {
     @Body() body: UpdateListingDto,
     @CurrentUser() user: any
   ) {
-    return this.marketplaceService.updateListing(user.id, user.organizationId, id, body)
+    return this.marketplaceService.updateListing(user.id, user.publisherId, id, body)
   }
 
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
@@ -203,7 +203,7 @@ export class MarketplaceController {
   @MemberRoles("PUBLISHER_OWNER")
   @Delete("listings/:id")
   async deleteListing(@Param("id") id: string, @CurrentUser() user: any) {
-    await this.marketplaceService.deleteListing(user.id, user.organizationId, id)
+    await this.marketplaceService.deleteListing(user.id, user.publisherId, id)
     return { success: true }
   }
 }
