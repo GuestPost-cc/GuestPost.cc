@@ -1,24 +1,15 @@
-import { Injectable, ForbiddenException, NotFoundException, BadRequestException } from "@nestjs/common"
+import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { OrdersService } from "../orders/orders.service"
 import { ServiceType } from "@guestpost/shared"
-
-const ALLOWED_TRANSITIONS: Record<string, string[]> = {
-  DRAFT: ["ASSIGNED", "CANCELLED"],
-  ASSIGNED: ["CONTENT_CREATION", "CANCELLED"],
-  CONTENT_CREATION: ["OUTREACH", "CANCELLED"],
-  OUTREACH: ["PUBLISHED", "CANCELLED"],
-  PUBLISHED: ["VERIFIED", "CANCELLED"],
-  VERIFIED: ["COMPLETED", "CANCELLED"],
-  COMPLETED: [],
-  CANCELLED: [],
-}
 
 @Injectable()
 export class CampaignsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly orders: OrdersService,
   ) {}
 
   async createOrder(data: {
@@ -31,12 +22,21 @@ export class CampaignsService {
     websiteId?: string
     organizationId: string
     campaignId?: string
+    idempotencyKey?: string
   }, userId: string) {
     if (data.websiteId) {
       const website = await this.prisma.website.findUnique({
         where: { id: data.websiteId },
       })
       if (!website) throw new NotFoundException("Website not found")
+      if (!website.isActive) throw new ForbiddenException("Website is not active")
+
+      // Orders may only target websites with an approved marketplace listing
+      const listing = await this.prisma.marketplaceListing.findFirst({
+        where: { websiteId: data.websiteId, status: "APPROVED" },
+        select: { id: true },
+      })
+      if (!listing) throw new ForbiddenException("Website does not have an approved marketplace listing")
     }
     if (data.campaignId) {
       const campaign = await this.prisma.campaign.findUnique({
@@ -47,59 +47,33 @@ export class CampaignsService {
         throw new ForbiddenException("Campaign does not belong to your organization")
       }
     }
-    const order = await this.prisma.order.create({
-      data: {
-        type: data.type,
-        title: data.title,
-        instructions: data.instructions,
-        targetUrl: data.targetUrl,
-        anchorText: data.anchorText,
-        customerId: data.customerId,
-        websiteId: data.websiteId,
-        organizationId: data.organizationId,
-        campaignId: data.campaignId,
-        status: "DRAFT",
-        paymentStatus: "PENDING",
-      },
-    })
+
+    // Delegate to the canonical order creation path: idempotency, item +
+    // amount calculation from the approved listing, and ORDER_CREATED event
+    const order = await this.orders.createOrder({
+      type: data.type,
+      title: data.title,
+      instructions: data.instructions,
+      customerId: data.customerId,
+      organizationId: data.organizationId,
+      campaignId: data.campaignId,
+      idempotencyKey: data.idempotencyKey,
+      targetUrl: data.targetUrl,
+      anchorText: data.anchorText,
+      items: data.websiteId
+        ? [{ websiteId: data.websiteId, targetUrl: data.targetUrl, anchorText: data.anchorText }]
+        : undefined,
+    }, userId)
+
     await this.audit.log({
       action: "ORDER_CREATED",
       entityType: "Order",
       entityId: order.id,
-      metadata: { type: data.type },
+      metadata: { type: data.type, campaignId: data.campaignId ?? null },
       userId,
       organizationId: data.organizationId,
     })
     return order
-  }
-
-  async updateOrderStatus(id: string, organizationId: string, status: any, userId: string) {
-    const order = await this.prisma.order.findFirst({
-      where: { id, organizationId },
-    })
-
-    if (!order) throw new NotFoundException(`Order ${id} not found`)
-
-    const allowed = ALLOWED_TRANSITIONS[order.status] ?? []
-    if (!allowed.includes(status)) {
-      throw new BadRequestException(
-        `Cannot transition order from ${order.status} to ${status}. Allowed: ${allowed.join(", ") || "none"}`,
-      )
-    }
-
-    const updated = await this.prisma.order.update({
-      where: { id },
-      data: { status },
-    })
-    await this.audit.log({
-      action: "ORDER_STATUS_CHANGED",
-      entityType: "Order",
-      entityId: id,
-      metadata: { from: order.status, to: status },
-      userId,
-      organizationId,
-    })
-    return updated
   }
 
   async getOrder(id: string, organizationId: string) {
@@ -110,6 +84,10 @@ export class CampaignsService {
         revisions: true,
         reports: true,
         website: true,
+        items: { include: { publications: true } },
+        events: { orderBy: { createdAt: "desc" } },
+        settlements: { include: { approvals: true } },
+        dispute: true,
       },
     })
 
@@ -117,12 +95,19 @@ export class CampaignsService {
     return order
   }
 
-  async listOrders(organizationId: string) {
-    return this.prisma.order.findMany({
-      where: { organizationId },
-      orderBy: { createdAt: "desc" },
-      include: { website: true, campaign: true },
-    })
+  async listOrders(organizationId: string, take = 50, skip = 0) {
+    const where = { organizationId }
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { website: true, campaign: true },
+        take,
+        skip,
+      }),
+      this.prisma.order.count({ where }),
+    ])
+    return { items, total, take, skip }
   }
 
   async createCampaign(data: { name: string; description?: string; organizationId: string }, userId: string) {
@@ -138,11 +123,18 @@ export class CampaignsService {
     return campaign
   }
 
-  async listCampaigns(organizationId: string) {
-    return this.prisma.campaign.findMany({
-      where: { organizationId },
-      orderBy: { createdAt: "desc" },
-    })
+  async listCampaigns(organizationId: string, take = 50, skip = 0) {
+    const where = { organizationId }
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.campaign.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take,
+        skip,
+      }),
+      this.prisma.campaign.count({ where }),
+    ])
+    return { items, total, take, skip }
   }
 
   async getCampaign(id: string, organizationId: string) {
@@ -157,17 +149,24 @@ export class CampaignsService {
     }
   }
 
-  async listCampaignOrders(campaignId: string, organizationId: string) {
+  async listCampaignOrders(campaignId: string, organizationId: string, take = 50, skip = 0) {
     const campaign = await this.prisma.campaign.findFirst({
       where: { id: campaignId, organizationId },
     })
     if (!campaign) throw new NotFoundException("Campaign not found")
 
-    return this.prisma.order.findMany({
-      where: { campaignId, organizationId },
-      orderBy: { createdAt: "desc" },
-      include: { items: true, website: true, settlements: true },
-    })
+    const where = { campaignId, organizationId }
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { items: true, website: true, settlements: true },
+        take,
+        skip,
+      }),
+      this.prisma.order.count({ where }),
+    ])
+    return { items, total, take, skip }
   }
 
   async deleteCampaign(id: string, organizationId: string, userId: string) {
@@ -187,14 +186,19 @@ export class CampaignsService {
     })
   }
 
-  async listPublisherOrders(publisherId: string) {
-    return this.prisma.order.findMany({
-      where: {
-        website: { publisherId },
-      },
-      orderBy: { createdAt: "desc" },
-      include: { website: true, campaign: true },
-    })
+  async listPublisherOrders(publisherId: string, take = 50, skip = 0) {
+    const where = { website: { publisherId } }
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.order.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { website: true, campaign: true },
+        take,
+        skip,
+      }),
+      this.prisma.order.count({ where }),
+    ])
+    return { items, total, take, skip }
   }
 
   async requestRevision(orderId: string, organizationId: string, notes: string, userId: string) {

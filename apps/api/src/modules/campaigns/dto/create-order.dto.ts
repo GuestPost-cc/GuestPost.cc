@@ -32,4 +32,9 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   campaignId?: string
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100)
+  idempotencyKey?: string
 }

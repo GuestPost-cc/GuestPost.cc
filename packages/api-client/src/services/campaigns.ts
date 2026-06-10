@@ -12,6 +12,19 @@ export type Campaign = {
   orderCount?: number
 }
 
+export interface Paginated<T> {
+  items: T[]
+  total: number
+  take: number
+  skip: number
+}
+
+export interface PaginationParams {
+  take?: number
+  skip?: number
+  [key: string]: string | number | boolean | undefined
+}
+
 export class CampaignsService {
   constructor(private client: HttpClient) {}
 
@@ -19,16 +32,23 @@ export class CampaignsService {
     return this.client.post<{ id: string; name: string }>("/campaigns", { json: data })
   }
 
-  listCampaigns() {
-    return this.client.get<Campaign[]>("/campaigns")
+  // Returns the items array; use listCampaignsPaginated for totals
+  async listCampaigns(params?: PaginationParams) {
+    const res = await this.listCampaignsPaginated(params)
+    return res.items
+  }
+
+  listCampaignsPaginated(params?: PaginationParams) {
+    return this.client.get<Paginated<Campaign>>("/campaigns", { params })
   }
 
   getCampaign(id: string) {
     return this.client.get<Campaign>(`/campaigns/${id}`)
   }
 
-  listCampaignOrders(id: string) {
-    return this.client.get<any[]>(`/campaigns/${id}/orders`)
+  async listCampaignOrders(id: string, params?: PaginationParams) {
+    const res = await this.client.get<Paginated<any>>(`/campaigns/${id}/orders`, { params })
+    return res.items
   }
 
   deleteCampaign(id: string) {
@@ -36,36 +56,36 @@ export class CampaignsService {
   }
 
   createOrder(data: {
-    campaignId: string
-    serviceType: ServiceType
-    websiteId: string
-    topic?: string
+    type: ServiceType
+    title?: string
     instructions?: string
-    budget?: number
+    targetUrl?: string
+    anchorText?: string
+    websiteId?: string
+    campaignId?: string
+    idempotencyKey?: string
   }) {
     return this.client.post<{ id: string; status: string }>("/campaigns/orders", { json: data })
   }
 
-  listOrders() {
-    return this.client.get<Array<{ id: string; serviceType: ServiceType; status: OrderStatus; createdAt: string }>>(
+  async listOrders(params?: PaginationParams) {
+    const res = await this.client.get<Paginated<{ id: string; type: ServiceType; status: OrderStatus; createdAt: string }>>(
       "/campaigns/orders",
+      { params },
     )
+    return res.items
   }
 
   getOrder(id: string) {
     return this.client.get<{
       id: string
       status: OrderStatus
-      serviceType: ServiceType
-      topic?: string
+      type: ServiceType
+      title?: string
       instructions?: string
-      price?: number
+      amount?: string | number
       createdAt: string
     }>(`/campaigns/orders/${id}`)
-  }
-
-  updateOrderStatus(id: string, status: OrderStatus) {
-    return this.client.patch(`/campaigns/orders/${id}/status`, { json: { status } })
   }
 
   requestRevision(orderId: string, data: { notes: string }) {
