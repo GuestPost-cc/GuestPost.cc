@@ -78,10 +78,14 @@ export class OrderPaymentService {
 
       await this.billing.reserve(wallet.id, verifiedTotal || amount, orderId, { id: userId, organizationId: userOrgId })
 
-      const updated = await tx.order.update({
-        where: { id: orderId },
-        data: { status: "PENDING_PAYMENT", amount: verifiedTotal || amount },
+      const submitted = await tx.order.updateMany({
+        where: { id: orderId, version: order.version },
+        data: { status: "PENDING_PAYMENT", amount: verifiedTotal || amount, version: { increment: 1 } },
       })
+      if (submitted.count === 0) {
+        throw new ConflictException("Order was modified by another request. Retry.")
+      }
+      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
 
       await tx.orderEvent.create({
         data: {
@@ -112,7 +116,15 @@ export class OrderPaymentService {
         organizationId: order.organizationId,
       })
 
-      await tx.order.update({ where: { id: orderId }, data: { paymentStatus: "PAID", status: "PAID" } })
+      // Version-guard the capture transition; payFromReserved is already
+      // idempotency-protected on reserved balance, this guards the order row.
+      const captured = await tx.order.updateMany({
+        where: { id: orderId, version: order.version },
+        data: { paymentStatus: "PAID", status: "PAID", version: { increment: 1 } },
+      })
+      if (captured.count === 0) {
+        throw new ConflictException("Order was modified by another request. Retry.")
+      }
 
       await tx.orderEvent.create({
         data: {

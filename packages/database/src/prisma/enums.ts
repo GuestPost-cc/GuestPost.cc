@@ -214,6 +214,18 @@ export const SettlementApprovalType = {
 export type SettlementApprovalType = (typeof SettlementApprovalType)[keyof typeof SettlementApprovalType]
 
 
+export const TransactionType = {
+  DEPOSIT: 'DEPOSIT',
+  PURCHASE: 'PURCHASE',
+  REFUND: 'REFUND',
+  WITHDRAWAL: 'WITHDRAWAL',
+  SETTLEMENT_RELEASE: 'SETTLEMENT_RELEASE',
+  RESERVATION: 'RESERVATION'
+} as const
+
+export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType]
+
+
 export const ListingType = {
   INTERNAL_SERVICE: 'INTERNAL_SERVICE',
   PUBLISHER_WEBSITE: 'PUBLISHER_WEBSITE',

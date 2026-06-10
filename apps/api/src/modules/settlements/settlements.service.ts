@@ -4,6 +4,7 @@ import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { QUEUES } from "@guestpost/shared"
 import { Decimal } from "@prisma/client/runtime/library"
+import { resolvePlatformFeeFraction } from "../../common/platform-fee"
 
 @Injectable()
 export class SettlementsService {
@@ -29,8 +30,8 @@ export class SettlementsService {
     const publisherId = item?.website?.publisherId
     if (!publisherId) throw new BadRequestException("No publisher found for this order")
 
-    const feePercent = Math.min(Math.max(Number(process.env.PLATFORM_FEE_PERCENT ?? 20), 0), 100)
-    const platformFee = Number(order.amount) * (feePercent / 100)
+    const feeFraction = await resolvePlatformFeeFraction(this.prisma)
+    const platformFee = Number(order.amount) * feeFraction
     const publisherAmount = Number(order.amount) - platformFee
 
     const reviewDays = Math.max(Number(process.env.SETTLEMENT_REVIEW_DAYS ?? 7), 0)

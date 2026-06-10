@@ -96,10 +96,14 @@ export class RefundService {
         }
       }
 
-      const updated = await tx.order.update({
-        where: { id: orderId },
-        data: { status: "REFUNDED", paymentStatus: "REFUNDED" },
+      const refundedOrder = await tx.order.updateMany({
+        where: { id: orderId, version: order.version },
+        data: { status: "REFUNDED", paymentStatus: "REFUNDED", version: { increment: 1 } },
       })
+      if (refundedOrder.count === 0) {
+        throw new ConflictException("Order was modified by another request. Retry.")
+      }
+      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
 
       await tx.transaction.create({
         data: {

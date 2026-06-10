@@ -252,13 +252,18 @@ export class OrdersService {
         }
       }
 
-      const updated = await tx.order.update({
-        where: { id: orderId },
+      const cancelled = await tx.order.updateMany({
+        where: { id: orderId, version: order.version },
         data: {
           status: "CANCELLED",
+          version: { increment: 1 },
           ...(order.paymentStatus === "PAID" ? { paymentStatus: "REFUNDED" } : {}),
         },
       })
+      if (cancelled.count === 0) {
+        throw new ConflictException("Order was modified by another request. Retry.")
+      }
+      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
 
       await tx.orderEvent.create({
         data: {

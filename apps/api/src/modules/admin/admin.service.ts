@@ -226,15 +226,20 @@ export class AdminService {
     if (order.status !== "PUBLISHED") throw new BadRequestException("Order must be in PUBLISHED status to verify")
 
     return this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.order.update({
-        where: { id: orderId },
+      const verified = await tx.order.updateMany({
+        where: { id: orderId, version: order.version },
         data: {
           status: "VERIFIED",
           verifiedAt: new Date(),
           verifiedBy: userId,
           verifyMethod: method,
+          version: { increment: 1 },
         },
       })
+      if (verified.count === 0) {
+        throw new ConflictException("Order was modified by another request. Retry.")
+      }
+      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
 
       await tx.orderEvent.create({
         data: {
@@ -284,10 +289,14 @@ export class AdminService {
         })
       }
 
-      const updated = await tx.order.update({
-        where: { id: orderId },
-        data: { status: "CANCELLED" },
+      const cancelled = await tx.order.updateMany({
+        where: { id: orderId, version: order.version },
+        data: { status: "CANCELLED", version: { increment: 1 } },
       })
+      if (cancelled.count === 0) {
+        throw new ConflictException("Order was modified by another request. Retry.")
+      }
+      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
 
       await tx.orderEvent.create({
         data: {

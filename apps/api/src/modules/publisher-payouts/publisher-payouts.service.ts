@@ -114,8 +114,8 @@ export class PublisherPayoutsService {
     const result = await this.prisma.$transaction(async (tx: any) => {
       // Status-guarded write: concurrent approve/reject — only one transition wins
       const transitioned = await tx.withdrawal.updateMany({
-        where: { id, status: "PENDING" },
-        data: { status: "APPROVED", approvedBy, approvedAt: new Date() },
+        where: { id, status: "PENDING", version: withdrawal.version },
+        data: { status: "APPROVED", approvedBy, approvedAt: new Date(), version: { increment: 1 } },
       })
       if (transitioned.count === 0) {
         throw new ConflictException("Withdrawal is no longer pending")
@@ -167,8 +167,8 @@ export class PublisherPayoutsService {
     return this.prisma.$transaction(async (tx: any) => {
       // Status-guarded write: prevents double mark-paid (double lifetimePaid increment)
       const transitioned = await tx.withdrawal.updateMany({
-        where: { id, status: "APPROVED" },
-        data: { status: "COMPLETED", approvedBy, approvedAt: new Date() },
+        where: { id, status: "APPROVED", version: withdrawal.version },
+        data: { status: "COMPLETED", approvedBy, approvedAt: new Date(), version: { increment: 1 } },
       })
       if (transitioned.count === 0) {
         throw new ConflictException("Withdrawal is not in APPROVED state")
@@ -215,8 +215,8 @@ export class PublisherPayoutsService {
     const result = await this.prisma.$transaction(async (tx: any) => {
       // Status-guarded write: prevents double reject (double balance restore)
       const transitioned = await tx.withdrawal.updateMany({
-        where: { id, status: "PENDING" },
-        data: { status: "REJECTED", approvedBy, approvedAt: new Date() },
+        where: { id, status: "PENDING", version: withdrawal.version },
+        data: { status: "REJECTED", approvedBy, approvedAt: new Date(), version: { increment: 1 } },
       })
       if (transitioned.count === 0) {
         throw new ConflictException("Withdrawal is no longer pending")

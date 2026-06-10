@@ -28,10 +28,12 @@ export type AggregateWithdrawal = {
 
 export type WithdrawalAvgAggregateOutputType = {
   amount: runtime.Decimal | null
+  version: number | null
 }
 
 export type WithdrawalSumAggregateOutputType = {
   amount: runtime.Decimal | null
+  version: number | null
 }
 
 export type WithdrawalMinAggregateOutputType = {
@@ -42,6 +44,7 @@ export type WithdrawalMinAggregateOutputType = {
   status: $Enums.WithdrawalStatus | null
   approvedBy: string | null
   approvedAt: Date | null
+  version: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -54,6 +57,7 @@ export type WithdrawalMaxAggregateOutputType = {
   status: $Enums.WithdrawalStatus | null
   approvedBy: string | null
   approvedAt: Date | null
+  version: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -66,6 +70,7 @@ export type WithdrawalCountAggregateOutputType = {
   status: number
   approvedBy: number
   approvedAt: number
+  version: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -74,10 +79,12 @@ export type WithdrawalCountAggregateOutputType = {
 
 export type WithdrawalAvgAggregateInputType = {
   amount?: true
+  version?: true
 }
 
 export type WithdrawalSumAggregateInputType = {
   amount?: true
+  version?: true
 }
 
 export type WithdrawalMinAggregateInputType = {
@@ -88,6 +95,7 @@ export type WithdrawalMinAggregateInputType = {
   status?: true
   approvedBy?: true
   approvedAt?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -100,6 +108,7 @@ export type WithdrawalMaxAggregateInputType = {
   status?: true
   approvedBy?: true
   approvedAt?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -112,6 +121,7 @@ export type WithdrawalCountAggregateInputType = {
   status?: true
   approvedBy?: true
   approvedAt?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -211,6 +221,7 @@ export type WithdrawalGroupByOutputType = {
   status: $Enums.WithdrawalStatus
   approvedBy: string | null
   approvedAt: Date | null
+  version: number
   createdAt: Date
   updatedAt: Date
   _count: WithdrawalCountAggregateOutputType | null
@@ -246,6 +257,7 @@ export type WithdrawalWhereInput = {
   status?: Prisma.EnumWithdrawalStatusFilter<"Withdrawal"> | $Enums.WithdrawalStatus
   approvedBy?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
   approvedAt?: Prisma.DateTimeNullableFilter<"Withdrawal"> | Date | string | null
+  version?: Prisma.IntFilter<"Withdrawal"> | number
   createdAt?: Prisma.DateTimeFilter<"Withdrawal"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Withdrawal"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
@@ -260,6 +272,7 @@ export type WithdrawalOrderByWithRelationInput = {
   status?: Prisma.SortOrder
   approvedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   publisher?: Prisma.PublisherOrderByWithRelationInput
@@ -277,6 +290,7 @@ export type WithdrawalWhereUniqueInput = Prisma.AtLeast<{
   status?: Prisma.EnumWithdrawalStatusFilter<"Withdrawal"> | $Enums.WithdrawalStatus
   approvedBy?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
   approvedAt?: Prisma.DateTimeNullableFilter<"Withdrawal"> | Date | string | null
+  version?: Prisma.IntFilter<"Withdrawal"> | number
   createdAt?: Prisma.DateTimeFilter<"Withdrawal"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Withdrawal"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
@@ -291,6 +305,7 @@ export type WithdrawalOrderByWithAggregationInput = {
   status?: Prisma.SortOrder
   approvedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   approvedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.WithdrawalCountOrderByAggregateInput
@@ -311,6 +326,7 @@ export type WithdrawalScalarWhereWithAggregatesInput = {
   status?: Prisma.EnumWithdrawalStatusWithAggregatesFilter<"Withdrawal"> | $Enums.WithdrawalStatus
   approvedBy?: Prisma.StringNullableWithAggregatesFilter<"Withdrawal"> | string | null
   approvedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Withdrawal"> | Date | string | null
+  version?: Prisma.IntWithAggregatesFilter<"Withdrawal"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Withdrawal"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Withdrawal"> | Date | string
 }
@@ -321,6 +337,7 @@ export type WithdrawalCreateInput = {
   method?: string
   status?: $Enums.WithdrawalStatus
   approvedAt?: Date | string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher: Prisma.PublisherCreateNestedOneWithoutWithdrawalsInput
@@ -335,6 +352,7 @@ export type WithdrawalUncheckedCreateInput = {
   status?: $Enums.WithdrawalStatus
   approvedBy?: string | null
   approvedAt?: Date | string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -345,6 +363,7 @@ export type WithdrawalUpdateInput = {
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutWithdrawalsNestedInput
@@ -359,6 +378,7 @@ export type WithdrawalUncheckedUpdateInput = {
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -371,6 +391,7 @@ export type WithdrawalCreateManyInput = {
   status?: $Enums.WithdrawalStatus
   approvedBy?: string | null
   approvedAt?: Date | string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -381,6 +402,7 @@ export type WithdrawalUpdateManyMutationInput = {
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -393,6 +415,7 @@ export type WithdrawalUncheckedUpdateManyInput = {
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -415,12 +438,14 @@ export type WithdrawalCountOrderByAggregateInput = {
   status?: Prisma.SortOrder
   approvedBy?: Prisma.SortOrder
   approvedAt?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
 export type WithdrawalAvgOrderByAggregateInput = {
   amount?: Prisma.SortOrder
+  version?: Prisma.SortOrder
 }
 
 export type WithdrawalMaxOrderByAggregateInput = {
@@ -431,6 +456,7 @@ export type WithdrawalMaxOrderByAggregateInput = {
   status?: Prisma.SortOrder
   approvedBy?: Prisma.SortOrder
   approvedAt?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -443,12 +469,14 @@ export type WithdrawalMinOrderByAggregateInput = {
   status?: Prisma.SortOrder
   approvedBy?: Prisma.SortOrder
   approvedAt?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
 export type WithdrawalSumOrderByAggregateInput = {
   amount?: Prisma.SortOrder
+  version?: Prisma.SortOrder
 }
 
 export type WithdrawalCreateNestedManyWithoutApprovedByUserInput = {
@@ -545,6 +573,7 @@ export type WithdrawalCreateWithoutApprovedByUserInput = {
   method?: string
   status?: $Enums.WithdrawalStatus
   approvedAt?: Date | string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher: Prisma.PublisherCreateNestedOneWithoutWithdrawalsInput
@@ -557,6 +586,7 @@ export type WithdrawalUncheckedCreateWithoutApprovedByUserInput = {
   method?: string
   status?: $Enums.WithdrawalStatus
   approvedAt?: Date | string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -598,6 +628,7 @@ export type WithdrawalScalarWhereInput = {
   status?: Prisma.EnumWithdrawalStatusFilter<"Withdrawal"> | $Enums.WithdrawalStatus
   approvedBy?: Prisma.StringNullableFilter<"Withdrawal"> | string | null
   approvedAt?: Prisma.DateTimeNullableFilter<"Withdrawal"> | Date | string | null
+  version?: Prisma.IntFilter<"Withdrawal"> | number
   createdAt?: Prisma.DateTimeFilter<"Withdrawal"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Withdrawal"> | Date | string
 }
@@ -608,6 +639,7 @@ export type WithdrawalCreateWithoutPublisherInput = {
   method?: string
   status?: $Enums.WithdrawalStatus
   approvedAt?: Date | string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   approvedByUser?: Prisma.UserCreateNestedOneWithoutApprovedWithdrawalsInput
@@ -620,6 +652,7 @@ export type WithdrawalUncheckedCreateWithoutPublisherInput = {
   status?: $Enums.WithdrawalStatus
   approvedBy?: string | null
   approvedAt?: Date | string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -657,6 +690,7 @@ export type WithdrawalCreateManyApprovedByUserInput = {
   method?: string
   status?: $Enums.WithdrawalStatus
   approvedAt?: Date | string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -667,6 +701,7 @@ export type WithdrawalUpdateWithoutApprovedByUserInput = {
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutWithdrawalsNestedInput
@@ -679,6 +714,7 @@ export type WithdrawalUncheckedUpdateWithoutApprovedByUserInput = {
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -690,6 +726,7 @@ export type WithdrawalUncheckedUpdateManyWithoutApprovedByUserInput = {
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -701,6 +738,7 @@ export type WithdrawalCreateManyPublisherInput = {
   status?: $Enums.WithdrawalStatus
   approvedBy?: string | null
   approvedAt?: Date | string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -711,6 +749,7 @@ export type WithdrawalUpdateWithoutPublisherInput = {
   method?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   approvedByUser?: Prisma.UserUpdateOneWithoutApprovedWithdrawalsNestedInput
@@ -723,6 +762,7 @@ export type WithdrawalUncheckedUpdateWithoutPublisherInput = {
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -734,6 +774,7 @@ export type WithdrawalUncheckedUpdateManyWithoutPublisherInput = {
   status?: Prisma.EnumWithdrawalStatusFieldUpdateOperationsInput | $Enums.WithdrawalStatus
   approvedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   approvedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -748,6 +789,7 @@ export type WithdrawalSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   status?: boolean
   approvedBy?: boolean
   approvedAt?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -762,6 +804,7 @@ export type WithdrawalSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   status?: boolean
   approvedBy?: boolean
   approvedAt?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -776,6 +819,7 @@ export type WithdrawalSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   status?: boolean
   approvedBy?: boolean
   approvedAt?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -790,11 +834,12 @@ export type WithdrawalSelectScalar = {
   status?: boolean
   approvedBy?: boolean
   approvedAt?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type WithdrawalOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "amount" | "method" | "status" | "approvedBy" | "approvedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["withdrawal"]>
+export type WithdrawalOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "amount" | "method" | "status" | "approvedBy" | "approvedAt" | "version" | "createdAt" | "updatedAt", ExtArgs["result"]["withdrawal"]>
 export type WithdrawalInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   approvedByUser?: boolean | Prisma.Withdrawal$approvedByUserArgs<ExtArgs>
@@ -822,6 +867,7 @@ export type $WithdrawalPayload<ExtArgs extends runtime.Types.Extensions.Internal
     status: $Enums.WithdrawalStatus
     approvedBy: string | null
     approvedAt: Date | null
+    version: number
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["withdrawal"]>
@@ -1256,6 +1302,7 @@ export interface WithdrawalFieldRefs {
   readonly status: Prisma.FieldRef<"Withdrawal", 'WithdrawalStatus'>
   readonly approvedBy: Prisma.FieldRef<"Withdrawal", 'String'>
   readonly approvedAt: Prisma.FieldRef<"Withdrawal", 'DateTime'>
+  readonly version: Prisma.FieldRef<"Withdrawal", 'Int'>
   readonly createdAt: Prisma.FieldRef<"Withdrawal", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Withdrawal", 'DateTime'>
 }

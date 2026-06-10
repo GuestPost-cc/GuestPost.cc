@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from "@nestjs/common"
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
@@ -12,6 +12,20 @@ export class OrderFulfillmentService {
     private readonly queue: QueueService,
   ) {}
 
+  // Optimistic-lock status transition: the row only changes if its version
+  // still matches what the caller read, preventing lost updates / concurrent
+  // state corruption. Returns the fresh row.
+  private async transition(orderId: string, fromVersion: number, data: any) {
+    const r = await this.prisma.order.updateMany({
+      where: { id: orderId, version: fromVersion },
+      data: { ...data, version: { increment: 1 } },
+    })
+    if (r.count === 0) {
+      throw new ConflictException("Order was modified by another request. Retry.")
+    }
+    return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
+  }
+
   async acceptOrder(orderId: string, publisherId: string, userId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, website: { publisherId } },
@@ -19,10 +33,7 @@ export class OrderFulfillmentService {
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "SUBMITTED") throw new BadRequestException("Order must be SUBMITTED to accept")
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "ACCEPTED", assigneeId: userId },
-    })
+    const updated = await this.transition(orderId, order.version, { status: "ACCEPTED", assigneeId: userId })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -54,10 +65,7 @@ export class OrderFulfillmentService {
       throw new BadRequestException("Order must be ACCEPTED or CONTENT_REQUESTED to submit content")
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "CONTENT_CREATION" },
-    })
+    const updated = await this.transition(orderId, order.version, { status: "CONTENT_CREATION" })
 
     // Upsert content order
     await this.prisma.contentOrder.upsert({
@@ -88,10 +96,7 @@ export class OrderFulfillmentService {
       throw new BadRequestException("Order must be in CONTENT_CREATION to mark content ready")
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "CONTENT_READY" },
-    })
+    const updated = await this.transition(orderId, order.version, { status: "CONTENT_READY" })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -114,10 +119,7 @@ export class OrderFulfillmentService {
       throw new BadRequestException("Content must be ready before submitting for review")
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "CUSTOMER_REVIEW" },
-    })
+    const updated = await this.transition(orderId, order.version, { status: "CUSTOMER_REVIEW" })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -155,10 +157,7 @@ export class OrderFulfillmentService {
       throw new BadRequestException("publishedUrl must use http or https")
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "PUBLISHED", publishedUrl, publishedAt: new Date() },
-    })
+    const updated = await this.transition(orderId, order.version, { status: "PUBLISHED", publishedUrl, publishedAt: new Date() })
 
     await this.prisma.orderEvent.create({
       data: {

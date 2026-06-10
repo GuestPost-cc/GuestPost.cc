@@ -98,7 +98,8 @@ export const ModelName = {
   MarketplaceRecommendation: 'MarketplaceRecommendation',
   PublisherProfile: 'PublisherProfile',
   MarketplaceFlag: 'MarketplaceFlag',
-  ListingFulfillmentRule: 'ListingFulfillmentRule'
+  ListingFulfillmentRule: 'ListingFulfillmentRule',
+  PlatformSettings: 'PlatformSettings'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -303,6 +304,7 @@ export const OrderScalarFieldEnum = {
   organizationId: 'organizationId',
   campaignId: 'campaignId',
   idempotencyKey: 'idempotencyKey',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -454,6 +456,7 @@ export const WithdrawalScalarFieldEnum = {
   status: 'status',
   approvedBy: 'approvedBy',
   approvedAt: 'approvedAt',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -862,6 +865,16 @@ export const ListingFulfillmentRuleScalarFieldEnum = {
 } as const
 
 export type ListingFulfillmentRuleScalarFieldEnum = (typeof ListingFulfillmentRuleScalarFieldEnum)[keyof typeof ListingFulfillmentRuleScalarFieldEnum]
+
+
+export const PlatformSettingsScalarFieldEnum = {
+  id: 'id',
+  platformFeePct: 'platformFeePct',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PlatformSettingsScalarFieldEnum = (typeof PlatformSettingsScalarFieldEnum)[keyof typeof PlatformSettingsScalarFieldEnum]
 
 
 export const SortOrder = {

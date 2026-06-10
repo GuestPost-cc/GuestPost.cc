@@ -243,7 +243,12 @@ model ActiveContext {
   activeOrganizationId String?
   activePublisherId    String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activeOrganization Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
+  activePublisher    Publisher?    @relation(fields: [activePublisherId], references: [id], onDelete: SetNull)
+
+  @@index([activeOrganizationId])
+  @@index([activePublisherId])
 }
 
 model Organization {
@@ -266,6 +271,7 @@ model Organization {
   auditLogs      AuditLog[]
   apiKeys        ApiKey[]
   marketplaceListings MarketplaceListing[]
+  activeContexts ActiveContext[]
 }
 
 model Membership {
@@ -338,6 +344,7 @@ model Publisher {
   marketplaceListings MarketplaceListing[]
   profile             PublisherProfile?
   transactions        Transaction[]
+  activeContexts      ActiveContext[]
 
   @@index([organizationId])
 }
@@ -388,6 +395,7 @@ model Order {
   organizationId     String
   campaignId         String?
   idempotencyKey     String?
+  version            Int           @default(0)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -581,6 +589,7 @@ model Withdrawal {
   status      WithdrawalStatus @default(PENDING)
   approvedBy  String?
   approvedAt  DateTime?
+  version     Int              @default(0)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
@@ -668,11 +677,20 @@ model Wallet {
   @@index([userId])
 }
 
+enum TransactionType {
+  DEPOSIT
+  PURCHASE
+  REFUND
+  WITHDRAWAL
+  SETTLEMENT_RELEASE
+  RESERVATION
+}
+
 model Transaction {
   id          String   @id @default(cuid())
   amount      Decimal
   currency    String   @default("USD")
-  type        String
+  type        TransactionType
   reference   String?
   description String?
   walletId    String?
@@ -1126,4 +1144,13 @@ model ListingFulfillmentRule {
   updatedAt   DateTime @updatedAt
 
   @@index([listingId])
+}
+
+// Singleton platform configuration (one row). Values resolved at runtime;
+// historical settlements retain the rate captured at creation time.
+model PlatformSettings {
+  id             String   @id @default(cuid())
+  platformFeePct Decimal  @default(20)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

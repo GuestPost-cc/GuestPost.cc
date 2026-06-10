@@ -267,3 +267,8 @@ export type MarketplaceFlag = Prisma.MarketplaceFlagModel
  * 
  */
 export type ListingFulfillmentRule = Prisma.ListingFulfillmentRuleModel
+/**
+ * Model PlatformSettings
+ * 
+ */
+export type PlatformSettings = Prisma.PlatformSettingsModel

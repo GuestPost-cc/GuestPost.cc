@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from "@nestjs/common"
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { RefundService } from "./refund.service"
@@ -10,6 +10,16 @@ export class OrderDisputeService {
     private readonly audit: AuditService,
     private readonly refund: RefundService,
   ) {}
+
+  private async transitionOrder(orderId: string, fromVersion: number, data: any) {
+    const r = await this.prisma.order.updateMany({
+      where: { id: orderId, version: fromVersion },
+      data: { ...data, version: { increment: 1 } },
+    })
+    if (r.count === 0) {
+      throw new ConflictException("Order was modified by another request. Retry.")
+    }
+  }
 
   async openDispute(orderId: string, organizationId: string, userId: string, reason: string) {
     const order = await this.prisma.order.findFirst({
@@ -36,10 +46,7 @@ export class OrderDisputeService {
       },
     })
 
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "DISPUTED" },
-    })
+    await this.transitionOrder(orderId, order.version, { status: "DISPUTED" })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -89,10 +96,7 @@ export class OrderDisputeService {
         },
       })
 
-      await this.prisma.order.update({
-        where: { id: order.id },
-        data: { status: previousStatus as any },
-      })
+      await this.transitionOrder(order.id, order.version, { status: previousStatus as any })
     } else if (action === "REFUND") {
       // Refund first — if it fails, the dispute stays open instead of being
       // marked resolved with the customer never refunded
@@ -120,10 +124,7 @@ export class OrderDisputeService {
 
       // Restore order to pre-dispute state
       const previousStatus = order.status === "DISPUTED" ? "PUBLISHED" : order.status
-      await this.prisma.order.update({
-        where: { id: order.id },
-        data: { status: previousStatus as any },
-      })
+      await this.transitionOrder(order.id, order.version, { status: previousStatus as any })
     }
 
     await this.prisma.orderEvent.create({

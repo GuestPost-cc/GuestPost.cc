@@ -1,8 +1,9 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from "@nestjs/common"
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
 import { QUEUES } from "@guestpost/shared"
+import { resolvePlatformFeeFraction } from "../../../common/platform-fee"
 
 @Injectable()
 export class OrderReviewService {
@@ -11,6 +12,17 @@ export class OrderReviewService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
   ) {}
+
+  private async transition(orderId: string, fromVersion: number, data: any) {
+    const r = await this.prisma.order.updateMany({
+      where: { id: orderId, version: fromVersion },
+      data: { ...data, version: { increment: 1 } },
+    })
+    if (r.count === 0) {
+      throw new ConflictException("Order was modified by another request. Retry.")
+    }
+    return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
+  }
 
   async approveContent(orderId: string, organizationId: string, userId: string) {
     const order = await this.prisma.order.findFirst({
@@ -31,10 +43,7 @@ export class OrderReviewService {
       throw new ForbiddenException("Only organization owner or order creator can approve content")
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "APPROVED" },
-    })
+    const updated = await this.transition(orderId, order.version, { status: "APPROVED" })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -79,12 +88,9 @@ export class OrderReviewService {
       throw new BadRequestException(`Maximum revisions (${maxRevisions}) reached. Open a dispute if unsatisfied.`)
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: {
-        status: "CONTENT_REQUESTED",
-        revisionCount: { increment: 1 },
-      },
+    const updated = await this.transition(orderId, order.version, {
+      status: "CONTENT_REQUESTED",
+      revisionCount: { increment: 1 },
     })
 
     await this.prisma.revision.create({
@@ -131,10 +137,7 @@ export class OrderReviewService {
       throw new ForbiddenException("Only organization owner or order creator can confirm delivery")
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: "DELIVERED", deliveredAt: new Date() },
-    })
+    const updated = await this.transition(orderId, order.version, { status: "DELIVERED", deliveredAt: new Date() })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -176,7 +179,8 @@ export class OrderReviewService {
     if (!publisher) return
 
     const grossAmount = order.amount ? Number(order.amount) : 0
-    const platformFee = grossAmount * 0.2
+    const feeFraction = await resolvePlatformFeeFraction(this.prisma)
+    const platformFee = grossAmount * feeFraction
     const publisherAmount = grossAmount - platformFee
     const reviewDays = 5
     const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)

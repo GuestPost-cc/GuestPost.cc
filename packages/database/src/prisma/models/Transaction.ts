@@ -38,7 +38,7 @@ export type TransactionMinAggregateOutputType = {
   id: string | null
   amount: runtime.Decimal | null
   currency: string | null
-  type: string | null
+  type: $Enums.TransactionType | null
   reference: string | null
   description: string | null
   walletId: string | null
@@ -52,7 +52,7 @@ export type TransactionMaxAggregateOutputType = {
   id: string | null
   amount: runtime.Decimal | null
   currency: string | null
-  type: string | null
+  type: $Enums.TransactionType | null
   reference: string | null
   description: string | null
   walletId: string | null
@@ -219,7 +219,7 @@ export type TransactionGroupByOutputType = {
   id: string
   amount: runtime.Decimal
   currency: string
-  type: string
+  type: $Enums.TransactionType
   reference: string | null
   description: string | null
   walletId: string | null
@@ -256,7 +256,7 @@ export type TransactionWhereInput = {
   id?: Prisma.StringFilter<"Transaction"> | string
   amount?: Prisma.DecimalFilter<"Transaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFilter<"Transaction"> | string
-  type?: Prisma.StringFilter<"Transaction"> | string
+  type?: Prisma.EnumTransactionTypeFilter<"Transaction"> | $Enums.TransactionType
   reference?: Prisma.StringNullableFilter<"Transaction"> | string | null
   description?: Prisma.StringNullableFilter<"Transaction"> | string | null
   walletId?: Prisma.StringNullableFilter<"Transaction"> | string | null
@@ -296,7 +296,7 @@ export type TransactionWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.TransactionWhereInput | Prisma.TransactionWhereInput[]
   amount?: Prisma.DecimalFilter<"Transaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFilter<"Transaction"> | string
-  type?: Prisma.StringFilter<"Transaction"> | string
+  type?: Prisma.EnumTransactionTypeFilter<"Transaction"> | $Enums.TransactionType
   description?: Prisma.StringNullableFilter<"Transaction"> | string | null
   walletId?: Prisma.StringNullableFilter<"Transaction"> | string | null
   orderId?: Prisma.StringNullableFilter<"Transaction"> | string | null
@@ -335,7 +335,7 @@ export type TransactionScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"Transaction"> | string
   amount?: Prisma.DecimalWithAggregatesFilter<"Transaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringWithAggregatesFilter<"Transaction"> | string
-  type?: Prisma.StringWithAggregatesFilter<"Transaction"> | string
+  type?: Prisma.EnumTransactionTypeWithAggregatesFilter<"Transaction"> | $Enums.TransactionType
   reference?: Prisma.StringNullableWithAggregatesFilter<"Transaction"> | string | null
   description?: Prisma.StringNullableWithAggregatesFilter<"Transaction"> | string | null
   walletId?: Prisma.StringNullableWithAggregatesFilter<"Transaction"> | string | null
@@ -349,7 +349,7 @@ export type TransactionCreateInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   createdAt?: Date | string
@@ -363,7 +363,7 @@ export type TransactionUncheckedCreateInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   walletId?: string | null
@@ -377,7 +377,7 @@ export type TransactionUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -391,7 +391,7 @@ export type TransactionUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -405,7 +405,7 @@ export type TransactionCreateManyInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   walletId?: string | null
@@ -419,7 +419,7 @@ export type TransactionUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -429,7 +429,7 @@ export type TransactionUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -667,11 +667,15 @@ export type TransactionUncheckedUpdateManyWithoutWalletNestedInput = {
   deleteMany?: Prisma.TransactionScalarWhereInput | Prisma.TransactionScalarWhereInput[]
 }
 
+export type EnumTransactionTypeFieldUpdateOperationsInput = {
+  set?: $Enums.TransactionType
+}
+
 export type TransactionCreateWithoutPublisherInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   createdAt?: Date | string
@@ -684,7 +688,7 @@ export type TransactionUncheckedCreateWithoutPublisherInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   walletId?: string | null
@@ -726,7 +730,7 @@ export type TransactionScalarWhereInput = {
   id?: Prisma.StringFilter<"Transaction"> | string
   amount?: Prisma.DecimalFilter<"Transaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFilter<"Transaction"> | string
-  type?: Prisma.StringFilter<"Transaction"> | string
+  type?: Prisma.EnumTransactionTypeFilter<"Transaction"> | $Enums.TransactionType
   reference?: Prisma.StringNullableFilter<"Transaction"> | string | null
   description?: Prisma.StringNullableFilter<"Transaction"> | string | null
   walletId?: Prisma.StringNullableFilter<"Transaction"> | string | null
@@ -740,7 +744,7 @@ export type TransactionCreateWithoutOrderInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   createdAt?: Date | string
@@ -753,7 +757,7 @@ export type TransactionUncheckedCreateWithoutOrderInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   walletId?: string | null
@@ -792,7 +796,7 @@ export type TransactionCreateWithoutSettlementInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   createdAt?: Date | string
@@ -805,7 +809,7 @@ export type TransactionUncheckedCreateWithoutSettlementInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   walletId?: string | null
@@ -844,7 +848,7 @@ export type TransactionCreateWithoutWalletInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   createdAt?: Date | string
@@ -857,7 +861,7 @@ export type TransactionUncheckedCreateWithoutWalletInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   orderId?: string | null
@@ -896,7 +900,7 @@ export type TransactionCreateManyPublisherInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   walletId?: string | null
@@ -909,7 +913,7 @@ export type TransactionUpdateWithoutPublisherInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -922,7 +926,7 @@ export type TransactionUncheckedUpdateWithoutPublisherInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -935,7 +939,7 @@ export type TransactionUncheckedUpdateManyWithoutPublisherInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -948,7 +952,7 @@ export type TransactionCreateManyOrderInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   walletId?: string | null
@@ -961,7 +965,7 @@ export type TransactionUpdateWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -974,7 +978,7 @@ export type TransactionUncheckedUpdateWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -987,7 +991,7 @@ export type TransactionUncheckedUpdateManyWithoutOrderInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1000,7 +1004,7 @@ export type TransactionCreateManySettlementInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   walletId?: string | null
@@ -1013,7 +1017,7 @@ export type TransactionUpdateWithoutSettlementInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1026,7 +1030,7 @@ export type TransactionUncheckedUpdateWithoutSettlementInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1039,7 +1043,7 @@ export type TransactionUncheckedUpdateManyWithoutSettlementInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1052,7 +1056,7 @@ export type TransactionCreateManyWalletInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: string
-  type: string
+  type: $Enums.TransactionType
   reference?: string | null
   description?: string | null
   orderId?: string | null
@@ -1065,7 +1069,7 @@ export type TransactionUpdateWithoutWalletInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1078,7 +1082,7 @@ export type TransactionUncheckedUpdateWithoutWalletInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1091,7 +1095,7 @@ export type TransactionUncheckedUpdateManyWithoutWalletInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currency?: Prisma.StringFieldUpdateOperationsInput | string
-  type?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1202,7 +1206,7 @@ export type $TransactionPayload<ExtArgs extends runtime.Types.Extensions.Interna
     id: string
     amount: runtime.Decimal
     currency: string
-    type: string
+    type: $Enums.TransactionType
     reference: string | null
     description: string | null
     walletId: string | null
@@ -1640,7 +1644,7 @@ export interface TransactionFieldRefs {
   readonly id: Prisma.FieldRef<"Transaction", 'String'>
   readonly amount: Prisma.FieldRef<"Transaction", 'Decimal'>
   readonly currency: Prisma.FieldRef<"Transaction", 'String'>
-  readonly type: Prisma.FieldRef<"Transaction", 'String'>
+  readonly type: Prisma.FieldRef<"Transaction", 'TransactionType'>
   readonly reference: Prisma.FieldRef<"Transaction", 'String'>
   readonly description: Prisma.FieldRef<"Transaction", 'String'>
   readonly walletId: Prisma.FieldRef<"Transaction", 'String'>

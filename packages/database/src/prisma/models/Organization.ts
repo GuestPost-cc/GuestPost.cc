@@ -205,6 +205,7 @@ export type OrganizationWhereInput = {
   auditLogs?: Prisma.AuditLogListRelationFilter
   apiKeys?: Prisma.ApiKeyListRelationFilter
   marketplaceListings?: Prisma.MarketplaceListingListRelationFilter
+  activeContexts?: Prisma.ActiveContextListRelationFilter
 }
 
 export type OrganizationOrderByWithRelationInput = {
@@ -226,6 +227,7 @@ export type OrganizationOrderByWithRelationInput = {
   auditLogs?: Prisma.AuditLogOrderByRelationAggregateInput
   apiKeys?: Prisma.ApiKeyOrderByRelationAggregateInput
   marketplaceListings?: Prisma.MarketplaceListingOrderByRelationAggregateInput
+  activeContexts?: Prisma.ActiveContextOrderByRelationAggregateInput
 }
 
 export type OrganizationWhereUniqueInput = Prisma.AtLeast<{
@@ -250,6 +252,7 @@ export type OrganizationWhereUniqueInput = Prisma.AtLeast<{
   auditLogs?: Prisma.AuditLogListRelationFilter
   apiKeys?: Prisma.ApiKeyListRelationFilter
   marketplaceListings?: Prisma.MarketplaceListingListRelationFilter
+  activeContexts?: Prisma.ActiveContextListRelationFilter
 }, "id" | "slug">
 
 export type OrganizationOrderByWithAggregationInput = {
@@ -297,6 +300,7 @@ export type OrganizationCreateInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateInput = {
@@ -318,6 +322,7 @@ export type OrganizationUncheckedCreateInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUpdateInput = {
@@ -339,6 +344,7 @@ export type OrganizationUpdateInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateInput = {
@@ -360,6 +366,7 @@ export type OrganizationUncheckedUpdateInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateManyInput = {
@@ -390,6 +397,11 @@ export type OrganizationUncheckedUpdateManyInput = {
   settings?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type OrganizationNullableScalarRelationFilter = {
+  is?: Prisma.OrganizationWhereInput | null
+  isNot?: Prisma.OrganizationWhereInput | null
 }
 
 export type OrganizationCountOrderByAggregateInput = {
@@ -425,9 +437,20 @@ export type OrganizationScalarRelationFilter = {
   isNot?: Prisma.OrganizationWhereInput
 }
 
-export type OrganizationNullableScalarRelationFilter = {
-  is?: Prisma.OrganizationWhereInput | null
-  isNot?: Prisma.OrganizationWhereInput | null
+export type OrganizationCreateNestedOneWithoutActiveContextsInput = {
+  create?: Prisma.XOR<Prisma.OrganizationCreateWithoutActiveContextsInput, Prisma.OrganizationUncheckedCreateWithoutActiveContextsInput>
+  connectOrCreate?: Prisma.OrganizationCreateOrConnectWithoutActiveContextsInput
+  connect?: Prisma.OrganizationWhereUniqueInput
+}
+
+export type OrganizationUpdateOneWithoutActiveContextsNestedInput = {
+  create?: Prisma.XOR<Prisma.OrganizationCreateWithoutActiveContextsInput, Prisma.OrganizationUncheckedCreateWithoutActiveContextsInput>
+  connectOrCreate?: Prisma.OrganizationCreateOrConnectWithoutActiveContextsInput
+  upsert?: Prisma.OrganizationUpsertWithoutActiveContextsInput
+  disconnect?: Prisma.OrganizationWhereInput | boolean
+  delete?: Prisma.OrganizationWhereInput | boolean
+  connect?: Prisma.OrganizationWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrganizationUpdateToOneWithWhereWithoutActiveContextsInput, Prisma.OrganizationUpdateWithoutActiveContextsInput>, Prisma.OrganizationUncheckedUpdateWithoutActiveContextsInput>
 }
 
 export type OrganizationCreateNestedOneWithoutMembershipsInput = {
@@ -588,6 +611,106 @@ export type OrganizationUpdateOneWithoutMarketplaceListingsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrganizationUpdateToOneWithWhereWithoutMarketplaceListingsInput, Prisma.OrganizationUpdateWithoutMarketplaceListingsInput>, Prisma.OrganizationUncheckedUpdateWithoutMarketplaceListingsInput>
 }
 
+export type OrganizationCreateWithoutActiveContextsInput = {
+  id?: string
+  name: string
+  slug: string
+  plan?: string
+  settings?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutOrganizationInput
+  teams?: Prisma.TeamCreateNestedManyWithoutOrganizationInput
+  publishers?: Prisma.PublisherCreateNestedManyWithoutOrganizationInput
+  campaigns?: Prisma.CampaignCreateNestedManyWithoutOrganizationInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutOrganizationInput
+  orders?: Prisma.OrderCreateNestedManyWithoutOrganizationInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutOrganizationInput
+  notifications?: Prisma.NotificationCreateNestedManyWithoutOrganizationInput
+  auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
+  apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
+  marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+}
+
+export type OrganizationUncheckedCreateWithoutActiveContextsInput = {
+  id?: string
+  name: string
+  slug: string
+  plan?: string
+  settings?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutOrganizationInput
+  teams?: Prisma.TeamUncheckedCreateNestedManyWithoutOrganizationInput
+  publishers?: Prisma.PublisherUncheckedCreateNestedManyWithoutOrganizationInput
+  campaigns?: Prisma.CampaignUncheckedCreateNestedManyWithoutOrganizationInput
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutOrganizationInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutOrganizationInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrganizationInput
+  notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganizationInput
+  auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
+  apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+}
+
+export type OrganizationCreateOrConnectWithoutActiveContextsInput = {
+  where: Prisma.OrganizationWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrganizationCreateWithoutActiveContextsInput, Prisma.OrganizationUncheckedCreateWithoutActiveContextsInput>
+}
+
+export type OrganizationUpsertWithoutActiveContextsInput = {
+  update: Prisma.XOR<Prisma.OrganizationUpdateWithoutActiveContextsInput, Prisma.OrganizationUncheckedUpdateWithoutActiveContextsInput>
+  create: Prisma.XOR<Prisma.OrganizationCreateWithoutActiveContextsInput, Prisma.OrganizationUncheckedCreateWithoutActiveContextsInput>
+  where?: Prisma.OrganizationWhereInput
+}
+
+export type OrganizationUpdateToOneWithWhereWithoutActiveContextsInput = {
+  where?: Prisma.OrganizationWhereInput
+  data: Prisma.XOR<Prisma.OrganizationUpdateWithoutActiveContextsInput, Prisma.OrganizationUncheckedUpdateWithoutActiveContextsInput>
+}
+
+export type OrganizationUpdateWithoutActiveContextsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  settings?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutOrganizationNestedInput
+  teams?: Prisma.TeamUpdateManyWithoutOrganizationNestedInput
+  publishers?: Prisma.PublisherUpdateManyWithoutOrganizationNestedInput
+  campaigns?: Prisma.CampaignUpdateManyWithoutOrganizationNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutOrganizationNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutOrganizationNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutOrganizationNestedInput
+  notifications?: Prisma.NotificationUpdateManyWithoutOrganizationNestedInput
+  auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
+  apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+}
+
+export type OrganizationUncheckedUpdateWithoutActiveContextsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.StringFieldUpdateOperationsInput | string
+  settings?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutOrganizationNestedInput
+  teams?: Prisma.TeamUncheckedUpdateManyWithoutOrganizationNestedInput
+  publishers?: Prisma.PublisherUncheckedUpdateManyWithoutOrganizationNestedInput
+  campaigns?: Prisma.CampaignUncheckedUpdateManyWithoutOrganizationNestedInput
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutOrganizationNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutOrganizationNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrganizationNestedInput
+  notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganizationNestedInput
+  auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
+  apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+}
+
 export type OrganizationCreateWithoutMembershipsInput = {
   id?: string
   name: string
@@ -606,6 +729,7 @@ export type OrganizationCreateWithoutMembershipsInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutMembershipsInput = {
@@ -626,6 +750,7 @@ export type OrganizationUncheckedCreateWithoutMembershipsInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutMembershipsInput = {
@@ -662,6 +787,7 @@ export type OrganizationUpdateWithoutMembershipsInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutMembershipsInput = {
@@ -682,6 +808,7 @@ export type OrganizationUncheckedUpdateWithoutMembershipsInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutTeamsInput = {
@@ -702,6 +829,7 @@ export type OrganizationCreateWithoutTeamsInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutTeamsInput = {
@@ -722,6 +850,7 @@ export type OrganizationUncheckedCreateWithoutTeamsInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutTeamsInput = {
@@ -758,6 +887,7 @@ export type OrganizationUpdateWithoutTeamsInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutTeamsInput = {
@@ -778,6 +908,7 @@ export type OrganizationUncheckedUpdateWithoutTeamsInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutPublishersInput = {
@@ -798,6 +929,7 @@ export type OrganizationCreateWithoutPublishersInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutPublishersInput = {
@@ -818,6 +950,7 @@ export type OrganizationUncheckedCreateWithoutPublishersInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutPublishersInput = {
@@ -854,6 +987,7 @@ export type OrganizationUpdateWithoutPublishersInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutPublishersInput = {
@@ -874,6 +1008,7 @@ export type OrganizationUncheckedUpdateWithoutPublishersInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutOrdersInput = {
@@ -894,6 +1029,7 @@ export type OrganizationCreateWithoutOrdersInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutOrdersInput = {
@@ -914,6 +1050,7 @@ export type OrganizationUncheckedCreateWithoutOrdersInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutOrdersInput = {
@@ -950,6 +1087,7 @@ export type OrganizationUpdateWithoutOrdersInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutOrdersInput = {
@@ -970,6 +1108,7 @@ export type OrganizationUncheckedUpdateWithoutOrdersInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutCampaignsInput = {
@@ -990,6 +1129,7 @@ export type OrganizationCreateWithoutCampaignsInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutCampaignsInput = {
@@ -1010,6 +1150,7 @@ export type OrganizationUncheckedCreateWithoutCampaignsInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutCampaignsInput = {
@@ -1046,6 +1187,7 @@ export type OrganizationUpdateWithoutCampaignsInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutCampaignsInput = {
@@ -1066,6 +1208,7 @@ export type OrganizationUncheckedUpdateWithoutCampaignsInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutApiKeysInput = {
@@ -1086,6 +1229,7 @@ export type OrganizationCreateWithoutApiKeysInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganizationInput
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutApiKeysInput = {
@@ -1106,6 +1250,7 @@ export type OrganizationUncheckedCreateWithoutApiKeysInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganizationInput
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutApiKeysInput = {
@@ -1142,6 +1287,7 @@ export type OrganizationUpdateWithoutApiKeysInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganizationNestedInput
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutApiKeysInput = {
@@ -1162,6 +1308,7 @@ export type OrganizationUncheckedUpdateWithoutApiKeysInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganizationNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutWalletsInput = {
@@ -1182,6 +1329,7 @@ export type OrganizationCreateWithoutWalletsInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutWalletsInput = {
@@ -1202,6 +1350,7 @@ export type OrganizationUncheckedCreateWithoutWalletsInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutWalletsInput = {
@@ -1238,6 +1387,7 @@ export type OrganizationUpdateWithoutWalletsInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutWalletsInput = {
@@ -1258,6 +1408,7 @@ export type OrganizationUncheckedUpdateWithoutWalletsInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutTicketsInput = {
@@ -1278,6 +1429,7 @@ export type OrganizationCreateWithoutTicketsInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutTicketsInput = {
@@ -1298,6 +1450,7 @@ export type OrganizationUncheckedCreateWithoutTicketsInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutTicketsInput = {
@@ -1334,6 +1487,7 @@ export type OrganizationUpdateWithoutTicketsInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutTicketsInput = {
@@ -1354,6 +1508,7 @@ export type OrganizationUncheckedUpdateWithoutTicketsInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutNotificationsInput = {
@@ -1374,6 +1529,7 @@ export type OrganizationCreateWithoutNotificationsInput = {
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutNotificationsInput = {
@@ -1394,6 +1550,7 @@ export type OrganizationUncheckedCreateWithoutNotificationsInput = {
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutNotificationsInput = {
@@ -1430,6 +1587,7 @@ export type OrganizationUpdateWithoutNotificationsInput = {
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutNotificationsInput = {
@@ -1450,6 +1608,7 @@ export type OrganizationUncheckedUpdateWithoutNotificationsInput = {
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutAuditLogsInput = {
@@ -1470,6 +1629,7 @@ export type OrganizationCreateWithoutAuditLogsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutAuditLogsInput = {
@@ -1490,6 +1650,7 @@ export type OrganizationUncheckedCreateWithoutAuditLogsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutAuditLogsInput = {
@@ -1526,6 +1687,7 @@ export type OrganizationUpdateWithoutAuditLogsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutAuditLogsInput = {
@@ -1546,6 +1708,7 @@ export type OrganizationUncheckedUpdateWithoutAuditLogsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationCreateWithoutMarketplaceListingsInput = {
@@ -1566,6 +1729,7 @@ export type OrganizationCreateWithoutMarketplaceListingsInput = {
   notifications?: Prisma.NotificationCreateNestedManyWithoutOrganizationInput
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationUncheckedCreateWithoutMarketplaceListingsInput = {
@@ -1586,6 +1750,7 @@ export type OrganizationUncheckedCreateWithoutMarketplaceListingsInput = {
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutOrganizationInput
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutOrganizationInput
   apiKeys?: Prisma.ApiKeyUncheckedCreateNestedManyWithoutOrganizationInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput
 }
 
 export type OrganizationCreateOrConnectWithoutMarketplaceListingsInput = {
@@ -1622,6 +1787,7 @@ export type OrganizationUpdateWithoutMarketplaceListingsInput = {
   notifications?: Prisma.NotificationUpdateManyWithoutOrganizationNestedInput
   auditLogs?: Prisma.AuditLogUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 export type OrganizationUncheckedUpdateWithoutMarketplaceListingsInput = {
@@ -1642,6 +1808,7 @@ export type OrganizationUncheckedUpdateWithoutMarketplaceListingsInput = {
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutOrganizationNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutOrganizationNestedInput
   apiKeys?: Prisma.ApiKeyUncheckedUpdateManyWithoutOrganizationNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput
 }
 
 
@@ -1661,6 +1828,7 @@ export type OrganizationCountOutputType = {
   auditLogs: number
   apiKeys: number
   marketplaceListings: number
+  activeContexts: number
 }
 
 export type OrganizationCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1675,6 +1843,7 @@ export type OrganizationCountOutputTypeSelect<ExtArgs extends runtime.Types.Exte
   auditLogs?: boolean | OrganizationCountOutputTypeCountAuditLogsArgs
   apiKeys?: boolean | OrganizationCountOutputTypeCountApiKeysArgs
   marketplaceListings?: boolean | OrganizationCountOutputTypeCountMarketplaceListingsArgs
+  activeContexts?: boolean | OrganizationCountOutputTypeCountActiveContextsArgs
 }
 
 /**
@@ -1764,6 +1933,13 @@ export type OrganizationCountOutputTypeCountMarketplaceListingsArgs<ExtArgs exte
   where?: Prisma.MarketplaceListingWhereInput
 }
 
+/**
+ * OrganizationCountOutputType without action
+ */
+export type OrganizationCountOutputTypeCountActiveContextsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ActiveContextWhereInput
+}
+
 
 export type OrganizationSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1784,6 +1960,7 @@ export type OrganizationSelect<ExtArgs extends runtime.Types.Extensions.Internal
   auditLogs?: boolean | Prisma.Organization$auditLogsArgs<ExtArgs>
   apiKeys?: boolean | Prisma.Organization$apiKeysArgs<ExtArgs>
   marketplaceListings?: boolean | Prisma.Organization$marketplaceListingsArgs<ExtArgs>
+  activeContexts?: boolean | Prisma.Organization$activeContextsArgs<ExtArgs>
   _count?: boolean | Prisma.OrganizationCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["organization"]>
 
@@ -1830,6 +2007,7 @@ export type OrganizationInclude<ExtArgs extends runtime.Types.Extensions.Interna
   auditLogs?: boolean | Prisma.Organization$auditLogsArgs<ExtArgs>
   apiKeys?: boolean | Prisma.Organization$apiKeysArgs<ExtArgs>
   marketplaceListings?: boolean | Prisma.Organization$marketplaceListingsArgs<ExtArgs>
+  activeContexts?: boolean | Prisma.Organization$activeContextsArgs<ExtArgs>
   _count?: boolean | Prisma.OrganizationCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OrganizationIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -1849,6 +2027,7 @@ export type $OrganizationPayload<ExtArgs extends runtime.Types.Extensions.Intern
     auditLogs: Prisma.$AuditLogPayload<ExtArgs>[]
     apiKeys: Prisma.$ApiKeyPayload<ExtArgs>[]
     marketplaceListings: Prisma.$MarketplaceListingPayload<ExtArgs>[]
+    activeContexts: Prisma.$ActiveContextPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2263,6 +2442,7 @@ export interface Prisma__OrganizationClient<T, Null = never, ExtArgs extends run
   auditLogs<T extends Prisma.Organization$auditLogsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organization$auditLogsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   apiKeys<T extends Prisma.Organization$apiKeysArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organization$apiKeysArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ApiKeyPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marketplaceListings<T extends Prisma.Organization$marketplaceListingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organization$marketplaceListingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  activeContexts<T extends Prisma.Organization$activeContextsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Organization$activeContextsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ActiveContextPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2948,6 +3128,30 @@ export type Organization$marketplaceListingsArgs<ExtArgs extends runtime.Types.E
   take?: number
   skip?: number
   distinct?: Prisma.MarketplaceListingScalarFieldEnum | Prisma.MarketplaceListingScalarFieldEnum[]
+}
+
+/**
+ * Organization.activeContexts
+ */
+export type Organization$activeContextsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ActiveContext
+   */
+  select?: Prisma.ActiveContextSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ActiveContext
+   */
+  omit?: Prisma.ActiveContextOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ActiveContextInclude<ExtArgs> | null
+  where?: Prisma.ActiveContextWhereInput
+  orderBy?: Prisma.ActiveContextOrderByWithRelationInput | Prisma.ActiveContextOrderByWithRelationInput[]
+  cursor?: Prisma.ActiveContextWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ActiveContextScalarFieldEnum | Prisma.ActiveContextScalarFieldEnum[]
 }
 
 /**

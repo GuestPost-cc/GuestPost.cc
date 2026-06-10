@@ -33,7 +33,7 @@ last_system_refresh: 2026-06-09T20:19:14Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `not-yet`
-- Last project sync: `2026-06-10T05:26:50Z`
+- Last project sync: `2026-06-10T10:32:46Z`
 - Last compaction: `not-yet`
 - Last validation: `not-yet` (`unknown`)
 - Last doctor: `not-yet` (`unknown`)

@@ -29,11 +29,13 @@ export type AggregateOrder = {
 export type OrderAvgAggregateOutputType = {
   amount: runtime.Decimal | null
   revisionCount: number | null
+  version: number | null
 }
 
 export type OrderSumAggregateOutputType = {
   amount: runtime.Decimal | null
   revisionCount: number | null
+  version: number | null
 }
 
 export type OrderMinAggregateOutputType = {
@@ -60,6 +62,7 @@ export type OrderMinAggregateOutputType = {
   organizationId: string | null
   campaignId: string | null
   idempotencyKey: string | null
+  version: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -88,6 +91,7 @@ export type OrderMaxAggregateOutputType = {
   organizationId: string | null
   campaignId: string | null
   idempotencyKey: string | null
+  version: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -116,6 +120,7 @@ export type OrderCountAggregateOutputType = {
   organizationId: number
   campaignId: number
   idempotencyKey: number
+  version: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -125,11 +130,13 @@ export type OrderCountAggregateOutputType = {
 export type OrderAvgAggregateInputType = {
   amount?: true
   revisionCount?: true
+  version?: true
 }
 
 export type OrderSumAggregateInputType = {
   amount?: true
   revisionCount?: true
+  version?: true
 }
 
 export type OrderMinAggregateInputType = {
@@ -156,6 +163,7 @@ export type OrderMinAggregateInputType = {
   organizationId?: true
   campaignId?: true
   idempotencyKey?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -184,6 +192,7 @@ export type OrderMaxAggregateInputType = {
   organizationId?: true
   campaignId?: true
   idempotencyKey?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -212,6 +221,7 @@ export type OrderCountAggregateInputType = {
   organizationId?: true
   campaignId?: true
   idempotencyKey?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -327,6 +337,7 @@ export type OrderGroupByOutputType = {
   organizationId: string
   campaignId: string | null
   idempotencyKey: string | null
+  version: number
   createdAt: Date
   updatedAt: Date
   _count: OrderCountAggregateOutputType | null
@@ -378,6 +389,7 @@ export type OrderWhereInput = {
   organizationId?: Prisma.StringFilter<"Order"> | string
   campaignId?: Prisma.StringNullableFilter<"Order"> | string | null
   idempotencyKey?: Prisma.StringNullableFilter<"Order"> | string | null
+  version?: Prisma.IntFilter<"Order"> | number
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   customer?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -419,6 +431,7 @@ export type OrderOrderByWithRelationInput = {
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrderInput | Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   customer?: Prisma.UserOrderByWithRelationInput
@@ -463,6 +476,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   websiteId?: Prisma.StringNullableFilter<"Order"> | string | null
   organizationId?: Prisma.StringFilter<"Order"> | string
   campaignId?: Prisma.StringNullableFilter<"Order"> | string | null
+  version?: Prisma.IntFilter<"Order"> | number
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   customer?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -504,6 +518,7 @@ export type OrderOrderByWithAggregationInput = {
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrderInput | Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrderInput | Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.OrderCountOrderByAggregateInput
@@ -540,6 +555,7 @@ export type OrderScalarWhereWithAggregatesInput = {
   organizationId?: Prisma.StringWithAggregatesFilter<"Order"> | string
   campaignId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   idempotencyKey?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
+  version?: Prisma.IntWithAggregatesFilter<"Order"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
 }
@@ -563,6 +579,7 @@ export type OrderCreateInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -604,6 +621,7 @@ export type OrderUncheckedCreateInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -635,6 +653,7 @@ export type OrderUpdateInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -676,6 +695,7 @@ export type OrderUncheckedUpdateInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -712,6 +732,7 @@ export type OrderCreateManyInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -735,6 +756,7 @@ export type OrderUpdateManyMutationInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -763,6 +785,7 @@ export type OrderUncheckedUpdateManyInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -801,6 +824,7 @@ export type OrderCountOrderByAggregateInput = {
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -808,6 +832,7 @@ export type OrderCountOrderByAggregateInput = {
 export type OrderAvgOrderByAggregateInput = {
   amount?: Prisma.SortOrder
   revisionCount?: Prisma.SortOrder
+  version?: Prisma.SortOrder
 }
 
 export type OrderMaxOrderByAggregateInput = {
@@ -834,6 +859,7 @@ export type OrderMaxOrderByAggregateInput = {
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -862,6 +888,7 @@ export type OrderMinOrderByAggregateInput = {
   organizationId?: Prisma.SortOrder
   campaignId?: Prisma.SortOrder
   idempotencyKey?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -869,6 +896,7 @@ export type OrderMinOrderByAggregateInput = {
 export type OrderSumOrderByAggregateInput = {
   amount?: Prisma.SortOrder
   revisionCount?: Prisma.SortOrder
+  version?: Prisma.SortOrder
 }
 
 export type OrderScalarRelationFilter = {
@@ -1252,6 +1280,7 @@ export type OrderCreateWithoutCustomerInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
@@ -1291,6 +1320,7 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1332,6 +1362,7 @@ export type OrderCreateWithoutAssigneeInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1371,6 +1402,7 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1436,6 +1468,7 @@ export type OrderScalarWhereInput = {
   organizationId?: Prisma.StringFilter<"Order"> | string
   campaignId?: Prisma.StringNullableFilter<"Order"> | string | null
   idempotencyKey?: Prisma.StringNullableFilter<"Order"> | string | null
+  version?: Prisma.IntFilter<"Order"> | number
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
 }
@@ -1475,6 +1508,7 @@ export type OrderCreateWithoutOrganizationInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1514,6 +1548,7 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   websiteId?: string | null
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1571,6 +1606,7 @@ export type OrderCreateWithoutWebsiteInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1610,6 +1646,7 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1667,6 +1704,7 @@ export type OrderCreateWithoutCampaignInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1706,6 +1744,7 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   websiteId?: string | null
   organizationId: string
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1763,6 +1802,7 @@ export type OrderCreateWithoutItemsInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1803,6 +1843,7 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -1849,6 +1890,7 @@ export type OrderUpdateWithoutItemsInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -1889,6 +1931,7 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -1919,6 +1962,7 @@ export type OrderCreateWithoutEventsInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -1959,6 +2003,7 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2005,6 +2050,7 @@ export type OrderUpdateWithoutEventsInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2045,6 +2091,7 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2075,6 +2122,7 @@ export type OrderCreateWithoutDisputeInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2115,6 +2163,7 @@ export type OrderUncheckedCreateWithoutDisputeInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2161,6 +2210,7 @@ export type OrderUpdateWithoutDisputeInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2201,6 +2251,7 @@ export type OrderUncheckedUpdateWithoutDisputeInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2231,6 +2282,7 @@ export type OrderCreateWithoutSettlementsInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2271,6 +2323,7 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2317,6 +2370,7 @@ export type OrderUpdateWithoutSettlementsInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2357,6 +2411,7 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2387,6 +2442,7 @@ export type OrderCreateWithoutContentOrderInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2427,6 +2483,7 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
@@ -2473,6 +2530,7 @@ export type OrderUpdateWithoutContentOrderInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2513,6 +2571,7 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
@@ -2543,6 +2602,7 @@ export type OrderCreateWithoutRevisionsInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2583,6 +2643,7 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2629,6 +2690,7 @@ export type OrderUpdateWithoutRevisionsInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2669,6 +2731,7 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2699,6 +2762,7 @@ export type OrderCreateWithoutReportsInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2739,6 +2803,7 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2785,6 +2850,7 @@ export type OrderUpdateWithoutReportsInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2825,6 +2891,7 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -2855,6 +2922,7 @@ export type OrderCreateWithoutTransactionsInput = {
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
@@ -2895,6 +2963,7 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
@@ -2941,6 +3010,7 @@ export type OrderUpdateWithoutTransactionsInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -2981,6 +3051,7 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3015,6 +3086,7 @@ export type OrderCreateManyCustomerInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -3042,6 +3114,7 @@ export type OrderCreateManyAssigneeInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -3065,6 +3138,7 @@ export type OrderUpdateWithoutCustomerInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
@@ -3104,6 +3178,7 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3139,6 +3214,7 @@ export type OrderUncheckedUpdateManyWithoutCustomerInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3162,6 +3238,7 @@ export type OrderUpdateWithoutAssigneeInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -3201,6 +3278,7 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3236,6 +3314,7 @@ export type OrderUncheckedUpdateManyWithoutAssigneeInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3263,6 +3342,7 @@ export type OrderCreateManyOrganizationInput = {
   websiteId?: string | null
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -3286,6 +3366,7 @@ export type OrderUpdateWithoutOrganizationInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -3325,6 +3406,7 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3360,6 +3442,7 @@ export type OrderUncheckedUpdateManyWithoutOrganizationInput = {
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3387,6 +3470,7 @@ export type OrderCreateManyWebsiteInput = {
   organizationId: string
   campaignId?: string | null
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -3410,6 +3494,7 @@ export type OrderUpdateWithoutWebsiteInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -3449,6 +3534,7 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3484,6 +3570,7 @@ export type OrderUncheckedUpdateManyWithoutWebsiteInput = {
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3511,6 +3598,7 @@ export type OrderCreateManyCampaignInput = {
   websiteId?: string | null
   organizationId: string
   idempotencyKey?: string | null
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -3534,6 +3622,7 @@ export type OrderUpdateWithoutCampaignInput = {
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
@@ -3573,6 +3662,7 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
@@ -3608,6 +3698,7 @@ export type OrderUncheckedUpdateManyWithoutCampaignInput = {
   websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.StringFieldUpdateOperationsInput | string
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -3712,6 +3803,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   organizationId?: boolean
   campaignId?: boolean
   idempotencyKey?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -3754,6 +3846,7 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   organizationId?: boolean
   campaignId?: boolean
   idempotencyKey?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -3787,6 +3880,7 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   organizationId?: boolean
   campaignId?: boolean
   idempotencyKey?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -3820,11 +3914,12 @@ export type OrderSelectScalar = {
   organizationId?: boolean
   campaignId?: boolean
   idempotencyKey?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "status" | "amount" | "currency" | "paymentStatus" | "title" | "instructions" | "targetUrl" | "anchorText" | "publishedUrl" | "publishedAt" | "verifiedAt" | "verifiedBy" | "verifyMethod" | "deliveredAt" | "revisionCount" | "customerId" | "assigneeId" | "websiteId" | "organizationId" | "campaignId" | "idempotencyKey" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "status" | "amount" | "currency" | "paymentStatus" | "title" | "instructions" | "targetUrl" | "anchorText" | "publishedUrl" | "publishedAt" | "verifiedAt" | "verifiedBy" | "verifyMethod" | "deliveredAt" | "revisionCount" | "customerId" | "assigneeId" | "websiteId" | "organizationId" | "campaignId" | "idempotencyKey" | "version" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
@@ -3897,6 +3992,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     organizationId: string
     campaignId: string | null
     idempotencyKey: string | null
+    version: number
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["order"]>
@@ -4358,6 +4454,7 @@ export interface OrderFieldRefs {
   readonly organizationId: Prisma.FieldRef<"Order", 'String'>
   readonly campaignId: Prisma.FieldRef<"Order", 'String'>
   readonly idempotencyKey: Prisma.FieldRef<"Order", 'String'>
+  readonly version: Prisma.FieldRef<"Order", 'Int'>
   readonly createdAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Order", 'DateTime'>
 }

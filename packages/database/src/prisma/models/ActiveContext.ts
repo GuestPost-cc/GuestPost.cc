@@ -175,6 +175,8 @@ export type ActiveContextWhereInput = {
   activeOrganizationId?: Prisma.StringNullableFilter<"ActiveContext"> | string | null
   activePublisherId?: Prisma.StringNullableFilter<"ActiveContext"> | string | null
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  activeOrganization?: Prisma.XOR<Prisma.OrganizationNullableScalarRelationFilter, Prisma.OrganizationWhereInput> | null
+  activePublisher?: Prisma.XOR<Prisma.PublisherNullableScalarRelationFilter, Prisma.PublisherWhereInput> | null
 }
 
 export type ActiveContextOrderByWithRelationInput = {
@@ -183,6 +185,8 @@ export type ActiveContextOrderByWithRelationInput = {
   activeOrganizationId?: Prisma.SortOrderInput | Prisma.SortOrder
   activePublisherId?: Prisma.SortOrderInput | Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
+  activeOrganization?: Prisma.OrganizationOrderByWithRelationInput
+  activePublisher?: Prisma.PublisherOrderByWithRelationInput
 }
 
 export type ActiveContextWhereUniqueInput = Prisma.AtLeast<{
@@ -194,6 +198,8 @@ export type ActiveContextWhereUniqueInput = Prisma.AtLeast<{
   activeOrganizationId?: Prisma.StringNullableFilter<"ActiveContext"> | string | null
   activePublisherId?: Prisma.StringNullableFilter<"ActiveContext"> | string | null
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  activeOrganization?: Prisma.XOR<Prisma.OrganizationNullableScalarRelationFilter, Prisma.OrganizationWhereInput> | null
+  activePublisher?: Prisma.XOR<Prisma.PublisherNullableScalarRelationFilter, Prisma.PublisherWhereInput> | null
 }, "id" | "userId">
 
 export type ActiveContextOrderByWithAggregationInput = {
@@ -218,9 +224,9 @@ export type ActiveContextScalarWhereWithAggregatesInput = {
 
 export type ActiveContextCreateInput = {
   id?: string
-  activeOrganizationId?: string | null
-  activePublisherId?: string | null
   user: Prisma.UserCreateNestedOneWithoutActiveContextInput
+  activeOrganization?: Prisma.OrganizationCreateNestedOneWithoutActiveContextsInput
+  activePublisher?: Prisma.PublisherCreateNestedOneWithoutActiveContextsInput
 }
 
 export type ActiveContextUncheckedCreateInput = {
@@ -232,9 +238,9 @@ export type ActiveContextUncheckedCreateInput = {
 
 export type ActiveContextUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  activeOrganizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  activePublisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   user?: Prisma.UserUpdateOneRequiredWithoutActiveContextNestedInput
+  activeOrganization?: Prisma.OrganizationUpdateOneWithoutActiveContextsNestedInput
+  activePublisher?: Prisma.PublisherUpdateOneWithoutActiveContextsNestedInput
 }
 
 export type ActiveContextUncheckedUpdateInput = {
@@ -253,8 +259,6 @@ export type ActiveContextCreateManyInput = {
 
 export type ActiveContextUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  activeOrganizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  activePublisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type ActiveContextUncheckedUpdateManyInput = {
@@ -290,6 +294,16 @@ export type ActiveContextMinOrderByAggregateInput = {
   activePublisherId?: Prisma.SortOrder
 }
 
+export type ActiveContextListRelationFilter = {
+  every?: Prisma.ActiveContextWhereInput
+  some?: Prisma.ActiveContextWhereInput
+  none?: Prisma.ActiveContextWhereInput
+}
+
+export type ActiveContextOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
+}
+
 export type ActiveContextCreateNestedOneWithoutUserInput = {
   create?: Prisma.XOR<Prisma.ActiveContextCreateWithoutUserInput, Prisma.ActiveContextUncheckedCreateWithoutUserInput>
   connectOrCreate?: Prisma.ActiveContextCreateOrConnectWithoutUserInput
@@ -322,10 +336,94 @@ export type ActiveContextUncheckedUpdateOneWithoutUserNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ActiveContextUpdateToOneWithWhereWithoutUserInput, Prisma.ActiveContextUpdateWithoutUserInput>, Prisma.ActiveContextUncheckedUpdateWithoutUserInput>
 }
 
+export type ActiveContextCreateNestedManyWithoutActiveOrganizationInput = {
+  create?: Prisma.XOR<Prisma.ActiveContextCreateWithoutActiveOrganizationInput, Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput> | Prisma.ActiveContextCreateWithoutActiveOrganizationInput[] | Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput[]
+  connectOrCreate?: Prisma.ActiveContextCreateOrConnectWithoutActiveOrganizationInput | Prisma.ActiveContextCreateOrConnectWithoutActiveOrganizationInput[]
+  createMany?: Prisma.ActiveContextCreateManyActiveOrganizationInputEnvelope
+  connect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+}
+
+export type ActiveContextUncheckedCreateNestedManyWithoutActiveOrganizationInput = {
+  create?: Prisma.XOR<Prisma.ActiveContextCreateWithoutActiveOrganizationInput, Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput> | Prisma.ActiveContextCreateWithoutActiveOrganizationInput[] | Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput[]
+  connectOrCreate?: Prisma.ActiveContextCreateOrConnectWithoutActiveOrganizationInput | Prisma.ActiveContextCreateOrConnectWithoutActiveOrganizationInput[]
+  createMany?: Prisma.ActiveContextCreateManyActiveOrganizationInputEnvelope
+  connect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+}
+
+export type ActiveContextUpdateManyWithoutActiveOrganizationNestedInput = {
+  create?: Prisma.XOR<Prisma.ActiveContextCreateWithoutActiveOrganizationInput, Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput> | Prisma.ActiveContextCreateWithoutActiveOrganizationInput[] | Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput[]
+  connectOrCreate?: Prisma.ActiveContextCreateOrConnectWithoutActiveOrganizationInput | Prisma.ActiveContextCreateOrConnectWithoutActiveOrganizationInput[]
+  upsert?: Prisma.ActiveContextUpsertWithWhereUniqueWithoutActiveOrganizationInput | Prisma.ActiveContextUpsertWithWhereUniqueWithoutActiveOrganizationInput[]
+  createMany?: Prisma.ActiveContextCreateManyActiveOrganizationInputEnvelope
+  set?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  disconnect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  delete?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  connect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  update?: Prisma.ActiveContextUpdateWithWhereUniqueWithoutActiveOrganizationInput | Prisma.ActiveContextUpdateWithWhereUniqueWithoutActiveOrganizationInput[]
+  updateMany?: Prisma.ActiveContextUpdateManyWithWhereWithoutActiveOrganizationInput | Prisma.ActiveContextUpdateManyWithWhereWithoutActiveOrganizationInput[]
+  deleteMany?: Prisma.ActiveContextScalarWhereInput | Prisma.ActiveContextScalarWhereInput[]
+}
+
+export type ActiveContextUncheckedUpdateManyWithoutActiveOrganizationNestedInput = {
+  create?: Prisma.XOR<Prisma.ActiveContextCreateWithoutActiveOrganizationInput, Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput> | Prisma.ActiveContextCreateWithoutActiveOrganizationInput[] | Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput[]
+  connectOrCreate?: Prisma.ActiveContextCreateOrConnectWithoutActiveOrganizationInput | Prisma.ActiveContextCreateOrConnectWithoutActiveOrganizationInput[]
+  upsert?: Prisma.ActiveContextUpsertWithWhereUniqueWithoutActiveOrganizationInput | Prisma.ActiveContextUpsertWithWhereUniqueWithoutActiveOrganizationInput[]
+  createMany?: Prisma.ActiveContextCreateManyActiveOrganizationInputEnvelope
+  set?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  disconnect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  delete?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  connect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  update?: Prisma.ActiveContextUpdateWithWhereUniqueWithoutActiveOrganizationInput | Prisma.ActiveContextUpdateWithWhereUniqueWithoutActiveOrganizationInput[]
+  updateMany?: Prisma.ActiveContextUpdateManyWithWhereWithoutActiveOrganizationInput | Prisma.ActiveContextUpdateManyWithWhereWithoutActiveOrganizationInput[]
+  deleteMany?: Prisma.ActiveContextScalarWhereInput | Prisma.ActiveContextScalarWhereInput[]
+}
+
+export type ActiveContextCreateNestedManyWithoutActivePublisherInput = {
+  create?: Prisma.XOR<Prisma.ActiveContextCreateWithoutActivePublisherInput, Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput> | Prisma.ActiveContextCreateWithoutActivePublisherInput[] | Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput[]
+  connectOrCreate?: Prisma.ActiveContextCreateOrConnectWithoutActivePublisherInput | Prisma.ActiveContextCreateOrConnectWithoutActivePublisherInput[]
+  createMany?: Prisma.ActiveContextCreateManyActivePublisherInputEnvelope
+  connect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+}
+
+export type ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput = {
+  create?: Prisma.XOR<Prisma.ActiveContextCreateWithoutActivePublisherInput, Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput> | Prisma.ActiveContextCreateWithoutActivePublisherInput[] | Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput[]
+  connectOrCreate?: Prisma.ActiveContextCreateOrConnectWithoutActivePublisherInput | Prisma.ActiveContextCreateOrConnectWithoutActivePublisherInput[]
+  createMany?: Prisma.ActiveContextCreateManyActivePublisherInputEnvelope
+  connect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+}
+
+export type ActiveContextUpdateManyWithoutActivePublisherNestedInput = {
+  create?: Prisma.XOR<Prisma.ActiveContextCreateWithoutActivePublisherInput, Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput> | Prisma.ActiveContextCreateWithoutActivePublisherInput[] | Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput[]
+  connectOrCreate?: Prisma.ActiveContextCreateOrConnectWithoutActivePublisherInput | Prisma.ActiveContextCreateOrConnectWithoutActivePublisherInput[]
+  upsert?: Prisma.ActiveContextUpsertWithWhereUniqueWithoutActivePublisherInput | Prisma.ActiveContextUpsertWithWhereUniqueWithoutActivePublisherInput[]
+  createMany?: Prisma.ActiveContextCreateManyActivePublisherInputEnvelope
+  set?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  disconnect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  delete?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  connect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  update?: Prisma.ActiveContextUpdateWithWhereUniqueWithoutActivePublisherInput | Prisma.ActiveContextUpdateWithWhereUniqueWithoutActivePublisherInput[]
+  updateMany?: Prisma.ActiveContextUpdateManyWithWhereWithoutActivePublisherInput | Prisma.ActiveContextUpdateManyWithWhereWithoutActivePublisherInput[]
+  deleteMany?: Prisma.ActiveContextScalarWhereInput | Prisma.ActiveContextScalarWhereInput[]
+}
+
+export type ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput = {
+  create?: Prisma.XOR<Prisma.ActiveContextCreateWithoutActivePublisherInput, Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput> | Prisma.ActiveContextCreateWithoutActivePublisherInput[] | Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput[]
+  connectOrCreate?: Prisma.ActiveContextCreateOrConnectWithoutActivePublisherInput | Prisma.ActiveContextCreateOrConnectWithoutActivePublisherInput[]
+  upsert?: Prisma.ActiveContextUpsertWithWhereUniqueWithoutActivePublisherInput | Prisma.ActiveContextUpsertWithWhereUniqueWithoutActivePublisherInput[]
+  createMany?: Prisma.ActiveContextCreateManyActivePublisherInputEnvelope
+  set?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  disconnect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  delete?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  connect?: Prisma.ActiveContextWhereUniqueInput | Prisma.ActiveContextWhereUniqueInput[]
+  update?: Prisma.ActiveContextUpdateWithWhereUniqueWithoutActivePublisherInput | Prisma.ActiveContextUpdateWithWhereUniqueWithoutActivePublisherInput[]
+  updateMany?: Prisma.ActiveContextUpdateManyWithWhereWithoutActivePublisherInput | Prisma.ActiveContextUpdateManyWithWhereWithoutActivePublisherInput[]
+  deleteMany?: Prisma.ActiveContextScalarWhereInput | Prisma.ActiveContextScalarWhereInput[]
+}
+
 export type ActiveContextCreateWithoutUserInput = {
   id?: string
-  activeOrganizationId?: string | null
-  activePublisherId?: string | null
+  activeOrganization?: Prisma.OrganizationCreateNestedOneWithoutActiveContextsInput
+  activePublisher?: Prisma.PublisherCreateNestedOneWithoutActiveContextsInput
 }
 
 export type ActiveContextUncheckedCreateWithoutUserInput = {
@@ -352,14 +450,148 @@ export type ActiveContextUpdateToOneWithWhereWithoutUserInput = {
 
 export type ActiveContextUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
-  activeOrganizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  activePublisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeOrganization?: Prisma.OrganizationUpdateOneWithoutActiveContextsNestedInput
+  activePublisher?: Prisma.PublisherUpdateOneWithoutActiveContextsNestedInput
 }
 
 export type ActiveContextUncheckedUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   activeOrganizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   activePublisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+}
+
+export type ActiveContextCreateWithoutActiveOrganizationInput = {
+  id?: string
+  user: Prisma.UserCreateNestedOneWithoutActiveContextInput
+  activePublisher?: Prisma.PublisherCreateNestedOneWithoutActiveContextsInput
+}
+
+export type ActiveContextUncheckedCreateWithoutActiveOrganizationInput = {
+  id?: string
+  userId: string
+  activePublisherId?: string | null
+}
+
+export type ActiveContextCreateOrConnectWithoutActiveOrganizationInput = {
+  where: Prisma.ActiveContextWhereUniqueInput
+  create: Prisma.XOR<Prisma.ActiveContextCreateWithoutActiveOrganizationInput, Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput>
+}
+
+export type ActiveContextCreateManyActiveOrganizationInputEnvelope = {
+  data: Prisma.ActiveContextCreateManyActiveOrganizationInput | Prisma.ActiveContextCreateManyActiveOrganizationInput[]
+  skipDuplicates?: boolean
+}
+
+export type ActiveContextUpsertWithWhereUniqueWithoutActiveOrganizationInput = {
+  where: Prisma.ActiveContextWhereUniqueInput
+  update: Prisma.XOR<Prisma.ActiveContextUpdateWithoutActiveOrganizationInput, Prisma.ActiveContextUncheckedUpdateWithoutActiveOrganizationInput>
+  create: Prisma.XOR<Prisma.ActiveContextCreateWithoutActiveOrganizationInput, Prisma.ActiveContextUncheckedCreateWithoutActiveOrganizationInput>
+}
+
+export type ActiveContextUpdateWithWhereUniqueWithoutActiveOrganizationInput = {
+  where: Prisma.ActiveContextWhereUniqueInput
+  data: Prisma.XOR<Prisma.ActiveContextUpdateWithoutActiveOrganizationInput, Prisma.ActiveContextUncheckedUpdateWithoutActiveOrganizationInput>
+}
+
+export type ActiveContextUpdateManyWithWhereWithoutActiveOrganizationInput = {
+  where: Prisma.ActiveContextScalarWhereInput
+  data: Prisma.XOR<Prisma.ActiveContextUpdateManyMutationInput, Prisma.ActiveContextUncheckedUpdateManyWithoutActiveOrganizationInput>
+}
+
+export type ActiveContextScalarWhereInput = {
+  AND?: Prisma.ActiveContextScalarWhereInput | Prisma.ActiveContextScalarWhereInput[]
+  OR?: Prisma.ActiveContextScalarWhereInput[]
+  NOT?: Prisma.ActiveContextScalarWhereInput | Prisma.ActiveContextScalarWhereInput[]
+  id?: Prisma.StringFilter<"ActiveContext"> | string
+  userId?: Prisma.StringFilter<"ActiveContext"> | string
+  activeOrganizationId?: Prisma.StringNullableFilter<"ActiveContext"> | string | null
+  activePublisherId?: Prisma.StringNullableFilter<"ActiveContext"> | string | null
+}
+
+export type ActiveContextCreateWithoutActivePublisherInput = {
+  id?: string
+  user: Prisma.UserCreateNestedOneWithoutActiveContextInput
+  activeOrganization?: Prisma.OrganizationCreateNestedOneWithoutActiveContextsInput
+}
+
+export type ActiveContextUncheckedCreateWithoutActivePublisherInput = {
+  id?: string
+  userId: string
+  activeOrganizationId?: string | null
+}
+
+export type ActiveContextCreateOrConnectWithoutActivePublisherInput = {
+  where: Prisma.ActiveContextWhereUniqueInput
+  create: Prisma.XOR<Prisma.ActiveContextCreateWithoutActivePublisherInput, Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput>
+}
+
+export type ActiveContextCreateManyActivePublisherInputEnvelope = {
+  data: Prisma.ActiveContextCreateManyActivePublisherInput | Prisma.ActiveContextCreateManyActivePublisherInput[]
+  skipDuplicates?: boolean
+}
+
+export type ActiveContextUpsertWithWhereUniqueWithoutActivePublisherInput = {
+  where: Prisma.ActiveContextWhereUniqueInput
+  update: Prisma.XOR<Prisma.ActiveContextUpdateWithoutActivePublisherInput, Prisma.ActiveContextUncheckedUpdateWithoutActivePublisherInput>
+  create: Prisma.XOR<Prisma.ActiveContextCreateWithoutActivePublisherInput, Prisma.ActiveContextUncheckedCreateWithoutActivePublisherInput>
+}
+
+export type ActiveContextUpdateWithWhereUniqueWithoutActivePublisherInput = {
+  where: Prisma.ActiveContextWhereUniqueInput
+  data: Prisma.XOR<Prisma.ActiveContextUpdateWithoutActivePublisherInput, Prisma.ActiveContextUncheckedUpdateWithoutActivePublisherInput>
+}
+
+export type ActiveContextUpdateManyWithWhereWithoutActivePublisherInput = {
+  where: Prisma.ActiveContextScalarWhereInput
+  data: Prisma.XOR<Prisma.ActiveContextUpdateManyMutationInput, Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherInput>
+}
+
+export type ActiveContextCreateManyActiveOrganizationInput = {
+  id?: string
+  userId: string
+  activePublisherId?: string | null
+}
+
+export type ActiveContextUpdateWithoutActiveOrganizationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  user?: Prisma.UserUpdateOneRequiredWithoutActiveContextNestedInput
+  activePublisher?: Prisma.PublisherUpdateOneWithoutActiveContextsNestedInput
+}
+
+export type ActiveContextUncheckedUpdateWithoutActiveOrganizationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  activePublisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+}
+
+export type ActiveContextUncheckedUpdateManyWithoutActiveOrganizationInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  activePublisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+}
+
+export type ActiveContextCreateManyActivePublisherInput = {
+  id?: string
+  userId: string
+  activeOrganizationId?: string | null
+}
+
+export type ActiveContextUpdateWithoutActivePublisherInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  user?: Prisma.UserUpdateOneRequiredWithoutActiveContextNestedInput
+  activeOrganization?: Prisma.OrganizationUpdateOneWithoutActiveContextsNestedInput
+}
+
+export type ActiveContextUncheckedUpdateWithoutActivePublisherInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  activeOrganizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+}
+
+export type ActiveContextUncheckedUpdateManyWithoutActivePublisherInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  activeOrganizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 
@@ -370,6 +602,8 @@ export type ActiveContextSelect<ExtArgs extends runtime.Types.Extensions.Interna
   activeOrganizationId?: boolean
   activePublisherId?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  activeOrganization?: boolean | Prisma.ActiveContext$activeOrganizationArgs<ExtArgs>
+  activePublisher?: boolean | Prisma.ActiveContext$activePublisherArgs<ExtArgs>
 }, ExtArgs["result"]["activeContext"]>
 
 export type ActiveContextSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -378,6 +612,8 @@ export type ActiveContextSelectCreateManyAndReturn<ExtArgs extends runtime.Types
   activeOrganizationId?: boolean
   activePublisherId?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  activeOrganization?: boolean | Prisma.ActiveContext$activeOrganizationArgs<ExtArgs>
+  activePublisher?: boolean | Prisma.ActiveContext$activePublisherArgs<ExtArgs>
 }, ExtArgs["result"]["activeContext"]>
 
 export type ActiveContextSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -386,6 +622,8 @@ export type ActiveContextSelectUpdateManyAndReturn<ExtArgs extends runtime.Types
   activeOrganizationId?: boolean
   activePublisherId?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  activeOrganization?: boolean | Prisma.ActiveContext$activeOrganizationArgs<ExtArgs>
+  activePublisher?: boolean | Prisma.ActiveContext$activePublisherArgs<ExtArgs>
 }, ExtArgs["result"]["activeContext"]>
 
 export type ActiveContextSelectScalar = {
@@ -398,18 +636,26 @@ export type ActiveContextSelectScalar = {
 export type ActiveContextOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "activeOrganizationId" | "activePublisherId", ExtArgs["result"]["activeContext"]>
 export type ActiveContextInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  activeOrganization?: boolean | Prisma.ActiveContext$activeOrganizationArgs<ExtArgs>
+  activePublisher?: boolean | Prisma.ActiveContext$activePublisherArgs<ExtArgs>
 }
 export type ActiveContextIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  activeOrganization?: boolean | Prisma.ActiveContext$activeOrganizationArgs<ExtArgs>
+  activePublisher?: boolean | Prisma.ActiveContext$activePublisherArgs<ExtArgs>
 }
 export type ActiveContextIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  activeOrganization?: boolean | Prisma.ActiveContext$activeOrganizationArgs<ExtArgs>
+  activePublisher?: boolean | Prisma.ActiveContext$activePublisherArgs<ExtArgs>
 }
 
 export type $ActiveContextPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "ActiveContext"
   objects: {
     user: Prisma.$UserPayload<ExtArgs>
+    activeOrganization: Prisma.$OrganizationPayload<ExtArgs> | null
+    activePublisher: Prisma.$PublisherPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -811,6 +1057,8 @@ readonly fields: ActiveContextFieldRefs;
 export interface Prisma__ActiveContextClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  activeOrganization<T extends Prisma.ActiveContext$activeOrganizationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ActiveContext$activeOrganizationArgs<ExtArgs>>): Prisma.Prisma__OrganizationClient<runtime.Types.Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  activePublisher<T extends Prisma.ActiveContext$activePublisherArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ActiveContext$activePublisherArgs<ExtArgs>>): Prisma.Prisma__PublisherClient<runtime.Types.Result.GetResult<Prisma.$PublisherPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1237,6 +1485,44 @@ export type ActiveContextDeleteManyArgs<ExtArgs extends runtime.Types.Extensions
    * Limit how many ActiveContexts to delete.
    */
   limit?: number
+}
+
+/**
+ * ActiveContext.activeOrganization
+ */
+export type ActiveContext$activeOrganizationArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Organization
+   */
+  select?: Prisma.OrganizationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Organization
+   */
+  omit?: Prisma.OrganizationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrganizationInclude<ExtArgs> | null
+  where?: Prisma.OrganizationWhereInput
+}
+
+/**
+ * ActiveContext.activePublisher
+ */
+export type ActiveContext$activePublisherArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Publisher
+   */
+  select?: Prisma.PublisherSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Publisher
+   */
+  omit?: Prisma.PublisherOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.PublisherInclude<ExtArgs> | null
+  where?: Prisma.PublisherWhereInput
 }
 
 /**
