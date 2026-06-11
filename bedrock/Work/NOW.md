@@ -1,6 +1,11 @@
 # Current Focus
 **Status: Beta hardened + load-proven (batch 15) — 1000 concurrent users, zero money drift, full automated test suite.**
 
+## Next session — pending fixes
+- Frontend/API contract sweep: batch 16 fixed order.serviceType->type + paginated unwrap, but other pages likely share the drift (portal orders/campaigns/reports use `order.items?.[0]?.serviceType` which is optional-chained so degrades to "—" rather than crashing — verify against real `items` shape). Audit every `.list()`/paginated client method for array-vs-{items} mismatch.
+- Latent pool-deadlock risk: only 18/66 audit.log calls pass `tx`. Hot money paths fixed; sweep remaining in-transaction audit.log/this.prisma.* calls in colder paths (disputes, refunds, settlements admin actions) before full production load.
+- Run servers via `pnpm dev:all` (compose + all apps) for a stable local stack — session-started foreground processes die with the shell.
+
 ## Completed (2026-06-11, batch 15 — integration + concurrency + 1000-user load)
 - **3 automated test harnesses** (package.json: test:integration / test:concurrency / test:load):
   - `integration-test.ts` — full money loop, 26 assertions incl. money conservation at each step, state-machine integrity, two-step settlement approval, tier-hold enforcement, idempotency replay
