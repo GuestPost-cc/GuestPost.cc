@@ -70,15 +70,17 @@ export class OrdersService {
         let total = 0
         for (const item of data.items) {
           let price: number
+          // Use tx (not this.prisma) — a separate connection here while the
+          // transaction holds its own deadlocks the pool under concurrency.
           if (item.websiteId) {
-            const listing = await this.prisma.marketplaceListing.findFirst({
+            const listing = await tx.marketplaceListing.findFirst({
               where: { websiteId: item.websiteId, status: "APPROVED" },
               select: { price: true },
             })
             if (!listing) throw new BadRequestException(`No approved marketplace listing found for website ${item.websiteId}`)
             price = Number(listing.price)
           } else {
-            const service = await this.prisma.service.findFirst({
+            const service = await tx.service.findFirst({
               where: { type: data.type as any, isActive: true },
               select: { price: true },
             })

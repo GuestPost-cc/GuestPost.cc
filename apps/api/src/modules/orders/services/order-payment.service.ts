@@ -69,21 +69,23 @@ export class OrderPaymentService {
         })
       }
 
-      await this.billing.reserve(wallet.id, amount, orderId, { id: userId, organizationId: userOrgId })
-
-      // Capture immediately — no external payment gateway, internal wallet only
-      await this.billing.payFromReserved(wallet.id, amount, orderId, {
-        id: userId,
-        organizationId: userOrgId,
-      })
-
+      // Claim the order BEFORE any money moves. Under concurrent
+      // submit-payment, only one request wins this version-guarded transition;
+      // losers throw here and never touch the wallet. (Previously the wallet
+      // debit happened first, so every parallel request debited and only the
+      // order guard deduped — a double-charge.)
       const captured = await tx.order.updateMany({
-        where: { id: orderId, version: order.version },
+        where: { id: orderId, version: order.version, status: "DRAFT" },
         data: { paymentStatus: "PAID", status: "PAID", version: { increment: 1 } },
       })
       if (captured.count === 0) {
         throw new ConflictException("Order was modified by another request. Retry.")
       }
+
+      // Reserve + capture inside THIS transaction so the debit commits or rolls
+      // back atomically with the order claim above.
+      await this.billing.reserve(wallet.id, amount, orderId, { id: userId, organizationId: userOrgId }, tx)
+      await this.billing.payFromReserved(wallet.id, amount, orderId, { id: userId, organizationId: userOrgId }, tx)
 
       await tx.orderEvent.create({
         data: {
@@ -107,6 +109,9 @@ export class OrderPaymentService {
         },
       })
 
+      // Pass tx — an un-scoped audit.log would grab a SECOND pooled connection
+      // while this transaction still holds its own. Under concurrency that
+      // exhausts the pool and every in-flight payment deadlocks until timeout.
       await this.audit.log({
         action: "PAYMENT_CAPTURED",
         entityType: "Order",
@@ -114,7 +119,7 @@ export class OrderPaymentService {
         metadata: { amount, from: "DRAFT", to: "SUBMITTED" },
         userId,
         organizationId: userOrgId,
-      })
+      }, tx)
 
       return tx.order.findUnique({ where: { id: orderId } })
     })

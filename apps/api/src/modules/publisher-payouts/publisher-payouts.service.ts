@@ -322,34 +322,62 @@ export class PublisherPayoutsService {
       include: { publisher: true },
     })
     if (!withdrawal) throw new NotFoundException("Withdrawal not found")
-    if (withdrawal.status !== "APPROVED") {
+    if (withdrawal.status !== "APPROVED" && withdrawal.status !== "PROCESSING") {
       throw new BadRequestException("Withdrawal must be approved before marking as paid")
+    }
+
+    // PROCESSING means a payout execution is in flight. Only a MANUAL
+    // execution may be completed by hand — automated providers (Wise/Stripe)
+    // own their completion via webhook or status poll, and marking those paid
+    // here could double-pay if the provider later settles the transfer.
+    let inFlightManualExecution: any = null
+    if (withdrawal.status === "PROCESSING") {
+      inFlightManualExecution = await this.prisma.payoutExecution.findFirst({
+        where: { withdrawalId: id, status: "PROCESSING" },
+        include: { provider: true },
+      })
+      if (!inFlightManualExecution || inFlightManualExecution.provider.name !== "manual") {
+        throw new BadRequestException(
+          "Withdrawal is being processed by an automated provider — completion comes from the provider, not mark-paid",
+        )
+      }
     }
 
     return this.prisma.$transaction(async (tx: any) => {
       // Status-guarded write: prevents double mark-paid (double lifetimePaid increment)
       const transitioned = await tx.withdrawal.updateMany({
-        where: { id, status: "APPROVED", version: withdrawal.version },
+        where: { id, status: withdrawal.status, version: withdrawal.version },
         data: { status: "COMPLETED", approvedBy, approvedAt: new Date(), version: { increment: 1 } },
       })
       if (transitioned.count === 0) {
-        throw new ConflictException("Withdrawal is not in APPROVED state")
+        throw new ConflictException("Withdrawal state changed — retry")
       }
       const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
 
-      // Record a completed execution for traceability
-      const manualProvider = await tx.payoutProvider.findUnique({ where: { name: "manual" } })
-      if (manualProvider) {
-        await tx.payoutExecution.create({
-          data: {
-            withdrawalId: id,
-            providerId: manualProvider.id,
-            status: "COMPLETED",
-            amount: withdrawal.amount,
-            providerExecutionId: `manual-${id}-${Date.now()}`,
-            providerMetadata: { markedBy: approvedBy, markedAt: new Date().toISOString() },
-          },
+      if (inFlightManualExecution) {
+        // Complete the in-flight manual execution instead of creating a duplicate
+        const execDone = await tx.payoutExecution.updateMany({
+          where: { id: inFlightManualExecution.id, status: "PROCESSING" },
+          data: { status: "COMPLETED", providerMetadata: { markedBy: approvedBy, markedAt: new Date().toISOString() } },
         })
+        if (execDone.count === 0) {
+          throw new ConflictException("Execution state changed — retry")
+        }
+      } else {
+        // Direct mark-paid without an execution: record one for traceability
+        const manualProvider = await tx.payoutProvider.findUnique({ where: { name: "manual" } })
+        if (manualProvider) {
+          await tx.payoutExecution.create({
+            data: {
+              withdrawalId: id,
+              providerId: manualProvider.id,
+              status: "COMPLETED",
+              amount: withdrawal.amount,
+              providerExecutionId: `manual-${id}-${Date.now()}`,
+              providerMetadata: { markedBy: approvedBy, markedAt: new Date().toISOString() },
+            },
+          })
+        }
       }
 
       const balance = await tx.publisherBalance.findUnique({

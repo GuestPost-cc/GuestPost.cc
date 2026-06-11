@@ -9,13 +9,13 @@ export interface PaginatedResponse<T> {
 }
 
 export interface PublisherBalanceResponse {
-  id: string
   publisherId: string
-  pendingAmount: number
-  approvedAmount: number
-  withdrawableAmount: number
-  lifetimeEarned: number
-  currency: string
+  pendingBalance: number
+  approvedBalance: number
+  withdrawableBalance: number
+  debtBalance: number
+  lifetimeEarnings: number
+  lifetimePaid: number
 }
 
 export interface WithdrawalResponse {
@@ -23,27 +23,51 @@ export interface WithdrawalResponse {
   amount: number
   currency: string
   status: WithdrawalStatus
-  note: string | null
+  availableAt: string | null
+  payoutMethodId: string | null
+  payoutMethod?: { id: string; type: string; label: string } | null
   createdAt: string
-  processedAt: string | null
+}
+
+export interface PayoutMethodResponse {
+  id: string
+  type: string
+  label: string
+  isDefault: boolean
+  displayDetails: Record<string, unknown>
 }
 
 export class PublisherPayoutsService {
   constructor(private client: HttpClient) {}
 
-  getBalance(publisherId: string) {
-    return this.client.get<PublisherBalanceResponse>(`/publisher-payouts/balance/${publisherId}`)
+  // Balance/withdrawals resolve the publisher from the session — no IDs in the path.
+  getBalance() {
+    return this.client.get<PublisherBalanceResponse>("/publisher-payouts/balance")
   }
 
-  requestWithdrawal(data: { amount: number; note?: string }) {
-    return this.client.post<WithdrawalResponse>("/publishers/withdrawals", {
+  requestWithdrawal(data: { amount: number; method?: string; payoutMethodId?: string; idempotencyKey?: string }) {
+    return this.client.post<WithdrawalResponse>("/publisher-payouts/withdrawals", {
       json: data as unknown as Record<string, unknown>,
     })
   }
 
   listWithdrawals(take?: number, skip?: number) {
-    return this.client.get<PaginatedResponse<WithdrawalResponse>>("/publishers/withdrawals", {
+    return this.client.get<PaginatedResponse<WithdrawalResponse>>("/publisher-payouts/withdrawals", {
       params: { take, skip },
     } as RequestOptions)
+  }
+
+  listPayoutMethods() {
+    return this.client.get<PayoutMethodResponse[]>("/publisher-payouts/payout-methods")
+  }
+
+  createPayoutMethod(data: { type: string; label: string; details: Record<string, unknown>; isDefault?: boolean }) {
+    return this.client.post<PayoutMethodResponse>("/publisher-payouts/payout-methods", {
+      json: data as unknown as Record<string, unknown>,
+    })
+  }
+
+  deactivatePayoutMethod(id: string) {
+    return this.client.post<{ id: string; isActive: boolean }>(`/publisher-payouts/payout-methods/${id}/deactivate`)
   }
 }

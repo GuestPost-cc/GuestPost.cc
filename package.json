@@ -16,8 +16,11 @@
     "dev:publisher": "turbo dev --filter @guestpost/publisher",
     "dev:admin": "turbo dev --filter @guestpost/admin",
     "dev:worker": "turbo dev --filter @guestpost/worker",
-    "seed:admin": "pnpm tsx scripts/seed-admin.ts",
-    "seed:users": "pnpm tsx scripts/seed-users.ts"
+    "seed": "pnpm tsx scripts/seed.ts",
+    "seed:users": "pnpm tsx scripts/seed.ts",
+    "test:integration": "pnpm tsx scripts/integration-test.ts",
+    "test:concurrency": "pnpm tsx scripts/concurrency-test.ts",
+    "test:load": "pnpm tsx scripts/load-test.ts"
   },
   "keywords": [],
   "author": "",

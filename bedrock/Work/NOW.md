@@ -1,5 +1,31 @@
 # Current Focus
-**Status: Payout go-live audit fixes complete (batch 11) — webhook signatures, provider idempotency, retry double-pay guard.**
+**Status: Beta hardened + load-proven (batch 15) — 1000 concurrent users, zero money drift, full automated test suite.**
+
+## Completed (2026-06-11, batch 15 — integration + concurrency + 1000-user load)
+- **3 automated test harnesses** (package.json: test:integration / test:concurrency / test:load):
+  - `integration-test.ts` — full money loop, 26 assertions incl. money conservation at each step, state-machine integrity, two-step settlement approval, tier-hold enforcement, idempotency replay
+  - `concurrency-test.ts` — 7 parallel attacks (double-pay, over-spend, double-release, withdrawal over-draw, idempotency storm, execute race, double mark-paid) + reconciliation referee. 16/16
+  - `load-test.ts` — provisions N users via DB (bypasses auth/billing rate limiters legitimately for setup), runs N concurrent order+payment flows. **1000/1000 paid, 0 errors, 151 orders/s, p99 434ms, zero drift**
+- **Critical concurrency bug fixed — double-charge**: `billing.reserve`/`payFromReserved` opened their OWN `$transaction` (independent commit), so under parallel submit-payment every request debited the wallet and only the order version-guard deduped → wallet drained N×. Fix: added optional `existingTx` param; submitPayment now claims the order (version-guarded DRAFT→PAID) BEFORE any money moves, and reserve/pay run inside that same tx (atomic rollback for losers)
+- **Pool-deadlock bug fixed (throughput killer)**: `createOrder` and `submitPayment` called `this.prisma.*` / `audit.log` (new connection) while holding a `$transaction` connection → pool starvation → 20s timeouts, 35% error rate at 40 concurrent. Fix: use `tx.` for in-transaction reads, pass `tx` to `audit.log`. Throughput went 1.2→151 orders/s
+- **PrismaService tuned**: connection_limit=25 + pool_timeout=20 injected into DATABASE_URL if absent; transactionOptions maxWait 10s / timeout 20s
+- **Settlement release return fix**: admin-approve returned the pre-release ADMIN_APPROVED snapshot instead of the final RELEASED row
+- 115 unit + 26 integration + 16 concurrency all green; 11/11 builds
+
+## Completed (2026-06-11, batch 14 — beta bring-up)
+- **DB rebuilt from scratch**: migration chain was unreplayable (db-push drift: missing DisputeStatus enum, dup indexes, missing FK columns) → squashed to single baseline `20260611120000_squashed_baseline` (schema DDL + hand-written CHECK constraints/partial indexes carried forward); old chain archived in `prisma/migrations_archive/`
+- **New seed** `scripts/seed.ts` (pnpm seed): 6 users (admin/finance/staff/publisher/client/member), staff bootstrap via DB (no self-promote API — old seed scripts used removed `set-staff` endpoint), roles via admin API, org + member invite, $5000 wallet via dev deposit, 3 publisher websites, 3 categories, 4 approved listings, 3 payout providers. Credentials in script output
+- **Bugs found by e2e money loop, all fixed**:
+  - `Order_websiteId_required` CHECK too strict (DRAFT couldn't carry websiteId — createOrder always does) → relaxed to non-DRAFT-requires-website
+  - `OrderEventType` enum missing `ORDER_SUBMITTED` (code emitted it) → added
+  - Wise/Stripe adapters never registered in PayoutProviderService → registered
+  - `getActiveProvider` decrypted unconditionally → empty/object config (manual provider) passes through
+  - `markWithdrawalPaid` couldn't complete in-flight manual executions (PROCESSING dead-end) → completes manual execution, refuses automated-provider ones (double-pay guard)
+  - api-client: settlement approve path wrong, withdrawal verbs POST vs PATCH, publisher-payouts paths/shapes all wrong → fixed + added execute/executions/retry/cancel/reconciliation/decrypt/markPaid/payout-methods
+- **Frontend extended**: publisher payout-methods page (add bank/PayPal, masked display, deactivate) + nav; withdrawals page wired to payout methods; admin finance: 4 tabs (settlements/withdrawals/payouts/reconciliation), execute payout, executions drill-down w/ retry/cancel, audited decrypt dialog (reason required)
+- **Verified e2e**: deposit $5000 → order $250 → fulfillment state machine → manual-verify → delivery → settlement (customer+admin approve) → $200 publisher withdrawable → withdrawal (NEW-tier hold enforced, then VERIFIED) → manual execute → mark-paid → lifetimePaid $200 → reconciliation 0 drift. Decrypt RBAC: admin w/ grant 200, OPERATIONS 403, audit row written
+- All services running: API :4000, website :3000, portal :3001, publisher :3002, admin :3003, worker (payout poll registered)
+- 115 API tests pass; all 11 turbo build targets pass
 
 ## Completed (2026-06-11, batch 11 — go-live audit fixes)
 - Webhook controller now verifies signatures BEFORE queueing, fail-closed: Stripe HMAC (`stripe-signature` t/v1, 300s tolerance, timing-safe) via `STRIPE_PAYOUT_WEBHOOK_SECRET` (falls back to `STRIPE_WEBHOOK_SECRET`); Wise RSA-SHA256 (`x-signature-sha256`) via `WISE_WEBHOOK_PUBLIC_KEY` (PEM). Missing config → 503, bad sig → 401, never enqueued

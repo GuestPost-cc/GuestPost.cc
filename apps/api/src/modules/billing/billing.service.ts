@@ -344,8 +344,13 @@ export class BillingService {
     })
   }
 
-  async reserve(walletId: string, amount: number, orderId: string, user: any) {
-    return this.prisma.$transaction(async (tx: any) => {
+  // `existingTx`: when the caller already holds a transaction (e.g. order
+  // payment capture), run inside it so the wallet movement commits or rolls
+  // back atomically with the caller's state change. Passing a separate
+  // transaction here would let a debit survive a rolled-back order capture —
+  // the double-charge bug under concurrent submit-payment.
+  async reserve(walletId: string, amount: number, orderId: string, user: any, existingTx?: any) {
+    const run = async (tx: any) => {
       const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
       this.assertWalletOwned(wallet, user)
 
@@ -379,11 +384,12 @@ export class BillingService {
       })
 
       return fresh
-    })
+    }
+    return existingTx ? run(existingTx) : this.prisma.$transaction(run)
   }
 
-  async payFromReserved(walletId: string, amount: number, orderId: string, user: any) {
-    return this.prisma.$transaction(async (tx: any) => {
+  async payFromReserved(walletId: string, amount: number, orderId: string, user: any, existingTx?: any) {
+    const run = async (tx: any) => {
       const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
       this.assertWalletOwned(wallet, user)
 
@@ -416,7 +422,8 @@ export class BillingService {
       })
 
       return fresh
-    })
+    }
+    return existingTx ? run(existingTx) : this.prisma.$transaction(run)
   }
 
   async refund(walletId: string, amount: number, orderId: string, user: any) {

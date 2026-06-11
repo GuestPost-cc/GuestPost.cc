@@ -98,7 +98,7 @@ export default function EarningsPage() {
 
   const { data: balance, isLoading, refetch, error } = useQuery({
     queryKey: ["publisher-balance", user?.publisherId],
-    queryFn: () => api.publisherPayouts.getBalance(user!.publisherId!),
+    queryFn: () => api.publisherPayouts.getBalance(),
     enabled: !!user?.publisherId,
   })
 
@@ -132,7 +132,7 @@ export default function EarningsPage() {
   })
 
   const handleWithdraw = (data: WithdrawFormData) => {
-    if (balance && data.amount > balance.withdrawableAmount) {
+    if (balance && data.amount > balance.withdrawableBalance) {
       toast.error("Amount exceeds withdrawable balance")
       return
     }
@@ -177,10 +177,10 @@ export default function EarningsPage() {
     }
   })
 
-  const pendingAmount = balance ? Number(balance.pendingAmount) : 0
-  const approvedAmount = balance ? Number(balance.approvedAmount) : 0
-  const withdrawableAmount = balance ? Number(balance.withdrawableAmount) : 0
-  const lifetimeAmount = balance ? Number(balance.lifetimeEarned) : 0
+  const pendingAmount = balance ? Number(balance.pendingBalance) : 0
+  const approvedAmount = balance ? Number(balance.approvedBalance) : 0
+  const withdrawableAmount = balance ? Number(balance.withdrawableBalance) : 0
+  const lifetimeAmount = balance ? Number(balance.lifetimeEarnings) : 0
 
   const balanceError = error ?? txnError
   if (balanceError)

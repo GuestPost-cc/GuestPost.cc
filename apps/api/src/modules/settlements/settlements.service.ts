@@ -251,7 +251,8 @@ export class SettlementsService {
       // Auto-release if admin approved
       await this.releaseFundsInternal(tx, id, { ...settlement, version: fresh.version }, userId)
 
-      return fresh
+      // Row is now RELEASED — return the final state, not the snapshot
+      return tx.settlement.findUniqueOrThrow({ where: { id } })
     })
 
     await this.notifySettlementReleased(settlement)
@@ -295,6 +296,9 @@ export class SettlementsService {
 
       if (targetStatus === "ADMIN_APPROVED") {
         await this.releaseFundsInternal(tx, id, { ...settlement, version: fresh.version }, userId)
+        // releaseFundsInternal moved the row to RELEASED — return the final
+        // state, not the pre-release snapshot
+        return tx.settlement.findUnique({ where: { id } })
       }
 
       return fresh

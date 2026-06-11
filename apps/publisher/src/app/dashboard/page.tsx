@@ -110,7 +110,7 @@ export default function DashboardPage() {
   const { user } = useAuth()
   const { data: balance, isLoading, error, refetch } = useQuery({
     queryKey: ["publisher-balance", user?.publisherId],
-    queryFn: () => api.publisherPayouts.getBalance(user!.publisherId!),
+    queryFn: () => api.publisherPayouts.getBalance(),
     enabled: !!user?.publisherId,
   })
 
@@ -157,10 +157,10 @@ export default function DashboardPage() {
   ).length
 
   const withdrawable = balance
-    ? `$${Number(balance.withdrawableAmount).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ? `$${Number(balance.withdrawableBalance).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : "$0.00"
   const lifetime = balance
-    ? `$${Number(balance.lifetimeEarned).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    ? `$${Number(balance.lifetimeEarnings).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
     : "$0.00"
 
   return (

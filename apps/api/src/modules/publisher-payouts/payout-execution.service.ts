@@ -1,4 +1,4 @@
-import { Injectable, Logger, ConflictException, NotFoundException } from "@nestjs/common"
+import { Injectable, Logger, ConflictException, NotFoundException, BadRequestException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
@@ -22,7 +22,7 @@ export class PayoutExecutionService {
     })
     if (!withdrawal) throw new NotFoundException("Withdrawal not found")
     if (withdrawal.status !== "APPROVED") {
-      throw new Error(`Withdrawal ${withdrawalId} is ${withdrawal.status}, expected APPROVED`)
+      throw new BadRequestException(`Withdrawal ${withdrawalId} is ${withdrawal.status}, expected APPROVED`)
     }
 
     const adapter = this.providerService.getAdapter(providerName)
@@ -187,7 +187,7 @@ export class PayoutExecutionService {
     })
     if (!execution) throw new NotFoundException("Payout execution not found")
     if (execution.status !== "FAILED") {
-      throw new Error(`Execution ${executionId} is ${execution.status}, expected FAILED`)
+      throw new BadRequestException(`Execution ${executionId} is ${execution.status}, expected FAILED`)
     }
 
     // A FAILED execution that already reached the provider may have actually
@@ -276,7 +276,7 @@ export class PayoutExecutionService {
     })
     if (!execution) throw new NotFoundException("Payout execution not found")
     if (!["PENDING", "PROCESSING"].includes(execution.status)) {
-      throw new Error(`Execution ${executionId} is ${execution.status}, cannot cancel`)
+      throw new BadRequestException(`Execution ${executionId} is ${execution.status}, cannot cancel`)
     }
 
     const adapter = this.providerService.getAdapter(execution.provider.name)

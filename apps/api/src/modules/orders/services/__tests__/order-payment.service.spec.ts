@@ -78,14 +78,14 @@ describe("OrderPaymentService", () => {
 
       const result = await service.submitPayment("order-1", "user-1", "org-1")
 
-      expect(billingMock.reserve).toHaveBeenCalledWith("wallet-1", 500, "order-1", {
-        id: "user-1",
-        organizationId: "org-1",
-      })
-      expect(billingMock.payFromReserved).toHaveBeenCalledWith("wallet-1", 500, "order-1", {
-        id: "user-1",
-        organizationId: "org-1",
-      })
+      // reserve/pay now run inside the order transaction (5th arg = tx) so the
+      // debit is atomic with the version-guarded order claim
+      expect(billingMock.reserve).toHaveBeenCalledWith(
+        "wallet-1", 500, "order-1", { id: "user-1", organizationId: "org-1" }, expect.anything(),
+      )
+      expect(billingMock.payFromReserved).toHaveBeenCalledWith(
+        "wallet-1", 500, "order-1", { id: "user-1", organizationId: "org-1" }, expect.anything(),
+      )
       expect(prismaMock.order.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ paymentStatus: "PAID", status: "PAID" }),
@@ -97,6 +97,7 @@ describe("OrderPaymentService", () => {
       expect(result.status).toBe("SUBMITTED")
       expect(auditMock.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: "PAYMENT_CAPTURED" }),
+        expect.anything(), // tx — audit runs inside the payment transaction
       )
     })
 

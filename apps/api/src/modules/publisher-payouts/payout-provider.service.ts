@@ -4,6 +4,8 @@ import { PrismaService } from "../../common/prisma.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
 import type { PayoutProviderAdapter } from "./providers/payout-provider.interface"
 import { ManualPayoutAdapter } from "./providers/manual-payout.adapter"
+import { WisePayoutAdapter } from "./providers/wise-payout.adapter"
+import { StripeConnectPayoutAdapter } from "./providers/stripe-connect-payout.adapter"
 
 @Injectable()
 export class PayoutProviderService implements OnModuleInit {
@@ -18,7 +20,9 @@ export class PayoutProviderService implements OnModuleInit {
 
   async onModuleInit() {
     this.register(new ManualPayoutAdapter())
-    this.logger.log("Registered 1 built-in provider adapter (manual)")
+    this.register(new WisePayoutAdapter())
+    this.register(new StripeConnectPayoutAdapter())
+    this.logger.log("Registered built-in provider adapters: manual, wise, stripe_connect")
   }
 
   register(adapter: PayoutProviderAdapter) {
@@ -45,8 +49,18 @@ export class PayoutProviderService implements OnModuleInit {
     if (!provider || !provider.isActive) {
       throw new Error(`Payout provider "${providerName}" is not active or not found`)
     }
-    const configVersion = (provider as any).configEncryptionKeyVersion ?? 0
-    const config = this.encryption.decrypt(provider.config as unknown as string, configVersion as number)
+    // Providers without secrets (manual) store an empty/plain JSON config —
+    // only string payloads are encrypted ciphertext.
+    const rawConfig = provider.config as unknown
+    let config: Record<string, unknown>
+    if (typeof rawConfig === "string" && rawConfig.length > 0) {
+      const configVersion = (provider as any).configEncryptionKeyVersion ?? 0
+      config = this.encryption.decrypt(rawConfig, configVersion as number)
+    } else if (rawConfig && typeof rawConfig === "object") {
+      config = rawConfig as Record<string, unknown>
+    } else {
+      config = {}
+    }
     return { ...provider, decryptedConfig: config }
   }
 }

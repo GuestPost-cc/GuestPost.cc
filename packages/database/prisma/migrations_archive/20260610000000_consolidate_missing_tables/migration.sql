@@ -1,3 +1,11 @@
+-- DisputeStatus historically existed only via db push; guard for fresh databases
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'DisputeStatus') THEN
+    CREATE TYPE "DisputeStatus" AS ENUM ('OPEN', 'UNDER_REVIEW', 'RESOLVED_REFUNDED', 'RESOLVED_REJECTED', 'RESOLVED_RESTORED');
+  END IF;
+END $$;
+
 CREATE TYPE "ListingType" AS ENUM ('INTERNAL_SERVICE', 'PUBLISHER_WEBSITE', 'GUEST_POST', 'NICHE_EDIT', 'EDITORIAL_LINK', 'DIGITAL_PR', 'SPONSORED_CONTENT', 'OUTREACH_LINK', 'LOCAL_CITATION', 'FOUNDATION_LINK', 'BLOG_ARTICLE', 'SEO_CONTENT');
 
 -- CreateEnum
@@ -276,11 +284,11 @@ CREATE TABLE "ListingFulfillmentRule" (
     CONSTRAINT "ListingFulfillmentRule_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+-- CreateIndex (already created by init on fresh databases; guard for both paths)
+CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User"("email");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Session_token_key" ON "Session"("token");
+CREATE UNIQUE INDEX IF NOT EXISTS "Session_token_key" ON "Session"("token");
 
 -- CreateIndex
 

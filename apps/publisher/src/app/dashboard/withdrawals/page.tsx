@@ -61,7 +61,6 @@ export default function WithdrawalsPage() {
 
   const requestSchema = z.object({
     amount: z.coerce.number().positive("Amount must be positive"),
-    note: z.string().optional(),
   })
 
   type RequestFormData = z.infer<typeof requestSchema>
@@ -78,39 +77,53 @@ export default function WithdrawalsPage() {
 
   const { data: balance, isLoading, refetch, error } = useQuery({
     queryKey: ["publisher-balance", user?.publisherId],
-    queryFn: () => api.publisherPayouts.getBalance(user!.publisherId!),
+    queryFn: () => api.publisherPayouts.getBalance(),
     enabled: !!user?.publisherId,
   })
 
-  const { data: withdrawalsRaw, isLoading: withdrawalsLoading, error: withdrawalsError } = useQuery({
+  const { data: withdrawalsRaw, isLoading: withdrawalsLoading, error: withdrawalsError, refetch: refetchWithdrawals } = useQuery({
     queryKey: ["publisher-withdrawals"],
     queryFn: () => api.publisherPayouts.listWithdrawals(),
   })
   const withdrawals = withdrawalsRaw?.items ?? []
 
+  const { data: payoutMethods } = useQuery({
+    queryKey: ["payout-methods"],
+    queryFn: () => api.publisherPayouts.listPayoutMethods(),
+  })
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
+  const defaultMethod = payoutMethods?.find((m) => m.isDefault) ?? payoutMethods?.[0]
+  const activeMethodId = selectedMethodId ?? defaultMethod?.id
+
   const requestMutation = useMutation({
-    mutationFn: (data: { amount: number; note?: string }) =>
+    mutationFn: (data: { amount: number; payoutMethodId?: string; method?: string }) =>
       api.publisherPayouts.requestWithdrawal(data),
     onSuccess: () => {
       toast.success("Withdrawal requested successfully")
       setShowRequestDialog(false)
       reset()
       refetch()
+      refetchWithdrawals()
     },
-    onError: () => {
-      toast.error("Failed to request withdrawal")
+    onError: (err: any) => {
+      toast.error(err?.message ?? "Failed to request withdrawal")
     },
   })
 
   const handleRequest = (data: RequestFormData) => {
-    if (balance && data.amount > balance.withdrawableAmount) {
+    if (balance && data.amount > balance.withdrawableBalance) {
       toast.error("Amount exceeds withdrawable balance")
       return
     }
-    requestMutation.mutate({ amount: data.amount, note: data.note || undefined })
+    const method = payoutMethods?.find((m) => m.id === activeMethodId)
+    requestMutation.mutate({
+      amount: data.amount,
+      payoutMethodId: activeMethodId ?? undefined,
+      method: method?.type ?? "bank_transfer",
+    })
   }
 
-  const withdrawableAmount = balance ? Number(balance.withdrawableAmount) : 0
+  const withdrawableAmount = balance ? Number(balance.withdrawableBalance) : 0
 
   const withdrawError = error ?? withdrawalsError
   if (withdrawError)
@@ -182,8 +195,7 @@ export default function WithdrawalsPage() {
                 .filter(
                   (w) =>
                     w.status === "COMPLETED" &&
-                    new Date(w.processedAt ?? w.createdAt).getMonth() ===
-                      new Date().getMonth()
+                    new Date(w.createdAt).getMonth() === new Date().getMonth()
                 )
                 .reduce((sum, w) => sum + w.amount, 0)
                 .toFixed(2)}
@@ -218,8 +230,8 @@ export default function WithdrawalsPage() {
                   <TableHead>Date</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Note</TableHead>
-                  <TableHead>Processed</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead>Available</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -241,11 +253,11 @@ export default function WithdrawalsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {withdrawal.note ?? "—"}
+                        {withdrawal.payoutMethod?.label ?? "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {withdrawal.processedAt
-                          ? new Date(withdrawal.processedAt).toLocaleDateString()
+                        {withdrawal.availableAt
+                          ? new Date(withdrawal.availableAt).toLocaleDateString()
                           : "—"}
                       </TableCell>
                     </TableRow>
@@ -305,12 +317,39 @@ export default function WithdrawalsPage() {
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="note">Note (Optional)</Label>
-              <Input
-                id="note"
-                placeholder="Add a note..."
-                {...register("note")}
-              />
+              <Label>Payout Method</Label>
+              {!payoutMethods || payoutMethods.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No payout method on file — add one under{" "}
+                  <a href="/dashboard/payout-methods" className="underline text-foreground">
+                    Payout Methods
+                  </a>{" "}
+                  first.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {payoutMethods.map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setSelectedMethodId(m.id)}
+                      className={`flex w-full items-center justify-between rounded-md border p-3 text-left text-sm transition-colors ${
+                        activeMethodId === m.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {m.type === "bank_transfer" ? <Building2 className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                        <span className="font-medium">{m.label}</span>
+                        {m.isDefault && <Badge variant="outline">Default</Badge>}
+                      </span>
+                      <span className="text-muted-foreground">
+                        {String(m.displayDetails?.bankName ?? m.displayDetails?.maskedEmail ?? m.type)}
+                        {m.displayDetails?.last4 ? ` ••••${m.displayDetails.last4}` : ""}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter>

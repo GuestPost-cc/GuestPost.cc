@@ -97,7 +97,7 @@ export class AdminService {
   }
 
   approveSettlement(id: string) {
-    return this.client.post(`/admin/settlements/${id}/approve`)
+    return this.client.post(`/admin/settlements/${id}/admin-approve`)
   }
 
   listWithdrawals(take?: number, skip?: number) {
@@ -107,13 +107,63 @@ export class AdminService {
   }
 
   approveWithdrawal(id: string) {
-    return this.client.post(`/admin/withdrawals/${id}/approve`)
+    return this.client.patch(`/admin/withdrawals/${id}/approve`)
+  }
+
+  markWithdrawalPaid(id: string) {
+    return this.client.patch(`/admin/withdrawals/${id}/mark-paid`)
   }
 
   rejectWithdrawal(id: string, note?: string) {
-    return this.client.post(`/admin/withdrawals/${id}/reject`, {
+    return this.client.patch(`/admin/withdrawals/${id}/reject`, {
       json: note ? { note } : {},
     })
+  }
+
+  executePayout(withdrawalId: string, providerName: string) {
+    return this.client.post<{ executionId: string; status: string; providerExecutionId: string | null }>(
+      `/admin/withdrawals/${withdrawalId}/execute`,
+      { json: { providerName } },
+    )
+  }
+
+  getWithdrawalExecutions(withdrawalId: string) {
+    return this.client.get<Array<{
+      id: string
+      status: string
+      amount: number
+      fee: number
+      errorMessage: string | null
+      providerExecutionId: string | null
+      createdAt: string
+      provider: { id: string; name: string; displayName: string }
+    }>>(`/admin/withdrawals/${withdrawalId}/executions`)
+  }
+
+  retryPayoutExecution(executionId: string) {
+    return this.client.post(`/admin/payout-executions/${executionId}/retry`)
+  }
+
+  cancelPayoutExecution(executionId: string) {
+    return this.client.post(`/admin/payout-executions/${executionId}/cancel`)
+  }
+
+  getReconciliation() {
+    return this.client.get<{
+      ranAt: string
+      ok: boolean
+      walletDrift: any[]
+      publisherDrift: any[]
+      stuckOrders: any[]
+      stuckPayouts: any[]
+    }>("/admin/reconciliation")
+  }
+
+  decryptPayoutMethod(payoutMethodId: string, reason: string) {
+    return this.client.post<{ details: Record<string, unknown>; methodId: string; publisherId: string }>(
+      `/admin/payout-methods/${payoutMethodId}/decrypt`,
+      { json: { reason } },
+    )
   }
 
   getMarketplaceStats() {

@@ -11,6 +11,7 @@ import {
   LogOut,
   Globe,
   Wallet,
+  CreditCard,
   Settings,
   ArrowUpRight,
 } from "lucide-react"
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/dashboard/websites", label: "Websites", icon: Globe },
   { href: "/dashboard/earnings", label: "Earnings", icon: DollarSign },
   { href: "/dashboard/withdrawals", label: "Withdrawals", icon: Wallet },
+  { href: "/dashboard/payout-methods", label: "Payout Methods", icon: CreditCard },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
