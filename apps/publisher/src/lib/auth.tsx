@@ -110,6 +110,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       const data = await res.json()
       if (data.token) setToken(data.token)
+
+      // Accounts register as CUSTOMER by default — convert this fresh account
+      // into a publisher (backend refuses staff/existing-membership accounts;
+      // new publishers start at NEW tier with the full withdrawal hold).
+      const convertRes = await fetch(`${getBaseUrl()}/api/v1/identity/become-publisher`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(data.token ? { Authorization: `Bearer ${data.token}` } : {}),
+        },
+        credentials: "include",
+        body: JSON.stringify({ publisherName: name }),
+      })
+      if (!convertRes.ok) {
+        const err = await convertRes.json().catch(() => ({}))
+        clearToken()
+        throw new Error(err.message ?? "Could not set up your publisher account")
+      }
+
       await refresh()
     } finally {
       setLoading(false)

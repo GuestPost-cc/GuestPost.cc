@@ -95,6 +95,7 @@ interface TimelineEvent {
 interface OrderDetail {
   id: string
   status: string
+  paymentStatus: string
   items: Array<{
     id: string
     serviceType: string
@@ -190,7 +191,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const queryClient = useQueryClient()
   const [showRevisionDialog, setShowRevisionDialog] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
+  const [showDisputeDialog, setShowDisputeDialog] = useState(false)
   const [revisionMessage, setRevisionMessage] = useState("")
+  const [disputeReason, setDisputeReason] = useState("")
 
   const { data: order, isLoading, error, refetch } = useQuery<OrderDetail>({
     queryKey: ["order", resolvedParams.id],
@@ -207,6 +210,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     },
     onError: () => {
       toast.error("Failed to cancel order")
+    },
+  })
+
+  const disputeMutation = useMutation({
+    mutationFn: () => api.orders.openDispute(resolvedParams.id, disputeReason.trim()),
+    onSuccess: () => {
+      toast.success("Dispute opened — our team will review it")
+      queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })
+      queryClient.invalidateQueries({ queryKey: ["orders"] })
+      setShowDisputeDialog(false)
+      setDisputeReason("")
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to open dispute")
     },
   })
 
@@ -261,6 +278,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const canRequestRevision = ["UNDER_REVIEW", "CONTENT_SUBMITTED", "PUBLISHED"].includes(order.status)
   const canCancel = !["COMPLETED", "CANCELLED", "REFUNDED"].includes(order.status)
+  // Backend allows disputes on PUBLISHED/VERIFIED/DELIVERED/CANCELLED or any
+  // paid order; surface the button once money has moved and no terminal state
+  const canDispute =
+    order.paymentStatus === "PAID" &&
+    !["REFUNDED", "DISPUTED"].includes(order.status)
 
   return (
     <div className="space-y-6">
@@ -287,6 +309,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <Button variant="outline" onClick={() => setShowRevisionDialog(true)}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Request Revision
+            </Button>
+          )}
+          {canDispute && (
+            <Button variant="outline" onClick={() => setShowDisputeDialog(true)}>
+              <AlertCircle className="mr-2 h-4 w-4" />
+              Open Dispute
             </Button>
           )}
           {canCancel && (
@@ -449,6 +477,37 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               disabled={cancelMutation.isPending}
             >
               {cancelMutation.isPending ? "Cancelling..." : "Cancel Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showDisputeDialog} onOpenChange={setShowDisputeDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open a Dispute</DialogTitle>
+            <DialogDescription>
+              Tell us what went wrong with this order. Our team reviews every dispute —
+              settlement to the publisher is paused while a dispute is active.
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Describe the issue (at least 10 characters)..."
+            value={disputeReason}
+            onChange={(e) => setDisputeReason(e.target.value)}
+            rows={4}
+            maxLength={2000}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDisputeDialog(false)}>
+              Back
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => disputeMutation.mutate()}
+              disabled={disputeMutation.isPending || disputeReason.trim().length < 10}
+            >
+              {disputeMutation.isPending ? "Submitting..." : "Open Dispute"}
             </Button>
           </DialogFooter>
         </DialogContent>

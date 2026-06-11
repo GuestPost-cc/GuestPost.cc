@@ -14,6 +14,7 @@ import {
   CreditCard,
   Settings,
   ArrowUpRight,
+  Store,
 } from "lucide-react"
 import { useAuth } from "../../lib/auth"
 import { Notifications } from "../../components/notifications"
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
   { href: "/dashboard/websites", label: "Websites", icon: Globe },
+  { href: "/dashboard/listings", label: "Listings", icon: Store },
   { href: "/dashboard/earnings", label: "Earnings", icon: DollarSign },
   { href: "/dashboard/withdrawals", label: "Withdrawals", icon: Wallet },
   { href: "/dashboard/payout-methods", label: "Payout Methods", icon: CreditCard },

@@ -126,7 +126,9 @@ async function bootstrap() {
         generalAnon: 5000,
         generalAuth: 5000,
         admin: 5000,
-        billing: 10,
+        // Test suites (integration + concurrency back-to-back) legitimately
+        // exceed 10 deposits/min; staging/production stay at 10.
+        billing: 1000,
       },
       staging: {
         auth: { signIn: 10, signUp: 5, magicLink: 5, resetPassword: 5 },

@@ -1,5 +1,16 @@
 # Current Focus
-**Status: Frontend completion sprint done (batch 18) — all 4 apps wired to real endpoints, notification center live, audit center backed, RBAC page guards. 141 unit + 26 integration + 16 concurrency green, 11/11 builds.**
+**Status: Audit #2 findings A-1..A-5 ALL FIXED (batch 19) — self-serve onboarding live both sides, dispute + listing UIs, prod fail-fast, stale-order detection. 147 unit + 26 integration + 16 concurrency green, 11/11 builds.**
+
+## Completed (2026-06-12, batch 19 — audit #2 fixes A-1..A-5)
+- **A-1 publisher onboarding**: `POST /identity/become-publisher` — fresh accounts only (refuses staff / existing customer or publisher memberships), creates own org + Publisher (tier NEW = max withdrawal hold) + PUBLISHER_OWNER membership + flips userType, in one tx, audited `PUBLISHER_SELF_ONBOARDED`, cache invalidated. Publisher signup flow calls it post-registration. Layered controls intact: NEW tier hold + listing moderation + dual settlement approval. Live-verified: signup→convert→PUBLISHER, double-convert 400, staff 403
+- **A-2 customer onboarding**: portal `CreateOrgGate` blocks dashboard until org exists (name → POST /identity/organizations w/ random slug suffix); createOrganization now invalidates auth cache. Live-verified: fresh signup → org → OWNER role + wallet 200 immediately
+- **A-3 dispute UI**: portal order detail "Open Dispute" (PAID, not REFUNDED/DISPUTED; reason ≥10 chars) → POST /orders/:id/dispute; client `orders.openDispute`. Live-verified
+- **A-3 listings UI**: publisher `/dashboard/listings` page (list + create dialog: title/desc/type/price/website, hardwired status PENDING_REVIEW — publishers can't self-approve) + nav. Live-verified
+- **A-4**: auth package throws at boot when production && !TRUSTED_ORIGINS (localhost fallback removed for prod)
+- **A-5**: reconciliation sweep now flags SUBMITTED orders >`ORDER_ACCEPT_STALE_DAYS` (default 7) — detector only, refunds stay on the single tested refund path (admin force-cancel)
+- 4 new unit tests (become-publisher guard matrix) — 147 total
+
+**Status (prior): Frontend completion sprint done (batch 18) — all 4 apps wired to real endpoints, notification center live, audit center backed, RBAC page guards. 141 unit + 26 integration + 16 concurrency green, 11/11 builds.**
 
 ## Completed (2026-06-12, batch 18 — frontend completion & integration sprint)
 - **Audit found 3 broken admin pages** (calling nonexistent routes) + zero mock data anywhere (batches 14/16 held up)

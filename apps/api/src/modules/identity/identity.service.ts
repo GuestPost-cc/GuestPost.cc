@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common"
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { CustomerRole } from "@guestpost/shared"
@@ -45,7 +45,75 @@ export class IdentityService {
       organizationId: org.id,
     })
 
+    // The creator must see their new org immediately, not after the 30s
+    // auth-context cache expires.
+    invalidateAuthContext(data.ownerId)
+
     return org
+  }
+
+  // Self-serve publisher onboarding. Strictly limited to FRESH accounts:
+  // a user with any existing customer or publisher membership must not be
+  // silently re-typed — customers keep wallets/orders under CUSTOMER, and
+  // existing publishers must not get a second publisher entity. Risk is
+  // bounded by the layered controls downstream: tier starts NEW (maximum
+  // withdrawal fraud-hold), listings require staff approval before they can
+  // sell, and settlements require delivery + dual approval before any money
+  // becomes withdrawable.
+  async becomePublisher(userId: string, publisherName?: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } })
+    if (!user) throw new NotFoundException("User not found")
+    if (user.userType === "STAFF") {
+      throw new ForbiddenException("Staff accounts cannot become publishers")
+    }
+
+    const [customerMemberships, publisherMemberships] = await Promise.all([
+      this.prisma.membership.count({ where: { userId } }),
+      this.prisma.publisherMembership.count({ where: { userId } }),
+    ])
+    if (publisherMemberships > 0) {
+      throw new BadRequestException("This account is already a publisher")
+    }
+    if (customerMemberships > 0) {
+      throw new BadRequestException(
+        "This account belongs to a customer organization. Use a separate account for publishing, or contact support.",
+      )
+    }
+
+    const name = (publisherName ?? user.name ?? user.email).trim().slice(0, 120)
+
+    const publisher = await this.prisma.$transaction(async (tx: any) => {
+      const org = await tx.organization.create({
+        data: { name: `Publisher org for ${user.email}`, slug: `pub-${userId.slice(0, 12)}` },
+      })
+      const created = await tx.publisher.create({
+        data: {
+          name,
+          email: user.email,
+          organizationId: org.id,
+          // NEW = longest withdrawal hold; staff upgrade tier later (FINANCE)
+          tier: "NEW",
+        },
+      })
+      await tx.publisherMembership.create({
+        data: { userId, publisherId: created.id, role: "PUBLISHER_OWNER" },
+      })
+      await tx.user.update({ where: { id: userId }, data: { userType: "PUBLISHER" } })
+
+      await this.audit.log({
+        action: "PUBLISHER_SELF_ONBOARDED",
+        entityType: "Publisher",
+        entityId: created.id,
+        metadata: { userId, name, organizationId: org.id },
+        userId,
+        organizationId: org.id,
+      }, tx)
+
+      return created
+    })
+
+    invalidateAuthContext(userId)
+    return { id: publisher.id, name: publisher.name, tier: publisher.tier }
   }
 
   async listOrganizations(userId: string) {

@@ -143,7 +143,7 @@ async function checkStuckOrders(prisma: AnyPrisma) {
       platformRevenue: { select: { id: true, reversedAt: true } },
     },
   })
-  return delivered
+  const stuck = delivered
     .filter((o: any) => o.settlements.length === 0 && (!o.platformRevenue || o.platformRevenue.reversedAt !== null))
     .map((o: any) => ({
       orderId: o.id,
@@ -151,6 +151,27 @@ async function checkStuckOrders(prisma: AnyPrisma) {
       deliveredAt: o.deliveredAt?.toISOString() ?? null,
       problem: "DELIVERED order has no active settlement and no platform revenue",
     }))
+
+  // Escrowed customer money must not age silently: paid orders no publisher
+  // ever accepted. Surfaced for staff action (force-cancel refunds through
+  // the single tested refund path) — deliberately NOT auto-refunded here;
+  // the sweep is a detector, not a money mover.
+  const staleDays = Math.max(Number(process.env.ORDER_ACCEPT_STALE_DAYS ?? 7), 1)
+  const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000)
+  const staleSubmitted = await prisma.order.findMany({
+    where: { status: "SUBMITTED", updatedAt: { lt: cutoff } },
+    select: { id: true, organizationId: true, amount: true, updatedAt: true },
+  })
+  for (const o of staleSubmitted) {
+    stuck.push({
+      orderId: o.id,
+      organizationId: o.organizationId,
+      amount: String(o.amount ?? 0),
+      problem: `SUBMITTED for >${staleDays}d with no publisher acceptance — customer funds escrowed; review or force-cancel (refund)`,
+    } as any)
+  }
+
+  return stuck
 }
 
 async function checkStuckPayouts(prisma: AnyPrisma) {

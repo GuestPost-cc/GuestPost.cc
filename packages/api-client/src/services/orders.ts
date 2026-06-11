@@ -165,6 +165,10 @@ export class OrdersService {
     return this.client.get<Array<{ id: string; eventType: OrderEventType; createdAt: string }>>(`/orders/${id}/events`)
   }
 
+  openDispute(id: string, reason: string) {
+    return this.client.post<{ id: string; status: string }>(`/orders/${id}/dispute`, { json: { reason } })
+  }
+
   async submitPayment(id: string) {
     const raw = await this.client.post<RawOrder>(`/orders/${id}/submit-payment`)
     return normalizeOrder(raw)

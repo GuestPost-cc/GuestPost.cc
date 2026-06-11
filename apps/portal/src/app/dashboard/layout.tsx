@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@guestpost/ui"
 import { Notifications } from "../../components/notifications"
+import { CreateOrgGate } from "../../components/create-org-gate"
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -48,7 +49,7 @@ const navItems = [
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading, signOut } = useAuth()
+  const { user, loading, signOut, refresh } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -66,6 +67,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     </div>
   )
   if (!user) return null
+
+  // No organization yet: every money action would 403 — onboard first
+  if (!user.organizationId) {
+    return <CreateOrgGate onCreated={() => refresh()} />
+  }
 
   const userInitials = user.name
     ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)

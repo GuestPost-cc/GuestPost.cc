@@ -47,14 +47,16 @@ async function main() {
   const pubBal0 = (await call("GET", "/publisher-payouts/balance", publisher)).data
   const walletId = wallet0.id
 
-  // Fund the run
-  await call("POST", `/billing/wallet/${walletId}/deposit`, client, { amount: 250, reference: `itest-${Date.now()}` })
-
   // Find a listing-backed website
   const listings = (await call("GET", "/marketplace/listings?limit=1")).data.listings
   check("marketplace has approved listings", listings.length > 0)
   const listing = listings[0]
   const price = Number(listing.price)
+
+  // Fund the run relative to the actual listing price — a flat amount goes
+  // stale as listings change and the shared dev wallet drains across runs
+  const fundAmount = price + 100
+  await call("POST", `/billing/wallet/${walletId}/deposit`, client, { amount: fundAmount, reference: `itest-${Date.now()}` })
 
   // Order lifecycle
   const order = (await call("POST", "/orders", client, {
@@ -70,7 +72,7 @@ async function main() {
   const walletAfterPay = (await call("GET", "/billing/wallet", client)).data
   check(
     "wallet debited exactly the listing price",
-    Math.abs(Number(wallet0.availableBalance) + 250 - price - Number(walletAfterPay.availableBalance)) < 0.001,
+    Math.abs(Number(wallet0.availableBalance) + fundAmount - price - Number(walletAfterPay.availableBalance)) < 0.001,
     { before: wallet0.availableBalance, after: walletAfterPay.availableBalance, price },
   )
 
