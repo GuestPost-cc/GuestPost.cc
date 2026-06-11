@@ -39,8 +39,8 @@ interface Stats {
 
 interface RecentOrder {
   id: string
-  customer: { name: string | null; email: string }
-  serviceType: string
+  customer: { name: string | null; email: string } | null
+  type: string
   status: string
   amount: number | null
   currency: string
@@ -199,13 +199,13 @@ function RecentOrdersTable({ orders, loading }: { orders: RecentOrder[]; loading
               {orders.slice(0, 10).map((order) => (
                 <TableRow key={order.id}>
                   <TableCell className="font-mono text-xs">{order.id.slice(0, 8)}</TableCell>
-                  <TableCell>{order.customer.name ?? order.customer.email}</TableCell>
+                  <TableCell>{order.customer?.name ?? order.customer?.email ?? "—"}</TableCell>
                   <TableCell className="capitalize">
-                    {order.serviceType.replace(/_/g, " ").toLowerCase()}
+                    {(order.type ?? "").replace(/_/g, " ").toLowerCase() || "—"}
                   </TableCell>
                   <TableCell>
                     <Badge variant={statusVariant(order.status) as any}>
-                      {order.status.replace(/_/g, " ")}
+                      {(order.status ?? "").replace(/_/g, " ") || "—"}
                     </Badge>
                   </TableCell>
                   <TableCell>

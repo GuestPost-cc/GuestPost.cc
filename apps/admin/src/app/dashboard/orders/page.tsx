@@ -56,13 +56,14 @@ import { adminFetch } from "../../../lib/api"
 
 interface Order {
   id: string
-  serviceType: string
+  type: string
   status: string
   amount: number | null
   currency: string
   createdAt: string
-  customer: { id: string; name: string | null; email: string }
-  items: Array<{ website: { id: string; url: string } | null }>
+  customer: { id: string; name: string | null; email: string } | null
+  website?: { id: string; url: string } | null
+  items?: Array<{ website: { id: string; url: string } | null }>
 }
 
 const statusVariant = (status: string) => {
@@ -181,7 +182,7 @@ function OrderActions({ order }: { order: Order }) {
                 <div>
                   <p className="text-muted-foreground">Service Type</p>
                   <p className="capitalize">
-                    {selectedOrder.serviceType.replace(/_/g, " ").toLowerCase()}
+                    {(selectedOrder.type ?? "").replace(/_/g, " ").toLowerCase() || "—"}
                   </p>
                 </div>
                 <div>
@@ -200,18 +201,18 @@ function OrderActions({ order }: { order: Order }) {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Customer</p>
-                  <p>{selectedOrder.customer.name ?? selectedOrder.customer.email}</p>
+                  <p>{selectedOrder.customer?.name ?? selectedOrder.customer?.email ?? "—"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Created</p>
                   <p>{format(new Date(selectedOrder.createdAt), "PP p")}</p>
                 </div>
               </div>
-              {selectedOrder.items.length > 0 && (
+              {(selectedOrder.items?.length ?? 0) > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">Items</p>
                   <div className="space-y-2">
-                    {selectedOrder.items.map((item, i) => (
+                    {selectedOrder.items?.map((item, i) => (
                       <div key={i} className="rounded border p-3 text-sm">
                         {item.website?.url ?? "No website assigned"}
                       </div>
@@ -240,7 +241,7 @@ export default function OrdersPage() {
 
   const { data: orders = [], isLoading, error, refetch } = useQuery({
     queryKey: ["admin", "orders"],
-    queryFn: () => api.admin.listOrders(),
+    queryFn: () => api.admin.listOrders() as Promise<Order[]>,
     retry: 1,
   })
 
@@ -256,16 +257,16 @@ export default function OrdersPage() {
         header: "Customer",
         cell: (info) => (
           <div>
-            <div className="font-medium">{info.getValue().name ?? "—"}</div>
-            <div className="text-xs text-muted-foreground">{info.getValue().email}</div>
+            <div className="font-medium">{info.getValue()?.name ?? "—"}</div>
+            <div className="text-xs text-muted-foreground">{info.getValue()?.email ?? "—"}</div>
           </div>
         ),
       }),
-      columnHelper.accessor("serviceType", {
+      columnHelper.accessor("type", {
         header: "Type",
         cell: (info) => (
           <span className="text-muted-foreground capitalize">
-            {info.getValue().replace(/_/g, " ").toLowerCase()}
+            {(info.getValue() ?? "").replace(/_/g, " ").toLowerCase() || "—"}
           </span>
         ),
       }),
@@ -317,8 +318,8 @@ export default function OrdersPage() {
     return orders.filter((o) => {
       const matchesSearch =
         search === "" ||
-        o.customer.name?.toLowerCase().includes(search.toLowerCase()) ||
-        o.customer.email.toLowerCase().includes(search.toLowerCase()) ||
+        o.customer?.name?.toLowerCase().includes(search.toLowerCase()) ||
+        o.customer?.email?.toLowerCase().includes(search.toLowerCase()) ||
         o.id.toLowerCase().includes(search.toLowerCase())
       const matchesStatus = statusFilter === "all" || o.status === statusFilter
       return matchesSearch && matchesStatus

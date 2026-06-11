@@ -45,8 +45,11 @@ export class OrdersService {
     return this.client.post<OrderResponse>("/orders", { json: data as unknown as Record<string, unknown> })
   }
 
-  list(params?: { status?: OrderStatus; campaignId?: string }) {
-    return this.client.get<OrderResponse[]>("/orders", { params })
+  // GET /orders returns a paginated envelope { items, total, take, skip };
+  // unwrap to the array all callers expect.
+  async list(params?: { status?: OrderStatus; campaignId?: string }): Promise<OrderResponse[]> {
+    const res = await this.client.get<{ items: OrderResponse[] } | OrderResponse[]>("/orders", { params })
+    return Array.isArray(res) ? res : (res?.items ?? [])
   }
 
   getById(id: string) {

@@ -22,13 +22,14 @@ export interface AdminUserResponse {
 
 export interface AdminOrderResponse {
   id: string
-  serviceType: string
+  type: string
   status: OrderStatus
   amount: number | null
   currency: string
   createdAt: string
-  customer: { id: string; name: string | null; email: string }
-  items: Array<{
+  customer: { id: string; name: string | null; email: string } | null
+  website: { id: string; url: string } | null
+  items?: Array<{
     website: { id: string; url: string } | null
   }>
 }

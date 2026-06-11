@@ -38,7 +38,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 
 function aggregateMonthlyData(orders: any[], field: string) {
   const data: Record<string, number> = {}
-  for (const o of orders) {
+  for (const o of Array.isArray(orders) ? orders : []) {
     const d = new Date(o.createdAt)
     const key = MONTHS[d.getMonth()]
     data[key] = (data[key] || 0) + (Number(o[field]) || 0)

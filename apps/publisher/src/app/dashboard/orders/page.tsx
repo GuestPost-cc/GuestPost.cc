@@ -112,10 +112,10 @@ function OrderCard({
       <CardContent className="p-4">
         <div className="mb-4">
           <h3 className="font-medium">
-            {order.serviceType.replace(/_/g, " ")}
+            {(order.items?.[0]?.serviceType ?? order.type ?? order.serviceType ?? "Order").replace(/_/g, " ")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {order.customerName}
+            {order.customerName ?? order.customer?.name ?? order.customer?.email ?? "—"}
           </p>
         </div>
 
