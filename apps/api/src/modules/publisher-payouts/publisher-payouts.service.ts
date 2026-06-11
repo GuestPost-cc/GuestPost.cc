@@ -471,6 +471,95 @@ export class PublisherPayoutsService {
     return result
   }
 
+  // FAILED -> REVERSED administrative recovery. A withdrawal whose payout
+  // execution hard-failed (bad bank details, provider rejection) otherwise
+  // traps the publisher's funds forever: the balance was decremented at
+  // request time and rejectWithdrawal only handles PENDING. Returns the money
+  // to withdrawableBalance so the publisher can fix details and re-request.
+  async reverseFailedWithdrawal(id: string, reversedBy: string, reason: string) {
+    const withdrawal = await this.prisma.withdrawal.findUnique({
+      where: { id },
+      include: { publisher: true },
+    })
+    if (!withdrawal) throw new NotFoundException("Withdrawal not found")
+    if (withdrawal.status !== "FAILED") {
+      throw new BadRequestException(`Only FAILED withdrawals can be reversed (current: ${withdrawal.status})`)
+    }
+
+    // Money must not have actually moved at the provider. A COMPLETED
+    // execution means the publisher was paid; PROCESSING means the provider
+    // may still pay — reversing either would double the funds.
+    const unsafeExecution = await this.prisma.payoutExecution.findFirst({
+      where: { withdrawalId: id, status: { in: ["COMPLETED", "PROCESSING"] } },
+      select: { id: true, status: true },
+    })
+    if (unsafeExecution) {
+      throw new BadRequestException(
+        `Cannot reverse: execution ${unsafeExecution.id} is ${unsafeExecution.status} — resolve at the provider first`,
+      )
+    }
+
+    const result = await this.prisma.$transaction(async (tx: any) => {
+      // Status+version guard: double reversal would double-restore the balance
+      const transitioned = await tx.withdrawal.updateMany({
+        where: { id, status: "FAILED", version: withdrawal.version },
+        data: { status: "REVERSED", approvedBy: reversedBy, approvedAt: new Date(), version: { increment: 1 } },
+      })
+      if (transitioned.count === 0) {
+        throw new ConflictException("Withdrawal is no longer FAILED — already reversed or retried")
+      }
+      const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
+
+      const balance = await tx.publisherBalance.findUnique({
+        where: { publisherId: withdrawal.publisherId },
+      })
+      if (!balance) throw new NotFoundException("Publisher balance not found")
+      const restored = await tx.publisherBalance.updateMany({
+        where: { publisherId: withdrawal.publisherId, version: balance.version },
+        data: {
+          withdrawableBalance: { increment: Number(withdrawal.amount) },
+          version: { increment: 1 },
+        },
+      })
+      if (restored.count === 0) {
+        throw new ConflictException("Publisher balance was modified by another request. Retry.")
+      }
+
+      // Offsetting ledger row for the WITHDRAWAL written at request time.
+      // Unique reference makes a concurrent duplicate reversal abort here
+      // even if it somehow passed the status guard.
+      await tx.transaction.create({
+        data: {
+          amount: withdrawal.amount,
+          type: "WITHDRAWAL_REVERSAL",
+          publisherId: withdrawal.publisherId,
+          reference: `withdrawal-reverse-${id}`,
+          description: `Failed withdrawal ${id} reversed — funds restored: ${reason}`,
+        },
+      })
+
+      await this.audit.log({
+        action: "WITHDRAWAL_REVERSED",
+        entityType: "Withdrawal",
+        entityId: id,
+        metadata: { publisherId: withdrawal.publisherId, amount: Number(withdrawal.amount), reason },
+        userId: reversedBy,
+        organizationId: withdrawal.publisher.organizationId,
+      }, tx)
+
+      return updated
+    })
+
+    await this.notifyPublisherMembers(
+      withdrawal.publisherId,
+      withdrawal.publisher.organizationId,
+      "WITHDRAWAL_REVERSED",
+      `Failed withdrawal of ${withdrawal.amount} was reversed — funds returned to your balance.`,
+    )
+
+    return result
+  }
+
   async listWithdrawals(publisherId?: string, take = 50, skip = 0) {
     const where = publisherId ? { publisherId } : {}
     const [items, total] = await this.prisma.$transaction([

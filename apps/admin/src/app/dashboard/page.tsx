@@ -324,7 +324,9 @@ export default function DashboardPage() {
       ["PENDING_PAYMENT", "ASSIGNED", "CONTENT_CREATION", "OUTREACH"].includes(o.status),
     )
 
-    const gmv = completedOrders?.reduce((sum, o) => sum + (o.amount ?? 0), 0) ?? 0
+    // Decimal columns arrive as strings — without Number() this reduce
+    // string-concatenates into a nonsense figure.
+    const gmv = completedOrders?.reduce((sum, o) => sum + Number(o.amount ?? 0), 0) ?? 0
 
     stats = {
       publishers: publishers.length,

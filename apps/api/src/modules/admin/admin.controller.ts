@@ -233,6 +233,23 @@ export class AdminController {
     return this.payouts.rejectWithdrawal(id, user.id)
   }
 
+  // FAILED -> REVERSED: returns trapped funds to the publisher's withdrawable
+  // balance after a hard provider failure. Refuses while any execution is
+  // COMPLETED/PROCESSING (money may have moved).
+  @Post("withdrawals/:id/reverse")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  reverseFailedWithdrawal(
+    @Param("id") id: string,
+    @Body() body: { reason?: string },
+    @CurrentUser() user: any,
+  ) {
+    const reason = (body?.reason ?? "").trim()
+    if (reason.length < 10) {
+      throw new BadRequestException("A reason of at least 10 characters is required to reverse a withdrawal")
+    }
+    return this.payouts.reverseFailedWithdrawal(id, user.id, reason)
+  }
+
   @Post("withdrawals/:id/execute")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   executePayout(
@@ -276,6 +293,84 @@ export class AdminController {
   ) {
     const ip = forwardedFor ?? "unknown"
     return this.payouts.decryptPayoutMethod(id, user.id, body.reason, ip, userAgent ?? "unknown")
+  }
+
+  // ── Audit log browsing — staff-action forensics is SUPER_ADMIN-only ────
+  @Get("audit-logs")
+  @StaffRoles("SUPER_ADMIN")
+  listAuditLogs(
+    @Query("action") action?: string,
+    @Query("entity") entity?: string,
+    @Query("entityId") entityId?: string,
+    @Query("actorId") actorId?: string,
+    @Query("startDate") startDate?: string,
+    @Query("endDate") endDate?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.admin.listAuditLogs({
+      action,
+      entityType: entity,
+      entityId,
+      userId: actorId,
+      startDate,
+      endDate,
+      page: page ? parseInt(page, 10) || 1 : 1,
+      limit: limit ? parseInt(limit, 10) || 50 : 50,
+    })
+  }
+
+  // ── Publisher directory ─────────────────────────────────────────────────
+  @Get("publishers")
+  listPublishers(
+    @Query("search") search?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.admin.listPublishers({
+      search,
+      page: page ? parseInt(page, 10) || 1 : 1,
+      limit: limit ? parseInt(limit, 10) || 50 : 50,
+    })
+  }
+
+  // Tier drives withdrawal hold windows (VERIFIED = no fraud hold) — that is
+  // a money-risk lever, so it is finance-controlled, not operations.
+  @Patch("publishers/:id/tier")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  updatePublisherTier(@Param("id") id: string, @Body("tier") tier: string, @CurrentUser() user: any) {
+    return this.admin.updatePublisherTier(id, tier, user)
+  }
+
+  // ── Support tickets (cross-organization) ────────────────────────────────
+  @Get("support/tickets")
+  listSupportTickets(
+    @Query("status") status?: string,
+    @Query("search") search?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.admin.listTicketsAdmin({
+      status,
+      search,
+      page: page ? parseInt(page, 10) || 1 : 1,
+      limit: limit ? parseInt(limit, 10) || 50 : 50,
+    })
+  }
+
+  @Get("support/tickets/:id")
+  getSupportTicket(@Param("id") id: string) {
+    return this.admin.getTicketAdmin(id)
+  }
+
+  @Patch("support/tickets/:id/status")
+  updateSupportTicketStatus(@Param("id") id: string, @Body("status") status: string, @CurrentUser() user: any) {
+    return this.admin.updateTicketStatusAdmin(id, status, user)
+  }
+
+  @Post("support/tickets/:id/messages")
+  addSupportTicketMessage(@Param("id") id: string, @Body("content") content: string, @CurrentUser() user: any) {
+    return this.admin.addTicketMessageAdmin(id, content, user)
   }
 
   @Get("marketplace/listings")

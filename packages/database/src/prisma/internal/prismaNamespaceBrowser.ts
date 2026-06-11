@@ -640,6 +640,7 @@ export const TransactionScalarFieldEnum = {
   currency: 'currency',
   type: 'type',
   reference: 'reference',
+  providerRef: 'providerRef',
   description: 'description',
   walletId: 'walletId',
   orderId: 'orderId',

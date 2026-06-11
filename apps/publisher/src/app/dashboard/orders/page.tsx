@@ -122,9 +122,11 @@ function OrderCard({
         <div className="mb-4 flex items-center justify-between text-sm">
           <div className="flex items-center gap-1 text-muted-foreground">
             <ExternalLink className="h-3 w-3" />
-            {order.website}
+            {order.website?.url ?? order.items?.[0]?.website?.url ?? "—"}
           </div>
-          <span className="font-medium">${order.price}</span>
+          <span className="font-medium">
+            ${Number(order.totalAmount ?? order.items?.[0]?.budget ?? 0).toFixed(2)}
+          </span>
         </div>
 
         <div className="mb-4">
@@ -309,7 +311,7 @@ export default function OrdersPage() {
                         "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {order.items?.[0]?.website?.url ?? order.website ?? "—"}
+                      {order.items?.[0]?.website?.url ?? order.website?.url ?? "—"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={config.variant}>{config.label}</Badge>

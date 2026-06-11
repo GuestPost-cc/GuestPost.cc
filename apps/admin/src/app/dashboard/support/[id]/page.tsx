@@ -94,9 +94,6 @@ export default function AdminTicketDetailPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant={ticket.priority === "HIGH" || ticket.priority === "URGENT" ? "destructive" : "secondary"}>
-                {ticket.priority}
-              </Badge>
               <Select defaultValue={ticket.status} onValueChange={(v) => updateStatus(v)}>
                 <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -107,9 +104,9 @@ export default function AdminTicketDetailPage() {
               </Select>
             </div>
           </div>
-          {ticket.assignee && (
-            <p className="text-sm text-muted-foreground flex items-center gap-1">
-              <UserCheck className="h-3 w-3" /> Assigned to {ticket.assignee.name}
+          {ticket.organization && (
+            <p className="text-sm text-muted-foreground">
+              Organization: {ticket.organization.name}
             </p>
           )}
         </CardHeader>

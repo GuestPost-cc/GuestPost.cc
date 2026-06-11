@@ -143,10 +143,17 @@ export class SettlementsService {
     if (activeDispute) throw new BadRequestException("Cannot approve settlement while dispute is active")
 
     return this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.settlement.update({
-        where: { id },
-        data: { status: "CUSTOMER_APPROVED" },
+      // Conditional transition — the unguarded update here could overwrite a
+      // settlement that was concurrently RELEASED (status corruption; the
+      // pre-tx status check reads a stale snapshot).
+      const transitioned = await tx.settlement.updateMany({
+        where: { id, status: { in: ["PENDING", "UNDER_REVIEW"] }, version: settlement.version },
+        data: { status: "CUSTOMER_APPROVED", version: { increment: 1 } },
       })
+      if (transitioned.count === 0) {
+        throw new ConflictException("Settlement was modified by another request. Retry.")
+      }
+      const updated = await tx.settlement.findUniqueOrThrow({ where: { id } })
 
       await tx.settlementApproval.upsert({
         where: { settlementId_type: { settlementId: id, type: "CUSTOMER" } },
@@ -180,7 +187,7 @@ export class SettlementsService {
         metadata: { orderId: settlement.orderId, publisherAmount: Number(settlement.publisherAmount) },
         userId,
         organizationId,
-      })
+      }, tx)
 
       return updated
     })
@@ -380,7 +387,7 @@ export class SettlementsService {
           },
           userId,
           organizationId: settlement.order.organizationId,
-        })
+        }, tx)
         await tx.settlementApproval.delete({ where: { id: revoked.id } })
       }
 

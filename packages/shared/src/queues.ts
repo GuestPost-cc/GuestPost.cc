@@ -6,6 +6,7 @@ export const QUEUES = {
   AI: "ai",
   VERIFICATION: "verification",
   PAYOUT: "payout",
+  RECONCILIATION: "reconciliation",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
@@ -42,5 +43,8 @@ export const QUEUE_JOBS = {
     EXECUTE: "payout-execute",
     CHECK_STATUS: "payout-check-status",
     WEBHOOK: "payout-webhook",
+  },
+  [QUEUES.RECONCILIATION]: {
+    RUN: "reconciliation-run",
   },
 } as const

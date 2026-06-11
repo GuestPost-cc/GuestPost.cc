@@ -28,6 +28,7 @@ import {
   DialogDescription,
 } from "@guestpost/ui"
 import { AlertCircle, DollarSign, RefreshCw, ShieldAlert, Eye, CheckCircle2, XCircle } from "lucide-react"
+import { useRequireRole, ForbiddenPage } from "../../../lib/use-require-role"
 
 const TABS = ["settlements", "withdrawals", "payouts", "reconciliation"] as const
 type Tab = (typeof TABS)[number]
@@ -75,6 +76,13 @@ function EmptyBlock({ label }: { label: string }) {
 }
 
 export default function FinancePage() {
+  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "FINANCE")
+  if (loading) return null
+  if (!allowed) return <ForbiddenPage requires="Finance or Super Admin" />
+  return <FinancePageInner />
+}
+
+function FinancePageInner() {
   const [activeTab, setActiveTab] = useState<Tab>("settlements")
   const queryClient = useQueryClient()
 

@@ -121,6 +121,14 @@ export class AdminService {
     })
   }
 
+  // FAILED -> REVERSED: restore trapped funds after a hard provider failure.
+  // Reason (min 10 chars) is required and audited.
+  reverseFailedWithdrawal(id: string, reason: string) {
+    return this.client.post(`/admin/withdrawals/${id}/reverse`, {
+      json: { reason },
+    })
+  }
+
   executePayout(withdrawalId: string, providerName: string) {
     return this.client.post<{ executionId: string; status: string; providerExecutionId: string | null }>(
       `/admin/withdrawals/${withdrawalId}/execute`,
@@ -229,26 +237,24 @@ export class AdminService {
     return this.client.patch(`/admin/marketplace/reviews/${reviewId}/moderate`, { json: { status } })
   }
 
-  listFlags(params?: { status?: string; severity?: string }) {
-    return this.client.get("/admin/marketplace/flags", { params: params as Record<string, string | undefined> })
-  }
-
-  resolveFlag(flagId: string, resolution: string) {
-    return this.client.post(`/admin/marketplace/flags/${flagId}/resolve`, { json: { resolution } })
-  }
-
   // -- Publishers --
-  listPublishers(params?: { search?: string; status?: string; page?: number; limit?: number }) {
+  // Backed by GET /admin/publishers. The backend's trust lever is the tier
+  // (NEW/TRUSTED/VERIFIED — drives withdrawal holds); there is no separate
+  // approve/suspend workflow, so none is exposed here.
+  listPublishers(params?: { search?: string; page?: number; limit?: number }) {
     return this.client.get<{
       items: Array<{
         id: string
         name: string | null
-        email: string
-        publisherRole: string | null
+        email: string | null
+        tier: "NEW" | "TRUSTED" | "VERIFIED"
         websiteCount: number
-        activeOrderCount: number
-        totalEarnings: number
-        banned: boolean
+        listingCount: number
+        settlementCount: number
+        withdrawableBalance: number
+        lifetimeEarnings: number
+        debtBalance: number
+        ownerBanned: boolean
         createdAt: string
       }>
       total: number
@@ -258,32 +264,21 @@ export class AdminService {
     }>("/admin/publishers", { params: params as Record<string, string | number | undefined> })
   }
 
-  approvePublisher(publisherId: string) {
-    return this.client.post(`/admin/publishers/${publisherId}/approve`)
-  }
-
-  rejectPublisher(publisherId: string, reason?: string) {
-    return this.client.post(`/admin/publishers/${publisherId}/reject`, { json: reason ? { reason } : {} })
-  }
-
-  suspendPublisher(publisherId: string) {
-    return this.client.post(`/admin/publishers/${publisherId}/suspend`)
-  }
-
-  restorePublisher(publisherId: string) {
-    return this.client.post(`/admin/publishers/${publisherId}/restore`)
+  updatePublisherTier(publisherId: string, tier: "NEW" | "TRUSTED" | "VERIFIED") {
+    return this.client.patch(`/admin/publishers/${publisherId}/tier`, { json: { tier } })
   }
 
   // -- Support --
-  listTickets(params?: { status?: string; priority?: string; search?: string; page?: number; limit?: number }) {
+  // Real Ticket model: subject/status/org/customer/messages. No priority or
+  // assignee fields exist in the backend — the previous types invented them.
+  listTickets(params?: { status?: string; search?: string; page?: number; limit?: number }) {
     return this.client.get<{
       items: Array<{
         id: string
         subject: string
         status: TicketStatus
-        priority: string
         customer: { id: string; name: string | null; email: string }
-        assignee: { id: string; name: string | null } | null
+        organization: { id: string; name: string } | null
         messageCount: number
         createdAt: string
         updatedAt: string
@@ -299,18 +294,14 @@ export class AdminService {
     return this.client.get<{
       id: string
       subject: string
+      description: string | null
       status: TicketStatus
-      priority: string
       customer: { id: string; name: string | null; email: string }
-      assignee: { id: string; name: string | null } | null
+      organization: { id: string; name: string } | null
       messages: Array<{ id: string; content: string; author: string; authorType: string; createdAt: string }>
       createdAt: string
       updatedAt: string
     }>(`/admin/support/tickets/${id}`)
-  }
-
-  assignTicket(ticketId: string, assigneeId: string) {
-    return this.client.patch(`/admin/support/tickets/${ticketId}/assign`, { json: { assigneeId } })
   }
 
   updateTicketStatus(ticketId: string, status: TicketStatus) {

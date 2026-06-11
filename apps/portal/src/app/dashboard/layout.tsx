@@ -31,6 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@guestpost/ui"
+import { Notifications } from "../../components/notifications"
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -113,12 +114,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </nav>
           
           <div className="border-t p-4 space-y-2">
-            {user.organizationId && (
-              <div className="px-3 py-1.5">
-                <p className="text-xs text-muted-foreground">Organization</p>
-                <p className="text-sm font-medium truncate">{user.name ?? "Organization"}</p>
-              </div>
-            )}
+            <div className="flex items-center justify-between px-3 py-1.5">
+              {user.organizationId ? (
+                <div>
+                  <p className="text-xs text-muted-foreground">Organization</p>
+                  <p className="text-sm font-medium truncate">{user.name ?? "Organization"}</p>
+                </div>
+              ) : <span />}
+              <Notifications />
+            </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-accent">
@@ -163,6 +167,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Menu className="h-5 w-5" />
           </button>
           <span className="font-semibold">GuestPost</span>
+          <div className="ml-auto"><Notifications /></div>
         </header>
 
         <main className="flex-1 p-6 lg:p-8">

@@ -54,7 +54,17 @@ export class OrdersController {
   @UseGuards(OrderOwnershipGuard)
   @RequireOrderOwnership()
   get(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.orders.getOrder(id, user.organizationId)
+    // Publishers have no organizationId — the ownership guard above is their
+    // access check (order.website.publisherId === user.publisherId)
+    return this.orders.getOrder(id, user.userType === "PUBLISHER" ? null : user.organizationId)
+  }
+
+  @Get(":id/events")
+  @UseGuards(OrderOwnershipGuard)
+  @RequireOrderOwnership()
+  async getEvents(@Param("id") id: string, @CurrentUser() user: any) {
+    const order = await this.orders.getOrder(id, user.userType === "PUBLISHER" ? null : user.organizationId)
+    return order.events
   }
 
   @Post(":id/items")

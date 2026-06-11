@@ -39,8 +39,16 @@ export class OrdersService {
 
     return this.prisma.$transaction(async (tx: any) => {
       if (data.idempotencyKey) {
+        // Tenant-scoped replay — a key-only lookup let any organization replay
+        // another tenant's key and read their order. The composite unique
+        // [organizationId, idempotencyKey] makes the scoping a DB guarantee.
         const existing = await tx.order.findUnique({
-          where: { idempotencyKey: data.idempotencyKey },
+          where: {
+            organizationId_idempotencyKey: {
+              organizationId: data.organizationId,
+              idempotencyKey: data.idempotencyKey,
+            },
+          },
         })
         if (existing) return existing
       }
@@ -290,9 +298,12 @@ export class OrdersService {
     })
   }
 
-  async getOrder(id: string, organizationId: string) {
+  // organizationId is null for publisher callers — OrderOwnershipGuard has
+  // already verified the order's website belongs to their publisher account,
+  // and a null org filter is a Prisma validation error (500), not a no-op.
+  async getOrder(id: string, organizationId?: string | null) {
     const order = await this.prisma.order.findFirst({
-      where: { id, organizationId },
+      where: organizationId ? { id, organizationId } : { id },
       include: {
         items: { include: { publications: true } },
         events: { orderBy: { createdAt: "desc" } },

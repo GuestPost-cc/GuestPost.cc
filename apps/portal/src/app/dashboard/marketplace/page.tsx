@@ -19,6 +19,7 @@ interface Listing {
   description: string
   shortDescription?: string
   type: string
+  fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
   price: number
   currency: string
   domainRating?: number
@@ -343,7 +344,14 @@ export default function MarketplacePage() {
                     {listing.category && (
                       <span className="text-xs font-medium text-primary">{listing.category.name}</span>
                     )}
-                    <span className="text-xs text-muted-foreground">{listing.type.replace("_", " ")}</span>
+                    <span className="text-xs text-muted-foreground">{listing.type?.replace(/_/g, " ") ?? ""}</span>
+                    {listing.fulfillmentType === "INTERNAL" ? (
+                      <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">Platform</span>
+                    ) : listing.fulfillmentType === "HYBRID" ? (
+                      <span className="ml-auto rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-600">Hybrid</span>
+                    ) : (
+                      <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Publisher</span>
+                    )}
                   </div>
                   <h3 className="font-semibold line-clamp-2 group-hover:text-primary transition-colors">
                     {listing.title}

@@ -288,7 +288,8 @@ export const TransactionType = {
   SETTLEMENT_RELEASE: 'SETTLEMENT_RELEASE',
   SETTLEMENT_CLAWBACK: 'SETTLEMENT_CLAWBACK',
   DEBT_REPAYMENT: 'DEBT_REPAYMENT',
-  RESERVATION: 'RESERVATION'
+  RESERVATION: 'RESERVATION',
+  CHARGEBACK: 'CHARGEBACK'
 } as const
 
 export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType]

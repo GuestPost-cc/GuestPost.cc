@@ -9,6 +9,7 @@ import { createReportWorker } from "./processors/report.processor"
 import { createNotificationWorker } from "./processors/notification.processor"
 import { createVerificationWorker } from "./processors/verification.processor"
 import { createPayoutWorker } from "./processors/payout.processor"
+import { createReconciliationWorker } from "./processors/reconciliation.processor"
 import { connection } from "./redis"
 import { prisma } from "@guestpost/database"
 import { Queue } from "bullmq"
@@ -30,6 +31,25 @@ async function registerPayoutStatusPoll() {
   )
   await queue.close()
   console.log("[WORKER] Registered payout status poll (every 10m)")
+}
+
+// Scheduled drift sweep — alerting must not depend on a human remembering to
+// call GET /admin/reconciliation. Interval configurable for ops tuning.
+async function registerReconciliationSweep() {
+  const everyMs = Math.max(Number(process.env.RECONCILIATION_SWEEP_MINUTES ?? 60), 5) * 60 * 1000
+  const queue = new Queue(QUEUES.RECONCILIATION, { connection })
+  await queue.add(
+    "reconciliation-run",
+    signJobPayload({}),
+    {
+      repeat: { every: everyMs },
+      jobId: "reconciliation-sweep",
+      removeOnComplete: { count: 24 },
+      removeOnFail: { count: 24 },
+    },
+  )
+  await queue.close()
+  console.log(`[WORKER] Registered reconciliation sweep (every ${everyMs / 60000}m)`)
 }
 
 async function checkConnections() {
@@ -57,10 +77,14 @@ checkConnections().then(() => {
     createNotificationWorker(),
     createVerificationWorker(),
     createPayoutWorker(),
+    createReconciliationWorker(),
   )
   console.log(`[WORKER] Started ${workers.length} workers`)
   registerPayoutStatusPoll().catch((err) => {
     console.error("[WORKER] Failed to register payout status poll:", err)
+  })
+  registerReconciliationSweep().catch((err) => {
+    console.error("[WORKER] Failed to register reconciliation sweep:", err)
   })
 })
 

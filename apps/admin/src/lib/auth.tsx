@@ -20,7 +20,7 @@ type User = {
   name: string | null
   image: string | null
   userType: "CUSTOMER" | "PUBLISHER" | "STAFF"
-  staffRole: "SUPER_ADMIN" | "OPERATIONS" | null
+  staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
   banned: boolean
 }
 

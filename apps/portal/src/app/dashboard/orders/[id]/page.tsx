@@ -91,6 +91,7 @@ interface TimelineEvent {
   createdAt: string
 }
 
+// Mirrors the api-client OrderResponse (normalized from the real API payload)
 interface OrderDetail {
   id: string
   status: string
@@ -101,7 +102,6 @@ interface OrderDetail {
     instructions: string | null
     budget: number | null
     website: { id: string; url: string } | null
-    assignedTo: { id: string; name: string | null } | null
   }>
   totalAmount: number | null
   currency: string
@@ -348,15 +348,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               )}
 
-              {order.items?.[0]?.assignedTo && (
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Assigned Writer</p>
-                  <p className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    {order.items[0].assignedTo.name || "Unknown"}
-                  </p>
-                </div>
-              )}
             </CardContent>
           </Card>
 

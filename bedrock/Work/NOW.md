@@ -1,5 +1,42 @@
 # Current Focus
-**Status: Beta hardened + load-proven (batch 15) — 1000 concurrent users, zero money drift, full automated test suite.**
+**Status: Frontend completion sprint done (batch 18) — all 4 apps wired to real endpoints, notification center live, audit center backed, RBAC page guards. 141 unit + 26 integration + 16 concurrency green, 11/11 builds.**
+
+## Completed (2026-06-12, batch 18 — frontend completion & integration sprint)
+- **Audit found 3 broken admin pages** (calling nonexistent routes) + zero mock data anywhere (batches 14/16 held up)
+- **New backend read surfaces** (thin, over existing models — no redesign):
+  - `GET /admin/audit-logs` (SUPER_ADMIN; action/entity/actor/date filters, paginated) — audit-logs page was 404
+  - `GET /admin/publishers` + `PATCH /admin/publishers/:id/tier` (tier = real trust lever; removed fabricated approve/reject/suspend/restore client methods + page actions)
+  - `GET/PATCH/POST /admin/support/tickets[...]` cross-org staff support (status change + reply notify customer via queue; removed fabricated priority/assignee fields)
+  - **notifications module**: `GET /notifications` (+unread-count, mark-read, mark-all-read) — strictly self-scoped (cross-user = 404, verified live)
+- **Notification center**: `NotificationBell` in packages/ui (presentation-only) + per-app wrapper (react-query, 60s unread poll, load-more, mark-read) mounted in portal/publisher/admin layouts. Data path proven live: publisher sees real WITHDRAWAL_APPROVED/SETTLEMENT_RELEASED rows, mark-read works
+- **RBAC page guards**: `useRequireRole` + ForbiddenPage in admin (finance → SUPER_ADMIN+FINANCE, audit-logs → SUPER_ADMIN); portal session-restore now rejects non-CUSTOMER (was sign-in only); publisher already enforced both paths
+- **Audit center**: filters + client-side search + CSV export on admin audit-logs page
+- **Ownership badges**: Platform/Publisher/Hybrid `fulfillmentType` badges on portal marketplace cards + detail page (client type updated — API always returned it)
+- **Crash sweep**: all `.replace`/`.toFixed`/`.map` renders guarded (1 fix in audit search on nullable entityId)
+- Smoke-tested live: all new endpoints return real data; OPERATIONS→audit-logs 403; cross-user notification 404
+- Suites: 141 unit + 26 integration + 16 concurrency, 11/11 builds
+
+**Status (prior): Pre-beta audit findings ALL FIXED (batch 17) — 141 unit + 26 integration + 16 concurrency green, 11/11 builds. Backend beta-ready; frontend polish next.**
+
+## Completed (2026-06-11, batch 17 — pre-beta audit fixes F-1..F-9)
+- **F-1 double-credit race**: deposit webhook P2002 now ABORTS tx (`DuplicateEventError` rethrow) — wallet increment can no longer commit without ledger row. Deposit rows store `providerRef` = Stripe payment_intent
+- **F-2 payout webhook normalization**: `packages/shared/src/payout-webhook.ts` `normalizeProviderWebhook` maps real Wise (`data.resource.id`/`current_state`) + Stripe (`data.object.id`/`status`) shapes through the SAME status maps as the poller; worker handleWebhook uses it; internal pre-normalized payloads pass through
+- **F-3 cross-tenant idempotency**: `@@unique([organizationId, idempotencyKey])` on Order (migration `20260611150000_prebeta_audit_fixes`), replay lookup composite-scoped
+- **F-4 withdrawal reversal**: `POST /admin/withdrawals/:id/reverse` (SUPER_ADMIN/FINANCE, reason ≥10 chars) — FAILED→REVERSED, balance restored, `WITHDRAWAL_REVERSAL` row `withdrawal-reverse-{id}`, refuses if any execution COMPLETED/PROCESSING; api-client `reverseFailedWithdrawal`
+- **F-5 settlement status corruption**: customerApprove now conditional updateMany (status in PENDING/UNDER_REVIEW + version); RELEASED can never revert; settlements audit.log now pass tx
+- **F-6 chargeback holds**: dispute.created → hold available→reserved on originating wallet (via providerRef), partial-hold + uncovered-exposure audit; dispute.closed won→release / lost→permanent debit w/ new `CHARGEBACK` TransactionType; all idempotent via unique references `chargeback-{hold|release|lost}-{disputeId}`
+- **F-7 contract drift**: api-client orders.ts normalizes raw API → declared type (totalAmount=Number(amount), items[].serviceType=order.type etc.); portal order detail page stale local type fixed, dead assignedTo block removed
+- **F-8 FINANCE lockout**: admin FE staffRole type + per-item nav role lists (finance: SUPER_ADMIN+FINANCE; marketplace: +OPERATIONS; audit-logs: SUPER_ADMIN)
+- **F-9 ops**: `scripts/backup-db.sh` (pg_dump custom+verify+rotate), `docs/OPERATIONS.md` (restore drill, pm2, runbooks), compose `restart: unless-stopped`, reconciliation core extracted to `packages/shared/src/reconciliation-core.ts` (BigInt 12dp), worker hourly sweep (`RECONCILIATION_SWEEP_MINUTES`) w/ staff notifications + `RECONCILIATION_DRIFT_DETECTED` audit on any drift
+- 26 new regression tests in `billing/__tests__/prebeta-audit-regression.spec.ts` (141 total)
+- Audit report: `bedrock/Evidence/PRE_BETA_AUDIT_2026-06-11.md`
+
+**Status (prior): Beta hardened + load-proven (batch 15) — 1000 concurrent users, zero money drift, full automated test suite. Memory vault populated with 8 domain branches.**
+
+## This session — permanent memory integration
+- Created 8 domain Memory branches (`identity-auth`, `billing-payments`, `orders-fulfillment`, `marketplace`, `settlements`, `publisher-payouts`, `infrastructure`, `security`)
+- Updated PROJECT.md with memory branch references
+- Populated glossary and decisions templates with domain content
 
 ## Next session — pending fixes
 - Frontend/API contract sweep: batch 16 fixed order.serviceType->type + paginated unwrap, but other pages likely share the drift (portal orders/campaigns/reports use `order.items?.[0]?.serviceType` which is optional-chained so degrades to "—" rather than crashing — verify against real `items` shape). Audit every `.list()`/paginated client method for array-vs-{items} mismatch.

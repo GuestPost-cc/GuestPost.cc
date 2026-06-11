@@ -114,8 +114,7 @@ export default function AdminSupportPage() {
                   <TableHead>Subject</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Assignee</TableHead>
+                  <TableHead>Organization</TableHead>
                   <TableHead>Messages</TableHead>
                   <TableHead>Last Updated</TableHead>
                   <TableHead className="text-right" />
@@ -131,12 +130,7 @@ export default function AdminSupportPage() {
                         {t.status.replace(/_/g, " ")}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant={t.priority === "HIGH" || t.priority === "URGENT" ? "destructive" : "secondary"}>
-                        {t.priority}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{t.assignee?.name || "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{t.organization?.name || "—"}</TableCell>
                     <TableCell className="text-center">{t.messageCount}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDistanceToNow(new Date(t.updatedAt), { addSuffix: true })}

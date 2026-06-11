@@ -22,6 +22,8 @@ export type {
 export { ReportingService } from "./services/reporting"
 export { SupportService } from "./services/support"
 export { PublishersService } from "./services/publishers"
+export { NotificationsService } from "./services/notifications"
+export type { NotificationItem, NotificationListResponse } from "./services/notifications"
 
 import { HttpClient, type ApiClientConfig } from "./client"
 import { IdentityService } from "./services/identity"
@@ -36,6 +38,7 @@ import { AdminService } from "./services/admin"
 import { ReportingService } from "./services/reporting"
 import { SupportService } from "./services/support"
 import { PublishersService } from "./services/publishers"
+import { NotificationsService } from "./services/notifications"
 
 export interface GuestPostApi {
   client: HttpClient
@@ -51,6 +54,7 @@ export interface GuestPostApi {
   reporting: ReportingService
   support: SupportService
   publishers: PublishersService
+  notifications: NotificationsService
 }
 
 export function createApiClient(config: ApiClientConfig): GuestPostApi {
@@ -69,5 +73,6 @@ export function createApiClient(config: ApiClientConfig): GuestPostApi {
     reporting: new ReportingService(client),
     support: new SupportService(client),
     publishers: new PublishersService(client),
+    notifications: new NotificationsService(client),
   }
 }

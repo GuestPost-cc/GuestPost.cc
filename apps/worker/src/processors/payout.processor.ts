@@ -1,6 +1,6 @@
 import { Worker } from "bullmq"
 import { connection } from "../redis"
-import { QUEUES, verifyJobPayload, checkProviderTransferStatus } from "@guestpost/shared"
+import { QUEUES, verifyJobPayload, checkProviderTransferStatus, normalizeProviderWebhook } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
 
 // Shared state transitions for "the provider says this transfer finished".
@@ -151,17 +151,23 @@ async function handleWebhook(job: any) {
     throw new Error("Unverified webhook — signature check required before enqueueing")
   }
   console.log(`[PAYOUT] Processing ${provider} webhook event: ${event}`)
-  const providerExecutionId = data.providerExecutionId ?? data.id
-  if (!providerExecutionId) {
+
+  // Real Wise payloads carry the transfer id at data.resource.id and state at
+  // current_state; Stripe at data.object.id / status. The normalizer maps both
+  // (and pre-normalized internal payloads) through the same status maps the
+  // poller uses — raw provider shapes previously matched nothing and every
+  // genuine webhook was skipped.
+  const normalized = normalizeProviderWebhook(provider, data)
+  if (!normalized.providerExecutionId) {
     console.warn(`[PAYOUT] No providerExecutionId in webhook data`)
     return { skipped: true, reason: "No providerExecutionId" }
   }
   const execution = await prisma.payoutExecution.findFirst({
-    where: { providerExecutionId },
+    where: { providerExecutionId: normalized.providerExecutionId },
     include: { withdrawal: { include: { publisher: true } } },
   })
   if (!execution) {
-    console.warn(`[PAYOUT] No execution found for providerExecutionId: ${providerExecutionId}`)
+    console.warn(`[PAYOUT] No execution found for providerExecutionId: ${normalized.providerExecutionId}`)
     return { skipped: true, reason: "Execution not found" }
   }
 
@@ -170,15 +176,17 @@ async function handleWebhook(job: any) {
     return { skipped: true, reason: `Execution is ${execution.status}, not PROCESSING` }
   }
 
-  const webhookStatus = data.status
+  const webhookStatus = normalized.status
   if (webhookStatus === "COMPLETED") {
-    await completeExecution(execution, "webhook", { ...data, provider, event })
+    await completeExecution(execution, "webhook", { provider, event, rawStatus: normalized.rawStatus })
     console.log(`[PAYOUT] Withdrawal ${execution.withdrawalId} completed via webhook`)
   } else if (webhookStatus === "FAILED") {
-    await failExecution(execution, "webhook", data.error ?? "Webhook reported failure", { ...data, provider, event })
+    await failExecution(execution, "webhook", normalized.error ?? "Provider reported failure", { provider, event, rawStatus: normalized.rawStatus })
     console.log(`[PAYOUT] Withdrawal ${execution.withdrawalId} failed via webhook`)
+  } else {
+    console.log(`[PAYOUT] Webhook state "${normalized.rawStatus}" is non-terminal — no transition`)
   }
-  return { executionId: execution.id, webhookStatus }
+  return { executionId: execution.id, webhookStatus, rawStatus: normalized.rawStatus }
 }
 
 export function createPayoutWorker() {

@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
+import { useRequireRole, ForbiddenPage } from "../../../lib/use-require-role"
 import { Card, CardContent } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
@@ -45,6 +46,13 @@ const ACTION_COLORS: Record<string, string> = {
 }
 
 export default function AuditLogsPage() {
+  const { allowed, loading } = useRequireRole("SUPER_ADMIN")
+  if (loading) return null
+  if (!allowed) return <ForbiddenPage requires="Super Admin" />
+  return <AuditLogsPageInner />
+}
+
+function AuditLogsPageInner() {
   const [search, setSearch] = useState("")
   const [actionFilter, setActionFilter] = useState("")
   const [page, setPage] = useState(1)
@@ -61,11 +69,41 @@ export default function AuditLogsPage() {
     if (!search) return true
     const q = search.toLowerCase()
     return l.action.toLowerCase().includes(q) ||
-      l.entity.toLowerCase().includes(q) ||
+      l.entity?.toLowerCase().includes(q) ||
       l.actorName?.toLowerCase().includes(q) ||
-      l.entityId.toLowerCase().includes(q) ||
-      JSON.stringify(l.metadata).toLowerCase().includes(q)
+      l.entityId?.toLowerCase().includes(q) ||
+      JSON.stringify(l.metadata ?? {}).toLowerCase().includes(q)
   })
+
+  const exportCsv = () => {
+    const header = ["createdAt", "action", "entity", "entityId", "actor", "ipAddress", "metadata"]
+    const rows = filteredLogs.map((l: any) => [
+      l.createdAt,
+      l.action,
+      l.entity ?? "",
+      l.entityId ?? "",
+      l.actorName ?? l.actorId ?? "system",
+      l.ipAddress ?? "",
+      JSON.stringify(l.metadata ?? {}),
+    ])
+    // Neutralize spreadsheet formula injection: metadata can carry
+    // user-supplied text (=, +, -, @ prefixes execute in Excel/Sheets).
+    const sanitize = (c: unknown) => {
+      let s = String(c).replace(/"/g, '""')
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`
+      return `"${s}"`
+    }
+    const csv = [header, ...rows]
+      .map((r) => r.map(sanitize).join(","))
+      .join("\n")
+    const blob = new Blob([csv], { type: "text/csv" })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = `audit-logs-page${pagination.page}-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (error) {
     return (
@@ -87,6 +125,9 @@ export default function AuditLogsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Audit Logs</h1>
           <p className="text-muted-foreground">Track all platform changes and user activity</p>
         </div>
+        <Button variant="outline" onClick={exportCsv} disabled={filteredLogs.length === 0}>
+          Export CSV
+        </Button>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

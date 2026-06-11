@@ -8,6 +8,8 @@ export interface MarketplaceListing {
   shortDescription?: string
   type: string
   status: string
+  // INTERNAL = platform-fulfilled, PUBLISHER = publisher-fulfilled, HYBRID = both
+  fulfillmentType: "INTERNAL" | "PUBLISHER" | "HYBRID"
   price: number
   currency: string
   priceType: string

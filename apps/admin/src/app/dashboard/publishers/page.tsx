@@ -1,9 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
+import { Card, CardContent } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
@@ -23,65 +23,42 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@guestpost/ui"
-import {
-  Search,
-  RefreshCw,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Ban,
-  UserCheck,
-  ExternalLink,
-  Newspaper,
-} from "lucide-react"
+import { Search, RefreshCw, AlertCircle, Newspaper } from "lucide-react"
 import { format } from "date-fns"
 import { toast } from "sonner"
+
+type Tier = "NEW" | "TRUSTED" | "VERIFIED"
+
+// Tier is the platform's real trust lever: it drives withdrawal hold windows.
+const TIER_BADGES: Record<Tier, { label: string; variant: "secondary" | "default" | "outline" }> = {
+  NEW: { label: "New", variant: "secondary" },
+  TRUSTED: { label: "Trusted", variant: "outline" },
+  VERIFIED: { label: "Verified", variant: "default" },
+}
 
 export default function AdminPublishersPage() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
   const [page, setPage] = useState(1)
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["admin", "publishers", search, statusFilter, page],
-    queryFn: () => api.admin.listPublishers({ search: search || undefined, status: statusFilter || undefined, page, limit: 20 }),
+    queryKey: ["admin", "publishers", search, page],
+    queryFn: () => api.admin.listPublishers({ search: search || undefined, page, limit: 20 }),
   })
 
-  const approveMutation = useMutation({
-    mutationFn: (id: string) => api.admin.approvePublisher(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin", "publishers"] }); toast.success("Publisher approved") },
-    onError: () => toast.error("Failed to approve publisher"),
-  })
-
-  const rejectMutation = useMutation({
-    mutationFn: (id: string) => api.admin.rejectPublisher(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin", "publishers"] }); toast.success("Publisher rejected") },
-    onError: () => toast.error("Failed to reject publisher"),
-  })
-
-  const suspendMutation = useMutation({
-    mutationFn: (id: string) => api.admin.suspendPublisher(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin", "publishers"] }); toast.success("Publisher suspended") },
-    onError: () => toast.error("Failed to suspend publisher"),
-  })
-
-  const restoreMutation = useMutation({
-    mutationFn: (id: string) => api.admin.restorePublisher(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin", "publishers"] }); toast.success("Publisher restored") },
-    onError: () => toast.error("Failed to restore publisher"),
+  const tierMutation = useMutation({
+    mutationFn: ({ id, tier }: { id: string; tier: Tier }) => api.admin.updatePublisherTier(id, tier),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "publishers"] })
+      toast.success("Publisher tier updated")
+    },
+    onError: (err: Error) => toast.error(err.message || "Failed to update tier"),
   })
 
   const publishers = data?.items ?? []
-  const pagination = data ? { page: data.page, totalPages: data.totalPages, total: data.total } : { page: 1, totalPages: 1, total: 0 }
-
-  const filteredPublishers = useMemo(() => {
-    if (!search) return publishers
-    const q = search.toLowerCase()
-    return publishers.filter((p: any) =>
-      p.name?.toLowerCase().includes(q) || p.email.toLowerCase().includes(q)
-    )
-  }, [publishers, search])
+  const pagination = data
+    ? { page: data.page, totalPages: data.totalPages, total: data.total }
+    : { page: 1, totalPages: 1, total: 0 }
 
   if (error) {
     return (
@@ -96,30 +73,21 @@ export default function AdminPublishersPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Publishers</h1>
-          <p className="text-muted-foreground">Manage publisher accounts and applications</p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold tracking-tight">Publishers</h1>
+        <p className="text-muted-foreground">
+          Publisher accounts, balances, and trust tier (tier controls withdrawal hold windows)
+        </p>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search publishers..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="pl-9" />
-        </div>
-        <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1) }}>
-            <SelectTrigger className="w-36"><SelectValue placeholder="All status" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All status</SelectItem>
-              <SelectItem value="ACTIVE">Active</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="SUSPENDED">Suspended</SelectItem>
-              <SelectItem value="REJECTED">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search by name or email..."
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setPage(1) }}
+          className="pl-9"
+        />
       </div>
 
       <Card>
@@ -128,7 +96,7 @@ export default function AdminPublishersPage() {
             <div className="p-4 space-y-3">
               {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
             </div>
-          ) : filteredPublishers.length === 0 ? (
+          ) : publishers.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Newspaper className="h-12 w-12 text-muted-foreground/50" />
               <h3 className="mt-4 text-lg font-medium">No publishers found</h3>
@@ -140,60 +108,51 @@ export default function AdminPublishersPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Tier</TableHead>
                   <TableHead className="text-center">Websites</TableHead>
-                  <TableHead className="text-center">Active Orders</TableHead>
-                  <TableHead>Earnings</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead className="text-center">Listings</TableHead>
+                  <TableHead className="text-center">Settlements</TableHead>
+                  <TableHead>Withdrawable</TableHead>
+                  <TableHead>Lifetime</TableHead>
                   <TableHead>Joined</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="text-right">Set Tier</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPublishers.map((p: any) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium">{p.name || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{p.email}</TableCell>
-                    <TableCell><Badge variant="secondary">{p.publisherRole || "NONE"}</Badge></TableCell>
-                    <TableCell className="text-center">{p.websiteCount}</TableCell>
-                    <TableCell className="text-center">{p.activeOrderCount}</TableCell>
-                    <TableCell className="font-mono text-sm">${(p.totalEarnings || 0).toFixed(2)}</TableCell>
-                    <TableCell>
-                      {p.banned ? (
-                        <Badge variant="destructive">Suspended</Badge>
-                      ) : p.publisherRole === "REJECTED" ? (
-                        <Badge variant="destructive">Rejected</Badge>
-                      ) : p.publisherRole === "PENDING" || !p.publisherRole ? (
-                        <Badge variant="secondary">Pending</Badge>
-                      ) : (
-                        <Badge variant="default">Active</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{format(new Date(p.createdAt), "PP")}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {p.publisherRole === "PENDING" || !p.publisherRole ? (
-                          <>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500" onClick={() => approveMutation.mutate(p.id)} disabled={approveMutation.isPending}>
-                              <CheckCircle className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => rejectMutation.mutate(p.id)} disabled={rejectMutation.isPending}>
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : p.banned ? (
-                          <Button variant="ghost" size="sm" onClick={() => restoreMutation.mutate(p.id)} disabled={restoreMutation.isPending}>
-                            <UserCheck className="mr-1 h-4 w-4" />Restore
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="sm" onClick={() => suspendMutation.mutate(p.id)} disabled={suspendMutation.isPending}>
-                            <Ban className="mr-1 h-4 w-4" />Suspend
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {publishers.map((p) => {
+                  const tierBadge = TIER_BADGES[p.tier] ?? TIER_BADGES.NEW
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium">
+                        {p.name || "—"}
+                        {p.ownerBanned && <Badge variant="destructive" className="ml-2">Owner banned</Badge>}
+                        {p.debtBalance > 0 && <Badge variant="destructive" className="ml-2">Debt ${p.debtBalance.toFixed(2)}</Badge>}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{p.email ?? "—"}</TableCell>
+                      <TableCell><Badge variant={tierBadge.variant}>{tierBadge.label}</Badge></TableCell>
+                      <TableCell className="text-center">{p.websiteCount}</TableCell>
+                      <TableCell className="text-center">{p.listingCount}</TableCell>
+                      <TableCell className="text-center">{p.settlementCount}</TableCell>
+                      <TableCell className="font-mono text-sm">${p.withdrawableBalance.toFixed(2)}</TableCell>
+                      <TableCell className="font-mono text-sm">${p.lifetimeEarnings.toFixed(2)}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{format(new Date(p.createdAt), "PP")}</TableCell>
+                      <TableCell className="text-right">
+                        <Select
+                          value={p.tier}
+                          onValueChange={(v) => tierMutation.mutate({ id: p.id, tier: v as Tier })}
+                          disabled={tierMutation.isPending}
+                        >
+                          <SelectTrigger className="w-32 ml-auto"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="NEW">New</SelectItem>
+                            <SelectItem value="TRUSTED">Trusted</SelectItem>
+                            <SelectItem value="VERIFIED">Verified</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}

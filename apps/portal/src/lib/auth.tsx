@@ -48,8 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         credentials: "include",
       })
       if (res.ok) {
-        setUser(await res.json())
-        return
+        const me = await res.json()
+        // Same gate as signIn: a restored PUBLISHER/STAFF session must not
+        // land in the customer portal.
+        if (me.userType === "CUSTOMER") {
+          setUser(me)
+          return
+        }
+        // Wrong-audience token must not linger in this app's storage
+        clearToken()
       }
     } catch (e) {
       console.error("Session refresh failed:", e)

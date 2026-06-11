@@ -775,4 +775,268 @@ export class AdminService {
 
     return updated
   }
+
+  // ── Audit log browsing (staff) ──────────────────────────────────────────
+
+  async listAuditLogs(params: {
+    action?: string
+    entityType?: string
+    entityId?: string
+    userId?: string
+    startDate?: string
+    endDate?: string
+    page?: number
+    limit?: number
+  }) {
+    const page = Math.max(params.page ?? 1, 1)
+    const limit = Math.min(Math.max(params.limit ?? 50, 1), 100)
+    const where: any = {}
+    if (params.action) where.action = { contains: params.action, mode: "insensitive" }
+    if (params.entityType) where.entityType = params.entityType
+    if (params.entityId) where.entityId = params.entityId
+    if (params.userId) where.userId = params.userId
+    if (params.startDate || params.endDate) {
+      where.createdAt = {}
+      if (params.startDate) where.createdAt.gte = new Date(params.startDate)
+      if (params.endDate) where.createdAt.lte = new Date(params.endDate)
+    }
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.auditLog.findMany({
+        where,
+        include: { user: { select: { id: true, name: true, email: true } } },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: (page - 1) * limit,
+      }),
+      this.prisma.auditLog.count({ where }),
+    ])
+
+    return {
+      items: rows.map((r: any) => ({
+        id: r.id,
+        action: r.action,
+        entity: r.entityType,
+        entityId: r.entityId,
+        actorId: r.userId,
+        actorName: r.user?.name ?? r.user?.email ?? null,
+        metadata: r.metadata,
+        ipAddress: r.ipAddress,
+        createdAt: r.createdAt,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    }
+  }
+
+  // ── Publisher directory (staff) ─────────────────────────────────────────
+
+  async listPublishers(params: { search?: string; page?: number; limit?: number }) {
+    const page = Math.max(params.page ?? 1, 1)
+    const limit = Math.min(Math.max(params.limit ?? 50, 1), 100)
+    const where: any = params.search
+      ? {
+          OR: [
+            { name: { contains: params.search, mode: "insensitive" } },
+            { email: { contains: params.search, mode: "insensitive" } },
+          ],
+        }
+      : {}
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.publisher.findMany({
+        where,
+        include: {
+          balance: { select: { withdrawableBalance: true, lifetimeEarnings: true, debtBalance: true } },
+          _count: { select: { websites: true, marketplaceListings: true, settlements: true } },
+          publisherMemberships: {
+            take: 1,
+            include: { user: { select: { id: true, email: true, banned: true } } },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        skip: (page - 1) * limit,
+      }),
+      this.prisma.publisher.count({ where }),
+    ])
+
+    return {
+      items: rows.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        email: p.email ?? p.publisherMemberships[0]?.user?.email ?? null,
+        tier: p.tier,
+        websiteCount: p._count.websites,
+        listingCount: p._count.marketplaceListings,
+        settlementCount: p._count.settlements,
+        withdrawableBalance: Number(p.balance?.withdrawableBalance ?? 0),
+        lifetimeEarnings: Number(p.balance?.lifetimeEarnings ?? 0),
+        debtBalance: Number(p.balance?.debtBalance ?? 0),
+        ownerBanned: p.publisherMemberships[0]?.user?.banned ?? false,
+        createdAt: p.createdAt,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    }
+  }
+
+  // Tier is the backend's real trust lever (NEW/TRUSTED/VERIFIED drive
+  // withdrawal holds) — there is no separate approve/suspend workflow.
+  async updatePublisherTier(publisherId: string, tier: string, actor: { id: string }) {
+    const valid = ["NEW", "TRUSTED", "VERIFIED"]
+    if (!valid.includes(tier)) {
+      throw new BadRequestException(`Invalid tier — must be one of ${valid.join(", ")}`)
+    }
+    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    if (!publisher) throw new NotFoundException("Publisher not found")
+
+    const updated = await this.prisma.publisher.update({
+      where: { id: publisherId },
+      data: { tier: tier as any },
+    })
+
+    await this.audit.log({
+      action: "PUBLISHER_TIER_CHANGED",
+      entityType: "Publisher",
+      entityId: publisherId,
+      metadata: { from: publisher.tier, to: tier },
+      userId: actor.id,
+      organizationId: publisher.organizationId,
+    })
+
+    return updated
+  }
+
+  // ── Support tickets (staff, cross-organization) ─────────────────────────
+
+  async listTicketsAdmin(params: { status?: string; search?: string; page?: number; limit?: number }) {
+    const page = Math.max(params.page ?? 1, 1)
+    const limit = Math.min(Math.max(params.limit ?? 50, 1), 100)
+    const where: any = {}
+    if (params.status) where.status = params.status
+    if (params.search) where.subject = { contains: params.search, mode: "insensitive" }
+
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.ticket.findMany({
+        where,
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          organization: { select: { id: true, name: true } },
+          _count: { select: { messages: true } },
+        },
+        orderBy: { updatedAt: "desc" },
+        take: limit,
+        skip: (page - 1) * limit,
+      }),
+      this.prisma.ticket.count({ where }),
+    ])
+
+    return {
+      items: rows.map((t: any) => ({
+        id: t.id,
+        subject: t.subject,
+        status: t.status,
+        customer: { id: t.user.id, name: t.user.name, email: t.user.email },
+        organization: t.organization ? { id: t.organization.id, name: t.organization.name } : null,
+        messageCount: t._count.messages,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    }
+  }
+
+  async getTicketAdmin(id: string) {
+    const t = await this.prisma.ticket.findUnique({
+      where: { id },
+      include: {
+        user: { select: { id: true, name: true, email: true, userType: true } },
+        organization: { select: { id: true, name: true } },
+        messages: {
+          include: { user: { select: { id: true, name: true, email: true, userType: true } } },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    })
+    if (!t) throw new NotFoundException("Ticket not found")
+    return {
+      id: t.id,
+      subject: t.subject,
+      description: t.description,
+      status: t.status,
+      customer: { id: t.user.id, name: t.user.name, email: t.user.email },
+      organization: t.organization ? { id: t.organization.id, name: t.organization.name } : null,
+      messages: t.messages.map((m: any) => ({
+        id: m.id,
+        content: m.content,
+        author: m.user.name ?? m.user.email,
+        authorType: m.user.userType,
+        createdAt: m.createdAt,
+      })),
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+    }
+  }
+
+  async updateTicketStatusAdmin(id: string, status: string, actor: { id: string }) {
+    const valid = ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER", "RESOLVED", "CLOSED"]
+    if (!valid.includes(status)) {
+      throw new BadRequestException(`Invalid status — must be one of ${valid.join(", ")}`)
+    }
+    const ticket = await this.prisma.ticket.findUnique({ where: { id } })
+    if (!ticket) throw new NotFoundException("Ticket not found")
+
+    const updated = await this.prisma.ticket.update({
+      where: { id },
+      data: { status: status as any },
+    })
+
+    await this.audit.log({
+      action: "SUPPORT_TICKET_STATUS_CHANGED",
+      entityType: "Ticket",
+      entityId: id,
+      metadata: { from: ticket.status, to: status },
+      userId: actor.id,
+      organizationId: ticket.organizationId,
+    })
+
+    // The customer who opened the ticket learns about the status change
+    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+      userId: ticket.userId,
+      organizationId: ticket.organizationId,
+      type: "SUPPORT_TICKET_UPDATED",
+      message: `Your support ticket "${ticket.subject}" is now ${status.replace(/_/g, " ").toLowerCase()}.`,
+    })
+
+    return updated
+  }
+
+  async addTicketMessageAdmin(id: string, content: string, actor: { id: string }) {
+    const ticket = await this.prisma.ticket.findUnique({ where: { id } })
+    if (!ticket) throw new NotFoundException("Ticket not found")
+    if (!content?.trim()) throw new BadRequestException("Message content is required")
+
+    const message = await this.prisma.ticketMessage.create({
+      data: { ticketId: id, userId: actor.id, content: content.trim() },
+    })
+
+    await this.prisma.ticket.update({ where: { id }, data: { updatedAt: new Date() } })
+
+    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+      userId: ticket.userId,
+      organizationId: ticket.organizationId,
+      type: "SUPPORT_TICKET_REPLY",
+      message: `Support replied to your ticket "${ticket.subject}".`,
+    })
+
+    return message
+  }
 }

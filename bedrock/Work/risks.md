@@ -7,41 +7,44 @@ updated: 2026-06-11
 # Risks
 
 Known project risks. Source: full architecture/security/financial review 2026-06-11.
-Status updated after hardening batch 9 (same day) — most blockers FIXED in working tree.
 
-## Fixed in batch 9 (2026-06-11, migrations 20260611000000 + 20260611010000)
+## Open risks (launch blockers)
 
-- FIXED: updateUserRole oldest-publisher privesc — now creates a fresh Publisher
-- FIXED: float money math — `splitPlatformFee` Decimal helper (fee-by-subtraction); Stripe deposit exact cents division
-- FIXED: first-item settlement bug — one-website-per-order invariant enforced in createOrder/addOrderItem
-- FIXED: clawback dead-end — PublisherBalance.debtBalance; partial clawback + debt netted at release (DEBT_REPAYMENT tx)
-- FIXED: forceCancelOrder strands PAID money — delegates to RefundService
-- FIXED: AuditLog/Notification SYSTEM-org FK loss — columns nullable, sentinels removed, financial audits write inside tx
-- FIXED: PlatformRevenue delete-on-refund — reversedAt column instead
-- FIXED: withdrawal tier holds decorative — availableAt enforced at approve; idempotency via @@unique([publisherId, idempotencyKey]) not PK
-- FIXED: withdrawal ledger gap — WITHDRAWAL tx at request, WITHDRAWAL_REVERSAL at reject
-- FIXED: dispute RESTORE hardcoded PUBLISHED — previousStatus stored; REFUND resolution idempotent
-- FIXED: confirmDelivery/settlement non-atomic — single transaction
-- FIXED: unpaginated listOrders/listPublisherOrders/listReports
-- FIXED: silent price-drift recharge — 409 with drifted items, prices synced outside tx
-- FIXED: reviewEndsAt decorative — SettlementAutoApproveService sweeps (interval, status-guarded); admin approval still required
-- FIXED: chargebacks invisible — charge.dispute.created handler + staff notifications
-- FIXED: review gate on unreachable COMPLETED — now COMPLETED/SETTLED/DELIVERED
-- FIXED: domain dedupe — Website.domain normalized column + backfill, checks in websites/admin create+update
-- FIXED: publisher fulfillment transitions not status-guarded
-- ADDED: PayoutMethod model + CRUD endpoints (bank details storage; real rail still pending)
-- ADDED: GET /admin/reconciliation — wallet/publisher balance vs ledger, stuck DELIVERED orders
-- REPAIRED: dev DB drift (missing CampaignStatus/ContentOrderStatus/RevisionStatus/WebsiteOwnershipType enums, Website.ownershipType, PlatformRevenue table) — migration 20260611010000 converts statuses in place with USING casts
+- Risk: `updateUserRole` publisher path attaches user as PUBLISHER_OWNER to the oldest Publisher in DB (admin.service.ts:124)
+  - Why it matters: privilege escalation — admin promotion hands over an unrelated publisher's listings/balance/withdrawals
+  - Mitigation: require explicit publisherId or create fresh Publisher
+- Risk: single-entry bookkeeping; no escrow/revenue ledger accounts; SETTLEMENT_RELEASE/capture/refund transactions have no offsetting entries
+  - Why it matters: money conservation unprovable; reconciliation drift undetectable; accounting audit fails
+  - Mitigation: double-entry ledger (wallet/escrow/payable/revenue/external accounts) + nightly reconciliation; medium-term
+- Risk: float money math — `Number(amount) * feeFraction` in settlements.service.ts:34, order-review.service.ts:184,206; Stripe deposit `Math.round(cents/100)` rounds to whole dollars (billing.service.ts:97)
+  - Why it matters: penny drift, fee+payout != gross, deposits mint/destroy money
+  - Mitigation: Decimal end-to-end, fee by subtraction, store cents
+- Risk: order-level settlement pays first item's publisher entire order amount (settlements.service.ts:26 findFirst)
+  - Why it matters: multi-website order = wrong publisher paid everything
+  - Mitigation: enforce one-website-per-order invariant now; item-level settlements long-term
+- Risk: refund clawback of RELEASED settlement hits CHECK >= 0 if publisher already withdrew — refund transaction aborts
+  - Why it matters: customer refund becomes impossible; stuck disputes
+  - Mitigation: PublisherDebt model, net against future settlements
+- Risk: forceCancelOrder cancels PAID orders without refund; skips RELEASED settlements (admin.service.ts:297)
+  - Why it matters: customer money stranded, publisher keeps payout on cancelled order
+  - Mitigation: refuse PAID or delegate to RefundService
+- Risk: AuditLog.organizationId FK + "SYSTEM"/"system" string values; audit.service.ts swallows create errors with warn
+  - Why it matters: staff-role changes, platform-website ops, webhook deposits may silently lose audit records
+  - Mitigation: seed SYSTEM org or nullable column; audit writes inside tx for financial ops
+- Risk: no payout rail — Withdrawal.method is a bare string, no PayoutMethod/bank details/Stripe Connect
+  - Why it matters: cannot actually pay publishers
+  - Mitigation: PayoutMethod entity + Stripe Connect or Wise, pre-launch
 
-## Still open
+## Open risks (non-blocking)
 
-- Full double-entry ledger with escrow/revenue accounts — reconciliation service is the interim guard; legacy withdrawals (pre-batch-9) lack WITHDRAWAL tx rows and will show as expected publisher drift
-- Real payout rail (Stripe Connect / Wise) — PayoutMethod stores details, transfers still manual mark-paid
-- Stripe refund-to-card / chargeback fund handling — refunds are wallet-credit only
-- Marketplace search ILIKE — fine to ~50k listings, then pg_trgm/FTS
-- Website ownership verification (DNS TXT) — schema/endpoint work pending; manual admin review only
-- MarketplaceListingView/Click growth — needs rollup + prune
-- Fulfillment service merge (publisher/operations near-duplicates, now guard-parity at least)
-- Order deadlines/SLA enforcement (no timeout on SUBMITTED orders)
-- Agency features: invoicing, sub-accounts, NET terms
-- E2E + concurrency test suite against real Postgres (unit coverage now exists for refund/withdrawal/fee paths)
+- Risk: tier withdrawal holds (NEW=30d etc.) computed but never enforced; reviewEndsAt set but consumed by nothing (no auto-release worker)
+- Risk: dispute RESTORE/REJECT restores hardcoded PUBLISHED regardless of pre-dispute status; REFUND resolution non-idempotent (refund commits, dispute update fails -> unresolvable)
+- Risk: confirmDelivery -> settlement creation non-atomic; DELIVERED orders without settlement possible, undetected
+- Risk: listOrders/listPublisherOrders/listReports unpaginated with heavy includes — first scale failure
+- Risk: submitPayment silently re-charges drifted listing price without consent (order-payment.service.ts:41)
+- Risk: no website ownership verification; URL unique bypassed by www/slash variants; reviews default APPROVED without purchase
+- Risk: publisher withdrawals create no Transaction row; PlatformRevenue deleted on refund (should be reversal rows)
+- Risk: only 5 spec files; zero settlement/refund/concurrency tests
+- Risk: no Stripe charge.dispute.created handler (chargebacks invisible)
+- Risk: settlement throughput — every settlement needs 2 manual approvals + every withdrawal 2 staff clicks
+-

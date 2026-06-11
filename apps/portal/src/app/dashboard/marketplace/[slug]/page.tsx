@@ -49,6 +49,7 @@ interface Listing {
   revisionRounds: number
   featured: boolean
   verified: boolean
+  fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
   allowGuestPost: boolean
   allowNicheEdit: boolean
   doFollowOnly: boolean
@@ -195,7 +196,14 @@ export default function ListingDetailPage() {
               {listing.category && (
                 <Badge variant="secondary">{listing.category.name}</Badge>
               )}
-              <Badge variant="outline">{listing.type.replace("_", " ")}</Badge>
+              <Badge variant="outline">{listing.type.replace(/_/g, " ")}</Badge>
+              {listing.fulfillmentType === "INTERNAL" ? (
+                <Badge>Platform fulfilled</Badge>
+              ) : listing.fulfillmentType === "HYBRID" ? (
+                <Badge variant="secondary">Hybrid fulfillment</Badge>
+              ) : (
+                <Badge variant="secondary">Publisher fulfilled</Badge>
+              )}
               {listing.verified && (
                 <span className="flex items-center gap-1 text-xs text-green-600">
                   <ShieldCheck className="h-4 w-4" /> Verified

@@ -4,6 +4,16 @@ import { AuditService } from "../audit/audit.service"
 import { Decimal } from "@prisma/client/runtime/library"
 import Stripe from "stripe"
 
+// Thrown inside an interactive transaction to force a ROLLBACK when a
+// concurrent duplicate is detected via P2002. Returning normally from the
+// transaction callback would COMMIT everything done before the constraint
+// violation (e.g. a wallet increment) — minting money on duplicate webhooks.
+class DuplicateEventError extends Error {
+  constructor(reference: string) {
+    super(`Duplicate event: ${reference}`)
+  }
+}
+
 @Injectable()
 export class BillingService {
   private stripe: any = null
@@ -86,21 +96,94 @@ export class BillingService {
       await this.processSuccessfulPayment(session)
     } else if (event.type === "charge.dispute.created") {
       await this.handleChargeback(event.data.object as any)
+    } else if (event.type === "charge.dispute.closed") {
+      await this.handleChargebackClosed(event.data.object as any)
     }
 
     return { received: true }
   }
 
-  // Cardholder opened a chargeback at their bank. Money will be pulled by
-  // Stripe regardless — this must never pass silently: audit + alert every
-  // staff member so finance can respond within the evidence window.
+  // Cardholder opened a chargeback at their bank. Stripe will pull the money
+  // regardless of what we do — so the disputed amount must stop being
+  // spendable NOW: move it available -> reserved on the originating wallet
+  // (found via the deposit's payment_intent), audit everything, and alert
+  // every staff member so finance can respond within the evidence window.
   private async handleChargeback(dispute: any) {
     this.logger.error(
       `Stripe chargeback received: dispute ${dispute.id}, charge ${dispute.charge}, amount ${dispute.amount} ${dispute.currency}`,
     )
 
+    const disputedAmount = new Decimal(dispute.amount ?? 0).div(100)
+    const paymentIntent: string | null = dispute.payment_intent ?? null
+
+    // Link dispute -> originating deposit -> wallet
+    const depositTx = paymentIntent
+      ? await this.prisma.transaction.findFirst({
+          where: { providerRef: paymentIntent, type: "DEPOSIT" },
+          select: { id: true, walletId: true, amount: true, reference: true },
+        })
+      : null
+
+    let holdResult: { held: string; shortfall: string; walletId: string } | null = null
+
+    if (depositTx?.walletId && disputedAmount.greaterThan(0)) {
+      try {
+        holdResult = await this.prisma.$transaction(async (tx: any) => {
+          // Idempotency: one hold per dispute. Unique Transaction.reference is
+          // the hard guarantee; this read is the fast path.
+          const existingHold = await tx.transaction.findFirst({
+            where: { reference: `chargeback-hold-${dispute.id}` },
+          })
+          if (existingHold) throw new DuplicateEventError(`chargeback-hold-${dispute.id}`)
+
+          const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: depositTx.walletId } })
+          const available = new Decimal(wallet.availableBalance)
+          // Hold what is still there — the org may have spent part of the
+          // deposit already. The shortfall is recorded for finance.
+          const held = Decimal.min(available, disputedAmount)
+          const shortfall = disputedAmount.minus(held)
+
+          if (held.greaterThan(0)) {
+            const updated = await tx.wallet.updateMany({
+              where: { id: wallet.id, version: wallet.version },
+              data: {
+                availableBalance: { decrement: held },
+                reservedBalance: { increment: held },
+                version: { increment: 1 },
+              },
+            })
+            if (updated.count === 0) {
+              throw new ConflictException("Wallet was modified by another request. Retry.")
+            }
+          }
+
+          // Hold row is written even for a zero hold so duplicate webhooks
+          // and the dispute-closed handler have a single source of truth.
+          await tx.transaction.create({
+            data: {
+              walletId: wallet.id,
+              amount: held.negated(),
+              type: "RESERVATION",
+              reference: `chargeback-hold-${dispute.id}`,
+              providerRef: paymentIntent,
+              description: `Chargeback hold of ${held.toFixed(2)} for dispute ${dispute.id}` +
+                (shortfall.greaterThan(0) ? ` (${shortfall.toFixed(2)} already spent — uncovered exposure)` : ""),
+            },
+          })
+
+          return { held: held.toFixed(2), shortfall: shortfall.toFixed(2), walletId: wallet.id }
+        })
+      } catch (err: any) {
+        if (err instanceof DuplicateEventError || err?.code === "P2002") {
+          this.logger.warn(`Chargeback hold for dispute ${dispute.id} already placed — duplicate webhook ignored`)
+          return
+        }
+        throw err
+      }
+    }
+
     await this.audit.log({
-      action: "STRIPE_CHARGEBACK_RECEIVED",
+      action: holdResult ? "STRIPE_CHARGEBACK_HOLD_PLACED" : "STRIPE_CHARGEBACK_UNLINKED",
       entityType: "StripeDispute",
       entityId: dispute.id,
       metadata: {
@@ -109,22 +192,144 @@ export class BillingService {
         currency: dispute.currency,
         reason: dispute.reason,
         status: dispute.status,
-        paymentIntent: dispute.payment_intent ?? null,
+        paymentIntent,
+        depositTransactionId: depositTx?.id ?? null,
+        walletId: holdResult?.walletId ?? null,
+        heldAmount: holdResult?.held ?? "0.00",
+        uncoveredExposure: holdResult?.shortfall ?? disputedAmount.toFixed(2),
       },
       userId: null,
       organizationId: null,
     })
 
+    const summary = holdResult
+      ? `${holdResult.held} held${Number(holdResult.shortfall) > 0 ? `, ${holdResult.shortfall} uncovered` : ""}`
+      : "NO WALLET LINK — manual review required"
+    await this.notifyStaff(
+      "STRIPE_CHARGEBACK",
+      `Chargeback ${dispute.id} for ${disputedAmount.toFixed(2)} ${String(dispute.currency).toUpperCase()} — ${summary}. Respond in Stripe dashboard.`,
+    )
+  }
+
+  // Dispute resolved at the bank. won -> release the hold back to available.
+  // lost -> the money left the platform: consume the hold permanently and
+  // write a CHARGEBACK ledger row so reconciliation stays balanced.
+  private async handleChargebackClosed(dispute: any) {
+    const hold = await this.prisma.transaction.findFirst({
+      where: { reference: `chargeback-hold-${dispute.id}` },
+      select: { id: true, walletId: true, amount: true },
+    })
+
+    if (!hold?.walletId) {
+      await this.audit.log({
+        action: "STRIPE_CHARGEBACK_CLOSED_UNLINKED",
+        entityType: "StripeDispute",
+        entityId: dispute.id,
+        metadata: { status: dispute.status, paymentIntent: dispute.payment_intent ?? null },
+        userId: null,
+        organizationId: null,
+      })
+      await this.notifyStaff(
+        "STRIPE_CHARGEBACK",
+        `Chargeback ${dispute.id} closed (${dispute.status}) — no hold on record, reconcile manually`,
+      )
+      return
+    }
+
+    const held = new Decimal(hold.amount).negated() // hold row is negative
+
+    // Money is debited ONLY on an explicit "lost". "won" and "warning_closed"
+    // (inquiry closed, no chargeback ever filed) both release the hold.
+    // Any unrecognized terminal status must not move money — alert instead.
+    const won = dispute.status === "won" || dispute.status === "warning_closed"
+    const lost = dispute.status === "lost"
+    if (!won && !lost) {
+      await this.audit.log({
+        action: "STRIPE_CHARGEBACK_CLOSED_UNRECOGNIZED",
+        entityType: "StripeDispute",
+        entityId: dispute.id,
+        metadata: { status: dispute.status, walletId: hold.walletId, heldAmount: held.toFixed(2) },
+        userId: null,
+        organizationId: null,
+      })
+      await this.notifyStaff(
+        "STRIPE_CHARGEBACK",
+        `Chargeback ${dispute.id} closed with unrecognized status "${dispute.status}" — hold of ${held.toFixed(2)} left in place, resolve manually`,
+      )
+      return
+    }
+    const reference = won ? `chargeback-release-${dispute.id}` : `chargeback-lost-${dispute.id}`
+
+    try {
+      await this.prisma.$transaction(async (tx: any) => {
+        const existing = await tx.transaction.findFirst({ where: { reference } })
+        if (existing) throw new DuplicateEventError(reference)
+
+        if (held.greaterThan(0)) {
+          const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: hold.walletId } })
+          const updated = await tx.wallet.updateMany({
+            where: { id: wallet.id, version: wallet.version },
+            data: won
+              ? {
+                  reservedBalance: { decrement: held },
+                  availableBalance: { increment: held },
+                  version: { increment: 1 },
+                }
+              : {
+                  reservedBalance: { decrement: held },
+                  version: { increment: 1 },
+                },
+          })
+          if (updated.count === 0) {
+            throw new ConflictException("Wallet was modified by another request. Retry.")
+          }
+        }
+
+        await tx.transaction.create({
+          data: {
+            walletId: hold.walletId,
+            // won: RESERVATION offset (+) nets the hold to zero, excluded from
+            // wallet sums. lost: CHARGEBACK (-) is counted — money left.
+            amount: won ? held : held.negated(),
+            type: won ? "RESERVATION" : "CHARGEBACK",
+            reference,
+            description: won
+              ? `Chargeback ${dispute.id} won — hold of ${held.toFixed(2)} released`
+              : `Chargeback ${dispute.id} lost — ${held.toFixed(2)} debited permanently`,
+          },
+        })
+      })
+    } catch (err: any) {
+      if (err instanceof DuplicateEventError || err?.code === "P2002") {
+        this.logger.warn(`Chargeback close for dispute ${dispute.id} already processed — duplicate webhook ignored`)
+        return
+      }
+      throw err
+    }
+
+    await this.audit.log({
+      action: won ? "STRIPE_CHARGEBACK_WON_RELEASED" : "STRIPE_CHARGEBACK_LOST_DEBITED",
+      entityType: "StripeDispute",
+      entityId: dispute.id,
+      metadata: { walletId: hold.walletId, amount: held.toFixed(2), disputeStatus: dispute.status },
+      userId: null,
+      organizationId: null,
+    })
+
+    await this.notifyStaff(
+      "STRIPE_CHARGEBACK",
+      won
+        ? `Chargeback ${dispute.id} WON — ${held.toFixed(2)} released back to the wallet`
+        : `Chargeback ${dispute.id} LOST — ${held.toFixed(2)} debited`,
+    )
+  }
+
+  private async notifyStaff(type: string, message: string) {
     const staff = await this.prisma.staffMembership.findMany({ select: { userId: true } })
     for (const s of staff) {
       await this.prisma.notification.create({
-        data: {
-          userId: s.userId,
-          organizationId: null,
-          type: "STRIPE_CHARGEBACK",
-          message: `Chargeback ${dispute.id} for ${(dispute.amount / 100).toFixed(2)} ${String(dispute.currency).toUpperCase()} — respond in Stripe dashboard`,
-        },
-      }).catch((err: any) => this.logger.error(`Failed to notify staff ${s.userId} of chargeback: ${err}`))
+        data: { userId: s.userId, organizationId: null, type, message },
+      }).catch((err: any) => this.logger.error(`Failed to notify staff ${s.userId}: ${err}`))
     }
   }
 
@@ -144,47 +349,50 @@ export class BillingService {
 
     const orgId = session.metadata?.organizationId || null
 
-    await this.prisma.$transaction(async (tx: any) => {
-      // Idempotency: unique constraint on Transaction.reference prevents duplicates
-      // Even if two webhooks arrive concurrently, only one tx.reference = session.id commits
-      const existingTx = await tx.transaction.findFirst({
-        where: { reference: session.id },
-      })
-      if (existingTx) {
-        this.logger.warn(`Transaction for session ${session.id} already processed`)
-        return
-      }
+    try {
+      await this.prisma.$transaction(async (tx: any) => {
+        // Idempotency: unique constraint on Transaction.reference prevents duplicates
+        // Even if two webhooks arrive concurrently, only one tx.reference = session.id commits
+        const existingTx = await tx.transaction.findFirst({
+          where: { reference: session.id },
+        })
+        if (existingTx) throw new DuplicateEventError(session.id)
 
-      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
-      const updated = await tx.wallet.updateMany({
-        where: { id: walletId, version: wallet.version },
-        data: {
-          availableBalance: { increment: amount },
-          version: { increment: 1 },
-        },
-      })
-      if (updated.count === 0) {
-        throw new ConflictException("Wallet was modified by another request. Retry.")
-      }
+        const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+        const updated = await tx.wallet.updateMany({
+          where: { id: walletId, version: wallet.version },
+          data: {
+            availableBalance: { increment: amount },
+            version: { increment: 1 },
+          },
+        })
+        if (updated.count === 0) {
+          throw new ConflictException("Wallet was modified by another request. Retry.")
+        }
 
-      try {
+        // P2002 here MUST propagate and roll the transaction back — catching
+        // it and returning would commit the wallet increment above without a
+        // ledger row (double credit). The unique constraint is the idempotency
+        // guarantee; the findFirst above is only the fast path.
         await tx.transaction.create({
           data: {
             walletId,
             amount,
             type: "DEPOSIT",
             reference: session.id,
+            // payment_intent linkage lets chargeback webhooks find this deposit
+            providerRef: session.payment_intent ?? null,
             description: `Stripe deposit of ${amount.toFixed(2)}`,
           },
         })
-      } catch (err: any) {
-        if (err?.code === "P2002") {
-          this.logger.warn(`Duplicate webhook: session ${session.id} already processed`)
-          return
-        }
-        throw err
+      })
+    } catch (err: any) {
+      if (err instanceof DuplicateEventError || err?.code === "P2002") {
+        this.logger.warn(`Duplicate webhook: session ${session.id} already processed — rolled back`)
+        return
       }
-    })
+      throw err
+    }
 
     await this.audit.log({
       action: "WALLET_DEPOSIT",

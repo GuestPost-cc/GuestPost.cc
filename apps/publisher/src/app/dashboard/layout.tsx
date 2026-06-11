@@ -16,6 +16,7 @@ import {
   ArrowUpRight,
 } from "lucide-react"
 import { useAuth } from "../../lib/auth"
+import { Notifications } from "../../components/notifications"
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -76,9 +77,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           })}
         </nav>
         <div className="border-t p-4">
-          <div className="rounded-lg bg-card p-3">
-            <p className="truncate text-sm font-medium">{user.name ?? user.email}</p>
-            <p className="text-xs text-muted-foreground">Publisher</p>
+          <div className="flex items-center gap-2 rounded-lg bg-card p-3">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{user.name ?? user.email}</p>
+              <p className="text-xs text-muted-foreground">Publisher</p>
+            </div>
+            <Notifications />
           </div>
           <button
             onClick={signOut}

@@ -469,7 +469,9 @@ model Order {
   dispute      OrderDispute?
   platformRevenue PlatformRevenue?
 
-  @@unique([idempotencyKey])
+  // Scoped per organization — a globally unique key let one tenant replay
+  // another tenant's key and read their order (cross-tenant leak).
+  @@unique([organizationId, idempotencyKey])
   @@index([organizationId, status])
   @@index([customerId, status])
   @@index([assigneeId])
@@ -860,6 +862,9 @@ enum TransactionType {
   SETTLEMENT_CLAWBACK
   DEBT_REPAYMENT
   RESERVATION
+  // Chargeback lost at the bank — money left the platform permanently.
+  // Included in wallet reconciliation sums (unlike RESERVATION).
+  CHARGEBACK
 }
 
 model Transaction {
@@ -868,6 +873,9 @@ model Transaction {
   currency    String   @default("USD")
   type        TransactionType
   reference   String?
+  // External provider linkage (e.g. Stripe payment_intent for deposits) —
+  // lets chargeback webhooks find the originating deposit + wallet.
+  providerRef String?
   description String?
   walletId    String?
   orderId     String?
@@ -887,6 +895,7 @@ model Transaction {
   @@index([createdAt])
   @@index([publisherId])
   @@index([settlementId])
+  @@index([providerRef])
 }
 
 model Ticket {

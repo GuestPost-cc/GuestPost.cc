@@ -16,6 +16,7 @@ import { SettlementsModule } from "./modules/settlements/settlements.module";
 import { PublisherPayoutsModule } from "./modules/publisher-payouts/publisher-payouts.module";
 import { ApiKeysModule } from "./modules/api-keys/api-keys.module";
 import { WebsitesModule } from "./modules/websites/websites.module";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { WebsitesModule } from "./modules/websites/websites.module";
     PublisherPayoutsModule,
     ApiKeysModule,
     WebsitesModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

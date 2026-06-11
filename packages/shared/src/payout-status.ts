@@ -13,7 +13,7 @@ export interface ProviderStatusResult {
   metadata?: Record<string, unknown>
 }
 
-const WISE_STATUS_MAP: Record<string, ProviderTransferStatus> = {
+export const WISE_STATUS_MAP: Record<string, ProviderTransferStatus> = {
   processing: "PROCESSING",
   funds_converted: "PROCESSING",
   outgoing_payment_sent: "PROCESSING",
@@ -22,7 +22,7 @@ const WISE_STATUS_MAP: Record<string, ProviderTransferStatus> = {
   failed: "FAILED",
 }
 
-const STRIPE_STATUS_MAP: Record<string, ProviderTransferStatus> = {
+export const STRIPE_STATUS_MAP: Record<string, ProviderTransferStatus> = {
   pending: "PROCESSING",
   in_transit: "PROCESSING",
   paid: "COMPLETED",
