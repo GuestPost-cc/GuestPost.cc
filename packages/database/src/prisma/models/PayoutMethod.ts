@@ -20,8 +20,20 @@ export type PayoutMethodModel = runtime.Types.Result.DefaultSelection<Prisma.$Pa
 
 export type AggregatePayoutMethod = {
   _count: PayoutMethodCountAggregateOutputType | null
+  _avg: PayoutMethodAvgAggregateOutputType | null
+  _sum: PayoutMethodSumAggregateOutputType | null
   _min: PayoutMethodMinAggregateOutputType | null
   _max: PayoutMethodMaxAggregateOutputType | null
+}
+
+export type PayoutMethodAvgAggregateOutputType = {
+  encryptionKeyVersion: number | null
+  version: number | null
+}
+
+export type PayoutMethodSumAggregateOutputType = {
+  encryptionKeyVersion: number | null
+  version: number | null
 }
 
 export type PayoutMethodMinAggregateOutputType = {
@@ -29,8 +41,10 @@ export type PayoutMethodMinAggregateOutputType = {
   publisherId: string | null
   type: string | null
   label: string | null
+  encryptionKeyVersion: number | null
   isDefault: boolean | null
   isActive: boolean | null
+  version: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -40,8 +54,10 @@ export type PayoutMethodMaxAggregateOutputType = {
   publisherId: string | null
   type: string | null
   label: string | null
+  encryptionKeyVersion: number | null
   isDefault: boolean | null
   isActive: boolean | null
+  version: number | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -52,21 +68,36 @@ export type PayoutMethodCountAggregateOutputType = {
   type: number
   label: number
   details: number
+  displayDetails: number
+  encryptionKeyVersion: number
   isDefault: number
   isActive: number
+  version: number
   createdAt: number
   updatedAt: number
   _all: number
 }
 
 
+export type PayoutMethodAvgAggregateInputType = {
+  encryptionKeyVersion?: true
+  version?: true
+}
+
+export type PayoutMethodSumAggregateInputType = {
+  encryptionKeyVersion?: true
+  version?: true
+}
+
 export type PayoutMethodMinAggregateInputType = {
   id?: true
   publisherId?: true
   type?: true
   label?: true
+  encryptionKeyVersion?: true
   isDefault?: true
   isActive?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -76,8 +107,10 @@ export type PayoutMethodMaxAggregateInputType = {
   publisherId?: true
   type?: true
   label?: true
+  encryptionKeyVersion?: true
   isDefault?: true
   isActive?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -88,8 +121,11 @@ export type PayoutMethodCountAggregateInputType = {
   type?: true
   label?: true
   details?: true
+  displayDetails?: true
+  encryptionKeyVersion?: true
   isDefault?: true
   isActive?: true
+  version?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -133,6 +169,18 @@ export type PayoutMethodAggregateArgs<ExtArgs extends runtime.Types.Extensions.I
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: PayoutMethodAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: PayoutMethodSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: PayoutMethodMinAggregateInputType
@@ -163,6 +211,8 @@ export type PayoutMethodGroupByArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   _count?: PayoutMethodCountAggregateInputType | true
+  _avg?: PayoutMethodAvgAggregateInputType
+  _sum?: PayoutMethodSumAggregateInputType
   _min?: PayoutMethodMinAggregateInputType
   _max?: PayoutMethodMaxAggregateInputType
 }
@@ -173,11 +223,16 @@ export type PayoutMethodGroupByOutputType = {
   type: string
   label: string
   details: runtime.JsonValue
+  displayDetails: runtime.JsonValue | null
+  encryptionKeyVersion: number
   isDefault: boolean
   isActive: boolean
+  version: number
   createdAt: Date
   updatedAt: Date
   _count: PayoutMethodCountAggregateOutputType | null
+  _avg: PayoutMethodAvgAggregateOutputType | null
+  _sum: PayoutMethodSumAggregateOutputType | null
   _min: PayoutMethodMinAggregateOutputType | null
   _max: PayoutMethodMaxAggregateOutputType | null
 }
@@ -206,8 +261,11 @@ export type PayoutMethodWhereInput = {
   type?: Prisma.StringFilter<"PayoutMethod"> | string
   label?: Prisma.StringFilter<"PayoutMethod"> | string
   details?: Prisma.JsonFilter<"PayoutMethod">
+  displayDetails?: Prisma.JsonNullableFilter<"PayoutMethod">
+  encryptionKeyVersion?: Prisma.IntFilter<"PayoutMethod"> | number
   isDefault?: Prisma.BoolFilter<"PayoutMethod"> | boolean
   isActive?: Prisma.BoolFilter<"PayoutMethod"> | boolean
+  version?: Prisma.IntFilter<"PayoutMethod"> | number
   createdAt?: Prisma.DateTimeFilter<"PayoutMethod"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PayoutMethod"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
@@ -220,8 +278,11 @@ export type PayoutMethodOrderByWithRelationInput = {
   type?: Prisma.SortOrder
   label?: Prisma.SortOrder
   details?: Prisma.SortOrder
+  displayDetails?: Prisma.SortOrderInput | Prisma.SortOrder
+  encryptionKeyVersion?: Prisma.SortOrder
   isDefault?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   publisher?: Prisma.PublisherOrderByWithRelationInput
@@ -237,8 +298,11 @@ export type PayoutMethodWhereUniqueInput = Prisma.AtLeast<{
   type?: Prisma.StringFilter<"PayoutMethod"> | string
   label?: Prisma.StringFilter<"PayoutMethod"> | string
   details?: Prisma.JsonFilter<"PayoutMethod">
+  displayDetails?: Prisma.JsonNullableFilter<"PayoutMethod">
+  encryptionKeyVersion?: Prisma.IntFilter<"PayoutMethod"> | number
   isDefault?: Prisma.BoolFilter<"PayoutMethod"> | boolean
   isActive?: Prisma.BoolFilter<"PayoutMethod"> | boolean
+  version?: Prisma.IntFilter<"PayoutMethod"> | number
   createdAt?: Prisma.DateTimeFilter<"PayoutMethod"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PayoutMethod"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherScalarRelationFilter, Prisma.PublisherWhereInput>
@@ -251,13 +315,18 @@ export type PayoutMethodOrderByWithAggregationInput = {
   type?: Prisma.SortOrder
   label?: Prisma.SortOrder
   details?: Prisma.SortOrder
+  displayDetails?: Prisma.SortOrderInput | Prisma.SortOrder
+  encryptionKeyVersion?: Prisma.SortOrder
   isDefault?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.PayoutMethodCountOrderByAggregateInput
+  _avg?: Prisma.PayoutMethodAvgOrderByAggregateInput
   _max?: Prisma.PayoutMethodMaxOrderByAggregateInput
   _min?: Prisma.PayoutMethodMinOrderByAggregateInput
+  _sum?: Prisma.PayoutMethodSumOrderByAggregateInput
 }
 
 export type PayoutMethodScalarWhereWithAggregatesInput = {
@@ -269,8 +338,11 @@ export type PayoutMethodScalarWhereWithAggregatesInput = {
   type?: Prisma.StringWithAggregatesFilter<"PayoutMethod"> | string
   label?: Prisma.StringWithAggregatesFilter<"PayoutMethod"> | string
   details?: Prisma.JsonWithAggregatesFilter<"PayoutMethod">
+  displayDetails?: Prisma.JsonNullableWithAggregatesFilter<"PayoutMethod">
+  encryptionKeyVersion?: Prisma.IntWithAggregatesFilter<"PayoutMethod"> | number
   isDefault?: Prisma.BoolWithAggregatesFilter<"PayoutMethod"> | boolean
   isActive?: Prisma.BoolWithAggregatesFilter<"PayoutMethod"> | boolean
+  version?: Prisma.IntWithAggregatesFilter<"PayoutMethod"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"PayoutMethod"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"PayoutMethod"> | Date | string
 }
@@ -280,8 +352,11 @@ export type PayoutMethodCreateInput = {
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: number
   isDefault?: boolean
   isActive?: boolean
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher: Prisma.PublisherCreateNestedOneWithoutPayoutMethodsInput
@@ -294,8 +369,11 @@ export type PayoutMethodUncheckedCreateInput = {
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: number
   isDefault?: boolean
   isActive?: boolean
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPayoutMethodInput
@@ -306,8 +384,11 @@ export type PayoutMethodUpdateInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: Prisma.IntFieldUpdateOperationsInput | number
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutPayoutMethodsNestedInput
@@ -320,8 +401,11 @@ export type PayoutMethodUncheckedUpdateInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: Prisma.IntFieldUpdateOperationsInput | number
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPayoutMethodNestedInput
@@ -333,8 +417,11 @@ export type PayoutMethodCreateManyInput = {
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: number
   isDefault?: boolean
   isActive?: boolean
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -344,8 +431,11 @@ export type PayoutMethodUpdateManyMutationInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: Prisma.IntFieldUpdateOperationsInput | number
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -356,8 +446,11 @@ export type PayoutMethodUncheckedUpdateManyInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: Prisma.IntFieldUpdateOperationsInput | number
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -383,10 +476,18 @@ export type PayoutMethodCountOrderByAggregateInput = {
   type?: Prisma.SortOrder
   label?: Prisma.SortOrder
   details?: Prisma.SortOrder
+  displayDetails?: Prisma.SortOrder
+  encryptionKeyVersion?: Prisma.SortOrder
   isDefault?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type PayoutMethodAvgOrderByAggregateInput = {
+  encryptionKeyVersion?: Prisma.SortOrder
+  version?: Prisma.SortOrder
 }
 
 export type PayoutMethodMaxOrderByAggregateInput = {
@@ -394,8 +495,10 @@ export type PayoutMethodMaxOrderByAggregateInput = {
   publisherId?: Prisma.SortOrder
   type?: Prisma.SortOrder
   label?: Prisma.SortOrder
+  encryptionKeyVersion?: Prisma.SortOrder
   isDefault?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -405,10 +508,17 @@ export type PayoutMethodMinOrderByAggregateInput = {
   publisherId?: Prisma.SortOrder
   type?: Prisma.SortOrder
   label?: Prisma.SortOrder
+  encryptionKeyVersion?: Prisma.SortOrder
   isDefault?: Prisma.SortOrder
   isActive?: Prisma.SortOrder
+  version?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type PayoutMethodSumOrderByAggregateInput = {
+  encryptionKeyVersion?: Prisma.SortOrder
+  version?: Prisma.SortOrder
 }
 
 export type PayoutMethodCreateNestedManyWithoutPublisherInput = {
@@ -474,8 +584,11 @@ export type PayoutMethodCreateWithoutPublisherInput = {
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: number
   isDefault?: boolean
   isActive?: boolean
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPayoutMethodInput
@@ -486,8 +599,11 @@ export type PayoutMethodUncheckedCreateWithoutPublisherInput = {
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: number
   isDefault?: boolean
   isActive?: boolean
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPayoutMethodInput
@@ -528,8 +644,11 @@ export type PayoutMethodScalarWhereInput = {
   type?: Prisma.StringFilter<"PayoutMethod"> | string
   label?: Prisma.StringFilter<"PayoutMethod"> | string
   details?: Prisma.JsonFilter<"PayoutMethod">
+  displayDetails?: Prisma.JsonNullableFilter<"PayoutMethod">
+  encryptionKeyVersion?: Prisma.IntFilter<"PayoutMethod"> | number
   isDefault?: Prisma.BoolFilter<"PayoutMethod"> | boolean
   isActive?: Prisma.BoolFilter<"PayoutMethod"> | boolean
+  version?: Prisma.IntFilter<"PayoutMethod"> | number
   createdAt?: Prisma.DateTimeFilter<"PayoutMethod"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PayoutMethod"> | Date | string
 }
@@ -539,8 +658,11 @@ export type PayoutMethodCreateWithoutWithdrawalsInput = {
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: number
   isDefault?: boolean
   isActive?: boolean
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
   publisher: Prisma.PublisherCreateNestedOneWithoutPayoutMethodsInput
@@ -552,8 +674,11 @@ export type PayoutMethodUncheckedCreateWithoutWithdrawalsInput = {
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: number
   isDefault?: boolean
   isActive?: boolean
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -579,8 +704,11 @@ export type PayoutMethodUpdateWithoutWithdrawalsInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: Prisma.IntFieldUpdateOperationsInput | number
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneRequiredWithoutPayoutMethodsNestedInput
@@ -592,8 +720,11 @@ export type PayoutMethodUncheckedUpdateWithoutWithdrawalsInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: Prisma.IntFieldUpdateOperationsInput | number
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -603,8 +734,11 @@ export type PayoutMethodCreateManyPublisherInput = {
   type: string
   label: string
   details: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: number
   isDefault?: boolean
   isActive?: boolean
+  version?: number
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -614,8 +748,11 @@ export type PayoutMethodUpdateWithoutPublisherInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: Prisma.IntFieldUpdateOperationsInput | number
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   withdrawals?: Prisma.WithdrawalUpdateManyWithoutPayoutMethodNestedInput
@@ -626,8 +763,11 @@ export type PayoutMethodUncheckedUpdateWithoutPublisherInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: Prisma.IntFieldUpdateOperationsInput | number
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPayoutMethodNestedInput
@@ -638,8 +778,11 @@ export type PayoutMethodUncheckedUpdateManyWithoutPublisherInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   label?: Prisma.StringFieldUpdateOperationsInput | string
   details?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  displayDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  encryptionKeyVersion?: Prisma.IntFieldUpdateOperationsInput | number
   isDefault?: Prisma.BoolFieldUpdateOperationsInput | boolean
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  version?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -681,8 +824,11 @@ export type PayoutMethodSelect<ExtArgs extends runtime.Types.Extensions.Internal
   type?: boolean
   label?: boolean
   details?: boolean
+  displayDetails?: boolean
+  encryptionKeyVersion?: boolean
   isDefault?: boolean
   isActive?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -696,8 +842,11 @@ export type PayoutMethodSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   type?: boolean
   label?: boolean
   details?: boolean
+  displayDetails?: boolean
+  encryptionKeyVersion?: boolean
   isDefault?: boolean
   isActive?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -709,8 +858,11 @@ export type PayoutMethodSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   type?: boolean
   label?: boolean
   details?: boolean
+  displayDetails?: boolean
+  encryptionKeyVersion?: boolean
   isDefault?: boolean
   isActive?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -722,13 +874,16 @@ export type PayoutMethodSelectScalar = {
   type?: boolean
   label?: boolean
   details?: boolean
+  displayDetails?: boolean
+  encryptionKeyVersion?: boolean
   isDefault?: boolean
   isActive?: boolean
+  version?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type PayoutMethodOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "type" | "label" | "details" | "isDefault" | "isActive" | "createdAt" | "updatedAt", ExtArgs["result"]["payoutMethod"]>
+export type PayoutMethodOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "type" | "label" | "details" | "displayDetails" | "encryptionKeyVersion" | "isDefault" | "isActive" | "version" | "createdAt" | "updatedAt", ExtArgs["result"]["payoutMethod"]>
 export type PayoutMethodInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
   withdrawals?: boolean | Prisma.PayoutMethod$withdrawalsArgs<ExtArgs>
@@ -753,8 +908,11 @@ export type $PayoutMethodPayload<ExtArgs extends runtime.Types.Extensions.Intern
     type: string
     label: string
     details: runtime.JsonValue
+    displayDetails: runtime.JsonValue | null
+    encryptionKeyVersion: number
     isDefault: boolean
     isActive: boolean
+    version: number
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["payoutMethod"]>
@@ -1187,8 +1345,11 @@ export interface PayoutMethodFieldRefs {
   readonly type: Prisma.FieldRef<"PayoutMethod", 'String'>
   readonly label: Prisma.FieldRef<"PayoutMethod", 'String'>
   readonly details: Prisma.FieldRef<"PayoutMethod", 'Json'>
+  readonly displayDetails: Prisma.FieldRef<"PayoutMethod", 'Json'>
+  readonly encryptionKeyVersion: Prisma.FieldRef<"PayoutMethod", 'Int'>
   readonly isDefault: Prisma.FieldRef<"PayoutMethod", 'Boolean'>
   readonly isActive: Prisma.FieldRef<"PayoutMethod", 'Boolean'>
+  readonly version: Prisma.FieldRef<"PayoutMethod", 'Int'>
   readonly createdAt: Prisma.FieldRef<"PayoutMethod", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"PayoutMethod", 'DateTime'>
 }

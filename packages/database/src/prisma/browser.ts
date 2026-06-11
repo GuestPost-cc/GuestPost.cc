@@ -138,6 +138,21 @@ export type Withdrawal = Prisma.WithdrawalModel
  */
 export type PayoutMethod = Prisma.PayoutMethodModel
 /**
+ * Model PayoutProvider
+ * 
+ */
+export type PayoutProvider = Prisma.PayoutProviderModel
+/**
+ * Model PayoutExecution
+ * 
+ */
+export type PayoutExecution = Prisma.PayoutExecutionModel
+/**
+ * Model PayoutBatch
+ * 
+ */
+export type PayoutBatch = Prisma.PayoutBatchModel
+/**
  * Model ApiKey
  * 
  */

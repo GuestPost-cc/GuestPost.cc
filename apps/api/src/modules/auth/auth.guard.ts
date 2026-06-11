@@ -4,6 +4,7 @@ import { auth } from "@guestpost/auth"
 import { prisma } from "@guestpost/database"
 import { IS_PUBLIC_KEY } from "../../common/decorators/public.decorator"
 import { ActiveContextService } from "../active-context/active-context.service"
+import { getCachedAuthContext, setCachedAuthContext } from "../../common/auth-context-cache"
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -25,6 +26,16 @@ export class AuthGuard implements CanActivate {
     })
 
     if (!session) throw new UnauthorizedException()
+
+    // Session is verified above on every request; the derived context (user
+    // row, active org/publisher, roles) is cached briefly. Mutations that
+    // change it call invalidateAuthContext().
+    const cached = getCachedAuthContext(session.user.id)
+    if (cached) {
+      request.user = cached
+      request.session = session.session
+      return true
+    }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } })
     if (!user) throw new UnauthorizedException("User not found")
@@ -102,6 +113,7 @@ export class AuthGuard implements CanActivate {
       publisherOrganizationId: publisherOrgId,
       ...roles,
     }
+    setCachedAuthContext(user.id, request.user)
     request.session = session.session
     return true
   }

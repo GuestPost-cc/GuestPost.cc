@@ -41,6 +41,13 @@ const QUEUE_CONFIGS: Record<string, QueueConfig> = {
       attempts: 2,
     },
   },
+  [QUEUES.PAYOUT]: {
+    defaultJobOptions: {
+      ...DEFAULT_JOB_OPTIONS,
+      attempts: 3,
+      backoff: { type: "exponential", delay: 10000 },
+    },
+  },
 }
 
 @Injectable()

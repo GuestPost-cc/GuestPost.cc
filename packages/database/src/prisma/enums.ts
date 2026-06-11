@@ -221,10 +221,34 @@ export const WithdrawalStatus = {
   APPROVED: 'APPROVED',
   PROCESSING: 'PROCESSING',
   COMPLETED: 'COMPLETED',
-  REJECTED: 'REJECTED'
+  REJECTED: 'REJECTED',
+  FAILED: 'FAILED',
+  REVERSED: 'REVERSED'
 } as const
 
 export type WithdrawalStatus = (typeof WithdrawalStatus)[keyof typeof WithdrawalStatus]
+
+
+export const PayoutExecutionStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED',
+  CANCELLED: 'CANCELLED'
+} as const
+
+export type PayoutExecutionStatus = (typeof PayoutExecutionStatus)[keyof typeof PayoutExecutionStatus]
+
+
+export const PayoutBatchStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  PARTIALLY_COMPLETED: 'PARTIALLY_COMPLETED',
+  FAILED: 'FAILED'
+} as const
+
+export type PayoutBatchStatus = (typeof PayoutBatchStatus)[keyof typeof PayoutBatchStatus]
 
 
 export const PublisherTier = {

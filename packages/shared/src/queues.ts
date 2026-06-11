@@ -5,6 +5,7 @@ export const QUEUES = {
   IMPORT: "import",
   AI: "ai",
   VERIFICATION: "verification",
+  PAYOUT: "payout",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
@@ -36,5 +37,10 @@ export const QUEUE_JOBS = {
   },
   [QUEUES.VERIFICATION]: {
     VERIFY_LINK: "verify-link",
+  },
+  [QUEUES.PAYOUT]: {
+    EXECUTE: "payout-execute",
+    CHECK_STATUS: "payout-check-status",
+    WEBHOOK: "payout-webhook",
   },
 } as const

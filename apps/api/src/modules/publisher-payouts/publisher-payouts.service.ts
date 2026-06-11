@@ -2,6 +2,8 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
+import { PayoutEncryptionService } from "./payout-encryption.service"
+import { PayoutExecutionService } from "./payout-execution.service"
 import { QUEUES } from "@guestpost/shared"
 import { Decimal } from "@prisma/client/runtime/library"
 
@@ -17,6 +19,8 @@ export class PublisherPayoutsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    private readonly encryption: PayoutEncryptionService,
+    private readonly execution: PayoutExecutionService,
   ) {}
 
   async getBalance(publisherId: string) {
@@ -47,6 +51,9 @@ export class PublisherPayoutsService {
       throw new BadRequestException(`Payout method type must be one of: ${allowed.join(", ")}`)
     }
 
+    const { ciphertext, version } = this.encryption.encrypt(dto.details)
+    const displayDetails = this.encryption.extractDisplayDetails(dto.details, dto.type)
+
     return this.prisma.$transaction(async (tx: any) => {
       if (dto.isDefault) {
         await tx.payoutMethod.updateMany({
@@ -59,28 +66,60 @@ export class PublisherPayoutsService {
           publisherId,
           type: dto.type,
           label: dto.label,
-          details: dto.details as any,
+          details: ciphertext as any,
+          displayDetails: displayDetails as any,
+          encryptionKeyVersion: version,
           isDefault: dto.isDefault ?? false,
         },
       })
+      const publisher = await tx.publisher.findUnique({ where: { id: publisherId } })
       await this.audit.log({
         action: "PAYOUT_METHOD_CREATED",
         entityType: "PayoutMethod",
         entityId: method.id,
         metadata: { publisherId, type: dto.type, label: dto.label },
         userId,
-        organizationId: null,
+        organizationId: publisher?.organizationId as string | null,
       }, tx)
-      return method
+      return { id: method.id, type: method.type, label: method.label, isDefault: method.isDefault, displayDetails }
     })
   }
 
   async listPayoutMethods(publisherId: string, userId: string) {
     await this.assertPublisherMember(userId, publisherId)
-    return this.prisma.payoutMethod.findMany({
+    const methods = await this.prisma.payoutMethod.findMany({
       where: { publisherId, isActive: true },
       orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+      select: { id: true, type: true, label: true, displayDetails: true, isDefault: true, isActive: true, createdAt: true, updatedAt: true },
     })
+    return methods.map((m: any) => ({
+      id: m.id,
+      type: m.type,
+      label: m.label,
+      isDefault: m.isDefault,
+      displayDetails: m.displayDetails ?? {},
+    }))
+  }
+
+  async decryptPayoutMethod(methodId: string, userId: string, reason: string, ipAddress: string, userAgent: string): Promise<{ details: Record<string, unknown>; methodId: string; publisherId: string }> {
+    const method = await this.prisma.payoutMethod.findUnique({
+      where: { id: methodId },
+      include: { publisher: { select: { organizationId: true } } },
+    })
+    if (!method) throw new NotFoundException("Payout method not found")
+
+    const details = this.encryption.decrypt(method.details as unknown as string, method.encryptionKeyVersion)
+
+    await this.audit.log({
+      action: "PAYOUT_METHOD_DECRYPTED",
+      entityType: "PayoutMethod",
+      entityId: methodId,
+      metadata: { publisherId: method.publisherId, reason, ipAddress, userAgent },
+      userId,
+      organizationId: method.publisher?.organizationId ?? null,
+    })
+
+    return { details, methodId, publisherId: method.publisherId }
   }
 
   async deactivatePayoutMethod(publisherId: string, userId: string, id: string) {
@@ -88,7 +127,8 @@ export class PublisherPayoutsService {
     const method = await this.prisma.payoutMethod.findFirst({ where: { id, publisherId } })
     if (!method) throw new NotFoundException("Payout method not found")
 
-    const updated = await this.prisma.payoutMethod.update({
+    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    await this.prisma.payoutMethod.update({
       where: { id },
       data: { isActive: false, isDefault: false },
     })
@@ -98,9 +138,9 @@ export class PublisherPayoutsService {
       entityId: id,
       metadata: { publisherId },
       userId,
-      organizationId: null,
+      organizationId: publisher?.organizationId ?? null,
     })
-    return updated
+    return { id, isActive: false }
   }
 
   // ─── WITHDRAWALS ────────────────────────────────────────────
@@ -297,8 +337,21 @@ export class PublisherPayoutsService {
       }
       const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
 
-      // The WITHDRAWAL ledger row was written at request time (when the
-      // balance moved) — only lifetimePaid changes here.
+      // Record a completed execution for traceability
+      const manualProvider = await tx.payoutProvider.findUnique({ where: { name: "manual" } })
+      if (manualProvider) {
+        await tx.payoutExecution.create({
+          data: {
+            withdrawalId: id,
+            providerId: manualProvider.id,
+            status: "COMPLETED",
+            amount: withdrawal.amount,
+            providerExecutionId: `manual-${id}-${Date.now()}`,
+            providerMetadata: { markedBy: approvedBy, markedAt: new Date().toISOString() },
+          },
+        })
+      }
+
       const balance = await tx.publisherBalance.findUnique({
         where: { publisherId: withdrawal.publisherId },
       })

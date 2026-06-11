@@ -1,10 +1,14 @@
-import { Controller, Get, Param, Patch, Post, Put, Delete, Body, Query, UseGuards, BadRequestException } from "@nestjs/common"
+import { Controller, Get, Param, Patch, Post, Put, Delete, Body, Query, UseGuards, BadRequestException, Req, Headers, Header } from "@nestjs/common"
 import { AdminService } from "./admin.service"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import { Permissions } from "../../common/decorators/permissions.decorator"
+import { PermissionsGuard } from "../../common/guards/permissions.guard"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { DecryptPayoutMethodDto } from "../publisher-payouts/dto/decrypt-payout-method.dto"
 import { SettlementsService } from "../settlements/settlements.service"
 import { PublisherPayoutsService } from "../publisher-payouts/publisher-payouts.service"
+import { PayoutExecutionService } from "../publisher-payouts/payout-execution.service"
 import { OrdersService } from "../orders/orders.service"
 import { OrderDisputeService } from "../orders/services/order-dispute.service"
 import { OrderOperationsService } from "../orders/services/order-operations.service"
@@ -30,6 +34,7 @@ export class AdminController {
     private readonly dispute: OrderDisputeService,
     private readonly ops: OrderOperationsService,
     private readonly reconciliation: ReconciliationService,
+    private readonly payoutExecution: PayoutExecutionService,
   ) {}
 
   // Financial drift detector — balances vs transaction history, stuck orders
@@ -226,6 +231,51 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   rejectWithdrawal(@Param("id") id: string, @CurrentUser() user: any) {
     return this.payouts.rejectWithdrawal(id, user.id)
+  }
+
+  @Post("withdrawals/:id/execute")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  executePayout(
+    @Param("id") id: string,
+    @Body() body: { providerName: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.payoutExecution.executeWithdrawal(id, body.providerName, user.id)
+  }
+
+  @Get("withdrawals/:id/executions")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  getWithdrawalExecutions(@Param("id") id: string) {
+    return this.payoutExecution.getExecutionsForWithdrawal(id)
+  }
+
+  @Post("payout-executions/:id/retry")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  retryPayoutExecution(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.payoutExecution.retryExecution(id, user.id)
+  }
+
+  @Post("payout-executions/:id/cancel")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  cancelPayoutExecution(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.payoutExecution.cancelExecution(id, user.id)
+  }
+
+  @Post("payout-methods/:id/decrypt")
+  @UseGuards(PermissionsGuard)
+  @Permissions("FINANCIAL_DATA_DECRYPT")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Header("Cache-Control", "no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
+  decryptPayoutMethod(
+    @Param("id") id: string,
+    @Body() body: DecryptPayoutMethodDto,
+    @CurrentUser() user: any,
+    @Headers("x-forwarded-for") forwardedFor?: string,
+    @Headers("user-agent") userAgent?: string,
+  ) {
+    const ip = forwardedFor ?? "unknown"
+    return this.payouts.decryptPayoutMethod(id, user.id, body.reason, ip, userAgent ?? "unknown")
   }
 
   @Get("marketplace/listings")

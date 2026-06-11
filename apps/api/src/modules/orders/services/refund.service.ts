@@ -24,7 +24,14 @@ export class RefundService {
     private readonly audit: AuditService,
   ) {}
 
-  async refundOrder(orderId: string, reason: string, userId: string) {
+  async refundOrder(orderId: string, reason: string, userId: string, idempotencyKey?: string) {
+    if (idempotencyKey) {
+      const existing = await this.prisma.transaction.findFirst({
+        where: { reference: idempotencyKey },
+      })
+      if (existing) return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
+    }
+
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
       include: { website: { select: { ownershipType: true } } },
@@ -40,6 +47,12 @@ export class RefundService {
 
     const result = await this.prisma.$transaction(async (tx: any) => {
       // Duplicate guard
+      if (idempotencyKey) {
+        const existing = await tx.transaction.findFirst({
+          where: { reference: idempotencyKey },
+        })
+        if (existing) return tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      }
       const existingRefund = await tx.transaction.findFirst({
         where: { orderId, type: "REFUND" },
       })
@@ -133,7 +146,7 @@ export class RefundService {
       // Refund captured payment to wallet. Refundable statuses are post-capture,
       // so the order's reservation was already consumed — reservedBalance must not
       // be touched (any reserved funds belong to other orders).
-      const wallet = await tx.wallet.findFirst({
+      const wallet = await tx.wallet.findUnique({
         where: { organizationId: order.organizationId },
       })
       const amount = order.amount ? new Decimal(order.amount) : new Decimal(0)
@@ -165,7 +178,7 @@ export class RefundService {
           type: "REFUND",
           orderId,
           walletId: wallet?.id ?? null,
-          reference: `refund-${orderId}`,
+          reference: idempotencyKey ?? `refund-${orderId}`,
           description: `Refund for order ${orderId}: ${reason}`,
         },
       })

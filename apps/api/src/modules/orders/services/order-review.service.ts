@@ -209,8 +209,21 @@ export class OrderReviewService {
     }
 
     // Publisher-owned websites: create settlement for publisher payout
-    const publisher = await tx.publisher.findFirst({
-      where: { websites: { some: { id: order.websiteId ?? undefined } } },
+    if (!order.websiteId) {
+      throw new Error(`Order ${orderId} has no websiteId — cannot create settlement`)
+    }
+    const website = await tx.website.findUnique({
+      where: { id: order.websiteId },
+      select: { publisherId: true },
+    })
+    if (!website) {
+      throw new Error(`Website ${order.websiteId} not found for order ${orderId}`)
+    }
+    if (!website.publisherId) {
+      throw new Error(`Website ${order.websiteId} has no publisher — cannot create settlement`)
+    }
+    const publisher = await tx.publisher.findUnique({
+      where: { id: website.publisherId },
     })
     if (!publisher) return
 

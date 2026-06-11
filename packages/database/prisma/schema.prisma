@@ -172,6 +172,24 @@ enum WithdrawalStatus {
   PROCESSING
   COMPLETED
   REJECTED
+  FAILED
+  REVERSED
+}
+
+enum PayoutExecutionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum PayoutBatchStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  PARTIALLY_COMPLETED
+  FAILED
 }
 
 enum PublisherTier {
@@ -333,11 +351,12 @@ model PublisherMembership {
 }
 
 model StaffMembership {
-  id        String    @id @default(cuid())
-  role      StaffRole @default(OPERATIONS)
-  userId    String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  role        StaffRole @default(OPERATIONS)
+  userId      String    @unique
+  permissions Json      @default("[]")  // String array of permission codes e.g. ["FINANCIAL_DATA_DECRYPT"]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id])
 }
@@ -634,6 +653,7 @@ model Withdrawal {
   // Client-supplied dedup key — scoped per publisher, never used as PK.
   idempotencyKey String?
   payoutMethodId String?
+  payoutBatchId String?
   approvedBy  String?
   approvedAt  DateTime?
   version     Int              @default(0)
@@ -643,29 +663,97 @@ model Withdrawal {
   publisher   Publisher @relation(fields: [publisherId], references: [id])
   approvedByUser User?  @relation("WithdrawalApprover", fields: [approvedBy], references: [id])
   payoutMethod PayoutMethod? @relation(fields: [payoutMethodId], references: [id])
+  payoutBatch PayoutBatch? @relation(fields: [payoutBatchId], references: [id])
+  executions PayoutExecution[]
 
   @@unique([publisherId, idempotencyKey])
   @@index([publisherId, status])
   @@index([approvedBy])
   @@index([status])
   @@index([payoutMethodId])
+  @@index([payoutBatchId])
 }
 
 model PayoutMethod {
-  id          String   @id @default(cuid())
-  publisherId String
-  type        String   // bank_transfer, paypal, wise
-  label       String
-  details     Json
-  isDefault   Boolean  @default(false)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  publisherId          String
+  type                 String   // bank_transfer, paypal, wise
+  label                String
+  details              Json     // AES-256-GCM encrypted via PayoutEncryptionService
+  displayDetails       Json?    // Non-sensitive display fields (bank name, last4) — unencrypted, safe for list endpoints
+  encryptionKeyVersion Int      @default(0)
+  isDefault            Boolean  @default(false)
+  isActive             Boolean  @default(true)
+  version              Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   publisher   Publisher    @relation(fields: [publisherId], references: [id])
   withdrawals Withdrawal[]
 
   @@index([publisherId])
+}
+
+model PayoutProvider {
+  id                       String   @id @default(cuid())
+  name                     String   @unique // "manual", "wise", "stripe_connect"
+  displayName              String
+  config                   Json     // Provider-specific config (API keys, webhook secrets) — AES-256-GCM encrypted
+  configEncryptionKeyVersion Int    @default(0)
+  isActive                 Boolean  @default(true)
+  version                  Int      @default(0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  executions PayoutExecution[]
+
+  @@index([isActive])
+}
+
+model PayoutExecution {
+  id                 String               @id @default(cuid())
+  withdrawalId       String
+  providerId         String
+  status             PayoutExecutionStatus @default(PENDING)
+  providerExecutionId String?              // Provider's reference ID (transfer ID, payment ID)
+  amount             Decimal
+  fee                Decimal              @default(0)
+  errorMessage       String?
+  providerMetadata   Json?
+  idempotencyKey     String?
+  version            Int                  @default(0)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  withdrawal Withdrawal     @relation(fields: [withdrawalId], references: [id])
+  provider   PayoutProvider @relation(fields: [providerId], references: [id])
+
+  @@unique([withdrawalId, idempotencyKey])
+  @@index([withdrawalId, status])
+  @@index([providerId, status])
+  @@index([status, createdAt])
+  @@index([providerExecutionId])
+}
+
+model PayoutBatch {
+  id                 String             @id @default(cuid())
+  name               String
+  status             PayoutBatchStatus  @default(PENDING)
+  totalAmount        Decimal            @default(0)
+  totalCount         Int                @default(0)
+  completedAmount    Decimal            @default(0)
+  completedCount     Int                @default(0)
+  failedCount        Int                @default(0)
+  notes              String?
+  metadata           Json?
+  createdBy          String
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  withdrawals Withdrawal[]
+
+  @@index([status, createdAt])
+  @@index([createdBy])
 }
 
 model ApiKey {

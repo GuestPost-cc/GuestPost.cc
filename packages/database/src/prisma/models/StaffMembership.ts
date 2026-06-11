@@ -44,6 +44,7 @@ export type StaffMembershipCountAggregateOutputType = {
   id: number
   role: number
   userId: number
+  permissions: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -70,6 +71,7 @@ export type StaffMembershipCountAggregateInputType = {
   id?: true
   role?: true
   userId?: true
+  permissions?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -151,6 +153,7 @@ export type StaffMembershipGroupByOutputType = {
   id: string
   role: $Enums.StaffRole
   userId: string
+  permissions: runtime.JsonValue
   createdAt: Date
   updatedAt: Date
   _count: StaffMembershipCountAggregateOutputType | null
@@ -180,6 +183,7 @@ export type StaffMembershipWhereInput = {
   id?: Prisma.StringFilter<"StaffMembership"> | string
   role?: Prisma.EnumStaffRoleFilter<"StaffMembership"> | $Enums.StaffRole
   userId?: Prisma.StringFilter<"StaffMembership"> | string
+  permissions?: Prisma.JsonFilter<"StaffMembership">
   createdAt?: Prisma.DateTimeFilter<"StaffMembership"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"StaffMembership"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -189,6 +193,7 @@ export type StaffMembershipOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   role?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  permissions?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
@@ -201,6 +206,7 @@ export type StaffMembershipWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.StaffMembershipWhereInput[]
   NOT?: Prisma.StaffMembershipWhereInput | Prisma.StaffMembershipWhereInput[]
   role?: Prisma.EnumStaffRoleFilter<"StaffMembership"> | $Enums.StaffRole
+  permissions?: Prisma.JsonFilter<"StaffMembership">
   createdAt?: Prisma.DateTimeFilter<"StaffMembership"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"StaffMembership"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
@@ -210,6 +216,7 @@ export type StaffMembershipOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   role?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  permissions?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.StaffMembershipCountOrderByAggregateInput
@@ -224,6 +231,7 @@ export type StaffMembershipScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"StaffMembership"> | string
   role?: Prisma.EnumStaffRoleWithAggregatesFilter<"StaffMembership"> | $Enums.StaffRole
   userId?: Prisma.StringWithAggregatesFilter<"StaffMembership"> | string
+  permissions?: Prisma.JsonWithAggregatesFilter<"StaffMembership">
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"StaffMembership"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"StaffMembership"> | Date | string
 }
@@ -231,6 +239,7 @@ export type StaffMembershipScalarWhereWithAggregatesInput = {
 export type StaffMembershipCreateInput = {
   id?: string
   role?: $Enums.StaffRole
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutStaffMembershipsInput
@@ -240,6 +249,7 @@ export type StaffMembershipUncheckedCreateInput = {
   id?: string
   role?: $Enums.StaffRole
   userId: string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -247,6 +257,7 @@ export type StaffMembershipUncheckedCreateInput = {
 export type StaffMembershipUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumStaffRoleFieldUpdateOperationsInput | $Enums.StaffRole
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutStaffMembershipsNestedInput
@@ -256,6 +267,7 @@ export type StaffMembershipUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumStaffRoleFieldUpdateOperationsInput | $Enums.StaffRole
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -264,6 +276,7 @@ export type StaffMembershipCreateManyInput = {
   id?: string
   role?: $Enums.StaffRole
   userId: string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -271,6 +284,7 @@ export type StaffMembershipCreateManyInput = {
 export type StaffMembershipUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumStaffRoleFieldUpdateOperationsInput | $Enums.StaffRole
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -279,6 +293,7 @@ export type StaffMembershipUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumStaffRoleFieldUpdateOperationsInput | $Enums.StaffRole
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -297,6 +312,7 @@ export type StaffMembershipCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   role?: Prisma.SortOrder
   userId?: Prisma.SortOrder
+  permissions?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -366,6 +382,7 @@ export type EnumStaffRoleFieldUpdateOperationsInput = {
 export type StaffMembershipCreateWithoutUserInput = {
   id?: string
   role?: $Enums.StaffRole
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -373,6 +390,7 @@ export type StaffMembershipCreateWithoutUserInput = {
 export type StaffMembershipUncheckedCreateWithoutUserInput = {
   id?: string
   role?: $Enums.StaffRole
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -410,6 +428,7 @@ export type StaffMembershipScalarWhereInput = {
   id?: Prisma.StringFilter<"StaffMembership"> | string
   role?: Prisma.EnumStaffRoleFilter<"StaffMembership"> | $Enums.StaffRole
   userId?: Prisma.StringFilter<"StaffMembership"> | string
+  permissions?: Prisma.JsonFilter<"StaffMembership">
   createdAt?: Prisma.DateTimeFilter<"StaffMembership"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"StaffMembership"> | Date | string
 }
@@ -417,6 +436,7 @@ export type StaffMembershipScalarWhereInput = {
 export type StaffMembershipCreateManyUserInput = {
   id?: string
   role?: $Enums.StaffRole
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -424,6 +444,7 @@ export type StaffMembershipCreateManyUserInput = {
 export type StaffMembershipUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumStaffRoleFieldUpdateOperationsInput | $Enums.StaffRole
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -431,6 +452,7 @@ export type StaffMembershipUpdateWithoutUserInput = {
 export type StaffMembershipUncheckedUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumStaffRoleFieldUpdateOperationsInput | $Enums.StaffRole
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -438,6 +460,7 @@ export type StaffMembershipUncheckedUpdateWithoutUserInput = {
 export type StaffMembershipUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   role?: Prisma.EnumStaffRoleFieldUpdateOperationsInput | $Enums.StaffRole
+  permissions?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -448,6 +471,7 @@ export type StaffMembershipSelect<ExtArgs extends runtime.Types.Extensions.Inter
   id?: boolean
   role?: boolean
   userId?: boolean
+  permissions?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -457,6 +481,7 @@ export type StaffMembershipSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   id?: boolean
   role?: boolean
   userId?: boolean
+  permissions?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -466,6 +491,7 @@ export type StaffMembershipSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   id?: boolean
   role?: boolean
   userId?: boolean
+  permissions?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -475,11 +501,12 @@ export type StaffMembershipSelectScalar = {
   id?: boolean
   role?: boolean
   userId?: boolean
+  permissions?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type StaffMembershipOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "role" | "userId" | "createdAt" | "updatedAt", ExtArgs["result"]["staffMembership"]>
+export type StaffMembershipOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "role" | "userId" | "permissions" | "createdAt" | "updatedAt", ExtArgs["result"]["staffMembership"]>
 export type StaffMembershipInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -499,6 +526,7 @@ export type $StaffMembershipPayload<ExtArgs extends runtime.Types.Extensions.Int
     id: string
     role: $Enums.StaffRole
     userId: string
+    permissions: runtime.JsonValue
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["staffMembership"]>
@@ -928,6 +956,7 @@ export interface StaffMembershipFieldRefs {
   readonly id: Prisma.FieldRef<"StaffMembership", 'String'>
   readonly role: Prisma.FieldRef<"StaffMembership", 'StaffRole'>
   readonly userId: Prisma.FieldRef<"StaffMembership", 'String'>
+  readonly permissions: Prisma.FieldRef<"StaffMembership", 'Json'>
   readonly createdAt: Prisma.FieldRef<"StaffMembership", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"StaffMembership", 'DateTime'>
 }

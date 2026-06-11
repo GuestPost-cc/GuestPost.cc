@@ -167,15 +167,23 @@ export class BillingService {
         throw new ConflictException("Wallet was modified by another request. Retry.")
       }
 
-      await tx.transaction.create({
-        data: {
-          walletId,
-          amount,
-          type: "DEPOSIT",
-          reference: session.id,
-          description: `Stripe deposit of ${amount.toFixed(2)}`,
-        },
-      })
+      try {
+        await tx.transaction.create({
+          data: {
+            walletId,
+            amount,
+            type: "DEPOSIT",
+            reference: session.id,
+            description: `Stripe deposit of ${amount.toFixed(2)}`,
+          },
+        })
+      } catch (err: any) {
+        if (err?.code === "P2002") {
+          this.logger.warn(`Duplicate webhook: session ${session.id} already processed`)
+          return
+        }
+        throw err
+      }
     })
 
     await this.audit.log({

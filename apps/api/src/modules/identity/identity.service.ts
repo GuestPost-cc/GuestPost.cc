@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/commo
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { CustomerRole } from "@guestpost/shared"
+import { invalidateAuthContext } from "../../common/auth-context-cache"
 
 @Injectable()
 export class IdentityService {
@@ -88,6 +89,7 @@ export class IdentityService {
         role,
       },
     })
+    invalidateAuthContext(user.id)
 
     await this.audit.log({
       action: "MEMBER_INVITED",
@@ -124,6 +126,7 @@ export class IdentityService {
     }
 
     await this.prisma.membership.delete({ where: { id: targetMembership.id } })
+    invalidateAuthContext(targetUserId)
 
     await this.audit.log({
       action: "MEMBER_REMOVED",

@@ -73,6 +73,9 @@ export const ModelName = {
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
   PayoutMethod: 'PayoutMethod',
+  PayoutProvider: 'PayoutProvider',
+  PayoutExecution: 'PayoutExecution',
+  PayoutBatch: 'PayoutBatch',
   ApiKey: 'ApiKey',
   ContentOrder: 'ContentOrder',
   Revision: 'Revision',
@@ -234,6 +237,7 @@ export const StaffMembershipScalarFieldEnum = {
   id: 'id',
   role: 'role',
   userId: 'userId',
+  permissions: 'permissions',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -463,6 +467,7 @@ export const WithdrawalScalarFieldEnum = {
   availableAt: 'availableAt',
   idempotencyKey: 'idempotencyKey',
   payoutMethodId: 'payoutMethodId',
+  payoutBatchId: 'payoutBatchId',
   approvedBy: 'approvedBy',
   approvedAt: 'approvedAt',
   version: 'version',
@@ -479,13 +484,69 @@ export const PayoutMethodScalarFieldEnum = {
   type: 'type',
   label: 'label',
   details: 'details',
+  displayDetails: 'displayDetails',
+  encryptionKeyVersion: 'encryptionKeyVersion',
   isDefault: 'isDefault',
   isActive: 'isActive',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type PayoutMethodScalarFieldEnum = (typeof PayoutMethodScalarFieldEnum)[keyof typeof PayoutMethodScalarFieldEnum]
+
+
+export const PayoutProviderScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  displayName: 'displayName',
+  config: 'config',
+  configEncryptionKeyVersion: 'configEncryptionKeyVersion',
+  isActive: 'isActive',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PayoutProviderScalarFieldEnum = (typeof PayoutProviderScalarFieldEnum)[keyof typeof PayoutProviderScalarFieldEnum]
+
+
+export const PayoutExecutionScalarFieldEnum = {
+  id: 'id',
+  withdrawalId: 'withdrawalId',
+  providerId: 'providerId',
+  status: 'status',
+  providerExecutionId: 'providerExecutionId',
+  amount: 'amount',
+  fee: 'fee',
+  errorMessage: 'errorMessage',
+  providerMetadata: 'providerMetadata',
+  idempotencyKey: 'idempotencyKey',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PayoutExecutionScalarFieldEnum = (typeof PayoutExecutionScalarFieldEnum)[keyof typeof PayoutExecutionScalarFieldEnum]
+
+
+export const PayoutBatchScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  status: 'status',
+  totalAmount: 'totalAmount',
+  totalCount: 'totalCount',
+  completedAmount: 'completedAmount',
+  completedCount: 'completedCount',
+  failedCount: 'failedCount',
+  notes: 'notes',
+  metadata: 'metadata',
+  createdBy: 'createdBy',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PayoutBatchScalarFieldEnum = (typeof PayoutBatchScalarFieldEnum)[keyof typeof PayoutBatchScalarFieldEnum]
 
 
 export const ApiKeyScalarFieldEnum = {

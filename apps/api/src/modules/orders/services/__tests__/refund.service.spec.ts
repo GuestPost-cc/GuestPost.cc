@@ -46,6 +46,7 @@ describe("RefundService", () => {
       },
       wallet: {
         findFirst: jest.fn().mockResolvedValue(wallet),
+        findUnique: jest.fn().mockResolvedValue(wallet),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       orderEvent: { create: jest.fn().mockResolvedValue({}) },

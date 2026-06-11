@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { QueueService } from "../queues/queue.service"
 import { RefundService } from "../orders/services/refund.service"
 import { StaffRole, QUEUES } from "@guestpost/shared"
@@ -83,6 +84,8 @@ export class AdminService {
   async updateUserRole(userId: string, role: string, user?: any) {
     const u = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!u) throw new NotFoundException("User not found")
+    // Role/type changes must take effect immediately, not after cache TTL
+    invalidateAuthContext(userId)
 
     const CUSTOMER_ROLES = ["OWNER", "MEMBER"] as const
     const PUBLISHER_ROLES = ["PUBLISHER_OWNER"] as const
@@ -168,6 +171,7 @@ export class AdminService {
   async updateStaffRole(userId: string, role: string, user?: any) {
     const target = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!target) throw new NotFoundException("User not found")
+    invalidateAuthContext(userId)
 
     if (!VALID_STAFF_ROLES.includes(role as StaffRole)) {
       throw new BadRequestException(`Invalid staff role: ${role}`)

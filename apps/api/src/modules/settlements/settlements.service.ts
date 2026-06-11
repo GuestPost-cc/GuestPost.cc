@@ -24,7 +24,7 @@ export class SettlementsService {
 
     // Find publisher from order items' websites
     const item = await this.prisma.orderItem.findFirst({
-      where: { orderId },
+      where: { orderId, websiteId: { not: null } },
       include: { website: { select: { publisherId: true } } },
     })
     const publisherId = item?.website?.publisherId
@@ -316,10 +316,14 @@ export class SettlementsService {
     if (settlement.status === "RELEASED") throw new BadRequestException("Cannot cancel released settlement")
 
     return this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.settlement.update({
-        where: { id },
-        data: { status: "CANCELLED" },
+      const updated = await tx.settlement.updateMany({
+        where: { id, version: settlement.version },
+        data: { status: "CANCELLED", version: { increment: 1 } },
       })
+      if (updated.count === 0) {
+        throw new ConflictException("Settlement was modified by another request. Retry.")
+      }
+      const settlementRow = await tx.settlement.findUniqueOrThrow({ where: { id } })
 
       await this.audit.log({
         action: "SETTLEMENT_CANCELLED",
@@ -328,9 +332,9 @@ export class SettlementsService {
         metadata: { orderId: settlement.orderId, reason },
         userId,
         organizationId: settlement.order.organizationId,
-      })
+      }, tx)
 
-      return updated
+      return settlementRow
     })
   }
 

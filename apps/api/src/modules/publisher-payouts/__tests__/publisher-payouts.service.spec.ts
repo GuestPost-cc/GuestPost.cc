@@ -7,6 +7,8 @@ describe("PublisherPayoutsService", () => {
   let prismaMock: any
   let auditMock: any
   let queueMock: any
+  let encryptionMock: any
+  let executionMock: any
 
   const publisher = { id: "pub-1", tier: "NEW", organizationId: "org-1" }
   const balance = { publisherId: "pub-1", withdrawableBalance: new Decimal(500), version: 1 }
@@ -14,6 +16,18 @@ describe("PublisherPayoutsService", () => {
   beforeEach(() => {
     auditMock = { log: jest.fn().mockResolvedValue(undefined) }
     queueMock = { addJob: jest.fn().mockResolvedValue(undefined) }
+    encryptionMock = {
+      encrypt: jest.fn().mockReturnValue({ ciphertext: "encrypted-data", version: 1 }),
+      decrypt: jest.fn().mockReturnValue({ accountNumber: "1234" }),
+      mask: jest.fn().mockImplementation((d: any) => ({ ...d, accountNumber: "****" })),
+    }
+    executionMock = {
+      executeWithdrawal: jest.fn(),
+      retryExecution: jest.fn(),
+      cancelExecution: jest.fn(),
+      getExecutionsForWithdrawal: jest.fn(),
+      getPendingStatusChecks: jest.fn(),
+    }
     prismaMock = {
       publisherMembership: {
         findFirst: jest.fn().mockResolvedValue({ id: "mem-1" }),
@@ -39,11 +53,13 @@ describe("PublisherPayoutsService", () => {
         update: jest.fn(),
         updateMany: jest.fn(),
       },
+      payoutExecution: { create: jest.fn().mockResolvedValue({}) },
+      payoutProvider: { findUnique: jest.fn().mockResolvedValue({ id: "manual-1", name: "manual" }) },
       transaction: { create: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       $transaction: jest.fn().mockImplementation(async (cb: any) => cb(prismaMock)),
     }
-    service = new PublisherPayoutsService(prismaMock as any, auditMock as any, queueMock as any)
+    service = new PublisherPayoutsService(prismaMock as any, auditMock as any, queueMock as any, encryptionMock as any, executionMock as any)
   })
 
   describe("requestWithdrawal", () => {

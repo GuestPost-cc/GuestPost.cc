@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
+import { invalidateAuthContext } from "../../common/auth-context-cache"
 
 @Injectable()
 export class ActiveContextService {
@@ -50,6 +51,7 @@ export class ActiveContextService {
       create: { userId, activeOrganizationId: organizationId },
       update: { activeOrganizationId: organizationId },
     })
+    invalidateAuthContext(userId)
     return ctx
   }
 
@@ -64,6 +66,7 @@ export class ActiveContextService {
       create: { userId, activePublisherId: publisherId },
       update: { activePublisherId: publisherId },
     })
+    invalidateAuthContext(userId)
     return ctx
   }
 
@@ -107,18 +110,22 @@ export class ActiveContextService {
   }
 
   async clearOrganization(userId: string) {
-    return this.prisma.activeContext.upsert({
+    const ctx = await this.prisma.activeContext.upsert({
       where: { userId },
       create: { userId, activeOrganizationId: null },
       update: { activeOrganizationId: null },
     })
+    invalidateAuthContext(userId)
+    return ctx
   }
 
   async clearPublisher(userId: string) {
-    return this.prisma.activeContext.upsert({
+    const ctx = await this.prisma.activeContext.upsert({
       where: { userId },
       create: { userId, activePublisherId: null },
       update: { activePublisherId: null },
     })
+    invalidateAuthContext(userId)
+    return ctx
   }
 }
