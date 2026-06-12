@@ -407,6 +407,17 @@ model Publisher {
   @@index([organizationId])
 }
 
+enum WebsiteVerificationStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  VERIFICATION_FAILED
+  REVOKED
+}
+
+enum VerificationMethod {
+  DNS_TXT
+}
+
 model Website {
   id              String                @id @default(cuid())
   url             String                @unique
@@ -421,6 +432,20 @@ model Website {
   isActive        Boolean               @default(true)
   publisherId     String?
   ownershipType   WebsiteOwnershipType   @default(PUBLISHER)
+
+  // ── Domain ownership verification (DNS TXT) ──
+  // Publisher sites start PENDING_VERIFICATION and must prove control via a
+  // DNS TXT record before any listing on them can be approved. Platform sites
+  // are created VERIFIED (the platform owns them).
+  verificationStatus       WebsiteVerificationStatus @default(PENDING_VERIFICATION)
+  verificationMethod       VerificationMethod?
+  verificationToken        String?
+  verifiedAt               DateTime?
+  lastVerificationCheckAt  DateTime?
+  verificationFailureReason String?
+  // Optimistic-lock guard for worker transitions
+  verificationVersion      Int                       @default(0)
+
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
 
@@ -433,6 +458,9 @@ model Website {
   @@index([isActive])
   @@index([ownershipType])
   @@index([domain])
+  @@index([verificationToken])
+  @@index([verificationStatus])
+  @@index([verifiedAt])
 }
 
 model Order {

@@ -1,15 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from "@nestjs/common"
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { QueueService } from "../queues/queue.service"
 import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
 import { ListingStatus, ListingType, ListingFulfillmentType } from "@guestpost/database"
 import { normalizeDomain } from "../../common/domain"
+import { QUEUES, generateVerificationToken, verificationTxtValue } from "@guestpost/shared"
 
 @Injectable()
 export class WebsitesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly queue: QueueService,
   ) {}
 
   async createWebsite(publisherId: string, organizationId: string, dto: CreateWebsiteDto, user: any) {
@@ -35,6 +38,11 @@ export class WebsitesService {
       throw new BadRequestException(`Website with this domain already exists (${existingWebsite.url})`)
     }
 
+    // Domain ownership must be proven before the site can sell. Mint a
+    // cryptographically random token now; the publisher publishes it as a
+    // DNS TXT record and the worker validates it.
+    const verificationToken = generateVerificationToken()
+
     const website = await this.prisma.website.create({
       data: {
         url: dto.url,
@@ -47,6 +55,9 @@ export class WebsitesService {
           traffic: dto.monthlyTraffic,
         },
         publisherId,
+        verificationStatus: "PENDING_VERIFICATION",
+        verificationMethod: "DNS_TXT",
+        verificationToken,
       },
     })
 
@@ -83,8 +94,62 @@ export class WebsitesService {
       userId: user.id,
       organizationId,
     })
+    await this.audit.log({
+      action: "WEBSITE_VERIFICATION_CREATED",
+      entityType: "Website",
+      entityId: website.id,
+      metadata: { domain, publisherId, organizationId, method: "DNS_TXT" },
+      userId: user.id,
+      organizationId,
+    })
 
     return website
+  }
+
+  // Returns the DNS record the publisher must publish + the current status.
+  // Enqueues the actual DNS check — lookups never run in the request path.
+  async requestVerification(publisherId: string, organizationId: string, id: string, user: any) {
+    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    if (!publisher || publisher.organizationId !== organizationId) {
+      throw new NotFoundException("Publisher not found")
+    }
+    const website = await this.prisma.website.findFirst({ where: { id, publisherId } })
+    if (!website) throw new NotFoundException("Website not found")
+    if (website.verificationStatus === "VERIFIED") {
+      throw new BadRequestException("Website is already verified")
+    }
+    if (!website.verificationToken) {
+      throw new BadRequestException("This website has no verification token")
+    }
+
+    await this.audit.log({
+      action: "WEBSITE_VERIFICATION_REQUESTED",
+      entityType: "Website",
+      entityId: website.id,
+      metadata: { domain: website.domain, publisherId, organizationId },
+      userId: user.id,
+      organizationId,
+    })
+
+    // Enqueue the DNS check. jobId dedupes rapid re-clicks within the window
+    // so a publisher can't spam-trigger lookups.
+    await this.queue.addJob(
+      QUEUES.WEBSITE_VERIFICATION,
+      "website-verify",
+      { websiteId: website.id, actorUserId: user.id },
+      { jobId: `website-verify-${website.id}`, removeOnComplete: { count: 50 }, removeOnFail: { count: 50 } },
+    )
+
+    return {
+      status: website.verificationStatus,
+      verificationStatus: website.verificationStatus,
+      instructions: {
+        type: "DNS_TXT",
+        host: "@",
+        value: verificationTxtValue(website.verificationToken),
+        note: "Add this as a TXT record on your root domain (and optionally www). DNS changes can take up to 48 hours to propagate. Click Verify after adding it.",
+      },
+    }
   }
 
   async updateWebsite(publisherId: string, organizationId: string, id: string, dto: UpdateWebsiteDto, user: any) {

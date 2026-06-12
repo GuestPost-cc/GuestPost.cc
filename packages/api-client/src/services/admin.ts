@@ -235,8 +235,8 @@ export class AdminService {
     return this.client.post<{ id: string; slug: string; status: string }>("/admin/marketplace/listings", { json: data })
   }
 
-  updateListingStatus(listingId: string, status: string) {
-    return this.client.patch(`/admin/marketplace/listings/${listingId}/status`, { json: { status } })
+  updateListingStatus(listingId: string, status: string, force?: boolean) {
+    return this.client.patch(`/admin/marketplace/listings/${listingId}/status`, { json: { status, force } })
   }
 
   toggleListingFeatured(listingId: string, featured: boolean) {

@@ -279,6 +279,23 @@ export const MembershipStatus = {
 export type MembershipStatus = (typeof MembershipStatus)[keyof typeof MembershipStatus]
 
 
+export const WebsiteVerificationStatus = {
+  PENDING_VERIFICATION: 'PENDING_VERIFICATION',
+  VERIFIED: 'VERIFIED',
+  VERIFICATION_FAILED: 'VERIFICATION_FAILED',
+  REVOKED: 'REVOKED'
+} as const
+
+export type WebsiteVerificationStatus = (typeof WebsiteVerificationStatus)[keyof typeof WebsiteVerificationStatus]
+
+
+export const VerificationMethod = {
+  DNS_TXT: 'DNS_TXT'
+} as const
+
+export type VerificationMethod = (typeof VerificationMethod)[keyof typeof VerificationMethod]
+
+
 export const SettlementApprovalType = {
   CUSTOMER: 'CUSTOMER',
   ADMIN: 'ADMIN'

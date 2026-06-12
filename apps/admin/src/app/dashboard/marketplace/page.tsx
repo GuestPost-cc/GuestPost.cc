@@ -65,7 +65,17 @@ interface Listing {
   category?: { name: string }
   organization?: { name: string }
   publisher?: { name: string }
+  websiteVerificationStatus?: string | null
+  websiteVerifiedAt?: string | null
+  websiteDomain?: string | null
   createdAt: string
+}
+
+const verifyBadge: Record<string, string> = {
+  VERIFIED: "bg-green-100 text-green-800",
+  PENDING_VERIFICATION: "bg-yellow-100 text-yellow-800",
+  VERIFICATION_FAILED: "bg-red-100 text-red-800",
+  REVOKED: "bg-red-100 text-red-800",
 }
 
 const statusColors: Record<string, string> = {
@@ -151,14 +161,25 @@ export default function AdminMarketplacePage() {
     )
   }
 
+  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
+
   const updateStatus = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      api.admin.updateListingStatus(id, status),
+    mutationFn: ({ id, status, force }: { id: string; status: string; force?: boolean }) =>
+      api.admin.updateListingStatus(id, status, force),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
       toast.success("Listing status updated")
     },
-    onError: () => toast.error("Failed to update status"),
+    onError: (err: any) => {
+      // API blocks approval of listings whose website isn't VERIFIED.
+      const body = err?.response?.body || err?.body || err
+      const code = body?.code || body?.message?.code
+      if (code === "WEBSITE_NOT_VERIFIED" || String(err?.message).includes("WEBSITE_NOT_VERIFIED")) {
+        toast.error("Domain not verified — publisher must verify ownership before this listing can be approved.")
+      } else {
+        toast.error(err?.message || "Failed to update status")
+      }
+    },
   })
 
   const toggleFeatured = useMutation({
@@ -357,6 +378,7 @@ export default function AdminMarketplacePage() {
               <TableHead className="w-[300px]">Listing</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Domain</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>DR</TableHead>
               <TableHead>Featured</TableHead>
@@ -369,7 +391,7 @@ export default function AdminMarketplacePage() {
             {isLoading ? (
               Array.from({ length: 10 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 9 }).map((_, j) => (
+                  {Array.from({ length: 10 }).map((_, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -378,7 +400,7 @@ export default function AdminMarketplacePage() {
               ))
             ) : listings.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   No listings found
                 </TableCell>
               </TableRow>
@@ -398,6 +420,18 @@ export default function AdminMarketplacePage() {
                     <Badge className={statusColors[listing.status] || "bg-gray-100"}>
                       {listing.status.replace("_", " ")}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {listing.websiteVerificationStatus ? (
+                      <Badge
+                        className={verifyBadge[listing.websiteVerificationStatus] || "bg-gray-100"}
+                        title={listing.websiteDomain ?? undefined}
+                      >
+                        {listing.websiteVerificationStatus.replace("_VERIFICATION", "").replace("_", " ")}
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Platform</span>
+                    )}
                   </TableCell>
                   <TableCell>{formatPrice(listing.price, listing.currency)}</TableCell>
                   <TableCell>{listing.domainRating || "-"}</TableCell>
@@ -456,16 +490,43 @@ export default function AdminMarketplacePage() {
                         </DropdownMenuItem>
                         {listing.status !== "ARCHIVED" && (
                           <>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                updateStatus.mutate({
-                                  id: listing.id,
-                                  status: "APPROVED",
-                                })
+                            {(() => {
+                              const blocked =
+                                !!listing.websiteVerificationStatus &&
+                                listing.websiteVerificationStatus !== "VERIFIED"
+                              if (blocked) {
+                                return (
+                                  <>
+                                    <DropdownMenuItem disabled className="text-muted-foreground">
+                                      Approve (domain not verified)
+                                    </DropdownMenuItem>
+                                    {isSuperAdmin && (
+                                      <DropdownMenuItem
+                                        className="text-amber-600"
+                                        onClick={() => {
+                                          if (
+                                            confirm(
+                                              "Emergency override: approve this listing even though the domain is NOT verified? This is audited.",
+                                            )
+                                          ) {
+                                            updateStatus.mutate({ id: listing.id, status: "APPROVED", force: true })
+                                          }
+                                        }}
+                                      >
+                                        Force approve (emergency)
+                                      </DropdownMenuItem>
+                                    )}
+                                  </>
+                                )
                               }
-                            >
-                              Approve
-                            </DropdownMenuItem>
+                              return (
+                                <DropdownMenuItem
+                                  onClick={() => updateStatus.mutate({ id: listing.id, status: "APPROVED" })}
+                                >
+                                  Approve
+                                </DropdownMenuItem>
+                              )
+                            })()}
                             <DropdownMenuItem
                               onClick={() =>
                                 updateStatus.mutate({

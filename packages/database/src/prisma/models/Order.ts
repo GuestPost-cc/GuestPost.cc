@@ -1110,14 +1110,6 @@ export type EnumPaymentStatusFieldUpdateOperationsInput = {
   set?: $Enums.PaymentStatus
 }
 
-export type IntFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type OrderCreateNestedManyWithoutCampaignInput = {
   create?: Prisma.XOR<Prisma.OrderCreateWithoutCampaignInput, Prisma.OrderUncheckedCreateWithoutCampaignInput> | Prisma.OrderCreateWithoutCampaignInput[] | Prisma.OrderUncheckedCreateWithoutCampaignInput[]
   connectOrCreate?: Prisma.OrderCreateOrConnectWithoutCampaignInput | Prisma.OrderCreateOrConnectWithoutCampaignInput[]

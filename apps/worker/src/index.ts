@@ -10,6 +10,7 @@ import { createNotificationWorker } from "./processors/notification.processor"
 import { createVerificationWorker } from "./processors/verification.processor"
 import { createPayoutWorker } from "./processors/payout.processor"
 import { createReconciliationWorker } from "./processors/reconciliation.processor"
+import { createWebsiteVerificationWorker } from "./processors/website-verification.processor"
 import { connection } from "./redis"
 import { prisma } from "@guestpost/database"
 import { Queue } from "bullmq"
@@ -52,6 +53,25 @@ async function registerReconciliationSweep() {
   console.log(`[WORKER] Registered reconciliation sweep (every ${everyMs / 60000}m)`)
 }
 
+// Domain re-verification sweep — every VERIFIED site is re-checked every 30d
+// and REVOKED if its TXT record vanished. Trust must decay, not persist forever.
+async function registerWebsiteReverifySweep() {
+  const everyMs = Math.max(Number(process.env.WEBSITE_REVERIFY_DAYS ?? 30), 1) * 24 * 60 * 60 * 1000
+  const queue = new Queue(QUEUES.WEBSITE_VERIFICATION, { connection })
+  await queue.add(
+    "website-reverify-sweep",
+    signJobPayload({}),
+    {
+      repeat: { every: everyMs },
+      jobId: "website-reverify-sweep",
+      removeOnComplete: { count: 12 },
+      removeOnFail: { count: 12 },
+    },
+  )
+  await queue.close()
+  console.log(`[WORKER] Registered website re-verify sweep (every ${everyMs / 86400000}d)`)
+}
+
 async function checkConnections() {
   try {
     await connection.ping()
@@ -78,6 +98,7 @@ checkConnections().then(() => {
     createVerificationWorker(),
     createPayoutWorker(),
     createReconciliationWorker(),
+    createWebsiteVerificationWorker(),
   )
   console.log(`[WORKER] Started ${workers.length} workers`)
   registerPayoutStatusPoll().catch((err) => {
@@ -85,6 +106,9 @@ checkConnections().then(() => {
   })
   registerReconciliationSweep().catch((err) => {
     console.error("[WORKER] Failed to register reconciliation sweep:", err)
+  })
+  registerWebsiteReverifySweep().catch((err) => {
+    console.error("[WORKER] Failed to register website re-verify sweep:", err)
   })
 })
 

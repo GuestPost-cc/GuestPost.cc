@@ -82,8 +82,10 @@ export class QueueService {
     return job
   }
 
-  async addJob<T = any>(queueName: string, jobName: string, data: T) {
-    const opts = (QUEUE_CONFIGS[queueName]?.defaultJobOptions ?? DEFAULT_JOB_OPTIONS) as JobsOptions
+  async addJob<T = any>(queueName: string, jobName: string, data: T, overrides?: JobsOptions) {
+    const base = (QUEUE_CONFIGS[queueName]?.defaultJobOptions ?? DEFAULT_JOB_OPTIONS) as JobsOptions
+    // Per-call overrides (e.g. jobId for dedupe) merge over the queue defaults.
+    const opts = { ...base, ...(overrides ?? {}) }
     // Every job is HMAC-signed — workers reject anything not enqueued by the
     // API (anyone with Redis network access could otherwise inject jobs)
     const payload = signJobPayload(data as Record<string, unknown>)

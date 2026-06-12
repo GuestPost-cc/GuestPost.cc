@@ -22,4 +22,8 @@ export class PublishersService {
   submitForReview(publisherId: string, websiteId: string): Promise<any> {
     return this.client.post(`/publishers/${publisherId}/websites/${websiteId}/submit`)
   }
+
+  verifyWebsite(publisherId: string, websiteId: string): Promise<any> {
+    return this.client.post(`/publishers/${publisherId}/websites/${websiteId}/verify`)
+  }
 }

@@ -11,6 +11,7 @@ module.exports = {
   testEnvironment: "node",
   moduleNameMapper: {
     "^@guestpost/database$": "<rootDir>/../../../packages/database/src",
+    "^@guestpost/shared/dist/dns-lookup$": "<rootDir>/../../../packages/shared/src/dns-lookup",
     "^@guestpost/shared$": "<rootDir>/../../../packages/shared/src",
     "^@guestpost/auth$": "<rootDir>/../../../packages/auth/src",
   },

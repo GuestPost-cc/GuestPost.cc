@@ -406,8 +406,13 @@ export class AdminController {
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Patch("marketplace/listings/:id/status")
-  updateListingStatus(@Param("id") id: string, @Body("status") status: string, @CurrentUser() user: any) {
-    return this.admin.updateListingStatus(id, status, user)
+  updateListingStatus(
+    @Param("id") id: string,
+    @Body("status") status: string,
+    @Body("force") force: boolean,
+    @CurrentUser() user: any,
+  ) {
+    return this.admin.updateListingStatus(id, status, user, force)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")

@@ -70,6 +70,17 @@ export class WebsitesController {
    }
 
    @MemberRoles("PUBLISHER_OWNER")
+   @Post(":id/verify")
+   async requestVerification(
+     @Param("publisherId") publisherId: string,
+     @Param("id") id: string,
+     @CurrentUser() user: any
+   ) {
+     const resolvedPublisherId = this.resolvePublisherId(publisherId, user);
+     return this.websitesService.requestVerification(resolvedPublisherId, user.publisherOrganizationId, id, user);
+   }
+
+   @MemberRoles("PUBLISHER_OWNER")
    @Post(":id/submit")
    async submitForReview(
      @Param("publisherId") publisherId: string,

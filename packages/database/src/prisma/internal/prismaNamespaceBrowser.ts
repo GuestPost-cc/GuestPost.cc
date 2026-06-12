@@ -282,6 +282,13 @@ export const WebsiteScalarFieldEnum = {
   isActive: 'isActive',
   publisherId: 'publisherId',
   ownershipType: 'ownershipType',
+  verificationStatus: 'verificationStatus',
+  verificationMethod: 'verificationMethod',
+  verificationToken: 'verificationToken',
+  verifiedAt: 'verifiedAt',
+  lastVerificationCheckAt: 'lastVerificationCheckAt',
+  verificationFailureReason: 'verificationFailureReason',
+  verificationVersion: 'verificationVersion',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

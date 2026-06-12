@@ -19,6 +19,10 @@ import {
   ExternalLink,
   Star,
   CheckCircle,
+  ShieldCheck,
+  ShieldAlert,
+  ShieldX,
+  Copy,
 } from "lucide-react"
 import {
   Table,
@@ -71,6 +75,23 @@ interface Website {
   price?: number
   niche?: string
   status: "ACTIVE" | "ARCHIVED" | "PENDING"
+  verificationStatus?: "PENDING_VERIFICATION" | "VERIFIED" | "VERIFICATION_FAILED" | "REVOKED"
+  verifiedAt?: string | null
+  verificationFailureReason?: string | null
+}
+
+interface VerifyInstructions {
+  type: string
+  host: string
+  value: string
+  note?: string
+}
+
+const VERIFY_BADGE: Record<string, { label: string; variant: any; Icon: any }> = {
+  VERIFIED: { label: "Verified", variant: "success", Icon: ShieldCheck },
+  PENDING_VERIFICATION: { label: "Pending", variant: "warning", Icon: ShieldAlert },
+  VERIFICATION_FAILED: { label: "Failed", variant: "destructive", Icon: ShieldX },
+  REVOKED: { label: "Revoked", variant: "destructive", Icon: ShieldX },
 }
 
 function WebsiteForm({
@@ -216,6 +237,8 @@ export default function WebsitesPage() {
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [editingWebsite, setEditingWebsite] = useState<Website | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [verifyTarget, setVerifyTarget] = useState<Website | null>(null)
+  const [verifyInstructions, setVerifyInstructions] = useState<VerifyInstructions | null>(null)
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const publisherId = user?.publisherId
@@ -236,6 +259,9 @@ export default function WebsitesPage() {
         niche: s.category || "",
         status: s.isActive ? "ACTIVE" : "ARCHIVED",
         marketplaceStatus: s.marketplaceListings?.[0]?.status || "PENDING",
+        verificationStatus: s.verificationStatus || "PENDING_VERIFICATION",
+        verifiedAt: s.verifiedAt || null,
+        verificationFailureReason: s.verificationFailureReason || null,
       })) as (Website & { marketplaceStatus: string })[]
     },
   })
@@ -296,6 +322,23 @@ export default function WebsitesPage() {
     },
     onError: () => {
       toast.error("Failed to submit website")
+    },
+  })
+
+  const verifyMutation = useMutation({
+    mutationFn: async (site: Website) => {
+      if (!publisherId) throw new Error("Not authenticated")
+      const res = await api.publishers.verifyWebsite(publisherId, site.id)
+      return res as { instructions: VerifyInstructions }
+    },
+    onSuccess: (res, site) => {
+      setVerifyTarget(site)
+      setVerifyInstructions(res.instructions)
+      queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
+      toast.success("Verification queued — add the TXT record below, then check back shortly")
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to start verification")
     },
   })
 
@@ -412,6 +455,7 @@ export default function WebsitesPage() {
                 <TableHead>Language</TableHead>
                 <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Verification</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -463,8 +507,30 @@ export default function WebsitesPage() {
                       {site.status}
                     </Badge>
                   </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const v = VERIFY_BADGE[site.verificationStatus ?? "PENDING_VERIFICATION"]
+                      return (
+                        <Badge variant={v.variant} className="gap-1" title={site.verificationFailureReason ?? undefined}>
+                          <v.Icon className="h-3 w-3" />
+                          {v.label}
+                        </Badge>
+                      )
+                    })()}
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      {site.verificationStatus !== "VERIFIED" && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Verify domain ownership (DNS TXT)"
+                          disabled={verifyMutation.isPending}
+                          onClick={() => verifyMutation.mutate(site)}
+                        >
+                          <ShieldCheck className="h-4 w-4" />
+                        </Button>
+                      )}
                       {site.marketplaceStatus === "DRAFT" && (
                         <Button
                           variant="ghost"
@@ -524,6 +590,81 @@ export default function WebsitesPage() {
             : undefined
         }
       />
+
+      <Dialog
+        open={!!verifyInstructions}
+        onOpenChange={(open) => {
+          if (!open) {
+            setVerifyInstructions(null)
+            setVerifyTarget(null)
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Verify domain ownership</DialogTitle>
+          </DialogHeader>
+          {verifyInstructions && (
+            <div className="space-y-4 text-sm">
+              <p className="text-muted-foreground">
+                Prove you control <span className="font-medium text-foreground">{verifyTarget?.url}</span> by
+                adding this DNS <span className="font-medium text-foreground">TXT</span> record at your domain
+                registrar.
+              </p>
+              <div className="space-y-2 rounded-lg border bg-muted/40 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Type</span>
+                  <code className="font-mono">{verifyInstructions.type}</code>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Host / Name</span>
+                  <code className="font-mono">{verifyInstructions.host}</code>
+                </div>
+                <div className="flex items-start justify-between gap-2">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Value</span>
+                  <div className="flex items-center gap-2">
+                    <code className="break-all font-mono text-right">{verifyInstructions.value}</code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Copy value"
+                      onClick={() => {
+                        navigator.clipboard.writeText(verifyInstructions.value)
+                        toast.success("Copied TXT value")
+                      }}
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {verifyInstructions.note ??
+                  "DNS changes can take up to 48 hours to propagate. We re-check automatically when you click Verify."}
+              </p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setVerifyInstructions(null)
+                setVerifyTarget(null)
+              }}
+            >
+              Close
+            </Button>
+            {verifyTarget && (
+              <Button
+                disabled={verifyMutation.isPending}
+                onClick={() => verifyMutation.mutate(verifyTarget)}
+              >
+                Re-check now
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

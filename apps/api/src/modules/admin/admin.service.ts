@@ -396,6 +396,7 @@ export class AdminService {
           category: { select: { name: true } },
           organization: { select: { name: true } },
           publisher: { select: { name: true } },
+          website: { select: { verificationStatus: true, verifiedAt: true, domain: true } },
         },
       }),
       this.prisma.marketplaceListing.count({ where }),
@@ -417,6 +418,10 @@ export class AdminService {
         category: l.category,
         organization: l.organization,
         publisher: l.publisher,
+        // null for platform/service listings with no attached website
+        websiteVerificationStatus: l.website?.verificationStatus ?? null,
+        websiteVerifiedAt: l.website?.verifiedAt?.toISOString() ?? null,
+        websiteDomain: l.website?.domain ?? null,
         createdAt: l.createdAt.toISOString(),
       })),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
@@ -438,15 +443,36 @@ export class AdminService {
     }
   }
 
-  async updateListingStatus(id: string, status: string, user: any) {
+  async updateListingStatus(id: string, status: string, user: any, force = false) {
     if (!Object.values(ListingStatus).includes(status as ListingStatus)) {
       throw new BadRequestException(`Invalid listing status: ${status}`)
     }
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id },
-      include: { publisher: { select: { email: true } } },
+      include: { publisher: { select: { email: true } }, website: { select: { verificationStatus: true, domain: true } } },
     })
     if (!listing) throw new NotFoundException("Listing not found")
+
+    // Domain ownership gate: a publisher listing cannot be APPROVED until its
+    // website is VERIFIED. Platform listings have no website (or a VERIFIED one)
+    // and pass through. Only SUPER_ADMIN may emergency-override, and the bypass
+    // is audited.
+    if (status === ListingStatus.APPROVED && listing.website && listing.website.verificationStatus !== "VERIFIED") {
+      if (!(force && user.role === "SUPER_ADMIN")) {
+        throw new BadRequestException({
+          code: "WEBSITE_NOT_VERIFIED",
+          message: `Cannot approve: website ${listing.website.domain ?? ""} is ${listing.website.verificationStatus}, not VERIFIED.`,
+        })
+      }
+      await this.audit.log({
+        action: "WEBSITE_VERIFICATION_OVERRIDE",
+        entityType: "MarketplaceListing",
+        entityId: id,
+        metadata: { domain: listing.website.domain, websiteStatus: listing.website.verificationStatus, reason: "SUPER_ADMIN emergency approval" },
+        userId: user.id,
+        organizationId: listing.organizationId ?? null,
+      })
+    }
 
     const updated = await this.prisma.marketplaceListing.update({
       where: { id },
