@@ -28,7 +28,10 @@ export interface PaginationParams {
 export class CampaignsService {
   constructor(private client: HttpClient) {}
 
-  createCampaign(data: { name: string; description?: string; organizationId: string }) {
+  // organizationId is derived server-side from the session — sending it is
+  // both rejected (forbidNonWhitelisted) and the tenant-escape-shaped field
+  // a client must never control.
+  createCampaign(data: { name: string; description?: string }) {
     return this.client.post<{ id: string; name: string }>("/campaigns", { json: data })
   }
 

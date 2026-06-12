@@ -25,6 +25,8 @@ export interface MarketplaceListing {
   featured: boolean
   verified: boolean
   websiteUrl?: string
+  // Fulfillment website — order items must reference this, not the listing id
+  websiteId?: string | null
   sampleUrl?: string
   category?: { id: string; name: string; slug: string }
   tags: Array<{ id: string; name: string; slug: string }>
@@ -170,8 +172,35 @@ export class MarketplaceService {
     return this.client.delete(`/marketplace/listings/${listingId}`)
   }
 
-  searchPublishers(params?: { category?: string; language?: string; country?: string; search?: string }): Promise<Array<{ id: string; name: string; websiteUrl: string; domainRating: number }>> {
-    return this.client.get("/marketplace/search", { params: params as Record<string, string | undefined> })
+  // Order-flow website picker. Built on the real listings endpoint and
+  // normalized to a flat array — the raw /marketplace/search route returns a
+  // {listings, pagination} envelope (and filters a listing type nothing
+  // uses), which crashed callers that expected an array.
+  // Returned `id` is the WEBSITE id (order items reference websites).
+  async searchPublishers(params?: { category?: string; language?: string; country?: string; search?: string }) {
+    const res = await this.searchListings({
+      query: params?.search,
+      category: params?.category,
+      language: params?.language,
+      country: params?.country,
+      limit: 50,
+    })
+    const seen = new Set<string>()
+    const out: Array<{ id: string; name: string; websiteUrl: string; domainRating: number; category?: string; language?: string; country?: string }> = []
+    for (const l of res.listings ?? []) {
+      if (!l.websiteId || seen.has(l.websiteId)) continue
+      seen.add(l.websiteId)
+      out.push({
+        id: l.websiteId,
+        name: l.title,
+        websiteUrl: l.websiteUrl ?? "",
+        domainRating: l.domainRating ?? 0,
+        category: l.category?.name,
+        language: l.language,
+        country: l.country,
+      })
+    }
+    return out
   }
 
 

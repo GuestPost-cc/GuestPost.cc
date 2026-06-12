@@ -52,7 +52,9 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 
 const createCampaignSchema = z.object({
-  name: z.string().min(1, "Campaign name is required").max(100),
+  // Mirrors CreateCampaignDto (MinLength 3 / MaxLength 200) so users get an
+  // inline message instead of a server 400
+  name: z.string().min(3, "Campaign name must be at least 3 characters").max(200),
 })
 
 type CreateCampaignForm = z.infer<typeof createCampaignSchema>
@@ -117,7 +119,7 @@ export default function CampaignsPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string }) => api.campaigns.createCampaign({ ...data, organizationId: user?.organizationId || "" }),
+    mutationFn: (data: { name: string }) => api.campaigns.createCampaign(data),
     onSuccess: () => {
       toast.success("Campaign created successfully")
       queryClient.invalidateQueries({ queryKey: ["campaigns"] })
@@ -172,7 +174,7 @@ export default function CampaignsPage() {
 
   const duplicateMutation = useMutation({
     mutationFn: (c: Campaign) =>
-      api.campaigns.createCampaign({ name: `${c.name} (copy)`, organizationId: user?.organizationId || "" }),
+      api.campaigns.createCampaign({ name: `${c.name} (copy)`.slice(0, 200) }),
     onSuccess: () => {
       toast.success("Campaign duplicated")
       queryClient.invalidateQueries({ queryKey: ["campaigns"] })

@@ -1,17 +1,23 @@
 import type { OrderStatus, ServiceType, OrderEventType } from "@guestpost/shared"
 import { HttpClient } from "../client"
 
+// Mirrors CreateOrderDto exactly — the API whitelists properties, so any
+// extra field is a 400. Service type/title/instructions live on the ORDER;
+// items carry only website + link targeting. Prices come from the listing
+// server-side and are never client-supplied.
 export interface OrderItemData {
-  websiteId: string
-  serviceType: ServiceType
-  topic?: string
-  instructions?: string
-  budget?: number
+  websiteId?: string
+  targetUrl?: string
+  anchorText?: string
 }
 
 export interface CreateOrderData {
+  type: ServiceType
+  title?: string
+  instructions?: string
   campaignId?: string
-  items: OrderItemData[]
+  idempotencyKey?: string
+  items?: OrderItemData[]
 }
 
 // Raw API shape: Order rows carry type/title/amount at the ORDER level and

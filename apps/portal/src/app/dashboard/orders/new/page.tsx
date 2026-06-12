@@ -659,15 +659,20 @@ export default function NewOrderPage() {
       return
     }
 
+    // Shape mirrors CreateOrderDto: service type/title/brief live on the
+    // order; items carry only website + link targeting. Keywords are folded
+    // into instructions so the publisher sees them.
     createMutation.mutate({
+      type: formData.serviceType as any,
+      title: formData.title,
+      instructions: [formData.brief, formData.targetKeywords ? `Target keywords: ${formData.targetKeywords}` : ""]
+        .filter(Boolean)
+        .join("\n\n")
+        .slice(0, 5000),
       campaignId: formData.campaignId,
       items: [{
-        websiteId: formData.websiteId || "",
-        serviceType: formData.serviceType as any,
-        topic: formData.title,
-        instructions: formData.brief,
-        targetKeywords: formData.targetKeywords,
-        targetUrl: formData.targetUrl,
+        websiteId: formData.websiteId || undefined,
+        targetUrl: formData.targetUrl || undefined,
       }],
     })
   }

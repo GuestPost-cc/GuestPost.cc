@@ -198,15 +198,14 @@ export default function OrdersPage() {
 
   const onSubmit = async (data: CreateOrderForm) => {
     try {
+      // Mirrors CreateOrderDto — quick-create makes a DRAFT without a
+      // website; the user picks placements before payment. Budget was a
+      // fabricated field: prices come from listings server-side.
       await api.orders.create({
+        type: data.serviceType as any,
+        title: data.topic,
+        instructions: data.instructions,
         campaignId: data.campaignId,
-        items: [{
-          serviceType: data.serviceType as any,
-          topic: data.topic,
-          instructions: data.instructions,
-          budget: data.budget,
-          websiteId: "",
-        }]
       })
       toast.success("Order created successfully")
       queryClient.invalidateQueries({ queryKey: ["orders"] })
