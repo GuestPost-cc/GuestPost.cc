@@ -98,6 +98,8 @@ export default function CampaignsPage() {
   const queryClient = useQueryClient()
   const [showCreateCampaign, setShowCreateCampaign] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  const [editTarget, setEditTarget] = useState<Campaign | null>(null)
+  const [editName, setEditName] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
 
   const { data: campaignsData, isLoading, error: campaignsError, refetch: refetchCampaigns } = useQuery({
@@ -143,6 +145,40 @@ export default function CampaignsPage() {
   const onSubmit = (data: CreateCampaignForm) => {
     createMutation.mutate({ name: data.name })
   }
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { name?: string; status?: "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED" } }) =>
+      api.campaigns.updateCampaign(id, data),
+    // Optimistic status flip — safe: status is cosmetic for existing orders
+    onMutate: async ({ id, data }) => {
+      if (!data.status) return
+      await queryClient.cancelQueries({ queryKey: ["campaigns"] })
+      const prev = queryClient.getQueryData<Campaign[]>(["campaigns"])
+      queryClient.setQueryData<Campaign[]>(["campaigns"], (old) =>
+        (old ?? []).map((c) => (c.id === id ? { ...c, status: data.status! } : c)),
+      )
+      return { prev }
+    },
+    onError: (err: Error, _vars, ctx: any) => {
+      if (ctx?.prev) queryClient.setQueryData(["campaigns"], ctx.prev)
+      toast.error(err.message || "Failed to update campaign")
+    },
+    onSuccess: () => {
+      toast.success("Campaign updated")
+      setEditTarget(null)
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ["campaigns"] }),
+  })
+
+  const duplicateMutation = useMutation({
+    mutationFn: (c: Campaign) =>
+      api.campaigns.createCampaign({ name: `${c.name} (copy)`, organizationId: user?.organizationId || "" }),
+    onSuccess: () => {
+      toast.success("Campaign duplicated")
+      queryClient.invalidateQueries({ queryKey: ["campaigns"] })
+    },
+    onError: (err: Error) => toast.error(err.message || "Failed to duplicate campaign"),
+  })
 
   const campaigns = campaignsData ?? []
   const filteredCampaigns = campaigns.filter((campaign: Campaign) =>
@@ -281,6 +317,28 @@ export default function CampaignsPage() {
                             Add Order
                           </Link>
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setEditTarget(campaign); setEditName(campaign.name) }}>
+                          <Edit className="mr-2 h-4 w-4" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => duplicateMutation.mutate(campaign)}>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Duplicate
+                        </DropdownMenuItem>
+                        {campaign.status === "ACTIVE" ? (
+                          <DropdownMenuItem onClick={() => updateMutation.mutate({ id: campaign.id, data: { status: "PAUSED" } })}>
+                            Pause
+                          </DropdownMenuItem>
+                        ) : campaign.status === "PAUSED" ? (
+                          <DropdownMenuItem onClick={() => updateMutation.mutate({ id: campaign.id, data: { status: "ACTIVE" } })}>
+                            Activate
+                          </DropdownMenuItem>
+                        ) : null}
+                        {campaign.status !== "ARCHIVED" && (
+                          <DropdownMenuItem onClick={() => updateMutation.mutate({ id: campaign.id, data: { status: "ARCHIVED" } })}>
+                            Archive
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           className="text-destructive"
@@ -350,6 +408,30 @@ export default function CampaignsPage() {
               onClick={() => showDeleteConfirm && deleteMutation.mutate(showDeleteConfirm)}
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete Campaign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Campaign</DialogTitle>
+            <DialogDescription>Orders attached to this campaign are unaffected.</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            maxLength={120}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
+            <Button
+              onClick={() => editTarget && updateMutation.mutate({ id: editTarget.id, data: { name: editName.trim() } })}
+              disabled={updateMutation.isPending || editName.trim().length < 2}
+            >
+              {updateMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -25,3 +25,5 @@ bedrock/Outputs/absorb-manifest.md
 bedrock/.obsidian/workspace
 bedrock/.obsidian/workspace.json
 bedrock/.obsidian/workspaces.json
+scripts/.wise-validation-key*
+test-results/

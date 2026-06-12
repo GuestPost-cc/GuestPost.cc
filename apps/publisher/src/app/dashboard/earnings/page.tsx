@@ -20,7 +20,7 @@ import {
   Filter,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
+import { Button, downloadCsv } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
 import { Skeleton } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
@@ -140,25 +140,18 @@ export default function EarningsPage() {
   }
 
   const handleExport = (txns: any[]) => {
-    const csv = [
-      ["Date", "Description", "Type", "Status", "Amount"].join(","),
-      ...txns.map((t: any) =>
-        [
-          new Date(t.createdAt).toISOString().split("T")[0],
-          `"${(t.description || "").replace(/"/g, '""')}"`,
-          t.type,
-          t.status,
-          t.amount,
-        ].join(","),
-      ),
-    ].join("\n")
-    const blob = new Blob([csv], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `earnings-export-${new Date().toISOString().split("T")[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    // downloadCsv neutralizes spreadsheet formula injection in descriptions
+    downloadCsv(
+      `earnings-export-${new Date().toISOString().split("T")[0]}.csv`,
+      ["Date", "Description", "Type", "Status", "Amount"],
+      txns.map((t: any) => [
+        new Date(t.createdAt).toISOString().split("T")[0],
+        t.description || "",
+        t.type,
+        t.status,
+        t.amount,
+      ]),
+    )
     toast.success("Earnings exported")
   }
 

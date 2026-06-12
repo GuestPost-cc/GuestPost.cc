@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: guestpost
+          POSTGRES_PASSWORD: guestpost
+          POSTGRES_DB: guestpost
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U guestpost"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://guestpost:guestpost@localhost:5432/guestpost?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-only-jwt-secret-not-used-in-prod-0123456789
+      QUEUE_SIGNING_SECRET: ci-only-queue-secret-not-used-in-prod-012345
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.5.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+        working-directory: packages/database
+
+      - name: Build all targets
+        run: pnpm build
+
+      - name: API unit tests
+        run: pnpm test
+        working-directory: apps/api
+
+      - name: UI component tests (coverage)
+        run: pnpm test:coverage
+        working-directory: packages/ui
+
+      # Playwright journeys need the full app stack; they run in the
+      # heavier nightly job / locally via `npx playwright test`.

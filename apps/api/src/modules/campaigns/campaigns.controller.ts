@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, Delete, UseGuards } from "@nestjs/common"
+import { Controller, Get, Post, Patch, Body, Param, Query, Delete, UseGuards } from "@nestjs/common"
 
 const parsePagination = (take?: string, skip?: string) => ({
   take: Math.min(Math.max(take ? parseInt(take, 10) || 50 : 50, 1), 100),
@@ -98,6 +98,21 @@ export class CampaignsController {
   listCampaignOrders(@Param("id") id: string, @CurrentUser() user: any, @Query("take") take?: string, @Query("skip") skip?: string) {
     const { take: t, skip: s } = parsePagination(take, skip)
     return this.campaigns.listCampaignOrders(id, user.organizationId, t, s)
+  }
+
+  @Patch(":id")
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("OWNER", "MEMBER")
+  updateCampaign(
+    @Param("id") id: string,
+    @Body() body: { name?: string; description?: string; status?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.campaigns.updateCampaign(id, user.organizationId, user.id, {
+      name: typeof body.name === "string" ? body.name.trim().slice(0, 120) : undefined,
+      description: typeof body.description === "string" ? body.description.slice(0, 2000) : undefined,
+      status: body.status,
+    })
   }
 
   @Delete(":id")

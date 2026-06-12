@@ -27,6 +27,7 @@
   "license": "ISC",
   "packageManager": "pnpm@11.5.1",
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "concurrently": "^10.0.3",
     "tsx": "^4.22.4",
     "turbo": "^2.9.16"

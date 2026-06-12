@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common"
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { OrdersService } from "../orders/orders.service"
@@ -167,6 +167,47 @@ export class CampaignsService {
       this.prisma.order.count({ where }),
     ])
     return { items, total, take, skip }
+  }
+
+  // Org-scoped partial update. Status changes never touch orders — a PAUSED
+  // or ARCHIVED campaign's existing orders continue their lifecycle; only
+  // new-order attachment is a frontend concern.
+  async updateCampaign(
+    id: string,
+    organizationId: string,
+    userId: string,
+    data: { name?: string; description?: string; status?: string },
+  ) {
+    const campaign = await this.prisma.campaign.findFirst({ where: { id, organizationId } })
+    if (!campaign) throw new NotFoundException("Campaign not found")
+
+    const VALID_STATUSES = ["ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"]
+    if (data.status && !VALID_STATUSES.includes(data.status)) {
+      throw new BadRequestException(`Invalid status — must be one of ${VALID_STATUSES.join(", ")}`)
+    }
+
+    const updated = await this.prisma.campaign.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.status !== undefined ? { status: data.status as any } : {}),
+      },
+    })
+
+    await this.audit.log({
+      action: "CAMPAIGN_UPDATED",
+      entityType: "Campaign",
+      entityId: id,
+      metadata: {
+        changes: data,
+        previous: { name: campaign.name, status: campaign.status },
+      },
+      userId,
+      organizationId,
+    })
+
+    return updated
   }
 
   async deleteCampaign(id: string, organizationId: string, userId: string) {

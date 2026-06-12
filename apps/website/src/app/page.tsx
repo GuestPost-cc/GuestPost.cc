@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Button } from "@guestpost/ui"
+import { SiteHeader, SiteFooter, PORTAL_URL, PUBLISHER_URL } from "../components/site-chrome"
 import { 
   Shield, 
   Zap, 
@@ -15,7 +16,7 @@ import {
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <Header />
+      <SiteHeader />
       <main>
         <Hero />
         <TrustedBy />
@@ -25,45 +26,8 @@ export default function HomePage() {
         <Testimonials />
         <CTA />
       </main>
-      <Footer />
+      <SiteFooter />
     </div>
-  )
-}
-
-function Header() {
-  return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-16 items-center justify-between">
-        <Link href="/" className="flex items-center gap-2 text-xl font-bold tracking-tight">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Globe className="h-5 w-5" />
-          </div>
-          GuestPost
-        </Link>
-        <nav className="flex items-center gap-8">
-          <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Features
-          </Link>
-          <Link href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            How It Works
-          </Link>
-          <Link href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Pricing
-          </Link>
-          <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Blog
-          </Link>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild>
-              <a href="http://localhost:3002">Publisher Login</a>
-            </Button>
-            <Button size="sm" asChild>
-              <a href="http://localhost:3001">Start Free Trial</a>
-            </Button>
-          </div>
-        </nav>
-      </div>
-    </header>
   )
 }
 
@@ -424,57 +388,3 @@ function CTA() {
   )
 }
 
-function Footer() {
-  return (
-    <footer className="border-t py-16">
-      <div className="container">
-        <div className="grid gap-12 md:grid-cols-4">
-          <div>
-            <div className="flex items-center gap-2 text-xl font-bold mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Globe className="h-5 w-5" />
-              </div>
-              GuestPost
-            </div>
-            <p className="text-sm text-muted-foreground max-w-xs">
-              Premium guest post placement service trusted by SEO professionals worldwide.
-            </p>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Product</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="#features" className="hover:text-foreground">Features</Link></li>
-              <li><Link href="#pricing" className="hover:text-foreground">Pricing</Link></li>
-              <li><Link href="#" className="hover:text-foreground">Publisher Network</Link></li>
-              <li><Link href="#" className="hover:text-foreground">Case Studies</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Company</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="#" className="hover:text-foreground">About</Link></li>
-              <li><Link href="/blog" className="hover:text-foreground">Blog</Link></li>
-              <li><Link href="#" className="hover:text-foreground">Careers</Link></li>
-              <li><Link href="#" className="hover:text-foreground">Contact</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link href="#" className="hover:text-foreground">Privacy Policy</Link></li>
-              <li><Link href="#" className="hover:text-foreground">Terms of Service</Link></li>
-              <li><Link href="#" className="hover:text-foreground">Refund Policy</Link></li>
-            </ul>
-          </div>
-        </div>
-        <div className="mt-12 pt-8 border-t flex items-center justify-between text-sm text-muted-foreground">
-          <span>&copy; 2026 GuestPost. All rights reserved.</span>
-          <div className="flex gap-6">
-            <Link href="#" className="hover:text-foreground">Twitter</Link>
-            <Link href="#" className="hover:text-foreground">LinkedIn</Link>
-          </div>
-        </div>
-      </div>
-    </footer>
-  )
-}

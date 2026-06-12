@@ -4,7 +4,7 @@ import { useState, useMemo } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
+import { Button, downloadCsv } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
 import { Skeleton, ErrorState } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
@@ -188,14 +188,9 @@ export default function ReportsPage() {
       ]
     })
 
-    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(",")).join("\n")
-    const blob = new Blob([csv], { type: "text/csv" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `guestpost-report-${format(new Date(), "yyyy-MM-dd")}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    // downloadCsv neutralizes formula injection — anchor text and target
+    // URLs are user-supplied and must never round-trip as spreadsheet formulas
+    downloadCsv(`guestpost-report-${format(new Date(), "yyyy-MM-dd")}.csv`, headers, rows)
     toast.success("Report exported to CSV")
   }
 

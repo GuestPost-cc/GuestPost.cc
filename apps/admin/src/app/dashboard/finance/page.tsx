@@ -1,6 +1,6 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@guestpost/ui"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, downloadCsv } from "@guestpost/ui"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { format } from "date-fns"
@@ -195,6 +195,22 @@ function FinancePageInner() {
 
       {activeTab === "settlements" && (
         <Card>
+          <div className="flex justify-end border-b px-4 py-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={settlements.length === 0}
+              onClick={() =>
+                downloadCsv(
+                  `settlements-${new Date().toISOString().slice(0, 10)}.csv`,
+                  ["id", "orderId", "publisher", "grossAmount", "status", "createdAt"],
+                  settlements.map((s: any) => [s.id, s.orderId, s.publisher?.name ?? s.publisherId, Number(s.grossAmount ?? s.amount ?? 0).toFixed(2), s.status, s.createdAt]),
+                )
+              }
+            >
+              Export CSV
+            </Button>
+          </div>
           <CardContent className="p-0">
             {settlementsQ.isLoading ? <LoadingRows /> :
              settlementsQ.error ? <ErrorBlock label="Failed to load settlements" onRetry={() => settlementsQ.refetch()} /> :
@@ -240,6 +256,22 @@ function FinancePageInner() {
 
       {activeTab === "withdrawals" && (
         <Card>
+          <div className="flex justify-end border-b px-4 py-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={withdrawals.length === 0}
+              onClick={() =>
+                downloadCsv(
+                  `withdrawals-${new Date().toISOString().slice(0, 10)}.csv`,
+                  ["id", "publisher", "amount", "status", "createdAt"],
+                  withdrawals.map((w: any) => [w.id, w.publisher?.name ?? w.publisherId, Number(w.amount ?? 0).toFixed(2), w.status, w.createdAt]),
+                )
+              }
+            >
+              Export CSV
+            </Button>
+          </div>
           <CardContent className="p-0">
             {withdrawalsQ.isLoading ? <LoadingRows /> :
              withdrawalsQ.error ? <ErrorBlock label="Failed to load withdrawals" onRetry={() => withdrawalsQ.refetch()} /> :

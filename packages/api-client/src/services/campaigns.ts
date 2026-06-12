@@ -51,6 +51,10 @@ export class CampaignsService {
     return res.items
   }
 
+  updateCampaign(id: string, data: { name?: string; description?: string; status?: "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED" }) {
+    return this.client.patch<{ id: string; name: string; status: string }>(`/campaigns/${id}`, { json: data })
+  }
+
   deleteCampaign(id: string) {
     return this.client.delete(`/campaigns/${id}`)
   }

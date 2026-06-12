@@ -1,10 +1,17 @@
 packages:
   - "apps/*"
   - "packages/*"
+# pnpm v11 build-script approvals (map form); onlyBuiltDependencies kept for
+# older pnpm compatibility.
 allowBuilds:
-  core-js: set this to true or false
+  "@nestjs/core": true
+  "@prisma/client": true
+  "@prisma/engines": true
+  prisma: true
   esbuild: true
   msgpackr-extract: true
+  sharp: true
+  core-js: false
 onlyBuiltDependencies:
   - "@nestjs/core"
   - "@prisma/client"
@@ -12,3 +19,4 @@ onlyBuiltDependencies:
   - prisma
   - esbuild
   - msgpackr-extract
+  - sharp
