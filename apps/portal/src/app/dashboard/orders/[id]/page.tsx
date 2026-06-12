@@ -200,6 +200,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     queryFn: () => api.orders.getById(resolvedParams.id) as Promise<OrderDetail>,
   })
 
+  const { data: proof } = useQuery<any>({
+    queryKey: ["order-proof", resolvedParams.id],
+    queryFn: () => api.orders.deliveryProof(resolvedParams.id),
+    enabled: !!order && ["PUBLISHED", "VERIFIED", "DELIVERED", "SETTLED", "COMPLETED", "DISPUTED"].includes(order.status),
+  })
+
   const cancelMutation = useMutation({
     mutationFn: () => api.orders.transitionStatus(resolvedParams.id, "CANCELLED"),
     onSuccess: () => {
@@ -328,6 +334,53 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
+          {proof?.hasDelivery && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-green-600" /> Delivery Proof
+                </CardTitle>
+                <CardDescription>Independently verified by the platform — no manual checking needed.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">Published URL</p>
+                  <a href={proof.publishedUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline break-all">{proof.publishedUrl}</a>
+                </div>
+                {proof.pageTitle && (
+                  <div className="space-y-1"><p className="text-sm text-muted-foreground">Page Title</p><p className="font-medium">{proof.pageTitle}</p></div>
+                )}
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Verification:</span>
+                  <StatusBadge status={proof.verificationStatus === "VERIFIED" || proof.interventionStatus === "APPROVED" || proof.interventionStatus === "OVERRIDDEN" ? "VERIFIED" : proof.verificationStatus} />
+                </div>
+                {proof.results && (
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {[
+                      ["URL Reachable", proof.results.urlReachable],
+                      ["Link Found", proof.results.linkFound],
+                      ["Target URL Matched", proof.results.targetUrlMatched],
+                      ["Anchor Verified", proof.results.anchorVerified],
+                    ].map(([label, ok]) => (
+                      <div key={label as string} className="flex items-center gap-2">
+                        {ok ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}
+                        <span className={ok ? "" : "text-muted-foreground"}>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-2">
+                  <span>Delivered by: {proof.deliveredBy}</span>
+                  {proof.submittedAt && <span>Submitted: {format(new Date(proof.submittedAt), "PPp")}</span>}
+                  {proof.verifiedAt && <span>Verified: {format(new Date(proof.verifiedAt), "PPp")}</span>}
+                  {proof.results?.checkedAt && <span>Checked: {format(new Date(proof.results.checkedAt), "PPp")}</span>}
+                </div>
+                {proof.screenshotUrl && (
+                  <a href={proof.screenshotUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">View screenshot</a>
+                )}
+              </CardContent>
+            </Card>
+          )}
           <Card>
             <CardHeader>
               <CardTitle>Order Details</CardTitle>

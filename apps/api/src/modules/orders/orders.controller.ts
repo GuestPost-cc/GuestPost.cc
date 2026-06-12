@@ -4,6 +4,7 @@ import { OrderPaymentService } from "./services/order-payment.service"
 import { OrderFulfillmentService } from "./services/order-fulfillment.service"
 import { OrderReviewService } from "./services/order-review.service"
 import { OrderDisputeService } from "./services/order-dispute.service"
+import { OrderDeliveryService } from "./services/order-delivery.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { CreateOrderDto } from "./dto/create-order.dto"
 import { AddOrderItemDto } from "./dto/add-order-item.dto"
@@ -24,6 +25,7 @@ export class OrdersController {
     private readonly fulfillment: OrderFulfillmentService,
     private readonly review: OrderReviewService,
     private readonly dispute: OrderDisputeService,
+    private readonly delivery: OrderDeliveryService,
   ) {}
 
   // ─── CRUD ─────────────────────────────────────────────────
@@ -130,6 +132,15 @@ export class OrdersController {
   @RequireOrderOwnership()
   confirmDelivery(@Param("id") id: string, @CurrentUser() user: any) {
     return this.review.confirmDelivery(id, user.organizationId, user.id)
+  }
+
+  // Customer-facing delivery proof (verification checklist, no internal evidence)
+  @Get(":id/delivery-proof")
+  @UseGuards(OrderOwnershipGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @RequireOrderOwnership()
+  deliveryProof(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.delivery.deliveryProof(id, user.organizationId)
   }
 
   @Post(":id/dispute")

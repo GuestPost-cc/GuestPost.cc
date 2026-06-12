@@ -144,6 +144,45 @@ export class OrderDeliveryService {
     })
   }
 
+  // Customer-safe delivery proof — verification results as booleans, no internal
+  // evidence (HTML hashes, object keys, fraud flags stay staff-only).
+  async deliveryProof(orderId: string, organizationId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, organizationId },
+      include: { website: { select: { ownershipType: true } } },
+    })
+    if (!order) throw new NotFoundException("Order not found")
+    if (!order.activeDeliveryVersionId) return { hasDelivery: false }
+    const version = await this.prisma.orderDeliveryVersion.findUnique({
+      where: { id: order.activeDeliveryVersionId },
+      include: { evidence: { orderBy: { createdAt: "desc" }, take: 1 } },
+    })
+    if (!version) return { hasDelivery: false }
+    const ev = version.evidence[0]
+    return {
+      hasDelivery: true,
+      publishedUrl: version.publishedUrl,
+      articleTitle: version.articleTitle,
+      screenshotUrl: version.screenshotUrl,
+      verificationStatus: version.verificationStatus,
+      interventionStatus: version.interventionStatus,
+      submittedAt: version.submittedAt,
+      deliveredBy: order.website?.ownershipType === "PLATFORM" ? "Platform" : "Publisher",
+      verifiedAt: order.verifiedAt,
+      pageTitle: ev?.pageTitle ?? null,
+      results: ev
+        ? {
+            urlReachable: ev.httpStatus >= 200 && ev.httpStatus < 400,
+            linkFound: ev.linkFound,
+            targetUrlMatched: ev.targetUrlMatched,
+            anchorVerified: ev.anchorFound,
+            verifiedAnchorText: ev.verifiedAnchorText,
+            checkedAt: ev.checkedAt,
+          }
+        : null,
+    }
+  }
+
   async getDelivery(id: string) {
     const v = await this.prisma.orderDeliveryVersion.findUnique({
       where: { id },

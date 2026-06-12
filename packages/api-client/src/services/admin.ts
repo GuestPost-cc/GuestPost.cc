@@ -255,6 +255,53 @@ export class AdminService {
     return this.client.get(`/admin/marketplace/listings/${listingId}/reviews`)
   }
 
+  // -- Delivery verification + fulfillment --
+  fulfillmentQueue() {
+    return this.client.get<any[]>("/operations/fulfillment-queue")
+  }
+  claimOrder(orderId: string) {
+    return this.client.post(`/orders/${orderId}/claim`)
+  }
+  assignOrder(orderId: string, assignedToUserId: string) {
+    return this.client.post(`/orders/${orderId}/assign`, { json: { assignedToUserId } })
+  }
+  reassignOrder(orderId: string, assignedToUserId: string) {
+    return this.client.post(`/orders/${orderId}/reassign`, { json: { assignedToUserId } })
+  }
+  submitPlatformDelivery(orderId: string, data: { publishedUrl: string; articleTitle?: string; notes?: string }) {
+    return this.client.post(`/orders/${orderId}/deliveries`, { json: data })
+  }
+  listDeliveries(orderId: string) {
+    return this.client.get<any[]>(`/orders/${orderId}/deliveries`)
+  }
+  getDelivery(deliveryId: string) {
+    return this.client.get<any>(`/deliveries/${deliveryId}`)
+  }
+  orderEvidence(orderId: string) {
+    return this.client.get<any[]>(`/orders/${orderId}/evidence`)
+  }
+  orderSnapshots(orderId: string) {
+    return this.client.get<any[]>(`/orders/${orderId}/snapshots`)
+  }
+  orderDeliveryAudit(orderId: string) {
+    return this.client.get<any[]>(`/orders/${orderId}/audit`)
+  }
+  disputeEvidence(disputeId: string) {
+    return this.client.get<any>(`/disputes/${disputeId}/evidence`)
+  }
+  reverifyDelivery(deliveryId: string) {
+    return this.client.post(`/deliveries/${deliveryId}/reverify`)
+  }
+  manualApproveDelivery(deliveryId: string, reason: string) {
+    return this.client.post(`/deliveries/${deliveryId}/manual-approve`, { json: { reason } })
+  }
+  manualRejectDelivery(deliveryId: string, reason: string) {
+    return this.client.post(`/deliveries/${deliveryId}/manual-reject`, { json: { reason } })
+  }
+  overrideDelivery(deliveryId: string, targetStatus: "VERIFIED" | "FAILED", reason: string) {
+    return this.client.post(`/deliveries/${deliveryId}/override`, { json: { targetStatus, reason } })
+  }
+
   moderateReview(reviewId: string, status: "APPROVED" | "REJECTED") {
     return this.client.patch(`/admin/marketplace/reviews/${reviewId}/moderate`, { json: { status } })
   }

@@ -211,4 +211,9 @@ export class OrdersService {
     const raw = await this.client.post<RawOrder>(`/orders/${id}/mark-published`, { json: { url } })
     return normalizeOrder(raw)
   }
+
+  // Customer-facing delivery proof (verification checklist + status).
+  deliveryProof(id: string) {
+    return this.client.get<any>(`/orders/${id}/delivery-proof`)
+  }
 }
