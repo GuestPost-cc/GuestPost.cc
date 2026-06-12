@@ -488,6 +488,9 @@ model Order {
   campaignId         String?
   idempotencyKey     String?
   version            Int           @default(0)
+  // Points at the current OrderDeliveryVersion (source of truth for delivery).
+  // Legacy publishedUrl/verifiedAt/deliveredAt are denormalized mirrors of it.
+  activeDeliveryVersionId String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -505,6 +508,9 @@ model Order {
   settlements  Settlement[]
   dispute      OrderDispute?
   platformRevenue PlatformRevenue?
+  deliveryVersions      OrderDeliveryVersion[]
+  fulfillmentAssignments FulfillmentAssignment[]
+  fraudFlags            DeliveryFraudFlag[]
 
   // Scoped per organization — a globally unique key let one tenant replay
   // another tenant's key and read their order (cross-tenant leak).
@@ -662,6 +668,141 @@ model SettlementApproval {
 
   @@unique([settlementId, type])
   @@index([settlementId])
+}
+
+// ── Order delivery: verification, evidence, fulfillment assignment ──────────
+// A delivery is not a human "done" claim. It is an immutable versioned record
+// (OrderDeliveryVersion) plus platform-captured evidence + snapshot. Settlement
+// gates on independent verification, never on the claim alone.
+
+enum FulfillmentAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  DELIVERED
+  CANCELLED
+}
+
+enum DeliveryVerificationStatus {
+  PENDING
+  VERIFIED
+  FAILED
+  MANUAL_REVIEW
+  RETRYING
+}
+
+enum DeliveryInterventionStatus {
+  NONE
+  APPROVED
+  REJECTED
+  OVERRIDDEN
+}
+
+// Platform-owned orders enter the Operations queue. Operations claims/assigns
+// and fulfills; identical downstream verification + settlement path as
+// publisher inventory (no bypass for platform inventory).
+model FulfillmentAssignment {
+  id               String                      @id @default(cuid())
+  orderId          String
+  assignedToUserId String
+  assignedByUserId String
+  assignedAt       DateTime                    @default(now())
+  completedAt      DateTime?
+  status           FulfillmentAssignmentStatus @default(ASSIGNED)
+  version          Int                         @default(0)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([orderId])
+  @@index([assignedToUserId, status])
+  @@index([status])
+}
+
+// Immutable delivery version. Revisions create NEW versions; nothing is ever
+// overwritten or deleted. Order.activeDeliveryVersionId points at the current.
+model OrderDeliveryVersion {
+  id                        String                     @id @default(cuid())
+  orderId                   String
+  version                   Int
+  publishedUrl              String
+  normalizedUrl             String
+  articleTitle              String?
+  notes                     String?
+  screenshotUrl             String?
+  submittedByUserId         String
+  submittedAt               DateTime                   @default(now())
+  verificationStatus        DeliveryVerificationStatus @default(PENDING)
+  verificationFailureReason String?
+  interventionStatus        DeliveryInterventionStatus @default(NONE)
+  supersededByVersion       Int?
+  // Optimistic-lock guard for worker/intervention transitions
+  verificationVersion       Int                        @default(0)
+  createdAt                 DateTime                   @default(now())
+
+  order    Order                          @relation(fields: [orderId], references: [id])
+  evidence DeliveryVerificationEvidence[]
+  snapshots DeliverySnapshot[]
+  fraudFlags DeliveryFraudFlag[]
+
+  @@unique([orderId, version])
+  @@index([orderId])
+  @@index([verificationStatus])
+  @@index([normalizedUrl])
+}
+
+// Immutable verification evidence — survives disputes + revisions forever.
+model DeliveryVerificationEvidence {
+  id                String   @id @default(cuid())
+  deliveryVersionId String
+  pageTitle         String?
+  metaTitle         String?
+  canonicalUrl      String?
+  resolvedUrl       String
+  httpStatus        Int
+  anchorFound       Boolean  @default(false)
+  linkFound         Boolean  @default(false)
+  targetUrlMatched  Boolean  @default(false)
+  verifiedAnchorText String?
+  verifiedTargetUrl String?
+  htmlHash          String?
+  redirectChain     Json?
+  checkedAt         DateTime @default(now())
+  createdAt         DateTime @default(now())
+
+  deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id])
+
+  @@index([deliveryVersionId])
+}
+
+// Raw HTML + headers stored permanently in object storage (MinIO dev / R2 prod).
+model DeliverySnapshot {
+  id                  String   @id @default(cuid())
+  deliveryVersionId   String
+  htmlObjectKey       String
+  screenshotObjectKey String?
+  responseHeaders     Json?
+  createdAt           DateTime @default(now())
+
+  deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id])
+
+  @@index([deliveryVersionId])
+}
+
+model DeliveryFraudFlag {
+  id                String   @id @default(cuid())
+  orderId           String
+  deliveryVersionId String
+  type              String
+  details           Json?
+  createdAt         DateTime @default(now())
+
+  order           Order                @relation(fields: [orderId], references: [id])
+  deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id])
+
+  @@index([orderId])
+  @@index([deliveryVersionId])
+  @@index([type])
 }
 
 model PublisherBalance {

@@ -6,6 +6,8 @@ import { OrderFulfillmentService } from "./services/order-fulfillment.service"
 import { OrderReviewService } from "./services/order-review.service"
 import { OrderDisputeService } from "./services/order-dispute.service"
 import { OrderOperationsService } from "./services/order-operations.service"
+import { OrderDeliveryService } from "./services/order-delivery.service"
+import { OrderFulfillmentAssignmentService } from "./services/order-fulfillment-assignment.service"
 import { RefundService } from "./services/refund.service"
 import { BillingModule } from "../billing/billing.module"
 import { QueueModule } from "../queues/queue.module"
@@ -21,8 +23,10 @@ import { AuditModule } from "../audit/audit.module"
     OrderReviewService,
     OrderDisputeService,
     OrderOperationsService,
+    OrderDeliveryService,
+    OrderFulfillmentAssignmentService,
     RefundService,
   ],
-  exports: [OrdersService, OrderDisputeService, RefundService, OrderOperationsService],
+  exports: [OrdersService, OrderDisputeService, RefundService, OrderOperationsService, OrderDeliveryService, OrderFulfillmentAssignmentService],
 })
 export class OrdersModule {}

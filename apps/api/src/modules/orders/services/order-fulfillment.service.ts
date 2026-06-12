@@ -3,6 +3,7 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
 import { QUEUES } from "@guestpost/shared"
+import { OrderDeliveryService } from "./order-delivery.service"
 
 @Injectable()
 export class OrderFulfillmentService {
@@ -10,6 +11,7 @@ export class OrderFulfillmentService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    private readonly delivery: OrderDeliveryService,
   ) {}
 
   // Optimistic-lock status transition: the row only changes if its version
@@ -140,57 +142,22 @@ export class OrderFulfillmentService {
     return updated
   }
 
-  async markPublished(orderId: string, publisherId: string, userId: string, publishedUrl: string) {
+  // Publisher submits a delivery. Creates an immutable OrderDeliveryVersion and
+  // enqueues independent verification (same path as platform Operations).
+  async markPublished(
+    orderId: string,
+    publisherId: string,
+    userId: string,
+    publishedUrl: string,
+    extra: { articleTitle?: string; notes?: string; screenshotUrl?: string } = {},
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, website: { publisherId } },
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "APPROVED") throw new BadRequestException("Content must be APPROVED before publishing")
 
-    let parsed: URL
-    try {
-      parsed = new URL(publishedUrl)
-    } catch {
-      throw new BadRequestException("publishedUrl must be a valid URL")
-    }
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      throw new BadRequestException("publishedUrl must use http or https")
-    }
-
-    const updated = await this.transition(orderId, order.version, "APPROVED", { status: "PUBLISHED", publishedUrl, publishedAt: new Date() })
-
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId,
-        eventType: "PUBLICATION_MARKED",
-        actorId: userId,
-        message: `Content published at ${publishedUrl}`,
-        metadata: { publishedUrl },
-      },
-    })
-
-    // Enqueue verification — OrderItem is the canonical anchor-text source,
-    // legacy Order.anchorText kept as fallback for pre-migration orders
-    const item = await this.prisma.orderItem.findFirst({
-      where: { orderId, anchorText: { not: null } },
-      select: { anchorText: true },
-    })
-    await this.queue.addJob(QUEUES.VERIFICATION, "verify-link", {
-      orderId,
-      targetUrl: publishedUrl,
-      anchorText: item?.anchorText ?? order.anchorText,
-      organizationId: order.organizationId,
-    })
-
-    await this.audit.log({
-      action: "PUBLICATION_MARKED",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: { publishedUrl },
-      userId,
-      organizationId: order.organizationId,
-    })
-
-    return updated
+    await this.delivery.submitDelivery(order, userId, { publishedUrl, ...extra })
+    return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
   }
 }

@@ -11,6 +11,7 @@ import { createVerificationWorker } from "./processors/verification.processor"
 import { createPayoutWorker } from "./processors/payout.processor"
 import { createReconciliationWorker } from "./processors/reconciliation.processor"
 import { createWebsiteVerificationWorker } from "./processors/website-verification.processor"
+import { createDeliveryVerificationWorker } from "./processors/delivery-verification.processor"
 import { connection } from "./redis"
 import { prisma } from "@guestpost/database"
 import { Queue } from "bullmq"
@@ -99,6 +100,7 @@ checkConnections().then(() => {
     createPayoutWorker(),
     createReconciliationWorker(),
     createWebsiteVerificationWorker(),
+    createDeliveryVerificationWorker(),
   )
   console.log(`[WORKER] Started ${workers.length} workers`)
   registerPayoutStatusPoll().catch((err) => {

@@ -40,7 +40,8 @@ describe("OrderOperationsService", () => {
       $transaction: jest.fn(),
     }
 
-    service = new OrderOperationsService(prismaMock as any, auditMock as any, queueMock as any)
+    const deliveryMock = { submitDelivery: jest.fn().mockResolvedValue({ id: "dv-1" }) }
+    service = new OrderOperationsService(prismaMock as any, auditMock as any, queueMock as any, deliveryMock as any)
   })
 
   describe("acceptOrder", () => {
@@ -136,26 +137,40 @@ describe("OrderOperationsService", () => {
   })
 
   describe("markPublished", () => {
-    it("marks platform order as PUBLISHED", async () => {
+    it("creates a delivery version when an assigned ops user publishes", async () => {
       const approvedOrder = { ...mockPlatformOrder, status: "APPROVED" }
       prismaMock.order.findUnique.mockResolvedValue(approvedOrder)
-      prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+      prismaMock.fulfillmentAssignment = {
+        findFirst: jest.fn().mockResolvedValue({ id: "fa-1", version: 0 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      }
       prismaMock.order.findUniqueOrThrow.mockResolvedValue({
         ...approvedOrder,
         status: "PUBLISHED",
         publishedUrl: "https://example.com/article",
-        publishedAt: new Date(),
         version: 2,
       })
 
       const result = await service.markPublished("order-1", "ops-user", "https://example.com/article")
 
       expect(result.status).toBe("PUBLISHED")
-      expect(queueMock.addJob).toHaveBeenCalledWith(
-        expect.any(String),
-        "verify-link",
+      // Delegates to the shared delivery service (immutable version + verify enqueue)
+      expect((service as any).delivery.submitDelivery).toHaveBeenCalledWith(
+        approvedOrder,
+        "ops-user",
         expect.objectContaining({ publishedUrl: "https://example.com/article" }),
       )
+      expect(prismaMock.fulfillmentAssignment.updateMany).toHaveBeenCalled()
+    })
+
+    it("rejects publish when ops user has no active assignment", async () => {
+      const approvedOrder = { ...mockPlatformOrder, status: "APPROVED" }
+      prismaMock.order.findUnique.mockResolvedValue(approvedOrder)
+      prismaMock.fulfillmentAssignment = { findFirst: jest.fn().mockResolvedValue(null) }
+
+      await expect(
+        service.markPublished("order-1", "ops-user", "https://example.com/article"),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("rejects publish for non-APPROVED orders", async () => {

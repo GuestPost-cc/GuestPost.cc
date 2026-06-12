@@ -6,6 +6,7 @@ export const QUEUES = {
   AI: "ai",
   VERIFICATION: "verification",
   WEBSITE_VERIFICATION: "website-verification",
+  DELIVERY_VERIFICATION: "delivery-verification",
   PAYOUT: "payout",
   RECONCILIATION: "reconciliation",
 } as const
@@ -43,6 +44,9 @@ export const QUEUE_JOBS = {
   [QUEUES.WEBSITE_VERIFICATION]: {
     VERIFY: "website-verify",
     REVERIFY_SWEEP: "website-reverify-sweep",
+  },
+  [QUEUES.DELIVERY_VERIFICATION]: {
+    VERIFY: "delivery-verify",
   },
   [QUEUES.PAYOUT]: {
     EXECUTE: "payout-execute",

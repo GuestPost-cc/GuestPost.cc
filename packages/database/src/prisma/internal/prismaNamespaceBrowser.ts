@@ -70,6 +70,11 @@ export const ModelName = {
   OrderDispute: 'OrderDispute',
   Settlement: 'Settlement',
   SettlementApproval: 'SettlementApproval',
+  FulfillmentAssignment: 'FulfillmentAssignment',
+  OrderDeliveryVersion: 'OrderDeliveryVersion',
+  DeliveryVerificationEvidence: 'DeliveryVerificationEvidence',
+  DeliverySnapshot: 'DeliverySnapshot',
+  DeliveryFraudFlag: 'DeliveryFraudFlag',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
   PayoutMethod: 'PayoutMethod',
@@ -321,6 +326,7 @@ export const OrderScalarFieldEnum = {
   campaignId: 'campaignId',
   idempotencyKey: 'idempotencyKey',
   version: 'version',
+  activeDeliveryVersionId: 'activeDeliveryVersionId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -447,6 +453,90 @@ export const SettlementApprovalScalarFieldEnum = {
 } as const
 
 export type SettlementApprovalScalarFieldEnum = (typeof SettlementApprovalScalarFieldEnum)[keyof typeof SettlementApprovalScalarFieldEnum]
+
+
+export const FulfillmentAssignmentScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  assignedToUserId: 'assignedToUserId',
+  assignedByUserId: 'assignedByUserId',
+  assignedAt: 'assignedAt',
+  completedAt: 'completedAt',
+  status: 'status',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FulfillmentAssignmentScalarFieldEnum = (typeof FulfillmentAssignmentScalarFieldEnum)[keyof typeof FulfillmentAssignmentScalarFieldEnum]
+
+
+export const OrderDeliveryVersionScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  version: 'version',
+  publishedUrl: 'publishedUrl',
+  normalizedUrl: 'normalizedUrl',
+  articleTitle: 'articleTitle',
+  notes: 'notes',
+  screenshotUrl: 'screenshotUrl',
+  submittedByUserId: 'submittedByUserId',
+  submittedAt: 'submittedAt',
+  verificationStatus: 'verificationStatus',
+  verificationFailureReason: 'verificationFailureReason',
+  interventionStatus: 'interventionStatus',
+  supersededByVersion: 'supersededByVersion',
+  verificationVersion: 'verificationVersion',
+  createdAt: 'createdAt'
+} as const
+
+export type OrderDeliveryVersionScalarFieldEnum = (typeof OrderDeliveryVersionScalarFieldEnum)[keyof typeof OrderDeliveryVersionScalarFieldEnum]
+
+
+export const DeliveryVerificationEvidenceScalarFieldEnum = {
+  id: 'id',
+  deliveryVersionId: 'deliveryVersionId',
+  pageTitle: 'pageTitle',
+  metaTitle: 'metaTitle',
+  canonicalUrl: 'canonicalUrl',
+  resolvedUrl: 'resolvedUrl',
+  httpStatus: 'httpStatus',
+  anchorFound: 'anchorFound',
+  linkFound: 'linkFound',
+  targetUrlMatched: 'targetUrlMatched',
+  verifiedAnchorText: 'verifiedAnchorText',
+  verifiedTargetUrl: 'verifiedTargetUrl',
+  htmlHash: 'htmlHash',
+  redirectChain: 'redirectChain',
+  checkedAt: 'checkedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type DeliveryVerificationEvidenceScalarFieldEnum = (typeof DeliveryVerificationEvidenceScalarFieldEnum)[keyof typeof DeliveryVerificationEvidenceScalarFieldEnum]
+
+
+export const DeliverySnapshotScalarFieldEnum = {
+  id: 'id',
+  deliveryVersionId: 'deliveryVersionId',
+  htmlObjectKey: 'htmlObjectKey',
+  screenshotObjectKey: 'screenshotObjectKey',
+  responseHeaders: 'responseHeaders',
+  createdAt: 'createdAt'
+} as const
+
+export type DeliverySnapshotScalarFieldEnum = (typeof DeliverySnapshotScalarFieldEnum)[keyof typeof DeliverySnapshotScalarFieldEnum]
+
+
+export const DeliveryFraudFlagScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  deliveryVersionId: 'deliveryVersionId',
+  type: 'type',
+  details: 'details',
+  createdAt: 'createdAt'
+} as const
+
+export type DeliveryFraudFlagScalarFieldEnum = (typeof DeliveryFraudFlagScalarFieldEnum)[keyof typeof DeliveryFraudFlagScalarFieldEnum]
 
 
 export const PublisherBalanceScalarFieldEnum = {

@@ -304,6 +304,37 @@ export const SettlementApprovalType = {
 export type SettlementApprovalType = (typeof SettlementApprovalType)[keyof typeof SettlementApprovalType]
 
 
+export const FulfillmentAssignmentStatus = {
+  ASSIGNED: 'ASSIGNED',
+  IN_PROGRESS: 'IN_PROGRESS',
+  DELIVERED: 'DELIVERED',
+  CANCELLED: 'CANCELLED'
+} as const
+
+export type FulfillmentAssignmentStatus = (typeof FulfillmentAssignmentStatus)[keyof typeof FulfillmentAssignmentStatus]
+
+
+export const DeliveryVerificationStatus = {
+  PENDING: 'PENDING',
+  VERIFIED: 'VERIFIED',
+  FAILED: 'FAILED',
+  MANUAL_REVIEW: 'MANUAL_REVIEW',
+  RETRYING: 'RETRYING'
+} as const
+
+export type DeliveryVerificationStatus = (typeof DeliveryVerificationStatus)[keyof typeof DeliveryVerificationStatus]
+
+
+export const DeliveryInterventionStatus = {
+  NONE: 'NONE',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  OVERRIDDEN: 'OVERRIDDEN'
+} as const
+
+export type DeliveryInterventionStatus = (typeof DeliveryInterventionStatus)[keyof typeof DeliveryInterventionStatus]
+
+
 export const TransactionType = {
   DEPOSIT: 'DEPOSIT',
   PURCHASE: 'PURCHASE',

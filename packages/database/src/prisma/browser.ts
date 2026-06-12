@@ -123,6 +123,31 @@ export type Settlement = Prisma.SettlementModel
  */
 export type SettlementApproval = Prisma.SettlementApprovalModel
 /**
+ * Model FulfillmentAssignment
+ * 
+ */
+export type FulfillmentAssignment = Prisma.FulfillmentAssignmentModel
+/**
+ * Model OrderDeliveryVersion
+ * 
+ */
+export type OrderDeliveryVersion = Prisma.OrderDeliveryVersionModel
+/**
+ * Model DeliveryVerificationEvidence
+ * 
+ */
+export type DeliveryVerificationEvidence = Prisma.DeliveryVerificationEvidenceModel
+/**
+ * Model DeliverySnapshot
+ * 
+ */
+export type DeliverySnapshot = Prisma.DeliverySnapshotModel
+/**
+ * Model DeliveryFraudFlag
+ * 
+ */
+export type DeliveryFraudFlag = Prisma.DeliveryFraudFlagModel
+/**
  * Model PublisherBalance
  * 
  */

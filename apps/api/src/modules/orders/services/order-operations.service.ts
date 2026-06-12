@@ -3,6 +3,7 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
 import { QUEUES } from "@guestpost/shared"
+import { OrderDeliveryService } from "./order-delivery.service"
 
 @Injectable()
 export class OrderOperationsService {
@@ -10,6 +11,7 @@ export class OrderOperationsService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    private readonly delivery: OrderDeliveryService,
   ) {}
 
   private async transition(orderId: string, fromVersion: number, expectedStatus: string, data: any) {
@@ -168,41 +170,34 @@ export class OrderOperationsService {
     return updated
   }
 
-  async markPublished(orderId: string, userId: string, publishedUrl: string) {
+  // Operations submits a platform delivery. Requires an active fulfillment
+  // assignment to this user (no unassigned drive-by deliveries). Same immutable
+  // version + verification path as publisher inventory.
+  async markPublished(
+    orderId: string,
+    userId: string,
+    publishedUrl: string,
+    extra: { articleTitle?: string; notes?: string; screenshotUrl?: string } = {},
+  ) {
     const order = await this.assertPlatformOrder(orderId)
     if (order.status !== "APPROVED") throw new BadRequestException("Order must be APPROVED to mark published")
 
-    const updated = await this.transition(orderId, order.version, "APPROVED", {
-      status: "PUBLISHED",
-      publishedUrl,
-      publishedAt: new Date(),
+    const assignment = await this.prisma.fulfillmentAssignment.findFirst({
+      where: { orderId, assignedToUserId: userId, status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
+    })
+    if (!assignment) {
+      throw new BadRequestException("You must be assigned this order before submitting a delivery")
+    }
+
+    const version = await this.delivery.submitDelivery(order, userId, { publishedUrl, ...extra })
+
+    // Mark the assignment delivered (version-guarded)
+    await this.prisma.fulfillmentAssignment.updateMany({
+      where: { id: assignment.id, version: assignment.version },
+      data: { status: "DELIVERED", completedAt: new Date(), version: { increment: 1 } },
     })
 
-    await this.queue.addJob(QUEUES.VERIFICATION, "verify-link", {
-      orderId,
-      publishedUrl,
-      websiteUrl: order.website?.url,
-    })
-
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId,
-        eventType: "PUBLICATION_MARKED",
-        actorId: userId,
-        message: `Publication marked by operations`,
-        metadata: { publishedUrl },
-      },
-    })
-
-    await this.audit.log({
-      action: "PUBLICATION_MARKED",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: { fromStatus: order.status, publishedUrl },
-      userId,
-      organizationId: order.organizationId,
-    })
-
-    return updated
+    void version
+    return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
   }
 }

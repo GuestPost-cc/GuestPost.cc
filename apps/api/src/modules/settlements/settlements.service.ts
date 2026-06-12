@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, evaluateSettlementEligibility, checkSeparationOfDuties } from "@guestpost/shared"
 import { Decimal } from "@prisma/client/runtime/library"
 import { resolvePlatformFeeFraction, splitPlatformFee } from "../../common/platform-fee"
 
@@ -21,6 +21,22 @@ export class SettlementsService {
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "DELIVERED") throw new BadRequestException("Order must be DELIVERED to create settlement")
+
+    // Independent-verification gate: no settlement on a human claim alone.
+    // Requires an active VERIFIED (or manually-approved) delivery, no open
+    // dispute, no active revision, no fraud flags, status DELIVERED.
+    const eligibility = await evaluateSettlementEligibility(this.prisma, orderId)
+    if (!eligibility.eligible) {
+      await this.audit.log({
+        action: "ORDER_DELIVERY_SETTLEMENT_BLOCKED",
+        entityType: "Order",
+        entityId: orderId,
+        metadata: { reasons: eligibility.reasons },
+        userId,
+        organizationId: order.organizationId,
+      })
+      throw new BadRequestException({ code: "SETTLEMENT_BLOCKED", message: `Settlement blocked: ${eligibility.reasons.join("; ")}`, reasons: eligibility.reasons })
+    }
 
     // Find publisher from order items' websites
     const item = await this.prisma.orderItem.findFirst({
@@ -408,6 +424,35 @@ export class SettlementsService {
   }
 
   private async releaseFundsInternal(tx: any, settlementId: string, settlement: any, userId: string) {
+    // Separation of duties: for platform inventory the fulfiller may not also
+    // release the settlement. Look up the order's ownership + active delivery
+    // submitter and block self-release.
+    const order = await tx.order.findUnique({
+      where: { id: settlement.orderId },
+      include: { website: { select: { ownershipType: true } } },
+    })
+    if (order) {
+      const active = order.activeDeliveryVersionId
+        ? await tx.orderDeliveryVersion.findUnique({ where: { id: order.activeDeliveryVersionId }, select: { submittedByUserId: true } })
+        : null
+      const violation = checkSeparationOfDuties({
+        ownershipType: order.website?.ownershipType ?? "PUBLISHER",
+        fulfilledByUserId: active?.submittedByUserId,
+        releasedByUserId: userId,
+      })
+      if (violation) {
+        await this.audit.log({
+          action: "ORDER_DELIVERY_SETTLEMENT_BLOCKED",
+          entityType: "Settlement",
+          entityId: settlementId,
+          metadata: { reason: violation, orderId: settlement.orderId },
+          userId,
+          organizationId: order.organizationId,
+        }, tx)
+        throw new ForbiddenException(violation)
+      }
+    }
+
     // Prevent duplicate release: only release if status is ADMIN_APPROVED and version matches
     const released = await tx.settlement.updateMany({
       where: { id: settlementId, status: "ADMIN_APPROVED", version: settlement.version },

@@ -1512,14 +1512,6 @@ export type EnumListingFulfillmentTypeFieldUpdateOperationsInput = {
   set?: $Enums.ListingFulfillmentType
 }
 
-export type NullableIntFieldUpdateOperationsInput = {
-  set?: number | null
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type MarketplaceListingUpdatecountriesInput = {
   set?: string[]
   push?: string | string[]
