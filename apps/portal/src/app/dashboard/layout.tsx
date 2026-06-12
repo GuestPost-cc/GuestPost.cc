@@ -34,6 +34,9 @@ import {
 import { Notifications } from "../../components/notifications"
 import { CreateOrgGate } from "../../components/create-org-gate"
 
+// ownerOnly items hit OWNER-gated backend routes (wallet deposit/checkout/
+// withdraw, org member/team management) — hiding them from MEMBER avoids
+// dead links that 403. The API enforces the boundary regardless.
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/campaigns", label: "Campaigns", icon: Megaphone },
@@ -42,7 +45,7 @@ const navItems = [
   { href: "/dashboard/marketplace/favorites", label: "Favorites", icon: Heart },
   { href: "/dashboard/marketplace/saved-lists", label: "Saved Lists", icon: Bookmark },
   { href: "/dashboard/reports", label: "Reports", icon: LayoutDashboard },
-  { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
+  { href: "/dashboard/billing", label: "Billing", icon: CreditCard, ownerOnly: true },
   { href: "/dashboard/settings/organization", label: "Organization", icon: Building2 },
   { href: "/dashboard/support", label: "Support", icon: HeadphonesIcon },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
@@ -99,7 +102,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           
           <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-            {navItems.map((item) => {
+            {navItems
+              .filter((item) => !item.ownerOnly || user.customerRole === "OWNER")
+              .map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
               const Icon = item.icon
               return (

@@ -95,11 +95,15 @@ export class AdminService {
       if (!membership) {
         const orgName = `Org for ${u.email}`
         const orgSlug = `org-${userId.slice(0, 8)}`
+        // A freshly created personal org's sole member is its OWNER — never
+        // the passed role. An org whose only member is a MEMBER is
+        // ownerless and administratively dead (nobody can deposit/invite).
+        // MEMBER is only meaningful when joining an EXISTING org via invite.
         const org = await this.prisma.organization.create({
           data: {
             name: orgName,
             slug: orgSlug,
-            memberships: { create: { userId, role: role as any } },
+            memberships: { create: { userId, role: "OWNER" } },
           },
         })
         membership = await this.prisma.membership.findFirstOrThrow({
