@@ -69,6 +69,22 @@ export class OrderDisputeService {
       organizationId,
     })
 
+    // Snapshot the evidence inventory at dispute-open so reviewers see a
+    // complete, immutable package (assembled live via GET /disputes/:id/evidence).
+    const [versionCount, snapshotCount, fraudCount] = await Promise.all([
+      this.prisma.orderDeliveryVersion.count({ where: { orderId } }),
+      this.prisma.deliverySnapshot.count({ where: { deliveryVersion: { orderId } } }),
+      this.prisma.deliveryFraudFlag.count({ where: { orderId } }),
+    ])
+    await this.audit.log({
+      action: "DISPUTE_EVIDENCE_ATTACHED",
+      entityType: "OrderDispute",
+      entityId: dispute.id,
+      metadata: { orderId, deliveryVersions: versionCount, snapshots: snapshotCount, fraudFlags: fraudCount },
+      userId,
+      organizationId,
+    })
+
     return dispute
   }
 
