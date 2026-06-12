@@ -80,7 +80,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen">
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card transform transition-transform duration-200 lg:translate-x-0 lg:static lg:inset-auto",
+        // Desktop: sticky full-viewport column so the sidebar never scrolls
+        // off-screen with long pages; nav scrolls internally on short screens
+        "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card transform transition-transform duration-200 lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:inset-auto",
         mobileOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex h-full flex-col">
@@ -96,7 +98,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           </div>
           
-          <nav className="flex-1 space-y-1 p-4">
+          <nav className="flex-1 space-y-1 overflow-y-auto p-4">
             {navItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
               const Icon = item.icon

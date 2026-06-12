@@ -48,7 +48,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-64 flex-col border-r bg-muted/30">
+      {/* Sticky viewport-height column: never scrolls off-screen with long
+          pages; nav scrolls internally when items exceed short viewports */}
+      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r bg-muted/30">
         <div className="flex items-center justify-between border-b px-6 py-5">
           <Link href="/dashboard" className="flex items-center gap-2 font-bold tracking-tight">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -57,7 +59,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             GuestPost
           </Link>
         </div>
-        <nav className="flex flex-1 flex-col gap-1 p-4">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))

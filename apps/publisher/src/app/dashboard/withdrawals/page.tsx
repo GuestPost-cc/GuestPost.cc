@@ -42,7 +42,9 @@ import {
   DialogDescription,
 } from "@guestpost/ui"
 
-type WithdrawalStatus = "PENDING" | "APPROVED" | "PROCESSING" | "COMPLETED" | "REJECTED"
+// Full WithdrawalStatus enum — FAILED (provider hard-failure) and REVERSED
+// (funds returned after failure) were missing and crashed the table
+type WithdrawalStatus = "PENDING" | "APPROVED" | "PROCESSING" | "COMPLETED" | "REJECTED" | "FAILED" | "REVERSED"
 
 const statusConfig: Record<
   WithdrawalStatus,
@@ -53,7 +55,12 @@ const statusConfig: Record<
   COMPLETED: { label: "Completed", icon: CheckCircle, variant: "success" },
   PROCESSING: { label: "Processing", icon: Clock, variant: "secondary" },
   REJECTED: { label: "Rejected", icon: XCircle, variant: "destructive" },
+  FAILED: { label: "Failed", icon: XCircle, variant: "destructive" },
+  REVERSED: { label: "Reversed — funds returned", icon: CheckCircle, variant: "outline" },
 }
+
+// Unknown statuses must never crash the table
+const fallbackStatus = { label: "Unknown", icon: Clock, variant: "outline" as const }
 
 export default function WithdrawalsPage() {
   const { user } = useAuth()
@@ -236,7 +243,7 @@ export default function WithdrawalsPage() {
               </TableHeader>
               <TableBody>
                 {withdrawals.map((withdrawal) => {
-                  const config = statusConfig[withdrawal.status]
+                  const config = statusConfig[withdrawal.status] ?? fallbackStatus
                   const Icon = config.icon
                   return (
                     <TableRow key={withdrawal.id}>

@@ -349,7 +349,9 @@ export default function AdminMarketplacePage() {
                           {listing.verified ? "Remove Verified" : "Mark Verified"}
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <a href={`/dashboard/marketplace/${listing.slug}`} target="_blank">
+                          {/* In-app preview of the public page (staff cannot
+                              enter the customer portal) + moderation actions */}
+                          <a href={`/dashboard/marketplace/${listing.slug}`}>
                             View Public Page
                           </a>
                         </DropdownMenuItem>

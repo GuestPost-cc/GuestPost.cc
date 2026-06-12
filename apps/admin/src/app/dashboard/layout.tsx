@@ -47,13 +47,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      <aside className="flex w-64 flex-col border-r bg-muted/30 p-6">
+      {/* Sticky viewport-height column: never scrolls off-screen with long
+          pages; nav scrolls internally when items exceed short viewports */}
+      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r bg-muted/30 p-6">
         <div className="mb-8">
           <Link href="/dashboard" className="text-lg font-bold tracking-tight">
             GuestPost Admin
           </Link>
         </div>
-        <nav className="flex flex-1 flex-col gap-2">
+        <nav className="flex flex-1 flex-col gap-2 overflow-y-auto">
           {navItems
             .filter(item => !item.roles || (user.staffRole && item.roles.includes(user.staffRole as StaffRole)))
             .map((item) => {
