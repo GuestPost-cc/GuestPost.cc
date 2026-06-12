@@ -47,10 +47,14 @@ async function main() {
   const pubBal0 = (await call("GET", "/publisher-payouts/balance", publisher)).data
   const walletId = wallet0.id
 
-  // Find a listing-backed website
-  const listings = (await call("GET", "/marketplace/listings?limit=1")).data.listings
-  check("marketplace has approved listings", listings.length > 0)
-  const listing = listings[0]
+  // Find a website-backed listing — listings without a websiteId (internal
+  // services, partial seed/validation rows) can't be fulfilled by a
+  // publisher, so the order would 404 at accept/publish. Mirrors the order
+  // wizard, which only offers website-backed listings.
+  const listings = (await call("GET", "/marketplace/listings?limit=50")).data.listings
+  const listing = listings.find((l: any) => l.websiteId)
+  check("marketplace has a website-backed approved listing", !!listing, listings.length)
+  if (!listing) { console.error("\n0 website-backed listings — run pnpm seed"); process.exit(1) }
   const price = Number(listing.price)
 
   // Fund the run relative to the actual listing price — a flat amount goes
