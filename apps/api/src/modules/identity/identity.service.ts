@@ -1,14 +1,16 @@
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
-import { CustomerRole } from "@guestpost/shared"
+import { CustomerRole, QUEUES } from "@guestpost/shared"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
+import { QueueService } from "../queues/queue.service"
 
 @Injectable()
 export class IdentityService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly queue: QueueService,
   ) {}
 
   async findUserById(id: string) {
@@ -68,7 +70,9 @@ export class IdentityService {
     }
 
     const [customerMemberships, publisherMemberships] = await Promise.all([
-      this.prisma.membership.count({ where: { userId } }),
+      // A pending invite shouldn't block becoming a publisher — only real
+      // (ACTIVE) customer memberships do
+      this.prisma.membership.count({ where: { userId, status: "ACTIVE" } }),
       this.prisma.publisherMembership.count({ where: { userId } }),
     ])
     if (publisherMemberships > 0) {
@@ -116,9 +120,11 @@ export class IdentityService {
     return { id: publisher.id, name: publisher.name, tier: publisher.tier }
   }
 
+  // Only ACTIVE memberships are real orgs the user belongs to. Pending
+  // invites are returned separately via listPendingInvites.
   async listOrganizations(userId: string) {
     const memberships = await this.prisma.membership.findMany({
-      where: { userId },
+      where: { userId, status: "ACTIVE" },
       include: { organization: { select: { id: true, name: true, slug: true } } },
     })
     const activeCtx = await this.prisma.activeContext.findUnique({ where: { userId } })
@@ -129,6 +135,65 @@ export class IdentityService {
       role: m.role,
       isActive: m.organization.id === activeCtx?.activeOrganizationId,
     }))
+  }
+
+  // Invitations awaiting this user's acceptance.
+  async listPendingInvites(userId: string) {
+    const pending = await this.prisma.membership.findMany({
+      where: { userId, status: "PENDING" },
+      include: { organization: { select: { id: true, name: true, slug: true } } },
+      orderBy: { createdAt: "desc" },
+    })
+    return pending.map((m) => ({
+      membershipId: m.id,
+      organizationId: m.organization.id,
+      organizationName: m.organization.name,
+      role: m.role,
+      invitedAt: m.createdAt,
+    }))
+  }
+
+  async respondToInvite(userId: string, membershipId: string, accept: boolean) {
+    const membership = await this.prisma.membership.findUnique({
+      where: { id: membershipId },
+      include: { organization: { select: { id: true, name: true } } },
+    })
+    // Scope to the caller — a membership id from another user is a 404, never
+    // actionable
+    if (!membership || membership.userId !== userId) {
+      throw new NotFoundException("Invitation not found")
+    }
+    if (membership.status !== "PENDING") {
+      throw new BadRequestException("This invitation has already been handled")
+    }
+
+    if (accept) {
+      const updated = await this.prisma.membership.update({
+        where: { id: membershipId },
+        data: { status: "ACTIVE" },
+      })
+      invalidateAuthContext(userId)
+      await this.audit.log({
+        action: "MEMBER_INVITE_ACCEPTED",
+        entityType: "Membership",
+        entityId: membershipId,
+        metadata: { organizationId: membership.organization.id, role: membership.role },
+        userId,
+        organizationId: membership.organization.id,
+      })
+      return { accepted: true, organizationId: membership.organization.id, role: updated.role }
+    }
+
+    await this.prisma.membership.delete({ where: { id: membershipId } })
+    await this.audit.log({
+      action: "MEMBER_INVITE_DECLINED",
+      entityType: "Membership",
+      entityId: membershipId,
+      metadata: { organizationId: membership.organization.id },
+      userId,
+      organizationId: membership.organization.id,
+    })
+    return { accepted: false }
   }
 
   async inviteMember(organizationId: string, callerUserId: string, email: string, role: CustomerRole) {
@@ -150,14 +215,23 @@ export class IdentityService {
     })
     if (existing) throw new ForbiddenException("User is already a member of this organization")
 
+    // Invite is PENDING until the user accepts — they get no access and the
+    // org doesn't appear in their list until then.
     const invited = await this.prisma.membership.create({
       data: {
         userId: user.id,
         organizationId,
         role,
+        status: "PENDING",
       },
     })
-    invalidateAuthContext(user.id)
+    // Notify the invited user
+    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+      userId: user.id,
+      organizationId,
+      type: "ORG_INVITE",
+      message: `You've been invited to join an organization as ${role}.`,
+    }).catch(() => {})
 
     await this.audit.log({
       action: "MEMBER_INVITED",
@@ -186,7 +260,7 @@ export class IdentityService {
 
     if (targetMembership.role === "OWNER") {
       const ownerCount = await this.prisma.membership.count({
-        where: { organizationId, role: "OWNER" },
+        where: { organizationId, role: "OWNER", status: "ACTIVE" },
       })
       if (ownerCount <= 1) {
         throw new ForbiddenException("Cannot remove the last owner of the organization")

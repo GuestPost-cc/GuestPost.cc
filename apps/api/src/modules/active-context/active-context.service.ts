@@ -18,7 +18,7 @@ export class ActiveContextService {
 
     if (user.userType === "CUSTOMER") {
       const membership = await this.prisma.membership.findFirst({
-        where: { userId },
+        where: { userId, status: "ACTIVE" },
         orderBy: { createdAt: "asc" },
       })
       activeOrganizationId = membership?.organizationId ?? null
@@ -41,10 +41,13 @@ export class ActiveContextService {
   }
 
   async setActiveOrganization(userId: string, organizationId: string) {
+    // Cannot switch into an org you haven't accepted yet
     const membership = await this.prisma.membership.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
     })
-    if (!membership) throw new ForbiddenException("User does not belong to this organization")
+    if (!membership || membership.status !== "ACTIVE") {
+      throw new ForbiddenException("You are not an active member of this organization")
+    }
 
     const ctx = await this.prisma.activeContext.upsert({
       where: { userId },

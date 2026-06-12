@@ -33,6 +33,7 @@ import {
 } from "@guestpost/ui"
 import { Notifications } from "../../components/notifications"
 import { CreateOrgGate } from "../../components/create-org-gate"
+import { OrgSwitcher } from "../../components/org-switcher"
 
 // ownerOnly items hit OWNER-gated backend routes (wallet deposit/checkout/
 // withdraw, org member/team management) — hiding them from MEMBER avoids
@@ -127,13 +128,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </nav>
           
           <div className="border-t p-4 space-y-2">
-            <div className="flex items-center justify-between px-3 py-1.5">
-              {user.organizationId ? (
-                <div>
-                  <p className="text-xs text-muted-foreground">Organization</p>
-                  <p className="text-sm font-medium truncate">{user.name ?? "Organization"}</p>
-                </div>
-              ) : <span />}
+            <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <OrgSwitcher />
+              </div>
               <Notifications />
             </div>
             <DropdownMenu>

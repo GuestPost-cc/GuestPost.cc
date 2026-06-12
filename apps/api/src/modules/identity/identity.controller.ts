@@ -43,6 +43,22 @@ export class IdentityController {
     return this.identity.listOrganizations(user.id)
   }
 
+  // Pending org invitations for the current user
+  @Get("invites")
+  listInvites(@CurrentUser() user: any) {
+    return this.identity.listPendingInvites(user.id)
+  }
+
+  @Post("invites/:membershipId/accept")
+  acceptInvite(@Param("membershipId") membershipId: string, @CurrentUser() user: any) {
+    return this.identity.respondToInvite(user.id, membershipId, true)
+  }
+
+  @Post("invites/:membershipId/decline")
+  declineInvite(@Param("membershipId") membershipId: string, @CurrentUser() user: any) {
+    return this.identity.respondToInvite(user.id, membershipId, false)
+  }
+
   @Get("publishers")
   listPublishers(@CurrentUser() user: any) {
     return this.activeContext.listPublishers(user.id)

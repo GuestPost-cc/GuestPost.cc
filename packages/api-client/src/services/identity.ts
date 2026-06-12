@@ -48,7 +48,34 @@ export class IdentityService {
   }
 
   listOrganizations() {
-    return this.client.get<Array<{ id: string; name: string; slug: string; role: string }>>("/identity/organizations")
+    return this.client.get<Array<{ id: string; name: string; slug: string; role: string; isActive: boolean }>>("/identity/organizations")
+  }
+
+  switchOrganization(organizationId: string) {
+    return this.client.post<{ activeOrganizationId: string }>("/identity/switch-organization", {
+      json: { organizationId },
+    })
+  }
+
+  // Pending org invitations awaiting this user's response
+  listInvites() {
+    return this.client.get<Array<{
+      membershipId: string
+      organizationId: string
+      organizationName: string
+      role: string
+      invitedAt: string
+    }>>("/identity/invites")
+  }
+
+  acceptInvite(membershipId: string) {
+    return this.client.post<{ accepted: boolean; organizationId: string; role: string }>(
+      `/identity/invites/${membershipId}/accept`,
+    )
+  }
+
+  declineInvite(membershipId: string) {
+    return this.client.post<{ accepted: boolean }>(`/identity/invites/${membershipId}/decline`)
   }
 
   getOrganization(orgId: string) {

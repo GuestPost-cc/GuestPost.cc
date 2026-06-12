@@ -321,19 +321,28 @@ model Organization {
   activeContexts ActiveContext[]
 }
 
+enum MembershipStatus {
+  PENDING
+  ACTIVE
+}
+
 model Membership {
-  id             String       @id @default(cuid())
-  role           CustomerRole @default(MEMBER)
+  id             String           @id @default(cuid())
+  role           CustomerRole     @default(MEMBER)
+  // PENDING until the invited user accepts. Only ACTIVE memberships grant
+  // access, appear in the org list, or can be switched into.
+  status         MembershipStatus @default(ACTIVE)
   userId         String
   organizationId String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([userId, organizationId])
   @@index([organizationId])
+  @@index([userId, status])
 }
 
 model PublisherMembership {

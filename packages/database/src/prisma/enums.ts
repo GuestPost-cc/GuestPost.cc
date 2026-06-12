@@ -271,6 +271,14 @@ export const VerificationStatus = {
 export type VerificationStatus = (typeof VerificationStatus)[keyof typeof VerificationStatus]
 
 
+export const MembershipStatus = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE'
+} as const
+
+export type MembershipStatus = (typeof MembershipStatus)[keyof typeof MembershipStatus]
+
+
 export const SettlementApprovalType = {
   CUSTOMER: 'CUSTOMER',
   ADMIN: 'ADMIN'

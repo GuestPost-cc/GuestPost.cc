@@ -212,6 +212,7 @@ export type OrganizationScalarFieldEnum = (typeof OrganizationScalarFieldEnum)[k
 export const MembershipScalarFieldEnum = {
   id: 'id',
   role: 'role',
+  status: 'status',
   userId: 'userId',
   organizationId: 'organizationId',
   createdAt: 'createdAt',

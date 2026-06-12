@@ -24,7 +24,8 @@ describe("IdentityService.becomePublisher", () => {
       $transaction: jest.fn().mockImplementation(async (cb: any) => cb(prisma)),
     }
     audit = { log: jest.fn().mockResolvedValue(undefined) }
-    service = new IdentityService(prisma, audit)
+    const queue = { addJob: jest.fn().mockResolvedValue({ id: "job-1" }) }
+    service = new IdentityService(prisma, audit, queue as any)
   })
 
   it("converts a fresh account: own org + publisher + membership + userType, NEW tier, audited", async () => {

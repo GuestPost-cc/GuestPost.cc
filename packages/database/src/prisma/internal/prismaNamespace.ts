@@ -4737,6 +4737,7 @@ export type OrganizationScalarFieldEnum = (typeof OrganizationScalarFieldEnum)[k
 export const MembershipScalarFieldEnum = {
   id: 'id',
   role: 'role',
+  status: 'status',
   userId: 'userId',
   organizationId: 'organizationId',
   createdAt: 'createdAt',
@@ -5644,6 +5645,20 @@ export type EnumCustomerRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
  * Reference to a field of type 'CustomerRole[]'
  */
 export type ListEnumCustomerRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CustomerRole[]'>
+    
+
+
+/**
+ * Reference to a field of type 'MembershipStatus'
+ */
+export type EnumMembershipStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MembershipStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'MembershipStatus[]'
+ */
+export type ListEnumMembershipStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MembershipStatus[]'>
     
 
 

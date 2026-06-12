@@ -50,10 +50,12 @@ export class AuthGuard implements CanActivate {
       activeOrganizationId = ctx.activeOrganizationId
 
       if (activeOrganizationId) {
+        // Only ACTIVE memberships grant access — a PENDING (unaccepted) invite
+        // must not let the user act in that org
         const membership = await prisma.membership.findUnique({
           where: { userId_organizationId: { userId: user.id, organizationId: activeOrganizationId } },
         })
-        if (!membership) {
+        if (!membership || membership.status !== "ACTIVE") {
           await this.activeContext.clearOrganization(user.id)
           activeOrganizationId = null
         }
@@ -61,7 +63,7 @@ export class AuthGuard implements CanActivate {
 
       if (!activeOrganizationId) {
         const fallback = await prisma.membership.findFirst({
-          where: { userId: user.id },
+          where: { userId: user.id, status: "ACTIVE" },
           orderBy: { createdAt: "asc" },
         })
         if (fallback) {

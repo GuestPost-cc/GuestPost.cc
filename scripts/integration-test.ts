@@ -51,11 +51,18 @@ async function main() {
   // services, partial seed/validation rows) can't be fulfilled by a
   // publisher, so the order would 404 at accept/publish. Mirrors the order
   // wizard, which only offers website-backed listings.
-  const listings = (await call("GET", "/marketplace/listings?limit=50")).data.listings
-  const listing = listings.find((l: any) => l.websiteId)
-  check("marketplace has a website-backed approved listing", !!listing, listings.length)
-  if (!listing) { console.error("\n0 website-backed listings — run pnpm seed"); process.exit(1) }
-  const price = Number(listing.price)
+  // Must be a website owned by the SEED publisher (publisher@) — the test
+  // fulfills as that account. With platform listings + other publishers'
+  // listings polluting a shared dev DB, picking any website-backed listing
+  // would hand the order to the wrong publisher (403 at accept).
+  const seedPublisher = await prisma.publisher.findFirstOrThrow({ where: { email: "publisher@guestpost.local" } })
+  const seedWebsite = await prisma.website.findFirstOrThrow({
+    where: { publisherId: seedPublisher.id, marketplaceListings: { some: { status: "APPROVED" } } },
+    include: { marketplaceListings: { where: { status: "APPROVED" }, take: 1 } },
+  })
+  const listing = { websiteId: seedWebsite.id, price: Number(seedWebsite.marketplaceListings[0].price) }
+  check("seed publisher has a website-backed approved listing", !!listing.websiteId)
+  const price = listing.price
 
   // Fund the run relative to the actual listing price — a flat amount goes
   // stale as listings change and the shared dev wallet drains across runs
