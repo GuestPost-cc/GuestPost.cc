@@ -6,9 +6,10 @@ import { PermissionsGuard } from "../../common/guards/permissions.guard"
 import { SettlementsModule } from "../settlements/settlements.module"
 import { PublisherPayoutsModule } from "../publisher-payouts/publisher-payouts.module"
 import { OrdersModule } from "../orders/orders.module"
+import { MarketplaceModule } from "../marketplace/marketplace.module"
 
 @Module({
-  imports: [SettlementsModule, PublisherPayoutsModule, OrdersModule],
+  imports: [SettlementsModule, PublisherPayoutsModule, OrdersModule, MarketplaceModule],
   controllers: [AdminController],
   providers: [AdminService, ReconciliationService, PermissionsGuard],
 })

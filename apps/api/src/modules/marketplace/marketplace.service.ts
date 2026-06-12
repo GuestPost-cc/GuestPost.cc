@@ -18,6 +18,36 @@ import { slugify } from "../../common/utils/slugify"
 export class MarketplaceService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Strips internal/sensitive fields before a listing leaves a PUBLIC route.
+  // The raw row leaked publisher email/tier/org, internal ids, and raw
+  // provider metric dumps (semrush/traffic) to anyone scraping the public
+  // marketplace. Whitelist what a buyer legitimately needs to see.
+  private toPublicListing(listing: any) {
+    const {
+      organizationId, publisherId, semrushData, metricsData, trafficData,
+      publisher, ...rest
+    } = listing
+    return {
+      ...rest,
+      // Publisher reduced to display-safe fields; email/tier/org never exposed
+      publisher: publisher
+        ? {
+            id: publisher.id,
+            name: publisher.name,
+            profile: publisher.profile
+              ? {
+                  bio: publisher.profile.bio ?? null,
+                  rating: publisher.profile.rating ?? null,
+                  totalReviews: publisher.profile.totalReviews ?? null,
+                  responseTime: publisher.profile.responseTime ?? null,
+                  completionRate: publisher.profile.completionRate ?? null,
+                }
+              : null,
+          }
+        : null,
+    }
+  }
+
   // =============================================================================
   // LISTING CRUD
   // =============================================================================
@@ -135,13 +165,13 @@ export class MarketplaceService {
       const avgRating = listing.reviews.length > 0
         ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) / listing.reviews.length
         : null
-      return {
+      return this.toPublicListing({
         ...listing,
         tags: listing.tags.map(t => t.tag),
         image: listing.images[0]?.url || null,
         reviewCount: listing.reviews.length,
         avgRating,
-      }
+      })
     })
 
     return {
@@ -225,12 +255,14 @@ export class MarketplaceService {
     }
 
     return {
-      ...listing,
-      tags: listing.tags.map(t => t.tag),
-      avgRating,
-      reviewCount: listing.reviews.length,
-      isFavorited,
-      relatedListings: relatedListings.map(l => ({
+      ...this.toPublicListing({
+        ...listing,
+        tags: listing.tags.map(t => t.tag),
+        avgRating,
+        reviewCount: listing.reviews.length,
+        isFavorited,
+      }),
+      relatedListings: relatedListings.map(l => this.toPublicListing({
         ...l,
         tags: l.tags.map(t => t.tag),
         image: l.images[0]?.url || null,
@@ -251,6 +283,59 @@ export class MarketplaceService {
       throw new ForbiddenException("You don't have access to this publisher")
     }
     return publisherId
+  }
+
+  // Staff-created platform-owned listing: no publisher, INTERNAL fulfillment,
+  // tied to a PLATFORM-owned website (or no website for a pure service). The
+  // platform fulfills these directly. Kept strictly separate from publisher
+  // listings — a platform listing must never carry a publisherId (settlement
+  // routing branches on website.ownershipType), and a publisher must never be
+  // able to reach this path (admin-guarded route).
+  async createPlatformListing(userId: string, dto: CreateListingDto & { websiteId?: string }) {
+    const slug = slugify(dto.title)
+    const existing = await this.prisma.marketplaceListing.findUnique({ where: { slug } })
+    if (existing) throw new BadRequestException("A listing with this title already exists")
+
+    let websiteId: string | null = null
+    if (dto.websiteId) {
+      const website = await this.prisma.website.findUnique({ where: { id: dto.websiteId } })
+      if (!website) throw new NotFoundException("Website not found")
+      // Reject publisher-owned sites — those belong to the publisher's own
+      // listing flow; a platform listing on a publisher site would corrupt
+      // settlement ownership.
+      if (website.ownershipType !== "PLATFORM") {
+        throw new BadRequestException("Platform listings can only be attached to platform-owned websites")
+      }
+      websiteId = website.id
+    }
+
+    const data: any = { ...dto }
+    delete data.tags
+    delete data.websiteId
+    delete data.publisherId
+    delete data.organizationId
+
+    const listing = await this.prisma.marketplaceListing.create({
+      data: {
+        ...data,
+        slug,
+        websiteId,
+        publisherId: null,
+        organizationId: null,
+        fulfillmentType: "INTERNAL",
+        status: dto.status || ListingStatus.PENDING_REVIEW,
+        tags: dto.tags ? { create: dto.tags.map((tagId) => ({ tag: { connect: { id: tagId } } })) } : undefined,
+      },
+      include: { category: true, tags: { include: { tag: true } } },
+    })
+
+    await this.createAuditLog(userId, null, "PLATFORM_LISTING_CREATED", listing.id, {
+      title: listing.title,
+      websiteId,
+      type: listing.type,
+    })
+
+    return listing
   }
 
   async createListing(userId: string, activePublisherId: string | null, dto: CreateListingDto) {

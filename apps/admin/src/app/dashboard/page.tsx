@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../lib/api"
+import { useAuth } from "../../lib/auth"
 import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
 import { Skeleton } from "@guestpost/ui"
 import {
@@ -274,6 +275,10 @@ function ActivityFeed() {
 
 export default function DashboardPage() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  // Settlements/withdrawals are SUPER_ADMIN/FINANCE backend routes — never
+  // fetch them for OPERATIONS (was a 403 storm on the overview page)
+  const canSeeFinance = user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "FINANCE"
 
   const { data: users, isLoading: usersLoading, error: usersError } = useQuery({
     queryKey: ["admin", "users"],
@@ -291,16 +296,19 @@ export default function DashboardPage() {
     queryKey: ["admin", "settlements"],
     queryFn: () => api.admin.listSettlements(),
     retry: 1,
+    enabled: canSeeFinance,
   })
 
   const { data: withdrawals, isLoading: withdrawalsLoading, error: withdrawalsError } = useQuery({
     queryKey: ["admin", "withdrawals"],
     queryFn: () => api.admin.listWithdrawals(),
     retry: 1,
+    enabled: canSeeFinance,
   })
 
-  const isLoading = usersLoading || ordersLoading || settlementsLoading || withdrawalsLoading
-  const queryError = usersError || ordersError || settlementsError || withdrawalsError
+  const isLoading = usersLoading || ordersLoading || (canSeeFinance && (settlementsLoading || withdrawalsLoading))
+  // Finance query errors only matter for finance-capable staff
+  const queryError = usersError || ordersError || (canSeeFinance ? settlementsError || withdrawalsError : undefined)
 
   if (queryError) {
     return (

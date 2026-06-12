@@ -1,12 +1,13 @@
 import Link from "next/link"
 import { Button } from "@guestpost/ui"
 import { SiteHeader, SiteFooter, PORTAL_URL, PUBLISHER_URL } from "../components/site-chrome"
-import { 
-  Shield, 
-  Zap, 
-  BarChart3, 
-  Users, 
-  Globe, 
+import {
+  Shield,
+  ShieldCheck,
+  Zap,
+  BarChart3,
+  Users,
+  Globe,
   Star,
   ArrowRight,
   CheckCircle2,
@@ -23,7 +24,7 @@ export default function HomePage() {
         <Features />
         <HowItWorks />
         <Pricing />
-        <Testimonials />
+        <WhyTrust />
         <CTA />
       </main>
       <SiteFooter />
@@ -40,8 +41,8 @@ function Hero() {
       </div>
       <div className="container flex flex-col items-center text-center gap-8">
         <div className="inline-flex items-center gap-2 rounded-full border bg-muted/50 px-4 py-1.5 text-sm font-medium">
-          <Star className="h-4 w-4 text-amber-500" />
-          <span>Trusted by 2,500+ SEO professionals</span>
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <span>Escrowed payments • Verified delivery</span>
         </div>
         <h1 className="max-w-4xl text-5xl font-bold tracking-tight sm:text-6xl lg:text-7xl">
           <span className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
@@ -51,23 +52,23 @@ function Hero() {
           <span className="text-primary">at Scale</span>
         </h1>
         <p className="max-w-2xl text-xl text-muted-foreground leading-relaxed">
-          Connect with 10,000+ vetted publishers, automate guest post campaigns, 
-          and track every metric that drives real SEO results.
+          A managed marketplace for guest posts and editorial links — vetted publishers,
+          escrowed orders, and verified placements, all in one workflow.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 mt-4">
           <Button size="lg" className="gap-2" asChild>
-            <a href="http://localhost:3001?signup=true">
-              Start Free Trial <ArrowRight className="h-4 w-4" />
+            <a href={PORTAL_URL}>
+              Get Started <ArrowRight className="h-4 w-4" />
             </a>
           </Button>
           <Button variant="outline" size="lg" asChild>
-            <a href="http://localhost:3002">
+            <a href={PUBLISHER_URL}>
               Become a Publisher
             </a>
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
-          No credit card required • Setup in 5 minutes
+          Free to start • Funds escrowed until delivery is verified
         </p>
       </div>
     </section>
@@ -98,7 +99,7 @@ function Features() {
     {
       icon: <Globe className="h-6 w-6" />,
       title: "Publisher Discovery",
-      description: "Access 10,000+ pre-vetted publishers with domain ratings 50+, real traffic data, and topical relevance scores.",
+      description: "Browse vetted publishers with domain ratings, real traffic data, and topical relevance — every listing reviewed before it can sell.",
     },
     {
       icon: <Zap className="h-6 w-6" />,
@@ -309,44 +310,45 @@ function Pricing() {
   )
 }
 
-function Testimonials() {
+// Value cards instead of fabricated testimonials — never invent people or
+// quotes for a money platform pre-launch (trust + legal liability)
+function WhyTrust() {
+  const points = [
+    {
+      icon: ShieldCheck,
+      title: "Your money is escrowed",
+      body: "Order funds are captured into escrow and released to the publisher only after the placement is verified live and you confirm delivery.",
+    },
+    {
+      icon: CheckCircle2,
+      title: "Every listing is reviewed",
+      body: "Publishers can't sell until our team reviews their listing. No PBNs, no surprise placements — real sites with real editorial standards.",
+    },
+    {
+      icon: BarChart3,
+      title: "Disputes pause settlement",
+      body: "If something goes wrong after delivery, open a dispute — settlement freezes automatically while our team reviews, with full refund where upheld.",
+    },
+  ]
   return (
     <section className="py-24 bg-muted/30">
       <div className="container">
         <div className="text-center mb-16">
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl mb-4">
-            Loved by SEO teams worldwide
+            Built like a fintech, not a forum
           </h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Link building usually runs on trust and spreadsheets. We replaced that with escrow, verification, and accountability.
+          </p>
         </div>
         <div className="grid gap-8 md:grid-cols-3">
-          {[
-            {
-              quote: "GuestPost helped us build 200+ contextual backlinks in 3 months. Our client's DA went from 34 to 52.",
-              author: "Sarah Chen",
-              role: "Head of SEO, DigitalScale",
-            },
-            {
-              quote: "The quality of publishers is unmatched. Every placement we've gotten has been indexed and driving traffic.",
-              author: "Marcus Johnson", 
-              role: "Founder, RankUp Agency",
-            },
-            {
-              quote: "Finally, a guest post service that doesn't feel like a PBN. Real sites, real editorial standards.",
-              author: "Lisa Park",
-              role: "SEO Director, TechStart",
-            },
-          ].map((testimonial) => (
-            <div key={testimonial.author} className="rounded-2xl bg-card p-8 shadow-sm">
-              <div className="flex gap-1 mb-4">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} className="h-5 w-5 fill-amber-500 text-amber-500" />
-                ))}
+          {points.map((p) => (
+            <div key={p.title} className="rounded-2xl bg-card p-8 shadow-sm">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10">
+                <p.icon className="h-5 w-5 text-primary" />
               </div>
-              <p className="text-muted-foreground mb-6 italic">"{testimonial.quote}"</p>
-              <div>
-                <p className="font-semibold">{testimonial.author}</p>
-                <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-              </div>
+              <h3 className="mt-5 font-semibold">{p.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{p.body}</p>
             </div>
           ))}
         </div>
@@ -369,11 +371,11 @@ function CTA() {
               Ready to build your SEO authority?
             </h2>
             <p className="text-primary-foreground/80 text-lg mb-8">
-              Join 2,500+ SEO professionals who trust GuestPost for their link building campaigns.
+              Start building authority on a marketplace where every order is escrowed and every placement is verified.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" variant="secondary" className="gap-2" asChild>
-                <a href="http://localhost:3001?signup=true">
+                <a href={PORTAL_URL}>
                   Start Free Trial <ArrowRight className="h-4 w-4" />
                 </a>
               </Button>

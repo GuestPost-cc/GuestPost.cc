@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
@@ -76,12 +77,45 @@ const statusColors: Record<string, string> = {
   ARCHIVED: "bg-gray-100 text-gray-500",
 }
 
+const LISTING_TYPES = ["GUEST_POST", "NICHE_EDIT", "EDITORIAL_LINK", "SPONSORED_CONTENT", "DIGITAL_PR", "BLOG_ARTICLE", "SEO_CONTENT"] as const
+
 export default function AdminMarketplacePage() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
   const [page, setPage] = useState(1)
+  // Moderation + platform-listing creation are SUPER_ADMIN/OPERATIONS
+  const canManage = user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
+  const [showCreate, setShowCreate] = useState(false)
+  const [pform, setPform] = useState({ title: "", description: "", type: "GUEST_POST", price: "", websiteId: "" })
+
+  const platformWebsitesQ = useQuery({
+    queryKey: ["admin", "platform-websites"],
+    queryFn: () => api.admin.listPlatformWebsites(),
+    enabled: showCreate,
+  })
+
+  const createPlatformMutation = useMutation({
+    mutationFn: () =>
+      api.admin.createPlatformListing({
+        title: pform.title.trim(),
+        description: pform.description.trim(),
+        type: pform.type,
+        price: Number(pform.price),
+        websiteId: pform.websiteId || undefined,
+        status: "APPROVED",
+      }),
+    onSuccess: () => {
+      toast.success("Platform listing created")
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+      setShowCreate(false)
+      setPform({ title: "", description: "", type: "GUEST_POST", price: "", websiteId: "" })
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to create platform listing"),
+  })
+  const canSubmitPlatform = pform.title.trim().length >= 3 && pform.description.trim().length >= 1 && Number(pform.price) > 0
 
   const { data, isLoading, error: listingsError } = useQuery({
     queryKey: ["admin-marketplace-listings", page, statusFilter, typeFilter],
@@ -165,10 +199,75 @@ export default function AdminMarketplacePage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Marketplace Management</h1>
-        <p className="text-muted-foreground">Manage marketplace listings and content</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Marketplace Management</h1>
+          <p className="text-muted-foreground">Publisher and platform-owned listings</p>
+        </div>
+        {canManage && (
+          <Button onClick={() => setShowCreate(true)}>
+            <Store className="mr-2 h-4 w-4" />
+            New Platform Listing
+          </Button>
+        )}
       </div>
+
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>New Platform Listing</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Platform-owned listing fulfilled by your team (no publisher). Attach an optional platform website.
+          </p>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Title</label>
+              <Input value={pform.title} onChange={(e) => setPform({ ...pform, title: e.target.value })} maxLength={200} placeholder="e.g. Premium editorial placement" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Description</label>
+              <Input value={pform.description} onChange={(e) => setPform({ ...pform, description: e.target.value })} maxLength={1000} placeholder="What the buyer gets" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Type</label>
+                <Select value={pform.type} onValueChange={(v) => setPform({ ...pform, type: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {LISTING_TYPES.map((t) => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">Price (USD)</label>
+                <Input type="number" min={1} step="0.01" value={pform.price} onChange={(e) => setPform({ ...pform, price: e.target.value })} placeholder="500" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium">Platform website (optional)</label>
+              <Select value={pform.websiteId || "none"} onValueChange={(v) => setPform({ ...pform, websiteId: v === "none" ? "" : v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder={platformWebsitesQ.isLoading ? "Loading..." : "No website (service listing)"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No website (service listing)</SelectItem>
+                  {(platformWebsitesQ.data ?? []).map((w) => (
+                    <SelectItem key={w.id} value={w.id}>{w.name ?? w.url}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Only platform-owned websites are selectable. Create them under Websites.</p>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
+            <Button onClick={() => createPlatformMutation.mutate()} disabled={!canSubmitPlatform || createPlatformMutation.isPending}>
+              {createPlatformMutation.isPending ? "Creating..." : "Create Listing"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>

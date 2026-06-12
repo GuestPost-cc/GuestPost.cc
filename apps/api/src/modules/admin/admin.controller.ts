@@ -15,6 +15,8 @@ import { OrderOperationsService } from "../orders/services/order-operations.serv
 import { SettlementReasonDto } from "../settlements/dto/settlement-reason.dto"
 import { CreatePlatformWebsiteDto, UpdatePlatformWebsiteDto } from "./dto/create-platform-website.dto"
 import { ReconciliationService } from "./reconciliation.service"
+import { MarketplaceService } from "../marketplace/marketplace.service"
+import { CreateListingDto } from "../marketplace/dto/marketplace.dto"
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max)
 const parsePagination = (take?: string, skip?: string) => ({
@@ -35,6 +37,7 @@ export class AdminController {
     private readonly ops: OrderOperationsService,
     private readonly reconciliation: ReconciliationService,
     private readonly payoutExecution: PayoutExecutionService,
+    private readonly marketplace: MarketplaceService,
   ) {}
 
   // Financial drift detector — balances vs transaction history, stuck orders
@@ -391,6 +394,14 @@ export class AdminController {
   @Get("marketplace/stats")
   getMarketplaceStats() {
     return this.admin.getMarketplaceStats()
+  }
+
+  // Create a PLATFORM-owned listing (no publisher, INTERNAL fulfillment).
+  // Service rejects publisher-owned websites so ownership can't be spoofed.
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Post("marketplace/listings")
+  createPlatformListing(@Body() body: CreateListingDto & { websiteId?: string }, @CurrentUser() user: any) {
+    return this.marketplace.createPlatformListing(user.id, body)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")

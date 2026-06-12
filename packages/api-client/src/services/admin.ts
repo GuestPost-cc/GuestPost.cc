@@ -213,6 +213,28 @@ export class AdminService {
     }>("/admin/marketplace/listings", { params: params as Record<string, string | number | undefined> })
   }
 
+  // Platform-owned websites (for attaching platform listings)
+  async listPlatformWebsites() {
+    const res = await this.client.get<{ websites: Array<{ id: string; url: string; name: string | null }> }>(
+      "/admin/websites",
+      { params: { ownershipType: "PLATFORM" } as Record<string, string> },
+    )
+    return res.websites ?? []
+  }
+
+  // Create a PLATFORM-owned marketplace listing (no publisher, INTERNAL
+  // fulfillment). websiteId must be a platform-owned website or omitted.
+  createPlatformListing(data: {
+    title: string
+    description: string
+    type: string
+    price: number
+    websiteId?: string
+    status?: string
+  }) {
+    return this.client.post<{ id: string; slug: string; status: string }>("/admin/marketplace/listings", { json: data })
+  }
+
   updateListingStatus(listingId: string, status: string) {
     return this.client.patch(`/admin/marketplace/listings/${listingId}/status`, { json: { status } })
   }
