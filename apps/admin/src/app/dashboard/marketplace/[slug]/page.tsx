@@ -164,7 +164,7 @@ export default function AdminListingPreviewPage({ params }: { params: Promise<{ 
           </div>
           {listing.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
-              {listing.tags.map((t) => (
+              {listing.tags.map((t: any) => (
                 <span key={t.id} className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{t.name}</span>
               ))}
             </div>
