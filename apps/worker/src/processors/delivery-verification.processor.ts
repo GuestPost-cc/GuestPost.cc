@@ -3,7 +3,7 @@ import { isIP } from "net"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 // Node-only deep imports keep cheerio + aws-sdk out of the shared index.
-import { runDeliveryVerification, FetchResult } from "@guestpost/shared/dist/delivery-verification-core"
+import { runDeliveryVerification, runSettlementHoldLinkSweep, FetchResult } from "@guestpost/shared/dist/delivery-verification-core"
 import { putObject } from "@guestpost/shared/dist/object-storage"
 import { prisma } from "@guestpost/database"
 
@@ -89,6 +89,12 @@ export function createDeliveryVerificationWorker() {
       if (!verifyJobPayload(job.data)) {
         console.error(`[DELIVERY_VERIFY] Job ${job.id} missing/invalid signature — rejecting`)
         throw new Error("Invalid job signature")
+      }
+      // Settlement-hold link monitoring sweep (repeatable).
+      if (job.name === "settlement-hold-sweep") {
+        const res = await runSettlementHoldLinkSweep(deps)
+        console.log(`[DELIVERY_VERIFY] hold link sweep: ${JSON.stringify(res)}`)
+        return res
       }
       if (job.name !== "delivery-verify") {
         console.warn(`[DELIVERY_VERIFY] Unknown job: ${job.name}`)

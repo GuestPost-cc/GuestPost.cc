@@ -5,7 +5,7 @@
  * manual-review / idempotent / fraud detection).
  */
 import { normalizeUrl, urlsMatch, sameDomain, evaluateSettlementEligibility, checkSeparationOfDuties } from "@guestpost/shared"
-import { runDeliveryVerification, FetchResult } from "@guestpost/shared/dist/delivery-verification-core"
+import { runDeliveryVerification, runDeliveryLinkRecheck, FetchResult } from "@guestpost/shared/dist/delivery-verification-core"
 
 // ── URL normalization ──────────────────────────────────────────────────────
 describe("normalizeUrl / urlsMatch", () => {
@@ -180,5 +180,53 @@ describe("runDeliveryVerification", () => {
     prisma.orderDeliveryVersion.findUnique.mockResolvedValue({ ...version, supersededByVersion: 2 })
     const res = await runDeliveryVerification({ prisma, fetchUrl: fetcher(goodHtml), putObject }, "v1")
     expect(res).toEqual({ skipped: "superseded" })
+  })
+})
+
+// ── Settlement-hold link monitoring ────────────────────────────────────────
+describe("runDeliveryLinkRecheck", () => {
+  let prisma: any
+  const putObject = jest.fn().mockResolvedValue({ objectKey: "k" })
+  const version = { id: "v1", orderId: "o1", publishedUrl: "https://blog.com/post", normalizedUrl: "https://blog.com/post", verificationStatus: "VERIFIED", verificationVersion: 1, supersededByVersion: null }
+  const order = { id: "o1", organizationId: "org1", customerId: "cust1", websiteId: "w1", targetUrl: "https://client.com/product", anchorText: "best product", website: { url: "https://blog.com", publisherId: "pub1" } }
+  const goodHtml = `<a href="https://client.com/product">best product</a>`
+
+  beforeEach(() => {
+    prisma = {
+      orderDeliveryVersion: { findUnique: jest.fn().mockResolvedValue({ ...version }), updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
+      order: { findUnique: jest.fn().mockResolvedValue({ ...order }) },
+      deliveryFraudFlag: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({}) },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
+      notification: { create: jest.fn().mockResolvedValue({}) },
+      publisherMembership: { findMany: jest.fn().mockResolvedValue([{ userId: "pub-user" }]) },
+      staffMembership: { findMany: jest.fn().mockResolvedValue([{ userId: "s1" }]) },
+    }
+  })
+  const fetcher = (html: string, status = 200) => jest.fn().mockResolvedValue({ finalUrl: "https://blog.com/post", status, headers: {}, html, redirectChain: [] } as FetchResult)
+
+  it("link still present -> ok, no flag", async () => {
+    const r = await runDeliveryLinkRecheck({ prisma, fetchUrl: fetcher(goodHtml), putObject }, "v1")
+    expect(r).toEqual({ ok: true })
+    expect(prisma.deliveryFraudFlag.create).not.toHaveBeenCalled()
+  })
+
+  it("link removed -> FAILED + LINK_REMOVED flag + audit + notify", async () => {
+    const r = await runDeliveryLinkRecheck({ prisma, fetchUrl: fetcher(`<p>article without the link</p>`), putObject }, "v1")
+    expect(r).toEqual({ removed: true })
+    expect(prisma.orderDeliveryVersion.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ verificationStatus: "FAILED" }) }))
+    expect(prisma.deliveryFraudFlag.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: "LINK_REMOVED" }) }))
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ action: "ORDER_DELIVERY_LINK_REMOVED" }) }))
+  })
+
+  it("transient outage -> skipped, never penalizes", async () => {
+    const r = await runDeliveryLinkRecheck({ prisma, fetchUrl: fetcher("", 503), putObject }, "v1")
+    expect(r).toEqual({ skipped: "transient" })
+    expect(prisma.deliveryFraudFlag.create).not.toHaveBeenCalled()
+  })
+
+  it("non-verified delivery -> skipped", async () => {
+    prisma.orderDeliveryVersion.findUnique.mockResolvedValue({ ...version, verificationStatus: "FAILED" })
+    const r = await runDeliveryLinkRecheck({ prisma, fetchUrl: fetcher(goodHtml), putObject }, "v1")
+    expect(r).toEqual({ skipped: "not_verified" })
   })
 })

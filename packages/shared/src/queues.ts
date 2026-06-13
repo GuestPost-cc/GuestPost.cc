@@ -47,6 +47,7 @@ export const QUEUE_JOBS = {
   },
   [QUEUES.DELIVERY_VERIFICATION]: {
     VERIFY: "delivery-verify",
+    HOLD_LINK_SWEEP: "settlement-hold-sweep",
   },
   [QUEUES.PAYOUT]: {
     EXECUTE: "payout-execute",

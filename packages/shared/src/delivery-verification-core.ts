@@ -358,3 +358,96 @@ export async function runDeliveryVerification(
 
   return { status: newStatus, reason: failureReason ?? undefined }
 }
+
+// ── Settlement-hold link monitoring ─────────────────────────────────────────
+// During the payout hold the live link is re-checked. If the publisher removed
+// or changed it, the active delivery is marked FAILED, a LINK_REMOVED fraud
+// flag is raised (which settlement gating blocks on), and everyone is notified.
+
+export interface LinkRecheckResult {
+  skipped?: string
+  ok?: boolean
+  removed?: boolean
+}
+
+export async function runDeliveryLinkRecheck(deps: DeliveryDeps, deliveryVersionId: string): Promise<LinkRecheckResult> {
+  const { prisma, fetchUrl } = deps
+  const now = (deps.now ?? (() => new Date()))()
+
+  const version = await prisma.orderDeliveryVersion.findUnique({ where: { id: deliveryVersionId } })
+  if (!version) return { skipped: "not_found" }
+  // Only monitor a currently-good delivery; failed/superseded ones already block.
+  if (version.verificationStatus !== "VERIFIED") return { skipped: "not_verified" }
+  if (version.supersededByVersion != null) return { skipped: "superseded" }
+
+  const order = await prisma.order.findUnique({
+    where: { id: version.orderId },
+    include: { website: { select: { url: true, publisherId: true } } },
+  })
+  if (!order) return { skipped: "order_not_found" }
+
+  let fetched: FetchResult
+  try {
+    fetched = await fetchUrl(version.publishedUrl)
+  } catch (err: any) {
+    fetched = { finalUrl: version.publishedUrl, status: 0, headers: {}, html: "", redirectChain: [], error: err?.message ?? "fetch failed" }
+  }
+  // A transient outage is NOT a removal — never penalize the publisher for it.
+  if (fetched.error || !ACCEPT_STATUSES.has(fetched.status)) return { skipped: "transient" }
+
+  const analysis = analyzeHtml(fetched.html, order.targetUrl ?? null, order.anchorText ?? null)
+  const stillPresent = analysis.linkFound && analysis.targetUrlMatched && analysis.anchorFound
+  if (stillPresent) return { ok: true }
+
+  // Link gone/changed — mark FAILED + raise LINK_REMOVED (version-guarded).
+  const reason = "Link removed or changed after delivery (detected during settlement hold)"
+  const upd = await prisma.orderDeliveryVersion.updateMany({
+    where: { id: version.id, verificationVersion: version.verificationVersion },
+    data: { verificationStatus: "FAILED", verificationFailureReason: reason, verificationVersion: version.verificationVersion + 1 },
+  })
+  if (upd.count === 0) return { skipped: "version_conflict" }
+
+  const exists = await prisma.deliveryFraudFlag.findFirst({ where: { deliveryVersionId: version.id, type: "LINK_REMOVED" }, select: { id: true } })
+  if (!exists) {
+    await prisma.deliveryFraudFlag.create({
+      data: { orderId: order.id, deliveryVersionId: version.id, type: "LINK_REMOVED", details: { detectedAt: now.toISOString(), publishedUrl: version.publishedUrl } },
+    })
+  }
+  await audit(prisma, "ORDER_DELIVERY_LINK_REMOVED", order, version, null, { reason, httpStatus: fetched.status })
+
+  const ownerIds = await publisherOwnerIds(prisma, order.website?.publisherId)
+  await notifyUsers(prisma, ownerIds, order.organizationId, "ORDER_DELIVERY_LINK_REMOVED", `The link for order ${order.id} is no longer live. Settlement is on hold until it is restored.`)
+  await notifyUsers(prisma, [order.customerId], order.organizationId, "ORDER_DELIVERY_LINK_REMOVED", `The placement for your order ${order.id} appears to have been removed. We've paused the publisher's payout and our team is reviewing.`)
+  await notifyUsers(prisma, await staffIds(prisma), null, "ORDER_DELIVERY_LINK_REMOVED", `Link removed on order ${order.id} during settlement hold — payout blocked.`)
+
+  return { removed: true }
+}
+
+export interface HoldSweepResult {
+  ok: boolean
+  checked: number
+  removed: number
+}
+
+// Re-checks the live link for every order whose payout is still on hold
+// (settlement PENDING/UNDER_REVIEW). Run periodically by the worker.
+export async function runSettlementHoldLinkSweep(deps: DeliveryDeps): Promise<HoldSweepResult> {
+  const { prisma } = deps
+  const held = await prisma.settlement.findMany({
+    where: { status: { in: ["PENDING", "UNDER_REVIEW"] } },
+    include: { order: { select: { activeDeliveryVersionId: true } } },
+    take: 500,
+  })
+
+  let checked = 0
+  let removed = 0
+  for (const s of held) {
+    const versionId = s.order?.activeDeliveryVersionId
+    if (!versionId) continue
+    const r = await runDeliveryLinkRecheck(deps, versionId)
+    if (r.skipped === "not_verified" || r.skipped === "superseded") continue
+    checked++
+    if (r.removed) removed++
+  }
+  return { ok: true, checked, removed }
+}

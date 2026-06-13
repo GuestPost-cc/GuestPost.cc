@@ -73,6 +73,26 @@ async function registerWebsiteReverifySweep() {
   console.log(`[WORKER] Registered website re-verify sweep (every ${everyMs / 86400000}d)`)
 }
 
+// Settlement-hold link monitoring — re-check the live link for every order
+// whose payout is still on hold. If removed, raises a fraud flag that blocks
+// release. Default every 6h.
+async function registerSettlementHoldLinkSweep() {
+  const everyMs = Math.max(Number(process.env.SETTLEMENT_LINK_SWEEP_HOURS ?? 6), 1) * 60 * 60 * 1000
+  const queue = new Queue(QUEUES.DELIVERY_VERIFICATION, { connection })
+  await queue.add(
+    "settlement-hold-sweep",
+    signJobPayload({}),
+    {
+      repeat: { every: everyMs },
+      jobId: "settlement-hold-sweep",
+      removeOnComplete: { count: 24 },
+      removeOnFail: { count: 24 },
+    },
+  )
+  await queue.close()
+  console.log(`[WORKER] Registered settlement-hold link sweep (every ${everyMs / 3600000}h)`)
+}
+
 async function checkConnections() {
   try {
     await connection.ping()
@@ -111,6 +131,9 @@ checkConnections().then(() => {
   })
   registerWebsiteReverifySweep().catch((err) => {
     console.error("[WORKER] Failed to register website re-verify sweep:", err)
+  })
+  registerSettlementHoldLinkSweep().catch((err) => {
+    console.error("[WORKER] Failed to register settlement-hold link sweep:", err)
   })
 })
 

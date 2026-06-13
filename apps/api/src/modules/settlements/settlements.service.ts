@@ -52,7 +52,10 @@ export class SettlementsService {
     const feeFraction = await resolvePlatformFeeFraction(this.prisma)
     const { fee: platformFee, net: publisherAmount } = splitPlatformFee(order.amount, feeFraction)
 
-    const reviewDays = Math.max(Number(process.env.SETTLEMENT_REVIEW_DAYS ?? 7), 0)
+    // 14-day hold: the publisher's payout is held while we keep re-checking the
+    // live link. If it's removed during the window, the link sweep raises a
+    // fraud flag and settlement gating blocks release.
+    const reviewDays = Math.max(Number(process.env.SETTLEMENT_REVIEW_DAYS ?? 14), 0)
     const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
 
     return this.prisma.$transaction(async (tx: any) => {
