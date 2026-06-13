@@ -268,4 +268,8 @@ export class OrdersService {
     const raw = await this.client.post<RawOrder>(`/orders/${id}/confirm-delivery`)
     return normalizeOrder(raw)
   }
+  // Manual fallback acceptance (only valid when auto-verification FAILED/MANUAL_REVIEW).
+  acceptDelivery(id: string) {
+    return this.client.post<{ status: string; acceptedBy: string }>(`/orders/${id}/accept-delivery`)
+  }
 }

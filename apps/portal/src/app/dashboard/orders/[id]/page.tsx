@@ -423,6 +423,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     onError: (e: Error) => toast.error(e.message || "Failed to confirm delivery"),
   })
 
+  // Fallback: accept manually when the automated check could not verify.
+  const acceptDeliveryMutation = useMutation({
+    mutationFn: () => api.orders.acceptDelivery(resolvedParams.id),
+    onSuccess: () => { toast.success("Delivery accepted — order complete"); refreshOrder() },
+    onError: (e: Error) => toast.error(e.message || "Failed to accept delivery"),
+  })
+
   const requestRevisionMutation = useMutation({
     mutationFn: () => api.orders.requestRevision(resolvedParams.id, revisionMessage.trim()),
     onSuccess: () => {
@@ -479,6 +486,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const canRequestRevision = order.status === "CUSTOMER_REVIEW"
   // Platform verified the live placement — customer confirms to complete + settle
   const canConfirmDelivery = order.status === "VERIFIED"
+  // System check is primary; manual accept is the fallback only when the
+  // automated check failed or needs review (and not already accepted).
+  const autoUnverified = proof?.hasDelivery && ["FAILED", "MANUAL_REVIEW"].includes(proof.verificationStatus) && proof.interventionStatus === "NONE"
+  const canManualAccept = order.status === "PUBLISHED" && autoUnverified
+  const verifyInProgress = order.status === "PUBLISHED" && proof?.hasDelivery && ["PENDING", "RETRYING"].includes(proof.verificationStatus)
   const canCancel = !["COMPLETED", "CANCELLED", "REFUNDED", "DELIVERED", "SETTLED", "DISPUTED"].includes(order.status)
   // Backend allows disputes on PUBLISHED/VERIFIED/DELIVERED/CANCELLED or any
   // paid order; surface the button once money has moved and no terminal state
@@ -572,6 +584,39 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   {confirmDeliveryMutation.isPending ? "Confirming..." : "Confirm Delivery"}
                 </Button>
               )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {verifyInProgress && (
+        <Card>
+          <CardContent className="flex items-center gap-3 pt-6 text-sm text-muted-foreground">
+            <RefreshCw className="h-4 w-4 animate-spin" />
+            Automated verification is running. We&apos;re checking the live placement — this usually takes a few minutes.
+          </CardContent>
+        </Card>
+      )}
+
+      {canManualAccept && (
+        <Card className="border-amber-300 bg-amber-50">
+          <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium text-amber-900">Automated check couldn&apos;t verify this delivery</p>
+              <p className="text-sm text-amber-800">
+                Our system couldn&apos;t confirm the live placement. Review the published page yourself — if it looks correct, accept it to complete the order. Otherwise open a dispute.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {proof?.publishedUrl && (
+                <Button variant="outline" asChild>
+                  <a href={proof.publishedUrl} target="_blank" rel="noopener noreferrer">Review page</a>
+                </Button>
+              )}
+              <Button variant="outline" onClick={() => setShowDisputeDialog(true)}>Open Dispute</Button>
+              <Button onClick={() => acceptDeliveryMutation.mutate()} disabled={acceptDeliveryMutation.isPending}>
+                {acceptDeliveryMutation.isPending ? "Accepting..." : "Accept Delivery"}
+              </Button>
             </div>
           </CardContent>
         </Card>

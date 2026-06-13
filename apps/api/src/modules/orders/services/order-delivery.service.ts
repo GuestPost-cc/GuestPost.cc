@@ -183,6 +183,79 @@ export class OrderDeliveryService {
     }
   }
 
+  // Customer manual acceptance — a SECONDARY fallback. The automated system
+  // check is always authoritative: this is only allowed when auto verification
+  // FAILED or needs MANUAL_REVIEW. A VERIFIED delivery uses Confirm Delivery
+  // instead; a still-running check must be waited out. Accepting completes the
+  // order (DELIVERED) so settlement can proceed.
+  async customerAcceptDelivery(orderId: string, organizationId: string, userId: string) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, organizationId },
+      include: { website: { select: { publisherId: true } } },
+    })
+    if (!order) throw new NotFoundException("Order not found")
+    if (!order.activeDeliveryVersionId) throw new BadRequestException("There is no delivery to accept yet")
+
+    const v = await this.prisma.orderDeliveryVersion.findUnique({ where: { id: order.activeDeliveryVersionId } })
+    if (!v) throw new BadRequestException("Active delivery not found")
+
+    // System-check priority: manual accept is the fallback path only.
+    if (v.verificationStatus === "VERIFIED") {
+      throw new BadRequestException("This delivery passed automated verification — use Confirm Delivery.")
+    }
+    if (!["FAILED", "MANUAL_REVIEW"].includes(v.verificationStatus)) {
+      throw new BadRequestException("Automated verification is still running — please wait for it to finish.")
+    }
+    if (order.status !== "PUBLISHED") {
+      throw new BadRequestException("Order is not awaiting delivery confirmation")
+    }
+
+    return this.prisma.$transaction(async (tx: any) => {
+      const upd = await tx.orderDeliveryVersion.updateMany({
+        where: { id: v.id, verificationVersion: v.verificationVersion },
+        data: { interventionStatus: "APPROVED", verificationFailureReason: null, verificationVersion: v.verificationVersion + 1 },
+      })
+      if (upd.count === 0) throw new ConflictException("Delivery was modified by another request. Retry.")
+
+      const ordUpd = await tx.order.updateMany({
+        where: { id: order.id, version: order.version, status: "PUBLISHED" },
+        data: { status: "DELIVERED", deliveredAt: new Date(), verifiedAt: new Date(), verifiedBy: userId, verifyMethod: "customer_manual", version: { increment: 1 } },
+      })
+      if (ordUpd.count === 0) throw new ConflictException("Order was modified by another request. Retry.")
+
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "DELIVERY_CONFIRMED",
+          actorId: userId,
+          message: "Customer manually accepted the delivery after the automated check could not verify it",
+          metadata: { priorVerification: v.verificationStatus, deliveryVersionId: v.id },
+        },
+      })
+      await this.audit.log(
+        {
+          action: "ORDER_DELIVERY_CUSTOMER_ACCEPTED",
+          entityType: "OrderDeliveryVersion",
+          entityId: v.id,
+          metadata: { orderId, publishedUrl: v.publishedUrl, priorVerification: v.verificationStatus, publisherId: order.website?.publisherId ?? null },
+          userId,
+          organizationId,
+        },
+        tx,
+      )
+
+      // Best-effort notify the publisher owners.
+      if (order.website?.publisherId) {
+        const owners = await tx.publisherMembership.findMany({ where: { publisherId: order.website.publisherId, role: "PUBLISHER_OWNER" }, select: { userId: true } })
+        for (const o of owners) {
+          await tx.notification.create({ data: { userId: o.userId, organizationId, type: "ORDER_DELIVERY_CUSTOMER_ACCEPTED", message: `Customer manually accepted delivery for order ${orderId}.` } }).catch(() => undefined)
+        }
+      }
+
+      return { status: "DELIVERED", acceptedBy: "customer" }
+    })
+  }
+
   async getDelivery(id: string) {
     const v = await this.prisma.orderDeliveryVersion.findUnique({
       where: { id },

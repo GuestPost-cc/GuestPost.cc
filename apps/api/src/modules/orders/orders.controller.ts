@@ -134,6 +134,17 @@ export class OrdersController {
     return this.review.confirmDelivery(id, user.organizationId, user.id)
   }
 
+  // Manual fallback: customer accepts the delivery when the automated check
+  // could not verify it (FAILED / MANUAL_REVIEW). System check stays primary.
+  @Post(":id/accept-delivery")
+  @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
+  @MemberRoles("OWNER", "MEMBER")
+  @ActorType("CUSTOMER")
+  @RequireOrderOwnership()
+  acceptDelivery(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.delivery.customerAcceptDelivery(id, user.organizationId, user.id)
+  }
+
   // Customer-facing delivery proof (verification checklist, no internal evidence)
   @Get(":id/delivery-proof")
   @UseGuards(OrderOwnershipGuard)
