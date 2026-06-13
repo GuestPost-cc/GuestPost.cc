@@ -139,6 +139,18 @@ export class AdminController {
     return this.admin.refundOrder(id, reason, user.id)
   }
 
+  @Get("disputes")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  listDisputes(@Query("status") status?: string, @Query("page") page?: string, @Query("limit") limit?: string) {
+    return this.dispute.listDisputes({ status, page: page ? parseInt(page, 10) : 1, limit: limit ? parseInt(limit, 10) : 50 })
+  }
+
+  @Post("disputes/:id/review")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  reviewDispute(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.dispute.markUnderReview(id, user.id)
+  }
+
   @Post("disputes/:id/resolve")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   resolveDispute(

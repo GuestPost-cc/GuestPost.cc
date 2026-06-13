@@ -11,6 +11,87 @@ export class OrderDisputeService {
     private readonly refund: RefundService,
   ) {}
 
+  // Staff dispute queue — open/under-review first, with the order + customer
+  // context needed to triage without opening each one.
+  async listDisputes(params: { status?: string; page?: number; limit?: number }) {
+    const page = Math.max(params.page ?? 1, 1)
+    const limit = Math.min(Math.max(params.limit ?? 50, 1), 100)
+    const where: any = {}
+    if (params.status && params.status !== "all") where.status = params.status
+
+    const [rows, total, openCount, underReviewCount] = await this.prisma.$transaction([
+      this.prisma.orderDispute.findMany({
+        where,
+        include: {
+          order: {
+            select: {
+              id: true,
+              title: true,
+              amount: true,
+              status: true,
+              organizationId: true,
+              customer: { select: { id: true, name: true, email: true } },
+              website: { select: { domain: true, url: true, ownershipType: true } },
+            },
+          },
+        },
+        // Active disputes (OPEN/UNDER_REVIEW) bubble up, then newest first.
+        orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+        take: limit,
+        skip: (page - 1) * limit,
+      }),
+      this.prisma.orderDispute.count({ where }),
+      this.prisma.orderDispute.count({ where: { status: "OPEN" } }),
+      this.prisma.orderDispute.count({ where: { status: "UNDER_REVIEW" } }),
+    ])
+
+    return {
+      items: rows.map((d: any) => ({
+        id: d.id,
+        orderId: d.orderId,
+        status: d.status,
+        reason: d.reason,
+        resolution: d.resolution,
+        raisedBy: d.raisedBy,
+        resolvedBy: d.resolvedBy,
+        resolvedAt: d.resolvedAt,
+        createdAt: d.createdAt,
+        order: d.order
+          ? {
+              id: d.order.id,
+              title: d.order.title,
+              amount: d.order.amount != null ? Number(d.order.amount) : null,
+              status: d.order.status,
+              customer: d.order.customer,
+              website: d.order.website,
+            }
+          : null,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+      counts: { open: openCount, underReview: underReviewCount, active: openCount + underReviewCount },
+    }
+  }
+
+  // Move an OPEN dispute to UNDER_REVIEW (triage claim).
+  async markUnderReview(disputeId: string, userId: string) {
+    const dispute = await this.prisma.orderDispute.findUnique({ where: { id: disputeId } })
+    if (!dispute) throw new NotFoundException("Dispute not found")
+    if (dispute.status !== "OPEN") throw new BadRequestException("Only OPEN disputes can be moved to review")
+    const updated = await this.prisma.orderDispute.update({ where: { id: disputeId }, data: { status: "UNDER_REVIEW" } })
+    await this.audit.log({
+      action: "DISPUTE_UNDER_REVIEW",
+      entityType: "OrderDispute",
+      entityId: disputeId,
+      metadata: { orderId: dispute.orderId },
+      userId,
+      organizationId: null,
+    })
+    return updated
+  }
+
   private async transitionOrder(orderId: string, fromVersion: number, data: any) {
     const r = await this.prisma.order.updateMany({
       where: { id: orderId, version: fromVersion },

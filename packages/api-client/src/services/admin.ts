@@ -309,6 +309,20 @@ export class AdminService {
   disputeEvidence(disputeId: string) {
     return this.client.get<any>(`/disputes/${disputeId}/evidence`)
   }
+  listDisputes(params?: { status?: string; page?: number; limit?: number }) {
+    const q = new URLSearchParams()
+    if (params?.status) q.set("status", params.status)
+    if (params?.page) q.set("page", String(params.page))
+    if (params?.limit) q.set("limit", String(params.limit))
+    const qs = q.toString()
+    return this.client.get<any>(`/admin/disputes${qs ? `?${qs}` : ""}`)
+  }
+  reviewDispute(disputeId: string) {
+    return this.client.post<any>(`/admin/disputes/${disputeId}/review`)
+  }
+  resolveDispute(disputeId: string, action: "RESTORE" | "REFUND" | "REJECT", resolution: string) {
+    return this.client.post<any>(`/admin/disputes/${disputeId}/resolve`, { json: { action, resolution } })
+  }
   reverifyDelivery(deliveryId: string) {
     return this.client.post(`/deliveries/${deliveryId}/reverify`)
   }
