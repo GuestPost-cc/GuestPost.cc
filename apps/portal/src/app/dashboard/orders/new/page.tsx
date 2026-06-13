@@ -577,11 +577,16 @@ export default function NewOrderPage() {
 
   const createMutation = useMutation({
     mutationFn: (data: any) => api.orders.create(data),
-    onSuccess: () => {
-      toast.success("Order created successfully!")
+    onSuccess: (order: any) => {
+      toast.success("Order created — complete payment to start fulfillment")
       queryClient.invalidateQueries({ queryKey: ["orders"] })
       localStorage.removeItem(STORAGE_KEY)
-      setSubmitSuccess(true)
+      // Draft orders only start fulfillment after payment — go straight to checkout.
+      if (order?.id) {
+        router.push(`/dashboard/orders/checkout/${order.id}`)
+      } else {
+        setSubmitSuccess(true)
+      }
     },
     onError: (error: any) => {
       toast.error(error?.message || "Failed to create order")

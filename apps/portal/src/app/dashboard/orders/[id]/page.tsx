@@ -450,6 +450,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const currentStatusIcon = currentStatusConfig.icon
 
   // Customer is reviewing the publisher's draft content
+  // Draft orders only enter the publisher/ops queue after payment.
+  const canPay = order.status === "DRAFT" || order.status === "PENDING_PAYMENT"
   const canApproveContent = order.status === "CUSTOMER_REVIEW"
   const canRequestRevision = order.status === "CUSTOMER_REVIEW"
   // Platform verified the live placement — customer confirms to complete + settle
@@ -507,20 +509,31 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </CardContent>
       </Card>
 
-      {(canApproveContent || canConfirmDelivery) && (
+      {(canPay || canApproveContent || canConfirmDelivery) && (
         <Card className="border-primary/40 bg-primary/5">
           <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="font-medium">
-                {canConfirmDelivery ? "Delivery verified — ready to confirm" : "Content ready for your review"}
+                {canPay
+                  ? "Complete payment to start your order"
+                  : canConfirmDelivery
+                  ? "Delivery verified — ready to confirm"
+                  : "Content ready for your review"}
               </p>
               <p className="text-sm text-muted-foreground">
-                {canConfirmDelivery
+                {canPay
+                  ? "Your order is in draft. Pay from your wallet to send it to the publisher."
+                  : canConfirmDelivery
                   ? "Confirm the live placement to complete the order and release settlement to the publisher."
                   : "Approve to let the publisher publish, or request changes."}
               </p>
             </div>
             <div className="flex gap-2 shrink-0">
+              {canPay && (
+                <Button onClick={() => router.push(`/dashboard/orders/checkout/${resolvedParams.id}`)}>
+                  Complete Payment
+                </Button>
+              )}
               {canApproveContent && (
                 <>
                   <Button variant="outline" onClick={() => setShowRevisionDialog(true)}>
