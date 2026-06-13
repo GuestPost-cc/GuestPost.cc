@@ -113,6 +113,10 @@ async function bootstrap() {
     generalAuth: number
     admin: number
     billing: number
+    // Per-IP first-line cap on verification trigger endpoints (publisher DNS
+    // verify, admin bulk-retry / recompute-trust). Secondary to the DB-based
+    // per-publisher/per-website business throttles — not a replacement.
+    verification: number
   }
 
   function getEnvLimits(): EnvLimits {
@@ -129,6 +133,7 @@ async function bootstrap() {
         // Test suites (integration + concurrency back-to-back) legitimately
         // exceed 10 deposits/min; staging/production stay at 10.
         billing: 1000,
+        verification: 1000,
       },
       staging: {
         auth: { signIn: 10, signUp: 5, magicLink: 5, resetPassword: 5 },
@@ -138,6 +143,7 @@ async function bootstrap() {
         generalAuth: 300,
         admin: 300,
         billing: 10,
+        verification: 30,
       },
       production: {
         auth: { signIn: 5, signUp: 5, magicLink: 5, resetPassword: 5 },
@@ -147,6 +153,7 @@ async function bootstrap() {
         generalAuth: 300,
         admin: 300,
         billing: 10,
+        verification: 15,
       },
     }
 
@@ -165,6 +172,7 @@ async function bootstrap() {
       generalAuth: Number(process.env.AUTHENTICATED_RATE_LIMIT_MAX) || d.generalAuth,
       admin: Number(process.env.ADMIN_RATE_LIMIT_MAX) || d.admin,
       billing: Number(process.env.BILLING_RATE_LIMIT_MAX) || d.billing,
+      verification: Number(process.env.VERIFICATION_RATE_LIMIT_MAX) || d.verification,
     }
   }
 
@@ -225,6 +233,26 @@ async function bootstrap() {
   server.use("/api/v1/marketplace/tags", ...createTieredLimiters(envLimits.marketplaceAnon, envLimits.marketplaceAuth))
   server.use("/api/v1/marketplace/stats", ...createTieredLimiters(envLimits.marketplaceAnon, envLimits.marketplaceAuth))
   server.use("/api/v1/marketplace/services", ...createTieredLimiters(envLimits.marketplaceAnon, envLimits.marketplaceAuth))
+
+  // Verification trigger endpoints — lightweight per-IP first line against
+  // automated abuse, layered ON TOP of the DB-based per-publisher/per-website
+  // throttles (which stay the primary, tenant-aware control). Only counts the
+  // POST routes that actually kick off DNS lookups / verification work.
+  const VERIFICATION_TRIGGER_RE = /\/(websites\/[^/]+\/verify|websites\/verification\/bulk-retry|websites\/[^/]+\/recompute-trust)$/
+  function isVerificationTrigger(req: express.Request): boolean {
+    return req.method === "POST" && VERIFICATION_TRIGGER_RE.test(req.path)
+  }
+  server.use(
+    "/api/v1",
+    rateLimit({
+      windowMs: 60 * 1000,
+      max: envLimits.verification,
+      skip: (req: express.Request) => !isVerificationTrigger(req),
+      standardHeaders: true,
+      legacyHeaders: false,
+      message: { statusCode: 429, message: "Too many verification requests from this IP, try again later" },
+    }),
+  )
 
   // Admin
   server.use("/api/v1/admin", createLimiter(envLimits.admin, "Too many admin requests, try again later"))
