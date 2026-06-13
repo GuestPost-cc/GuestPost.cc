@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { Card, CardContent, CardHeader, CardTitle, Badge, Skeleton, ErrorState, Button } from "@guestpost/ui"
@@ -92,8 +92,8 @@ export default function SettlementReviewPage() {
               </TableHeader>
               <TableBody>
                 {reviewable.map((s: any) => (
-                  <>
-                    <TableRow key={s.id} className="cursor-pointer" onClick={() => setExpanded(expanded === s.id ? null : s.id)}>
+                  <Fragment key={s.id}>
+                    <TableRow className="cursor-pointer" onClick={() => setExpanded(expanded === s.id ? null : s.id)}>
                       <TableCell>{expanded === s.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                       <TableCell className="font-mono text-xs">{s.orderId.slice(0, 8)}</TableCell>
                       <TableCell className="text-sm">{s.publisher?.name ?? s.publisher?.email}</TableCell>
@@ -102,11 +102,11 @@ export default function SettlementReviewPage() {
                       <TableCell className="text-xs text-muted-foreground">{format(new Date(s.createdAt), "PP")}</TableCell>
                     </TableRow>
                     {expanded === s.id && (
-                      <TableRow key={s.id + "-d"}>
+                      <TableRow>
                         <TableCell colSpan={6}><DeliveryRow orderId={s.orderId} /></TableCell>
                       </TableRow>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>

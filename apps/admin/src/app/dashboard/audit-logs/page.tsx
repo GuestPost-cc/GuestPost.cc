@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Fragment } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { useRequireRole, ForbiddenPage } from "../../../lib/use-require-role"
@@ -250,8 +250,8 @@ function AuditLogsPageInner() {
                     const isOpen = expanded.has(log.id)
                     const Icon = cat.Icon
                     return (
-                      <>
-                        <TableRow key={log.id} className="cursor-pointer" onClick={() => toggle(log.id)}>
+                      <Fragment key={log.id}>
+                        <TableRow className="cursor-pointer" onClick={() => toggle(log.id)}>
                           <TableCell>{isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</TableCell>
                           <TableCell className="whitespace-nowrap" title={format(new Date(log.createdAt), "PPpp")}>
                             <span className="text-sm">{formatDistanceToNow(new Date(log.createdAt), { addSuffix: true })}</span>
@@ -281,7 +281,7 @@ function AuditLogsPageInner() {
                           </TableCell>
                         </TableRow>
                         {isOpen && (
-                          <TableRow key={log.id + "-d"} className="bg-muted/30">
+                          <TableRow className="bg-muted/30">
                             <TableCell></TableCell>
                             <TableCell colSpan={5} className="py-3">
                               <div className="grid gap-3 text-xs sm:grid-cols-2">
@@ -305,7 +305,7 @@ function AuditLogsPageInner() {
                             </TableCell>
                           </TableRow>
                         )}
-                      </>
+                      </Fragment>
                     )
                   })}
                 </TableBody>
