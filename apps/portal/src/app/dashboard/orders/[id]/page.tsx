@@ -105,12 +105,39 @@ interface OrderDetail {
     instructions: string | null
     budget: number | null
     website: { id: string; url: string } | null
+    publications?: Array<{
+      id: string
+      publishedUrl: string | null
+      targetUrl: string | null
+      anchorText: string | null
+      screenshotUrl: string | null
+      publicationDate: string | null
+      verificationStatus: string
+    }>
   }>
+  submittedContent?: { title: string | null; brief: string | null; deliverable: string | null; status: string } | null
+  revisions?: Array<{ id: string; notes: string | null; files: unknown; status: string; createdAt: string }>
+  publishedUrl?: string | null
   totalAmount: number | null
   currency: string
   createdAt: string
   updatedAt: string
   events: TimelineEvent[]
+}
+
+// Revision.files Json is loosely shaped — accept array of strings or {url,name}.
+function fileEntries(files: unknown): Array<{ url: string; name: string }> {
+  if (!Array.isArray(files)) return []
+  return files
+    .map((f: any) => {
+      if (typeof f === "string") return { url: f, name: f.split("/").pop() || f }
+      if (f && typeof f === "object" && (f.url || f.href)) {
+        const url = f.url ?? f.href
+        return { url, name: f.name ?? f.filename ?? url.split("/").pop() ?? url }
+      }
+      return null
+    })
+    .filter(Boolean) as Array<{ url: string; name: string }>
 }
 
 function OrderTimeline({ events }: { events: TimelineEvent[] }) {
@@ -515,6 +542,64 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </CardContent>
             </Card>
           )}
+          {(() => {
+            const sc = order.submittedContent
+            const hasContent = sc && (sc.deliverable || sc.brief)
+            const pubs = (order.items ?? []).flatMap((i: any) => i.publications ?? []).filter((p: any) => p.publishedUrl)
+            const files = (order.revisions ?? []).flatMap((r: any) => fileEntries(r.files))
+            if (!hasContent && pubs.length === 0 && files.length === 0) return null
+            return (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Submitted Content</CardTitle>
+                  <CardDescription>What the publisher submitted for this order.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {hasContent && (
+                    <div className="space-y-1">
+                      {sc!.title && <p className="font-medium">{sc!.title}</p>}
+                      <div className="rounded-lg border bg-muted/30 p-3">
+                        <p className="whitespace-pre-wrap text-sm">{sc!.deliverable || sc!.brief}</p>
+                      </div>
+                    </div>
+                  )}
+                  {pubs.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Published links</p>
+                      {pubs.map((p: any) => (
+                        <div key={p.id} className="flex flex-col gap-1 rounded-lg border p-3">
+                          <a href={p.publishedUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 break-all text-sm font-medium text-primary hover:underline">
+                            {p.publishedUrl} <ExternalLink className="h-3 w-3 shrink-0" />
+                          </a>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            {p.anchorText && <span>Anchor: <span className="text-foreground">{p.anchorText}</span></span>}
+                            {p.targetUrl && <span className="break-all">→ {p.targetUrl}</span>}
+                            {p.publicationDate && <span>{format(new Date(p.publicationDate), "PP")}</span>}
+                          </div>
+                          {p.screenshotUrl && (
+                            <a href={p.screenshotUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">View screenshot</a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {files.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Files</p>
+                      <div className="flex flex-col gap-1">
+                        {files.map((f, i) => (
+                          <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
+                            <FileText className="h-3.5 w-3.5 shrink-0" /> {f.name}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })()}
+
           <Card>
             <CardHeader>
               <CardTitle>Order Details</CardTitle>

@@ -23,6 +23,16 @@ export interface CreateOrderData {
 // Raw API shape: Order rows carry type/title/amount at the ORDER level and
 // items carry price/targetUrl/anchorText. Decimal columns serialize as
 // strings over JSON.
+interface RawPublication {
+  id: string
+  publishedUrl: string | null
+  targetUrl: string | null
+  anchorText: string | null
+  screenshotUrl: string | null
+  publicationDate: string | null
+  verificationStatus: string
+}
+
 interface RawOrderItem {
   id: string
   websiteId: string | null
@@ -31,6 +41,7 @@ interface RawOrderItem {
   price: string | number | null
   status: OrderStatus
   website?: { id: string; url: string } | null
+  publications?: RawPublication[]
 }
 
 interface RawOrder {
@@ -49,6 +60,8 @@ interface RawOrder {
   website?: { id: string; url: string; name?: string | null } | null
   items?: RawOrderItem[]
   events?: Array<{ id: string; eventType: OrderEventType; message?: string | null; metadata: Record<string, unknown> | null; createdAt: string }>
+  contentOrder?: { id: string; title: string | null; brief: string | null; deliverable: string | null; status: string } | null
+  revisions?: Array<{ id: string; notes: string | null; files: unknown; status: string; createdAt: string }>
   settlements?: unknown[]
   dispute?: unknown
   createdAt: string
@@ -77,7 +90,19 @@ export interface OrderResponse {
     anchorText: string | null
     status: OrderStatus
     website: { id: string; url: string } | null
+    publications: Array<{
+      id: string
+      publishedUrl: string | null
+      targetUrl: string | null
+      anchorText: string | null
+      screenshotUrl: string | null
+      publicationDate: string | null
+      verificationStatus: string
+    }>
   }>
+  // Content the publisher/operations submitted for this order.
+  submittedContent: { title: string | null; brief: string | null; deliverable: string | null; status: string } | null
+  revisions: Array<{ id: string; notes: string | null; files: unknown; status: string; createdAt: string }>
   totalAmount: number | null
   currency: string
   createdAt: string
@@ -118,7 +143,20 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
       anchorText: item.anchorText ?? null,
       status: item.status,
       website: item.website ?? orderWebsite,
+      publications: (item.publications ?? []).map((p) => ({
+        id: p.id,
+        publishedUrl: p.publishedUrl ?? null,
+        targetUrl: p.targetUrl ?? null,
+        anchorText: p.anchorText ?? null,
+        screenshotUrl: p.screenshotUrl ?? null,
+        publicationDate: p.publicationDate ?? null,
+        verificationStatus: p.verificationStatus,
+      })),
     })),
+    submittedContent: raw.contentOrder
+      ? { title: raw.contentOrder.title ?? null, brief: raw.contentOrder.brief ?? null, deliverable: raw.contentOrder.deliverable ?? null, status: raw.contentOrder.status }
+      : null,
+    revisions: (raw.revisions ?? []).map((r) => ({ id: r.id, notes: r.notes ?? null, files: r.files ?? null, status: r.status, createdAt: r.createdAt })),
     totalAmount: raw.amount != null ? Number(raw.amount) : null,
     currency: raw.currency,
     createdAt: raw.createdAt,
