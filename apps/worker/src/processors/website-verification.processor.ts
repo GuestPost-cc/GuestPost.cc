@@ -4,6 +4,7 @@ import { QUEUES, verifyJobPayload, runWebsiteVerify, runWebsiteReverifySweep } f
 // Node-only DNS lookup — deep import keeps node `dns` out of the shared index
 // (which the browser apps bundle).
 import { checkDnsTxtToken } from "@guestpost/shared/dist/dns-lookup"
+import { enqueueTrustRecompute } from "../trust-enqueue"
 import { prisma } from "@guestpost/database"
 
 // DNS TXT domain-ownership verification worker. Thin adapter over the pure
@@ -20,7 +21,7 @@ interface VerifyJobData {
 }
 
 export function createWebsiteVerificationWorker() {
-  const deps = { prisma, checkDns: checkDnsTxtToken }
+  const deps = { prisma, checkDns: checkDnsTxtToken, onTrustEvent: enqueueTrustRecompute }
   const worker = new Worker(
     QUEUES.WEBSITE_VERIFICATION,
     async (job) => {

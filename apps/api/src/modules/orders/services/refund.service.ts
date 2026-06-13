@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { QueueService } from "../../queues/queue.service"
 import { Decimal } from "@prisma/client/runtime/library"
 
 const REFUNDABLE_STATUSES = [
@@ -24,6 +25,7 @@ export class RefundService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly queue: QueueService,
   ) {}
 
   async refundOrder(orderId: string, reason: string, userId: string, idempotencyKey?: string) {
@@ -36,7 +38,7 @@ export class RefundService {
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { website: { select: { ownershipType: true } } },
+      include: { website: { select: { ownershipType: true, publisherId: true } } },
     })
     if (!order) throw new NotFoundException("Order not found")
 
@@ -206,6 +208,9 @@ export class RefundService {
 
       return updated
     })
+
+    // Event-driven trust recompute (refund reflects badly on the publisher).
+    await this.queue.enqueueTrustRecompute(order.website?.publisherId, "REFUND_ISSUED", `order ${orderId} refunded`)
 
     return result
   }

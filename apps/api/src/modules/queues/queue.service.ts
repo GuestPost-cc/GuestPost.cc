@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { Queue, QueueOptions, JobsOptions } from "bullmq"
 import IORedis from "ioredis"
-import { QUEUES, signJobPayload } from "@guestpost/shared"
+import { QUEUES, QUEUE_JOBS, signJobPayload, trustRecomputeJobOptions } from "@guestpost/shared"
 
 let connection: IORedis | null = null
 
@@ -92,5 +92,22 @@ export class QueueService {
     const job = await this.getQueue(queueName).add(jobName, payload, opts)
     this.logger.log(`Job queued: ${queueName}/${jobName} (job ${job.id})`)
     return job
+  }
+
+  // Event-driven publisher trust recompute. jobId dedup + delay debounce so a
+  // burst of trust-affecting events for one publisher collapses into a single
+  // recompute. Never throws into the caller's transaction path.
+  async enqueueTrustRecompute(publisherId: string | null | undefined, sourceEvent: string, reason?: string) {
+    if (!publisherId) return
+    try {
+      await this.addJob(
+        QUEUES.PUBLISHER_TRUST,
+        QUEUE_JOBS[QUEUES.PUBLISHER_TRUST].RECOMPUTE,
+        { publisherId, sourceEvent, reason: reason ?? sourceEvent },
+        trustRecomputeJobOptions(publisherId),
+      )
+    } catch (err) {
+      this.logger.error(`Failed to enqueue trust recompute for ${publisherId}: ${err}`)
+    }
   }
 }

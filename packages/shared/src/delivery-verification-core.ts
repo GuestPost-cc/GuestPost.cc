@@ -29,6 +29,8 @@ export interface DeliveryDeps {
   fetchUrl: DeliveryFetcher
   putObject: ObjectPutter
   now?: () => Date
+  // Optional hook to trigger event-driven publisher trust recompute.
+  onTrustEvent?: (publisherId: string | null | undefined, sourceEvent: string, reason?: string) => void | Promise<void>
 }
 
 export interface DeliveryVerifyResult {
@@ -368,6 +370,7 @@ export interface LinkRecheckResult {
   skipped?: string
   ok?: boolean
   removed?: boolean
+  restored?: boolean
 }
 
 export async function runDeliveryLinkRecheck(deps: DeliveryDeps, deliveryVersionId: string): Promise<LinkRecheckResult> {
@@ -376,15 +379,22 @@ export async function runDeliveryLinkRecheck(deps: DeliveryDeps, deliveryVersion
 
   const version = await prisma.orderDeliveryVersion.findUnique({ where: { id: deliveryVersionId } })
   if (!version) return { skipped: "not_found" }
-  // Only monitor a currently-good delivery; failed/superseded ones already block.
-  if (version.verificationStatus !== "VERIFIED") return { skipped: "not_verified" }
   if (version.supersededByVersion != null) return { skipped: "superseded" }
+
+  // We monitor VERIFIED deliveries (detect removal) and FAILED deliveries that
+  // were flagged LINK_REMOVED (detect restoration). Anything else is skipped.
+  const hadRemovalFlag =
+    version.verificationStatus === "FAILED"
+      ? await prisma.deliveryFraudFlag.findFirst({ where: { deliveryVersionId: version.id, type: "LINK_REMOVED" }, select: { id: true } })
+      : null
+  if (version.verificationStatus !== "VERIFIED" && !hadRemovalFlag) return { skipped: "not_verified" }
 
   const order = await prisma.order.findUnique({
     where: { id: version.orderId },
     include: { website: { select: { url: true, publisherId: true } } },
   })
   if (!order) return { skipped: "order_not_found" }
+  const publisherId = order.website?.publisherId
 
   let fetched: FetchResult
   try {
@@ -397,9 +407,25 @@ export async function runDeliveryLinkRecheck(deps: DeliveryDeps, deliveryVersion
 
   const analysis = analyzeHtml(fetched.html, order.targetUrl ?? null, order.anchorText ?? null)
   const stillPresent = analysis.linkFound && analysis.targetUrlMatched && analysis.anchorFound
+
+  // ── Restoration path: a previously-removed link is back ──────────────────
+  if (hadRemovalFlag) {
+    if (!stillPresent) return { ok: true } // still gone
+    const upd = await prisma.orderDeliveryVersion.updateMany({
+      where: { id: version.id, verificationVersion: version.verificationVersion },
+      data: { verificationStatus: "VERIFIED", verificationFailureReason: null, verificationVersion: version.verificationVersion + 1 },
+    })
+    if (upd.count === 0) return { skipped: "version_conflict" }
+    await audit(prisma, "ORDER_DELIVERY_LINK_RESTORED", order, version, null, { httpStatus: fetched.status })
+    await notifyUsers(prisma, await staffIds(prisma), null, "ORDER_DELIVERY_LINK_RESTORED", `Link restored on order ${order.id}. Note: the LINK_REMOVED fraud flag remains for review.`)
+    // Restoration re-evaluates trust (historical penalty is kept per the algorithm).
+    await deps.onTrustEvent?.(publisherId, "LINK_RESTORED", `link restored on order ${order.id}`)
+    return { restored: true }
+  }
+
+  // ── Removal path: monitored VERIFIED link is gone ────────────────────────
   if (stillPresent) return { ok: true }
 
-  // Link gone/changed — mark FAILED + raise LINK_REMOVED (version-guarded).
   const reason = "Link removed or changed after delivery (detected during settlement hold)"
   const upd = await prisma.orderDeliveryVersion.updateMany({
     where: { id: version.id, verificationVersion: version.verificationVersion },
@@ -415,10 +441,13 @@ export async function runDeliveryLinkRecheck(deps: DeliveryDeps, deliveryVersion
   }
   await audit(prisma, "ORDER_DELIVERY_LINK_REMOVED", order, version, null, { reason, httpStatus: fetched.status })
 
-  const ownerIds = await publisherOwnerIds(prisma, order.website?.publisherId)
+  const ownerIds = await publisherOwnerIds(prisma, publisherId)
   await notifyUsers(prisma, ownerIds, order.organizationId, "ORDER_DELIVERY_LINK_REMOVED", `The link for order ${order.id} is no longer live. Settlement is on hold until it is restored.`)
   await notifyUsers(prisma, [order.customerId], order.organizationId, "ORDER_DELIVERY_LINK_REMOVED", `The placement for your order ${order.id} appears to have been removed. We've paused the publisher's payout and our team is reviewing.`)
   await notifyUsers(prisma, await staffIds(prisma), null, "ORDER_DELIVERY_LINK_REMOVED", `Link removed on order ${order.id} during settlement hold — payout blocked.`)
+
+  // Settlement freeze (fraud flag) is intact; trust recompute is now triggered.
+  await deps.onTrustEvent?.(publisherId, "LINK_REMOVED", `link removed on order ${order.id}`)
 
   return { removed: true }
 }
@@ -427,6 +456,7 @@ export interface HoldSweepResult {
   ok: boolean
   checked: number
   removed: number
+  restored: number
 }
 
 // Re-checks the live link for every order whose payout is still on hold
@@ -441,6 +471,7 @@ export async function runSettlementHoldLinkSweep(deps: DeliveryDeps): Promise<Ho
 
   let checked = 0
   let removed = 0
+  let restored = 0
   for (const s of held) {
     const versionId = s.order?.activeDeliveryVersionId
     if (!versionId) continue
@@ -448,6 +479,7 @@ export async function runSettlementHoldLinkSweep(deps: DeliveryDeps): Promise<Ho
     if (r.skipped === "not_verified" || r.skipped === "superseded") continue
     checked++
     if (r.removed) removed++
+    if (r.restored) restored++
   }
-  return { ok: true, checked, removed }
+  return { ok: true, checked, removed, restored }
 }

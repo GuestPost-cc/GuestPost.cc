@@ -7,6 +7,7 @@ export const QUEUES = {
   VERIFICATION: "verification",
   WEBSITE_VERIFICATION: "website-verification",
   DELIVERY_VERIFICATION: "delivery-verification",
+  PUBLISHER_TRUST: "publisher-trust",
   PAYOUT: "payout",
   RECONCILIATION: "reconciliation",
 } as const
@@ -48,6 +49,9 @@ export const QUEUE_JOBS = {
   [QUEUES.DELIVERY_VERIFICATION]: {
     VERIFY: "delivery-verify",
     HOLD_LINK_SWEEP: "settlement-hold-sweep",
+  },
+  [QUEUES.PUBLISHER_TRUST]: {
+    RECOMPUTE: "publisher-trust-recompute",
   },
   [QUEUES.PAYOUT]: {
     EXECUTE: "payout-execute",

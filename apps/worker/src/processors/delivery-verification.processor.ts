@@ -6,6 +6,7 @@ import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { runDeliveryVerification, runSettlementHoldLinkSweep, FetchResult } from "@guestpost/shared/dist/delivery-verification-core"
 import { putObject } from "@guestpost/shared/dist/object-storage"
 import { prisma } from "@guestpost/database"
+import { enqueueTrustRecompute } from "../trust-enqueue"
 
 // Delivery verification worker. Fetches the published page (SSRF-guarded,
 // redirect chain resolved manually), then delegates to the pure core which
@@ -82,7 +83,7 @@ async function fetchWithChain(startUrl: string): Promise<FetchResult> {
 }
 
 export function createDeliveryVerificationWorker() {
-  const deps = { prisma, fetchUrl: fetchWithChain, putObject }
+  const deps = { prisma, fetchUrl: fetchWithChain, putObject, onTrustEvent: enqueueTrustRecompute }
   const worker = new Worker(
     QUEUES.DELIVERY_VERIFICATION,
     async (job) => {

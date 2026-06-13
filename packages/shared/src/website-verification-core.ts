@@ -14,6 +14,8 @@ export interface VerificationDeps {
   prisma: any
   checkDns: DnsChecker
   now?: () => Date
+  // Optional hook to trigger event-driven publisher trust recompute.
+  onTrustEvent?: (publisherId: string | null | undefined, sourceEvent: string, reason?: string) => void | Promise<void>
 }
 
 // Notify every owner user of a publisher. Best-effort — a failed notification
@@ -122,6 +124,7 @@ export async function runWebsiteVerify(
       "WEBSITE_VERIFIED",
       `Domain ownership verified for ${website.domain ?? website.url}. Your website can now be listed on the marketplace.`,
     )
+    await deps.onTrustEvent?.(website.publisherId, "WEBSITE_REVERIFIED", `website ${website.domain ?? website.url} verified`)
     return { ok: true, status: "VERIFIED" }
   }
 
@@ -266,6 +269,7 @@ export async function runWebsiteReverifySweep(deps: VerificationDeps): Promise<S
       await notifyPublisherOwners(prisma, website.publisherId, organizationId, "WEBSITE_VERIFICATION_REVOKED", `Domain verification REVOKED for ${website.domain ?? website.url} after ${failures} failed checks. Re-add the TXT record and re-verify.`)
       await notifyOps(prisma, "WEBSITE_VERIFICATION_REVOKED", `Website ${website.domain ?? website.url} (publisher ${website.publisherId}) REVOKED after ${failures} consecutive failures.`)
       await enforceRevocation(prisma, website, organizationId)
+      await deps.onTrustEvent?.(website.publisherId, "WEBSITE_REVOKED", `website ${website.domain ?? website.url} revoked`)
       continue
     }
 

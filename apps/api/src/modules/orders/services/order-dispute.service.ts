@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { QueueService } from "../../queues/queue.service"
 import { RefundService } from "./refund.service"
 
 @Injectable()
@@ -9,7 +10,14 @@ export class OrderDisputeService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly refund: RefundService,
+    private readonly queue: QueueService,
   ) {}
+
+  // Resolve the order's publisher for trust events.
+  private async publisherIdForOrder(orderId: string): Promise<string | null> {
+    const o = await this.prisma.order.findUnique({ where: { id: orderId }, include: { website: { select: { publisherId: true } } } })
+    return o?.website?.publisherId ?? null
+  }
 
   // Staff dispute queue — open/under-review first, with the order + customer
   // context needed to triage without opening each one.
@@ -166,6 +174,8 @@ export class OrderDisputeService {
       organizationId,
     })
 
+    await this.queue.enqueueTrustRecompute(await this.publisherIdForOrder(orderId), "DISPUTE_OPENED", `dispute opened on order ${orderId}`)
+
     return dispute
   }
 
@@ -249,6 +259,8 @@ export class OrderDisputeService {
       userId,
       organizationId: order.organizationId,
     })
+
+    await this.queue.enqueueTrustRecompute(await this.publisherIdForOrder(order.id), "DISPUTE_RESOLVED", `dispute ${disputeId} resolved (${action})`)
 
     return this.prisma.orderDispute.findUnique({ where: { id: disputeId } })
   }

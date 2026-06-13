@@ -53,7 +53,8 @@ describe("RefundService", () => {
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       $transaction: jest.fn().mockImplementation(async (cb: any) => cb(prismaMock)),
     }
-    service = new RefundService(prismaMock as any, auditMock as any)
+    const queueMock = { enqueueTrustRecompute: jest.fn().mockResolvedValue(undefined) }
+    service = new RefundService(prismaMock as any, auditMock as any, queueMock as any)
   })
 
   it("rejects duplicate refunds", async () => {

@@ -510,6 +510,9 @@ export class SettlementsService {
       data: { status: "COMPLETED" },
     })
 
+    // Event-driven trust recompute (proven completion + payout released).
+    await this.queue.enqueueTrustRecompute(settlement.publisherId, "SETTLEMENT_RELEASED", `settlement ${settlementId} released`)
+
     await tx.transaction.create({
       data: {
         amount: publisherAmount,
