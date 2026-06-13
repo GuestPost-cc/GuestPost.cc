@@ -697,14 +697,6 @@ export type EnumDeliveryInterventionStatusFieldUpdateOperationsInput = {
   set?: $Enums.DeliveryInterventionStatus
 }
 
-export type NullableIntFieldUpdateOperationsInput = {
-  set?: number | null
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type OrderDeliveryVersionCreateNestedOneWithoutEvidenceInput = {
   create?: Prisma.XOR<Prisma.OrderDeliveryVersionCreateWithoutEvidenceInput, Prisma.OrderDeliveryVersionUncheckedCreateWithoutEvidenceInput>
   connectOrCreate?: Prisma.OrderDeliveryVersionCreateOrConnectWithoutEvidenceInput

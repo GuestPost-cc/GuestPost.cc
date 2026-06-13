@@ -5,6 +5,7 @@
 // is a thin adapter that injects the real prisma client + DNS lookup. No node
 // `dns` import here, so this is safe to keep in the package index.
 import type { DnsCheckResult } from "./dns-verification"
+import { generateVerificationToken } from "./dns-verification"
 
 export type DnsChecker = (websiteUrl: string, token: string) => Promise<DnsCheckResult>
 
@@ -74,12 +75,21 @@ export async function runWebsiteVerify(
   const result = await checkDns(website.url, website.verificationToken)
 
   if (result.found) {
+    // Token rotation: the proven token becomes activeVerifiedToken (what the
+    // sweep re-checks, since it's what's in DNS), and a fresh token is minted
+    // for the next verification cycle. Existing verification stays valid.
+    const rotatedToken = generateVerificationToken()
     const upd = await prisma.website.updateMany({
       where: { id: website.id, verificationVersion: expectedVersion },
       data: {
         verificationStatus: "VERIFIED",
         verifiedAt: now,
         lastVerificationCheckAt: now,
+        lastSuccessfulVerificationAt: now,
+        activeVerifiedToken: website.verificationToken,
+        verificationToken: rotatedToken,
+        verificationCheckCount: { increment: 1 },
+        consecutiveFailures: 0,
         verificationFailureReason: null,
         verificationVersion: expectedVersion + 1,
       },
@@ -91,6 +101,16 @@ export async function runWebsiteVerify(
         entityType: "Website",
         entityId: website.id,
         metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, matchedHost: result.matchedHost },
+        userId: actorUserId ?? null,
+        organizationId,
+      },
+    })
+    await prisma.auditLog.create({
+      data: {
+        action: "WEBSITE_VERIFICATION_TOKEN_ROTATED",
+        entityType: "Website",
+        entityId: website.id,
+        metadata: { domain: website.domain, publisherId: website.publisherId, organizationId },
         userId: actorUserId ?? null,
         organizationId,
       },
@@ -141,24 +161,53 @@ export interface SweepResult {
   total: number
   revoked: number
   refreshed: number
+  warned: number
 }
 
-// 30-day re-verification sweep. A VERIFIED site whose TXT record vanished is
-// REVOKED; the rest get lastVerificationCheckAt refreshed. A transient resolver
-// error is logged and skipped (never revokes on a single failed lookup).
+// Revocation enforcement: a REVOKED domain's marketplace listings are hidden
+// (PAUSED) so it can no longer sell, take new orders, or be approved/edited.
+// Completed orders, settlements, and historical reporting are untouched.
+export async function enforceRevocation(prisma: any, website: any, organizationId: string | null) {
+  const hidden = await prisma.marketplaceListing.updateMany({
+    where: { websiteId: website.id, status: { in: ["APPROVED", "PENDING_REVIEW", "DRAFT", "PAUSED"] } },
+    data: { status: "PAUSED" },
+  })
+  await prisma.auditLog.create({
+    data: {
+      action: "WEBSITE_REVOKED_ENFORCEMENT",
+      entityType: "Website",
+      entityId: website.id,
+      metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, listingsHidden: hidden.count },
+      userId: null,
+      organizationId,
+    },
+  })
+  await notifyPublisherOwners(prisma, website.publisherId, organizationId, "WEBSITE_REVOKED_ENFORCEMENT", `Listings for ${website.domain ?? website.url} were hidden because domain ownership is no longer verified.`)
+  await notifyOps(prisma, "WEBSITE_REVOKED_ENFORCEMENT", `Revocation enforced on ${website.domain ?? website.url}: ${hidden.count} listing(s) hidden.`)
+  return hidden.count
+}
+
+// Periodic ownership health check (default 30 days). Transient DNS outages must
+// not instantly revoke: a domain is REVOKED only after 3 consecutive failed
+// checks. 1 failure warns the publisher, 2 notifies Operations, 3 revokes +
+// enforces. A successful check resets the failure streak.
 export async function runWebsiteReverifySweep(deps: VerificationDeps): Promise<SweepResult> {
   const { prisma, checkDns } = deps
   const sites = await prisma.website.findMany({
-    where: { verificationStatus: "VERIFIED", verificationToken: { not: null }, publisherId: { not: null } },
+    where: { verificationStatus: "VERIFIED", publisherId: { not: null } },
     select: { id: true },
   })
 
   let revoked = 0
   let refreshed = 0
+  let warned = 0
   for (const { id } of sites) {
     const website = await prisma.website.findUnique({ where: { id } })
-    if (!website || !website.verificationToken || !website.publisherId) continue
+    if (!website || !website.publisherId) continue
     if (website.verificationStatus !== "VERIFIED") continue
+    // Re-check the token actually proven present in DNS (survives rotation).
+    const checkToken = website.activeVerifiedToken ?? website.verificationToken
+    if (!checkToken) continue
 
     const publisher = await prisma.publisher.findUnique({ where: { id: website.publisherId } })
     const organizationId = publisher?.organizationId ?? null
@@ -167,55 +216,84 @@ export async function runWebsiteReverifySweep(deps: VerificationDeps): Promise<S
 
     let result: DnsCheckResult
     try {
-      result = await checkDns(website.url, website.verificationToken)
+      result = await checkDns(website.url, checkToken)
     } catch {
-      // Transient resolver failure: don't revoke on a single error.
+      // Transient resolver failure: don't count it as a failure at all.
       continue
     }
 
     if (result.found) {
       await prisma.website.updateMany({
         where: { id: website.id, verificationVersion: expectedVersion },
-        data: { lastVerificationCheckAt: now },
+        data: {
+          lastVerificationCheckAt: now,
+          lastSuccessfulVerificationAt: now,
+          verificationCheckCount: { increment: 1 },
+          consecutiveFailures: 0,
+        },
       })
       refreshed++
       continue
     }
 
+    const failures = (website.consecutiveFailures ?? 0) + 1
     const reason = result.reason ?? "Verification TXT record no longer present"
-    const upd = await prisma.website.updateMany({
-      where: { id: website.id, verificationVersion: expectedVersion, verificationStatus: "VERIFIED" },
+
+    if (failures >= 3) {
+      const upd = await prisma.website.updateMany({
+        where: { id: website.id, verificationVersion: expectedVersion, verificationStatus: "VERIFIED" },
+        data: {
+          verificationStatus: "REVOKED",
+          lastVerificationCheckAt: now,
+          verificationCheckCount: { increment: 1 },
+          consecutiveFailures: failures,
+          verificationFailureReason: reason,
+          verificationVersion: expectedVersion + 1,
+        },
+      })
+      if (upd.count === 0) continue
+      revoked++
+      await prisma.auditLog.create({
+        data: {
+          action: "WEBSITE_VERIFICATION_REVOKED",
+          entityType: "Website",
+          entityId: website.id,
+          metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, reason, consecutiveFailures: failures },
+          userId: null,
+          organizationId,
+        },
+      })
+      await notifyPublisherOwners(prisma, website.publisherId, organizationId, "WEBSITE_VERIFICATION_REVOKED", `Domain verification REVOKED for ${website.domain ?? website.url} after ${failures} failed checks. Re-add the TXT record and re-verify.`)
+      await notifyOps(prisma, "WEBSITE_VERIFICATION_REVOKED", `Website ${website.domain ?? website.url} (publisher ${website.publisherId}) REVOKED after ${failures} consecutive failures.`)
+      await enforceRevocation(prisma, website, organizationId)
+      continue
+    }
+
+    // 1 or 2 failures — record + warn, do not revoke.
+    await prisma.website.updateMany({
+      where: { id: website.id, verificationVersion: expectedVersion },
       data: {
-        verificationStatus: "REVOKED",
         lastVerificationCheckAt: now,
+        verificationCheckCount: { increment: 1 },
+        consecutiveFailures: failures,
         verificationFailureReason: reason,
-        verificationVersion: expectedVersion + 1,
       },
     })
-    if (upd.count === 0) continue
-    revoked++
+    warned++
     await prisma.auditLog.create({
       data: {
-        action: "WEBSITE_VERIFICATION_REVOKED",
+        action: "WEBSITE_VERIFICATION_HEALTH_WARNING",
         entityType: "Website",
         entityId: website.id,
-        metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, reason },
+        metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, consecutiveFailures: failures, reason },
         userId: null,
         organizationId,
       },
     })
-    await notifyPublisherOwners(
-      prisma,
-      website.publisherId,
-      organizationId,
-      "WEBSITE_VERIFICATION_REVOKED",
-      `Domain verification REVOKED for ${website.domain ?? website.url}: the TXT record was removed. Re-add it and re-verify to keep your listings active.`,
-    )
-    await notifyOps(
-      prisma,
-      "WEBSITE_VERIFICATION_REVOKED",
-      `Website ${website.domain ?? website.url} (publisher ${website.publisherId}) was REVOKED — TXT record removed.`,
-    )
+    await notifyPublisherOwners(prisma, website.publisherId, organizationId, "WEBSITE_VERIFICATION_HEALTH_WARNING", `Health check ${failures}/3 failed for ${website.domain ?? website.url}: ${reason}. Verify the TXT record is still present.`)
+    if (failures >= 2) {
+      await notifyOps(prisma, "WEBSITE_VERIFICATION_HEALTH_WARNING", `Website ${website.domain ?? website.url} (publisher ${website.publisherId}) has ${failures} consecutive failed checks — one more revokes it.`)
+    }
   }
-  return { ok: true, total: sites.length, revoked, refreshed }
+  return { ok: true, total: sites.length, revoked, refreshed, warned }
 }

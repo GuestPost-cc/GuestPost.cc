@@ -81,6 +81,12 @@ export class OrdersService {
           // Use tx (not this.prisma) — a separate connection here while the
           // transaction holds its own deadlocks the pool under concurrency.
           if (item.websiteId) {
+            // Block orders on a revoked domain — defence in depth beyond listing
+            // pause (a REVOKED publisher site may never take new orders).
+            const site = await tx.website.findUnique({ where: { id: item.websiteId }, select: { verificationStatus: true, ownershipType: true } })
+            if (site?.ownershipType === "PUBLISHER" && site.verificationStatus === "REVOKED") {
+              throw new BadRequestException({ code: "WEBSITE_REVOKED", message: `Website ${item.websiteId} ownership is revoked and cannot take new orders` })
+            }
             const listing = await tx.marketplaceListing.findFirst({
               where: { websiteId: item.websiteId, status: "APPROVED" },
               select: { price: true },

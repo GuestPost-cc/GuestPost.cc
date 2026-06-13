@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useMemo } from "react"
 import { cn } from "@guestpost/ui"
-import { LayoutDashboard, Users, Building, ShoppingCart, Landmark, Settings, LogOut, Store, Newspaper, HeadphonesIcon, ScrollText, ClipboardList, Scale } from "lucide-react"
+import { LayoutDashboard, Users, Building, ShoppingCart, Landmark, Settings, LogOut, Store, Newspaper, HeadphonesIcon, ScrollText, ClipboardList, Scale, ShieldCheck } from "lucide-react"
 import { useAuth } from "../../lib/auth"
 import { Notifications } from "../../components/notifications"
 
@@ -22,6 +22,7 @@ const navItems: Array<{ href: string; label: string; icon: any; roles?: StaffRol
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
   { href: "/dashboard/marketplace", label: "Marketplace", icon: Store, roles: ["SUPER_ADMIN", "OPERATIONS"] },
   { href: "/dashboard/fulfillment", label: "Fulfillment", icon: ClipboardList, roles: ["SUPER_ADMIN", "OPERATIONS"] },
+  { href: "/dashboard/verification", label: "Verification", icon: ShieldCheck, roles: ["SUPER_ADMIN", "OPERATIONS"] },
   { href: "/dashboard/finance", label: "Finance", icon: Landmark, roles: ["SUPER_ADMIN", "FINANCE"] },
   { href: "/dashboard/finance/settlement-review", label: "Settlement Review", icon: Scale, roles: ["SUPER_ADMIN", "FINANCE"] },
   { href: "/dashboard/support", label: "Support", icon: HeadphonesIcon },

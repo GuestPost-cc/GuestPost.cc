@@ -146,8 +146,10 @@ describe("runWebsiteReverifySweep", () => {
     domain: "example.com",
     publisherId: "pub1",
     verificationToken: "tok",
+    activeVerifiedToken: "tok",
     verificationStatus: "VERIFIED",
     verificationVersion: 3,
+    consecutiveFailures: 0,
   }
 
   beforeEach(() => {
@@ -160,24 +162,27 @@ describe("runWebsiteReverifySweep", () => {
       publisher: { findUnique: jest.fn().mockResolvedValue({ id: "pub1", organizationId: "org1" }) },
       publisherMembership: { findMany: jest.fn().mockResolvedValue([{ userId: "u1" }]) },
       staffMembership: { findMany: jest.fn().mockResolvedValue([{ userId: "s1" }]) },
+      marketplaceListing: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
       notification: { create: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
     }
   })
 
-  it("refreshes lastVerificationCheckAt when the record still exists", async () => {
+  it("refreshes + resets failure streak when the record still exists", async () => {
     const checkDns = jest.fn().mockResolvedValue({ found: true, matchedHost: "example.com", reason: null })
     const res = await runWebsiteReverifySweep({ prisma, checkDns })
 
     expect(res).toMatchObject({ ok: true, total: 1, revoked: 0, refreshed: 1 })
     expect(prisma.website.updateMany).toHaveBeenCalledWith({
       where: { id: "w1", verificationVersion: 3 },
-      data: { lastVerificationCheckAt: expect.any(Date) },
+      data: expect.objectContaining({ lastVerificationCheckAt: expect.any(Date), consecutiveFailures: 0 }),
     })
     expect(prisma.auditLog.create).not.toHaveBeenCalled()
   })
 
-  it("REVOKES + audits + notifies publisher & ops when the record is gone", async () => {
+  it("REVOKES + enforces + notifies on the 3rd consecutive miss", async () => {
+    // 2 prior failures -> this miss is the 3rd, which revokes.
+    prisma.website.findUnique.mockResolvedValue({ ...verifiedSite, consecutiveFailures: 2 })
     const checkDns = jest.fn().mockResolvedValue({ found: false, matchedHost: null, reason: "No TXT record found" })
     const res = await runWebsiteReverifySweep({ prisma, checkDns })
 
@@ -225,8 +230,11 @@ describe("WebsitesService.requestVerification", () => {
           publisherId: "pub1",
           verificationToken: "tok",
           verificationStatus: "PENDING_VERIFICATION",
+          lastVerificationRequestAt: null,
         }),
+        update: jest.fn().mockResolvedValue({}),
       },
+      auditLog: { count: jest.fn().mockResolvedValue(0) },
     }
     audit = { log: jest.fn().mockResolvedValue(undefined) }
     queue = { addJob: jest.fn().mockResolvedValue({ id: "job1" }) }

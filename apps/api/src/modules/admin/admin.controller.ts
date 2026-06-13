@@ -15,6 +15,7 @@ import { OrderOperationsService } from "../orders/services/order-operations.serv
 import { SettlementReasonDto } from "../settlements/dto/settlement-reason.dto"
 import { CreatePlatformWebsiteDto, UpdatePlatformWebsiteDto } from "./dto/create-platform-website.dto"
 import { ReconciliationService } from "./reconciliation.service"
+import { WebsiteVerificationService } from "./website-verification.service"
 import { MarketplaceService } from "../marketplace/marketplace.service"
 import { CreateListingDto } from "../marketplace/dto/marketplace.dto"
 
@@ -38,7 +39,39 @@ export class AdminController {
     private readonly reconciliation: ReconciliationService,
     private readonly payoutExecution: PayoutExecutionService,
     private readonly marketplace: MarketplaceService,
+    private readonly websiteVerification: WebsiteVerificationService,
   ) {}
+
+  // ── Verification governance + review center ────────────────────────────────
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Get("websites/force-approved")
+  forceApprovedReport(@CurrentUser() user: any) {
+    return this.websiteVerification.forceApprovedReport(user.id)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Get("websites/verification")
+  verificationReviewCenter(
+    @Query("publisherId") publisherId?: string,
+    @Query("domain") domain?: string,
+    @Query("status") status?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+  ) {
+    return this.websiteVerification.reviewCenter({ publisherId, domain, status, from, to })
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Post("websites/verification/bulk-retry")
+  bulkRetryVerification(@Body("websiteIds") websiteIds: string[], @CurrentUser() user: any) {
+    return this.websiteVerification.bulkRetry(websiteIds ?? [], user.id)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Post("websites/:id/recompute-trust")
+  recomputeTrust(@Param("id") id: string) {
+    return this.websiteVerification.recomputeTrustScore(id)
+  }
 
   // Financial drift detector — balances vs transaction history, stuck orders
   @Get("reconciliation")

@@ -27,10 +27,16 @@ export type AggregateWebsite = {
 }
 
 export type WebsiteAvgAggregateOutputType = {
+  verificationCheckCount: number | null
+  consecutiveFailures: number | null
+  trustScore: number | null
   verificationVersion: number | null
 }
 
 export type WebsiteSumAggregateOutputType = {
+  verificationCheckCount: number | null
+  consecutiveFailures: number | null
+  trustScore: number | null
   verificationVersion: number | null
 }
 
@@ -48,9 +54,16 @@ export type WebsiteMinAggregateOutputType = {
   verificationStatus: $Enums.WebsiteVerificationStatus | null
   verificationMethod: $Enums.VerificationMethod | null
   verificationToken: string | null
+  activeVerifiedToken: string | null
   verifiedAt: Date | null
   lastVerificationCheckAt: Date | null
+  lastSuccessfulVerificationAt: Date | null
+  lastVerificationRequestAt: Date | null
+  verificationCheckCount: number | null
+  consecutiveFailures: number | null
   verificationFailureReason: string | null
+  canonicalDomain: string | null
+  trustScore: number | null
   verificationVersion: number | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -70,9 +83,16 @@ export type WebsiteMaxAggregateOutputType = {
   verificationStatus: $Enums.WebsiteVerificationStatus | null
   verificationMethod: $Enums.VerificationMethod | null
   verificationToken: string | null
+  activeVerifiedToken: string | null
   verifiedAt: Date | null
   lastVerificationCheckAt: Date | null
+  lastSuccessfulVerificationAt: Date | null
+  lastVerificationRequestAt: Date | null
+  verificationCheckCount: number | null
+  consecutiveFailures: number | null
   verificationFailureReason: string | null
+  canonicalDomain: string | null
+  trustScore: number | null
   verificationVersion: number | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -93,9 +113,16 @@ export type WebsiteCountAggregateOutputType = {
   verificationStatus: number
   verificationMethod: number
   verificationToken: number
+  activeVerifiedToken: number
   verifiedAt: number
   lastVerificationCheckAt: number
+  lastSuccessfulVerificationAt: number
+  lastVerificationRequestAt: number
+  verificationCheckCount: number
+  consecutiveFailures: number
   verificationFailureReason: number
+  canonicalDomain: number
+  trustScore: number
   verificationVersion: number
   createdAt: number
   updatedAt: number
@@ -104,10 +131,16 @@ export type WebsiteCountAggregateOutputType = {
 
 
 export type WebsiteAvgAggregateInputType = {
+  verificationCheckCount?: true
+  consecutiveFailures?: true
+  trustScore?: true
   verificationVersion?: true
 }
 
 export type WebsiteSumAggregateInputType = {
+  verificationCheckCount?: true
+  consecutiveFailures?: true
+  trustScore?: true
   verificationVersion?: true
 }
 
@@ -125,9 +158,16 @@ export type WebsiteMinAggregateInputType = {
   verificationStatus?: true
   verificationMethod?: true
   verificationToken?: true
+  activeVerifiedToken?: true
   verifiedAt?: true
   lastVerificationCheckAt?: true
+  lastSuccessfulVerificationAt?: true
+  lastVerificationRequestAt?: true
+  verificationCheckCount?: true
+  consecutiveFailures?: true
   verificationFailureReason?: true
+  canonicalDomain?: true
+  trustScore?: true
   verificationVersion?: true
   createdAt?: true
   updatedAt?: true
@@ -147,9 +187,16 @@ export type WebsiteMaxAggregateInputType = {
   verificationStatus?: true
   verificationMethod?: true
   verificationToken?: true
+  activeVerifiedToken?: true
   verifiedAt?: true
   lastVerificationCheckAt?: true
+  lastSuccessfulVerificationAt?: true
+  lastVerificationRequestAt?: true
+  verificationCheckCount?: true
+  consecutiveFailures?: true
   verificationFailureReason?: true
+  canonicalDomain?: true
+  trustScore?: true
   verificationVersion?: true
   createdAt?: true
   updatedAt?: true
@@ -170,9 +217,16 @@ export type WebsiteCountAggregateInputType = {
   verificationStatus?: true
   verificationMethod?: true
   verificationToken?: true
+  activeVerifiedToken?: true
   verifiedAt?: true
   lastVerificationCheckAt?: true
+  lastSuccessfulVerificationAt?: true
+  lastVerificationRequestAt?: true
+  verificationCheckCount?: true
+  consecutiveFailures?: true
   verificationFailureReason?: true
+  canonicalDomain?: true
+  trustScore?: true
   verificationVersion?: true
   createdAt?: true
   updatedAt?: true
@@ -280,9 +334,16 @@ export type WebsiteGroupByOutputType = {
   verificationStatus: $Enums.WebsiteVerificationStatus
   verificationMethod: $Enums.VerificationMethod | null
   verificationToken: string | null
+  activeVerifiedToken: string | null
   verifiedAt: Date | null
   lastVerificationCheckAt: Date | null
+  lastSuccessfulVerificationAt: Date | null
+  lastVerificationRequestAt: Date | null
+  verificationCheckCount: number
+  consecutiveFailures: number
   verificationFailureReason: string | null
+  canonicalDomain: string | null
+  trustScore: number | null
   verificationVersion: number
   createdAt: Date
   updatedAt: Date
@@ -326,9 +387,16 @@ export type WebsiteWhereInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFilter<"Website"> | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.EnumVerificationMethodNullableFilter<"Website"> | $Enums.VerificationMethod | null
   verificationToken?: Prisma.StringNullableFilter<"Website"> | string | null
+  activeVerifiedToken?: Prisma.StringNullableFilter<"Website"> | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
   lastVerificationCheckAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  lastVerificationRequestAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  verificationCheckCount?: Prisma.IntFilter<"Website"> | number
+  consecutiveFailures?: Prisma.IntFilter<"Website"> | number
   verificationFailureReason?: Prisma.StringNullableFilter<"Website"> | string | null
+  canonicalDomain?: Prisma.StringNullableFilter<"Website"> | string | null
+  trustScore?: Prisma.IntNullableFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntFilter<"Website"> | number
   createdAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Website"> | Date | string
@@ -353,9 +421,16 @@ export type WebsiteOrderByWithRelationInput = {
   verificationStatus?: Prisma.SortOrder
   verificationMethod?: Prisma.SortOrderInput | Prisma.SortOrder
   verificationToken?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeVerifiedToken?: Prisma.SortOrderInput | Prisma.SortOrder
   verifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastVerificationCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastSuccessfulVerificationAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastVerificationRequestAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  verificationCheckCount?: Prisma.SortOrder
+  consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  canonicalDomain?: Prisma.SortOrderInput | Prisma.SortOrder
+  trustScore?: Prisma.SortOrderInput | Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -383,9 +458,16 @@ export type WebsiteWhereUniqueInput = Prisma.AtLeast<{
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFilter<"Website"> | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.EnumVerificationMethodNullableFilter<"Website"> | $Enums.VerificationMethod | null
   verificationToken?: Prisma.StringNullableFilter<"Website"> | string | null
+  activeVerifiedToken?: Prisma.StringNullableFilter<"Website"> | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
   lastVerificationCheckAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  lastVerificationRequestAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  verificationCheckCount?: Prisma.IntFilter<"Website"> | number
+  consecutiveFailures?: Prisma.IntFilter<"Website"> | number
   verificationFailureReason?: Prisma.StringNullableFilter<"Website"> | string | null
+  canonicalDomain?: Prisma.StringNullableFilter<"Website"> | string | null
+  trustScore?: Prisma.IntNullableFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntFilter<"Website"> | number
   createdAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Website"> | Date | string
@@ -410,9 +492,16 @@ export type WebsiteOrderByWithAggregationInput = {
   verificationStatus?: Prisma.SortOrder
   verificationMethod?: Prisma.SortOrderInput | Prisma.SortOrder
   verificationToken?: Prisma.SortOrderInput | Prisma.SortOrder
+  activeVerifiedToken?: Prisma.SortOrderInput | Prisma.SortOrder
   verifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   lastVerificationCheckAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastSuccessfulVerificationAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastVerificationRequestAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  verificationCheckCount?: Prisma.SortOrder
+  consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  canonicalDomain?: Prisma.SortOrderInput | Prisma.SortOrder
+  trustScore?: Prisma.SortOrderInput | Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -441,9 +530,16 @@ export type WebsiteScalarWhereWithAggregatesInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusWithAggregatesFilter<"Website"> | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.EnumVerificationMethodNullableWithAggregatesFilter<"Website"> | $Enums.VerificationMethod | null
   verificationToken?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
+  activeVerifiedToken?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
   verifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Website"> | Date | string | null
   lastVerificationCheckAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Website"> | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Website"> | Date | string | null
+  lastVerificationRequestAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Website"> | Date | string | null
+  verificationCheckCount?: Prisma.IntWithAggregatesFilter<"Website"> | number
+  consecutiveFailures?: Prisma.IntWithAggregatesFilter<"Website"> | number
   verificationFailureReason?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
+  canonicalDomain?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
+  trustScore?: Prisma.IntNullableWithAggregatesFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntWithAggregatesFilter<"Website"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Website"> | Date | string
@@ -463,9 +559,16 @@ export type WebsiteCreateInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -490,9 +593,16 @@ export type WebsiteUncheckedCreateInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -515,9 +625,16 @@ export type WebsiteUpdateInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -542,9 +659,16 @@ export type WebsiteUncheckedUpdateInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -568,9 +692,16 @@ export type WebsiteCreateManyInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -590,9 +721,16 @@ export type WebsiteUpdateManyMutationInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -613,9 +751,16 @@ export type WebsiteUncheckedUpdateManyInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -646,15 +791,25 @@ export type WebsiteCountOrderByAggregateInput = {
   verificationStatus?: Prisma.SortOrder
   verificationMethod?: Prisma.SortOrder
   verificationToken?: Prisma.SortOrder
+  activeVerifiedToken?: Prisma.SortOrder
   verifiedAt?: Prisma.SortOrder
   lastVerificationCheckAt?: Prisma.SortOrder
+  lastSuccessfulVerificationAt?: Prisma.SortOrder
+  lastVerificationRequestAt?: Prisma.SortOrder
+  verificationCheckCount?: Prisma.SortOrder
+  consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrder
+  canonicalDomain?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
 export type WebsiteAvgOrderByAggregateInput = {
+  verificationCheckCount?: Prisma.SortOrder
+  consecutiveFailures?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
 }
 
@@ -672,9 +827,16 @@ export type WebsiteMaxOrderByAggregateInput = {
   verificationStatus?: Prisma.SortOrder
   verificationMethod?: Prisma.SortOrder
   verificationToken?: Prisma.SortOrder
+  activeVerifiedToken?: Prisma.SortOrder
   verifiedAt?: Prisma.SortOrder
   lastVerificationCheckAt?: Prisma.SortOrder
+  lastSuccessfulVerificationAt?: Prisma.SortOrder
+  lastVerificationRequestAt?: Prisma.SortOrder
+  verificationCheckCount?: Prisma.SortOrder
+  consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrder
+  canonicalDomain?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -694,15 +856,25 @@ export type WebsiteMinOrderByAggregateInput = {
   verificationStatus?: Prisma.SortOrder
   verificationMethod?: Prisma.SortOrder
   verificationToken?: Prisma.SortOrder
+  activeVerifiedToken?: Prisma.SortOrder
   verifiedAt?: Prisma.SortOrder
   lastVerificationCheckAt?: Prisma.SortOrder
+  lastSuccessfulVerificationAt?: Prisma.SortOrder
+  lastVerificationRequestAt?: Prisma.SortOrder
+  verificationCheckCount?: Prisma.SortOrder
+  consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrder
+  canonicalDomain?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
 
 export type WebsiteSumOrderByAggregateInput = {
+  verificationCheckCount?: Prisma.SortOrder
+  consecutiveFailures?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
 }
 
@@ -773,6 +945,14 @@ export type IntFieldUpdateOperationsInput = {
   divide?: number
 }
 
+export type NullableIntFieldUpdateOperationsInput = {
+  set?: number | null
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
 export type WebsiteCreateNestedOneWithoutOrdersInput = {
   create?: Prisma.XOR<Prisma.WebsiteCreateWithoutOrdersInput, Prisma.WebsiteUncheckedCreateWithoutOrdersInput>
   connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutOrdersInput
@@ -835,9 +1015,16 @@ export type WebsiteCreateWithoutPublisherInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -860,9 +1047,16 @@ export type WebsiteUncheckedCreateWithoutPublisherInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -915,9 +1109,16 @@ export type WebsiteScalarWhereInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFilter<"Website"> | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.EnumVerificationMethodNullableFilter<"Website"> | $Enums.VerificationMethod | null
   verificationToken?: Prisma.StringNullableFilter<"Website"> | string | null
+  activeVerifiedToken?: Prisma.StringNullableFilter<"Website"> | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
   lastVerificationCheckAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  lastVerificationRequestAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  verificationCheckCount?: Prisma.IntFilter<"Website"> | number
+  consecutiveFailures?: Prisma.IntFilter<"Website"> | number
   verificationFailureReason?: Prisma.StringNullableFilter<"Website"> | string | null
+  canonicalDomain?: Prisma.StringNullableFilter<"Website"> | string | null
+  trustScore?: Prisma.IntNullableFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntFilter<"Website"> | number
   createdAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Website"> | Date | string
@@ -937,9 +1138,16 @@ export type WebsiteCreateWithoutOrdersInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -963,9 +1171,16 @@ export type WebsiteUncheckedCreateWithoutOrdersInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1003,9 +1218,16 @@ export type WebsiteUpdateWithoutOrdersInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1029,9 +1251,16 @@ export type WebsiteUncheckedUpdateWithoutOrdersInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1053,9 +1282,16 @@ export type WebsiteCreateWithoutOrderItemsInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1079,9 +1315,16 @@ export type WebsiteUncheckedCreateWithoutOrderItemsInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1119,9 +1362,16 @@ export type WebsiteUpdateWithoutOrderItemsInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1145,9 +1395,16 @@ export type WebsiteUncheckedUpdateWithoutOrderItemsInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1169,9 +1426,16 @@ export type WebsiteCreateWithoutMarketplaceListingsInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1195,9 +1459,16 @@ export type WebsiteUncheckedCreateWithoutMarketplaceListingsInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1235,9 +1506,16 @@ export type WebsiteUpdateWithoutMarketplaceListingsInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1261,9 +1539,16 @@ export type WebsiteUncheckedUpdateWithoutMarketplaceListingsInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1285,9 +1570,16 @@ export type WebsiteCreateManyPublisherInput = {
   verificationStatus?: $Enums.WebsiteVerificationStatus
   verificationMethod?: $Enums.VerificationMethod | null
   verificationToken?: string | null
+  activeVerifiedToken?: string | null
   verifiedAt?: Date | string | null
   lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
   verificationFailureReason?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
   verificationVersion?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1307,9 +1599,16 @@ export type WebsiteUpdateWithoutPublisherInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1332,9 +1631,16 @@ export type WebsiteUncheckedUpdateWithoutPublisherInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1357,9 +1663,16 @@ export type WebsiteUncheckedUpdateManyWithoutPublisherInput = {
   verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
   verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
   verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1429,9 +1742,16 @@ export type WebsiteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   verificationStatus?: boolean
   verificationMethod?: boolean
   verificationToken?: boolean
+  activeVerifiedToken?: boolean
   verifiedAt?: boolean
   lastVerificationCheckAt?: boolean
+  lastSuccessfulVerificationAt?: boolean
+  lastVerificationRequestAt?: boolean
+  verificationCheckCount?: boolean
+  consecutiveFailures?: boolean
   verificationFailureReason?: boolean
+  canonicalDomain?: boolean
+  trustScore?: boolean
   verificationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1457,9 +1777,16 @@ export type WebsiteSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   verificationStatus?: boolean
   verificationMethod?: boolean
   verificationToken?: boolean
+  activeVerifiedToken?: boolean
   verifiedAt?: boolean
   lastVerificationCheckAt?: boolean
+  lastSuccessfulVerificationAt?: boolean
+  lastVerificationRequestAt?: boolean
+  verificationCheckCount?: boolean
+  consecutiveFailures?: boolean
   verificationFailureReason?: boolean
+  canonicalDomain?: boolean
+  trustScore?: boolean
   verificationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1481,9 +1808,16 @@ export type WebsiteSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   verificationStatus?: boolean
   verificationMethod?: boolean
   verificationToken?: boolean
+  activeVerifiedToken?: boolean
   verifiedAt?: boolean
   lastVerificationCheckAt?: boolean
+  lastSuccessfulVerificationAt?: boolean
+  lastVerificationRequestAt?: boolean
+  verificationCheckCount?: boolean
+  consecutiveFailures?: boolean
   verificationFailureReason?: boolean
+  canonicalDomain?: boolean
+  trustScore?: boolean
   verificationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1505,15 +1839,22 @@ export type WebsiteSelectScalar = {
   verificationStatus?: boolean
   verificationMethod?: boolean
   verificationToken?: boolean
+  activeVerifiedToken?: boolean
   verifiedAt?: boolean
   lastVerificationCheckAt?: boolean
+  lastSuccessfulVerificationAt?: boolean
+  lastVerificationRequestAt?: boolean
+  verificationCheckCount?: boolean
+  consecutiveFailures?: boolean
   verificationFailureReason?: boolean
+  canonicalDomain?: boolean
+  trustScore?: boolean
   verificationVersion?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type WebsiteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "url" | "domain" | "name" | "category" | "language" | "country" | "metrics" | "isActive" | "publisherId" | "ownershipType" | "verificationStatus" | "verificationMethod" | "verificationToken" | "verifiedAt" | "lastVerificationCheckAt" | "verificationFailureReason" | "verificationVersion" | "createdAt" | "updatedAt", ExtArgs["result"]["website"]>
+export type WebsiteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "url" | "domain" | "name" | "category" | "language" | "country" | "metrics" | "isActive" | "publisherId" | "ownershipType" | "verificationStatus" | "verificationMethod" | "verificationToken" | "activeVerifiedToken" | "verifiedAt" | "lastVerificationCheckAt" | "lastSuccessfulVerificationAt" | "lastVerificationRequestAt" | "verificationCheckCount" | "consecutiveFailures" | "verificationFailureReason" | "canonicalDomain" | "trustScore" | "verificationVersion" | "createdAt" | "updatedAt", ExtArgs["result"]["website"]>
 export type WebsiteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
   orders?: boolean | Prisma.Website$ordersArgs<ExtArgs>
@@ -1551,9 +1892,16 @@ export type $WebsitePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     verificationStatus: $Enums.WebsiteVerificationStatus
     verificationMethod: $Enums.VerificationMethod | null
     verificationToken: string | null
+    activeVerifiedToken: string | null
     verifiedAt: Date | null
     lastVerificationCheckAt: Date | null
+    lastSuccessfulVerificationAt: Date | null
+    lastVerificationRequestAt: Date | null
+    verificationCheckCount: number
+    consecutiveFailures: number
     verificationFailureReason: string | null
+    canonicalDomain: string | null
+    trustScore: number | null
     verificationVersion: number
     createdAt: Date
     updatedAt: Date
@@ -1998,9 +2346,16 @@ export interface WebsiteFieldRefs {
   readonly verificationStatus: Prisma.FieldRef<"Website", 'WebsiteVerificationStatus'>
   readonly verificationMethod: Prisma.FieldRef<"Website", 'VerificationMethod'>
   readonly verificationToken: Prisma.FieldRef<"Website", 'String'>
+  readonly activeVerifiedToken: Prisma.FieldRef<"Website", 'String'>
   readonly verifiedAt: Prisma.FieldRef<"Website", 'DateTime'>
   readonly lastVerificationCheckAt: Prisma.FieldRef<"Website", 'DateTime'>
+  readonly lastSuccessfulVerificationAt: Prisma.FieldRef<"Website", 'DateTime'>
+  readonly lastVerificationRequestAt: Prisma.FieldRef<"Website", 'DateTime'>
+  readonly verificationCheckCount: Prisma.FieldRef<"Website", 'Int'>
+  readonly consecutiveFailures: Prisma.FieldRef<"Website", 'Int'>
   readonly verificationFailureReason: Prisma.FieldRef<"Website", 'String'>
+  readonly canonicalDomain: Prisma.FieldRef<"Website", 'String'>
+  readonly trustScore: Prisma.FieldRef<"Website", 'Int'>
   readonly verificationVersion: Prisma.FieldRef<"Website", 'Int'>
   readonly createdAt: Prisma.FieldRef<"Website", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Website", 'DateTime'>

@@ -255,6 +255,21 @@ export class AdminService {
     return this.client.get(`/admin/marketplace/listings/${listingId}/reviews`)
   }
 
+  // -- Website verification governance + review center --
+  verificationReviewCenter(filters: { publisherId?: string; domain?: string; status?: string; from?: string; to?: string } = {}) {
+    const q = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][]).toString()
+    return this.client.get<any>(`/admin/websites/verification${q ? `?${q}` : ""}`)
+  }
+  forceApprovedReport() {
+    return this.client.get<any>("/admin/websites/force-approved")
+  }
+  bulkRetryVerification(websiteIds: string[]) {
+    return this.client.post<any>("/admin/websites/verification/bulk-retry", { json: { websiteIds } })
+  }
+  recomputeTrust(websiteId: string) {
+    return this.client.post<any>(`/admin/websites/${websiteId}/recompute-trust`)
+  }
+
   // -- Delivery verification + fulfillment --
   fulfillmentQueue() {
     return this.client.get<any[]>("/operations/fulfillment-queue")

@@ -390,6 +390,14 @@ export class MarketplaceService {
       throw new ForbiddenException("You don't have access to this listing")
     }
 
+    // Block edits on a revoked domain — ownership must be re-verified first.
+    if (listing.websiteId) {
+      const site = await this.prisma.website.findUnique({ where: { id: listing.websiteId }, select: { verificationStatus: true, ownershipType: true } })
+      if (site?.ownershipType === "PUBLISHER" && site.verificationStatus === "REVOKED") {
+        throw new BadRequestException({ code: "WEBSITE_REVOKED", message: "Cannot edit listing: domain ownership is revoked. Re-verify the domain first." })
+      }
+    }
+
     const updateData: any = { ...dto }
     delete updateData.tags
     // Ownership fields cannot be reassigned via update

@@ -439,10 +439,25 @@ model Website {
   // are created VERIFIED (the platform owns them).
   verificationStatus       WebsiteVerificationStatus @default(PENDING_VERIFICATION)
   verificationMethod       VerificationMethod?
+  // Token the publisher must currently publish in DNS (next verification cycle).
   verificationToken        String?
+  // Token actually proven present in DNS — what the periodic sweep re-checks.
+  // Kept separate from verificationToken so rotation never false-revokes a
+  // domain whose published TXT still holds the previously-proven secret.
+  activeVerifiedToken      String?
   verifiedAt               DateTime?
   lastVerificationCheckAt  DateTime?
+  lastSuccessfulVerificationAt DateTime?
+  lastVerificationRequestAt DateTime?
+  verificationCheckCount   Int                       @default(0)
+  // Consecutive failed health checks. 3 in a row -> REVOKED (transient-tolerant).
+  consecutiveFailures      Int                       @default(0)
   verificationFailureReason String?
+  // Canonical apex domain (protocol/path/www stripped, lowercase, punycode).
+  // Unique per non-platform site — one verified domain = one publisher.
+  canonicalDomain          String?
+  // Internal moderation trust score 0-100 (never exposed publicly).
+  trustScore               Int?
   // Optimistic-lock guard for worker transitions
   verificationVersion      Int                       @default(0)
 
@@ -458,6 +473,7 @@ model Website {
   @@index([isActive])
   @@index([ownershipType])
   @@index([domain])
+  @@index([canonicalDomain])
   @@index([verificationToken])
   @@index([verificationStatus])
   @@index([verifiedAt])
