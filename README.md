@@ -51,35 +51,51 @@ A comprehensive guest post marketplace platform for SEO link building campaigns.
 
 - Node.js 18+
 - pnpm 11+
-- Docker
+- Docker (Compose v2)
 
-### Installation
+### First-time setup
 
 ```bash
-# Install dependencies
+# 1. Install dependencies
 pnpm install
 
-# Start infrastructure services
+# 2. Create the dev env file from the template
+cp .env.example .env.development
+# Adjust secrets as needed. The defaults already match the docker-compose stack.
+
+# 3. Start infrastructure services (Postgres, Redis, MinIO, Mailpit, Traefik)
 pnpm services:up
 
-# Build all packages and apps
+# 4. Build every package and app once. This also generates the Prisma client
+#    and copies its native engine binary into packages/database/dist/prisma.
 pnpm build
 ```
+
+After step 4 the repo is ready to run.
 
 ### Development
 
 ```bash
-# Start all services in development mode
+# Run the full stack (all 4 Next apps + API + worker)
 pnpm dev:all
 
-# Start individual app
-pnpm dev:website
-pnpm dev:portal
-pnpm dev:publisher
-pnpm dev:admin
-
-# Start only the API
+# Or run a single piece
 pnpm dev:api
+pnpm dev:website     # 3000
+pnpm dev:portal      # 3001
+pnpm dev:publisher   # 3002
+pnpm dev:admin       # 3003
+pnpm dev:worker
+```
+
+`pnpm dev:*` is wired through Turborepo with `dependsOn: ["^build"]`, so workspace
+dependencies (`@guestpost/database`, `@guestpost/shared`, …) are built before the
+target app starts.
+
+When you change the Prisma schema, regenerate the client:
+
+```bash
+pnpm --filter @guestpost/database db:generate
 ```
 
 ### Seed Test Data
@@ -91,21 +107,36 @@ pnpm seed:users   # Create test customers and publishers
 
 ### Environment Variables
 
-Create `.env.development` in the root with:
+All env vars live in `.env.development` at the repo root. The API loader at
+[`apps/api/src/main.ts`](apps/api/src/main.ts) only reads that file when
+`NODE_ENV=development` — the `dev` script sets it for you.
 
-```env
-# Database
-DATABASE_URL=postgresql://guestpost:guestpost@localhost:5432/guestpost
+The minimum required keys (already present in `.env.example`):
 
-# Redis
-REDIS_URL=redis://localhost:6379
+| Key                  | Purpose                                              |
+|----------------------|------------------------------------------------------|
+| `DATABASE_URL`       | Postgres connection string (literal, no `${...}`)    |
+| `REDIS_URL`          | Redis connection string                              |
+| `JWT_SECRET`         | Better Auth / JWT signing key                        |
+| `NEXT_PUBLIC_API_URL`| Public API origin used by the frontends              |
 
-# API URL for frontend apps
-NEXT_PUBLIC_API_URL=http://localhost:4000
+> **Note:** `dotenv` does **not** expand `${POSTGRES_USER}`-style placeholders.
+> Always inline literal values in `DATABASE_URL`.
 
-# Auth
-JWT_SECRET=your-secret-key
-```
+### Troubleshooting
+
+- **`FATAL: Missing required environment variables`** — `.env.development` is
+  missing, or you ran the API without `NODE_ENV=development`. Use `pnpm dev:api`
+  (which sets it) or copy `.env.example` to `.env.development`.
+- **`Cannot find module '.../dist/main.ts'`** — stale `apps/api/nest-cli.json`
+  with `entryFile: "main.ts"`. It must be `"main"` (no extension).
+- **`Prisma Client could not locate the Query Engine for runtime "..."`** — the
+  native engine binary isn't in `packages/database/dist/prisma/`. Run
+  `pnpm build` (or `pnpm --filter @guestpost/database build`) to regenerate
+  and copy it.
+- **`Authentication failed against database server`** — `DATABASE_URL`
+  credentials don't match what Postgres was started with. The docker-compose
+  defaults are `guestpost:guestpost`.
 
 ## Project Structure
 
