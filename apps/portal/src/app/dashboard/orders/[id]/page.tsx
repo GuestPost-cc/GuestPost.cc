@@ -26,6 +26,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@guestpost/ui"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@guestpost/ui"
+import DOMPurify from "isomorphic-dompurify"
+import { Eye, Code } from "lucide-react"
 import {
   ArrowLeft,
   Clock,
@@ -123,6 +126,51 @@ interface OrderDetail {
   createdAt: string
   updatedAt: string
   events: TimelineEvent[]
+}
+
+// Publisher-submitted content is rendered in the customer's browser — sanitize
+// to neutralize XSS (scripts, event handlers, javascript: URLs). Links open in
+// a new tab.
+if (typeof window !== "undefined" && !(DOMPurify as any).__gpHook) {
+  DOMPurify.addHook("afterSanitizeAttributes", (node: any) => {
+    if (node.tagName === "A") {
+      node.setAttribute("target", "_blank")
+      node.setAttribute("rel", "noopener noreferrer")
+    }
+  })
+  ;(DOMPurify as any).__gpHook = true
+}
+
+// Renders submitted content: plain text as-is, HTML via a sanitized Preview /
+// raw HTML source tabbed view. Images + formatting are constrained so they
+// never blow out the card layout.
+function SubmittedContentBody({ content }: { content: string }) {
+  const hasHtml = /<\/?[a-z][\s\S]*>/i.test(content)
+  if (!hasHtml) {
+    return (
+      <div className="rounded-lg border bg-muted/30 p-3">
+        <p className="whitespace-pre-wrap break-words text-sm">{content}</p>
+      </div>
+    )
+  }
+  const clean = DOMPurify.sanitize(content)
+  return (
+    <Tabs defaultValue="preview" className="w-full">
+      <TabsList>
+        <TabsTrigger value="preview" className="gap-1"><Eye className="h-3.5 w-3.5" /> Preview</TabsTrigger>
+        <TabsTrigger value="html" className="gap-1"><Code className="h-3.5 w-3.5" /> HTML</TabsTrigger>
+      </TabsList>
+      <TabsContent value="preview">
+        <div
+          className="max-w-none overflow-x-auto rounded-lg border bg-background p-4 text-sm leading-relaxed [&_a]:text-primary [&_a]:underline [&_h1]:mb-2 [&_h1]:mt-3 [&_h1]:text-lg [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-3 [&_h2]:text-base [&_h2]:font-semibold [&_h3]:mb-1 [&_h3]:mt-2 [&_h3]:font-semibold [&_img]:my-2 [&_img]:max-w-full [&_img]:rounded-lg [&_li]:my-0.5 [&_ol]:my-2 [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-2 [&_table]:w-full [&_td]:border [&_td]:p-1 [&_th]:border [&_th]:p-1 [&_ul]:my-2 [&_ul]:list-disc [&_ul]:pl-5"
+          dangerouslySetInnerHTML={{ __html: clean }}
+        />
+      </TabsContent>
+      <TabsContent value="html">
+        <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg border bg-muted/30 p-3 text-xs">{content}</pre>
+      </TabsContent>
+    </Tabs>
+  )
 }
 
 // Revision.files Json is loosely shaped — accept array of strings or {url,name}.
@@ -556,11 +604,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {hasContent && (
-                    <div className="space-y-1">
+                    <div className="space-y-1.5">
                       {sc!.title && <p className="font-medium">{sc!.title}</p>}
-                      <div className="rounded-lg border bg-muted/30 p-3">
-                        <p className="whitespace-pre-wrap text-sm">{sc!.deliverable || sc!.brief}</p>
-                      </div>
+                      <SubmittedContentBody content={(sc!.deliverable || sc!.brief)!} />
                     </div>
                   )}
                   {pubs.length > 0 && (
