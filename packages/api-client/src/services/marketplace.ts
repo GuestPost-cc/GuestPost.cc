@@ -177,6 +177,59 @@ export class MarketplaceService {
   // {listings, pagination} envelope (and filters a listing type nothing
   // uses), which crashed callers that expected an array.
   // Returned `id` is the WEBSITE id (order items reference websites).
+  // Order placements: one entry per fulfillment website, with price + the
+  // auto-derived fulfiller. Publisher-owned site -> that publisher; platform-
+  // owned (INTERNAL fulfillment) -> Platform. The customer picks a SITE; the
+  // publisher is never chosen by hand.
+  async searchPlacements(params?: { category?: string; language?: string; country?: string; search?: string }) {
+    const res = await this.searchListings({
+      query: params?.search,
+      category: params?.category,
+      language: params?.language,
+      country: params?.country,
+      limit: 50,
+    })
+    const seen = new Set<string>()
+    const out: Array<{
+      websiteId: string
+      listingSlug: string
+      name: string
+      websiteUrl: string
+      price: number
+      currency: string
+      domainRating: number
+      traffic: number
+      category?: string
+      language?: string
+      country?: string
+      turnaroundDays?: number
+      fulfilledBy: { kind: "PLATFORM" | "PUBLISHER"; name: string }
+    }> = []
+    for (const l of res.listings ?? []) {
+      if (!l.websiteId || seen.has(l.websiteId)) continue
+      seen.add(l.websiteId)
+      const isPlatform = l.fulfillmentType === "INTERNAL"
+      out.push({
+        websiteId: l.websiteId,
+        listingSlug: l.slug,
+        name: l.title,
+        websiteUrl: l.websiteUrl ?? "",
+        price: l.price ?? 0,
+        currency: l.currency ?? "USD",
+        domainRating: l.domainRating ?? 0,
+        traffic: l.traffic ?? 0,
+        category: l.category?.name,
+        language: l.language,
+        country: l.country,
+        turnaroundDays: l.turnaroundDays,
+        fulfilledBy: isPlatform
+          ? { kind: "PLATFORM", name: "Platform" }
+          : { kind: "PUBLISHER", name: l.publisher?.name ?? "Publisher" },
+      })
+    }
+    return out
+  }
+
   async searchPublishers(params?: { category?: string; language?: string; country?: string; search?: string }) {
     const res = await this.searchListings({
       query: params?.search,

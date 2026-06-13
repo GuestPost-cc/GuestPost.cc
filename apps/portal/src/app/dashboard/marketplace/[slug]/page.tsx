@@ -54,6 +54,7 @@ interface Listing {
   allowNicheEdit: boolean
   doFollowOnly: boolean
   websiteUrl?: string
+  websiteId?: string | null
   sampleUrl?: string
   category?: { id: string; name: string; slug: string }
   tags: Array<{ id: string; name: string; slug: string }>
@@ -265,11 +266,12 @@ export default function ListingDetailPage() {
               size="lg"
               onClick={() => {
                 if (!listing) return
-                const params = new URLSearchParams({
-                  listing: listing.slug,
-                  type: listing.type,
-                })
-                if (listing.publisher?.id) params.set("publisherId", listing.publisher.id)
+                const params = new URLSearchParams({ type: listing.type, name: listing.title })
+                // Target the fulfillment website; publisher is auto-derived from it.
+                if (listing.websiteId) params.set("websiteId", listing.websiteId)
+                if (listing.websiteUrl) params.set("url", listing.websiteUrl)
+                if (listing.price != null) params.set("price", String(listing.price))
+                params.set("fulfilledBy", listing.fulfillmentType === "INTERNAL" ? "Platform" : (listing.publisher?.name ?? "Publisher"))
                 router.push(`/dashboard/orders/new?${params.toString()}`)
               }}
             >

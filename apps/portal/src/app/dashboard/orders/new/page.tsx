@@ -73,24 +73,35 @@ const serviceTypes = [
 
 const orderSchema = z.object({
   serviceType: z.string().min(1, "Please select a service type"),
-  websiteId: z.string().min(1, "Please select a publisher"),
+  websiteId: z.string().min(1, "Please select a website"),
   campaignId: z.string().min(1, "Please select a campaign"),
   title: z.string().min(3, "Title must be at least 3 characters").max(100),
   brief: z.string().min(20, "Brief must be at least 20 characters").max(2000),
   targetKeywords: z.string().min(1, "Please add at least one target keyword"),
   targetUrl: z.string().url("Please enter a valid URL").or(z.literal("")),
+  // Display-only: the selected site + its auto-derived fulfiller (for review).
+  placementName: z.string().optional(),
+  placementUrl: z.string().optional(),
+  placementPrice: z.number().optional(),
+  fulfilledByLabel: z.string().optional(),
 })
 
 type OrderFormData = z.infer<typeof orderSchema>
 
-interface Publisher {
-  id: string
+interface Placement {
+  websiteId: string
+  listingSlug: string
   name: string
   websiteUrl: string
+  price: number
+  currency: string
   domainRating: number
+  traffic: number
   category?: string
   language?: string
   country?: string
+  turnaroundDays?: number
+  fulfilledBy: { kind: "PLATFORM" | "PUBLISHER"; name: string }
 }
 
 interface DraftData {
@@ -101,7 +112,7 @@ interface DraftData {
 
 const STEPS = [
   { number: 1, title: "Service", description: "Select your service type" },
-  { number: 2, title: "Publisher", description: "Choose your publisher" },
+  { number: 2, title: "Website", description: "Choose a website" },
   { number: 3, title: "Content", description: "Content requirements" },
   { number: 4, title: "Review", description: "Review your order" },
   { number: 5, title: "Submit", description: "Confirmation" },
@@ -205,13 +216,13 @@ function ServiceSelection({
   )
 }
 
-function PublisherSelection({
+function WebsiteSelection({
   selected,
   onSelect,
   serviceType,
 }: {
   selected: string
-  onSelect: (id: string) => void
+  onSelect: (p: Placement) => void
   serviceType: string
 }) {
   const [search, setSearch] = useState("")
@@ -219,43 +230,38 @@ function PublisherSelection({
   const [page, setPage] = useState(0)
   const pageSize = 6
 
-  const { data: publishersData, isLoading, error: publishersError, refetch: refetchPublishers } = useQuery({
-    queryKey: ["marketplace", search, categoryFilter],
-    queryFn: () => api.marketplace.searchPublishers({
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ["placements", search, categoryFilter],
+    queryFn: () => api.marketplace.searchPlacements({
       search: search || undefined,
       category: categoryFilter !== "all" ? categoryFilter : undefined,
-    }) as Promise<Publisher[]>,
+    }) as Promise<Placement[]>,
   })
 
-  if (publishersError) {
-    return <ErrorState title="Failed to load publishers" description={(publishersError as Error).message} onRetry={() => refetchPublishers()} />
+  if (error) {
+    return <ErrorState title="Failed to load websites" description={(error as Error).message} onRetry={() => refetch()} />
   }
 
-  const publishers = publishersData ?? []
-  const totalPages = Math.ceil(publishers.length / pageSize)
-  const paginatedPublishers = publishers.slice(page * pageSize, (page + 1) * pageSize)
+  const placements = data ?? []
+  const totalPages = Math.ceil(placements.length / pageSize)
+  const paginated = placements.slice(page * pageSize, (page + 1) * pageSize)
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold">Select Publisher</h2>
-        <p className="text-muted-foreground">Browse and select a publisher for your {serviceType.replace(/_/g, " ").toLowerCase()}</p>
+        <h2 className="text-xl font-semibold">Select a Website</h2>
+        <p className="text-muted-foreground">
+          Pick where your {serviceType.replace(/_/g, " ").toLowerCase()} goes. The fulfiller is set automatically from the site.
+        </p>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search publishers..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Search websites..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-40">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
+          <SelectTrigger className="w-40"><SelectValue placeholder="Category" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             <SelectItem value="technology">Technology</SelectItem>
@@ -270,57 +276,50 @@ function PublisherSelection({
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
-            <Card key={i}>
-              <CardHeader className="pb-2">
-                <Skeleton className="h-5 w-32" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-4 w-full" />
-              </CardContent>
-            </Card>
+            <Card key={i}><CardHeader className="pb-2"><Skeleton className="h-5 w-32" /></CardHeader><CardContent><Skeleton className="h-4 w-full" /></CardContent></Card>
           ))}
         </div>
-      ) : publishers.length === 0 ? (
+      ) : placements.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12">
           <Globe className="h-12 w-12 text-muted-foreground/50" />
-          <h3 className="mt-4 text-lg font-medium">No publishers found</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Try adjusting your search or filters
-          </p>
+          <h3 className="mt-4 text-lg font-medium">No websites found</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Try adjusting your search or filters</p>
         </div>
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {paginatedPublishers.map((publisher) => {
-              const isSelected = selected === publisher.id
+            {paginated.map((p) => {
+              const isSelected = selected === p.websiteId
+              const platform = p.fulfilledBy.kind === "PLATFORM"
               return (
                 <Card
-                  key={publisher.id}
-                  className={`cursor-pointer transition-all hover:border-primary/50 ${
-                    isSelected ? "border-primary bg-primary/5" : ""
-                  }`}
-                  onClick={() => onSelect(publisher.id)}
+                  key={p.websiteId}
+                  className={`cursor-pointer transition-all hover:border-primary/50 ${isSelected ? "border-primary bg-primary/5" : ""}`}
+                  onClick={() => onSelect(p)}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                        <Globe className="h-5 w-5" />
-                      </div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted"><Globe className="h-5 w-5" /></div>
                       {isSelected && (
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary">
-                          <Check className="h-4 w-4 text-primary-foreground" />
-                        </div>
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary"><Check className="h-4 w-4 text-primary-foreground" /></div>
                       )}
                     </div>
-                    <CardTitle className="mt-4 text-base">{publisher.name}</CardTitle>
+                    <CardTitle className="mt-3 text-base">{p.name}</CardTitle>
+                    <p className="truncate text-xs text-muted-foreground">{p.websiteUrl}</p>
                   </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground truncate">{publisher.websiteUrl}</span>
-                      <Badge variant="secondary" className="ml-2 shrink-0">
-                        DR {publisher.domainRating}
-                      </Badge>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-semibold">{p.currency} {p.price.toLocaleString()}</span>
+                      <Badge variant="secondary">DR {p.domainRating}</Badge>
                     </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      {p.traffic > 0 && <span>{p.traffic.toLocaleString()} traffic</span>}
+                      {p.turnaroundDays ? <span>· {p.turnaroundDays}d turnaround</span> : null}
+                    </div>
+                    {/* Auto-derived fulfiller — never chosen by hand */}
+                    <Badge className={platform ? "bg-indigo-100 text-indigo-700" : "bg-emerald-100 text-emerald-700"}>
+                      {platform ? "Fulfilled by Platform" : `Fulfilled by ${p.fulfilledBy.name}`}
+                    </Badge>
                   </CardContent>
                 </Card>
               )
@@ -329,25 +328,9 @@ function PublisherSelection({
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Page {page + 1} of {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}><ChevronLeft className="h-4 w-4" /></Button>
+              <span className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</span>
+              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}><ChevronRight className="h-4 w-4" /></Button>
             </div>
           )}
         </>
@@ -476,6 +459,16 @@ function ReviewStep({ data }: { data: Partial<OrderFormData> }) {
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Campaign</p>
               <p className="font-medium">{campaign?.name ?? "—"}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Website</p>
+              <p className="font-medium">{data.placementName ?? "—"}</p>
+              {data.placementUrl && <p className="text-xs text-muted-foreground">{data.placementUrl}</p>}
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Fulfilled by</p>
+              <p className="font-medium">{data.fulfilledByLabel ?? "—"}</p>
+              {data.placementPrice != null && <p className="text-xs text-muted-foreground">Price: ${data.placementPrice.toLocaleString()}</p>}
             </div>
           </div>
 
@@ -622,6 +615,25 @@ export default function NewOrderPage() {
     }
   }, [currentStep, formData])
 
+  // Prefill when arriving from a marketplace listing's "Order Now" — the site +
+  // its auto-derived fulfiller are carried in the query string. Reading
+  // location avoids the useSearchParams Suspense requirement.
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    const websiteId = sp.get("websiteId")
+    if (!websiteId) return
+    setFormData((prev) => ({
+      ...prev,
+      websiteId,
+      serviceType: sp.get("type") || prev.serviceType,
+      placementName: sp.get("name") || prev.placementName,
+      placementUrl: sp.get("url") || prev.placementUrl,
+      placementPrice: sp.get("price") ? Number(sp.get("price")) : prev.placementPrice,
+      fulfilledByLabel: sp.get("fulfilledBy") || prev.fulfilledByLabel,
+    }))
+    setCurrentStep((s) => (s < 2 ? 2 : s))
+  }, [])
+
   const updateFormData = (data: Partial<OrderFormData>) => {
     setFormData((prev) => ({ ...prev, ...data }))
   }
@@ -731,9 +743,15 @@ export default function NewOrderPage() {
           )}
 
           {currentStep === 2 && (
-            <PublisherSelection
+            <WebsiteSelection
               selected={formData.websiteId || ""}
-              onSelect={(id) => updateFormData({ websiteId: id })}
+              onSelect={(p) => updateFormData({
+                websiteId: p.websiteId,
+                placementName: p.name,
+                placementUrl: p.websiteUrl,
+                placementPrice: p.price,
+                fulfilledByLabel: p.fulfilledBy.kind === "PLATFORM" ? "Platform" : p.fulfilledBy.name,
+              })}
               serviceType={formData.serviceType || ""}
             />
           )}
