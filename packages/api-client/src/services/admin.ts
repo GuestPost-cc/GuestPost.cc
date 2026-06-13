@@ -255,6 +255,11 @@ export class AdminService {
     return this.client.get(`/admin/marketplace/listings/${listingId}/reviews`)
   }
 
+  // Staff listing preview by slug — returns the listing in any status.
+  getListingBySlug(slug: string) {
+    return this.client.get<any>(`/admin/marketplace/listings/by-slug/${slug}`)
+  }
+
   // -- Website verification governance + review center --
   verificationReviewCenter(filters: { publisherId?: string; domain?: string; status?: string; from?: string; to?: string } = {}) {
     const q = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][]).toString()

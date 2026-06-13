@@ -429,6 +429,12 @@ export class AdminController {
     return this.admin.getMarketplaceStats()
   }
 
+  // Staff listing preview — any status (for moderation of pending/draft/etc).
+  @Get("marketplace/listings/by-slug/:slug")
+  getListingForStaff(@Param("slug") slug: string) {
+    return this.marketplace.getListingForStaff(slug)
+  }
+
   // Create a PLATFORM-owned listing (no publisher, INTERNAL fulfillment).
   // Service rejects publisher-owned websites so ownership can't be spoofed.
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")

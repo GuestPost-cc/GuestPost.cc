@@ -185,6 +185,30 @@ export class MarketplaceService {
     }
   }
 
+  // Staff preview — fetch a listing by slug in ANY status (pending/draft/
+  // rejected/paused/archived) for moderation. No public status gate, no view
+  // tracking. Authorization is enforced by the StaffRoles guard on the route.
+  async getListingForStaff(slug: string) {
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { slug },
+      include: {
+        category: true,
+        tags: { include: { tag: true } },
+        images: { orderBy: { sortOrder: "asc" } },
+        pricingTiers: { orderBy: { sortOrder: "asc" } },
+        reviews: {
+          include: { user: { select: { id: true, name: true, image: true } } },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        },
+        publisher: { include: { profile: true } },
+        website: true,
+      },
+    })
+    if (!listing) throw new NotFoundException("Listing not found")
+    return { ...listing, relatedListings: [] }
+  }
+
   async getListing(slug: string, userId?: string) {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { slug },

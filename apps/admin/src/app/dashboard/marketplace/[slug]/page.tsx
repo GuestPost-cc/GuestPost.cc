@@ -56,8 +56,10 @@ export default function AdminListingPreviewPage({ params }: { params: Promise<{ 
   const canModerate = user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
 
   const { data: listing, isLoading, error, refetch } = useQuery({
+    // Staff endpoint returns the listing in ANY status (pending/draft/etc) —
+    // the public getListing 404s anything not APPROVED for non-owners.
     queryKey: ["admin", "listing-preview", slug],
-    queryFn: () => api.marketplace.getListing(slug),
+    queryFn: () => api.admin.getListingBySlug(slug),
   })
 
   const invalidate = () => {
