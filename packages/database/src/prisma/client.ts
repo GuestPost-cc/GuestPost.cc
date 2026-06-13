@@ -173,6 +173,11 @@ export type DeliverySnapshot = Prisma.DeliverySnapshotModel
  */
 export type DeliveryFraudFlag = Prisma.DeliveryFraudFlagModel
 /**
+ * Model OrderReview
+ * 
+ */
+export type OrderReview = Prisma.OrderReviewModel
+/**
  * Model PublisherBalance
  * 
  */

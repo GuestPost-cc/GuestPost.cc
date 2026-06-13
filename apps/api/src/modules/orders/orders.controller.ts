@@ -134,6 +134,24 @@ export class OrdersController {
     return this.review.confirmDelivery(id, user.organizationId, user.id)
   }
 
+  // Per-order review (customer, after delivery). Feeds the publisher rating.
+  @Post(":id/review")
+  @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
+  @MemberRoles("OWNER", "MEMBER")
+  @ActorType("CUSTOMER")
+  @RequireOrderOwnership()
+  submitReview(@Param("id") id: string, @Body() body: { rating: number; comment?: string }, @CurrentUser() user: any) {
+    return this.review.submitReview(id, user.organizationId, user.id, Number(body.rating), body.comment)
+  }
+
+  @Get(":id/review")
+  @UseGuards(OrderOwnershipGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @RequireOrderOwnership()
+  getReview(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.review.getReview(id, user.organizationId)
+  }
+
   // Manual fallback: customer accepts the delivery when the automated check
   // could not verify it (FAILED / MANUAL_REVIEW). System check stays primary.
   @Post(":id/accept-delivery")

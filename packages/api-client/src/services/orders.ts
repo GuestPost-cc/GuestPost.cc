@@ -272,4 +272,10 @@ export class OrdersService {
   acceptDelivery(id: string) {
     return this.client.post<{ status: string; acceptedBy: string }>(`/orders/${id}/accept-delivery`)
   }
+  submitReview(id: string, rating: number, comment?: string) {
+    return this.client.post<any>(`/orders/${id}/review`, { json: { rating, comment } })
+  }
+  getReview(id: string) {
+    return this.client.get<{ id: string; rating: number; comment: string | null; createdAt: string } | null>(`/orders/${id}/review`)
+  }
 }

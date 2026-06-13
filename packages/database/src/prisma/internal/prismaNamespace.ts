@@ -416,6 +416,7 @@ export const ModelName = {
   DeliveryVerificationEvidence: 'DeliveryVerificationEvidence',
   DeliverySnapshot: 'DeliverySnapshot',
   DeliveryFraudFlag: 'DeliveryFraudFlag',
+  OrderReview: 'OrderReview',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
   PayoutMethod: 'PayoutMethod',
@@ -466,7 +467,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "service" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplacePricingTier" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings"
+    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "service" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplacePricingTier" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2391,6 +2392,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.DeliveryFraudFlagCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.DeliveryFraudFlagCountAggregateOutputType> | number
+        }
+      }
+    }
+    OrderReview: {
+      payload: Prisma.$OrderReviewPayload<ExtArgs>
+      fields: Prisma.OrderReviewFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OrderReviewFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OrderReviewFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload>
+        }
+        findFirst: {
+          args: Prisma.OrderReviewFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OrderReviewFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload>
+        }
+        findMany: {
+          args: Prisma.OrderReviewFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload>[]
+        }
+        create: {
+          args: Prisma.OrderReviewCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload>
+        }
+        createMany: {
+          args: Prisma.OrderReviewCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OrderReviewCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload>[]
+        }
+        delete: {
+          args: Prisma.OrderReviewDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload>
+        }
+        update: {
+          args: Prisma.OrderReviewUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload>
+        }
+        deleteMany: {
+          args: Prisma.OrderReviewDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OrderReviewUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OrderReviewUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload>[]
+        }
+        upsert: {
+          args: Prisma.OrderReviewUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderReviewPayload>
+        }
+        aggregate: {
+          args: Prisma.OrderReviewAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOrderReview>
+        }
+        groupBy: {
+          args: Prisma.OrderReviewGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderReviewGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OrderReviewCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderReviewCountAggregateOutputType> | number
         }
       }
     }
@@ -5441,6 +5516,19 @@ export const DeliveryFraudFlagScalarFieldEnum = {
 export type DeliveryFraudFlagScalarFieldEnum = (typeof DeliveryFraudFlagScalarFieldEnum)[keyof typeof DeliveryFraudFlagScalarFieldEnum]
 
 
+export const OrderReviewScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  publisherId: 'publisherId',
+  customerId: 'customerId',
+  rating: 'rating',
+  comment: 'comment',
+  createdAt: 'createdAt'
+} as const
+
+export type OrderReviewScalarFieldEnum = (typeof OrderReviewScalarFieldEnum)[keyof typeof OrderReviewScalarFieldEnum]
+
+
 export const PublisherBalanceScalarFieldEnum = {
   id: 'id',
   publisherId: 'publisherId',
@@ -6683,6 +6771,7 @@ export type GlobalOmitConfig = {
   deliveryVerificationEvidence?: Prisma.DeliveryVerificationEvidenceOmit
   deliverySnapshot?: Prisma.DeliverySnapshotOmit
   deliveryFraudFlag?: Prisma.DeliveryFraudFlagOmit
+  orderReview?: Prisma.OrderReviewOmit
   publisherBalance?: Prisma.PublisherBalanceOmit
   withdrawal?: Prisma.WithdrawalOmit
   payoutMethod?: Prisma.PayoutMethodOmit

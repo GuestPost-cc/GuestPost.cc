@@ -13,6 +13,66 @@ export class OrderReviewService {
     private readonly queue: QueueService,
   ) {}
 
+  // Customer review for a completed order. One per order. Recomputes the
+  // publisher's aggregate rating (the trust score in TR-B3 builds on this).
+  async submitReview(orderId: string, organizationId: string, userId: string, rating: number, comment?: string) {
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      throw new BadRequestException("Rating must be an integer from 1 to 5")
+    }
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, organizationId },
+      include: { website: { select: { publisherId: true } } },
+    })
+    if (!order) throw new NotFoundException("Order not found")
+    if (!["DELIVERED", "SETTLED", "COMPLETED"].includes(order.status)) {
+      throw new BadRequestException("You can review an order once it is delivered")
+    }
+    const isCreator = order.customerId === userId
+    const isOwner = await this.prisma.membership.findFirst({ where: { organizationId, userId, role: "OWNER" } })
+    if (!isCreator && !isOwner) throw new ForbiddenException("Only the order creator or organization owner can review")
+
+    const publisherId = order.website?.publisherId ?? null
+
+    const review = await this.prisma.orderReview.upsert({
+      where: { orderId },
+      create: { orderId, publisherId, customerId: userId, rating, comment: comment?.slice(0, 2000) || null },
+      update: { rating, comment: comment?.slice(0, 2000) || null },
+    })
+
+    // Recompute the publisher's aggregate rating from all their order reviews.
+    if (publisherId) {
+      const agg = await this.prisma.orderReview.aggregate({
+        where: { publisherId },
+        _avg: { rating: true },
+        _count: { _all: true },
+      })
+      await this.prisma.publisherProfile.upsert({
+        where: { publisherId },
+        create: { publisherId, rating: agg._avg.rating ?? rating, totalReviews: agg._count._all },
+        update: { rating: agg._avg.rating ?? rating, totalReviews: agg._count._all },
+      })
+    }
+
+    await this.prisma.orderEvent.create({
+      data: { orderId, eventType: "DELIVERY_CONFIRMED", actorId: userId, message: `Customer left a ${rating}-star review` },
+    })
+    await this.audit.log({
+      action: "ORDER_REVIEWED",
+      entityType: "Order",
+      entityId: orderId,
+      metadata: { rating, publisherId },
+      userId,
+      organizationId,
+    })
+    return review
+  }
+
+  async getReview(orderId: string, organizationId: string) {
+    const order = await this.prisma.order.findFirst({ where: { id: orderId, organizationId }, select: { id: true } })
+    if (!order) throw new NotFoundException("Order not found")
+    return this.prisma.orderReview.findUnique({ where: { orderId } })
+  }
+
   private async transition(orderId: string, fromVersion: number, data: any) {
     const r = await this.prisma.order.updateMany({
       where: { id: orderId, version: fromVersion },

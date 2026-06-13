@@ -75,6 +75,7 @@ export const ModelName = {
   DeliveryVerificationEvidence: 'DeliveryVerificationEvidence',
   DeliverySnapshot: 'DeliverySnapshot',
   DeliveryFraudFlag: 'DeliveryFraudFlag',
+  OrderReview: 'OrderReview',
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
   PayoutMethod: 'PayoutMethod',
@@ -544,6 +545,19 @@ export const DeliveryFraudFlagScalarFieldEnum = {
 } as const
 
 export type DeliveryFraudFlagScalarFieldEnum = (typeof DeliveryFraudFlagScalarFieldEnum)[keyof typeof DeliveryFraudFlagScalarFieldEnum]
+
+
+export const OrderReviewScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  publisherId: 'publisherId',
+  customerId: 'customerId',
+  rating: 'rating',
+  comment: 'comment',
+  createdAt: 'createdAt'
+} as const
+
+export type OrderReviewScalarFieldEnum = (typeof OrderReviewScalarFieldEnum)[keyof typeof OrderReviewScalarFieldEnum]
 
 
 export const PublisherBalanceScalarFieldEnum = {

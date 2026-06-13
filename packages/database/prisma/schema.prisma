@@ -403,6 +403,7 @@ model Publisher {
   profile             PublisherProfile?
   transactions        Transaction[]
   activeContexts      ActiveContext[]
+  orderReviews        OrderReview[]
 
   @@index([organizationId])
 }
@@ -528,6 +529,7 @@ model Order {
   fulfillmentAssignments FulfillmentAssignment[]
   fraudFlags            DeliveryFraudFlag[]
   tickets               Ticket[]
+  review                OrderReview?
 
   // Scoped per organization — a globally unique key let one tenant replay
   // another tenant's key and read their order (cross-tenant leak).
@@ -820,6 +822,24 @@ model DeliveryFraudFlag {
   @@index([orderId])
   @@index([deliveryVersionId])
   @@index([type])
+}
+
+// Per-order review left by the customer after completion. One per order; feeds
+// the publisher trust rating (separate from listing-level MarketplaceReview).
+model OrderReview {
+  id          String   @id @default(cuid())
+  orderId     String   @unique
+  publisherId String?
+  customerId  String
+  rating      Int      // 1..5
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  order     Order      @relation(fields: [orderId], references: [id])
+  publisher Publisher? @relation(fields: [publisherId], references: [id])
+
+  @@index([publisherId])
+  @@index([customerId])
 }
 
 model PublisherBalance {

@@ -28,7 +28,7 @@ import {
 } from "@guestpost/ui"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@guestpost/ui"
 import DOMPurify from "isomorphic-dompurify"
-import { Eye, Code } from "lucide-react"
+import { Eye, Code, Star } from "lucide-react"
 import {
   ArrowLeft,
   Clock,
@@ -359,6 +359,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     queryKey: ["order-proof", resolvedParams.id],
     queryFn: () => api.orders.deliveryProof(resolvedParams.id),
     enabled: !!order && ["PUBLISHED", "VERIFIED", "DELIVERED", "SETTLED", "COMPLETED", "DISPUTED"].includes(order.status),
+  })
+
+  const reviewable = !!order && ["DELIVERED", "SETTLED", "COMPLETED"].includes(order.status)
+  const { data: existingReview } = useQuery<any>({
+    queryKey: ["order-review", resolvedParams.id],
+    queryFn: () => api.orders.getReview(resolvedParams.id),
+    enabled: reviewable,
+  })
+  const [reviewRating, setReviewRating] = useState(0)
+  const [reviewComment, setReviewComment] = useState("")
+  const reviewMutation = useMutation({
+    mutationFn: () => api.orders.submitReview(resolvedParams.id, reviewRating, reviewComment.trim() || undefined),
+    onSuccess: () => {
+      toast.success("Thanks for your review")
+      queryClient.invalidateQueries({ queryKey: ["order-review", resolvedParams.id] })
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to submit review"),
   })
 
   const cancelMutation = useMutation({
@@ -726,6 +743,48 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </Card>
             )
           })()}
+
+          {reviewable && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5" /> Your Review</CardTitle>
+                <CardDescription>Rate this order — your feedback shapes the publisher&apos;s trust rating.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {existingReview ? (
+                  <div className="space-y-1">
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <Star key={n} className={`h-5 w-5 ${n <= existingReview.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`} />
+                      ))}
+                    </div>
+                    {existingReview.comment && <p className="text-sm text-muted-foreground">{existingReview.comment}</p>}
+                    <p className="text-xs text-muted-foreground">Submitted {format(new Date(existingReview.createdAt), "PP")} — you can update it by rating again.</p>
+                  </div>
+                ) : null}
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <button key={n} type="button" onClick={() => setReviewRating(n)} aria-label={`${n} star`}>
+                      <Star className={`h-7 w-7 transition-colors ${n <= (reviewRating || existingReview?.rating || 0) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-300"}`} />
+                    </button>
+                  ))}
+                </div>
+                <Textarea
+                  rows={3}
+                  placeholder="Optional: how was the placement quality, communication, turnaround?"
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  maxLength={2000}
+                />
+                <Button
+                  onClick={() => reviewMutation.mutate()}
+                  disabled={reviewMutation.isPending || (reviewRating === 0 && !existingReview)}
+                >
+                  {reviewMutation.isPending ? "Submitting..." : existingReview ? "Update Review" : "Submit Review"}
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>

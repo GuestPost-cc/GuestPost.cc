@@ -418,6 +418,7 @@ export type OrderWhereInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentListRelationFilter
   fraudFlags?: Prisma.DeliveryFraudFlagListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
+  review?: Prisma.XOR<Prisma.OrderReviewNullableScalarRelationFilter, Prisma.OrderReviewWhereInput> | null
 }
 
 export type OrderOrderByWithRelationInput = {
@@ -466,6 +467,7 @@ export type OrderOrderByWithRelationInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentOrderByRelationAggregateInput
   fraudFlags?: Prisma.DeliveryFraudFlagOrderByRelationAggregateInput
   tickets?: Prisma.TicketOrderByRelationAggregateInput
+  review?: Prisma.OrderReviewOrderByWithRelationInput
 }
 
 export type OrderWhereUniqueInput = Prisma.AtLeast<{
@@ -518,6 +520,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentListRelationFilter
   fraudFlags?: Prisma.DeliveryFraudFlagListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
+  review?: Prisma.XOR<Prisma.OrderReviewNullableScalarRelationFilter, Prisma.OrderReviewWhereInput> | null
 }, "id" | "organizationId_idempotencyKey">
 
 export type OrderOrderByWithAggregationInput = {
@@ -629,6 +632,7 @@ export type OrderCreateInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateInput = {
@@ -672,6 +676,7 @@ export type OrderUncheckedCreateInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUpdateInput = {
@@ -715,6 +720,7 @@ export type OrderUpdateInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateInput = {
@@ -758,6 +764,7 @@ export type OrderUncheckedUpdateInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateManyInput = {
@@ -1300,6 +1307,20 @@ export type OrderUpdateOneRequiredWithoutFraudFlagsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutFraudFlagsInput, Prisma.OrderUpdateWithoutFraudFlagsInput>, Prisma.OrderUncheckedUpdateWithoutFraudFlagsInput>
 }
 
+export type OrderCreateNestedOneWithoutReviewInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutReviewInput, Prisma.OrderUncheckedCreateWithoutReviewInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutReviewInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
+export type OrderUpdateOneRequiredWithoutReviewNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutReviewInput, Prisma.OrderUncheckedCreateWithoutReviewInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutReviewInput
+  upsert?: Prisma.OrderUpsertWithoutReviewInput
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutReviewInput, Prisma.OrderUpdateWithoutReviewInput>, Prisma.OrderUncheckedUpdateWithoutReviewInput>
+}
+
 export type OrderCreateNestedOneWithoutContentOrderInput = {
   create?: Prisma.XOR<Prisma.OrderCreateWithoutContentOrderInput, Prisma.OrderUncheckedCreateWithoutContentOrderInput>
   connectOrCreate?: Prisma.OrderCreateOrConnectWithoutContentOrderInput
@@ -1428,6 +1449,7 @@ export type OrderCreateWithoutCustomerInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutCustomerInput = {
@@ -1470,6 +1492,7 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutCustomerInput = {
@@ -1522,6 +1545,7 @@ export type OrderCreateWithoutAssigneeInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutAssigneeInput = {
@@ -1564,6 +1588,7 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutAssigneeInput = {
@@ -1681,6 +1706,7 @@ export type OrderCreateWithoutOrganizationInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutOrganizationInput = {
@@ -1723,6 +1749,7 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutOrganizationInput = {
@@ -1791,6 +1818,7 @@ export type OrderCreateWithoutWebsiteInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutWebsiteInput = {
@@ -1833,6 +1861,7 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutWebsiteInput = {
@@ -1901,6 +1930,7 @@ export type OrderCreateWithoutCampaignInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutCampaignInput = {
@@ -1943,6 +1973,7 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutCampaignInput = {
@@ -2011,6 +2042,7 @@ export type OrderCreateWithoutItemsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutItemsInput = {
@@ -2053,6 +2085,7 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutItemsInput = {
@@ -2111,6 +2144,7 @@ export type OrderUpdateWithoutItemsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutItemsInput = {
@@ -2153,6 +2187,7 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutEventsInput = {
@@ -2195,6 +2230,7 @@ export type OrderCreateWithoutEventsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutEventsInput = {
@@ -2237,6 +2273,7 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutEventsInput = {
@@ -2295,6 +2332,7 @@ export type OrderUpdateWithoutEventsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutEventsInput = {
@@ -2337,6 +2375,7 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutDisputeInput = {
@@ -2379,6 +2418,7 @@ export type OrderCreateWithoutDisputeInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutDisputeInput = {
@@ -2421,6 +2461,7 @@ export type OrderUncheckedCreateWithoutDisputeInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutDisputeInput = {
@@ -2479,6 +2520,7 @@ export type OrderUpdateWithoutDisputeInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutDisputeInput = {
@@ -2521,6 +2563,7 @@ export type OrderUncheckedUpdateWithoutDisputeInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutSettlementsInput = {
@@ -2563,6 +2606,7 @@ export type OrderCreateWithoutSettlementsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutSettlementsInput = {
@@ -2605,6 +2649,7 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutSettlementsInput = {
@@ -2663,6 +2708,7 @@ export type OrderUpdateWithoutSettlementsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutSettlementsInput = {
@@ -2705,6 +2751,7 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutFulfillmentAssignmentsInput = {
@@ -2747,6 +2794,7 @@ export type OrderCreateWithoutFulfillmentAssignmentsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutFulfillmentAssignmentsInput = {
@@ -2789,6 +2837,7 @@ export type OrderUncheckedCreateWithoutFulfillmentAssignmentsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutFulfillmentAssignmentsInput = {
@@ -2847,6 +2896,7 @@ export type OrderUpdateWithoutFulfillmentAssignmentsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutFulfillmentAssignmentsInput = {
@@ -2889,6 +2939,7 @@ export type OrderUncheckedUpdateWithoutFulfillmentAssignmentsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutDeliveryVersionsInput = {
@@ -2931,6 +2982,7 @@ export type OrderCreateWithoutDeliveryVersionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutDeliveryVersionsInput = {
@@ -2973,6 +3025,7 @@ export type OrderUncheckedCreateWithoutDeliveryVersionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutDeliveryVersionsInput = {
@@ -3031,6 +3084,7 @@ export type OrderUpdateWithoutDeliveryVersionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutDeliveryVersionsInput = {
@@ -3073,6 +3127,7 @@ export type OrderUncheckedUpdateWithoutDeliveryVersionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutFraudFlagsInput = {
@@ -3115,6 +3170,7 @@ export type OrderCreateWithoutFraudFlagsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutOrderInput
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutFraudFlagsInput = {
@@ -3157,6 +3213,7 @@ export type OrderUncheckedCreateWithoutFraudFlagsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutOrderInput
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutFraudFlagsInput = {
@@ -3215,6 +3272,7 @@ export type OrderUpdateWithoutFraudFlagsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutOrderNestedInput
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutFraudFlagsInput = {
@@ -3256,6 +3314,195 @@ export type OrderUncheckedUpdateWithoutFraudFlagsInput = {
   platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
   deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutOrderNestedInput
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+}
+
+export type OrderCreateWithoutReviewInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
+  version?: number
+  activeDeliveryVersionId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
+  assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
+  campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
+  contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+}
+
+export type OrderUncheckedCreateWithoutReviewInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: string | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  customerId: string
+  assigneeId?: string | null
+  websiteId?: string | null
+  organizationId: string
+  campaignId?: string | null
+  idempotencyKey?: string | null
+  version?: number
+  activeDeliveryVersionId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+}
+
+export type OrderCreateOrConnectWithoutReviewInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutReviewInput, Prisma.OrderUncheckedCreateWithoutReviewInput>
+}
+
+export type OrderUpsertWithoutReviewInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutReviewInput, Prisma.OrderUncheckedUpdateWithoutReviewInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutReviewInput, Prisma.OrderUncheckedCreateWithoutReviewInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutReviewInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutReviewInput, Prisma.OrderUncheckedUpdateWithoutReviewInput>
+}
+
+export type OrderUpdateWithoutReviewInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
+  assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
+  campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
+  contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutReviewInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  customerId?: Prisma.StringFieldUpdateOperationsInput | string
+  assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
 }
 
@@ -3299,6 +3546,7 @@ export type OrderCreateWithoutContentOrderInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutContentOrderInput = {
@@ -3341,6 +3589,7 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutContentOrderInput = {
@@ -3399,6 +3648,7 @@ export type OrderUpdateWithoutContentOrderInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutContentOrderInput = {
@@ -3441,6 +3691,7 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutRevisionsInput = {
@@ -3483,6 +3734,7 @@ export type OrderCreateWithoutRevisionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutRevisionsInput = {
@@ -3525,6 +3777,7 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutRevisionsInput = {
@@ -3583,6 +3836,7 @@ export type OrderUpdateWithoutRevisionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutRevisionsInput = {
@@ -3625,6 +3879,7 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutReportsInput = {
@@ -3667,6 +3922,7 @@ export type OrderCreateWithoutReportsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutReportsInput = {
@@ -3709,6 +3965,7 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutReportsInput = {
@@ -3767,6 +4024,7 @@ export type OrderUpdateWithoutReportsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutReportsInput = {
@@ -3809,6 +4067,7 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutPlatformRevenueInput = {
@@ -3851,6 +4110,7 @@ export type OrderCreateWithoutPlatformRevenueInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutPlatformRevenueInput = {
@@ -3893,6 +4153,7 @@ export type OrderUncheckedCreateWithoutPlatformRevenueInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutPlatformRevenueInput = {
@@ -3951,6 +4212,7 @@ export type OrderUpdateWithoutPlatformRevenueInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutPlatformRevenueInput = {
@@ -3993,6 +4255,7 @@ export type OrderUncheckedUpdateWithoutPlatformRevenueInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutTransactionsInput = {
@@ -4035,6 +4298,7 @@ export type OrderCreateWithoutTransactionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutTransactionsInput = {
@@ -4077,6 +4341,7 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutTransactionsInput = {
@@ -4135,6 +4400,7 @@ export type OrderUpdateWithoutTransactionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutTransactionsInput = {
@@ -4177,6 +4443,7 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutTicketsInput = {
@@ -4219,6 +4486,7 @@ export type OrderCreateWithoutTicketsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutOrderInput
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutTicketsInput = {
@@ -4261,6 +4529,7 @@ export type OrderUncheckedCreateWithoutTicketsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutOrderInput
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutTicketsInput = {
@@ -4319,6 +4588,7 @@ export type OrderUpdateWithoutTicketsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutOrderNestedInput
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutTicketsInput = {
@@ -4361,6 +4631,7 @@ export type OrderUncheckedUpdateWithoutTicketsInput = {
   deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutOrderNestedInput
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderCreateManyCustomerInput = {
@@ -4461,6 +4732,7 @@ export type OrderUpdateWithoutCustomerInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutCustomerInput = {
@@ -4503,6 +4775,7 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutCustomerInput = {
@@ -4574,6 +4847,7 @@ export type OrderUpdateWithoutAssigneeInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutAssigneeInput = {
@@ -4616,6 +4890,7 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutAssigneeInput = {
@@ -4716,6 +4991,7 @@ export type OrderUpdateWithoutOrganizationInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutOrganizationInput = {
@@ -4758,6 +5034,7 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutOrganizationInput = {
@@ -4858,6 +5135,7 @@ export type OrderUpdateWithoutWebsiteInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutWebsiteInput = {
@@ -4900,6 +5178,7 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutWebsiteInput = {
@@ -5000,6 +5279,7 @@ export type OrderUpdateWithoutCampaignInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutCampaignInput = {
@@ -5042,6 +5322,7 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutCampaignInput = {
@@ -5231,6 +5512,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   fulfillmentAssignments?: boolean | Prisma.Order$fulfillmentAssignmentsArgs<ExtArgs>
   fraudFlags?: boolean | Prisma.Order$fraudFlagsArgs<ExtArgs>
   tickets?: boolean | Prisma.Order$ticketsArgs<ExtArgs>
+  review?: boolean | Prisma.Order$reviewArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["order"]>
 
@@ -5354,6 +5636,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   fulfillmentAssignments?: boolean | Prisma.Order$fulfillmentAssignmentsArgs<ExtArgs>
   fraudFlags?: boolean | Prisma.Order$fraudFlagsArgs<ExtArgs>
   tickets?: boolean | Prisma.Order$ticketsArgs<ExtArgs>
+  review?: boolean | Prisma.Order$reviewArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -5392,6 +5675,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     fulfillmentAssignments: Prisma.$FulfillmentAssignmentPayload<ExtArgs>[]
     fraudFlags: Prisma.$DeliveryFraudFlagPayload<ExtArgs>[]
     tickets: Prisma.$TicketPayload<ExtArgs>[]
+    review: Prisma.$OrderReviewPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -5833,6 +6117,7 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   fulfillmentAssignments<T extends Prisma.Order$fulfillmentAssignmentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$fulfillmentAssignmentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FulfillmentAssignmentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   fraudFlags<T extends Prisma.Order$fraudFlagsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$fraudFlagsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudFlagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tickets<T extends Prisma.Order$ticketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$ticketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  review<T extends Prisma.Order$reviewArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$reviewArgs<ExtArgs>>): Prisma.Prisma__OrderReviewClient<runtime.Types.Result.GetResult<Prisma.$OrderReviewPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -6636,6 +6921,25 @@ export type Order$ticketsArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   take?: number
   skip?: number
   distinct?: Prisma.TicketScalarFieldEnum | Prisma.TicketScalarFieldEnum[]
+}
+
+/**
+ * Order.review
+ */
+export type Order$reviewArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OrderReview
+   */
+  select?: Prisma.OrderReviewSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OrderReview
+   */
+  omit?: Prisma.OrderReviewOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrderReviewInclude<ExtArgs> | null
+  where?: Prisma.OrderReviewWhereInput
 }
 
 /**
