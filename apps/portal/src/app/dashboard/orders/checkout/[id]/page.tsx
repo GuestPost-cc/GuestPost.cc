@@ -166,18 +166,26 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
           )}
 
           <div className="flex gap-3">
-            <Button variant="outline" className="flex-1" asChild>
-              <Link href="/dashboard/billing">
-                {hasSufficientBalance ? "Deposit More" : "Deposit Funds"}
+            <Button variant={hasSufficientBalance ? "outline" : "default"} className="flex-1" asChild>
+              <Link
+                href={
+                  hasSufficientBalance
+                    ? "/dashboard/billing"
+                    : `/dashboard/billing?deposit=${Math.ceil(amount - balance)}&returnTo=${encodeURIComponent(`/dashboard/orders/checkout/${resolvedParams.id}`)}`
+                }
+              >
+                {hasSufficientBalance ? "Deposit More" : `Deposit $${Math.ceil(amount - balance).toLocaleString()} to continue`}
               </Link>
             </Button>
-            <Button
-              className="flex-1"
-              disabled={!hasSufficientBalance || isProcessing || order?.status !== "DRAFT"}
-              onClick={() => proceedToPayment()}
-            >
-              {isProcessing ? "Processing..." : "Pay Now"}
-            </Button>
+            {hasSufficientBalance && (
+              <Button
+                className="flex-1"
+                disabled={isProcessing || order?.status !== "DRAFT"}
+                onClick={() => proceedToPayment()}
+              >
+                {isProcessing ? "Processing..." : "Pay Now"}
+              </Button>
+            )}
           </div>
 
           {order.status !== "DRAFT" && (

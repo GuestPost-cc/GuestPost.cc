@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -120,8 +121,11 @@ function TransactionsSkeleton() {
 
 export default function BillingPage() {
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [showDepositDialog, setShowDepositDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  // Set when checkout sends the customer here to top up; we return them after.
+  const [returnTo, setReturnTo] = useState<string | null>(null)
 
   const {
     register,
@@ -158,6 +162,19 @@ export default function BillingPage() {
     .filter((o: any) => !["COMPLETED", "CANCELLED", "REFUNDED"].includes(o.status))
     .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
 
+  // Auto-open the deposit dialog (prefilled) when checkout redirects here for a
+  // top-up: /dashboard/billing?deposit=<amount>&returnTo=<url>
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search)
+    const amt = Number(sp.get("deposit"))
+    const ret = sp.get("returnTo")
+    if (amt > 0) {
+      setShowDepositDialog(true)
+      setValue("amount", Math.ceil(amt), { shouldValidate: true })
+    }
+    if (ret) setReturnTo(ret)
+  }, [setValue])
+
   const depositMutation = useMutation({
     mutationFn: (amount: number) => {
       if (!walletData?.id) throw new Error("Wallet not loaded")
@@ -169,6 +186,12 @@ export default function BillingPage() {
       queryClient.invalidateQueries({ queryKey: ["transactions"] })
       setShowDepositDialog(false)
       reset()
+      // Bounce back to checkout (or wherever) now that funds are available.
+      if (returnTo) {
+        const dest = returnTo
+        setReturnTo(null)
+        router.push(dest)
+      }
     },
     onError: () => {
       toast.error("Failed to process deposit")
