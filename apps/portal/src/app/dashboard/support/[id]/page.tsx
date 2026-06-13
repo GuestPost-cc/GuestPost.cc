@@ -39,10 +39,12 @@ interface TicketMessage {
 interface TicketDetail {
   id: string
   subject: string
+  description?: string | null
   status: string
   priority: string | null
   createdAt: string
   updatedAt: string
+  order?: { id: string; title: string | null; status: string } | null
   messages: TicketMessage[]
 }
 
@@ -187,6 +189,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             <p className="text-sm text-muted-foreground">
               #{ticket.id} • Created {format(new Date(ticket.createdAt), "PPp")}
             </p>
+            {ticket.order && (
+              <Link href={`/dashboard/orders/${ticket.order.id}`} className="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline">
+                Order #{ticket.order.id.slice(0, 8)}{ticket.order.title ? ` — ${ticket.order.title}` : ""}
+              </Link>
+            )}
           </div>
         </div>
 
@@ -208,10 +215,17 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Opening request (ticket body) always shown as the first post */}
+              {ticket.description && (
+                <div className="rounded-lg border bg-muted/30 p-4">
+                  <p className="mb-1 text-xs font-medium text-muted-foreground">Original request</p>
+                  <p className="whitespace-pre-wrap text-sm">{ticket.description}</p>
+                </div>
+              )}
               {ticket.messages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-center">
-                  <MessageSquare className="h-10 w-10 text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">No messages yet</p>
+                <div className="flex flex-col items-center justify-center py-6 text-center">
+                  <MessageSquare className="h-8 w-8 text-muted-foreground/50" />
+                  <p className="mt-2 text-sm text-muted-foreground">No replies yet — our team will respond here.</p>
                 </div>
               ) : (
                 <div className="space-y-6">

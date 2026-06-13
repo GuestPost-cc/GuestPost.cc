@@ -43,8 +43,10 @@ import {
 } from "lucide-react"
 import { format, formatDistanceToNow } from "date-fns"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useState } from "react"
+import { LifeBuoy } from "lucide-react"
 
 const statusConfig: Record<string, { color: string; icon: React.ElementType; description: string }> = {
   DRAFT: { color: "bg-gray-100 text-gray-700", icon: FileText, description: "Order is in draft state" },
@@ -243,8 +245,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [showRevisionDialog, setShowRevisionDialog] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [showDisputeDialog, setShowDisputeDialog] = useState(false)
+  const [showSupportDialog, setShowSupportDialog] = useState(false)
   const [revisionMessage, setRevisionMessage] = useState("")
   const [disputeReason, setDisputeReason] = useState("")
+  const [supportSubject, setSupportSubject] = useState("")
+  const [supportMessage, setSupportMessage] = useState("")
+  const router = useRouter()
 
   const { data: order, isLoading, error, refetch } = useQuery<OrderDetail>({
     queryKey: ["order", resolvedParams.id],
@@ -270,6 +276,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     },
   })
 
+  const supportMutation = useMutation({
+    mutationFn: () =>
+      api.support.createTicket({
+        subject: supportSubject.trim() || `Help with order #${resolvedParams.id.slice(0, 8)}`,
+        message: supportMessage.trim(),
+        orderId: resolvedParams.id,
+      }),
+    onSuccess: (t: any) => {
+      toast.success("Support ticket created")
+      setShowSupportDialog(false)
+      setSupportSubject("")
+      setSupportMessage("")
+      if (t?.id) router.push(`/dashboard/support/${t.id}`)
+    },
+    onError: (err: Error) => toast.error(err.message || "Failed to create ticket"),
+  })
+
   const disputeMutation = useMutation({
     mutationFn: () => api.orders.openDispute(resolvedParams.id, disputeReason.trim()),
     onSuccess: () => {
@@ -284,11 +307,29 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     },
   })
 
+  const refreshOrder = () => {
+    queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })
+    queryClient.invalidateQueries({ queryKey: ["order-proof", resolvedParams.id] })
+    queryClient.invalidateQueries({ queryKey: ["orders"] })
+  }
+
+  const approveContentMutation = useMutation({
+    mutationFn: () => api.orders.approveContent(resolvedParams.id),
+    onSuccess: () => { toast.success("Content approved — publisher can now publish"); refreshOrder() },
+    onError: (e: Error) => toast.error(e.message || "Failed to approve content"),
+  })
+
+  const confirmDeliveryMutation = useMutation({
+    mutationFn: () => api.orders.confirmDelivery(resolvedParams.id),
+    onSuccess: () => { toast.success("Delivery confirmed — order complete"); refreshOrder() },
+    onError: (e: Error) => toast.error(e.message || "Failed to confirm delivery"),
+  })
+
   const requestRevisionMutation = useMutation({
-    mutationFn: () => api.campaigns.requestRevision(resolvedParams.id, { notes: revisionMessage }),
+    mutationFn: () => api.orders.requestRevision(resolvedParams.id, revisionMessage.trim()),
     onSuccess: () => {
       toast.success("Revision request submitted")
-      queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })
+      refreshOrder()
       setShowRevisionDialog(false)
       setRevisionMessage("")
     },
@@ -333,8 +374,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const currentStatusConfig = statusConfig[order.status] || statusConfig.DRAFT
   const currentStatusIcon = currentStatusConfig.icon
 
-  const canRequestRevision = ["UNDER_REVIEW", "CONTENT_SUBMITTED", "PUBLISHED"].includes(order.status)
-  const canCancel = !["COMPLETED", "CANCELLED", "REFUNDED"].includes(order.status)
+  // Customer is reviewing the publisher's draft content
+  const canApproveContent = order.status === "CUSTOMER_REVIEW"
+  const canRequestRevision = order.status === "CUSTOMER_REVIEW"
+  // Platform verified the live placement — customer confirms to complete + settle
+  const canConfirmDelivery = order.status === "VERIFIED"
+  const canCancel = !["COMPLETED", "CANCELLED", "REFUNDED", "DELIVERED", "SETTLED", "DISPUTED"].includes(order.status)
   // Backend allows disputes on PUBLISHED/VERIFIED/DELIVERED/CANCELLED or any
   // paid order; surface the button once money has moved and no terminal state
   const canDispute =
@@ -362,18 +407,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div className="flex gap-3">
-          {canRequestRevision && (
-            <Button variant="outline" onClick={() => setShowRevisionDialog(true)}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Request Revision
-            </Button>
-          )}
           {canDispute && (
             <Button variant="outline" onClick={() => setShowDisputeDialog(true)}>
               <AlertCircle className="mr-2 h-4 w-4" />
               Open Dispute
             </Button>
           )}
+          <Button variant="outline" onClick={() => setShowSupportDialog(true)}>
+            <LifeBuoy className="mr-2 h-4 w-4" />
+            Get Help
+          </Button>
           {canCancel && (
             <Button variant="destructive" onClick={() => setShowCancelDialog(true)}>
               <XCircle className="mr-2 h-4 w-4" />
@@ -388,6 +431,40 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <OrderProgress status={order.status} />
         </CardContent>
       </Card>
+
+      {(canApproveContent || canConfirmDelivery) && (
+        <Card className="border-primary/40 bg-primary/5">
+          <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">
+                {canConfirmDelivery ? "Delivery verified — ready to confirm" : "Content ready for your review"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {canConfirmDelivery
+                  ? "Confirm the live placement to complete the order and release settlement to the publisher."
+                  : "Approve to let the publisher publish, or request changes."}
+              </p>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              {canApproveContent && (
+                <>
+                  <Button variant="outline" onClick={() => setShowRevisionDialog(true)}>
+                    Request Revision
+                  </Button>
+                  <Button onClick={() => approveContentMutation.mutate()} disabled={approveContentMutation.isPending}>
+                    {approveContentMutation.isPending ? "Approving..." : "Approve Content"}
+                  </Button>
+                </>
+              )}
+              {canConfirmDelivery && (
+                <Button onClick={() => confirmDeliveryMutation.mutate()} disabled={confirmDeliveryMutation.isPending}>
+                  {confirmDeliveryMutation.isPending ? "Confirming..." : "Confirm Delivery"}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
@@ -587,6 +664,49 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               disabled={cancelMutation.isPending}
             >
               {cancelMutation.isPending ? "Cancelling..." : "Cancel Order"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Get help with this order</DialogTitle>
+            <DialogDescription>
+              Opens a support ticket linked to order #{resolvedParams.id.slice(0, 8)}. Our team replies in the ticket thread.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div>
+              <Label htmlFor="support-subject">Subject</Label>
+              <Input
+                id="support-subject"
+                value={supportSubject}
+                onChange={(e) => setSupportSubject(e.target.value)}
+                placeholder={`Help with order #${resolvedParams.id.slice(0, 8)}`}
+                maxLength={200}
+              />
+            </div>
+            <div>
+              <Label htmlFor="support-message">How can we help?</Label>
+              <Textarea
+                id="support-message"
+                rows={4}
+                value={supportMessage}
+                onChange={(e) => setSupportMessage(e.target.value)}
+                placeholder="Describe your issue (at least 10 characters)..."
+                maxLength={5000}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSupportDialog(false)}>Cancel</Button>
+            <Button
+              onClick={() => supportMutation.mutate()}
+              disabled={supportMutation.isPending || supportMessage.trim().length < 10}
+            >
+              {supportMutation.isPending ? "Creating..." : "Create Ticket"}
             </Button>
           </DialogFooter>
         </DialogContent>

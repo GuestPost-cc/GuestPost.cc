@@ -764,6 +764,7 @@ export const TicketScalarFieldEnum = {
   status: 'status',
   organizationId: 'organizationId',
   userId: 'userId',
+  orderId: 'orderId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const

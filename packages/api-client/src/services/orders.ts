@@ -216,4 +216,18 @@ export class OrdersService {
   deliveryProof(id: string) {
     return this.client.get<any>(`/orders/${id}/delivery-proof`)
   }
+
+  // ── Customer review flow ──────────────────────────────────────────────────
+  async approveContent(id: string) {
+    const raw = await this.client.post<RawOrder>(`/orders/${id}/approve-content`)
+    return normalizeOrder(raw)
+  }
+  async requestRevision(id: string, notes: string) {
+    const raw = await this.client.post<RawOrder>(`/orders/${id}/request-revision`, { json: { notes } })
+    return normalizeOrder(raw)
+  }
+  async confirmDelivery(id: string) {
+    const raw = await this.client.post<RawOrder>(`/orders/${id}/confirm-delivery`)
+    return normalizeOrder(raw)
+  }
 }

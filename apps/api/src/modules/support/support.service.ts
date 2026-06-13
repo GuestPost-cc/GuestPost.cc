@@ -10,14 +10,20 @@ export class SupportService {
     private readonly queue: QueueService,
   ) {}
 
-  async createTicket(data: { subject: string; description?: string; userId: string; organizationId: string }) {
+  async createTicket(data: { subject: string; description?: string; orderId?: string; userId: string; organizationId: string }) {
+    // If an order is referenced, it must belong to the caller's org — blocks
+    // attaching a ticket to another tenant's order.
+    if (data.orderId) {
+      const order = await this.prisma.order.findFirst({ where: { id: data.orderId, organizationId: data.organizationId }, select: { id: true } })
+      if (!order) throw new NotFoundException("Order not found")
+    }
     return this.prisma.ticket.create({ data })
   }
 
   async listTickets(organizationId: string) {
     return this.prisma.ticket.findMany({
       where: { organizationId },
-      include: { user: true },
+      include: { user: true, order: { select: { id: true, title: true, status: true } } },
       orderBy: { updatedAt: "desc" },
     })
   }
@@ -25,7 +31,7 @@ export class SupportService {
   async getTicket(id: string, organizationId: string) {
     const ticket = await this.prisma.ticket.findFirst({
       where: { id, organizationId },
-      include: { messages: { include: { user: true } } },
+      include: { messages: { include: { user: true } }, order: { select: { id: true, title: true, status: true } } },
     })
 
     if (!ticket) throw new NotFoundException("Ticket not found")

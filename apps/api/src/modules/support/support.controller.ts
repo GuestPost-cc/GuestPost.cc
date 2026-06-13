@@ -15,12 +15,13 @@ export class SupportController {
 
   @Post("tickets")
   createTicket(
-    @Body() body: { subject: string; description?: string },
+    @Body() body: { subject: string; description?: string; orderId?: string },
     @CurrentUser() user: any,
   ) {
     return this.support.createTicket({
       subject: body.subject,
       description: body.description,
+      orderId: body.orderId,
       userId: user.id,
       organizationId: user.organizationId,
     })
