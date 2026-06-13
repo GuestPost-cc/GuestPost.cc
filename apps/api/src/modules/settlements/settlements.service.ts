@@ -500,9 +500,11 @@ export class SettlementsService {
       })
     }
 
+    // Settlement released = order fully closed. COMPLETED is the terminal state;
+    // post-release clawback still works (COMPLETED is refundable).
     await tx.order.update({
       where: { id: settlement.orderId },
-      data: { status: "SETTLED" },
+      data: { status: "COMPLETED" },
     })
 
     await tx.transaction.create({

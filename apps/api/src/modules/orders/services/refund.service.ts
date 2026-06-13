@@ -7,7 +7,9 @@ const REFUNDABLE_STATUSES = [
   "PAID", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED",
   "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW",
   "APPROVED", "PUBLISHED", "VERIFIED", "DELIVERED",
-  "SETTLED", "DISPUTED",
+  // SETTLED kept for legacy rows; COMPLETED is the terminal state and must stay
+  // refundable so post-release publisher clawback still works.
+  "SETTLED", "COMPLETED", "DISPUTED",
 ]
 
 /**
