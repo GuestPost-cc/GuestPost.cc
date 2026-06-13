@@ -84,9 +84,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen">
       <aside className={cn(
-        // Desktop: sticky full-viewport column so the sidebar never scrolls
-        // off-screen with long pages; nav scrolls internally on short screens
-        "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card transform transition-transform duration-200 lg:translate-x-0 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:inset-auto",
+        // Fixed full-viewport column on every breakpoint — never scrolls off
+        // with long pages and immune to ancestor overflow/transform (which
+        // break `sticky`). Desktop content is offset by lg:pl-64; mobile slides
+        // in as an overlay. Nav scrolls internally on short screens.
+        "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card transform transition-transform duration-200 lg:translate-x-0",
         mobileOpen ? "translate-x-0" : "-translate-x-full"
       )}>
         <div className="flex h-full flex-col">
@@ -172,7 +174,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:hidden">
           <button onClick={() => setMobileOpen(true)} className="lg:hidden">
             <Menu className="h-5 w-5" />

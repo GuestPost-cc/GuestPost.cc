@@ -50,9 +50,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex min-h-screen">
-      {/* Sticky viewport-height column: never scrolls off-screen with long
-          pages; nav scrolls internally when items exceed short viewports */}
-      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r bg-muted/30 p-6">
+      {/* Fixed viewport-height column: stays put regardless of page length or
+          any ancestor overflow/transform (sticky is fragile against those).
+          Content offset by lg:ml-64. Nav scrolls internally on short screens. */}
+      <aside className="sticky top-0 z-40 flex h-screen w-64 shrink-0 flex-col border-r bg-muted/30 p-6 lg:fixed lg:inset-y-0 lg:left-0">
         <div className="mb-8">
           <Link href="/dashboard" className="text-lg font-bold tracking-tight">
             GuestPost Admin
@@ -97,7 +98,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
         </div>
       </aside>
-      <main className="flex-1 p-8">{children}</main>
+      <main className="flex-1 p-8 lg:ml-64">{children}</main>
     </div>
   )
 }
