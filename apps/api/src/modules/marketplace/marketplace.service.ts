@@ -34,6 +34,7 @@ export class MarketplaceService {
         ? {
             id: publisher.id,
             name: publisher.name,
+            tier: publisher.tier ?? null,
             profile: publisher.profile
               ? {
                   bio: publisher.profile.bio ?? null,
@@ -41,6 +42,7 @@ export class MarketplaceService {
                   totalReviews: publisher.profile.totalReviews ?? null,
                   responseTime: publisher.profile.responseTime ?? null,
                   completionRate: publisher.profile.completionRate ?? null,
+                  trustScore: publisher.profile.trustScore ?? null,
                 }
               : null,
           }

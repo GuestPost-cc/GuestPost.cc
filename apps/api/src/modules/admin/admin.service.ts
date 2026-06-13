@@ -880,6 +880,7 @@ export class AdminService {
         where,
         include: {
           balance: { select: { withdrawableBalance: true, lifetimeEarnings: true, debtBalance: true } },
+          profile: { select: { trustScore: true, rating: true, totalReviews: true, completionRate: true } },
           _count: { select: { websites: true, marketplaceListings: true, settlements: true } },
           publisherMemberships: {
             take: 1,
@@ -899,6 +900,10 @@ export class AdminService {
         name: p.name,
         email: p.email ?? p.publisherMemberships[0]?.user?.email ?? null,
         tier: p.tier,
+        trustScore: p.profile?.trustScore ?? null,
+        rating: p.profile?.rating ?? null,
+        totalReviews: p.profile?.totalReviews ?? 0,
+        completionRate: p.profile?.completionRate ?? null,
         websiteCount: p._count.websites,
         listingCount: p._count.marketplaceListings,
         settlementCount: p._count.settlements,

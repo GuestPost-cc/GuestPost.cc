@@ -12,6 +12,7 @@ import { PayoutExecutionService } from "../publisher-payouts/payout-execution.se
 import { OrdersService } from "../orders/orders.service"
 import { OrderDisputeService } from "../orders/services/order-dispute.service"
 import { OrderOperationsService } from "../orders/services/order-operations.service"
+import { OrderReviewService } from "../orders/services/order-review.service"
 import { SettlementReasonDto } from "../settlements/dto/settlement-reason.dto"
 import { CreatePlatformWebsiteDto, UpdatePlatformWebsiteDto } from "./dto/create-platform-website.dto"
 import { ReconciliationService } from "./reconciliation.service"
@@ -40,7 +41,15 @@ export class AdminController {
     private readonly payoutExecution: PayoutExecutionService,
     private readonly marketplace: MarketplaceService,
     private readonly websiteVerification: WebsiteVerificationService,
+    private readonly orderReview: OrderReviewService,
   ) {}
+
+  // Recompute a publisher's trust score + tier from their full track record.
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Post("publishers/:id/recompute-trust")
+  recomputePublisherTrust(@Param("id") id: string) {
+    return this.orderReview.recomputePublisherTrust(id)
+  }
 
   // ── Verification governance + review center ────────────────────────────────
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")

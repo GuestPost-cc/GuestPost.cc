@@ -68,3 +68,63 @@ export function trustBand(score: number | null | undefined): "Low" | "Medium" | 
   if (score == null) return "Unknown"
   return score >= 70 ? "High" : score >= 40 ? "Medium" : "Low"
 }
+
+// ── Publisher-level trust ───────────────────────────────────────────────────
+// Aggregate trust across a publisher's whole track record. Internal signals
+// only. Drives the publisher tier (NEW / TRUSTED / VERIFIED) shown in the
+// marketplace and used by moderation.
+export interface PublisherTrustInputs {
+  avgRating: number | null       // 1..5 from order reviews
+  reviewCount: number
+  completedOrders: number
+  totalOrders: number
+  disputeCount: number
+  refundCount: number
+  linkRemovals: number           // LINK_REMOVED fraud flags across their orders
+  websiteRevocations: number     // REVOKED websites (lost domain verification)
+}
+
+export interface PublisherTrust {
+  score: number
+  band: "Low" | "Medium" | "High"
+  tier: "NEW" | "TRUSTED" | "VERIFIED"
+}
+
+export function computePublisherTrust(input: PublisherTrustInputs): PublisherTrust {
+  // New publishers with no track record start neutral-low (must earn trust).
+  if (input.totalOrders === 0 && input.reviewCount === 0) {
+    return { score: 30, band: "Low", tier: "NEW" }
+  }
+
+  let score = 45 // baseline once they have history
+
+  // Review quality (1..5 -> up to +25)
+  if (input.avgRating != null && input.reviewCount > 0) {
+    score += clamp(((input.avgRating - 3) / 2) * 25, -25, 25)
+    score += clamp(input.reviewCount, 0, 5) // a little for volume of feedback
+  }
+
+  // Reliable completion
+  const base = Math.max(input.totalOrders, 1)
+  const completionRate = input.completedOrders / base
+  score += clamp(Math.round(completionRate * 20), 0, 20)
+  score += clamp(Math.floor(input.completedOrders / 3), 0, 10) // proven volume
+
+  // Penalties — rates over the order base, plus hard hits for trust violations
+  score -= Math.round((input.disputeCount / base) * 30)
+  score -= Math.round((input.refundCount / base) * 25)
+  // Removing a delivered link is the worst trust violation on this platform.
+  score -= input.linkRemovals * 12
+  score -= input.websiteRevocations * 8
+
+  const final = clamp(Math.round(score), 0, 100)
+  const band: PublisherTrust["band"] = final >= 70 ? "High" : final >= 40 ? "Medium" : "Low"
+  // Tier ladder — VERIFIED requires sustained high trust + real volume.
+  const tier: PublisherTrust["tier"] =
+    final >= 80 && input.completedOrders >= 5 && input.linkRemovals === 0
+      ? "VERIFIED"
+      : final >= 55
+      ? "TRUSTED"
+      : "NEW"
+  return { score: final, band, tier }
+}

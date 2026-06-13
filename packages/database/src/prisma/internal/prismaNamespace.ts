@@ -6021,6 +6021,7 @@ export const PublisherProfileScalarFieldEnum = {
   responseTime: 'responseTime',
   completionRate: 'completionRate',
   rating: 'rating',
+  trustScore: 'trustScore',
   totalReviews: 'totalReviews',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

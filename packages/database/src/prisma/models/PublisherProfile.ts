@@ -30,6 +30,7 @@ export type PublisherProfileAvgAggregateOutputType = {
   responseTime: number | null
   completionRate: number | null
   rating: number | null
+  trustScore: number | null
   totalReviews: number | null
 }
 
@@ -37,6 +38,7 @@ export type PublisherProfileSumAggregateOutputType = {
   responseTime: number | null
   completionRate: number | null
   rating: number | null
+  trustScore: number | null
   totalReviews: number | null
 }
 
@@ -47,6 +49,7 @@ export type PublisherProfileMinAggregateOutputType = {
   responseTime: number | null
   completionRate: number | null
   rating: number | null
+  trustScore: number | null
   totalReviews: number | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -59,6 +62,7 @@ export type PublisherProfileMaxAggregateOutputType = {
   responseTime: number | null
   completionRate: number | null
   rating: number | null
+  trustScore: number | null
   totalReviews: number | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -72,6 +76,7 @@ export type PublisherProfileCountAggregateOutputType = {
   responseTime: number
   completionRate: number
   rating: number
+  trustScore: number
   totalReviews: number
   createdAt: number
   updatedAt: number
@@ -83,6 +88,7 @@ export type PublisherProfileAvgAggregateInputType = {
   responseTime?: true
   completionRate?: true
   rating?: true
+  trustScore?: true
   totalReviews?: true
 }
 
@@ -90,6 +96,7 @@ export type PublisherProfileSumAggregateInputType = {
   responseTime?: true
   completionRate?: true
   rating?: true
+  trustScore?: true
   totalReviews?: true
 }
 
@@ -100,6 +107,7 @@ export type PublisherProfileMinAggregateInputType = {
   responseTime?: true
   completionRate?: true
   rating?: true
+  trustScore?: true
   totalReviews?: true
   createdAt?: true
   updatedAt?: true
@@ -112,6 +120,7 @@ export type PublisherProfileMaxAggregateInputType = {
   responseTime?: true
   completionRate?: true
   rating?: true
+  trustScore?: true
   totalReviews?: true
   createdAt?: true
   updatedAt?: true
@@ -125,6 +134,7 @@ export type PublisherProfileCountAggregateInputType = {
   responseTime?: true
   completionRate?: true
   rating?: true
+  trustScore?: true
   totalReviews?: true
   createdAt?: true
   updatedAt?: true
@@ -225,6 +235,7 @@ export type PublisherProfileGroupByOutputType = {
   responseTime: number | null
   completionRate: number | null
   rating: number | null
+  trustScore: number | null
   totalReviews: number
   createdAt: Date
   updatedAt: Date
@@ -261,6 +272,7 @@ export type PublisherProfileWhereInput = {
   responseTime?: Prisma.IntNullableFilter<"PublisherProfile"> | number | null
   completionRate?: Prisma.FloatNullableFilter<"PublisherProfile"> | number | null
   rating?: Prisma.FloatNullableFilter<"PublisherProfile"> | number | null
+  trustScore?: Prisma.IntNullableFilter<"PublisherProfile"> | number | null
   totalReviews?: Prisma.IntFilter<"PublisherProfile"> | number
   createdAt?: Prisma.DateTimeFilter<"PublisherProfile"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PublisherProfile"> | Date | string
@@ -275,6 +287,7 @@ export type PublisherProfileOrderByWithRelationInput = {
   responseTime?: Prisma.SortOrderInput | Prisma.SortOrder
   completionRate?: Prisma.SortOrderInput | Prisma.SortOrder
   rating?: Prisma.SortOrderInput | Prisma.SortOrder
+  trustScore?: Prisma.SortOrderInput | Prisma.SortOrder
   totalReviews?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -292,6 +305,7 @@ export type PublisherProfileWhereUniqueInput = Prisma.AtLeast<{
   responseTime?: Prisma.IntNullableFilter<"PublisherProfile"> | number | null
   completionRate?: Prisma.FloatNullableFilter<"PublisherProfile"> | number | null
   rating?: Prisma.FloatNullableFilter<"PublisherProfile"> | number | null
+  trustScore?: Prisma.IntNullableFilter<"PublisherProfile"> | number | null
   totalReviews?: Prisma.IntFilter<"PublisherProfile"> | number
   createdAt?: Prisma.DateTimeFilter<"PublisherProfile"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"PublisherProfile"> | Date | string
@@ -306,6 +320,7 @@ export type PublisherProfileOrderByWithAggregationInput = {
   responseTime?: Prisma.SortOrderInput | Prisma.SortOrder
   completionRate?: Prisma.SortOrderInput | Prisma.SortOrder
   rating?: Prisma.SortOrderInput | Prisma.SortOrder
+  trustScore?: Prisma.SortOrderInput | Prisma.SortOrder
   totalReviews?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -327,6 +342,7 @@ export type PublisherProfileScalarWhereWithAggregatesInput = {
   responseTime?: Prisma.IntNullableWithAggregatesFilter<"PublisherProfile"> | number | null
   completionRate?: Prisma.FloatNullableWithAggregatesFilter<"PublisherProfile"> | number | null
   rating?: Prisma.FloatNullableWithAggregatesFilter<"PublisherProfile"> | number | null
+  trustScore?: Prisma.IntNullableWithAggregatesFilter<"PublisherProfile"> | number | null
   totalReviews?: Prisma.IntWithAggregatesFilter<"PublisherProfile"> | number
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"PublisherProfile"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"PublisherProfile"> | Date | string
@@ -339,6 +355,7 @@ export type PublisherProfileCreateInput = {
   responseTime?: number | null
   completionRate?: number | null
   rating?: number | null
+  trustScore?: number | null
   totalReviews?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -353,6 +370,7 @@ export type PublisherProfileUncheckedCreateInput = {
   responseTime?: number | null
   completionRate?: number | null
   rating?: number | null
+  trustScore?: number | null
   totalReviews?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -365,6 +383,7 @@ export type PublisherProfileUpdateInput = {
   responseTime?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   completionRate?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rating?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   totalReviews?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -379,6 +398,7 @@ export type PublisherProfileUncheckedUpdateInput = {
   responseTime?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   completionRate?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rating?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   totalReviews?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -392,6 +412,7 @@ export type PublisherProfileCreateManyInput = {
   responseTime?: number | null
   completionRate?: number | null
   rating?: number | null
+  trustScore?: number | null
   totalReviews?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -404,6 +425,7 @@ export type PublisherProfileUpdateManyMutationInput = {
   responseTime?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   completionRate?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rating?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   totalReviews?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -417,6 +439,7 @@ export type PublisherProfileUncheckedUpdateManyInput = {
   responseTime?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   completionRate?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rating?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   totalReviews?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -435,6 +458,7 @@ export type PublisherProfileCountOrderByAggregateInput = {
   responseTime?: Prisma.SortOrder
   completionRate?: Prisma.SortOrder
   rating?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   totalReviews?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -444,6 +468,7 @@ export type PublisherProfileAvgOrderByAggregateInput = {
   responseTime?: Prisma.SortOrder
   completionRate?: Prisma.SortOrder
   rating?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   totalReviews?: Prisma.SortOrder
 }
 
@@ -454,6 +479,7 @@ export type PublisherProfileMaxOrderByAggregateInput = {
   responseTime?: Prisma.SortOrder
   completionRate?: Prisma.SortOrder
   rating?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   totalReviews?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -466,6 +492,7 @@ export type PublisherProfileMinOrderByAggregateInput = {
   responseTime?: Prisma.SortOrder
   completionRate?: Prisma.SortOrder
   rating?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   totalReviews?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -475,6 +502,7 @@ export type PublisherProfileSumOrderByAggregateInput = {
   responseTime?: Prisma.SortOrder
   completionRate?: Prisma.SortOrder
   rating?: Prisma.SortOrder
+  trustScore?: Prisma.SortOrder
   totalReviews?: Prisma.SortOrder
 }
 
@@ -525,6 +553,7 @@ export type PublisherProfileCreateWithoutPublisherInput = {
   responseTime?: number | null
   completionRate?: number | null
   rating?: number | null
+  trustScore?: number | null
   totalReviews?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -537,6 +566,7 @@ export type PublisherProfileUncheckedCreateWithoutPublisherInput = {
   responseTime?: number | null
   completionRate?: number | null
   rating?: number | null
+  trustScore?: number | null
   totalReviews?: number
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -565,6 +595,7 @@ export type PublisherProfileUpdateWithoutPublisherInput = {
   responseTime?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   completionRate?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rating?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   totalReviews?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -577,6 +608,7 @@ export type PublisherProfileUncheckedUpdateWithoutPublisherInput = {
   responseTime?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   completionRate?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
   rating?: Prisma.NullableFloatFieldUpdateOperationsInput | number | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   totalReviews?: Prisma.IntFieldUpdateOperationsInput | number
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -592,6 +624,7 @@ export type PublisherProfileSelect<ExtArgs extends runtime.Types.Extensions.Inte
   responseTime?: boolean
   completionRate?: boolean
   rating?: boolean
+  trustScore?: boolean
   totalReviews?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -606,6 +639,7 @@ export type PublisherProfileSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   responseTime?: boolean
   completionRate?: boolean
   rating?: boolean
+  trustScore?: boolean
   totalReviews?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -620,6 +654,7 @@ export type PublisherProfileSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   responseTime?: boolean
   completionRate?: boolean
   rating?: boolean
+  trustScore?: boolean
   totalReviews?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -634,12 +669,13 @@ export type PublisherProfileSelectScalar = {
   responseTime?: boolean
   completionRate?: boolean
   rating?: boolean
+  trustScore?: boolean
   totalReviews?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type PublisherProfileOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "bio" | "stats" | "responseTime" | "completionRate" | "rating" | "totalReviews" | "createdAt" | "updatedAt", ExtArgs["result"]["publisherProfile"]>
+export type PublisherProfileOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "publisherId" | "bio" | "stats" | "responseTime" | "completionRate" | "rating" | "trustScore" | "totalReviews" | "createdAt" | "updatedAt", ExtArgs["result"]["publisherProfile"]>
 export type PublisherProfileInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
 }
@@ -663,6 +699,7 @@ export type $PublisherProfilePayload<ExtArgs extends runtime.Types.Extensions.In
     responseTime: number | null
     completionRate: number | null
     rating: number | null
+    trustScore: number | null
     totalReviews: number
     createdAt: Date
     updatedAt: Date
@@ -1097,6 +1134,7 @@ export interface PublisherProfileFieldRefs {
   readonly responseTime: Prisma.FieldRef<"PublisherProfile", 'Int'>
   readonly completionRate: Prisma.FieldRef<"PublisherProfile", 'Float'>
   readonly rating: Prisma.FieldRef<"PublisherProfile", 'Float'>
+  readonly trustScore: Prisma.FieldRef<"PublisherProfile", 'Int'>
   readonly totalReviews: Prisma.FieldRef<"PublisherProfile", 'Int'>
   readonly createdAt: Prisma.FieldRef<"PublisherProfile", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"PublisherProfile", 'DateTime'>

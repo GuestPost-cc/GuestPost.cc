@@ -359,6 +359,10 @@ export class AdminService {
         name: string | null
         email: string | null
         tier: "NEW" | "TRUSTED" | "VERIFIED"
+        trustScore: number | null
+        rating: number | null
+        totalReviews: number
+        completionRate: number | null
         websiteCount: number
         listingCount: number
         settlementCount: number
@@ -377,6 +381,9 @@ export class AdminService {
 
   updatePublisherTier(publisherId: string, tier: "NEW" | "TRUSTED" | "VERIFIED") {
     return this.client.patch(`/admin/publishers/${publisherId}/tier`, { json: { tier } })
+  }
+  recomputePublisherTrust(publisherId: string) {
+    return this.client.post<{ score: number; band: string; tier: string }>(`/admin/publishers/${publisherId}/recompute-trust`)
   }
 
   // -- Support --

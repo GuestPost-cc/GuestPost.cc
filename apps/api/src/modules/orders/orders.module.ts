@@ -30,6 +30,6 @@ import { AuditModule } from "../audit/audit.module"
     DeliveryInterventionService,
     RefundService,
   ],
-  exports: [OrdersService, OrderDisputeService, RefundService, OrderOperationsService, OrderDeliveryService, OrderFulfillmentAssignmentService],
+  exports: [OrdersService, OrderDisputeService, RefundService, OrderOperationsService, OrderDeliveryService, OrderFulfillmentAssignmentService, OrderReviewService],
 })
 export class OrdersModule {}

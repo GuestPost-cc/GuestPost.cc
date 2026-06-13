@@ -46,6 +46,12 @@ export default function AdminPublishersPage() {
     queryFn: () => api.admin.listPublishers({ search: search || undefined, page, limit: 20 }),
   })
 
+  const recomputeMutation = useMutation({
+    mutationFn: (id: string) => api.admin.recomputePublisherTrust(id),
+    onSuccess: (r: any) => { toast.success(`Trust recomputed: ${r.band} (${r.score}) → ${r.tier}`); queryClient.invalidateQueries({ queryKey: ["admin", "publishers"] }) },
+    onError: (e: any) => toast.error(e?.message || "Failed to recompute"),
+  })
+
   const tierMutation = useMutation({
     mutationFn: ({ id, tier }: { id: string; tier: Tier }) => api.admin.updatePublisherTier(id, tier),
     onSuccess: () => {
@@ -109,6 +115,7 @@ export default function AdminPublishersPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Tier</TableHead>
+                  <TableHead>Trust</TableHead>
                   <TableHead className="text-center">Websites</TableHead>
                   <TableHead className="text-center">Listings</TableHead>
                   <TableHead className="text-center">Settlements</TableHead>
@@ -130,6 +137,28 @@ export default function AdminPublishersPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">{p.email ?? "—"}</TableCell>
                       <TableCell><Badge variant={tierBadge.variant}>{tierBadge.label}</Badge></TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          {p.trustScore != null ? (
+                            <Badge variant={p.trustScore >= 70 ? "success" : p.trustScore >= 40 ? "warning" : "destructive"}>
+                              {p.trustScore >= 70 ? "High" : p.trustScore >= 40 ? "Medium" : "Low"} {p.trustScore}
+                            </Badge>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                          {p.rating != null && p.totalReviews > 0 && (
+                            <span className="text-xs text-muted-foreground" title={`${p.totalReviews} review(s)`}>★ {p.rating.toFixed(1)}</span>
+                          )}
+                          <button
+                            className="text-muted-foreground hover:text-foreground"
+                            title="Recompute trust"
+                            onClick={() => recomputeMutation.mutate(p.id)}
+                            disabled={recomputeMutation.isPending}
+                          >
+                            <RefreshCw className={`h-3 w-3 ${recomputeMutation.isPending ? "animate-spin" : ""}`} />
+                          </button>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-center">{p.websiteCount}</TableCell>
                       <TableCell className="text-center">{p.listingCount}</TableCell>
                       <TableCell className="text-center">{p.settlementCount}</TableCell>

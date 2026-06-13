@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, computePublisherTrust } from "@guestpost/shared"
 import { resolvePlatformFeeFraction, splitPlatformFee } from "../../../common/platform-fee"
 
 @Injectable()
@@ -39,18 +39,9 @@ export class OrderReviewService {
       update: { rating, comment: comment?.slice(0, 2000) || null },
     })
 
-    // Recompute the publisher's aggregate rating from all their order reviews.
+    // Recompute the publisher's aggregate rating + trust score.
     if (publisherId) {
-      const agg = await this.prisma.orderReview.aggregate({
-        where: { publisherId },
-        _avg: { rating: true },
-        _count: { _all: true },
-      })
-      await this.prisma.publisherProfile.upsert({
-        where: { publisherId },
-        create: { publisherId, rating: agg._avg.rating ?? rating, totalReviews: agg._count._all },
-        update: { rating: agg._avg.rating ?? rating, totalReviews: agg._count._all },
-      })
+      await this.recomputePublisherTrust(publisherId)
     }
 
     await this.prisma.orderEvent.create({
@@ -65,6 +56,46 @@ export class OrderReviewService {
       organizationId,
     })
     return review
+  }
+
+  // Aggregate the publisher's whole track record into a trust score + tier.
+  // Internal signals only: reviews, completion, disputes, refunds, link
+  // removals (worst), website revocations. Stored on PublisherProfile + Publisher.tier.
+  async recomputePublisherTrust(publisherId: string) {
+    const [reviewAgg, totalOrders, completedOrders, disputeCount, refundCount, linkRemovals, websiteRevocations] = await Promise.all([
+      this.prisma.orderReview.aggregate({ where: { publisherId }, _avg: { rating: true }, _count: { _all: true } }),
+      this.prisma.order.count({ where: { website: { publisherId } } }),
+      this.prisma.order.count({ where: { website: { publisherId }, status: { in: ["DELIVERED", "SETTLED", "COMPLETED"] } } }),
+      this.prisma.orderDispute.count({ where: { order: { website: { publisherId } } } }),
+      this.prisma.order.count({ where: { website: { publisherId }, status: "REFUNDED" } }),
+      this.prisma.deliveryFraudFlag.count({ where: { type: "LINK_REMOVED", order: { website: { publisherId } } } }),
+      this.prisma.website.count({ where: { publisherId, verificationStatus: "REVOKED" } }),
+    ])
+
+    const avgRating = reviewAgg._avg.rating ?? null
+    const reviewCount = reviewAgg._count._all
+    const { score, band, tier } = computePublisherTrust({
+      avgRating, reviewCount, completedOrders, totalOrders, disputeCount, refundCount, linkRemovals, websiteRevocations,
+    })
+    const completionRate = totalOrders > 0 ? completedOrders / totalOrders : null
+
+    await this.prisma.publisherProfile.upsert({
+      where: { publisherId },
+      create: { publisherId, rating: avgRating, totalReviews: reviewCount, trustScore: score, completionRate },
+      update: { rating: avgRating, totalReviews: reviewCount, trustScore: score, completionRate },
+    })
+    // Sync the publicly-shown tier to earned trust (up or down).
+    await this.prisma.publisher.update({ where: { id: publisherId }, data: { tier } }).catch(() => undefined)
+
+    await this.audit.log({
+      action: "PUBLISHER_TRUST_RECOMPUTED",
+      entityType: "Publisher",
+      entityId: publisherId,
+      metadata: { score, band, tier, avgRating, reviewCount, completedOrders, disputeCount, refundCount, linkRemovals, websiteRevocations },
+      userId: null,
+      organizationId: null,
+    })
+    return { publisherId, score, band, tier }
   }
 
   async getReview(orderId: string, organizationId: string) {

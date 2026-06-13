@@ -1519,6 +1519,9 @@ model PublisherProfile {
   responseTime Int?     // avg response time in hours
   completionRate Float?  // order completion rate
   rating       Float?
+  // Internal publisher trust score 0-100 (folds in reviews, link uptime,
+  // disputes, refunds, completion). Drives the publisher tier.
+  trustScore   Int?
   totalReviews Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
