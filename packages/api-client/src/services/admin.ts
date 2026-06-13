@@ -90,6 +90,14 @@ export class AdminService {
   getOrderById(id: string) {
     return this.client.get(`/admin/orders/${id}`)
   }
+  // Order interventions — verification/advancement is automated; staff only
+  // force-cancel (SUPER_ADMIN) or refund (SUPER_ADMIN/FINANCE), reason required.
+  forceCancelOrder(id: string, reason: string) {
+    return this.client.post<any>(`/admin/orders/${id}/force-cancel`, { json: { reason } })
+  }
+  refundOrder(id: string, reason: string) {
+    return this.client.post<any>(`/admin/orders/${id}/refund`, { json: { reason } })
+  }
 
   listSettlements(take?: number, skip?: number) {
     return this.client.get<PaginatedResponse<AdminSettlementResponse>>("/admin/settlements", {

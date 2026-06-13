@@ -28,21 +28,25 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
   DialogFooter,
 } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
+import { Skeleton, Textarea } from "@guestpost/ui"
 import {
   ShoppingCart,
   Search,
-  CheckCircle,
   XCircle,
   AlertCircle,
-  RefreshCw,
   DollarSign,
   Eye,
+  Ban,
+  ClipboardList,
+  Scale,
 } from "lucide-react"
+import Link from "next/link"
 import { format } from "date-fns"
 import { toast } from "sonner"
+import { useAuth } from "../../../lib/auth"
 import { ORDER_STATUS_LABELS } from "@guestpost/shared"
 import {
   createColumnHelper,
@@ -92,86 +96,96 @@ const statusVariant = (status: string) => {
   }
 }
 
+// Lifecycle is automated: customer pays -> publisher/ops fulfill -> the system
+// verifies the live link -> customer confirms -> settlement. Staff don't push
+// status manually; they monitor and intervene (force-cancel / refund), review
+// deliveries in Fulfillment, and work Disputes there.
+const TERMINAL = ["COMPLETED", "CANCELLED", "REFUNDED"]
+const CANCELLABLE = ["DRAFT", "PENDING_PAYMENT", "PAID", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW", "APPROVED"]
+const REFUNDABLE = ["PAID", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW", "APPROVED", "PUBLISHED", "VERIFIED", "DELIVERED", "SETTLED", "DISPUTED"]
+
 function OrderActions({ order }: { order: Order }) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
+  const canRefund = user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "FINANCE"
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
+  const [action, setAction] = useState<null | "cancel" | "refund">(null)
+  const [reason, setReason] = useState("")
 
-  const transitionMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      return api.orders.transitionStatus(id, status as any)
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin", "orders"] })
+
+  const intervene = useMutation({
+    mutationFn: ({ kind, reason }: { kind: "cancel" | "refund"; reason: string }) =>
+      kind === "cancel" ? api.admin.forceCancelOrder(order.id, reason) : api.admin.refundOrder(order.id, reason),
+    onSuccess: (_d, vars) => {
+      toast.success(vars.kind === "cancel" ? "Order force-cancelled" : "Order refunded")
+      setAction(null); setReason(""); refresh()
     },
-    onSuccess: () => {
-      toast.success("Order status updated")
-      queryClient.invalidateQueries({ queryKey: ["admin", "orders"] })
-    },
-    onError: () => toast.error("Failed to update order"),
+    onError: (e: any) => toast.error(e?.message || "Action failed"),
   })
+
+  const showCancel = isSuperAdmin && CANCELLABLE.includes(order.status)
+  const showRefund = canRefund && REFUNDABLE.includes(order.status) && !TERMINAL.includes(order.status)
 
   return (
     <>
-      <div className="flex items-center gap-2">
-        <Button size="sm" variant="ghost" onClick={() => { setSelectedOrder(order); setDetailOpen(true) }}>
-          <Eye className="h-3 w-3" />
+      <div className="flex items-center gap-1">
+        <Button size="sm" variant="ghost" title="View" onClick={() => { setSelectedOrder(order); setDetailOpen(true) }}>
+          <Eye className="h-3.5 w-3.5" />
         </Button>
-        {order.status === "PENDING_PAYMENT" && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => transitionMutation.mutate({ id: order.id, status: "PAID" })}
-            disabled={transitionMutation.isPending}
-          >
-            <CheckCircle className="h-3 w-3" />
+        {order.status === "DISPUTED" && (
+          <Button size="sm" variant="ghost" title="Work dispute" asChild>
+            <Link href="/dashboard/disputes"><Scale className="h-3.5 w-3.5 text-orange-600" /></Link>
           </Button>
         )}
-        {order.status === "ASSIGNED" && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => transitionMutation.mutate({ id: order.id, status: "CONTENT_CREATION" })}
-            disabled={transitionMutation.isPending}
-          >
-            <RefreshCw className="h-3 w-3" />
+        {["PUBLISHED", "VERIFIED"].includes(order.status) && (
+          <Button size="sm" variant="ghost" title="Review delivery in Fulfillment" asChild>
+            <Link href="/dashboard/fulfillment"><ClipboardList className="h-3.5 w-3.5" /></Link>
           </Button>
         )}
-        {order.status === "PUBLISHED" && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => transitionMutation.mutate({ id: order.id, status: "VERIFIED" })}
-            disabled={transitionMutation.isPending}
-          >
-            <CheckCircle className="h-3 w-3" />
+        {showCancel && (
+          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" title="Force cancel" onClick={() => { setAction("cancel"); setReason("") }}>
+            <Ban className="h-3.5 w-3.5" />
           </Button>
         )}
-        {["PENDING_PAYMENT", "DRAFT"].includes(order.status) && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            onClick={() => transitionMutation.mutate({ id: order.id, status: "CANCELLED" })}
-            disabled={transitionMutation.isPending}
-          >
-            <XCircle className="h-3 w-3" />
-          </Button>
-        )}
-        {["COMPLETED", "VERIFIED", "PUBLISHED"].includes(order.status) && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            onClick={() => transitionMutation.mutate({ id: order.id, status: "REFUNDED" })}
-            disabled={transitionMutation.isPending}
-          >
-            <DollarSign className="h-3 w-3" />
+        {showRefund && (
+          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" title="Refund" onClick={() => { setAction("refund"); setReason("") }}>
+            <DollarSign className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
+
+      <Dialog open={!!action} onOpenChange={(o) => { if (!o) { setAction(null); setReason("") } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{action === "cancel" ? "Force-cancel order" : "Refund order"}</DialogTitle>
+            <DialogDescription>
+              {action === "cancel"
+                ? "Cancels the order and refunds any captured payment. Use only for stuck or erroneous orders."
+                : "Refunds the customer. If a settlement was already released, the publisher is clawed back."}
+            </DialogDescription>
+          </DialogHeader>
+          <Textarea placeholder="Reason (recorded in the audit trail)..." value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={1000} />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAction(null); setReason("") }}>Cancel</Button>
+            <Button
+              variant="destructive"
+              disabled={intervene.isPending || reason.trim().length < 3}
+              onClick={() => action && intervene.mutate({ kind: action, reason: reason.trim() })}
+            >
+              {intervene.isPending ? "Working..." : action === "cancel" ? "Force Cancel" : "Refund"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Order Details</DialogTitle>
+            <DialogDescription>Read-only — the order lifecycle is automated; intervene via Fulfillment, Disputes, or the actions here.</DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-4">
