@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { sortOrdersByPriority } from "@guestpost/shared"
 import { api } from "../../../lib/api"
 import { Card, CardContent } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
@@ -315,7 +316,7 @@ export default function OrdersPage() {
   )
 
   const filteredOrders = useMemo(() => {
-    return orders.filter((o) => {
+    const filtered = orders.filter((o) => {
       const matchesSearch =
         search === "" ||
         o.customer?.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -324,6 +325,8 @@ export default function OrdersPage() {
       const matchesStatus = statusFilter === "all" || o.status === statusFilter
       return matchesSearch && matchesStatus
     })
+    // Ops verify + settle from the top: unsettled/disputed first, newest first.
+    return sortOrdersByPriority(filtered)
   }, [orders, search, statusFilter])
 
   const table = useReactTable({

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { sortOrdersByPriority, isActiveOrder } from "@guestpost/shared"
 import { api } from "../../../lib/api"
 import { Button } from "@guestpost/ui"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
@@ -391,8 +392,15 @@ export default function OrdersPage() {
       )
     }
 
-    return data
+    // Unfinished / unsettled orders (and anything needing attention) always
+    // rank above closed ones, newest first within each tier.
+    return sortOrdersByPriority(data)
   }, [ordersData, statusFilter, searchQuery])
+
+  const activeCount = useMemo(
+    () => (ordersData ?? []).filter((o: Order) => isActiveOrder(o.status)).length,
+    [ordersData],
+  )
 
   const table = useReactTable({
     data: filteredData,
@@ -437,7 +445,11 @@ export default function OrdersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-          <p className="text-muted-foreground">Manage your guest post orders</p>
+          <p className="text-muted-foreground">
+            {activeCount > 0
+              ? `${activeCount} order${activeCount !== 1 ? "s" : ""} in progress — shown first`
+              : "Manage your guest post orders"}
+          </p>
         </div>
         <Button onClick={() => setShowCreateOrder(true)}>
           <Plus className="mr-2 h-4 w-4" />

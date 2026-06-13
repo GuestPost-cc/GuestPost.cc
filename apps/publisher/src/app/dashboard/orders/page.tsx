@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
+import { sortOrdersByPriority } from "@guestpost/shared"
 import Link from "next/link"
 import { api } from "../../../lib/api"
 import { toast } from "sonner"
@@ -185,8 +186,10 @@ export default function OrdersPage() {
     queryFn: () => api.orders.list(),
   })
 
-  const filteredOrders = orders.filter(
-    (order: any) => statusFilter === "ALL" || order.status === statusFilter
+  // Orders awaiting publisher action (unsettled/in-flight) rank above closed
+  // ones, newest first — so work to do is always at the top.
+  const filteredOrders = sortOrdersByPriority(
+    orders.filter((order: any) => statusFilter === "ALL" || order.status === statusFilter),
   )
 
   if (error)
