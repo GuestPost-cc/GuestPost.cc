@@ -92,8 +92,28 @@ const eventLabels: Record<string, string> = {
 interface TimelineEvent {
   id: string
   eventType: string
+  message?: string | null
   metadata: Record<string, unknown> | null
   createdAt: string
+}
+
+// Human one-liner for a timeline event — never raw JSON. Prefer the server
+// message; otherwise build a readable detail from known metadata fields.
+function eventDetail(event: TimelineEvent): string | null {
+  const m = (event.metadata ?? {}) as Record<string, any>
+  // Server message is already human ("Content published at https://…").
+  if (event.message && event.message.trim()) return event.message.trim()
+
+  const parts: string[] = []
+  const url = m.publishedUrl ?? m.url
+  if (url) parts.push(`Published at ${url}`)
+  if (m.reason) parts.push(`Reason: ${m.reason}`)
+  if (m.notes) parts.push(String(m.notes))
+  if (m.newStatus) parts.push(`Status → ${String(m.newStatus).replace(/_/g, " ").toLowerCase()}`)
+  if (typeof m.amount === "number") parts.push(`Amount: $${m.amount.toLocaleString()}`)
+  if (typeof m.publisherAmount === "number") parts.push(`Publisher payout: $${m.publisherAmount.toLocaleString()}`)
+  if (m.version != null && url == null) parts.push(`Revision v${m.version}`)
+  return parts.length ? parts.join(" · ") : null
 }
 
 // Mirrors the api-client OrderResponse (normalized from the real API payload)
@@ -212,15 +232,18 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
                 <Icon className={`h-3 w-3 ${isLatest ? "text-primary-foreground" : "text-muted-foreground"}`} />
               </div>
               <div className="flex flex-col">
-                <span className="font-medium">{eventLabels[event.eventType] || event.eventType}</span>
-                <span className="text-sm text-muted-foreground">
+                <span className="font-medium">
+                  {eventLabels[event.eventType] || event.eventType.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                </span>
+                {(() => {
+                  const detail = eventDetail(event)
+                  return detail ? (
+                    <span className="mt-0.5 text-sm text-muted-foreground break-words">{detail}</span>
+                  ) : null
+                })()}
+                <span className="mt-0.5 text-xs text-muted-foreground" title={format(new Date(event.createdAt), "PPpp")}>
                   {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
                 </span>
-                {event.metadata && Object.keys(event.metadata).length > 0 && (
-                  <div className="mt-1 text-sm text-muted-foreground">
-                    {JSON.stringify(event.metadata)}
-                  </div>
-                )}
               </div>
             </div>
           )
