@@ -54,17 +54,39 @@ const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | 
   ARCHIVED: "outline",
 }
 
+// Services-tab state. A listing's services live on the listing row itself
+// (response includes services[]); per-row writes go through the dedicated
+// /listings/:id/services endpoints to avoid bulk-replacing.
+type ServiceRow = {
+  id: string
+  serviceType: string
+  price: number
+  currency: string
+  turnaroundDays: number
+  revisionRounds: number
+  warrantyDays?: number | null
+  availability: "AVAILABLE" | "PAUSED" | "WAITLIST"
+  version: number
+}
+
 export default function PublisherListingsPage() {
   const { user } = useAuth()
   const publisherId = (user as any)?.publisherId as string | undefined
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
+  const [servicesForListing, setServicesForListing] = useState<{ id: string; title: string; services: ServiceRow[] } | null>(null)
   const [form, setForm] = useState({
     title: "",
     description: "",
     type: "GUEST_POST",
     price: "",
     websiteId: "",
+  })
+  const [newService, setNewService] = useState({
+    serviceType: "GUEST_POST",
+    price: "",
+    turnaroundDays: "7",
+    revisionRounds: "2",
   })
 
   const listingsQ = useQuery({
@@ -99,6 +121,78 @@ export default function PublisherListingsPage() {
     },
     onError: (err: Error) => toast.error(err.message || "Failed to create listing"),
   })
+
+  // Service-management mutations (per-row endpoints). All three invalidate
+  // the publisher-listings query so the table reflects new state.
+  type AddServiceVars = {
+    listingId: string
+    data: {
+      serviceType: string
+      price: number
+      turnaroundDays: number
+      currency?: string
+      revisionRounds?: number
+      warrantyDays?: number
+      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
+    }
+  }
+  type UpdateServiceVars = {
+    listingId: string
+    serviceId: string
+    data: {
+      version: number
+      price?: number
+      turnaroundDays?: number
+      currency?: string
+      revisionRounds?: number
+      warrantyDays?: number
+      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
+    }
+  }
+  const addServiceMut = useMutation({
+    mutationFn: (vars: AddServiceVars) =>
+      api.marketplace.addListingService(vars.listingId, vars.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
+      setNewService({ serviceType: "GUEST_POST", price: "", turnaroundDays: "7", revisionRounds: "2" })
+      toast.success("Service added")
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to add service"),
+  })
+  const updateServiceMut = useMutation({
+    mutationFn: (vars: UpdateServiceVars) =>
+      api.marketplace.updateListingService(vars.listingId, vars.serviceId, vars.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["publisher-listings"] }),
+    onError: (e: Error) => toast.error(e.message || "Update failed"),
+  })
+  const pauseServiceMut = useMutation({
+    mutationFn: (vars: { listingId: string; serviceId: string }) =>
+      api.marketplace.pauseListingService(vars.listingId, vars.serviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
+      toast.success("Service paused")
+    },
+    onError: (e: Error) => toast.error(e.message || "Pause failed"),
+  })
+
+  // ── Phase 6 lifecycle mutations (publisher-side) ────────────────────────
+  // Each transition refreshes the listings query so the phase badge moves
+  // immediately. Errors surface with the server's friendly message
+  // (NO_AVAILABLE_SERVICES, WEBSITE_NOT_VERIFIED, etc.).
+  function makeLifecycleMutation(fn: (id: string) => Promise<any>, label: string) {
+    return useMutation({
+      mutationFn: fn,
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
+        toast.success(label)
+      },
+      onError: (e: any) => toast.error(e?.message || `${label} failed`),
+    })
+  }
+  const submitMut  = makeLifecycleMutation((id) => api.marketplace.submitListing(id),  "Submitted for review")
+  const pauseMut   = makeLifecycleMutation((id) => api.marketplace.pauseListing(id),   "Listing paused")
+  const unpauseMut = makeLifecycleMutation((id) => api.marketplace.unpauseListing(id), "Listing unpaused")
+  const archiveMut = makeLifecycleMutation((id) => api.marketplace.archiveListing(id), "Listing archived")
 
   const listings = (listingsQ.data ?? []) as any[]
   const canSubmit =
@@ -149,24 +243,67 @@ export default function PublisherListingsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Title</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Price</TableHead>
+                  <TableHead>Services</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {listings.map((l: any) => (
-                  <TableRow key={l.id}>
-                    <TableCell className="font-medium max-w-[320px] truncate">{l.title}</TableCell>
-                    <TableCell className="text-muted-foreground">{String(l.type ?? "").replace(/_/g, " ")}</TableCell>
-                    <TableCell className="font-mono text-sm">${Number(l.price ?? 0).toFixed(2)}</TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_VARIANTS[l.status] ?? "secondary"}>
-                        {String(l.status ?? "").replace(/_/g, " ")}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {listings.map((l: any) => {
+                  const services: ServiceRow[] = (l.services as ServiceRow[] | undefined) ?? []
+                  // Phase 6: lifecyclePhase comes from the server (computed
+                  // from status + ownerType + website verification + service
+                  // count). The phase decides which lifecycle CTAs render —
+                  // the raw status badge below is kept for staff-visible
+                  // back-compat but not the primary UI signal.
+                  const phase: string = l.lifecyclePhase ?? l.status
+                  return (
+                    <TableRow key={l.id}>
+                      <TableCell className="font-medium max-w-[320px] truncate">{l.title}</TableCell>
+                      <TableCell className="text-muted-foreground text-xs">
+                        {services.length === 0
+                          ? <span className="italic">No services yet</span>
+                          : services.map(s => `${s.serviceType.replace(/_/g, " ")} · $${Number(s.price).toFixed(0)} · ${s.turnaroundDays}d`).join(" • ")}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_VARIANTS[l.status] ?? "secondary"}>
+                          {phase.replace(/_/g, " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        {phase === "READY_FOR_REVIEW" && (
+                          <Button size="sm" onClick={() => submitMut.mutate(l.id)} disabled={submitMut.isPending}>
+                            Submit for review
+                          </Button>
+                        )}
+                        {phase === "PUBLISHED" && (
+                          <Button size="sm" variant="outline" onClick={() => pauseMut.mutate(l.id)} disabled={pauseMut.isPending}>
+                            Pause
+                          </Button>
+                        )}
+                        {phase === "PAUSED" && (
+                          <Button size="sm" variant="outline" onClick={() => unpauseMut.mutate(l.id)} disabled={unpauseMut.isPending}>
+                            Unpause
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setServicesForListing({ id: l.id, title: l.title, services })}
+                        >
+                          Services
+                        </Button>
+                        {phase !== "ARCHIVED" && (
+                          <Button size="sm" variant="ghost" onClick={() => {
+                            if (confirm("Archive this listing? Existing orders are untouched.")) archiveMut.mutate(l.id)
+                          }} disabled={archiveMut.isPending}>
+                            Archive
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
@@ -250,6 +387,116 @@ export default function PublisherListingsPage() {
             <Button onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}>
               {createMutation.isPending ? "Submitting..." : "Submit for Review"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/*
+        Services dialog — per-row management for a listing's ListingService
+        children. Pause is soft (sets availability=PAUSED) so historical
+        orders that snapshot this serviceId never orphan. Price/TAT edits go
+        through a version-guarded PATCH; concurrent edits get a 409.
+      */}
+      <Dialog open={!!servicesForListing} onOpenChange={(v) => { if (!v) setServicesForListing(null) }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Services on “{servicesForListing?.title}”</DialogTitle>
+            <DialogDescription>
+              Each row is a separately purchasable offering. Buyers pick one at checkout — your edits here never affect in-flight orders.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>TAT</TableHead>
+                  <TableHead>Availability</TableHead>
+                  <TableHead className="text-right"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {servicesForListing?.services.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                      No services configured yet. Add the first one below.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {servicesForListing?.services.map(s => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.serviceType.replace(/_/g, " ")}</TableCell>
+                    <TableCell className="font-mono text-sm">${Number(s.price).toFixed(2)}</TableCell>
+                    <TableCell>{s.turnaroundDays}d</TableCell>
+                    <TableCell>
+                      <Select
+                        value={s.availability}
+                        onValueChange={(v) => updateServiceMut.mutate({
+                          listingId: servicesForListing!.id,
+                          serviceId: s.id,
+                          data: { version: s.version, availability: v as "AVAILABLE" | "PAUSED" | "WAITLIST" },
+                        })}
+                      >
+                        <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AVAILABLE">Available</SelectItem>
+                          <SelectItem value="PAUSED">Paused</SelectItem>
+                          <SelectItem value="WAITLIST">Waitlist</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => pauseServiceMut.mutate({ listingId: servicesForListing!.id, serviceId: s.id })}
+                        disabled={s.availability === "PAUSED"}
+                      >
+                        Pause
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="border-t pt-4 space-y-3">
+              <div className="text-sm font-medium">Add a service</div>
+              <div className="grid grid-cols-4 gap-3">
+                <Select value={newService.serviceType} onValueChange={(v) => setNewService({ ...newService, serviceType: v })}>
+                  <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
+                  <SelectContent>
+                    {LISTING_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input type="number" min={1} step="0.01" placeholder="Price" value={newService.price} onChange={(e) => setNewService({ ...newService, price: e.target.value })} />
+                <Input type="number" min={1} placeholder="TAT (days)" value={newService.turnaroundDays} onChange={(e) => setNewService({ ...newService, turnaroundDays: e.target.value })} />
+                <Input type="number" min={0} placeholder="Revisions" value={newService.revisionRounds} onChange={(e) => setNewService({ ...newService, revisionRounds: e.target.value })} />
+              </div>
+              <Button
+                size="sm"
+                disabled={!servicesForListing || !newService.price || Number(newService.price) <= 0 || addServiceMut.isPending}
+                onClick={() => {
+                  if (!servicesForListing) return
+                  addServiceMut.mutate({
+                    listingId: servicesForListing.id,
+                    data: {
+                      serviceType: newService.serviceType,
+                      price: Number(newService.price),
+                      turnaroundDays: Number(newService.turnaroundDays) || 7,
+                      revisionRounds: Number(newService.revisionRounds) || 2,
+                    },
+                  })
+                }}
+              >
+                {addServiceMut.isPending ? "Adding..." : "Add service"}
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setServicesForListing(null)}>Done</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

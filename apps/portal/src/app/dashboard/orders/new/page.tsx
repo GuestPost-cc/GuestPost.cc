@@ -44,6 +44,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { toast } from "sonner"
 import Link from "next/link"
 import { format } from "date-fns"
+import { BriefForm } from "../../../../components/BriefForm"
 
 const STORAGE_KEY = "guestpost-order-draft"
 
@@ -84,6 +85,15 @@ const orderSchema = z.object({
   placementUrl: z.string().optional(),
   placementPrice: z.number().optional(),
   fulfilledByLabel: z.string().optional(),
+  // Phase 2: when the customer arrived from a listing's "Order Now" with a
+  // service picked, both serviceType and websiteId are locked. The wizard
+  // hides Steps 1–2 and forwards listingServiceId on submit.
+  listingServiceId: z.string().optional(),
+  locked: z.boolean().optional(),
+  // Phase 6: structured per-service brief — validated server-side, kept
+  // free-form here. Mirrored into title/brief/targetUrl/targetKeywords for
+  // back-compat display in legacy renderers.
+  briefData: z.record(z.string(), z.unknown()).optional(),
 })
 
 type OrderFormData = z.infer<typeof orderSchema>
@@ -340,6 +350,59 @@ function WebsiteSelection({
 }
 
 function ContentRequirements({ data, onUpdate }: { data: Partial<OrderFormData>; onUpdate: (data: Partial<OrderFormData>) => void }) {
+  // Phase 6: when a serviceType is known, render the per-service BriefForm
+  // instead of the generic 4-field form. The legacy fields (title /
+  // instructions / targetUrl) are still snapshotted onto Order — we derive
+  // them from the brief payload so server-side display falls back cleanly
+  // for any legacy renderer that hasn't been updated yet.
+  const updateField = (field: keyof OrderFormData, value: any) => {
+    onUpdate({ ...data, [field]: value })
+  }
+
+  const onBriefChange = (brief: Record<string, unknown>) => {
+    // Mirror a few well-known fields to the legacy form columns so the
+    // wizard's existing validation (and downstream summary rendering) keep
+    // working. The full brief is sent as briefData on submit.
+    const derivedTitle = String(brief.title ?? brief.topic ?? "").slice(0, 100)
+    const derivedTargetUrl = (brief.targetUrl as string) ?? ""
+    const derivedKeywords = Array.isArray(brief.targetKeywords) ? (brief.targetKeywords as string[]).join(", ") : ""
+    onUpdate({
+      ...data,
+      brief: typeof brief.topic === "string" ? brief.topic : (typeof brief.notes === "string" ? brief.notes : "filled via brief form"),
+      title: derivedTitle || "Untitled",
+      targetUrl: derivedTargetUrl,
+      targetKeywords: derivedKeywords,
+      briefData: brief,
+    })
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold">Content Requirements</h2>
+        <p className="text-muted-foreground">Provide details about your content needs</p>
+      </div>
+
+      {/* Phase 6: per-service brief form. Falls back to the legacy 4-field
+          renderer below only when there's no serviceType yet (early-wizard
+          state — shouldn't be reachable because the listing-detail picker
+          locks serviceType before this step). */}
+      {data.serviceType && (
+        <BriefForm
+          serviceType={data.serviceType as any}
+          value={(data.briefData as Record<string, unknown>) ?? {}}
+          onChange={onBriefChange}
+        />
+      )}
+
+      {/* Legacy form (only rendered when serviceType is unknown).
+          Kept for back-compat; expected not to render in the locked Phase 6 flow. */}
+      {!data.serviceType && <LegacyBriefFields data={data} updateField={updateField} />}
+    </div>
+  )
+}
+
+function LegacyBriefFields({ data, updateField }: { data: Partial<OrderFormData>; updateField: (k: keyof OrderFormData, v: any) => void }) {
   const { register, formState: { errors } } = useForm({
     defaultValues: {
       title: data.title || "",
@@ -348,10 +411,6 @@ function ContentRequirements({ data, onUpdate }: { data: Partial<OrderFormData>;
       targetUrl: data.targetUrl || "",
     },
   })
-
-  const updateField = (field: keyof OrderFormData, value: string) => {
-    onUpdate({ ...data, [field]: value })
-  }
 
   return (
     <div className="space-y-6">
@@ -623,10 +682,17 @@ export default function NewOrderPage() {
   // Prefill when arriving from a marketplace listing's "Order Now" — the site +
   // its auto-derived fulfiller are carried in the query string. Reading
   // location avoids the useSearchParams Suspense requirement.
+  //
+  // Phase 2: when ?locked=1 is set, the listingServiceId carries the
+  // customer's pick. We skip Steps 1 (Service) and 2 (Website) and jump
+  // straight to the Brief, because re-picking either would violate the
+  // "service + website locked after listing-page selection" contract.
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search)
     const websiteId = sp.get("websiteId")
     if (!websiteId) return
+    const listingServiceId = sp.get("listingServiceId") ?? undefined
+    const locked = sp.get("locked") === "1" && !!listingServiceId
     setFormData((prev) => ({
       ...prev,
       websiteId,
@@ -635,8 +701,13 @@ export default function NewOrderPage() {
       placementUrl: sp.get("url") || prev.placementUrl,
       placementPrice: sp.get("price") ? Number(sp.get("price")) : prev.placementPrice,
       fulfilledByLabel: sp.get("fulfilledBy") || prev.fulfilledByLabel,
+      listingServiceId,
+      locked,
     }))
-    setCurrentStep((s) => (s < 2 ? 2 : s))
+    // Locked flow lands directly on the Brief step (Step 3); legacy flow
+    // (no listingServiceId) keeps the existing behavior of starting at the
+    // Website step.
+    setCurrentStep((s) => (locked ? Math.max(s, 3) : Math.max(s, 2)))
   }, [])
 
   const updateFormData = (data: Partial<OrderFormData>) => {
@@ -665,7 +736,12 @@ export default function NewOrderPage() {
   }
 
   const handleBack = () => {
-    if (currentStep > 1) {
+    // Locked flow: the floor of the wizard is Step 3 (Brief). Steps 1–2
+    // (Service / Website) are read-only display once a listingServiceId is
+    // present — back into them would let the customer override the locked
+    // pick, which the architecture forbids.
+    const floor = formData.locked ? 3 : 1
+    if (currentStep > floor) {
       setCurrentStep((s) => s - 1)
     }
   }
@@ -679,6 +755,10 @@ export default function NewOrderPage() {
     // Shape mirrors CreateOrderDto: service type/title/brief live on the
     // order; items carry only website + link targeting. Keywords are folded
     // into instructions so the publisher sees them.
+    //
+    // Phase 2: when listingServiceId is set, the server snapshots
+    // price/TAT/serviceType/channel from THAT row — type below is only kept
+    // as a denormalized mirror and ignored if it disagrees with the snapshot.
     createMutation.mutate({
       type: formData.serviceType as any,
       title: formData.title,
@@ -687,6 +767,10 @@ export default function NewOrderPage() {
         .join("\n\n")
         .slice(0, 5000),
       campaignId: formData.campaignId,
+      listingServiceId: formData.listingServiceId,
+      // Phase 6: forward the structured brief. Server re-validates against
+      // the per-service Zod registry — a 400 here surfaces field paths.
+      briefData: formData.briefData as Record<string, unknown> | undefined,
       items: [{
         websiteId: formData.websiteId || undefined,
         targetUrl: formData.targetUrl || undefined,

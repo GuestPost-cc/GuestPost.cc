@@ -1,0 +1,24 @@
+-- Phase 7 (partial) legacy cleanup.
+--
+-- DROPPED THIS MIGRATION:
+--   * Service table — no readers anywhere in apps/api, apps/worker, or
+--     api-client (audit run during Phase 7 step). Global per-type pricing
+--     was the pre-marketplace fallback path; obsoleted by ListingService.
+--
+-- KEEP (re-audit revised the original drop plan):
+--   * ContentOrder table — misnamed in the original architecture review.
+--     It's actually the PUBLISHER's submitted-content store: title, brief,
+--     deliverable, status. Read at apps/portal/src/app/dashboard/orders/
+--     [id]/page.tsx via order.submittedContent (mapped from contentOrder in
+--     packages/api-client/src/services/orders.ts:164). Distinct from
+--     Order.briefData (the CUSTOMER's brief). Stays permanently.
+--
+-- DEFERRED to a follow-up cleanup (still live consumers):
+--   * MarketplaceListing.type / .price / .turnaroundDays / .revisionRounds
+--     / .warrantyDays columns — still rendered as fallback by some UI
+--     surfaces; drop after the portal/admin/publisher fully migrate to
+--     `services[]` + `priceFrom` + `lifecyclePhase`.
+--   * ListingType enum — only referenced by the deferred MarketplaceListing
+--     columns above; dropped alongside them.
+
+DROP TABLE IF EXISTS "Service";

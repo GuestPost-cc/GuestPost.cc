@@ -18,9 +18,13 @@ interface Listing {
   slug: string
   description: string
   shortDescription?: string
-  type: string
+  // Phase 7: type / price / turnaroundDays are LEGACY listing-level columns
+  // scheduled for drop. Prefer priceFrom + serviceTypes[] + services[].
+  type?: string
   fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
-  price: number
+  price?: number
+  priceFrom?: number | null
+  serviceTypes?: string[]
   currency: string
   domainRating?: number
   traffic?: number
@@ -344,7 +348,12 @@ export default function MarketplacePage() {
                     {listing.category && (
                       <span className="text-xs font-medium text-primary">{listing.category.name}</span>
                     )}
-                    <span className="text-xs text-muted-foreground">{listing.type?.replace(/_/g, " ") ?? ""}</span>
+                    {/* Phase 7: prefer the first AVAILABLE service over the
+                        deprecated listing-level `type`. */}
+                    <span className="text-xs text-muted-foreground">{
+                      ((listing as any).serviceTypes?.[0] ?? listing.type ?? "")
+                        .replace(/_/g, " ")
+                    }</span>
                     {listing.fulfillmentType === "INTERNAL" ? (
                       <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-primary">Platform</span>
                     ) : listing.fulfillmentType === "HYBRID" ? (
@@ -371,8 +380,30 @@ export default function MarketplacePage() {
                       </span>
                     )}
                   </div>
+                  {/* Phase 6: per-service chips + "from $X". priceFrom is the
+                      cheapest AVAILABLE service price; serviceTypes is the
+                      deduped list. Falls back to the legacy listing-level
+                      price when the new fields aren't on the payload. */}
+                  {(listing as any).serviceTypes?.length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {((listing as any).serviceTypes as string[]).slice(0, 3).map((t) => (
+                        <span key={t} className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          {t.replace(/_/g, " ")}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div className="flex items-center justify-between pt-2 border-t">
-                    <span className="font-bold text-lg">{formatPrice(listing.price, listing.currency)}</span>
+                    <span className="font-bold text-lg">
+                      {(listing as any).priceFrom != null ? (
+                        <>
+                          <span className="text-xs text-muted-foreground font-normal mr-1">from</span>
+                          {formatPrice((listing as any).priceFrom, listing.currency)}
+                        </>
+                      ) : (
+                        formatPrice(listing.price ?? 0, listing.currency)
+                      )}
+                    </span>
                     {listing.avgRating && (
                       <div className="flex items-center gap-1">
                         <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />

@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/guestpost-platform && bedrock refresh-system --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+            "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/GuestPost.cc && bedrock refresh-system --project /Users/shohan/Desktop/GuestPost/GuestPost.cc"
           }
         ]
       }
@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+            "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/GuestPost.cc"
           }
         ]
       }
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/guestpost-platform"
+            "command": "bedrock sync --project /Users/shohan/Desktop/GuestPost/GuestPost.cc"
           }
         ]
       }

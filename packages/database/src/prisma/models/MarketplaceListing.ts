@@ -27,7 +27,6 @@ export type AggregateMarketplaceListing = {
 }
 
 export type MarketplaceListingAvgAggregateOutputType = {
-  price: runtime.Decimal | null
   minPrice: runtime.Decimal | null
   maxPrice: runtime.Decimal | null
   domainRating: number | null
@@ -35,13 +34,9 @@ export type MarketplaceListingAvgAggregateOutputType = {
   traffic: number | null
   referringDomains: number | null
   spamScore: number | null
-  turnaroundDays: number | null
-  revisionRounds: number | null
-  warrantyDays: number | null
 }
 
 export type MarketplaceListingSumAggregateOutputType = {
-  price: runtime.Decimal | null
   minPrice: runtime.Decimal | null
   maxPrice: runtime.Decimal | null
   domainRating: number | null
@@ -49,9 +44,6 @@ export type MarketplaceListingSumAggregateOutputType = {
   traffic: number | null
   referringDomains: number | null
   spamScore: number | null
-  turnaroundDays: number | null
-  revisionRounds: number | null
-  warrantyDays: number | null
 }
 
 export type MarketplaceListingMinAggregateOutputType = {
@@ -60,10 +52,9 @@ export type MarketplaceListingMinAggregateOutputType = {
   slug: string | null
   description: string | null
   shortDescription: string | null
-  type: $Enums.ListingType | null
   status: $Enums.ListingStatus | null
   fulfillmentType: $Enums.ListingFulfillmentType | null
-  price: runtime.Decimal | null
+  ownerType: $Enums.WebsiteOwnershipType | null
   currency: string | null
   priceType: string | null
   minPrice: runtime.Decimal | null
@@ -75,13 +66,8 @@ export type MarketplaceListingMinAggregateOutputType = {
   spamScore: number | null
   country: string | null
   language: string | null
-  turnaroundDays: number | null
-  revisionRounds: number | null
-  warrantyDays: number | null
   featured: boolean | null
   verified: boolean | null
-  allowGuestPost: boolean | null
-  allowNicheEdit: boolean | null
   doFollowOnly: boolean | null
   websiteUrl: string | null
   sampleUrl: string | null
@@ -102,10 +88,9 @@ export type MarketplaceListingMaxAggregateOutputType = {
   slug: string | null
   description: string | null
   shortDescription: string | null
-  type: $Enums.ListingType | null
   status: $Enums.ListingStatus | null
   fulfillmentType: $Enums.ListingFulfillmentType | null
-  price: runtime.Decimal | null
+  ownerType: $Enums.WebsiteOwnershipType | null
   currency: string | null
   priceType: string | null
   minPrice: runtime.Decimal | null
@@ -117,13 +102,8 @@ export type MarketplaceListingMaxAggregateOutputType = {
   spamScore: number | null
   country: string | null
   language: string | null
-  turnaroundDays: number | null
-  revisionRounds: number | null
-  warrantyDays: number | null
   featured: boolean | null
   verified: boolean | null
-  allowGuestPost: boolean | null
-  allowNicheEdit: boolean | null
   doFollowOnly: boolean | null
   websiteUrl: string | null
   sampleUrl: string | null
@@ -144,10 +124,9 @@ export type MarketplaceListingCountAggregateOutputType = {
   slug: number
   description: number
   shortDescription: number
-  type: number
   status: number
   fulfillmentType: number
-  price: number
+  ownerType: number
   currency: number
   priceType: number
   minPrice: number
@@ -161,13 +140,8 @@ export type MarketplaceListingCountAggregateOutputType = {
   language: number
   countries: number
   languages: number
-  turnaroundDays: number
-  revisionRounds: number
-  warrantyDays: number
   featured: number
   verified: number
-  allowGuestPost: number
-  allowNicheEdit: number
   doFollowOnly: number
   websiteUrl: number
   sampleUrl: number
@@ -188,7 +162,6 @@ export type MarketplaceListingCountAggregateOutputType = {
 
 
 export type MarketplaceListingAvgAggregateInputType = {
-  price?: true
   minPrice?: true
   maxPrice?: true
   domainRating?: true
@@ -196,13 +169,9 @@ export type MarketplaceListingAvgAggregateInputType = {
   traffic?: true
   referringDomains?: true
   spamScore?: true
-  turnaroundDays?: true
-  revisionRounds?: true
-  warrantyDays?: true
 }
 
 export type MarketplaceListingSumAggregateInputType = {
-  price?: true
   minPrice?: true
   maxPrice?: true
   domainRating?: true
@@ -210,9 +179,6 @@ export type MarketplaceListingSumAggregateInputType = {
   traffic?: true
   referringDomains?: true
   spamScore?: true
-  turnaroundDays?: true
-  revisionRounds?: true
-  warrantyDays?: true
 }
 
 export type MarketplaceListingMinAggregateInputType = {
@@ -221,10 +187,9 @@ export type MarketplaceListingMinAggregateInputType = {
   slug?: true
   description?: true
   shortDescription?: true
-  type?: true
   status?: true
   fulfillmentType?: true
-  price?: true
+  ownerType?: true
   currency?: true
   priceType?: true
   minPrice?: true
@@ -236,13 +201,8 @@ export type MarketplaceListingMinAggregateInputType = {
   spamScore?: true
   country?: true
   language?: true
-  turnaroundDays?: true
-  revisionRounds?: true
-  warrantyDays?: true
   featured?: true
   verified?: true
-  allowGuestPost?: true
-  allowNicheEdit?: true
   doFollowOnly?: true
   websiteUrl?: true
   sampleUrl?: true
@@ -263,10 +223,9 @@ export type MarketplaceListingMaxAggregateInputType = {
   slug?: true
   description?: true
   shortDescription?: true
-  type?: true
   status?: true
   fulfillmentType?: true
-  price?: true
+  ownerType?: true
   currency?: true
   priceType?: true
   minPrice?: true
@@ -278,13 +237,8 @@ export type MarketplaceListingMaxAggregateInputType = {
   spamScore?: true
   country?: true
   language?: true
-  turnaroundDays?: true
-  revisionRounds?: true
-  warrantyDays?: true
   featured?: true
   verified?: true
-  allowGuestPost?: true
-  allowNicheEdit?: true
   doFollowOnly?: true
   websiteUrl?: true
   sampleUrl?: true
@@ -305,10 +259,9 @@ export type MarketplaceListingCountAggregateInputType = {
   slug?: true
   description?: true
   shortDescription?: true
-  type?: true
   status?: true
   fulfillmentType?: true
-  price?: true
+  ownerType?: true
   currency?: true
   priceType?: true
   minPrice?: true
@@ -322,13 +275,8 @@ export type MarketplaceListingCountAggregateInputType = {
   language?: true
   countries?: true
   languages?: true
-  turnaroundDays?: true
-  revisionRounds?: true
-  warrantyDays?: true
   featured?: true
   verified?: true
-  allowGuestPost?: true
-  allowNicheEdit?: true
   doFollowOnly?: true
   websiteUrl?: true
   sampleUrl?: true
@@ -439,10 +387,9 @@ export type MarketplaceListingGroupByOutputType = {
   slug: string
   description: string
   shortDescription: string | null
-  type: $Enums.ListingType
   status: $Enums.ListingStatus
   fulfillmentType: $Enums.ListingFulfillmentType
-  price: runtime.Decimal
+  ownerType: $Enums.WebsiteOwnershipType
   currency: string
   priceType: string
   minPrice: runtime.Decimal | null
@@ -456,13 +403,8 @@ export type MarketplaceListingGroupByOutputType = {
   language: string | null
   countries: string[]
   languages: string[]
-  turnaroundDays: number | null
-  revisionRounds: number
-  warrantyDays: number | null
   featured: boolean
   verified: boolean
-  allowGuestPost: boolean
-  allowNicheEdit: boolean
   doFollowOnly: boolean
   websiteUrl: string | null
   sampleUrl: string | null
@@ -509,10 +451,9 @@ export type MarketplaceListingWhereInput = {
   slug?: Prisma.StringFilter<"MarketplaceListing"> | string
   description?: Prisma.StringFilter<"MarketplaceListing"> | string
   shortDescription?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
-  type?: Prisma.EnumListingTypeFilter<"MarketplaceListing"> | $Enums.ListingType
   status?: Prisma.EnumListingStatusFilter<"MarketplaceListing"> | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFilter<"MarketplaceListing"> | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFilter<"MarketplaceListing"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFilter<"MarketplaceListing"> | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFilter<"MarketplaceListing"> | string
   priceType?: Prisma.StringFilter<"MarketplaceListing"> | string
   minPrice?: Prisma.DecimalNullableFilter<"MarketplaceListing"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -526,13 +467,8 @@ export type MarketplaceListingWhereInput = {
   language?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   countries?: Prisma.StringNullableListFilter<"MarketplaceListing">
   languages?: Prisma.StringNullableListFilter<"MarketplaceListing">
-  turnaroundDays?: Prisma.IntNullableFilter<"MarketplaceListing"> | number | null
-  revisionRounds?: Prisma.IntFilter<"MarketplaceListing"> | number
-  warrantyDays?: Prisma.IntNullableFilter<"MarketplaceListing"> | number | null
   featured?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   verified?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
-  allowGuestPost?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
-  allowNicheEdit?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   doFollowOnly?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   websiteUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   sampleUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
@@ -554,12 +490,13 @@ export type MarketplaceListingWhereInput = {
   category?: Prisma.XOR<Prisma.MarketplaceCategoryNullableScalarRelationFilter, Prisma.MarketplaceCategoryWhereInput> | null
   tags?: Prisma.MarketplaceListingTagListRelationFilter
   images?: Prisma.MarketplaceListingImageListRelationFilter
-  pricingTiers?: Prisma.MarketplacePricingTierListRelationFilter
   reviews?: Prisma.MarketplaceReviewListRelationFilter
   favorites?: Prisma.MarketplaceFavoriteListRelationFilter
   savedLists?: Prisma.MarketplaceSavedListItemListRelationFilter
   views?: Prisma.MarketplaceListingViewListRelationFilter
   clicks?: Prisma.MarketplaceListingClickListRelationFilter
+  services?: Prisma.ListingServiceListRelationFilter
+  orders?: Prisma.OrderListRelationFilter
 }
 
 export type MarketplaceListingOrderByWithRelationInput = {
@@ -568,10 +505,9 @@ export type MarketplaceListingOrderByWithRelationInput = {
   slug?: Prisma.SortOrder
   description?: Prisma.SortOrder
   shortDescription?: Prisma.SortOrderInput | Prisma.SortOrder
-  type?: Prisma.SortOrder
   status?: Prisma.SortOrder
   fulfillmentType?: Prisma.SortOrder
-  price?: Prisma.SortOrder
+  ownerType?: Prisma.SortOrder
   currency?: Prisma.SortOrder
   priceType?: Prisma.SortOrder
   minPrice?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -585,13 +521,8 @@ export type MarketplaceListingOrderByWithRelationInput = {
   language?: Prisma.SortOrderInput | Prisma.SortOrder
   countries?: Prisma.SortOrder
   languages?: Prisma.SortOrder
-  turnaroundDays?: Prisma.SortOrderInput | Prisma.SortOrder
-  revisionRounds?: Prisma.SortOrder
-  warrantyDays?: Prisma.SortOrderInput | Prisma.SortOrder
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
-  allowGuestPost?: Prisma.SortOrder
-  allowNicheEdit?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
   websiteUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   sampleUrl?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -613,12 +544,13 @@ export type MarketplaceListingOrderByWithRelationInput = {
   category?: Prisma.MarketplaceCategoryOrderByWithRelationInput
   tags?: Prisma.MarketplaceListingTagOrderByRelationAggregateInput
   images?: Prisma.MarketplaceListingImageOrderByRelationAggregateInput
-  pricingTiers?: Prisma.MarketplacePricingTierOrderByRelationAggregateInput
   reviews?: Prisma.MarketplaceReviewOrderByRelationAggregateInput
   favorites?: Prisma.MarketplaceFavoriteOrderByRelationAggregateInput
   savedLists?: Prisma.MarketplaceSavedListItemOrderByRelationAggregateInput
   views?: Prisma.MarketplaceListingViewOrderByRelationAggregateInput
   clicks?: Prisma.MarketplaceListingClickOrderByRelationAggregateInput
+  services?: Prisma.ListingServiceOrderByRelationAggregateInput
+  orders?: Prisma.OrderOrderByRelationAggregateInput
 }
 
 export type MarketplaceListingWhereUniqueInput = Prisma.AtLeast<{
@@ -630,10 +562,9 @@ export type MarketplaceListingWhereUniqueInput = Prisma.AtLeast<{
   title?: Prisma.StringFilter<"MarketplaceListing"> | string
   description?: Prisma.StringFilter<"MarketplaceListing"> | string
   shortDescription?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
-  type?: Prisma.EnumListingTypeFilter<"MarketplaceListing"> | $Enums.ListingType
   status?: Prisma.EnumListingStatusFilter<"MarketplaceListing"> | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFilter<"MarketplaceListing"> | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFilter<"MarketplaceListing"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFilter<"MarketplaceListing"> | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFilter<"MarketplaceListing"> | string
   priceType?: Prisma.StringFilter<"MarketplaceListing"> | string
   minPrice?: Prisma.DecimalNullableFilter<"MarketplaceListing"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -647,13 +578,8 @@ export type MarketplaceListingWhereUniqueInput = Prisma.AtLeast<{
   language?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   countries?: Prisma.StringNullableListFilter<"MarketplaceListing">
   languages?: Prisma.StringNullableListFilter<"MarketplaceListing">
-  turnaroundDays?: Prisma.IntNullableFilter<"MarketplaceListing"> | number | null
-  revisionRounds?: Prisma.IntFilter<"MarketplaceListing"> | number
-  warrantyDays?: Prisma.IntNullableFilter<"MarketplaceListing"> | number | null
   featured?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   verified?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
-  allowGuestPost?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
-  allowNicheEdit?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   doFollowOnly?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   websiteUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   sampleUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
@@ -675,12 +601,13 @@ export type MarketplaceListingWhereUniqueInput = Prisma.AtLeast<{
   category?: Prisma.XOR<Prisma.MarketplaceCategoryNullableScalarRelationFilter, Prisma.MarketplaceCategoryWhereInput> | null
   tags?: Prisma.MarketplaceListingTagListRelationFilter
   images?: Prisma.MarketplaceListingImageListRelationFilter
-  pricingTiers?: Prisma.MarketplacePricingTierListRelationFilter
   reviews?: Prisma.MarketplaceReviewListRelationFilter
   favorites?: Prisma.MarketplaceFavoriteListRelationFilter
   savedLists?: Prisma.MarketplaceSavedListItemListRelationFilter
   views?: Prisma.MarketplaceListingViewListRelationFilter
   clicks?: Prisma.MarketplaceListingClickListRelationFilter
+  services?: Prisma.ListingServiceListRelationFilter
+  orders?: Prisma.OrderListRelationFilter
 }, "id" | "slug">
 
 export type MarketplaceListingOrderByWithAggregationInput = {
@@ -689,10 +616,9 @@ export type MarketplaceListingOrderByWithAggregationInput = {
   slug?: Prisma.SortOrder
   description?: Prisma.SortOrder
   shortDescription?: Prisma.SortOrderInput | Prisma.SortOrder
-  type?: Prisma.SortOrder
   status?: Prisma.SortOrder
   fulfillmentType?: Prisma.SortOrder
-  price?: Prisma.SortOrder
+  ownerType?: Prisma.SortOrder
   currency?: Prisma.SortOrder
   priceType?: Prisma.SortOrder
   minPrice?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -706,13 +632,8 @@ export type MarketplaceListingOrderByWithAggregationInput = {
   language?: Prisma.SortOrderInput | Prisma.SortOrder
   countries?: Prisma.SortOrder
   languages?: Prisma.SortOrder
-  turnaroundDays?: Prisma.SortOrderInput | Prisma.SortOrder
-  revisionRounds?: Prisma.SortOrder
-  warrantyDays?: Prisma.SortOrderInput | Prisma.SortOrder
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
-  allowGuestPost?: Prisma.SortOrder
-  allowNicheEdit?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
   websiteUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   sampleUrl?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -744,10 +665,9 @@ export type MarketplaceListingScalarWhereWithAggregatesInput = {
   slug?: Prisma.StringWithAggregatesFilter<"MarketplaceListing"> | string
   description?: Prisma.StringWithAggregatesFilter<"MarketplaceListing"> | string
   shortDescription?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
-  type?: Prisma.EnumListingTypeWithAggregatesFilter<"MarketplaceListing"> | $Enums.ListingType
   status?: Prisma.EnumListingStatusWithAggregatesFilter<"MarketplaceListing"> | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeWithAggregatesFilter<"MarketplaceListing"> | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalWithAggregatesFilter<"MarketplaceListing"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeWithAggregatesFilter<"MarketplaceListing"> | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringWithAggregatesFilter<"MarketplaceListing"> | string
   priceType?: Prisma.StringWithAggregatesFilter<"MarketplaceListing"> | string
   minPrice?: Prisma.DecimalNullableWithAggregatesFilter<"MarketplaceListing"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -761,13 +681,8 @@ export type MarketplaceListingScalarWhereWithAggregatesInput = {
   language?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
   countries?: Prisma.StringNullableListFilter<"MarketplaceListing">
   languages?: Prisma.StringNullableListFilter<"MarketplaceListing">
-  turnaroundDays?: Prisma.IntNullableWithAggregatesFilter<"MarketplaceListing"> | number | null
-  revisionRounds?: Prisma.IntWithAggregatesFilter<"MarketplaceListing"> | number
-  warrantyDays?: Prisma.IntNullableWithAggregatesFilter<"MarketplaceListing"> | number | null
   featured?: Prisma.BoolWithAggregatesFilter<"MarketplaceListing"> | boolean
   verified?: Prisma.BoolWithAggregatesFilter<"MarketplaceListing"> | boolean
-  allowGuestPost?: Prisma.BoolWithAggregatesFilter<"MarketplaceListing"> | boolean
-  allowNicheEdit?: Prisma.BoolWithAggregatesFilter<"MarketplaceListing"> | boolean
   doFollowOnly?: Prisma.BoolWithAggregatesFilter<"MarketplaceListing"> | boolean
   websiteUrl?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
   sampleUrl?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
@@ -791,10 +706,9 @@ export type MarketplaceListingCreateInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -808,13 +722,8 @@ export type MarketplaceListingCreateInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -832,12 +741,13 @@ export type MarketplaceListingCreateInput = {
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateInput = {
@@ -846,10 +756,9 @@ export type MarketplaceListingUncheckedCreateInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -863,13 +772,8 @@ export type MarketplaceListingUncheckedCreateInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -887,12 +791,13 @@ export type MarketplaceListingUncheckedCreateInput = {
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUpdateInput = {
@@ -901,10 +806,9 @@ export type MarketplaceListingUpdateInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -918,13 +822,8 @@ export type MarketplaceListingUpdateInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -942,12 +841,13 @@ export type MarketplaceListingUpdateInput = {
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateInput = {
@@ -956,10 +856,9 @@ export type MarketplaceListingUncheckedUpdateInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -973,13 +872,8 @@ export type MarketplaceListingUncheckedUpdateInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -997,12 +891,13 @@ export type MarketplaceListingUncheckedUpdateInput = {
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateManyInput = {
@@ -1011,10 +906,9 @@ export type MarketplaceListingCreateManyInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -1028,13 +922,8 @@ export type MarketplaceListingCreateManyInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -1058,10 +947,9 @@ export type MarketplaceListingUpdateManyMutationInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -1075,13 +963,8 @@ export type MarketplaceListingUpdateManyMutationInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1101,10 +984,9 @@ export type MarketplaceListingUncheckedUpdateManyInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -1118,13 +1000,8 @@ export type MarketplaceListingUncheckedUpdateManyInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1152,6 +1029,11 @@ export type MarketplaceListingOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
+export type MarketplaceListingNullableScalarRelationFilter = {
+  is?: Prisma.MarketplaceListingWhereInput | null
+  isNot?: Prisma.MarketplaceListingWhereInput | null
+}
+
 export type StringNullableListFilter<$PrismaModel = never> = {
   equals?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel> | null
   has?: string | Prisma.StringFieldRefInput<$PrismaModel> | null
@@ -1166,10 +1048,9 @@ export type MarketplaceListingCountOrderByAggregateInput = {
   slug?: Prisma.SortOrder
   description?: Prisma.SortOrder
   shortDescription?: Prisma.SortOrder
-  type?: Prisma.SortOrder
   status?: Prisma.SortOrder
   fulfillmentType?: Prisma.SortOrder
-  price?: Prisma.SortOrder
+  ownerType?: Prisma.SortOrder
   currency?: Prisma.SortOrder
   priceType?: Prisma.SortOrder
   minPrice?: Prisma.SortOrder
@@ -1183,13 +1064,8 @@ export type MarketplaceListingCountOrderByAggregateInput = {
   language?: Prisma.SortOrder
   countries?: Prisma.SortOrder
   languages?: Prisma.SortOrder
-  turnaroundDays?: Prisma.SortOrder
-  revisionRounds?: Prisma.SortOrder
-  warrantyDays?: Prisma.SortOrder
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
-  allowGuestPost?: Prisma.SortOrder
-  allowNicheEdit?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
   websiteUrl?: Prisma.SortOrder
   sampleUrl?: Prisma.SortOrder
@@ -1208,7 +1084,6 @@ export type MarketplaceListingCountOrderByAggregateInput = {
 }
 
 export type MarketplaceListingAvgOrderByAggregateInput = {
-  price?: Prisma.SortOrder
   minPrice?: Prisma.SortOrder
   maxPrice?: Prisma.SortOrder
   domainRating?: Prisma.SortOrder
@@ -1216,9 +1091,6 @@ export type MarketplaceListingAvgOrderByAggregateInput = {
   traffic?: Prisma.SortOrder
   referringDomains?: Prisma.SortOrder
   spamScore?: Prisma.SortOrder
-  turnaroundDays?: Prisma.SortOrder
-  revisionRounds?: Prisma.SortOrder
-  warrantyDays?: Prisma.SortOrder
 }
 
 export type MarketplaceListingMaxOrderByAggregateInput = {
@@ -1227,10 +1099,9 @@ export type MarketplaceListingMaxOrderByAggregateInput = {
   slug?: Prisma.SortOrder
   description?: Prisma.SortOrder
   shortDescription?: Prisma.SortOrder
-  type?: Prisma.SortOrder
   status?: Prisma.SortOrder
   fulfillmentType?: Prisma.SortOrder
-  price?: Prisma.SortOrder
+  ownerType?: Prisma.SortOrder
   currency?: Prisma.SortOrder
   priceType?: Prisma.SortOrder
   minPrice?: Prisma.SortOrder
@@ -1242,13 +1113,8 @@ export type MarketplaceListingMaxOrderByAggregateInput = {
   spamScore?: Prisma.SortOrder
   country?: Prisma.SortOrder
   language?: Prisma.SortOrder
-  turnaroundDays?: Prisma.SortOrder
-  revisionRounds?: Prisma.SortOrder
-  warrantyDays?: Prisma.SortOrder
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
-  allowGuestPost?: Prisma.SortOrder
-  allowNicheEdit?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
   websiteUrl?: Prisma.SortOrder
   sampleUrl?: Prisma.SortOrder
@@ -1269,10 +1135,9 @@ export type MarketplaceListingMinOrderByAggregateInput = {
   slug?: Prisma.SortOrder
   description?: Prisma.SortOrder
   shortDescription?: Prisma.SortOrder
-  type?: Prisma.SortOrder
   status?: Prisma.SortOrder
   fulfillmentType?: Prisma.SortOrder
-  price?: Prisma.SortOrder
+  ownerType?: Prisma.SortOrder
   currency?: Prisma.SortOrder
   priceType?: Prisma.SortOrder
   minPrice?: Prisma.SortOrder
@@ -1284,13 +1149,8 @@ export type MarketplaceListingMinOrderByAggregateInput = {
   spamScore?: Prisma.SortOrder
   country?: Prisma.SortOrder
   language?: Prisma.SortOrder
-  turnaroundDays?: Prisma.SortOrder
-  revisionRounds?: Prisma.SortOrder
-  warrantyDays?: Prisma.SortOrder
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
-  allowGuestPost?: Prisma.SortOrder
-  allowNicheEdit?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
   websiteUrl?: Prisma.SortOrder
   sampleUrl?: Prisma.SortOrder
@@ -1306,7 +1166,6 @@ export type MarketplaceListingMinOrderByAggregateInput = {
 }
 
 export type MarketplaceListingSumOrderByAggregateInput = {
-  price?: Prisma.SortOrder
   minPrice?: Prisma.SortOrder
   maxPrice?: Prisma.SortOrder
   domainRating?: Prisma.SortOrder
@@ -1314,9 +1173,6 @@ export type MarketplaceListingSumOrderByAggregateInput = {
   traffic?: Prisma.SortOrder
   referringDomains?: Prisma.SortOrder
   spamScore?: Prisma.SortOrder
-  turnaroundDays?: Prisma.SortOrder
-  revisionRounds?: Prisma.SortOrder
-  warrantyDays?: Prisma.SortOrder
 }
 
 export type MarketplaceListingScalarRelationFilter = {
@@ -1450,6 +1306,22 @@ export type MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput = {
   deleteMany?: Prisma.MarketplaceListingScalarWhereInput | Prisma.MarketplaceListingScalarWhereInput[]
 }
 
+export type MarketplaceListingCreateNestedOneWithoutOrdersInput = {
+  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutOrdersInput, Prisma.MarketplaceListingUncheckedCreateWithoutOrdersInput>
+  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutOrdersInput
+  connect?: Prisma.MarketplaceListingWhereUniqueInput
+}
+
+export type MarketplaceListingUpdateOneWithoutOrdersNestedInput = {
+  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutOrdersInput, Prisma.MarketplaceListingUncheckedCreateWithoutOrdersInput>
+  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutOrdersInput
+  upsert?: Prisma.MarketplaceListingUpsertWithoutOrdersInput
+  disconnect?: Prisma.MarketplaceListingWhereInput | boolean
+  delete?: Prisma.MarketplaceListingWhereInput | boolean
+  connect?: Prisma.MarketplaceListingWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MarketplaceListingUpdateToOneWithWhereWithoutOrdersInput, Prisma.MarketplaceListingUpdateWithoutOrdersInput>, Prisma.MarketplaceListingUncheckedUpdateWithoutOrdersInput>
+}
+
 export type MarketplaceListingCreateNestedManyWithoutCategoryInput = {
   create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoryInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput> | Prisma.MarketplaceListingCreateWithoutCategoryInput[] | Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput[]
   connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput | Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput[]
@@ -1500,10 +1372,6 @@ export type MarketplaceListingCreatelanguagesInput = {
   set: string[]
 }
 
-export type EnumListingTypeFieldUpdateOperationsInput = {
-  set?: $Enums.ListingType
-}
-
 export type EnumListingStatusFieldUpdateOperationsInput = {
   set?: $Enums.ListingStatus
 }
@@ -1520,6 +1388,20 @@ export type MarketplaceListingUpdatecountriesInput = {
 export type MarketplaceListingUpdatelanguagesInput = {
   set?: string[]
   push?: string | string[]
+}
+
+export type MarketplaceListingCreateNestedOneWithoutServicesInput = {
+  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutServicesInput, Prisma.MarketplaceListingUncheckedCreateWithoutServicesInput>
+  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutServicesInput
+  connect?: Prisma.MarketplaceListingWhereUniqueInput
+}
+
+export type MarketplaceListingUpdateOneRequiredWithoutServicesNestedInput = {
+  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutServicesInput, Prisma.MarketplaceListingUncheckedCreateWithoutServicesInput>
+  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutServicesInput
+  upsert?: Prisma.MarketplaceListingUpsertWithoutServicesInput
+  connect?: Prisma.MarketplaceListingWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MarketplaceListingUpdateToOneWithWhereWithoutServicesInput, Prisma.MarketplaceListingUpdateWithoutServicesInput>, Prisma.MarketplaceListingUncheckedUpdateWithoutServicesInput>
 }
 
 export type MarketplaceListingCreateNestedOneWithoutTagsInput = {
@@ -1548,20 +1430,6 @@ export type MarketplaceListingUpdateOneRequiredWithoutImagesNestedInput = {
   upsert?: Prisma.MarketplaceListingUpsertWithoutImagesInput
   connect?: Prisma.MarketplaceListingWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.MarketplaceListingUpdateToOneWithWhereWithoutImagesInput, Prisma.MarketplaceListingUpdateWithoutImagesInput>, Prisma.MarketplaceListingUncheckedUpdateWithoutImagesInput>
-}
-
-export type MarketplaceListingCreateNestedOneWithoutPricingTiersInput = {
-  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutPricingTiersInput, Prisma.MarketplaceListingUncheckedCreateWithoutPricingTiersInput>
-  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutPricingTiersInput
-  connect?: Prisma.MarketplaceListingWhereUniqueInput
-}
-
-export type MarketplaceListingUpdateOneRequiredWithoutPricingTiersNestedInput = {
-  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutPricingTiersInput, Prisma.MarketplaceListingUncheckedCreateWithoutPricingTiersInput>
-  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutPricingTiersInput
-  upsert?: Prisma.MarketplaceListingUpsertWithoutPricingTiersInput
-  connect?: Prisma.MarketplaceListingWhereUniqueInput
-  update?: Prisma.XOR<Prisma.XOR<Prisma.MarketplaceListingUpdateToOneWithWhereWithoutPricingTiersInput, Prisma.MarketplaceListingUpdateWithoutPricingTiersInput>, Prisma.MarketplaceListingUncheckedUpdateWithoutPricingTiersInput>
 }
 
 export type MarketplaceListingCreateNestedOneWithoutReviewsInput = {
@@ -1640,10 +1508,9 @@ export type MarketplaceListingCreateWithoutOrganizationInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -1657,13 +1524,8 @@ export type MarketplaceListingCreateWithoutOrganizationInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -1680,12 +1542,13 @@ export type MarketplaceListingCreateWithoutOrganizationInput = {
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutOrganizationInput = {
@@ -1694,10 +1557,9 @@ export type MarketplaceListingUncheckedCreateWithoutOrganizationInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -1711,13 +1573,8 @@ export type MarketplaceListingUncheckedCreateWithoutOrganizationInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -1734,12 +1591,13 @@ export type MarketplaceListingUncheckedCreateWithoutOrganizationInput = {
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutOrganizationInput = {
@@ -1777,10 +1635,9 @@ export type MarketplaceListingScalarWhereInput = {
   slug?: Prisma.StringFilter<"MarketplaceListing"> | string
   description?: Prisma.StringFilter<"MarketplaceListing"> | string
   shortDescription?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
-  type?: Prisma.EnumListingTypeFilter<"MarketplaceListing"> | $Enums.ListingType
   status?: Prisma.EnumListingStatusFilter<"MarketplaceListing"> | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFilter<"MarketplaceListing"> | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFilter<"MarketplaceListing"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFilter<"MarketplaceListing"> | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFilter<"MarketplaceListing"> | string
   priceType?: Prisma.StringFilter<"MarketplaceListing"> | string
   minPrice?: Prisma.DecimalNullableFilter<"MarketplaceListing"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -1794,13 +1651,8 @@ export type MarketplaceListingScalarWhereInput = {
   language?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   countries?: Prisma.StringNullableListFilter<"MarketplaceListing">
   languages?: Prisma.StringNullableListFilter<"MarketplaceListing">
-  turnaroundDays?: Prisma.IntNullableFilter<"MarketplaceListing"> | number | null
-  revisionRounds?: Prisma.IntFilter<"MarketplaceListing"> | number
-  warrantyDays?: Prisma.IntNullableFilter<"MarketplaceListing"> | number | null
   featured?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   verified?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
-  allowGuestPost?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
-  allowNicheEdit?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   doFollowOnly?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   websiteUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   sampleUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
@@ -1824,10 +1676,9 @@ export type MarketplaceListingCreateWithoutPublisherInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -1841,13 +1692,8 @@ export type MarketplaceListingCreateWithoutPublisherInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -1864,12 +1710,13 @@ export type MarketplaceListingCreateWithoutPublisherInput = {
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutPublisherInput = {
@@ -1878,10 +1725,9 @@ export type MarketplaceListingUncheckedCreateWithoutPublisherInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -1895,13 +1741,8 @@ export type MarketplaceListingUncheckedCreateWithoutPublisherInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -1918,12 +1759,13 @@ export type MarketplaceListingUncheckedCreateWithoutPublisherInput = {
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutPublisherInput = {
@@ -1958,10 +1800,9 @@ export type MarketplaceListingCreateWithoutWebsiteInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -1975,13 +1816,8 @@ export type MarketplaceListingCreateWithoutWebsiteInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -1998,12 +1834,13 @@ export type MarketplaceListingCreateWithoutWebsiteInput = {
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutWebsiteInput = {
@@ -2012,10 +1849,9 @@ export type MarketplaceListingUncheckedCreateWithoutWebsiteInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2029,13 +1865,8 @@ export type MarketplaceListingUncheckedCreateWithoutWebsiteInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -2052,12 +1883,13 @@ export type MarketplaceListingUncheckedCreateWithoutWebsiteInput = {
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutWebsiteInput = {
@@ -2086,16 +1918,15 @@ export type MarketplaceListingUpdateManyWithWhereWithoutWebsiteInput = {
   data: Prisma.XOR<Prisma.MarketplaceListingUpdateManyMutationInput, Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteInput>
 }
 
-export type MarketplaceListingCreateWithoutCategoryInput = {
+export type MarketplaceListingCreateWithoutOrdersInput = {
   id?: string
   title: string
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2109,13 +1940,220 @@ export type MarketplaceListingCreateWithoutCategoryInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
+  doFollowOnly?: boolean
+  websiteUrl?: string | null
+  sampleUrl?: string | null
+  signupUrl?: string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publishedAt?: Date | string | null
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
+  organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
+  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
+  images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
+  reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
+  favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
+  savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
+  views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
+  clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+}
+
+export type MarketplaceListingUncheckedCreateWithoutOrdersInput = {
+  id?: string
+  title: string
+  slug: string
+  description: string
+  shortDescription?: string | null
+  status?: $Enums.ListingStatus
+  fulfillmentType?: $Enums.ListingFulfillmentType
+  ownerType?: $Enums.WebsiteOwnershipType
+  currency?: string
+  priceType?: string
+  minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: number | null
+  domainAuthority?: number | null
+  traffic?: number | null
+  referringDomains?: number | null
+  spamScore?: number | null
+  country?: string | null
+  language?: string | null
+  countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
+  featured?: boolean
+  verified?: boolean
+  doFollowOnly?: boolean
+  websiteUrl?: string | null
+  sampleUrl?: string | null
+  signupUrl?: string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publisherId?: string | null
+  websiteId?: string | null
+  organizationId?: string | null
+  publishedAt?: Date | string | null
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  categoryId?: string | null
+  tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
+  images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
+  reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
+  favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
+  savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
+  views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
+  clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+}
+
+export type MarketplaceListingCreateOrConnectWithoutOrdersInput = {
+  where: Prisma.MarketplaceListingWhereUniqueInput
+  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutOrdersInput, Prisma.MarketplaceListingUncheckedCreateWithoutOrdersInput>
+}
+
+export type MarketplaceListingUpsertWithoutOrdersInput = {
+  update: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutOrdersInput, Prisma.MarketplaceListingUncheckedUpdateWithoutOrdersInput>
+  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutOrdersInput, Prisma.MarketplaceListingUncheckedCreateWithoutOrdersInput>
+  where?: Prisma.MarketplaceListingWhereInput
+}
+
+export type MarketplaceListingUpdateToOneWithWhereWithoutOrdersInput = {
+  where?: Prisma.MarketplaceListingWhereInput
+  data: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutOrdersInput, Prisma.MarketplaceListingUncheckedUpdateWithoutOrdersInput>
+}
+
+export type MarketplaceListingUpdateWithoutOrdersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
+  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  priceType?: Prisma.StringFieldUpdateOperationsInput | string
+  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
+  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
+  organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
+  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
+  images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
+  reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
+  favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
+  savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
+  views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
+  clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+}
+
+export type MarketplaceListingUncheckedUpdateWithoutOrdersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
+  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  priceType?: Prisma.StringFieldUpdateOperationsInput | string
+  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
+  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
+  images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
+  reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
+  favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
+  savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
+  views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
+  clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+}
+
+export type MarketplaceListingCreateWithoutCategoryInput = {
+  id?: string
+  title: string
+  slug: string
+  description: string
+  shortDescription?: string | null
+  status?: $Enums.ListingStatus
+  fulfillmentType?: $Enums.ListingFulfillmentType
+  ownerType?: $Enums.WebsiteOwnershipType
+  currency?: string
+  priceType?: string
+  minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: number | null
+  domainAuthority?: number | null
+  traffic?: number | null
+  referringDomains?: number | null
+  spamScore?: number | null
+  country?: string | null
+  language?: string | null
+  countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
+  featured?: boolean
+  verified?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -2132,12 +2170,13 @@ export type MarketplaceListingCreateWithoutCategoryInput = {
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutCategoryInput = {
@@ -2146,10 +2185,9 @@ export type MarketplaceListingUncheckedCreateWithoutCategoryInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2163,13 +2201,8 @@ export type MarketplaceListingUncheckedCreateWithoutCategoryInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -2186,12 +2219,13 @@ export type MarketplaceListingUncheckedCreateWithoutCategoryInput = {
   updatedAt?: Date | string
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutCategoryInput = {
@@ -2220,16 +2254,15 @@ export type MarketplaceListingUpdateManyWithWhereWithoutCategoryInput = {
   data: Prisma.XOR<Prisma.MarketplaceListingUpdateManyMutationInput, Prisma.MarketplaceListingUncheckedUpdateManyWithoutCategoryInput>
 }
 
-export type MarketplaceListingCreateWithoutTagsInput = {
+export type MarketplaceListingCreateWithoutServicesInput = {
   id?: string
   title: string
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2243,13 +2276,220 @@ export type MarketplaceListingCreateWithoutTagsInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
+  doFollowOnly?: boolean
+  websiteUrl?: string | null
+  sampleUrl?: string | null
+  signupUrl?: string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publishedAt?: Date | string | null
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
+  organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
+  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
+  images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
+  reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
+  favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
+  savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
+  views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
+  clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
+}
+
+export type MarketplaceListingUncheckedCreateWithoutServicesInput = {
+  id?: string
+  title: string
+  slug: string
+  description: string
+  shortDescription?: string | null
+  status?: $Enums.ListingStatus
+  fulfillmentType?: $Enums.ListingFulfillmentType
+  ownerType?: $Enums.WebsiteOwnershipType
+  currency?: string
+  priceType?: string
+  minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: number | null
+  domainAuthority?: number | null
+  traffic?: number | null
+  referringDomains?: number | null
+  spamScore?: number | null
+  country?: string | null
+  language?: string | null
+  countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
+  featured?: boolean
+  verified?: boolean
+  doFollowOnly?: boolean
+  websiteUrl?: string | null
+  sampleUrl?: string | null
+  signupUrl?: string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publisherId?: string | null
+  websiteId?: string | null
+  organizationId?: string | null
+  publishedAt?: Date | string | null
+  expiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  categoryId?: string | null
+  tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
+  images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
+  reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
+  favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
+  savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
+  views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
+  clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
+}
+
+export type MarketplaceListingCreateOrConnectWithoutServicesInput = {
+  where: Prisma.MarketplaceListingWhereUniqueInput
+  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutServicesInput, Prisma.MarketplaceListingUncheckedCreateWithoutServicesInput>
+}
+
+export type MarketplaceListingUpsertWithoutServicesInput = {
+  update: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutServicesInput, Prisma.MarketplaceListingUncheckedUpdateWithoutServicesInput>
+  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutServicesInput, Prisma.MarketplaceListingUncheckedCreateWithoutServicesInput>
+  where?: Prisma.MarketplaceListingWhereInput
+}
+
+export type MarketplaceListingUpdateToOneWithWhereWithoutServicesInput = {
+  where?: Prisma.MarketplaceListingWhereInput
+  data: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutServicesInput, Prisma.MarketplaceListingUncheckedUpdateWithoutServicesInput>
+}
+
+export type MarketplaceListingUpdateWithoutServicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
+  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  priceType?: Prisma.StringFieldUpdateOperationsInput | string
+  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
+  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
+  organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
+  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
+  images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
+  reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
+  favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
+  savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
+  views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
+  clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
+}
+
+export type MarketplaceListingUncheckedUpdateWithoutServicesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
+  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  priceType?: Prisma.StringFieldUpdateOperationsInput | string
+  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
+  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
+  images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
+  reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
+  favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
+  savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
+  views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
+  clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
+}
+
+export type MarketplaceListingCreateWithoutTagsInput = {
+  id?: string
+  title: string
+  slug: string
+  description: string
+  shortDescription?: string | null
+  status?: $Enums.ListingStatus
+  fulfillmentType?: $Enums.ListingFulfillmentType
+  ownerType?: $Enums.WebsiteOwnershipType
+  currency?: string
+  priceType?: string
+  minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: number | null
+  domainAuthority?: number | null
+  traffic?: number | null
+  referringDomains?: number | null
+  spamScore?: number | null
+  country?: string | null
+  language?: string | null
+  countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
+  featured?: boolean
+  verified?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -2266,12 +2506,13 @@ export type MarketplaceListingCreateWithoutTagsInput = {
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutTagsInput = {
@@ -2280,10 +2521,9 @@ export type MarketplaceListingUncheckedCreateWithoutTagsInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2297,13 +2537,8 @@ export type MarketplaceListingUncheckedCreateWithoutTagsInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -2320,12 +2555,13 @@ export type MarketplaceListingUncheckedCreateWithoutTagsInput = {
   updatedAt?: Date | string
   categoryId?: string | null
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutTagsInput = {
@@ -2350,10 +2586,9 @@ export type MarketplaceListingUpdateWithoutTagsInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2367,13 +2602,8 @@ export type MarketplaceListingUpdateWithoutTagsInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2390,12 +2620,13 @@ export type MarketplaceListingUpdateWithoutTagsInput = {
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutTagsInput = {
@@ -2404,10 +2635,9 @@ export type MarketplaceListingUncheckedUpdateWithoutTagsInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2421,13 +2651,8 @@ export type MarketplaceListingUncheckedUpdateWithoutTagsInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2444,12 +2669,13 @@ export type MarketplaceListingUncheckedUpdateWithoutTagsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutImagesInput = {
@@ -2458,10 +2684,9 @@ export type MarketplaceListingCreateWithoutImagesInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2475,13 +2700,8 @@ export type MarketplaceListingCreateWithoutImagesInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -2498,12 +2718,13 @@ export type MarketplaceListingCreateWithoutImagesInput = {
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutImagesInput = {
@@ -2512,10 +2733,9 @@ export type MarketplaceListingUncheckedCreateWithoutImagesInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2529,13 +2749,8 @@ export type MarketplaceListingUncheckedCreateWithoutImagesInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -2552,12 +2767,13 @@ export type MarketplaceListingUncheckedCreateWithoutImagesInput = {
   updatedAt?: Date | string
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutImagesInput = {
@@ -2582,10 +2798,9 @@ export type MarketplaceListingUpdateWithoutImagesInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2599,13 +2814,8 @@ export type MarketplaceListingUpdateWithoutImagesInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2622,12 +2832,13 @@ export type MarketplaceListingUpdateWithoutImagesInput = {
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutImagesInput = {
@@ -2636,10 +2847,9 @@ export type MarketplaceListingUncheckedUpdateWithoutImagesInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2653,13 +2863,8 @@ export type MarketplaceListingUncheckedUpdateWithoutImagesInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2676,244 +2881,13 @@ export type MarketplaceListingUncheckedUpdateWithoutImagesInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
-}
-
-export type MarketplaceListingCreateWithoutPricingTiersInput = {
-  id?: string
-  title: string
-  slug: string
-  description: string
-  shortDescription?: string | null
-  type: $Enums.ListingType
-  status?: $Enums.ListingStatus
-  fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
-  currency?: string
-  priceType?: string
-  minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  maxPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  domainRating?: number | null
-  domainAuthority?: number | null
-  traffic?: number | null
-  referringDomains?: number | null
-  spamScore?: number | null
-  country?: string | null
-  language?: string | null
-  countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
-  languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
-  featured?: boolean
-  verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
-  doFollowOnly?: boolean
-  websiteUrl?: string | null
-  sampleUrl?: string | null
-  signupUrl?: string | null
-  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  publishedAt?: Date | string | null
-  expiresAt?: Date | string | null
-  createdAt?: Date | string
-  updatedAt?: Date | string
-  publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
-  website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
-  organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
-  tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
-  images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
-  favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
-  savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
-  views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
-  clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
-}
-
-export type MarketplaceListingUncheckedCreateWithoutPricingTiersInput = {
-  id?: string
-  title: string
-  slug: string
-  description: string
-  shortDescription?: string | null
-  type: $Enums.ListingType
-  status?: $Enums.ListingStatus
-  fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
-  currency?: string
-  priceType?: string
-  minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  maxPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  domainRating?: number | null
-  domainAuthority?: number | null
-  traffic?: number | null
-  referringDomains?: number | null
-  spamScore?: number | null
-  country?: string | null
-  language?: string | null
-  countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
-  languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
-  featured?: boolean
-  verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
-  doFollowOnly?: boolean
-  websiteUrl?: string | null
-  sampleUrl?: string | null
-  signupUrl?: string | null
-  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  publisherId?: string | null
-  websiteId?: string | null
-  organizationId?: string | null
-  publishedAt?: Date | string | null
-  expiresAt?: Date | string | null
-  createdAt?: Date | string
-  updatedAt?: Date | string
-  categoryId?: string | null
-  tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
-  images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
-  favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
-  savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
-  views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
-  clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
-}
-
-export type MarketplaceListingCreateOrConnectWithoutPricingTiersInput = {
-  where: Prisma.MarketplaceListingWhereUniqueInput
-  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutPricingTiersInput, Prisma.MarketplaceListingUncheckedCreateWithoutPricingTiersInput>
-}
-
-export type MarketplaceListingUpsertWithoutPricingTiersInput = {
-  update: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutPricingTiersInput, Prisma.MarketplaceListingUncheckedUpdateWithoutPricingTiersInput>
-  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutPricingTiersInput, Prisma.MarketplaceListingUncheckedCreateWithoutPricingTiersInput>
-  where?: Prisma.MarketplaceListingWhereInput
-}
-
-export type MarketplaceListingUpdateToOneWithWhereWithoutPricingTiersInput = {
-  where?: Prisma.MarketplaceListingWhereInput
-  data: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutPricingTiersInput, Prisma.MarketplaceListingUncheckedUpdateWithoutPricingTiersInput>
-}
-
-export type MarketplaceListingUpdateWithoutPricingTiersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  title?: Prisma.StringFieldUpdateOperationsInput | string
-  slug?: Prisma.StringFieldUpdateOperationsInput | string
-  description?: Prisma.StringFieldUpdateOperationsInput | string
-  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
-  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
-  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  currency?: Prisma.StringFieldUpdateOperationsInput | string
-  priceType?: Prisma.StringFieldUpdateOperationsInput | string
-  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
-  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
-  website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
-  organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
-  tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
-  images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
-  favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
-  savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
-  views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
-  clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
-}
-
-export type MarketplaceListingUncheckedUpdateWithoutPricingTiersInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  title?: Prisma.StringFieldUpdateOperationsInput | string
-  slug?: Prisma.StringFieldUpdateOperationsInput | string
-  description?: Prisma.StringFieldUpdateOperationsInput | string
-  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
-  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
-  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  currency?: Prisma.StringFieldUpdateOperationsInput | string
-  priceType?: Prisma.StringFieldUpdateOperationsInput | string
-  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
-  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
-  images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
-  favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
-  savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
-  views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
-  clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutReviewsInput = {
@@ -2922,10 +2896,9 @@ export type MarketplaceListingCreateWithoutReviewsInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2939,13 +2912,8 @@ export type MarketplaceListingCreateWithoutReviewsInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -2963,11 +2931,12 @@ export type MarketplaceListingCreateWithoutReviewsInput = {
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutReviewsInput = {
@@ -2976,10 +2945,9 @@ export type MarketplaceListingUncheckedCreateWithoutReviewsInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -2993,13 +2961,8 @@ export type MarketplaceListingUncheckedCreateWithoutReviewsInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -3017,11 +2980,12 @@ export type MarketplaceListingUncheckedCreateWithoutReviewsInput = {
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutReviewsInput = {
@@ -3046,10 +3010,9 @@ export type MarketplaceListingUpdateWithoutReviewsInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3063,13 +3026,8 @@ export type MarketplaceListingUpdateWithoutReviewsInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3087,11 +3045,12 @@ export type MarketplaceListingUpdateWithoutReviewsInput = {
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutReviewsInput = {
@@ -3100,10 +3059,9 @@ export type MarketplaceListingUncheckedUpdateWithoutReviewsInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3117,13 +3075,8 @@ export type MarketplaceListingUncheckedUpdateWithoutReviewsInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3141,11 +3094,12 @@ export type MarketplaceListingUncheckedUpdateWithoutReviewsInput = {
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutFavoritesInput = {
@@ -3154,10 +3108,9 @@ export type MarketplaceListingCreateWithoutFavoritesInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3171,13 +3124,8 @@ export type MarketplaceListingCreateWithoutFavoritesInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -3195,11 +3143,12 @@ export type MarketplaceListingCreateWithoutFavoritesInput = {
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutFavoritesInput = {
@@ -3208,10 +3157,9 @@ export type MarketplaceListingUncheckedCreateWithoutFavoritesInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3225,13 +3173,8 @@ export type MarketplaceListingUncheckedCreateWithoutFavoritesInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -3249,11 +3192,12 @@ export type MarketplaceListingUncheckedCreateWithoutFavoritesInput = {
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutFavoritesInput = {
@@ -3278,10 +3222,9 @@ export type MarketplaceListingUpdateWithoutFavoritesInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3295,13 +3238,8 @@ export type MarketplaceListingUpdateWithoutFavoritesInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3319,11 +3257,12 @@ export type MarketplaceListingUpdateWithoutFavoritesInput = {
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutFavoritesInput = {
@@ -3332,10 +3271,9 @@ export type MarketplaceListingUncheckedUpdateWithoutFavoritesInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3349,13 +3287,8 @@ export type MarketplaceListingUncheckedUpdateWithoutFavoritesInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3373,11 +3306,12 @@ export type MarketplaceListingUncheckedUpdateWithoutFavoritesInput = {
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutSavedListsInput = {
@@ -3386,10 +3320,9 @@ export type MarketplaceListingCreateWithoutSavedListsInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3403,13 +3336,8 @@ export type MarketplaceListingCreateWithoutSavedListsInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -3427,11 +3355,12 @@ export type MarketplaceListingCreateWithoutSavedListsInput = {
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutSavedListsInput = {
@@ -3440,10 +3369,9 @@ export type MarketplaceListingUncheckedCreateWithoutSavedListsInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3457,13 +3385,8 @@ export type MarketplaceListingUncheckedCreateWithoutSavedListsInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -3481,11 +3404,12 @@ export type MarketplaceListingUncheckedCreateWithoutSavedListsInput = {
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutSavedListsInput = {
@@ -3510,10 +3434,9 @@ export type MarketplaceListingUpdateWithoutSavedListsInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3527,13 +3450,8 @@ export type MarketplaceListingUpdateWithoutSavedListsInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3551,11 +3469,12 @@ export type MarketplaceListingUpdateWithoutSavedListsInput = {
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutSavedListsInput = {
@@ -3564,10 +3483,9 @@ export type MarketplaceListingUncheckedUpdateWithoutSavedListsInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3581,13 +3499,8 @@ export type MarketplaceListingUncheckedUpdateWithoutSavedListsInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3605,11 +3518,12 @@ export type MarketplaceListingUncheckedUpdateWithoutSavedListsInput = {
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutViewsInput = {
@@ -3618,10 +3532,9 @@ export type MarketplaceListingCreateWithoutViewsInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3635,13 +3548,8 @@ export type MarketplaceListingCreateWithoutViewsInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -3659,11 +3567,12 @@ export type MarketplaceListingCreateWithoutViewsInput = {
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutViewsInput = {
@@ -3672,10 +3581,9 @@ export type MarketplaceListingUncheckedCreateWithoutViewsInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3689,13 +3597,8 @@ export type MarketplaceListingUncheckedCreateWithoutViewsInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -3713,11 +3616,12 @@ export type MarketplaceListingUncheckedCreateWithoutViewsInput = {
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   clicks?: Prisma.MarketplaceListingClickUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutViewsInput = {
@@ -3742,10 +3646,9 @@ export type MarketplaceListingUpdateWithoutViewsInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3759,13 +3662,8 @@ export type MarketplaceListingUpdateWithoutViewsInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3783,11 +3681,12 @@ export type MarketplaceListingUpdateWithoutViewsInput = {
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutViewsInput = {
@@ -3796,10 +3695,9 @@ export type MarketplaceListingUncheckedUpdateWithoutViewsInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3813,13 +3711,8 @@ export type MarketplaceListingUncheckedUpdateWithoutViewsInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3837,11 +3730,12 @@ export type MarketplaceListingUncheckedUpdateWithoutViewsInput = {
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutClicksInput = {
@@ -3850,10 +3744,9 @@ export type MarketplaceListingCreateWithoutClicksInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3867,13 +3760,8 @@ export type MarketplaceListingCreateWithoutClicksInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -3891,11 +3779,12 @@ export type MarketplaceListingCreateWithoutClicksInput = {
   category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingUncheckedCreateWithoutClicksInput = {
@@ -3904,10 +3793,9 @@ export type MarketplaceListingUncheckedCreateWithoutClicksInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3921,13 +3809,8 @@ export type MarketplaceListingUncheckedCreateWithoutClicksInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -3945,11 +3828,12 @@ export type MarketplaceListingUncheckedCreateWithoutClicksInput = {
   categoryId?: string | null
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedCreateNestedManyWithoutListingInput
   views?: Prisma.MarketplaceListingViewUncheckedCreateNestedManyWithoutListingInput
+  services?: Prisma.ListingServiceUncheckedCreateNestedManyWithoutListingInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
 export type MarketplaceListingCreateOrConnectWithoutClicksInput = {
@@ -3974,10 +3858,9 @@ export type MarketplaceListingUpdateWithoutClicksInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -3991,13 +3874,8 @@ export type MarketplaceListingUpdateWithoutClicksInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4015,11 +3893,12 @@ export type MarketplaceListingUpdateWithoutClicksInput = {
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutClicksInput = {
@@ -4028,10 +3907,9 @@ export type MarketplaceListingUncheckedUpdateWithoutClicksInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4045,13 +3923,8 @@ export type MarketplaceListingUncheckedUpdateWithoutClicksInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4069,11 +3942,12 @@ export type MarketplaceListingUncheckedUpdateWithoutClicksInput = {
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateManyOrganizationInput = {
@@ -4082,10 +3956,9 @@ export type MarketplaceListingCreateManyOrganizationInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4099,13 +3972,8 @@ export type MarketplaceListingCreateManyOrganizationInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -4128,10 +3996,9 @@ export type MarketplaceListingUpdateWithoutOrganizationInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4145,13 +4012,8 @@ export type MarketplaceListingUpdateWithoutOrganizationInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4168,12 +4030,13 @@ export type MarketplaceListingUpdateWithoutOrganizationInput = {
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutOrganizationInput = {
@@ -4182,10 +4045,9 @@ export type MarketplaceListingUncheckedUpdateWithoutOrganizationInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4199,13 +4061,8 @@ export type MarketplaceListingUncheckedUpdateWithoutOrganizationInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4222,12 +4079,13 @@ export type MarketplaceListingUncheckedUpdateWithoutOrganizationInput = {
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateManyWithoutOrganizationInput = {
@@ -4236,10 +4094,9 @@ export type MarketplaceListingUncheckedUpdateManyWithoutOrganizationInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4253,13 +4110,8 @@ export type MarketplaceListingUncheckedUpdateManyWithoutOrganizationInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4282,10 +4134,9 @@ export type MarketplaceListingCreateManyPublisherInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4299,13 +4150,8 @@ export type MarketplaceListingCreateManyPublisherInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -4328,10 +4174,9 @@ export type MarketplaceListingUpdateWithoutPublisherInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4345,13 +4190,8 @@ export type MarketplaceListingUpdateWithoutPublisherInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4368,12 +4208,13 @@ export type MarketplaceListingUpdateWithoutPublisherInput = {
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutPublisherInput = {
@@ -4382,10 +4223,9 @@ export type MarketplaceListingUncheckedUpdateWithoutPublisherInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4399,13 +4239,8 @@ export type MarketplaceListingUncheckedUpdateWithoutPublisherInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4422,12 +4257,13 @@ export type MarketplaceListingUncheckedUpdateWithoutPublisherInput = {
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateManyWithoutPublisherInput = {
@@ -4436,10 +4272,9 @@ export type MarketplaceListingUncheckedUpdateManyWithoutPublisherInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4453,13 +4288,8 @@ export type MarketplaceListingUncheckedUpdateManyWithoutPublisherInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4482,10 +4312,9 @@ export type MarketplaceListingCreateManyWebsiteInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4499,13 +4328,8 @@ export type MarketplaceListingCreateManyWebsiteInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -4528,10 +4352,9 @@ export type MarketplaceListingUpdateWithoutWebsiteInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4545,13 +4368,8 @@ export type MarketplaceListingUpdateWithoutWebsiteInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4568,12 +4386,13 @@ export type MarketplaceListingUpdateWithoutWebsiteInput = {
   category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutWebsiteInput = {
@@ -4582,10 +4401,9 @@ export type MarketplaceListingUncheckedUpdateWithoutWebsiteInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4599,13 +4417,8 @@ export type MarketplaceListingUncheckedUpdateWithoutWebsiteInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4622,12 +4435,13 @@ export type MarketplaceListingUncheckedUpdateWithoutWebsiteInput = {
   categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateManyWithoutWebsiteInput = {
@@ -4636,10 +4450,9 @@ export type MarketplaceListingUncheckedUpdateManyWithoutWebsiteInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4653,13 +4466,8 @@ export type MarketplaceListingUncheckedUpdateManyWithoutWebsiteInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4682,10 +4490,9 @@ export type MarketplaceListingCreateManyCategoryInput = {
   slug: string
   description: string
   shortDescription?: string | null
-  type: $Enums.ListingType
   status?: $Enums.ListingStatus
   fulfillmentType?: $Enums.ListingFulfillmentType
-  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: $Enums.WebsiteOwnershipType
   currency?: string
   priceType?: string
   minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4699,13 +4506,8 @@ export type MarketplaceListingCreateManyCategoryInput = {
   language?: string | null
   countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  turnaroundDays?: number | null
-  revisionRounds?: number
-  warrantyDays?: number | null
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: string | null
   sampleUrl?: string | null
@@ -4728,10 +4530,9 @@ export type MarketplaceListingUpdateWithoutCategoryInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4745,13 +4546,8 @@ export type MarketplaceListingUpdateWithoutCategoryInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4768,12 +4564,13 @@ export type MarketplaceListingUpdateWithoutCategoryInput = {
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateWithoutCategoryInput = {
@@ -4782,10 +4579,9 @@ export type MarketplaceListingUncheckedUpdateWithoutCategoryInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4799,13 +4595,8 @@ export type MarketplaceListingUncheckedUpdateWithoutCategoryInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4822,12 +4613,13 @@ export type MarketplaceListingUncheckedUpdateWithoutCategoryInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  pricingTiers?: Prisma.MarketplacePricingTierUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
   savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
   views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
   clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingUncheckedUpdateManyWithoutCategoryInput = {
@@ -4836,10 +4628,9 @@ export type MarketplaceListingUncheckedUpdateManyWithoutCategoryInput = {
   slug?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.StringFieldUpdateOperationsInput | string
   shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  type?: Prisma.EnumListingTypeFieldUpdateOperationsInput | $Enums.ListingType
   status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
   fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
   currency?: Prisma.StringFieldUpdateOperationsInput | string
   priceType?: Prisma.StringFieldUpdateOperationsInput | string
   minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
@@ -4853,13 +4644,8 @@ export type MarketplaceListingUncheckedUpdateManyWithoutCategoryInput = {
   language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
   languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  revisionRounds?: Prisma.IntFieldUpdateOperationsInput | number
-  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowGuestPost?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  allowNicheEdit?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4884,23 +4670,25 @@ export type MarketplaceListingUncheckedUpdateManyWithoutCategoryInput = {
 export type MarketplaceListingCountOutputType = {
   tags: number
   images: number
-  pricingTiers: number
   reviews: number
   favorites: number
   savedLists: number
   views: number
   clicks: number
+  services: number
+  orders: number
 }
 
 export type MarketplaceListingCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tags?: boolean | MarketplaceListingCountOutputTypeCountTagsArgs
   images?: boolean | MarketplaceListingCountOutputTypeCountImagesArgs
-  pricingTiers?: boolean | MarketplaceListingCountOutputTypeCountPricingTiersArgs
   reviews?: boolean | MarketplaceListingCountOutputTypeCountReviewsArgs
   favorites?: boolean | MarketplaceListingCountOutputTypeCountFavoritesArgs
   savedLists?: boolean | MarketplaceListingCountOutputTypeCountSavedListsArgs
   views?: boolean | MarketplaceListingCountOutputTypeCountViewsArgs
   clicks?: boolean | MarketplaceListingCountOutputTypeCountClicksArgs
+  services?: boolean | MarketplaceListingCountOutputTypeCountServicesArgs
+  orders?: boolean | MarketplaceListingCountOutputTypeCountOrdersArgs
 }
 
 /**
@@ -4925,13 +4713,6 @@ export type MarketplaceListingCountOutputTypeCountTagsArgs<ExtArgs extends runti
  */
 export type MarketplaceListingCountOutputTypeCountImagesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.MarketplaceListingImageWhereInput
-}
-
-/**
- * MarketplaceListingCountOutputType without action
- */
-export type MarketplaceListingCountOutputTypeCountPricingTiersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.MarketplacePricingTierWhereInput
 }
 
 /**
@@ -4969,6 +4750,20 @@ export type MarketplaceListingCountOutputTypeCountClicksArgs<ExtArgs extends run
   where?: Prisma.MarketplaceListingClickWhereInput
 }
 
+/**
+ * MarketplaceListingCountOutputType without action
+ */
+export type MarketplaceListingCountOutputTypeCountServicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ListingServiceWhereInput
+}
+
+/**
+ * MarketplaceListingCountOutputType without action
+ */
+export type MarketplaceListingCountOutputTypeCountOrdersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OrderWhereInput
+}
+
 
 export type MarketplaceListingSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -4976,10 +4771,9 @@ export type MarketplaceListingSelect<ExtArgs extends runtime.Types.Extensions.In
   slug?: boolean
   description?: boolean
   shortDescription?: boolean
-  type?: boolean
   status?: boolean
   fulfillmentType?: boolean
-  price?: boolean
+  ownerType?: boolean
   currency?: boolean
   priceType?: boolean
   minPrice?: boolean
@@ -4993,13 +4787,8 @@ export type MarketplaceListingSelect<ExtArgs extends runtime.Types.Extensions.In
   language?: boolean
   countries?: boolean
   languages?: boolean
-  turnaroundDays?: boolean
-  revisionRounds?: boolean
-  warrantyDays?: boolean
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: boolean
   sampleUrl?: boolean
@@ -5021,12 +4810,13 @@ export type MarketplaceListingSelect<ExtArgs extends runtime.Types.Extensions.In
   category?: boolean | Prisma.MarketplaceListing$categoryArgs<ExtArgs>
   tags?: boolean | Prisma.MarketplaceListing$tagsArgs<ExtArgs>
   images?: boolean | Prisma.MarketplaceListing$imagesArgs<ExtArgs>
-  pricingTiers?: boolean | Prisma.MarketplaceListing$pricingTiersArgs<ExtArgs>
   reviews?: boolean | Prisma.MarketplaceListing$reviewsArgs<ExtArgs>
   favorites?: boolean | Prisma.MarketplaceListing$favoritesArgs<ExtArgs>
   savedLists?: boolean | Prisma.MarketplaceListing$savedListsArgs<ExtArgs>
   views?: boolean | Prisma.MarketplaceListing$viewsArgs<ExtArgs>
   clicks?: boolean | Prisma.MarketplaceListing$clicksArgs<ExtArgs>
+  services?: boolean | Prisma.MarketplaceListing$servicesArgs<ExtArgs>
+  orders?: boolean | Prisma.MarketplaceListing$ordersArgs<ExtArgs>
   _count?: boolean | Prisma.MarketplaceListingCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["marketplaceListing"]>
 
@@ -5036,10 +4826,9 @@ export type MarketplaceListingSelectCreateManyAndReturn<ExtArgs extends runtime.
   slug?: boolean
   description?: boolean
   shortDescription?: boolean
-  type?: boolean
   status?: boolean
   fulfillmentType?: boolean
-  price?: boolean
+  ownerType?: boolean
   currency?: boolean
   priceType?: boolean
   minPrice?: boolean
@@ -5053,13 +4842,8 @@ export type MarketplaceListingSelectCreateManyAndReturn<ExtArgs extends runtime.
   language?: boolean
   countries?: boolean
   languages?: boolean
-  turnaroundDays?: boolean
-  revisionRounds?: boolean
-  warrantyDays?: boolean
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: boolean
   sampleUrl?: boolean
@@ -5087,10 +4871,9 @@ export type MarketplaceListingSelectUpdateManyAndReturn<ExtArgs extends runtime.
   slug?: boolean
   description?: boolean
   shortDescription?: boolean
-  type?: boolean
   status?: boolean
   fulfillmentType?: boolean
-  price?: boolean
+  ownerType?: boolean
   currency?: boolean
   priceType?: boolean
   minPrice?: boolean
@@ -5104,13 +4887,8 @@ export type MarketplaceListingSelectUpdateManyAndReturn<ExtArgs extends runtime.
   language?: boolean
   countries?: boolean
   languages?: boolean
-  turnaroundDays?: boolean
-  revisionRounds?: boolean
-  warrantyDays?: boolean
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: boolean
   sampleUrl?: boolean
@@ -5138,10 +4916,9 @@ export type MarketplaceListingSelectScalar = {
   slug?: boolean
   description?: boolean
   shortDescription?: boolean
-  type?: boolean
   status?: boolean
   fulfillmentType?: boolean
-  price?: boolean
+  ownerType?: boolean
   currency?: boolean
   priceType?: boolean
   minPrice?: boolean
@@ -5155,13 +4932,8 @@ export type MarketplaceListingSelectScalar = {
   language?: boolean
   countries?: boolean
   languages?: boolean
-  turnaroundDays?: boolean
-  revisionRounds?: boolean
-  warrantyDays?: boolean
   featured?: boolean
   verified?: boolean
-  allowGuestPost?: boolean
-  allowNicheEdit?: boolean
   doFollowOnly?: boolean
   websiteUrl?: boolean
   sampleUrl?: boolean
@@ -5179,7 +4951,7 @@ export type MarketplaceListingSelectScalar = {
   categoryId?: boolean
 }
 
-export type MarketplaceListingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "slug" | "description" | "shortDescription" | "type" | "status" | "fulfillmentType" | "price" | "currency" | "priceType" | "minPrice" | "maxPrice" | "domainRating" | "domainAuthority" | "traffic" | "referringDomains" | "spamScore" | "country" | "language" | "countries" | "languages" | "turnaroundDays" | "revisionRounds" | "warrantyDays" | "featured" | "verified" | "allowGuestPost" | "allowNicheEdit" | "doFollowOnly" | "websiteUrl" | "sampleUrl" | "signupUrl" | "metricsData" | "trafficData" | "semrushData" | "publisherId" | "websiteId" | "organizationId" | "publishedAt" | "expiresAt" | "createdAt" | "updatedAt" | "categoryId", ExtArgs["result"]["marketplaceListing"]>
+export type MarketplaceListingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "slug" | "description" | "shortDescription" | "status" | "fulfillmentType" | "ownerType" | "currency" | "priceType" | "minPrice" | "maxPrice" | "domainRating" | "domainAuthority" | "traffic" | "referringDomains" | "spamScore" | "country" | "language" | "countries" | "languages" | "featured" | "verified" | "doFollowOnly" | "websiteUrl" | "sampleUrl" | "signupUrl" | "metricsData" | "trafficData" | "semrushData" | "publisherId" | "websiteId" | "organizationId" | "publishedAt" | "expiresAt" | "createdAt" | "updatedAt" | "categoryId", ExtArgs["result"]["marketplaceListing"]>
 export type MarketplaceListingInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.MarketplaceListing$publisherArgs<ExtArgs>
   website?: boolean | Prisma.MarketplaceListing$websiteArgs<ExtArgs>
@@ -5187,12 +4959,13 @@ export type MarketplaceListingInclude<ExtArgs extends runtime.Types.Extensions.I
   category?: boolean | Prisma.MarketplaceListing$categoryArgs<ExtArgs>
   tags?: boolean | Prisma.MarketplaceListing$tagsArgs<ExtArgs>
   images?: boolean | Prisma.MarketplaceListing$imagesArgs<ExtArgs>
-  pricingTiers?: boolean | Prisma.MarketplaceListing$pricingTiersArgs<ExtArgs>
   reviews?: boolean | Prisma.MarketplaceListing$reviewsArgs<ExtArgs>
   favorites?: boolean | Prisma.MarketplaceListing$favoritesArgs<ExtArgs>
   savedLists?: boolean | Prisma.MarketplaceListing$savedListsArgs<ExtArgs>
   views?: boolean | Prisma.MarketplaceListing$viewsArgs<ExtArgs>
   clicks?: boolean | Prisma.MarketplaceListing$clicksArgs<ExtArgs>
+  services?: boolean | Prisma.MarketplaceListing$servicesArgs<ExtArgs>
+  orders?: boolean | Prisma.MarketplaceListing$ordersArgs<ExtArgs>
   _count?: boolean | Prisma.MarketplaceListingCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type MarketplaceListingIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -5217,12 +4990,13 @@ export type $MarketplaceListingPayload<ExtArgs extends runtime.Types.Extensions.
     category: Prisma.$MarketplaceCategoryPayload<ExtArgs> | null
     tags: Prisma.$MarketplaceListingTagPayload<ExtArgs>[]
     images: Prisma.$MarketplaceListingImagePayload<ExtArgs>[]
-    pricingTiers: Prisma.$MarketplacePricingTierPayload<ExtArgs>[]
     reviews: Prisma.$MarketplaceReviewPayload<ExtArgs>[]
     favorites: Prisma.$MarketplaceFavoritePayload<ExtArgs>[]
     savedLists: Prisma.$MarketplaceSavedListItemPayload<ExtArgs>[]
     views: Prisma.$MarketplaceListingViewPayload<ExtArgs>[]
     clicks: Prisma.$MarketplaceListingClickPayload<ExtArgs>[]
+    services: Prisma.$ListingServicePayload<ExtArgs>[]
+    orders: Prisma.$OrderPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -5230,10 +5004,9 @@ export type $MarketplaceListingPayload<ExtArgs extends runtime.Types.Extensions.
     slug: string
     description: string
     shortDescription: string | null
-    type: $Enums.ListingType
     status: $Enums.ListingStatus
     fulfillmentType: $Enums.ListingFulfillmentType
-    price: runtime.Decimal
+    ownerType: $Enums.WebsiteOwnershipType
     currency: string
     priceType: string
     minPrice: runtime.Decimal | null
@@ -5247,13 +5020,8 @@ export type $MarketplaceListingPayload<ExtArgs extends runtime.Types.Extensions.
     language: string | null
     countries: string[]
     languages: string[]
-    turnaroundDays: number | null
-    revisionRounds: number
-    warrantyDays: number | null
     featured: boolean
     verified: boolean
-    allowGuestPost: boolean
-    allowNicheEdit: boolean
     doFollowOnly: boolean
     websiteUrl: string | null
     sampleUrl: string | null
@@ -5669,12 +5437,13 @@ export interface Prisma__MarketplaceListingClient<T, Null = never, ExtArgs exten
   category<T extends Prisma.MarketplaceListing$categoryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$categoryArgs<ExtArgs>>): Prisma.Prisma__MarketplaceCategoryClient<runtime.Types.Result.GetResult<Prisma.$MarketplaceCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   tags<T extends Prisma.MarketplaceListing$tagsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$tagsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingTagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   images<T extends Prisma.MarketplaceListing$imagesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$imagesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingImagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  pricingTiers<T extends Prisma.MarketplaceListing$pricingTiersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$pricingTiersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplacePricingTierPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   reviews<T extends Prisma.MarketplaceListing$reviewsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$reviewsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceReviewPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   favorites<T extends Prisma.MarketplaceListing$favoritesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$favoritesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceFavoritePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   savedLists<T extends Prisma.MarketplaceListing$savedListsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$savedListsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceSavedListItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   views<T extends Prisma.MarketplaceListing$viewsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$viewsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingViewPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   clicks<T extends Prisma.MarketplaceListing$clicksArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$clicksArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingClickPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  services<T extends Prisma.MarketplaceListing$servicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$servicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ListingServicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  orders<T extends Prisma.MarketplaceListing$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -5709,10 +5478,9 @@ export interface MarketplaceListingFieldRefs {
   readonly slug: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly description: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly shortDescription: Prisma.FieldRef<"MarketplaceListing", 'String'>
-  readonly type: Prisma.FieldRef<"MarketplaceListing", 'ListingType'>
   readonly status: Prisma.FieldRef<"MarketplaceListing", 'ListingStatus'>
   readonly fulfillmentType: Prisma.FieldRef<"MarketplaceListing", 'ListingFulfillmentType'>
-  readonly price: Prisma.FieldRef<"MarketplaceListing", 'Decimal'>
+  readonly ownerType: Prisma.FieldRef<"MarketplaceListing", 'WebsiteOwnershipType'>
   readonly currency: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly priceType: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly minPrice: Prisma.FieldRef<"MarketplaceListing", 'Decimal'>
@@ -5726,13 +5494,8 @@ export interface MarketplaceListingFieldRefs {
   readonly language: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly countries: Prisma.FieldRef<"MarketplaceListing", 'String[]'>
   readonly languages: Prisma.FieldRef<"MarketplaceListing", 'String[]'>
-  readonly turnaroundDays: Prisma.FieldRef<"MarketplaceListing", 'Int'>
-  readonly revisionRounds: Prisma.FieldRef<"MarketplaceListing", 'Int'>
-  readonly warrantyDays: Prisma.FieldRef<"MarketplaceListing", 'Int'>
   readonly featured: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
   readonly verified: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
-  readonly allowGuestPost: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
-  readonly allowNicheEdit: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
   readonly doFollowOnly: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
   readonly websiteUrl: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly sampleUrl: Prisma.FieldRef<"MarketplaceListing", 'String'>
@@ -6268,30 +6031,6 @@ export type MarketplaceListing$imagesArgs<ExtArgs extends runtime.Types.Extensio
 }
 
 /**
- * MarketplaceListing.pricingTiers
- */
-export type MarketplaceListing$pricingTiersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  /**
-   * Select specific fields to fetch from the MarketplacePricingTier
-   */
-  select?: Prisma.MarketplacePricingTierSelect<ExtArgs> | null
-  /**
-   * Omit specific fields from the MarketplacePricingTier
-   */
-  omit?: Prisma.MarketplacePricingTierOmit<ExtArgs> | null
-  /**
-   * Choose, which related nodes to fetch as well
-   */
-  include?: Prisma.MarketplacePricingTierInclude<ExtArgs> | null
-  where?: Prisma.MarketplacePricingTierWhereInput
-  orderBy?: Prisma.MarketplacePricingTierOrderByWithRelationInput | Prisma.MarketplacePricingTierOrderByWithRelationInput[]
-  cursor?: Prisma.MarketplacePricingTierWhereUniqueInput
-  take?: number
-  skip?: number
-  distinct?: Prisma.MarketplacePricingTierScalarFieldEnum | Prisma.MarketplacePricingTierScalarFieldEnum[]
-}
-
-/**
  * MarketplaceListing.reviews
  */
 export type MarketplaceListing$reviewsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -6409,6 +6148,54 @@ export type MarketplaceListing$clicksArgs<ExtArgs extends runtime.Types.Extensio
   take?: number
   skip?: number
   distinct?: Prisma.MarketplaceListingClickScalarFieldEnum | Prisma.MarketplaceListingClickScalarFieldEnum[]
+}
+
+/**
+ * MarketplaceListing.services
+ */
+export type MarketplaceListing$servicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ListingService
+   */
+  select?: Prisma.ListingServiceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ListingService
+   */
+  omit?: Prisma.ListingServiceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ListingServiceInclude<ExtArgs> | null
+  where?: Prisma.ListingServiceWhereInput
+  orderBy?: Prisma.ListingServiceOrderByWithRelationInput | Prisma.ListingServiceOrderByWithRelationInput[]
+  cursor?: Prisma.ListingServiceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ListingServiceScalarFieldEnum | Prisma.ListingServiceScalarFieldEnum[]
+}
+
+/**
+ * MarketplaceListing.orders
+ */
+export type MarketplaceListing$ordersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Order
+   */
+  select?: Prisma.OrderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Order
+   */
+  omit?: Prisma.OrderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrderInclude<ExtArgs> | null
+  where?: Prisma.OrderWhereInput
+  orderBy?: Prisma.OrderOrderByWithRelationInput | Prisma.OrderOrderByWithRelationInput[]
+  cursor?: Prisma.OrderWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.OrderScalarFieldEnum | Prisma.OrderScalarFieldEnum[]
 }
 
 /**

@@ -139,12 +139,18 @@ export class OrderReviewService {
       throw new BadRequestException("Order must be in CUSTOMER_REVIEW to request revision")
     }
 
-    // Find revision rounds cap from first listing
-    const listing = await this.prisma.marketplaceListing.findFirst({
-      where: { websiteId: order.websiteId ?? undefined },
-      select: { revisionRounds: true },
-    })
-    const maxRevisions = listing?.revisionRounds ?? 2
+    // Phase 7: revision-rounds cap moved off the deprecated listing-level
+    // column onto the snapshotted ListingService. We read the SAME row the
+    // order locked into at creation, so customer + publisher contract
+    // matches what they saw at checkout even after subsequent edits.
+    let maxRevisions = 2
+    if (order.listingServiceId) {
+      const ls = await this.prisma.listingService.findUnique({
+        where: { id: order.listingServiceId },
+        select: { revisionRounds: true },
+      })
+      if (ls?.revisionRounds != null) maxRevisions = ls.revisionRounds
+    }
     if (order.revisionCount >= maxRevisions) {
       throw new BadRequestException(`Maximum revisions (${maxRevisions}) reached. Open a dispute if unsatisfied.`)
     }
@@ -249,8 +255,28 @@ export class OrderReviewService {
     })
     if (!order || !order.amount) return
 
-    // Platform-owned websites: record platform revenue, skip settlement
-    if (order.website?.ownershipType === "PLATFORM") {
+    // Phase 6 snapshot resolver. Reads the order's per-service price from
+    // the snapshotted ListingService (or NULL for legacy orders) so both
+    // PlatformRevenue and Settlement freeze the same five fields.
+    let snapshotLsId: string | null = order.listingServiceId ?? null
+    let snapshotServiceType: any   = order.type ?? null
+    let snapshotUnitPrice: any     = null
+    if (order.listingServiceId) {
+      const ls = await tx.listingService.findUnique({
+        where: { id: order.listingServiceId },
+        select: { price: true, serviceType: true },
+      })
+      if (ls) {
+        snapshotUnitPrice = ls.price
+        snapshotServiceType = ls.serviceType
+      }
+    }
+    const snapshotOwnerType = order.website?.ownershipType ?? null
+
+    // Platform channel orders: record platform revenue, skip settlement.
+    // Channel snapshot wins; ownership fallback for legacy orders only.
+    const channel = order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    if (channel === "PLATFORM") {
       const existingRevenue = await tx.platformRevenue.findUnique({ where: { orderId } })
       if (existingRevenue) return
 
@@ -264,6 +290,12 @@ export class OrderReviewService {
           platformFee,
           netRevenue,
           recordedAt: new Date(),
+          // Phase 6 snapshots — frozen at recognition time.
+          listingServiceId:   snapshotLsId,
+          serviceType:        snapshotServiceType,
+          ownerType:          snapshotOwnerType,
+          fulfillmentChannel: "PLATFORM",
+          unitPrice:          snapshotUnitPrice,
         },
       })
       return
@@ -302,6 +334,13 @@ export class OrderReviewService {
         publisherAmount,
         status: "PENDING",
         reviewEndsAt,
+        // Phase 6 snapshots — same shape as createSettlement() in
+        // SettlementsService for parity.
+        listingServiceId:   snapshotLsId,
+        serviceType:        snapshotServiceType,
+        ownerType:          snapshotOwnerType,
+        fulfillmentChannel: "PUBLISHER",
+        unitPrice:          snapshotUnitPrice,
       },
     })
   }

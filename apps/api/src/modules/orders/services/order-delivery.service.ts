@@ -167,7 +167,7 @@ export class OrderDeliveryService {
       verificationStatus: version.verificationStatus,
       interventionStatus: version.interventionStatus,
       submittedAt: version.submittedAt,
-      deliveredBy: order.website?.ownershipType === "PLATFORM" ? "Platform" : "Publisher",
+      deliveredBy: (order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")) === "PLATFORM" ? "Platform" : "Publisher",
       verifiedAt: order.verifiedAt,
       pageTitle: ev?.pageTitle ?? null,
       results: ev

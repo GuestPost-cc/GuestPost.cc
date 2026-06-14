@@ -221,9 +221,19 @@ export class AdminService {
     }>("/admin/marketplace/listings", { params: params as Record<string, string | number | undefined> })
   }
 
-  // Platform-owned websites (for attaching platform listings)
+  // Platform-owned websites (for attaching platform listings + ownership
+  // management). Phase 6.5: response carries managedByUserId + managedBy
+  // for the ownership picker.
   async listPlatformWebsites() {
-    const res = await this.client.get<{ websites: Array<{ id: string; url: string; name: string | null }> }>(
+    const res = await this.client.get<{ websites: Array<{
+      id: string
+      url: string
+      name: string | null
+      domain?: string | null
+      ownershipType: "PLATFORM" | "PUBLISHER"
+      managedByUserId?: string | null
+      managedBy?: { id: string; name: string | null } | null
+    }> }>(
       "/admin/websites",
       { params: { ownershipType: "PLATFORM" } as Record<string, string> },
     )
@@ -232,13 +242,33 @@ export class AdminService {
 
   // Create a PLATFORM-owned marketplace listing (no publisher, INTERNAL
   // fulfillment). websiteId must be a platform-owned website or omitted.
+  // Phase 2: accepts an optional services[] for the multi-service shape;
+  // legacy clients pass type+price and the API shims a single service row.
+  // Phase 6.5: site-ownership reassignment + OPS staff picker.
+  assignWebsite(websiteId: string, data: { managedByUserId: string | null; reason?: string }) {
+    return this.client.patch(`/admin/websites/${websiteId}/assign`, { json: data })
+  }
+  listOpsStaff() {
+    return this.client.get<Array<{ id: string; name: string | null; email: string }>>("/admin/users/ops")
+  }
+
   createPlatformListing(data: {
     title: string
     description: string
     type: string
     price: number
+    turnaroundDays?: number
     websiteId?: string
     status?: string
+    services?: Array<{
+      serviceType: string
+      price: number
+      turnaroundDays: number
+      currency?: string
+      revisionRounds?: number
+      warrantyDays?: number
+      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
+    }>
   }) {
     return this.client.post<{ id: string; slug: string; status: string }>("/admin/marketplace/listings", { json: data })
   }

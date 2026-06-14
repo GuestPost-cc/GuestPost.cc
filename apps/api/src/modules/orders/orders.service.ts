@@ -3,7 +3,9 @@ import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { RefundService } from "./services/refund.service"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, validateBrief, UnknownServiceTypeError } from "@guestpost/shared"
+import { ZodError } from "zod"
+import { Prisma } from "@guestpost/database"
 
 @Injectable()
 export class OrdersService {
@@ -24,6 +26,14 @@ export class OrdersService {
     idempotencyKey?: string
     targetUrl?: string
     anchorText?: string
+    // Phase 2 preferred: the customer's locked pick from the listing detail
+    // page. When set, the server snapshots its serviceType / price /
+    // turnaroundDays / fulfillmentChannel onto the order; downstream code
+    // never re-reads the listing for pricing or routing.
+    listingServiceId?: string
+    // Phase 6: structured per-service brief. Server validates against the
+    // shared Zod registry keyed on the resolved serviceType (snapshot).
+    briefData?: Record<string, unknown>
     items?: Array<{ websiteId?: string; targetUrl?: string; anchorText?: string }>
   }, userId: string) {
     // INVARIANT: one website per order. Settlement, refund clawback, and
@@ -53,24 +63,170 @@ export class OrdersService {
         if (existing) return existing
       }
 
+      // ── Phase 2 snapshot: resolve listingService → listing → website ────
+      //
+      // Preferred path: the client passed listingServiceId from the
+      // listing-detail picker. We validate AVAILABLE inside the txn — a
+      // publisher pausing the service in the same instant loses the race and
+      // the order fails fast rather than silently selling a paused row.
+      //
+      // Legacy fallback: items[0].websiteId + data.type. We look up the
+      // matching (listingId, serviceType) and snapshot if found, otherwise
+      // leave the snapshot columns NULL (Phase 4 will require them).
+      const firstItem = data.items?.find((i) => i.websiteId)
+      let snapshot: {
+        listingId: string | null
+        listingServiceId: string | null
+        fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
+        turnaroundDays: number | null
+        snapshotPrice: number | null
+        snapshotServiceType: string | null
+        websiteId: string | null
+        // Phase 6.5: carry the site's default Ops owner through so we can
+        // auto-create a FulfillmentAssignment after the order lands.
+        managedByUserId: string | null
+      } = {
+        listingId: null,
+        listingServiceId: null,
+        fulfillmentChannel: null,
+        turnaroundDays: null,
+        snapshotPrice: null,
+        snapshotServiceType: null,
+        websiteId: firstItem?.websiteId ?? null,
+        managedByUserId: null,
+      }
+
+      if (data.listingServiceId) {
+        const ls = await tx.listingService.findUnique({
+          where: { id: data.listingServiceId },
+          include: { listing: { include: { website: { select: { id: true, ownershipType: true, verificationStatus: true, managedByUserId: true } } } } },
+        })
+        if (!ls) throw new BadRequestException(`Listing service ${data.listingServiceId} not found`)
+        if (ls.availability !== "AVAILABLE") {
+          throw new ConflictException({
+            code: "SERVICE_UNAVAILABLE",
+            message: `Service ${ls.serviceType} is ${ls.availability} on this listing`,
+          })
+        }
+        if (ls.listing.status !== "APPROVED") {
+          throw new BadRequestException("Listing is not approved")
+        }
+        const site = ls.listing.website
+        if (site?.ownershipType === "PUBLISHER" && site.verificationStatus === "REVOKED") {
+          throw new BadRequestException({ code: "WEBSITE_REVOKED", message: "Website ownership is revoked and cannot take new orders" })
+        }
+        // The item's websiteId (if present) must agree with the listing's.
+        // Mismatches indicate a tampered client payload — reject outright.
+        if (firstItem?.websiteId && site?.id && firstItem.websiteId !== site.id) {
+          throw new BadRequestException("Item websiteId does not match the listing's website")
+        }
+        snapshot = {
+          listingId: ls.listingId,
+          listingServiceId: ls.id,
+          fulfillmentChannel: ls.listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
+          turnaroundDays: ls.turnaroundDays,
+          snapshotPrice: Number(ls.price),
+          snapshotServiceType: ls.serviceType,
+          websiteId: site?.id ?? firstItem?.websiteId ?? null,
+          managedByUserId: site?.managedByUserId ?? null,
+        }
+      } else if (firstItem?.websiteId) {
+        // Legacy fallback — try to find a ListingService row matching
+        // (websiteId, type) so historical clients still get snapshot columns.
+        const listing = await tx.marketplaceListing.findFirst({
+          where: { websiteId: firstItem.websiteId, status: "APPROVED" },
+          select: { id: true, ownerType: true, website: { select: { managedByUserId: true } } },
+        })
+        if (listing) {
+          const ls = await tx.listingService.findUnique({
+            where: { listingId_serviceType: { listingId: listing.id, serviceType: data.type as any } },
+          })
+          if (ls && ls.availability === "AVAILABLE") {
+            snapshot = {
+              listingId: listing.id,
+              listingServiceId: ls.id,
+              fulfillmentChannel: listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
+              turnaroundDays: ls.turnaroundDays,
+              snapshotPrice: Number(ls.price),
+              snapshotServiceType: ls.serviceType,
+              websiteId: firstItem.websiteId,
+              managedByUserId: listing.website?.managedByUserId ?? null,
+            }
+          }
+        }
+      }
+
+      // Phase 4 hard-switch: every new order must resolve to a ListingService
+      // snapshot. The customer's locked pick is the source of truth for
+      // serviceType, price, TAT, and fulfillmentChannel — no order can sneak
+      // through without one now that the historical backfill is complete.
+      //
+      // Backwards-compat fallback above STILL resolves the snapshot from
+      // (websiteId, type) when the client passes only those — so old clients
+      // keep working as long as their (websiteId, type) maps to an
+      // AVAILABLE ListingService row. If it doesn't, fail fast here rather
+      // than silently writing an unsnapshotted order.
+      if (!snapshot.listingServiceId) {
+        throw new BadRequestException({
+          code: "LISTING_SERVICE_REQUIRED",
+          message: "Order requires a listingServiceId (or a websiteId+type that maps to an AVAILABLE ListingService).",
+        })
+      }
+
+      // ── Phase 6: validate the per-service brief ────────────────────────
+      // The snapshot serviceType is the authoritative discriminator — we
+      // refuse to validate against a different serviceType than the one
+      // the customer's listing pick locked in. If the client omitted
+      // briefData entirely we accept that (Phase 6 keeps it optional);
+      // shape/typing validation happens via Zod and any ZodError surfaces
+      // as a 400 with the field path.
+      let validatedBrief: Prisma.InputJsonValue | null = null
+      if (data.briefData !== undefined && data.briefData !== null) {
+        const serviceTypeForBrief = snapshot.snapshotServiceType ?? data.type
+        try {
+          validatedBrief = validateBrief(serviceTypeForBrief, data.briefData) as Prisma.InputJsonValue
+        } catch (err) {
+          if (err instanceof ZodError) {
+            throw new BadRequestException({
+              code: "BRIEF_INVALID",
+              message: "Brief failed validation",
+              issues: err.issues.map(i => ({ path: i.path.join("."), message: i.message })),
+            })
+          }
+          if (err instanceof UnknownServiceTypeError) {
+            throw new BadRequestException({
+              code: "BRIEF_SERVICE_UNKNOWN",
+              message: err.message,
+            })
+          }
+          throw err
+        }
+      }
+
       // Order-level website link is required for publisher fulfillment
       // (acceptOrder matches on order.website.publisherId)
-      const firstItem = data.items?.find((i) => i.websiteId)
       const order = await tx.order.create({
         data: {
-          type: data.type,
+          type: snapshot.snapshotServiceType ?? data.type,
           title: data.title,
           instructions: data.instructions,
           customerId: data.customerId,
           organizationId: data.organizationId,
           campaignId: data.campaignId,
           idempotencyKey: data.idempotencyKey ?? null,
-          websiteId: firstItem?.websiteId ?? null,
+          websiteId: snapshot.websiteId,
           targetUrl: data.targetUrl ?? firstItem?.targetUrl ?? null,
           anchorText: data.anchorText ?? firstItem?.anchorText ?? null,
           status: "DRAFT",
           paymentStatus: "PENDING",
           amount: 0,
+          // Phase 2 snapshot columns — see the resolveSnapshot block above.
+          listingId: snapshot.listingId,
+          listingServiceId: snapshot.listingServiceId,
+          fulfillmentChannel: snapshot.fulfillmentChannel,
+          turnaroundDays: snapshot.turnaroundDays,
+          // Phase 6: structured brief, validated above against the registry.
+          briefData: validatedBrief ?? Prisma.JsonNull,
         },
       })
 
@@ -87,19 +243,17 @@ export class OrdersService {
             if (site?.ownershipType === "PUBLISHER" && site.verificationStatus === "REVOKED") {
               throw new BadRequestException({ code: "WEBSITE_REVOKED", message: `Website ${item.websiteId} ownership is revoked and cannot take new orders` })
             }
-            const listing = await tx.marketplaceListing.findFirst({
-              where: { websiteId: item.websiteId, status: "APPROVED" },
-              select: { price: true },
-            })
-            if (!listing) throw new BadRequestException(`No approved marketplace listing found for website ${item.websiteId}`)
-            price = Number(listing.price)
+            // Post-Phase-4: snapshot.snapshotPrice is always set (the order
+            // already failed if listingServiceId was unresolvable above), so
+            // the listing-level fallback is gone.
+            if (snapshot.snapshotPrice == null) {
+              throw new BadRequestException("Internal: order snapshot missing price")
+            }
+            price = snapshot.snapshotPrice
           } else {
-            const service = await tx.service.findFirst({
-              where: { type: data.type as any, isActive: true },
-              select: { price: true },
-            })
-            if (!service) throw new BadRequestException(`No active service found for type ${data.type}`)
-            price = Number(service.price)
+            // Orders without a website are no longer accepted — the
+            // listingServiceId snapshot always implies a website.
+            throw new BadRequestException("Order items must reference a website")
           }
 
           await tx.orderItem.create({
@@ -117,13 +271,44 @@ export class OrdersService {
         await tx.order.update({ where: { id: order.id }, data: { amount: total } })
       }
 
+      // ── Phase 6.5: auto-assign PLATFORM orders to the site's Ops owner ──
+      //
+      // When fulfillmentChannel resolves to PLATFORM and the site has a
+      // managedByUserId, create exactly one ASSIGNED FulfillmentAssignment
+      // inside the same txn — the Ops owner sees the order in their "Mine"
+      // inbox immediately, no manual claim required. Sites without an owner
+      // fall back to the shared unassigned-Ops queue (no row written).
+      let autoAssignedToUserId: string | null = null
+      if (snapshot.fulfillmentChannel === "PLATFORM" && snapshot.managedByUserId) {
+        await tx.fulfillmentAssignment.create({
+          data: {
+            orderId: order.id,
+            assignedToUserId: snapshot.managedByUserId,
+            // assignedByUserId is the order's customer — same row currently
+            // used by manual claims tracks who initiated the assignment. The
+            // metadata flag `auto: true` (on the OrderEvent below) signals
+            // "system-driven, not a human claim" for audit reads.
+            assignedByUserId: userId,
+            status: "ASSIGNED",
+          },
+        })
+        autoAssignedToUserId = snapshot.managedByUserId
+      }
+
       await tx.orderEvent.create({
         data: {
           orderId: order.id,
           eventType: "ORDER_CREATED",
           actorId: userId,
           message: `Order created as DRAFT`,
-          metadata: { type: data.type },
+          metadata: {
+            type: data.type,
+            listingId: snapshot.listingId,
+            listingServiceId: snapshot.listingServiceId,
+            fulfillmentChannel: snapshot.fulfillmentChannel,
+            autoAssignedToUserId,
+            auto: autoAssignedToUserId !== null,
+          },
         },
       })
 
@@ -154,22 +339,20 @@ export class OrdersService {
       )
     }
 
-    let price: number
-    if (data.websiteId) {
-      const listing = await this.prisma.marketplaceListing.findFirst({
-        where: { websiteId: data.websiteId, status: "APPROVED" },
-        select: { price: true },
-      })
-      if (!listing) throw new BadRequestException(`No approved marketplace listing found for website ${data.websiteId}`)
-      price = Number(listing.price)
-    } else {
-      const service = await this.prisma.service.findFirst({
-        where: { type: order.type as any, isActive: true },
-        select: { price: true },
-      })
-      if (!service) throw new BadRequestException(`No active service found for type ${order.type}`)
-      price = Number(service.price)
+    // addOrderItem is a back-end-only helper used to bolt items onto a DRAFT
+    // order. Post-Phase-4 it reads the order's snapshotted listingServiceId
+    // for pricing — the legacy listing-level / Service-table fallbacks are
+    // removed.
+    if (!order.listingServiceId) {
+      throw new BadRequestException("Order has no listingServiceId — recreate with the new flow")
     }
+    const ls = await this.prisma.listingService.findUnique({
+      where: { id: order.listingServiceId },
+      select: { price: true, availability: true },
+    })
+    if (!ls) throw new BadRequestException("Order's listing service no longer exists")
+    if (ls.availability !== "AVAILABLE") throw new BadRequestException("Order's service is not available")
+    const price: number = Number(ls.price)
 
     const item = await this.prisma.orderItem.create({
       data: {

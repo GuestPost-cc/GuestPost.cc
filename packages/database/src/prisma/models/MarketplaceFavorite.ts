@@ -28,6 +28,7 @@ export type MarketplaceFavoriteMinAggregateOutputType = {
   id: string | null
   userId: string | null
   listingId: string | null
+  serviceType: $Enums.ServiceType | null
   createdAt: Date | null
 }
 
@@ -35,6 +36,7 @@ export type MarketplaceFavoriteMaxAggregateOutputType = {
   id: string | null
   userId: string | null
   listingId: string | null
+  serviceType: $Enums.ServiceType | null
   createdAt: Date | null
 }
 
@@ -42,6 +44,7 @@ export type MarketplaceFavoriteCountAggregateOutputType = {
   id: number
   userId: number
   listingId: number
+  serviceType: number
   createdAt: number
   _all: number
 }
@@ -51,6 +54,7 @@ export type MarketplaceFavoriteMinAggregateInputType = {
   id?: true
   userId?: true
   listingId?: true
+  serviceType?: true
   createdAt?: true
 }
 
@@ -58,6 +62,7 @@ export type MarketplaceFavoriteMaxAggregateInputType = {
   id?: true
   userId?: true
   listingId?: true
+  serviceType?: true
   createdAt?: true
 }
 
@@ -65,6 +70,7 @@ export type MarketplaceFavoriteCountAggregateInputType = {
   id?: true
   userId?: true
   listingId?: true
+  serviceType?: true
   createdAt?: true
   _all?: true
 }
@@ -145,6 +151,7 @@ export type MarketplaceFavoriteGroupByOutputType = {
   id: string
   userId: string
   listingId: string
+  serviceType: $Enums.ServiceType | null
   createdAt: Date
   _count: MarketplaceFavoriteCountAggregateOutputType | null
   _min: MarketplaceFavoriteMinAggregateOutputType | null
@@ -173,6 +180,7 @@ export type MarketplaceFavoriteWhereInput = {
   id?: Prisma.StringFilter<"MarketplaceFavorite"> | string
   userId?: Prisma.StringFilter<"MarketplaceFavorite"> | string
   listingId?: Prisma.StringFilter<"MarketplaceFavorite"> | string
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"MarketplaceFavorite"> | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceFavorite"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   listing?: Prisma.XOR<Prisma.MarketplaceListingScalarRelationFilter, Prisma.MarketplaceListingWhereInput>
@@ -182,6 +190,7 @@ export type MarketplaceFavoriteOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
   listing?: Prisma.MarketplaceListingOrderByWithRelationInput
@@ -189,21 +198,23 @@ export type MarketplaceFavoriteOrderByWithRelationInput = {
 
 export type MarketplaceFavoriteWhereUniqueInput = Prisma.AtLeast<{
   id?: string
-  userId_listingId?: Prisma.MarketplaceFavoriteUserIdListingIdCompoundUniqueInput
+  userId_listingId_serviceType?: Prisma.MarketplaceFavoriteUserIdListingIdServiceTypeCompoundUniqueInput
   AND?: Prisma.MarketplaceFavoriteWhereInput | Prisma.MarketplaceFavoriteWhereInput[]
   OR?: Prisma.MarketplaceFavoriteWhereInput[]
   NOT?: Prisma.MarketplaceFavoriteWhereInput | Prisma.MarketplaceFavoriteWhereInput[]
   userId?: Prisma.StringFilter<"MarketplaceFavorite"> | string
   listingId?: Prisma.StringFilter<"MarketplaceFavorite"> | string
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"MarketplaceFavorite"> | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceFavorite"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   listing?: Prisma.XOR<Prisma.MarketplaceListingScalarRelationFilter, Prisma.MarketplaceListingWhereInput>
-}, "id" | "userId_listingId">
+}, "id" | "userId_listingId_serviceType">
 
 export type MarketplaceFavoriteOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.MarketplaceFavoriteCountOrderByAggregateInput
   _max?: Prisma.MarketplaceFavoriteMaxOrderByAggregateInput
@@ -217,11 +228,13 @@ export type MarketplaceFavoriteScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"MarketplaceFavorite"> | string
   userId?: Prisma.StringWithAggregatesFilter<"MarketplaceFavorite"> | string
   listingId?: Prisma.StringWithAggregatesFilter<"MarketplaceFavorite"> | string
+  serviceType?: Prisma.EnumServiceTypeNullableWithAggregatesFilter<"MarketplaceFavorite"> | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MarketplaceFavorite"> | Date | string
 }
 
 export type MarketplaceFavoriteCreateInput = {
   id?: string
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutMarketplaceFavoritesInput
   listing: Prisma.MarketplaceListingCreateNestedOneWithoutFavoritesInput
@@ -231,11 +244,13 @@ export type MarketplaceFavoriteUncheckedCreateInput = {
   id?: string
   userId: string
   listingId: string
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
 }
 
 export type MarketplaceFavoriteUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutMarketplaceFavoritesNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneRequiredWithoutFavoritesNestedInput
@@ -245,6 +260,7 @@ export type MarketplaceFavoriteUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   listingId?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -252,11 +268,13 @@ export type MarketplaceFavoriteCreateManyInput = {
   id?: string
   userId: string
   listingId: string
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
 }
 
 export type MarketplaceFavoriteUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -264,6 +282,7 @@ export type MarketplaceFavoriteUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   listingId?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -277,15 +296,17 @@ export type MarketplaceFavoriteOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
-export type MarketplaceFavoriteUserIdListingIdCompoundUniqueInput = {
+export type MarketplaceFavoriteUserIdListingIdServiceTypeCompoundUniqueInput = {
   userId: string
   listingId: string
+  serviceType: $Enums.ServiceType
 }
 
 export type MarketplaceFavoriteCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -293,6 +314,7 @@ export type MarketplaceFavoriteMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -300,6 +322,7 @@ export type MarketplaceFavoriteMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
   listingId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -389,6 +412,7 @@ export type MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput = {
 
 export type MarketplaceFavoriteCreateWithoutUserInput = {
   id?: string
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
   listing: Prisma.MarketplaceListingCreateNestedOneWithoutFavoritesInput
 }
@@ -396,6 +420,7 @@ export type MarketplaceFavoriteCreateWithoutUserInput = {
 export type MarketplaceFavoriteUncheckedCreateWithoutUserInput = {
   id?: string
   listingId: string
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
 }
 
@@ -432,11 +457,13 @@ export type MarketplaceFavoriteScalarWhereInput = {
   id?: Prisma.StringFilter<"MarketplaceFavorite"> | string
   userId?: Prisma.StringFilter<"MarketplaceFavorite"> | string
   listingId?: Prisma.StringFilter<"MarketplaceFavorite"> | string
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"MarketplaceFavorite"> | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceFavorite"> | Date | string
 }
 
 export type MarketplaceFavoriteCreateWithoutListingInput = {
   id?: string
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutMarketplaceFavoritesInput
 }
@@ -444,6 +471,7 @@ export type MarketplaceFavoriteCreateWithoutListingInput = {
 export type MarketplaceFavoriteUncheckedCreateWithoutListingInput = {
   id?: string
   userId: string
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
 }
 
@@ -476,11 +504,13 @@ export type MarketplaceFavoriteUpdateManyWithWhereWithoutListingInput = {
 export type MarketplaceFavoriteCreateManyUserInput = {
   id?: string
   listingId: string
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
 }
 
 export type MarketplaceFavoriteUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   listing?: Prisma.MarketplaceListingUpdateOneRequiredWithoutFavoritesNestedInput
 }
@@ -488,23 +518,27 @@ export type MarketplaceFavoriteUpdateWithoutUserInput = {
 export type MarketplaceFavoriteUncheckedUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   listingId?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type MarketplaceFavoriteUncheckedUpdateManyWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   listingId?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type MarketplaceFavoriteCreateManyListingInput = {
   id?: string
   userId: string
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
 }
 
 export type MarketplaceFavoriteUpdateWithoutListingInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutMarketplaceFavoritesNestedInput
 }
@@ -512,12 +546,14 @@ export type MarketplaceFavoriteUpdateWithoutListingInput = {
 export type MarketplaceFavoriteUncheckedUpdateWithoutListingInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
 export type MarketplaceFavoriteUncheckedUpdateManyWithoutListingInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -527,6 +563,7 @@ export type MarketplaceFavoriteSelect<ExtArgs extends runtime.Types.Extensions.I
   id?: boolean
   userId?: boolean
   listingId?: boolean
+  serviceType?: boolean
   createdAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   listing?: boolean | Prisma.MarketplaceListingDefaultArgs<ExtArgs>
@@ -536,6 +573,7 @@ export type MarketplaceFavoriteSelectCreateManyAndReturn<ExtArgs extends runtime
   id?: boolean
   userId?: boolean
   listingId?: boolean
+  serviceType?: boolean
   createdAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   listing?: boolean | Prisma.MarketplaceListingDefaultArgs<ExtArgs>
@@ -545,6 +583,7 @@ export type MarketplaceFavoriteSelectUpdateManyAndReturn<ExtArgs extends runtime
   id?: boolean
   userId?: boolean
   listingId?: boolean
+  serviceType?: boolean
   createdAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   listing?: boolean | Prisma.MarketplaceListingDefaultArgs<ExtArgs>
@@ -554,10 +593,11 @@ export type MarketplaceFavoriteSelectScalar = {
   id?: boolean
   userId?: boolean
   listingId?: boolean
+  serviceType?: boolean
   createdAt?: boolean
 }
 
-export type MarketplaceFavoriteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "listingId" | "createdAt", ExtArgs["result"]["marketplaceFavorite"]>
+export type MarketplaceFavoriteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "listingId" | "serviceType" | "createdAt", ExtArgs["result"]["marketplaceFavorite"]>
 export type MarketplaceFavoriteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   listing?: boolean | Prisma.MarketplaceListingDefaultArgs<ExtArgs>
@@ -581,6 +621,7 @@ export type $MarketplaceFavoritePayload<ExtArgs extends runtime.Types.Extensions
     id: string
     userId: string
     listingId: string
+    serviceType: $Enums.ServiceType | null
     createdAt: Date
   }, ExtArgs["result"]["marketplaceFavorite"]>
   composites: {}
@@ -1010,6 +1051,7 @@ export interface MarketplaceFavoriteFieldRefs {
   readonly id: Prisma.FieldRef<"MarketplaceFavorite", 'String'>
   readonly userId: Prisma.FieldRef<"MarketplaceFavorite", 'String'>
   readonly listingId: Prisma.FieldRef<"MarketplaceFavorite", 'String'>
+  readonly serviceType: Prisma.FieldRef<"MarketplaceFavorite", 'ServiceType'>
   readonly createdAt: Prisma.FieldRef<"MarketplaceFavorite", 'DateTime'>
 }
     

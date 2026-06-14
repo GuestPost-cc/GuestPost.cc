@@ -22,6 +22,7 @@ const navItems: Array<{ href: string; label: string; icon: any; roles?: StaffRol
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
   { href: "/dashboard/disputes", label: "Disputes", icon: AlertTriangle, roles: ["SUPER_ADMIN", "OPERATIONS", "FINANCE"] },
   { href: "/dashboard/marketplace", label: "Marketplace", icon: Store, roles: ["SUPER_ADMIN", "OPERATIONS"] },
+  { href: "/dashboard/websites", label: "Platform Websites", icon: Store, roles: ["SUPER_ADMIN", "OPERATIONS"] },
   { href: "/dashboard/fulfillment", label: "Fulfillment", icon: ClipboardList, roles: ["SUPER_ADMIN", "OPERATIONS"] },
   { href: "/dashboard/verification", label: "Verification", icon: ShieldCheck, roles: ["SUPER_ADMIN", "OPERATIONS"] },
   { href: "/dashboard/finance", label: "Finance", icon: Landmark, roles: ["SUPER_ADMIN", "FINANCE"] },

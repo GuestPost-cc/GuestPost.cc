@@ -30,12 +30,14 @@ export type PlatformRevenueAvgAggregateOutputType = {
   amount: runtime.Decimal | null
   platformFee: runtime.Decimal | null
   netRevenue: runtime.Decimal | null
+  unitPrice: runtime.Decimal | null
 }
 
 export type PlatformRevenueSumAggregateOutputType = {
   amount: runtime.Decimal | null
   platformFee: runtime.Decimal | null
   netRevenue: runtime.Decimal | null
+  unitPrice: runtime.Decimal | null
 }
 
 export type PlatformRevenueMinAggregateOutputType = {
@@ -46,6 +48,11 @@ export type PlatformRevenueMinAggregateOutputType = {
   netRevenue: runtime.Decimal | null
   recordedAt: Date | null
   reversedAt: Date | null
+  listingServiceId: string | null
+  serviceType: $Enums.ServiceType | null
+  ownerType: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel: $Enums.FulfillmentChannel | null
+  unitPrice: runtime.Decimal | null
   createdAt: Date | null
 }
 
@@ -57,6 +64,11 @@ export type PlatformRevenueMaxAggregateOutputType = {
   netRevenue: runtime.Decimal | null
   recordedAt: Date | null
   reversedAt: Date | null
+  listingServiceId: string | null
+  serviceType: $Enums.ServiceType | null
+  ownerType: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel: $Enums.FulfillmentChannel | null
+  unitPrice: runtime.Decimal | null
   createdAt: Date | null
 }
 
@@ -68,6 +80,11 @@ export type PlatformRevenueCountAggregateOutputType = {
   netRevenue: number
   recordedAt: number
   reversedAt: number
+  listingServiceId: number
+  serviceType: number
+  ownerType: number
+  fulfillmentChannel: number
+  unitPrice: number
   createdAt: number
   _all: number
 }
@@ -77,12 +94,14 @@ export type PlatformRevenueAvgAggregateInputType = {
   amount?: true
   platformFee?: true
   netRevenue?: true
+  unitPrice?: true
 }
 
 export type PlatformRevenueSumAggregateInputType = {
   amount?: true
   platformFee?: true
   netRevenue?: true
+  unitPrice?: true
 }
 
 export type PlatformRevenueMinAggregateInputType = {
@@ -93,6 +112,11 @@ export type PlatformRevenueMinAggregateInputType = {
   netRevenue?: true
   recordedAt?: true
   reversedAt?: true
+  listingServiceId?: true
+  serviceType?: true
+  ownerType?: true
+  fulfillmentChannel?: true
+  unitPrice?: true
   createdAt?: true
 }
 
@@ -104,6 +128,11 @@ export type PlatformRevenueMaxAggregateInputType = {
   netRevenue?: true
   recordedAt?: true
   reversedAt?: true
+  listingServiceId?: true
+  serviceType?: true
+  ownerType?: true
+  fulfillmentChannel?: true
+  unitPrice?: true
   createdAt?: true
 }
 
@@ -115,6 +144,11 @@ export type PlatformRevenueCountAggregateInputType = {
   netRevenue?: true
   recordedAt?: true
   reversedAt?: true
+  listingServiceId?: true
+  serviceType?: true
+  ownerType?: true
+  fulfillmentChannel?: true
+  unitPrice?: true
   createdAt?: true
   _all?: true
 }
@@ -213,6 +247,11 @@ export type PlatformRevenueGroupByOutputType = {
   netRevenue: runtime.Decimal
   recordedAt: Date
   reversedAt: Date | null
+  listingServiceId: string | null
+  serviceType: $Enums.ServiceType | null
+  ownerType: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel: $Enums.FulfillmentChannel | null
+  unitPrice: runtime.Decimal | null
   createdAt: Date
   _count: PlatformRevenueCountAggregateOutputType | null
   _avg: PlatformRevenueAvgAggregateOutputType | null
@@ -247,8 +286,14 @@ export type PlatformRevenueWhereInput = {
   netRevenue?: Prisma.DecimalFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Prisma.DateTimeFilter<"PlatformRevenue"> | Date | string
   reversedAt?: Prisma.DateTimeNullableFilter<"PlatformRevenue"> | Date | string | null
+  listingServiceId?: Prisma.StringNullableFilter<"PlatformRevenue"> | string | null
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"PlatformRevenue"> | $Enums.ServiceType | null
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeNullableFilter<"PlatformRevenue"> | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.EnumFulfillmentChannelNullableFilter<"PlatformRevenue"> | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.DecimalNullableFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFilter<"PlatformRevenue"> | Date | string
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
+  listingService?: Prisma.XOR<Prisma.ListingServiceNullableScalarRelationFilter, Prisma.ListingServiceWhereInput> | null
 }
 
 export type PlatformRevenueOrderByWithRelationInput = {
@@ -259,8 +304,14 @@ export type PlatformRevenueOrderByWithRelationInput = {
   netRevenue?: Prisma.SortOrder
   recordedAt?: Prisma.SortOrder
   reversedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  listingServiceId?: Prisma.SortOrderInput | Prisma.SortOrder
+  serviceType?: Prisma.SortOrderInput | Prisma.SortOrder
+  ownerType?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentChannel?: Prisma.SortOrderInput | Prisma.SortOrder
+  unitPrice?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   order?: Prisma.OrderOrderByWithRelationInput
+  listingService?: Prisma.ListingServiceOrderByWithRelationInput
 }
 
 export type PlatformRevenueWhereUniqueInput = Prisma.AtLeast<{
@@ -274,8 +325,14 @@ export type PlatformRevenueWhereUniqueInput = Prisma.AtLeast<{
   netRevenue?: Prisma.DecimalFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Prisma.DateTimeFilter<"PlatformRevenue"> | Date | string
   reversedAt?: Prisma.DateTimeNullableFilter<"PlatformRevenue"> | Date | string | null
+  listingServiceId?: Prisma.StringNullableFilter<"PlatformRevenue"> | string | null
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"PlatformRevenue"> | $Enums.ServiceType | null
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeNullableFilter<"PlatformRevenue"> | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.EnumFulfillmentChannelNullableFilter<"PlatformRevenue"> | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.DecimalNullableFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFilter<"PlatformRevenue"> | Date | string
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
+  listingService?: Prisma.XOR<Prisma.ListingServiceNullableScalarRelationFilter, Prisma.ListingServiceWhereInput> | null
 }, "id" | "orderId">
 
 export type PlatformRevenueOrderByWithAggregationInput = {
@@ -286,6 +343,11 @@ export type PlatformRevenueOrderByWithAggregationInput = {
   netRevenue?: Prisma.SortOrder
   recordedAt?: Prisma.SortOrder
   reversedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  listingServiceId?: Prisma.SortOrderInput | Prisma.SortOrder
+  serviceType?: Prisma.SortOrderInput | Prisma.SortOrder
+  ownerType?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentChannel?: Prisma.SortOrderInput | Prisma.SortOrder
+  unitPrice?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.PlatformRevenueCountOrderByAggregateInput
   _avg?: Prisma.PlatformRevenueAvgOrderByAggregateInput
@@ -305,6 +367,11 @@ export type PlatformRevenueScalarWhereWithAggregatesInput = {
   netRevenue?: Prisma.DecimalWithAggregatesFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Prisma.DateTimeWithAggregatesFilter<"PlatformRevenue"> | Date | string
   reversedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"PlatformRevenue"> | Date | string | null
+  listingServiceId?: Prisma.StringNullableWithAggregatesFilter<"PlatformRevenue"> | string | null
+  serviceType?: Prisma.EnumServiceTypeNullableWithAggregatesFilter<"PlatformRevenue"> | $Enums.ServiceType | null
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeNullableWithAggregatesFilter<"PlatformRevenue"> | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.EnumFulfillmentChannelNullableWithAggregatesFilter<"PlatformRevenue"> | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.DecimalNullableWithAggregatesFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"PlatformRevenue"> | Date | string
 }
 
@@ -315,8 +382,13 @@ export type PlatformRevenueCreateInput = {
   netRevenue: runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Date | string
   reversedAt?: Date | string | null
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutPlatformRevenueInput
+  listingService?: Prisma.ListingServiceCreateNestedOneWithoutPlatformRevenuesInput
 }
 
 export type PlatformRevenueUncheckedCreateInput = {
@@ -327,6 +399,11 @@ export type PlatformRevenueUncheckedCreateInput = {
   netRevenue: runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Date | string
   reversedAt?: Date | string | null
+  listingServiceId?: string | null
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
 }
 
@@ -337,8 +414,13 @@ export type PlatformRevenueUpdateInput = {
   netRevenue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reversedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutPlatformRevenueNestedInput
+  listingService?: Prisma.ListingServiceUpdateOneWithoutPlatformRevenuesNestedInput
 }
 
 export type PlatformRevenueUncheckedUpdateInput = {
@@ -349,6 +431,11 @@ export type PlatformRevenueUncheckedUpdateInput = {
   netRevenue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reversedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -360,6 +447,11 @@ export type PlatformRevenueCreateManyInput = {
   netRevenue: runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Date | string
   reversedAt?: Date | string | null
+  listingServiceId?: string | null
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
 }
 
@@ -370,6 +462,10 @@ export type PlatformRevenueUpdateManyMutationInput = {
   netRevenue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reversedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -381,6 +477,11 @@ export type PlatformRevenueUncheckedUpdateManyInput = {
   netRevenue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reversedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -397,6 +498,11 @@ export type PlatformRevenueCountOrderByAggregateInput = {
   netRevenue?: Prisma.SortOrder
   recordedAt?: Prisma.SortOrder
   reversedAt?: Prisma.SortOrder
+  listingServiceId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
+  ownerType?: Prisma.SortOrder
+  fulfillmentChannel?: Prisma.SortOrder
+  unitPrice?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -404,6 +510,7 @@ export type PlatformRevenueAvgOrderByAggregateInput = {
   amount?: Prisma.SortOrder
   platformFee?: Prisma.SortOrder
   netRevenue?: Prisma.SortOrder
+  unitPrice?: Prisma.SortOrder
 }
 
 export type PlatformRevenueMaxOrderByAggregateInput = {
@@ -414,6 +521,11 @@ export type PlatformRevenueMaxOrderByAggregateInput = {
   netRevenue?: Prisma.SortOrder
   recordedAt?: Prisma.SortOrder
   reversedAt?: Prisma.SortOrder
+  listingServiceId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
+  ownerType?: Prisma.SortOrder
+  fulfillmentChannel?: Prisma.SortOrder
+  unitPrice?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -425,6 +537,11 @@ export type PlatformRevenueMinOrderByAggregateInput = {
   netRevenue?: Prisma.SortOrder
   recordedAt?: Prisma.SortOrder
   reversedAt?: Prisma.SortOrder
+  listingServiceId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
+  ownerType?: Prisma.SortOrder
+  fulfillmentChannel?: Prisma.SortOrder
+  unitPrice?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -432,6 +549,17 @@ export type PlatformRevenueSumOrderByAggregateInput = {
   amount?: Prisma.SortOrder
   platformFee?: Prisma.SortOrder
   netRevenue?: Prisma.SortOrder
+  unitPrice?: Prisma.SortOrder
+}
+
+export type PlatformRevenueListRelationFilter = {
+  every?: Prisma.PlatformRevenueWhereInput
+  some?: Prisma.PlatformRevenueWhereInput
+  none?: Prisma.PlatformRevenueWhereInput
+}
+
+export type PlatformRevenueOrderByRelationAggregateInput = {
+  _count?: Prisma.SortOrder
 }
 
 export type PlatformRevenueCreateNestedOneWithoutOrderInput = {
@@ -466,6 +594,48 @@ export type PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.PlatformRevenueUpdateToOneWithWhereWithoutOrderInput, Prisma.PlatformRevenueUpdateWithoutOrderInput>, Prisma.PlatformRevenueUncheckedUpdateWithoutOrderInput>
 }
 
+export type PlatformRevenueCreateNestedManyWithoutListingServiceInput = {
+  create?: Prisma.XOR<Prisma.PlatformRevenueCreateWithoutListingServiceInput, Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput> | Prisma.PlatformRevenueCreateWithoutListingServiceInput[] | Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput[]
+  connectOrCreate?: Prisma.PlatformRevenueCreateOrConnectWithoutListingServiceInput | Prisma.PlatformRevenueCreateOrConnectWithoutListingServiceInput[]
+  createMany?: Prisma.PlatformRevenueCreateManyListingServiceInputEnvelope
+  connect?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+}
+
+export type PlatformRevenueUncheckedCreateNestedManyWithoutListingServiceInput = {
+  create?: Prisma.XOR<Prisma.PlatformRevenueCreateWithoutListingServiceInput, Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput> | Prisma.PlatformRevenueCreateWithoutListingServiceInput[] | Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput[]
+  connectOrCreate?: Prisma.PlatformRevenueCreateOrConnectWithoutListingServiceInput | Prisma.PlatformRevenueCreateOrConnectWithoutListingServiceInput[]
+  createMany?: Prisma.PlatformRevenueCreateManyListingServiceInputEnvelope
+  connect?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+}
+
+export type PlatformRevenueUpdateManyWithoutListingServiceNestedInput = {
+  create?: Prisma.XOR<Prisma.PlatformRevenueCreateWithoutListingServiceInput, Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput> | Prisma.PlatformRevenueCreateWithoutListingServiceInput[] | Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput[]
+  connectOrCreate?: Prisma.PlatformRevenueCreateOrConnectWithoutListingServiceInput | Prisma.PlatformRevenueCreateOrConnectWithoutListingServiceInput[]
+  upsert?: Prisma.PlatformRevenueUpsertWithWhereUniqueWithoutListingServiceInput | Prisma.PlatformRevenueUpsertWithWhereUniqueWithoutListingServiceInput[]
+  createMany?: Prisma.PlatformRevenueCreateManyListingServiceInputEnvelope
+  set?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+  disconnect?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+  delete?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+  connect?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+  update?: Prisma.PlatformRevenueUpdateWithWhereUniqueWithoutListingServiceInput | Prisma.PlatformRevenueUpdateWithWhereUniqueWithoutListingServiceInput[]
+  updateMany?: Prisma.PlatformRevenueUpdateManyWithWhereWithoutListingServiceInput | Prisma.PlatformRevenueUpdateManyWithWhereWithoutListingServiceInput[]
+  deleteMany?: Prisma.PlatformRevenueScalarWhereInput | Prisma.PlatformRevenueScalarWhereInput[]
+}
+
+export type PlatformRevenueUncheckedUpdateManyWithoutListingServiceNestedInput = {
+  create?: Prisma.XOR<Prisma.PlatformRevenueCreateWithoutListingServiceInput, Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput> | Prisma.PlatformRevenueCreateWithoutListingServiceInput[] | Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput[]
+  connectOrCreate?: Prisma.PlatformRevenueCreateOrConnectWithoutListingServiceInput | Prisma.PlatformRevenueCreateOrConnectWithoutListingServiceInput[]
+  upsert?: Prisma.PlatformRevenueUpsertWithWhereUniqueWithoutListingServiceInput | Prisma.PlatformRevenueUpsertWithWhereUniqueWithoutListingServiceInput[]
+  createMany?: Prisma.PlatformRevenueCreateManyListingServiceInputEnvelope
+  set?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+  disconnect?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+  delete?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+  connect?: Prisma.PlatformRevenueWhereUniqueInput | Prisma.PlatformRevenueWhereUniqueInput[]
+  update?: Prisma.PlatformRevenueUpdateWithWhereUniqueWithoutListingServiceInput | Prisma.PlatformRevenueUpdateWithWhereUniqueWithoutListingServiceInput[]
+  updateMany?: Prisma.PlatformRevenueUpdateManyWithWhereWithoutListingServiceInput | Prisma.PlatformRevenueUpdateManyWithWhereWithoutListingServiceInput[]
+  deleteMany?: Prisma.PlatformRevenueScalarWhereInput | Prisma.PlatformRevenueScalarWhereInput[]
+}
+
 export type PlatformRevenueCreateWithoutOrderInput = {
   id?: string
   amount: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -473,7 +643,12 @@ export type PlatformRevenueCreateWithoutOrderInput = {
   netRevenue: runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Date | string
   reversedAt?: Date | string | null
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
+  listingService?: Prisma.ListingServiceCreateNestedOneWithoutPlatformRevenuesInput
 }
 
 export type PlatformRevenueUncheckedCreateWithoutOrderInput = {
@@ -483,6 +658,11 @@ export type PlatformRevenueUncheckedCreateWithoutOrderInput = {
   netRevenue: runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Date | string
   reversedAt?: Date | string | null
+  listingServiceId?: string | null
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
 }
 
@@ -509,7 +689,12 @@ export type PlatformRevenueUpdateWithoutOrderInput = {
   netRevenue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reversedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  listingService?: Prisma.ListingServiceUpdateOneWithoutPlatformRevenuesNestedInput
 }
 
 export type PlatformRevenueUncheckedUpdateWithoutOrderInput = {
@@ -519,6 +704,146 @@ export type PlatformRevenueUncheckedUpdateWithoutOrderInput = {
   netRevenue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   recordedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   reversedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type PlatformRevenueCreateWithoutListingServiceInput = {
+  id?: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFee?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  netRevenue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  recordedAt?: Date | string
+  reversedAt?: Date | string | null
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Date | string
+  order: Prisma.OrderCreateNestedOneWithoutPlatformRevenueInput
+}
+
+export type PlatformRevenueUncheckedCreateWithoutListingServiceInput = {
+  id?: string
+  orderId: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFee?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  netRevenue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  recordedAt?: Date | string
+  reversedAt?: Date | string | null
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Date | string
+}
+
+export type PlatformRevenueCreateOrConnectWithoutListingServiceInput = {
+  where: Prisma.PlatformRevenueWhereUniqueInput
+  create: Prisma.XOR<Prisma.PlatformRevenueCreateWithoutListingServiceInput, Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput>
+}
+
+export type PlatformRevenueCreateManyListingServiceInputEnvelope = {
+  data: Prisma.PlatformRevenueCreateManyListingServiceInput | Prisma.PlatformRevenueCreateManyListingServiceInput[]
+  skipDuplicates?: boolean
+}
+
+export type PlatformRevenueUpsertWithWhereUniqueWithoutListingServiceInput = {
+  where: Prisma.PlatformRevenueWhereUniqueInput
+  update: Prisma.XOR<Prisma.PlatformRevenueUpdateWithoutListingServiceInput, Prisma.PlatformRevenueUncheckedUpdateWithoutListingServiceInput>
+  create: Prisma.XOR<Prisma.PlatformRevenueCreateWithoutListingServiceInput, Prisma.PlatformRevenueUncheckedCreateWithoutListingServiceInput>
+}
+
+export type PlatformRevenueUpdateWithWhereUniqueWithoutListingServiceInput = {
+  where: Prisma.PlatformRevenueWhereUniqueInput
+  data: Prisma.XOR<Prisma.PlatformRevenueUpdateWithoutListingServiceInput, Prisma.PlatformRevenueUncheckedUpdateWithoutListingServiceInput>
+}
+
+export type PlatformRevenueUpdateManyWithWhereWithoutListingServiceInput = {
+  where: Prisma.PlatformRevenueScalarWhereInput
+  data: Prisma.XOR<Prisma.PlatformRevenueUpdateManyMutationInput, Prisma.PlatformRevenueUncheckedUpdateManyWithoutListingServiceInput>
+}
+
+export type PlatformRevenueScalarWhereInput = {
+  AND?: Prisma.PlatformRevenueScalarWhereInput | Prisma.PlatformRevenueScalarWhereInput[]
+  OR?: Prisma.PlatformRevenueScalarWhereInput[]
+  NOT?: Prisma.PlatformRevenueScalarWhereInput | Prisma.PlatformRevenueScalarWhereInput[]
+  id?: Prisma.StringFilter<"PlatformRevenue"> | string
+  orderId?: Prisma.StringFilter<"PlatformRevenue"> | string
+  amount?: Prisma.DecimalFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFee?: Prisma.DecimalFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  netRevenue?: Prisma.DecimalFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  recordedAt?: Prisma.DateTimeFilter<"PlatformRevenue"> | Date | string
+  reversedAt?: Prisma.DateTimeNullableFilter<"PlatformRevenue"> | Date | string | null
+  listingServiceId?: Prisma.StringNullableFilter<"PlatformRevenue"> | string | null
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"PlatformRevenue"> | $Enums.ServiceType | null
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeNullableFilter<"PlatformRevenue"> | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.EnumFulfillmentChannelNullableFilter<"PlatformRevenue"> | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.DecimalNullableFilter<"PlatformRevenue"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Prisma.DateTimeFilter<"PlatformRevenue"> | Date | string
+}
+
+export type PlatformRevenueCreateManyListingServiceInput = {
+  id?: string
+  orderId: string
+  amount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFee?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  netRevenue: runtime.Decimal | runtime.DecimalJsLike | number | string
+  recordedAt?: Date | string
+  reversedAt?: Date | string | null
+  serviceType?: $Enums.ServiceType | null
+  ownerType?: $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  unitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Date | string
+}
+
+export type PlatformRevenueUpdateWithoutListingServiceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFee?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  netRevenue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  recordedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reversedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  order?: Prisma.OrderUpdateOneRequiredWithoutPlatformRevenueNestedInput
+}
+
+export type PlatformRevenueUncheckedUpdateWithoutListingServiceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFee?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  netRevenue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  recordedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reversedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type PlatformRevenueUncheckedUpdateManyWithoutListingServiceInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  amount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  platformFee?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  netRevenue?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  recordedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  reversedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
+  ownerType?: Prisma.NullableEnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  unitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -532,8 +857,14 @@ export type PlatformRevenueSelect<ExtArgs extends runtime.Types.Extensions.Inter
   netRevenue?: boolean
   recordedAt?: boolean
   reversedAt?: boolean
+  listingServiceId?: boolean
+  serviceType?: boolean
+  ownerType?: boolean
+  fulfillmentChannel?: boolean
+  unitPrice?: boolean
   createdAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  listingService?: boolean | Prisma.PlatformRevenue$listingServiceArgs<ExtArgs>
 }, ExtArgs["result"]["platformRevenue"]>
 
 export type PlatformRevenueSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -544,8 +875,14 @@ export type PlatformRevenueSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   netRevenue?: boolean
   recordedAt?: boolean
   reversedAt?: boolean
+  listingServiceId?: boolean
+  serviceType?: boolean
+  ownerType?: boolean
+  fulfillmentChannel?: boolean
+  unitPrice?: boolean
   createdAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  listingService?: boolean | Prisma.PlatformRevenue$listingServiceArgs<ExtArgs>
 }, ExtArgs["result"]["platformRevenue"]>
 
 export type PlatformRevenueSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -556,8 +893,14 @@ export type PlatformRevenueSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   netRevenue?: boolean
   recordedAt?: boolean
   reversedAt?: boolean
+  listingServiceId?: boolean
+  serviceType?: boolean
+  ownerType?: boolean
+  fulfillmentChannel?: boolean
+  unitPrice?: boolean
   createdAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  listingService?: boolean | Prisma.PlatformRevenue$listingServiceArgs<ExtArgs>
 }, ExtArgs["result"]["platformRevenue"]>
 
 export type PlatformRevenueSelectScalar = {
@@ -568,24 +911,33 @@ export type PlatformRevenueSelectScalar = {
   netRevenue?: boolean
   recordedAt?: boolean
   reversedAt?: boolean
+  listingServiceId?: boolean
+  serviceType?: boolean
+  ownerType?: boolean
+  fulfillmentChannel?: boolean
+  unitPrice?: boolean
   createdAt?: boolean
 }
 
-export type PlatformRevenueOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "amount" | "platformFee" | "netRevenue" | "recordedAt" | "reversedAt" | "createdAt", ExtArgs["result"]["platformRevenue"]>
+export type PlatformRevenueOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "amount" | "platformFee" | "netRevenue" | "recordedAt" | "reversedAt" | "listingServiceId" | "serviceType" | "ownerType" | "fulfillmentChannel" | "unitPrice" | "createdAt", ExtArgs["result"]["platformRevenue"]>
 export type PlatformRevenueInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  listingService?: boolean | Prisma.PlatformRevenue$listingServiceArgs<ExtArgs>
 }
 export type PlatformRevenueIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  listingService?: boolean | Prisma.PlatformRevenue$listingServiceArgs<ExtArgs>
 }
 export type PlatformRevenueIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  listingService?: boolean | Prisma.PlatformRevenue$listingServiceArgs<ExtArgs>
 }
 
 export type $PlatformRevenuePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "PlatformRevenue"
   objects: {
     order: Prisma.$OrderPayload<ExtArgs>
+    listingService: Prisma.$ListingServicePayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -595,6 +947,11 @@ export type $PlatformRevenuePayload<ExtArgs extends runtime.Types.Extensions.Int
     netRevenue: runtime.Decimal
     recordedAt: Date
     reversedAt: Date | null
+    listingServiceId: string | null
+    serviceType: $Enums.ServiceType | null
+    ownerType: $Enums.WebsiteOwnershipType | null
+    fulfillmentChannel: $Enums.FulfillmentChannel | null
+    unitPrice: runtime.Decimal | null
     createdAt: Date
   }, ExtArgs["result"]["platformRevenue"]>
   composites: {}
@@ -991,6 +1348,7 @@ readonly fields: PlatformRevenueFieldRefs;
 export interface Prisma__PlatformRevenueClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   order<T extends Prisma.OrderDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDefaultArgs<ExtArgs>>): Prisma.Prisma__OrderClient<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  listingService<T extends Prisma.PlatformRevenue$listingServiceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.PlatformRevenue$listingServiceArgs<ExtArgs>>): Prisma.Prisma__ListingServiceClient<runtime.Types.Result.GetResult<Prisma.$ListingServicePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1027,6 +1385,11 @@ export interface PlatformRevenueFieldRefs {
   readonly netRevenue: Prisma.FieldRef<"PlatformRevenue", 'Decimal'>
   readonly recordedAt: Prisma.FieldRef<"PlatformRevenue", 'DateTime'>
   readonly reversedAt: Prisma.FieldRef<"PlatformRevenue", 'DateTime'>
+  readonly listingServiceId: Prisma.FieldRef<"PlatformRevenue", 'String'>
+  readonly serviceType: Prisma.FieldRef<"PlatformRevenue", 'ServiceType'>
+  readonly ownerType: Prisma.FieldRef<"PlatformRevenue", 'WebsiteOwnershipType'>
+  readonly fulfillmentChannel: Prisma.FieldRef<"PlatformRevenue", 'FulfillmentChannel'>
+  readonly unitPrice: Prisma.FieldRef<"PlatformRevenue", 'Decimal'>
   readonly createdAt: Prisma.FieldRef<"PlatformRevenue", 'DateTime'>
 }
     
@@ -1421,6 +1784,25 @@ export type PlatformRevenueDeleteManyArgs<ExtArgs extends runtime.Types.Extensio
    * Limit how many PlatformRevenues to delete.
    */
   limit?: number
+}
+
+/**
+ * PlatformRevenue.listingService
+ */
+export type PlatformRevenue$listingServiceArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ListingService
+   */
+  select?: Prisma.ListingServiceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ListingService
+   */
+  omit?: Prisma.ListingServiceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ListingServiceInclude<ExtArgs> | null
+  where?: Prisma.ListingServiceWhereInput
 }
 
 /**

@@ -31,6 +31,7 @@ export type MarketplaceListingClickMinAggregateOutputType = {
   sessionId: string | null
   ipAddress: string | null
   action: string | null
+  serviceType: $Enums.ServiceType | null
   createdAt: Date | null
 }
 
@@ -41,6 +42,7 @@ export type MarketplaceListingClickMaxAggregateOutputType = {
   sessionId: string | null
   ipAddress: string | null
   action: string | null
+  serviceType: $Enums.ServiceType | null
   createdAt: Date | null
 }
 
@@ -51,6 +53,7 @@ export type MarketplaceListingClickCountAggregateOutputType = {
   sessionId: number
   ipAddress: number
   action: number
+  serviceType: number
   metadata: number
   createdAt: number
   _all: number
@@ -64,6 +67,7 @@ export type MarketplaceListingClickMinAggregateInputType = {
   sessionId?: true
   ipAddress?: true
   action?: true
+  serviceType?: true
   createdAt?: true
 }
 
@@ -74,6 +78,7 @@ export type MarketplaceListingClickMaxAggregateInputType = {
   sessionId?: true
   ipAddress?: true
   action?: true
+  serviceType?: true
   createdAt?: true
 }
 
@@ -84,6 +89,7 @@ export type MarketplaceListingClickCountAggregateInputType = {
   sessionId?: true
   ipAddress?: true
   action?: true
+  serviceType?: true
   metadata?: true
   createdAt?: true
   _all?: true
@@ -168,6 +174,7 @@ export type MarketplaceListingClickGroupByOutputType = {
   sessionId: string | null
   ipAddress: string | null
   action: string
+  serviceType: $Enums.ServiceType | null
   metadata: runtime.JsonValue | null
   createdAt: Date
   _count: MarketplaceListingClickCountAggregateOutputType | null
@@ -200,6 +207,7 @@ export type MarketplaceListingClickWhereInput = {
   sessionId?: Prisma.StringNullableFilter<"MarketplaceListingClick"> | string | null
   ipAddress?: Prisma.StringNullableFilter<"MarketplaceListingClick"> | string | null
   action?: Prisma.StringFilter<"MarketplaceListingClick"> | string
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"MarketplaceListingClick"> | $Enums.ServiceType | null
   metadata?: Prisma.JsonNullableFilter<"MarketplaceListingClick">
   createdAt?: Prisma.DateTimeFilter<"MarketplaceListingClick"> | Date | string
   listing?: Prisma.XOR<Prisma.MarketplaceListingScalarRelationFilter, Prisma.MarketplaceListingWhereInput>
@@ -212,6 +220,7 @@ export type MarketplaceListingClickOrderByWithRelationInput = {
   sessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   ipAddress?: Prisma.SortOrderInput | Prisma.SortOrder
   action?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrderInput | Prisma.SortOrder
   metadata?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   listing?: Prisma.MarketplaceListingOrderByWithRelationInput
@@ -227,6 +236,7 @@ export type MarketplaceListingClickWhereUniqueInput = Prisma.AtLeast<{
   sessionId?: Prisma.StringNullableFilter<"MarketplaceListingClick"> | string | null
   ipAddress?: Prisma.StringNullableFilter<"MarketplaceListingClick"> | string | null
   action?: Prisma.StringFilter<"MarketplaceListingClick"> | string
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"MarketplaceListingClick"> | $Enums.ServiceType | null
   metadata?: Prisma.JsonNullableFilter<"MarketplaceListingClick">
   createdAt?: Prisma.DateTimeFilter<"MarketplaceListingClick"> | Date | string
   listing?: Prisma.XOR<Prisma.MarketplaceListingScalarRelationFilter, Prisma.MarketplaceListingWhereInput>
@@ -239,6 +249,7 @@ export type MarketplaceListingClickOrderByWithAggregationInput = {
   sessionId?: Prisma.SortOrderInput | Prisma.SortOrder
   ipAddress?: Prisma.SortOrderInput | Prisma.SortOrder
   action?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrderInput | Prisma.SortOrder
   metadata?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.MarketplaceListingClickCountOrderByAggregateInput
@@ -256,6 +267,7 @@ export type MarketplaceListingClickScalarWhereWithAggregatesInput = {
   sessionId?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListingClick"> | string | null
   ipAddress?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListingClick"> | string | null
   action?: Prisma.StringWithAggregatesFilter<"MarketplaceListingClick"> | string
+  serviceType?: Prisma.EnumServiceTypeNullableWithAggregatesFilter<"MarketplaceListingClick"> | $Enums.ServiceType | null
   metadata?: Prisma.JsonNullableWithAggregatesFilter<"MarketplaceListingClick">
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MarketplaceListingClick"> | Date | string
 }
@@ -266,6 +278,7 @@ export type MarketplaceListingClickCreateInput = {
   sessionId?: string | null
   ipAddress?: string | null
   action?: string
+  serviceType?: $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   listing: Prisma.MarketplaceListingCreateNestedOneWithoutClicksInput
@@ -278,6 +291,7 @@ export type MarketplaceListingClickUncheckedCreateInput = {
   sessionId?: string | null
   ipAddress?: string | null
   action?: string
+  serviceType?: $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
 }
@@ -288,6 +302,7 @@ export type MarketplaceListingClickUpdateInput = {
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   listing?: Prisma.MarketplaceListingUpdateOneRequiredWithoutClicksNestedInput
@@ -300,6 +315,7 @@ export type MarketplaceListingClickUncheckedUpdateInput = {
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -311,6 +327,7 @@ export type MarketplaceListingClickCreateManyInput = {
   sessionId?: string | null
   ipAddress?: string | null
   action?: string
+  serviceType?: $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
 }
@@ -321,6 +338,7 @@ export type MarketplaceListingClickUpdateManyMutationInput = {
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -332,6 +350,7 @@ export type MarketplaceListingClickUncheckedUpdateManyInput = {
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -353,6 +372,7 @@ export type MarketplaceListingClickCountOrderByAggregateInput = {
   sessionId?: Prisma.SortOrder
   ipAddress?: Prisma.SortOrder
   action?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
   metadata?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
@@ -364,6 +384,7 @@ export type MarketplaceListingClickMaxOrderByAggregateInput = {
   sessionId?: Prisma.SortOrder
   ipAddress?: Prisma.SortOrder
   action?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -374,6 +395,7 @@ export type MarketplaceListingClickMinOrderByAggregateInput = {
   sessionId?: Prisma.SortOrder
   ipAddress?: Prisma.SortOrder
   action?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -425,6 +447,7 @@ export type MarketplaceListingClickCreateWithoutListingInput = {
   sessionId?: string | null
   ipAddress?: string | null
   action?: string
+  serviceType?: $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
 }
@@ -435,6 +458,7 @@ export type MarketplaceListingClickUncheckedCreateWithoutListingInput = {
   sessionId?: string | null
   ipAddress?: string | null
   action?: string
+  serviceType?: $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
 }
@@ -475,6 +499,7 @@ export type MarketplaceListingClickScalarWhereInput = {
   sessionId?: Prisma.StringNullableFilter<"MarketplaceListingClick"> | string | null
   ipAddress?: Prisma.StringNullableFilter<"MarketplaceListingClick"> | string | null
   action?: Prisma.StringFilter<"MarketplaceListingClick"> | string
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"MarketplaceListingClick"> | $Enums.ServiceType | null
   metadata?: Prisma.JsonNullableFilter<"MarketplaceListingClick">
   createdAt?: Prisma.DateTimeFilter<"MarketplaceListingClick"> | Date | string
 }
@@ -485,6 +510,7 @@ export type MarketplaceListingClickCreateManyListingInput = {
   sessionId?: string | null
   ipAddress?: string | null
   action?: string
+  serviceType?: $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
 }
@@ -495,6 +521,7 @@ export type MarketplaceListingClickUpdateWithoutListingInput = {
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -505,6 +532,7 @@ export type MarketplaceListingClickUncheckedUpdateWithoutListingInput = {
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -515,6 +543,7 @@ export type MarketplaceListingClickUncheckedUpdateManyWithoutListingInput = {
   sessionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   ipAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   action?: Prisma.StringFieldUpdateOperationsInput | string
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   metadata?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -528,6 +557,7 @@ export type MarketplaceListingClickSelect<ExtArgs extends runtime.Types.Extensio
   sessionId?: boolean
   ipAddress?: boolean
   action?: boolean
+  serviceType?: boolean
   metadata?: boolean
   createdAt?: boolean
   listing?: boolean | Prisma.MarketplaceListingDefaultArgs<ExtArgs>
@@ -540,6 +570,7 @@ export type MarketplaceListingClickSelectCreateManyAndReturn<ExtArgs extends run
   sessionId?: boolean
   ipAddress?: boolean
   action?: boolean
+  serviceType?: boolean
   metadata?: boolean
   createdAt?: boolean
   listing?: boolean | Prisma.MarketplaceListingDefaultArgs<ExtArgs>
@@ -552,6 +583,7 @@ export type MarketplaceListingClickSelectUpdateManyAndReturn<ExtArgs extends run
   sessionId?: boolean
   ipAddress?: boolean
   action?: boolean
+  serviceType?: boolean
   metadata?: boolean
   createdAt?: boolean
   listing?: boolean | Prisma.MarketplaceListingDefaultArgs<ExtArgs>
@@ -564,11 +596,12 @@ export type MarketplaceListingClickSelectScalar = {
   sessionId?: boolean
   ipAddress?: boolean
   action?: boolean
+  serviceType?: boolean
   metadata?: boolean
   createdAt?: boolean
 }
 
-export type MarketplaceListingClickOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "listingId" | "userId" | "sessionId" | "ipAddress" | "action" | "metadata" | "createdAt", ExtArgs["result"]["marketplaceListingClick"]>
+export type MarketplaceListingClickOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "listingId" | "userId" | "sessionId" | "ipAddress" | "action" | "serviceType" | "metadata" | "createdAt", ExtArgs["result"]["marketplaceListingClick"]>
 export type MarketplaceListingClickInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   listing?: boolean | Prisma.MarketplaceListingDefaultArgs<ExtArgs>
 }
@@ -591,6 +624,7 @@ export type $MarketplaceListingClickPayload<ExtArgs extends runtime.Types.Extens
     sessionId: string | null
     ipAddress: string | null
     action: string
+    serviceType: $Enums.ServiceType | null
     metadata: runtime.JsonValue | null
     createdAt: Date
   }, ExtArgs["result"]["marketplaceListingClick"]>
@@ -1023,6 +1057,7 @@ export interface MarketplaceListingClickFieldRefs {
   readonly sessionId: Prisma.FieldRef<"MarketplaceListingClick", 'String'>
   readonly ipAddress: Prisma.FieldRef<"MarketplaceListingClick", 'String'>
   readonly action: Prisma.FieldRef<"MarketplaceListingClick", 'String'>
+  readonly serviceType: Prisma.FieldRef<"MarketplaceListingClick", 'ServiceType'>
   readonly metadata: Prisma.FieldRef<"MarketplaceListingClick", 'Json'>
   readonly createdAt: Prisma.FieldRef<"MarketplaceListingClick", 'DateTime'>
 }

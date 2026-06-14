@@ -129,7 +129,8 @@ export default function AdminListingPreviewPage({ params }: { params: Promise<{ 
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={STATUS_VARIANTS[listing.status] ?? "secondary"}>{listing.status.replace(/_/g, " ")}</Badge>
-            <Badge variant="outline">{listing.type.replace(/_/g, " ")}</Badge>
+            {/* Phase 7: prefer the first AVAILABLE service. */}
+            <Badge variant="outline">{(((listing as any).serviceTypes?.[0]) ?? listing.type ?? "").replace(/_/g, " ")}</Badge>
             {listing.fulfillmentType === "INTERNAL" ? (
               <Badge>Platform fulfilled</Badge>
             ) : listing.fulfillmentType === "HYBRID" ? (
@@ -150,7 +151,8 @@ export default function AdminListingPreviewPage({ params }: { params: Promise<{ 
         <CardContent className="space-y-4">
           <p className="whitespace-pre-wrap text-sm text-muted-foreground">{listing.description}</p>
           <div className="flex flex-wrap items-center gap-6 text-sm">
-            <span className="text-2xl font-bold">${Number(listing.price).toFixed(2)}</span>
+            {/* Phase 7: priceFrom + first AVAILABLE service price > legacy. */}
+            <span className="text-2xl font-bold">${Number((listing as any).priceFrom ?? listing.price ?? 0).toFixed(2)}</span>
             {typeof listing.domainRating === "number" && (
               <span className="inline-flex items-center gap-1 text-muted-foreground"><TrendingUp className="h-4 w-4" /> DR {listing.domainRating}</span>
             )}
@@ -160,7 +162,12 @@ export default function AdminListingPreviewPage({ params }: { params: Promise<{ 
             {listing.websiteUrl && (
               <span className="inline-flex items-center gap-1 text-muted-foreground"><Globe className="h-4 w-4" /> {listing.websiteUrl}</span>
             )}
-            {listing.turnaroundDays && <span className="text-muted-foreground">{listing.turnaroundDays}d turnaround</span>}
+            {(() => {
+              // Phase 7: surface the first AVAILABLE service's TAT in the
+              // header summary; fall back to the legacy listing column.
+              const td = (listing as any).services?.find((s: any) => s.availability === "AVAILABLE")?.turnaroundDays ?? listing.turnaroundDays
+              return td ? <span className="text-muted-foreground">{td}d turnaround</span> : null
+            })()}
           </div>
           {listing.tags?.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

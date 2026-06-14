@@ -371,6 +371,9 @@ importers:
       stripe:
         specifier: ^22.2.0
         version: 22.2.0(@types/node@22.19.19)
+      zod:
+        specifier: ^3.0.0
+        version: 3.25.76
     devDependencies:
       '@nestjs/cli':
         specifier: ^11.0.0
@@ -694,6 +697,9 @@ importers:
       cheerio:
         specifier: ^1.2.0
         version: 1.2.0
+      zod:
+        specifier: ^3.0.0
+        version: 3.25.76
     devDependencies:
       '@types/node':
         specifier: ^22.19.19
@@ -704,6 +710,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@guestpost/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@radix-ui/react-avatar':
         specifier: ^1.1.0
         version: 1.1.11(@types/react-dom@19.2.3(@types/react@19.2.16))(@types/react@19.2.16)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -791,7 +800,7 @@ importers:
         version: 5.9.3
       vitest:
         specifier: ^4.1.8
-        version: 4.1.8(@types/node@22.19.19)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@22.19.19)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4))
+        version: 4.1.8(@types/node@22.19.19)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@22.19.19)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.48.0)(tsx@4.22.4))
 
 packages:
 
@@ -8334,6 +8343,7 @@ snapshots:
       magic-string: 0.30.21
     optionalDependencies:
       vite: 8.0.16(@types/node@22.19.19)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4)
+    optional: true
 
   '@vitest/pretty-format@4.1.8':
     dependencies:
@@ -8648,7 +8658,7 @@ snapshots:
       prisma: 6.19.3(typescript@5.9.3)
       react: 19.2.7
       react-dom: 19.2.7(react@19.2.7)
-      vitest: 4.1.8(@types/node@22.19.19)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@22.19.19)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.48.0)(tsx@4.22.4))
+      vitest: 4.1.8(@types/node@22.19.19)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@22.19.19)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.48.0)(tsx@4.22.4))
     transitivePeerDependencies:
       - '@cloudflare/workers-types'
       - '@opentelemetry/api'
@@ -11496,6 +11506,7 @@ snapshots:
       jiti: 2.7.0
       terser: 5.48.0
       tsx: 4.22.4
+    optional: true
 
   vitest@4.1.8(@types/node@22.19.19)(@vitest/coverage-v8@4.1.8)(jsdom@29.1.1(@noble/hashes@2.2.0))(vite@8.0.16(@types/node@22.19.19)(esbuild@0.28.0)(jiti@1.21.7)(terser@5.48.0)(tsx@4.22.4)):
     dependencies:
@@ -11554,6 +11565,7 @@ snapshots:
       jsdom: 29.1.1(@noble/hashes@2.2.0)
     transitivePeerDependencies:
       - msw
+    optional: true
 
   w3c-xmlserializer@5.0.0:
     dependencies:

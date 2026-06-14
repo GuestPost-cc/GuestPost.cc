@@ -18,7 +18,7 @@ import { CreatePlatformWebsiteDto, UpdatePlatformWebsiteDto } from "./dto/create
 import { ReconciliationService } from "./reconciliation.service"
 import { WebsiteVerificationService } from "./website-verification.service"
 import { MarketplaceService } from "../marketplace/marketplace.service"
-import { CreateListingDto } from "../marketplace/dto/marketplace.dto"
+import { CreateListingDto, ListingServiceInput, UpdateListingServiceInput } from "../marketplace/dto/marketplace.dto"
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max)
 const parsePagination = (take?: string, skip?: string) => ({
@@ -464,6 +464,53 @@ export class AdminController {
     return this.marketplace.createPlatformListing(user.id, body)
   }
 
+  // Per-service endpoints for PLATFORM-owned listings. Mirror of the publisher
+  // endpoints (marketplace.controller.ts) but gated to staff. assertListingWriteAccess
+  // skips the publisher-membership check when isStaff=true.
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Post("marketplace/listings/:id/services")
+  addPlatformListingService(
+    @Param("id") listingId: string,
+    @Body() body: ListingServiceInput,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplace.addServiceToListing(
+      { userId: user.id, isStaff: true },
+      listingId,
+      body,
+    )
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Put("marketplace/listings/:id/services/:serviceId")
+  updatePlatformListingService(
+    @Param("id") listingId: string,
+    @Param("serviceId") serviceId: string,
+    @Body() body: UpdateListingServiceInput,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplace.updateServiceOnListing(
+      { userId: user.id, isStaff: true },
+      listingId,
+      serviceId,
+      body,
+    )
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Delete("marketplace/listings/:id/services/:serviceId")
+  pausePlatformListingService(
+    @Param("id") listingId: string,
+    @Param("serviceId") serviceId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplace.pauseServiceOnListing(
+      { userId: user.id, isStaff: true },
+      listingId,
+      serviceId,
+    )
+  }
+
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Patch("marketplace/listings/:id/status")
   updateListingStatus(
@@ -505,6 +552,24 @@ export class AdminController {
   @Put("websites/:id")
   updateWebsite(@Param("id") id: string, @Body() body: UpdatePlatformWebsiteDto, @CurrentUser() user: any) {
     return this.admin.updatePlatformWebsite(id, body, user)
+  }
+
+  // Phase 6.5: site-ownership reassignment + OPS staff picker for the admin
+  // UI. Both staff-gated; reassignment writes an audit row with from/to.
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Patch("websites/:id/assign")
+  assignWebsite(
+    @Param("id") id: string,
+    @Body() body: { managedByUserId: string | null; reason?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.admin.reassignPlatformWebsite(id, body, user)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Get("users/ops")
+  listOpsStaff() {
+    return this.admin.listOperationsStaff()
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")

@@ -940,6 +940,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </DialogContent>
       </Dialog>
 
+      <OrderSupportPanel orderId={order.id} onOpenNew={() => setShowSupportDialog(true)} />
+
       <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
         <DialogContent>
           <DialogHeader>
@@ -1014,5 +1016,62 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+// Phase 6.5: in-context support panel for an order. Lists any tickets the
+// customer has opened for THIS order, deep-links into them, and surfaces an
+// "Open ticket" CTA that pre-fills the orderId via the parent dialog. Falls
+// back to a tasteful empty state when there are no tickets yet.
+function OrderSupportPanel({ orderId, onOpenNew }: { orderId: string; onOpenNew(): void }) {
+  const { data: tickets, isLoading } = useQuery({
+    queryKey: ["order-tickets", orderId],
+    queryFn: async () => {
+      const all = await api.support.listTickets()
+      return ((all ?? []) as any[]).filter((t: any) => t.order?.id === orderId)
+    },
+  })
+
+  return (
+    <Card className="mt-6">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base">Support</CardTitle>
+            <CardDescription className="text-xs">Open or follow up on tickets for this order.</CardDescription>
+          </div>
+          <Button size="sm" variant="outline" onClick={onOpenNew}>Open ticket</Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-16 w-full" />
+        ) : (tickets ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">No tickets yet for this order.</p>
+        ) : (
+          <div className="space-y-2">
+            {((tickets ?? []) as any[]).map((t: any) => (
+              <Link
+                key={t.id}
+                href={`/dashboard/support/${t.id}`}
+                className="block p-3 border rounded-md hover:bg-muted/40"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="font-medium text-sm truncate">{t.subject}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {t.fulfillmentChannel === "PLATFORM" ? "Platform support" : t.fulfillmentChannel === "PUBLISHER" ? "Publisher support" : "Support"}
+                      {" · "}
+                      Updated {new Date(t.updatedAt ?? t.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="capitalize">{String(t.status).toLowerCase().replace(/_/g, " ")}</Badge>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

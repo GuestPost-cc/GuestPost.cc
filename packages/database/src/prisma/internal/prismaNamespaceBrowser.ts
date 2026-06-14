@@ -63,7 +63,6 @@ export const ModelName = {
   Website: 'Website',
   Order: 'Order',
   Campaign: 'Campaign',
-  Service: 'Service',
   OrderItem: 'OrderItem',
   OrderEvent: 'OrderEvent',
   Publication: 'Publication',
@@ -96,9 +95,9 @@ export const ModelName = {
   MarketplaceCategory: 'MarketplaceCategory',
   MarketplaceTag: 'MarketplaceTag',
   MarketplaceListing: 'MarketplaceListing',
+  ListingService: 'ListingService',
   MarketplaceListingTag: 'MarketplaceListingTag',
   MarketplaceListingImage: 'MarketplaceListingImage',
-  MarketplacePricingTier: 'MarketplacePricingTier',
   MarketplaceReview: 'MarketplaceReview',
   MarketplaceFavorite: 'MarketplaceFavorite',
   MarketplaceSavedList: 'MarketplaceSavedList',
@@ -288,6 +287,7 @@ export const WebsiteScalarFieldEnum = {
   isActive: 'isActive',
   publisherId: 'publisherId',
   ownershipType: 'ownershipType',
+  managedByUserId: 'managedByUserId',
   verificationStatus: 'verificationStatus',
   verificationMethod: 'verificationMethod',
   verificationToken: 'verificationToken',
@@ -335,6 +335,11 @@ export const OrderScalarFieldEnum = {
   idempotencyKey: 'idempotencyKey',
   version: 'version',
   activeDeliveryVersionId: 'activeDeliveryVersionId',
+  listingId: 'listingId',
+  listingServiceId: 'listingServiceId',
+  fulfillmentChannel: 'fulfillmentChannel',
+  turnaroundDays: 'turnaroundDays',
+  briefData: 'briefData',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -353,20 +358,6 @@ export const CampaignScalarFieldEnum = {
 } as const
 
 export type CampaignScalarFieldEnum = (typeof CampaignScalarFieldEnum)[keyof typeof CampaignScalarFieldEnum]
-
-
-export const ServiceScalarFieldEnum = {
-  id: 'id',
-  type: 'type',
-  name: 'name',
-  price: 'price',
-  currency: 'currency',
-  isActive: 'isActive',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type ServiceScalarFieldEnum = (typeof ServiceScalarFieldEnum)[keyof typeof ServiceScalarFieldEnum]
 
 
 export const OrderItemScalarFieldEnum = {
@@ -444,6 +435,11 @@ export const SettlementScalarFieldEnum = {
   reviewEndsAt: 'reviewEndsAt',
   settledAt: 'settledAt',
   version: 'version',
+  listingServiceId: 'listingServiceId',
+  serviceType: 'serviceType',
+  ownerType: 'ownerType',
+  fulfillmentChannel: 'fulfillmentChannel',
+  unitPrice: 'unitPrice',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -732,6 +728,11 @@ export const PlatformRevenueScalarFieldEnum = {
   netRevenue: 'netRevenue',
   recordedAt: 'recordedAt',
   reversedAt: 'reversedAt',
+  listingServiceId: 'listingServiceId',
+  serviceType: 'serviceType',
+  ownerType: 'ownerType',
+  fulfillmentChannel: 'fulfillmentChannel',
+  unitPrice: 'unitPrice',
   createdAt: 'createdAt'
 } as const
 
@@ -779,6 +780,9 @@ export const TicketScalarFieldEnum = {
   organizationId: 'organizationId',
   userId: 'userId',
   orderId: 'orderId',
+  fulfillmentChannel: 'fulfillmentChannel',
+  assignedToUserId: 'assignedToUserId',
+  assignedPublisherId: 'assignedPublisherId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -859,10 +863,9 @@ export const MarketplaceListingScalarFieldEnum = {
   slug: 'slug',
   description: 'description',
   shortDescription: 'shortDescription',
-  type: 'type',
   status: 'status',
   fulfillmentType: 'fulfillmentType',
-  price: 'price',
+  ownerType: 'ownerType',
   currency: 'currency',
   priceType: 'priceType',
   minPrice: 'minPrice',
@@ -876,13 +879,8 @@ export const MarketplaceListingScalarFieldEnum = {
   language: 'language',
   countries: 'countries',
   languages: 'languages',
-  turnaroundDays: 'turnaroundDays',
-  revisionRounds: 'revisionRounds',
-  warrantyDays: 'warrantyDays',
   featured: 'featured',
   verified: 'verified',
-  allowGuestPost: 'allowGuestPost',
-  allowNicheEdit: 'allowNicheEdit',
   doFollowOnly: 'doFollowOnly',
   websiteUrl: 'websiteUrl',
   sampleUrl: 'sampleUrl',
@@ -901,6 +899,26 @@ export const MarketplaceListingScalarFieldEnum = {
 } as const
 
 export type MarketplaceListingScalarFieldEnum = (typeof MarketplaceListingScalarFieldEnum)[keyof typeof MarketplaceListingScalarFieldEnum]
+
+
+export const ListingServiceScalarFieldEnum = {
+  id: 'id',
+  listingId: 'listingId',
+  serviceType: 'serviceType',
+  price: 'price',
+  currency: 'currency',
+  turnaroundDays: 'turnaroundDays',
+  revisionRounds: 'revisionRounds',
+  warrantyDays: 'warrantyDays',
+  requirements: 'requirements',
+  fulfillmentSettings: 'fulfillmentSettings',
+  availability: 'availability',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ListingServiceScalarFieldEnum = (typeof ListingServiceScalarFieldEnum)[keyof typeof ListingServiceScalarFieldEnum]
 
 
 export const MarketplaceListingTagScalarFieldEnum = {
@@ -924,20 +942,6 @@ export const MarketplaceListingImageScalarFieldEnum = {
 export type MarketplaceListingImageScalarFieldEnum = (typeof MarketplaceListingImageScalarFieldEnum)[keyof typeof MarketplaceListingImageScalarFieldEnum]
 
 
-export const MarketplacePricingTierScalarFieldEnum = {
-  id: 'id',
-  listingId: 'listingId',
-  name: 'name',
-  price: 'price',
-  description: 'description',
-  features: 'features',
-  sortOrder: 'sortOrder',
-  createdAt: 'createdAt'
-} as const
-
-export type MarketplacePricingTierScalarFieldEnum = (typeof MarketplacePricingTierScalarFieldEnum)[keyof typeof MarketplacePricingTierScalarFieldEnum]
-
-
 export const MarketplaceReviewScalarFieldEnum = {
   id: 'id',
   listingId: 'listingId',
@@ -959,6 +963,7 @@ export const MarketplaceFavoriteScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   listingId: 'listingId',
+  serviceType: 'serviceType',
   createdAt: 'createdAt'
 } as const
 
@@ -1010,6 +1015,7 @@ export const MarketplaceListingClickScalarFieldEnum = {
   sessionId: 'sessionId',
   ipAddress: 'ipAddress',
   action: 'action',
+  serviceType: 'serviceType',
   metadata: 'metadata',
   createdAt: 'createdAt'
 } as const
@@ -1024,6 +1030,7 @@ export const MarketplaceSearchHistoryScalarFieldEnum = {
   filters: 'filters',
   resultCount: 'resultCount',
   clickedId: 'clickedId',
+  serviceType: 'serviceType',
   createdAt: 'createdAt'
 } as const
 

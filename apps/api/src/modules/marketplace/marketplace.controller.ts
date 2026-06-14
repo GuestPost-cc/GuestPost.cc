@@ -6,16 +6,18 @@ import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import { 
-  SearchListingsDto, 
-  CreateListingDto, 
-  UpdateListingDto, 
+import {
+  SearchListingsDto,
+  CreateListingDto,
+  UpdateListingDto,
   CreateReviewDto,
   CreateFavoriteDto,
   CreateSavedListDto,
   AddToSavedListDto,
   GetListingFiltersDto,
-  GetRecommendationsDto
+  GetRecommendationsDto,
+  ListingServiceInput,
+  UpdateListingServiceInput,
 } from "./dto/marketplace.dto"
 
 @Controller("marketplace")
@@ -36,6 +38,16 @@ export class MarketplaceController {
   @Get("listings/:slug")
   async getListing(@Param("slug") slug: string, @CurrentUser() user?: any) {
     return this.marketplaceService.getListing(slug, user?.id)
+  }
+
+  // Lightweight service-menu endpoint for the order-creation flow's service
+  // picker — avoids re-fetching the full listing payload when the user has
+  // already opened the detail page and just wants the (id, type, price, TAT,
+  // availability) tuples to render the selector.
+  @Public()
+  @Get("listings/:slug/services")
+  async getListingServices(@Param("slug") slug: string) {
+    return this.marketplaceService.getListingServices(slug)
   }
 
   @Public()
@@ -66,6 +78,10 @@ export class MarketplaceController {
     @Query("limit") limit?: string,
     @Query("sortBy") sortBy?: string,
   ) {
+    // Phase 7: `type: "PUBLISHER_WEBSITE"` used to filter against the
+    // deprecated ListingType enum. The post-Phase-7 contract is that ANY
+    // APPROVED listing with ≥1 AVAILABLE service is a marketplace
+    // placement; the search default returns all such listings.
     return this.marketplaceService.searchListings({
       query,
       category,
@@ -73,7 +89,6 @@ export class MarketplaceController {
       page: page ? parseInt(page, 10) : 1,
       limit: limit ? parseInt(limit, 10) : 20,
       sortBy: sortBy as any,
-      type: "PUBLISHER_WEBSITE",
     })
   }
 
@@ -205,5 +220,100 @@ export class MarketplaceController {
   async deleteListing(@Param("id") id: string, @CurrentUser() user: any) {
     await this.marketplaceService.deleteListing(user.id, user.publisherId, id)
     return { success: true }
+  }
+
+  // ── Phase 6 lifecycle transitions (publisher-side) ────────────────────
+  // Each maps 1:1 to a service-method. Status edits are publisher-membership
+  // gated; admin uses /admin/marketplace/listings/:id/status for its own
+  // approve/reject path.
+
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("listings/:id/submit")
+  async submitListing(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.marketplaceService.submitListingForReview(user.id, user.publisherId, id)
+  }
+
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("listings/:id/pause")
+  async pauseListing(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.marketplaceService.pauseListing(user.id, user.publisherId, id)
+  }
+
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("listings/:id/unpause")
+  async unpauseListing(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.marketplaceService.unpauseListing(user.id, user.publisherId, id)
+  }
+
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("listings/:id/archive")
+  async archiveListing(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.marketplaceService.archiveListing(user.id, user.publisherId, id)
+  }
+
+  // ── Per-service endpoints (publisher path) ──────────────────────────────
+  // Listing's services are now first-class rows; these endpoints let the
+  // publisher dashboard add, edit, and pause individual services without
+  // touching the listing-level record. Platform listings use the admin
+  // mirrors of these endpoints (admin.controller.ts).
+
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("listings/:id/services")
+  async addService(
+    @Param("id") listingId: string,
+    @Body() body: ListingServiceInput,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplaceService.addServiceToListing(
+      { userId: user.id, activePublisherId: user.publisherId },
+      listingId,
+      body,
+    )
+  }
+
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
+  @Put("listings/:id/services/:serviceId")
+  async updateService(
+    @Param("id") listingId: string,
+    @Param("serviceId") serviceId: string,
+    @Body() body: UpdateListingServiceInput,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplaceService.updateServiceOnListing(
+      { userId: user.id, activePublisherId: user.publisherId },
+      listingId,
+      serviceId,
+      body,
+    )
+  }
+
+  // Soft-disable. Hard delete is never offered to publishers — historical
+  // orders' listingServiceId would orphan and break order detail rendering.
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("PUBLISHER")
+  @MemberRoles("PUBLISHER_OWNER")
+  @Delete("listings/:id/services/:serviceId")
+  async pauseService(
+    @Param("id") listingId: string,
+    @Param("serviceId") serviceId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplaceService.pauseServiceOnListing(
+      { userId: user.id, activePublisherId: user.publisherId },
+      listingId,
+      serviceId,
+    )
   }
 }

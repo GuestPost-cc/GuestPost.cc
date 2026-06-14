@@ -3,6 +3,7 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
 import { Decimal } from "@prisma/client/runtime/library"
+import { orderEventMetadata } from "@guestpost/shared"
 
 const REFUNDABLE_STATUSES = [
   "PAID", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED",
@@ -62,7 +63,10 @@ export class RefundService {
       })
       if (existingRefund) throw new BadRequestException("Order already refunded")
 
-      const isPlatformOrder = order.website?.ownershipType === "PLATFORM"
+      // Channel snapshot is authoritative — but legacy orders predate the
+      // snapshot, so fall back to website.ownershipType for them.
+      const channel = order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+      const isPlatformOrder = channel === "PLATFORM"
       let cancelledSettlementId: string | null = null
 
       if (isPlatformOrder) {
@@ -201,7 +205,14 @@ export class RefundService {
         action: "ORDER_REFUNDED",
         entityType: "Order",
         entityId: orderId,
-        metadata: { fromStatus: order.status, reason },
+        // Phase 6 standardized metadata — orderEventMetadata supplies the
+        // snapshot trio so historical refund replays don't have to chase
+        // a possibly-edited live listing.
+        metadata: {
+          fromStatus: order.status,
+          reason,
+          ...orderEventMetadata(order),
+        },
         userId,
         organizationId: order.organizationId,
       }, tx)

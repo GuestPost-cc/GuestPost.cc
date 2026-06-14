@@ -40,6 +40,7 @@ export type MarketplaceSearchHistoryMinAggregateOutputType = {
   query: string | null
   resultCount: number | null
   clickedId: string | null
+  serviceType: $Enums.ServiceType | null
   createdAt: Date | null
 }
 
@@ -49,6 +50,7 @@ export type MarketplaceSearchHistoryMaxAggregateOutputType = {
   query: string | null
   resultCount: number | null
   clickedId: string | null
+  serviceType: $Enums.ServiceType | null
   createdAt: Date | null
 }
 
@@ -59,6 +61,7 @@ export type MarketplaceSearchHistoryCountAggregateOutputType = {
   filters: number
   resultCount: number
   clickedId: number
+  serviceType: number
   createdAt: number
   _all: number
 }
@@ -78,6 +81,7 @@ export type MarketplaceSearchHistoryMinAggregateInputType = {
   query?: true
   resultCount?: true
   clickedId?: true
+  serviceType?: true
   createdAt?: true
 }
 
@@ -87,6 +91,7 @@ export type MarketplaceSearchHistoryMaxAggregateInputType = {
   query?: true
   resultCount?: true
   clickedId?: true
+  serviceType?: true
   createdAt?: true
 }
 
@@ -97,6 +102,7 @@ export type MarketplaceSearchHistoryCountAggregateInputType = {
   filters?: true
   resultCount?: true
   clickedId?: true
+  serviceType?: true
   createdAt?: true
   _all?: true
 }
@@ -194,6 +200,7 @@ export type MarketplaceSearchHistoryGroupByOutputType = {
   filters: runtime.JsonValue | null
   resultCount: number | null
   clickedId: string | null
+  serviceType: $Enums.ServiceType | null
   createdAt: Date
   _count: MarketplaceSearchHistoryCountAggregateOutputType | null
   _avg: MarketplaceSearchHistoryAvgAggregateOutputType | null
@@ -227,6 +234,7 @@ export type MarketplaceSearchHistoryWhereInput = {
   filters?: Prisma.JsonNullableFilter<"MarketplaceSearchHistory">
   resultCount?: Prisma.IntNullableFilter<"MarketplaceSearchHistory"> | number | null
   clickedId?: Prisma.StringNullableFilter<"MarketplaceSearchHistory"> | string | null
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"MarketplaceSearchHistory"> | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceSearchHistory"> | Date | string
 }
 
@@ -237,6 +245,7 @@ export type MarketplaceSearchHistoryOrderByWithRelationInput = {
   filters?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCount?: Prisma.SortOrderInput | Prisma.SortOrder
   clickedId?: Prisma.SortOrderInput | Prisma.SortOrder
+  serviceType?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -250,6 +259,7 @@ export type MarketplaceSearchHistoryWhereUniqueInput = Prisma.AtLeast<{
   filters?: Prisma.JsonNullableFilter<"MarketplaceSearchHistory">
   resultCount?: Prisma.IntNullableFilter<"MarketplaceSearchHistory"> | number | null
   clickedId?: Prisma.StringNullableFilter<"MarketplaceSearchHistory"> | string | null
+  serviceType?: Prisma.EnumServiceTypeNullableFilter<"MarketplaceSearchHistory"> | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceSearchHistory"> | Date | string
 }, "id">
 
@@ -260,6 +270,7 @@ export type MarketplaceSearchHistoryOrderByWithAggregationInput = {
   filters?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCount?: Prisma.SortOrderInput | Prisma.SortOrder
   clickedId?: Prisma.SortOrderInput | Prisma.SortOrder
+  serviceType?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   _count?: Prisma.MarketplaceSearchHistoryCountOrderByAggregateInput
   _avg?: Prisma.MarketplaceSearchHistoryAvgOrderByAggregateInput
@@ -278,6 +289,7 @@ export type MarketplaceSearchHistoryScalarWhereWithAggregatesInput = {
   filters?: Prisma.JsonNullableWithAggregatesFilter<"MarketplaceSearchHistory">
   resultCount?: Prisma.IntNullableWithAggregatesFilter<"MarketplaceSearchHistory"> | number | null
   clickedId?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceSearchHistory"> | string | null
+  serviceType?: Prisma.EnumServiceTypeNullableWithAggregatesFilter<"MarketplaceSearchHistory"> | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MarketplaceSearchHistory"> | Date | string
 }
 
@@ -288,6 +300,7 @@ export type MarketplaceSearchHistoryCreateInput = {
   filters?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   resultCount?: number | null
   clickedId?: string | null
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
 }
 
@@ -298,6 +311,7 @@ export type MarketplaceSearchHistoryUncheckedCreateInput = {
   filters?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   resultCount?: number | null
   clickedId?: string | null
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
 }
 
@@ -308,6 +322,7 @@ export type MarketplaceSearchHistoryUpdateInput = {
   filters?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   resultCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   clickedId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -318,6 +333,7 @@ export type MarketplaceSearchHistoryUncheckedUpdateInput = {
   filters?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   resultCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   clickedId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -328,6 +344,7 @@ export type MarketplaceSearchHistoryCreateManyInput = {
   filters?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   resultCount?: number | null
   clickedId?: string | null
+  serviceType?: $Enums.ServiceType | null
   createdAt?: Date | string
 }
 
@@ -338,6 +355,7 @@ export type MarketplaceSearchHistoryUpdateManyMutationInput = {
   filters?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   resultCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   clickedId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -348,6 +366,7 @@ export type MarketplaceSearchHistoryUncheckedUpdateManyInput = {
   filters?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   resultCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   clickedId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
@@ -358,6 +377,7 @@ export type MarketplaceSearchHistoryCountOrderByAggregateInput = {
   filters?: Prisma.SortOrder
   resultCount?: Prisma.SortOrder
   clickedId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -371,6 +391,7 @@ export type MarketplaceSearchHistoryMaxOrderByAggregateInput = {
   query?: Prisma.SortOrder
   resultCount?: Prisma.SortOrder
   clickedId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -380,6 +401,7 @@ export type MarketplaceSearchHistoryMinOrderByAggregateInput = {
   query?: Prisma.SortOrder
   resultCount?: Prisma.SortOrder
   clickedId?: Prisma.SortOrder
+  serviceType?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
 }
 
@@ -396,6 +418,7 @@ export type MarketplaceSearchHistorySelect<ExtArgs extends runtime.Types.Extensi
   filters?: boolean
   resultCount?: boolean
   clickedId?: boolean
+  serviceType?: boolean
   createdAt?: boolean
 }, ExtArgs["result"]["marketplaceSearchHistory"]>
 
@@ -406,6 +429,7 @@ export type MarketplaceSearchHistorySelectCreateManyAndReturn<ExtArgs extends ru
   filters?: boolean
   resultCount?: boolean
   clickedId?: boolean
+  serviceType?: boolean
   createdAt?: boolean
 }, ExtArgs["result"]["marketplaceSearchHistory"]>
 
@@ -416,6 +440,7 @@ export type MarketplaceSearchHistorySelectUpdateManyAndReturn<ExtArgs extends ru
   filters?: boolean
   resultCount?: boolean
   clickedId?: boolean
+  serviceType?: boolean
   createdAt?: boolean
 }, ExtArgs["result"]["marketplaceSearchHistory"]>
 
@@ -426,10 +451,11 @@ export type MarketplaceSearchHistorySelectScalar = {
   filters?: boolean
   resultCount?: boolean
   clickedId?: boolean
+  serviceType?: boolean
   createdAt?: boolean
 }
 
-export type MarketplaceSearchHistoryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "query" | "filters" | "resultCount" | "clickedId" | "createdAt", ExtArgs["result"]["marketplaceSearchHistory"]>
+export type MarketplaceSearchHistoryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "query" | "filters" | "resultCount" | "clickedId" | "serviceType" | "createdAt", ExtArgs["result"]["marketplaceSearchHistory"]>
 
 export type $MarketplaceSearchHistoryPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "MarketplaceSearchHistory"
@@ -441,6 +467,7 @@ export type $MarketplaceSearchHistoryPayload<ExtArgs extends runtime.Types.Exten
     filters: runtime.JsonValue | null
     resultCount: number | null
     clickedId: string | null
+    serviceType: $Enums.ServiceType | null
     createdAt: Date
   }, ExtArgs["result"]["marketplaceSearchHistory"]>
   composites: {}
@@ -871,6 +898,7 @@ export interface MarketplaceSearchHistoryFieldRefs {
   readonly filters: Prisma.FieldRef<"MarketplaceSearchHistory", 'Json'>
   readonly resultCount: Prisma.FieldRef<"MarketplaceSearchHistory", 'Int'>
   readonly clickedId: Prisma.FieldRef<"MarketplaceSearchHistory", 'String'>
+  readonly serviceType: Prisma.FieldRef<"MarketplaceSearchHistory", 'ServiceType'>
   readonly createdAt: Prisma.FieldRef<"MarketplaceSearchHistory", 'DateTime'>
 }
     

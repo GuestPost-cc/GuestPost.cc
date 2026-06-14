@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
-import { QUEUES, evaluateSettlementEligibility, checkSeparationOfDuties } from "@guestpost/shared"
+import { QUEUES, evaluateSettlementEligibility, checkSeparationOfDuties, orderEventMetadata } from "@guestpost/shared"
 import { Decimal } from "@prisma/client/runtime/library"
 import { resolvePlatformFeeFraction, splitPlatformFee } from "../../common/platform-fee"
 
@@ -38,13 +38,34 @@ export class SettlementsService {
       throw new BadRequestException({ code: "SETTLEMENT_BLOCKED", message: `Settlement blocked: ${eligibility.reasons.join("; ")}`, reasons: eligibility.reasons })
     }
 
-    // Find publisher from order items' websites
+    // Find publisher from order items' websites + the website's ownership
+    // type (we snapshot it onto Settlement so historical reports survive a
+    // later ownership change).
     const item = await this.prisma.orderItem.findFirst({
       where: { orderId, websiteId: { not: null } },
-      include: { website: { select: { publisherId: true } } },
+      include: { website: { select: { publisherId: true, ownershipType: true } } },
     })
     const publisherId = item?.website?.publisherId
+    const ownerType   = item?.website?.ownershipType ?? null
     if (!publisherId) throw new BadRequestException("No publisher found for this order")
+
+    // Phase 6: pull the per-service unitPrice from the snapshotted
+    // ListingService row. Always present for new orders (Phase 4 hard
+    // switch) but tolerate NULL for legacy orders that haven't been
+    // backfilled — the column is nullable and reports degrade gracefully.
+    let listingServiceId: string | null = order.listingServiceId ?? null
+    let serviceType: any = order.type ?? null
+    let unitPrice: Decimal | null = null
+    if (order.listingServiceId) {
+      const ls = await this.prisma.listingService.findUnique({
+        where: { id: order.listingServiceId },
+        select: { price: true, serviceType: true },
+      })
+      if (ls) {
+        unitPrice = new Decimal(ls.price)
+        serviceType = ls.serviceType
+      }
+    }
 
     if (!order.amount || new Decimal(order.amount).lessThanOrEqualTo(0)) {
       throw new BadRequestException("Order has no amount to settle")
@@ -77,6 +98,12 @@ export class SettlementsService {
             publisherAmount,
             status: "PENDING",
             reviewEndsAt,
+            // Phase 6 snapshots (read-only after creation).
+            listingServiceId,
+            serviceType,
+            ownerType,
+            fulfillmentChannel: order.fulfillmentChannel ?? null,
+            unitPrice,
           },
         })
       } catch (err: any) {
@@ -100,7 +127,15 @@ export class SettlementsService {
         action: "SETTLEMENT_CREATED",
         entityType: "Settlement",
         entityId: settlement.id,
-        metadata: { orderId, publisherAmount: publisherAmount.toNumber(), platformFee: platformFee.toNumber() },
+        // Standardized Phase 6 metadata helper — every order-scoped audit
+        // should carry the snapshot trio so historical reports / replays
+        // never have to chase the live listing.
+        metadata: {
+          orderId,
+          publisherAmount: publisherAmount.toNumber(),
+          platformFee: platformFee.toNumber(),
+          ...orderEventMetadata(order),
+        },
         userId,
         organizationId: order.organizationId,
       }, tx)
@@ -438,8 +473,12 @@ export class SettlementsService {
       const active = order.activeDeliveryVersionId
         ? await tx.orderDeliveryVersion.findUnique({ where: { id: order.activeDeliveryVersionId }, select: { submittedByUserId: true } })
         : null
+      // Channel-first read for SoD check: a platform order must not be
+      // released by its own fulfiller, regardless of the website's later
+      // ownership changes.
+      const channel = order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
       const violation = checkSeparationOfDuties({
-        ownershipType: order.website?.ownershipType ?? "PUBLISHER",
+        ownershipType: channel,
         fulfilledByUserId: active?.submittedByUserId,
         releasedByUserId: userId,
       })

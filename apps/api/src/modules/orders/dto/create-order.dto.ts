@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, MaxLength } from "class-validator"
+import { IsString, IsOptional, IsEnum, IsArray, IsObject, ValidateNested, MaxLength } from "class-validator"
 import { Type } from "class-transformer"
 import { ServiceType } from "@guestpost/database"
 
@@ -39,6 +39,22 @@ export class CreateOrderDto {
   @IsString()
   @IsOptional()
   idempotencyKey?: string
+
+  // Phase 2: the customer's locked pick from the listing detail page.
+  // Optional in Phase 2 (legacy clients without it still work via the
+  // (websiteId, type) fallback) → required in Phase 4.
+  @IsString()
+  @IsOptional()
+  listingServiceId?: string
+
+  // Phase 6: structured per-service brief. Validated server-side against
+  // the @guestpost/shared brief Zod registry. Shape varies by ServiceType
+  // (e.g. LOCAL_CITATION carries an address object; NICHE_EDIT requires
+  // existingArticleUrl). class-validator can't introspect Zod, so we
+  // accept any object here and let the service layer Zod-parse it.
+  @IsObject()
+  @IsOptional()
+  briefData?: Record<string, unknown>
 
   @IsArray()
   @IsOptional()

@@ -113,11 +113,6 @@ export type Order = Prisma.OrderModel
  */
 export type Campaign = Prisma.CampaignModel
 /**
- * Model Service
- * 
- */
-export type Service = Prisma.ServiceModel
-/**
  * Model OrderItem
  * 
  */
@@ -278,6 +273,11 @@ export type MarketplaceTag = Prisma.MarketplaceTagModel
  */
 export type MarketplaceListing = Prisma.MarketplaceListingModel
 /**
+ * Model ListingService
+ * 
+ */
+export type ListingService = Prisma.ListingServiceModel
+/**
  * Model MarketplaceListingTag
  * 
  */
@@ -287,11 +287,6 @@ export type MarketplaceListingTag = Prisma.MarketplaceListingTagModel
  * 
  */
 export type MarketplaceListingImage = Prisma.MarketplaceListingImageModel
-/**
- * Model MarketplacePricingTier
- * 
- */
-export type MarketplacePricingTier = Prisma.MarketplacePricingTierModel
 /**
  * Model MarketplaceReview
  * 

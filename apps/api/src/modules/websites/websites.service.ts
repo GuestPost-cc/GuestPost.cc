@@ -3,7 +3,7 @@ import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
-import { ListingStatus, ListingType, ListingFulfillmentType } from "@guestpost/database"
+import { ListingStatus, ListingFulfillmentType } from "@guestpost/database"
 import { normalizeDomain } from "../../common/domain"
 import { QUEUES, generateVerificationToken, verificationTxtValue } from "@guestpost/shared"
 
@@ -97,25 +97,36 @@ export class WebsitesService {
     // Create associated MarketplaceListing with PENDING_REVIEW status
     const slug = dto.url.replace(/^https?:\/\//, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + Date.now()
 
+    // Phase 7: the legacy listing-level type/price/turnaroundDays columns
+    // are gone. We materialize a single GUEST_POST ListingService alongside
+    // the listing using the publisher's submitted price/TAT — they can add
+    // more services later via the publisher Services dialog.
     await this.prisma.marketplaceListing.create({
       data: {
         title: dto.url,
         slug,
         description: `Guest posting placement on ${dto.url}`,
-        type: ListingType.PUBLISHER_WEBSITE,
         status: ListingStatus.PENDING_REVIEW,
         fulfillmentType: ListingFulfillmentType.PUBLISHER,
-        price: dto.price || 0,
         currency: "USD",
         domainRating: dto.domainRating,
         traffic: dto.monthlyTraffic,
         country: dto.country,
         language: dto.language,
-        turnaroundDays: dto.turnaroundDays,
         websiteUrl: dto.url,
         publisherId,
         websiteId: website.id,
         organizationId,
+        ownerType: "PUBLISHER",
+        services: {
+          create: [{
+            serviceType: "GUEST_POST",
+            price: dto.price ?? 0,
+            currency: "USD",
+            turnaroundDays: dto.turnaroundDays ?? 7,
+            availability: "AVAILABLE",
+          }],
+        },
       },
     })
 
@@ -251,6 +262,10 @@ export class WebsitesService {
     })
 
     if (listing) {
+      // Phase 7: price + turnaroundDays move per-service. If the dto
+      // carried them, propagate to the matching ListingService row(s)
+      // (currently a publisher only has GUEST_POST seeded by the create
+      // path; multi-service edits happen through the Services dialog).
       await this.prisma.marketplaceListing.update({
         where: { id: listing.id },
         data: {
@@ -259,11 +274,18 @@ export class WebsitesService {
           traffic: dto.monthlyTraffic,
           country: dto.country,
           language: dto.language,
-          price: dto.price,
-          turnaroundDays: dto.turnaroundDays,
           websiteUrl: dto.url,
         },
       })
+      if (dto.price != null || dto.turnaroundDays != null) {
+        await this.prisma.listingService.updateMany({
+          where: { listingId: listing.id },
+          data: {
+            ...(dto.price != null         ? { price: dto.price } : {}),
+            ...(dto.turnaroundDays != null ? { turnaroundDays: dto.turnaroundDays } : {}),
+          },
+        })
+      }
     }
 
     await this.audit.log({
@@ -286,8 +308,14 @@ export class WebsitesService {
     return this.prisma.website.findMany({
       where: { publisherId },
       include: {
+        // Phase 7: legacy price + turnaroundDays selectors were dropped.
+        // Surface the AVAILABLE services so callers can render per-service
+        // price/TAT directly.
         marketplaceListings: {
-          select: { status: true, price: true, turnaroundDays: true }
+          select: {
+            status: true,
+            services: { where: { availability: "AVAILABLE" }, select: { serviceType: true, price: true, turnaroundDays: true } },
+          },
         }
       },
       orderBy: { createdAt: "desc" },

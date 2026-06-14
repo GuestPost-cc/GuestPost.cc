@@ -32,25 +32,34 @@ export class OrderPaymentService {
       // NEVER silently charged a drifted price — they approved the cart at
       // the old price, so any drift fails with 409 and the items are updated
       // for an explicit re-confirmation on the next attempt.
+      //
+      // Drift source preference: when the order has a listingServiceId snapshot
+      // we read THAT row's live price (the per-service price the customer
+      // picked); otherwise we fall back to the listing's flat price
+      // (legacy orders that predate the snapshot).
       const items = await tx.orderItem.findMany({ where: { orderId } })
       const driftedItems: Array<{ itemId: string; oldPrice: number; newPrice: number }> = []
       for (const item of items) {
         let serverPrice: any
-        if (item.websiteId) {
-          const listing = await tx.marketplaceListing.findFirst({
-            where: { websiteId: item.websiteId, status: "APPROVED" },
-            select: { price: true },
-          })
-          if (!listing) throw new BadRequestException(`Listing no longer available for website ${item.websiteId}`)
-          serverPrice = listing.price
-        } else {
-          const service = await tx.service.findFirst({
-            where: { type: order.type as any, isActive: true },
-            select: { price: true },
-          })
-          if (!service) throw new BadRequestException(`No active service for type ${order.type}`)
-          serverPrice = service.price
+        // Post-Phase-4: order.listingServiceId is the only drift source.
+        // Pre-snapshot legacy orders are out of band — they were backfilled,
+        // and any order created today is guaranteed to have a snapshot
+        // (orders.service.ts asserts).
+        if (!order.listingServiceId) {
+          throw new BadRequestException("Order has no listingServiceId snapshot — cannot price")
         }
+        const ls = await tx.listingService.findUnique({
+          where: { id: order.listingServiceId },
+          select: { price: true, availability: true },
+        })
+        if (!ls) throw new BadRequestException("Listing service no longer available")
+        if (ls.availability !== "AVAILABLE") {
+          throw new ConflictException({
+            code: "SERVICE_UNAVAILABLE",
+            message: "Service is no longer available — refresh and try again",
+          })
+        }
+        serverPrice = ls.price
         if (!new Decimal(item.price ?? 0).equals(serverPrice)) {
           // Sync via the NON-transactional client: the 409 below aborts this
           // transaction, and the corrected prices must survive the rollback

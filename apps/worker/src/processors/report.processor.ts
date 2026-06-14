@@ -25,6 +25,17 @@ export function createReportWorker() {
           })
           if (!order) throw new Error(`Order ${orderId} not found`)
 
+          // Phase 6: pull the per-service unitPrice off the snapshotted
+          // ListingService so the export carries it without re-deriving
+          // from a possibly-edited live row.
+          let unitPrice: any = null
+          if (order.listingServiceId) {
+            const ls = await prisma.listingService.findUnique({
+              where: { id: order.listingServiceId }, select: { price: true },
+            })
+            unitPrice = ls?.price ?? null
+          }
+
           await prisma.report.create({
             data: {
               orderId,
@@ -41,6 +52,13 @@ export function createReportWorker() {
                 website: order.website?.url,
                 publisher: order.website?.publisherId,
                 ownershipType: order.website?.ownershipType,
+                fulfillmentChannel: order.fulfillmentChannel ?? null,
+                // Phase 6 reporting snapshot trio (per-service truth).
+                listingId: order.listingId ?? null,
+                listingServiceId: order.listingServiceId ?? null,
+                serviceType: order.type,
+                unitPrice: unitPrice ? String(unitPrice) : null,
+                turnaroundDays: order.turnaroundDays ?? null,
                 publishedAt: order.publishedAt,
                 campaignProgress: "100%",
               },

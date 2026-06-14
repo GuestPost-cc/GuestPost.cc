@@ -1,7 +1,7 @@
 ---
 area: history
-project: guestpost-platform
-updated: 2026-06-13
+project: GuestPost.cc
+updated: 2026-06-14
 ---
 
 # Project History

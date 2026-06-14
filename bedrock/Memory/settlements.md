@@ -2,10 +2,26 @@
 note_type: domain-memory
 domain: settlements
 project: guestpost-platform
-updated: 2026-06-11
+updated: 2026-06-14
 ---
 
 # Settlements
+
+## Snapshot trio (Phase 6 — reporting accuracy)
+
+`Settlement` and `PlatformRevenue` each carry FIVE additional read-only columns frozen at creation time:
+
+| Column | Source |
+|---|---|
+| `listingServiceId` | from `Order.listingServiceId` (FK SET NULL on listing-service drop) |
+| `serviceType` | from the `ListingService` row's `serviceType` |
+| `ownerType` | from the `Website.ownershipType` AT CREATION (PUBLISHER / PLATFORM) |
+| `fulfillmentChannel` | from `Order.fulfillmentChannel` snapshot |
+| `unitPrice` | per-service price (`ListingService.price`) at creation; distinct from `grossAmount` which is the full order amount |
+
+These are NEVER updated after creation. Historical reports + refund clawback chains read them rather than re-derive from the live (mutable) listing.
+
+Backfill: `scripts/backfill-settlement-snapshots.ts` covered 60/60 historical Settlement rows + 0 PlatformRevenue rows (no platform orders existed yet). Idempotent — only touches rows where `listingServiceId IS NULL`.
 
 ## Dual-Approval System
 

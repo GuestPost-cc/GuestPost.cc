@@ -5,7 +5,7 @@ import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { QueueService } from "../queues/queue.service"
 import { RefundService } from "../orders/services/refund.service"
 import { StaffRole, QUEUES } from "@guestpost/shared"
-import { ListingStatus, ListingType, WebsiteOwnershipType } from "@guestpost/database"
+import { ListingStatus, WebsiteOwnershipType } from "@guestpost/database"
 import { normalizeDomain } from "../../common/domain"
 
 const VALID_STAFF_ROLES: StaffRole[] = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
@@ -384,7 +384,10 @@ export class AdminService {
     const limit = Math.min(100, Math.max(1, params.limit ?? 20))
     const where: any = {}
     if (params.status) where.status = params.status
-    if (params.type) where.type = params.type
+    // Phase 7: the listing-level `type` column is gone. The `type` filter
+    // now means "listings with at least one AVAILABLE service of this
+    // serviceType" — matches the public search semantics.
+    if (params.type) where.services = { some: { availability: "AVAILABLE", serviceType: params.type as any } }
 
     const [listings, total] = await Promise.all([
       this.prisma.marketplaceListing.findMany({
@@ -397,6 +400,10 @@ export class AdminService {
           organization: { select: { name: true } },
           publisher: { select: { name: true } },
           website: { select: { verificationStatus: true, verifiedAt: true, domain: true } },
+          // Phase 7: service rows back the priceFrom + serviceTypes the
+          // admin browse table renders. Only AVAILABLE rows; sorted asc
+          // so services[0] is the cheapest = priceFrom source.
+          services: { where: { availability: "AVAILABLE" }, orderBy: { price: "asc" } },
         },
       }),
       this.prisma.marketplaceListing.count({ where }),
@@ -407,9 +414,15 @@ export class AdminService {
         id: l.id,
         title: l.title,
         slug: l.slug,
-        type: l.type,
+        // Phase 7: card-shape fields. Type is now the first AVAILABLE
+        // service's serviceType; price is the minimum across AVAILABLE
+        // services. Legacy fields removed; consumers should read priceFrom +
+        // serviceTypes (also surfaced here for the admin browse table).
+        type: l.services[0]?.serviceType ?? null,
+        serviceTypes: Array.from(new Set(l.services.map(s => s.serviceType))),
+        priceFrom: l.services[0]?.price != null ? Number(l.services[0].price) : null,
         status: l.status,
-        price: Number(l.price),
+        price: l.services[0]?.price != null ? Number(l.services[0].price) : 0,
         currency: l.currency,
         domainRating: l.domainRating,
         traffic: l.traffic,
@@ -585,6 +598,32 @@ export class AdminService {
     })
     if (existing) throw new BadRequestException(`Website with this domain already exists (${existing.url})`)
 
+    // Phase 6.5 default ownership: an OPERATIONS staffer who adds a site is
+    // its default manager — auto-assignment + ticket routing flow through
+    // them on every order to come. SUPER_ADMIN creates can pass an explicit
+    // managedByUserId; if omitted the site stays NULL (shared Ops queue).
+    let managedByUserId: string | null = null
+    if (dto.managedByUserId) {
+      const target = await this.prisma.staffMembership.findUnique({
+        where: { userId: dto.managedByUserId },
+        select: { role: true },
+      })
+      if (!target || target.role !== "OPERATIONS") {
+        throw new BadRequestException({
+          code: "INVALID_OWNER",
+          message: "managedByUserId must reference an OPERATIONS staff member",
+        })
+      }
+      managedByUserId = dto.managedByUserId
+    } else {
+      // Auto-default when the creator is OPERATIONS themselves.
+      const creator = await this.prisma.staffMembership.findUnique({
+        where: { userId: user.id },
+        select: { role: true },
+      })
+      if (creator?.role === "OPERATIONS") managedByUserId = user.id
+    }
+
     const website = await this.prisma.website.create({
       data: {
         url: dto.url,
@@ -596,28 +635,31 @@ export class AdminService {
         metrics: { dr: dto.domainRating ?? 0, traffic: dto.monthlyTraffic ?? 0 },
         ownershipType: WebsiteOwnershipType.PLATFORM,
         isActive: true,
+        managedByUserId,
       },
     })
 
+    // Phase 7: the legacy listing-level type/price/turnaroundDays columns
+    // are dropped. We still auto-create a listing row so the website appears
+    // on the marketplace (admin can edit + add services from the Manage
+    // Services dialog), but no longer write the deprecated fields.
     await this.prisma.marketplaceListing.create({
       data: {
         title: dto.url,
         slug: `platform-${website.id.slice(0, 8)}`,
         description: dto.name ?? dto.url,
-        type: ListingType.PUBLISHER_WEBSITE,
         status: ListingStatus.APPROVED,
         fulfillmentType: "INTERNAL",
-        price: dto.price ?? 0,
         currency: "USD",
         domainRating: dto.domainRating ?? 0,
         traffic: dto.monthlyTraffic ?? 0,
         country: dto.country ?? null,
         language: dto.language ?? null,
-        turnaroundDays: dto.turnaroundDays ?? null,
         websiteUrl: dto.url,
         websiteId: website.id,
         organizationId: user.organizationId ?? null,
         publisherId: null,
+        ownerType: "PLATFORM",
       },
     })
 
@@ -625,12 +667,78 @@ export class AdminService {
       action: "PLATFORM_WEBSITE_CREATED",
       entityType: "Website",
       entityId: website.id,
-      metadata: { url: dto.url, createdBy: user.id },
+      metadata: { url: dto.url, createdBy: user.id, managedByUserId },
       userId: user.id,
       organizationId: null,
     })
 
     return website
+  }
+
+  // Phase 6.5 admin reassign — change which OPERATIONS user manages a
+  // platform site. Existing FulfillmentAssignment rows are NOT touched (no
+  // surprise hand-off of in-flight work); only new orders route to the new
+  // owner. Existing tickets stay with their original assignee for the same
+  // reason — admin uses POST /tickets/:id/reassign for per-ticket migration.
+  async reassignPlatformWebsite(
+    websiteId: string,
+    body: { managedByUserId: string | null; reason?: string },
+    user: any,
+  ) {
+    const website = await this.prisma.website.findUnique({
+      where: { id: websiteId },
+      select: { id: true, ownershipType: true, managedByUserId: true, url: true },
+    })
+    if (!website) throw new NotFoundException("Website not found")
+    if (website.ownershipType !== "PLATFORM") {
+      throw new BadRequestException("Only platform websites have a managed-by owner")
+    }
+
+    let newOwnerId: string | null = null
+    if (body.managedByUserId) {
+      const target = await this.prisma.staffMembership.findUnique({
+        where: { userId: body.managedByUserId },
+        select: { role: true },
+      })
+      if (!target || target.role !== "OPERATIONS") {
+        throw new BadRequestException({
+          code: "INVALID_OWNER",
+          message: "managedByUserId must reference an OPERATIONS staff member",
+        })
+      }
+      newOwnerId = body.managedByUserId
+    }
+
+    await this.prisma.website.update({
+      where: { id: websiteId },
+      data:  { managedByUserId: newOwnerId },
+    })
+
+    await this.audit.log({
+      action: "WEBSITE_OWNERSHIP_REASSIGNED",
+      entityType: "Website",
+      entityId: websiteId,
+      metadata: {
+        url: website.url,
+        fromUserId: website.managedByUserId ?? null,
+        toUserId: newOwnerId,
+        reason: body.reason ?? null,
+      },
+      userId: user.id,
+      organizationId: null,
+    })
+
+    return { id: websiteId, managedByUserId: newOwnerId }
+  }
+
+  // List OPERATIONS staff for the admin reassignment picker.
+  async listOperationsStaff() {
+    const memberships = await this.prisma.staffMembership.findMany({
+      where: { role: "OPERATIONS" },
+      include: { user: { select: { id: true, name: true, email: true } } },
+      orderBy: { createdAt: "asc" },
+    })
+    return memberships.map(m => ({ id: m.user.id, name: m.user.name, email: m.user.email }))
   }
 
   async updatePlatformWebsite(id: string, dto: any, user: any) {
@@ -656,6 +764,9 @@ export class AdminService {
       where: { websiteId: id, status: { not: ListingStatus.ARCHIVED } },
     })
     if (listing) {
+      // Phase 7: price + turnaroundDays now live per-service on
+      // ListingService rows. The PATCH /admin/websites/:id endpoint no
+      // longer attempts to sync those fields onto the listing.
       await this.prisma.marketplaceListing.update({
         where: { id: listing.id },
         data: {
@@ -664,8 +775,6 @@ export class AdminService {
           traffic: dto.monthlyTraffic ?? listing.traffic,
           country: dto.country ?? listing.country,
           language: dto.language ?? listing.language,
-          price: dto.price ?? listing.price,
-          turnaroundDays: dto.turnaroundDays ?? listing.turnaroundDays,
           websiteUrl: dto.url ?? listing.websiteUrl,
         },
       })
@@ -699,6 +808,10 @@ export class AdminService {
             take: 1,
           },
           publisher: { select: { id: true, name: true } },
+          // Phase 6.5: surface the platform-site owner so the admin
+          // websites page can render the "Managed by" column without a
+          // second round-trip per row.
+          managedBy: { select: { id: true, name: true } },
         },
       }),
       this.prisma.website.count({ where }),

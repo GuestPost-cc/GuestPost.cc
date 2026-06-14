@@ -1,5 +1,50 @@
 # Current Focus
-**Status: Beta readiness sprint done (batch 20) — provider validation 30/30 (signed webhooks E2E), marketing site 10 routes, campaign edit UX, safe CSV exports, FE test infra (vitest 9 + Playwright 2 + CI), production runbook + Dockerfiles. 147 unit + 26 integration + 16 concurrency green.**
+**Status: Marketplace listing-service redesign complete + multi-actor support tickets shipped (2026-06-14, batch 21–24). 14 Prisma migrations applied through Phase 7; full backend + frontend audited and migrated off the deprecated `MarketplaceListing.type/price/turnaroundDays/revisionRounds` columns; 1543 historical orders backfilled with `listingServiceId` / `fulfillmentChannel`; 60 Settlement rows backfilled with snapshot trio. VPS-staging attempt rolled back — VPS too weak for the full dev stack, all VPS files purged.**
+
+## Completed (2026-06-14, batch 24 — VPS staging abandoned, files removed)
+- Provisioned a Hetzner-class VPS to host dev/test workflow: rsync from laptop → tmux-managed `pnpm dev:all` → Caddy reverse proxy + auto-HTTPS, R2 replacing MinIO, Mailpit behind Caddy basicauth, GitHub kept as the "verified code" store
+- VPS bootstrapped (deploy user, SSH-key only, UFW, fail2ban, Caddy, Node 22, pnpm 11), 30MB of source rsync'd, all 14 migrations applied on fresh Postgres, Phase 6 settlement backfill ran (60/60), all 6 apps started in tmux ("API running on http://localhost:4000")
+- Next dev mode hung serving the first compiled request — VPS was thrashing (multi-GB RAM blown by 4 concurrent `next dev` + nest --watch + tsc --watch). User confirmed VPS too underprovisioned for the full stack, deleted the VPS, asked to remove all VPS files
+- Removed: `infrastructure/{vps,caddy}/`, `infrastructure/docker/docker-compose.staging.yml`, `apps/{portal,publisher,admin}/Dockerfile`, `scripts/vps-sync.sh`, `.env.vps.example`, README VPS section, plan-file Part 2
+- Repo restored to laptop-only state. Open question (`bedrock/Work/open-questions.md`): where to host shared dev/testing next?
+
+## Completed (2026-06-14, batch 23 — Phase 7 cleanup migration)
+- Final drop migration `20260615130000_phase7_listing_columns` — `MarketplaceListing.{type,price,turnaroundDays,revisionRounds,warrantyDays}` columns + `ListingType` enum removed. Earlier `20260615120000_phase7_legacy_drop` already dropped the `Service` table
+- All UI surfaces migrated off the legacy columns: portal browse + favorites + saved-lists + listing detail, admin browse + listing detail — read `priceFrom` + `serviceTypes[]` + `services[]` instead
+- Backend pruned: `LISTING_TYPE_TO_SERVICE_TYPE` map gone, `resolveServicesInput` shim collapsed to "services[] only", related-listings + recommendations now match on service overlap, admin filter on `services.some({serviceType})`, `createPlatformWebsite` + `updatePlatformWebsite` stopped writing legacy columns, DTO `type`/`price` made optional+ignored (one-release back-compat)
+- Local-interface fields in portal/admin/saved-lists/favorites pages all marked optional so future drops don't break
+- ContentOrder kept (originally on the drop list — turned out to be misnamed but live: stores publisher's submitted-content `title`/`brief`/`deliverable`, read at `apps/portal/src/app/dashboard/orders/[id]/page.tsx` via `order.submittedContent`)
+
+## Completed (2026-06-14, batch 22 — Phase 6.5: ops site-ownership + symmetric multi-actor support tickets)
+- **`Website.managedByUserId`** + admin `PATCH /admin/websites/:id/assign` (validates target has OPERATIONS staff role; audit-logged with from/to). Reassignment does NOT touch in-flight `FulfillmentAssignment` rows (no surprise hand-off)
+- `createPlatformWebsite` auto-defaults `managedByUserId` to the creator when they're OPERATIONS
+- **Auto-assignment**: `OrdersService.create` writes one `FulfillmentAssignment(ASSIGNED)` for PLATFORM-channel orders inside the same txn when the site has a manager
+- **Support tickets channel-aware**: `Ticket.{fulfillmentChannel, assignedToUserId, assignedPublisherId}` snapshotted at create. `listTickets(actor)` returns role-keyed OR-clauses (customer: own org; publisher: assigned publisher; SUPER_ADMIN+FINANCE: all; OPS: assigned-to-me + unassigned PLATFORM pool). `addMessage` enforces same matrix. SUPER_ADMIN-only `POST /tickets/:id/reassign`
+- Cross-role notifications: customer's org + fulfiller + every active SUPER_ADMIN/FINANCE on every ticket event
+- Admin UI: new `/dashboard/websites` page with reassign dialog (Ops picker + reason); portal order-detail gains an `OrderSupportPanel` that lists tickets for THIS order with deep-link + inline "Open ticket"
+- Publisher dashboard: lifecycle buttons (Submit/Pause/Unpause/Archive) gated by `lifecyclePhase`
+
+## Completed (2026-06-14, batch 21 — Phase 6: per-service briefs + lifecycle + search rewrite + settlement snapshots + waitlist)
+- **Shared package**: `packages/shared/src/briefs/` — Zod registry per `ServiceType` (8 schemas: GUEST_POST has title/topic/targetUrl/anchorText/keywords/wordCount/niche/notes; NICHE_EDIT requires existingArticleUrl; LOCAL_CITATION has compound address; etc.) + `validateBrief(serviceType, data)`. Lifecycle helper at `packages/shared/src/lifecycle/listing-phase.ts` computes `AWAITING_VERIFICATION` / `AWAITING_SERVICES` / `READY_FOR_REVIEW` / `IN_REVIEW` / `READY_TO_PUBLISH` / `PUBLISHED` / `PAUSED` / `REJECTED` / `ARCHIVED` from (status, ownerType, website verification, AVAILABLE service count). `packages/shared/src/audit/order-event-metadata.ts` standardizes audit payload (listingId/listingServiceId/serviceType/fulfillmentChannel/ownerType)
+- **Schema additive bundle** `20260615100000_phase6_additive`: Settlement+PlatformRevenue gain 5 snapshot cols (listingServiceId/serviceType/ownerType/fulfillmentChannel/unitPrice); `Order.briefData JSONB`; `MarketplaceListingClick.serviceType` + `MarketplaceSearchHistory.serviceType`; `ListingService` composite indexes `(availability, serviceType, price)` + `(availability, turnaroundDays)`; `Website.managedByUserId` + FK; `Ticket` routing cols + indexes
+- **Order brief**: `OrdersService.create` runs `validateBrief(snapshot.snapshotServiceType, body.briefData)` inside the txn; rejects with `BRIEF_INVALID` + Zod issue path. `Order.briefData` snapshotted; later listing edits never alter contract
+- **Search rewrite**: filters key off `services.some({availability:"AVAILABLE", serviceType, price, turnaroundDays})`. Card returns `priceFrom` (min AVAILABLE service price) + `serviceTypes[]` (deduped) + `lifecyclePhase`. Listings with zero AVAILABLE services excluded automatically
+- **Lifecycle endpoints**: `POST /marketplace/listings/:id/{submit,pause,unpause,archive}` — version-guarded via status-as-version (each `updateMany` constrains on the source status), audit-logged. submit gates: website VERIFIED + ≥1 AVAILABLE service
+- **Settlement+revenue snapshot**: `createSettlement` + `createSettlementForOrder` both write the 5 columns. Backfill script `scripts/backfill-settlement-snapshots.ts` covered 60/60 historical rows (0 parity gap)
+- **Waitlist**: `availability=WAITLIST` on a service. When publisher flips to AVAILABLE via `updateServiceOnListing`, fan-out to `MarketplaceFavorite` rows scoped to (listingId, serviceType) OR (listingId, null) via the existing notification queue. `MarketplaceFavorite.serviceType` column added
+- **OrderOwnershipGuard**: gained `fulfillmentChannel` consistency check (publisher actor refused when channel=PLATFORM — covers website-reassigned-mid-flight)
+- **Portal `<BriefForm>`**: per-service rendered fields (text/textarea/url/number/select/tags/address compound); forwards `briefData` to `orders.create`. Falls back to legacy 4-field form only if `serviceType` is unknown
+- Marketplace stats: `totalServices`, `activeServices`, `servicesByType` (count + avgPrice per ServiceType) — listing-level counts kept
+
+## VPS / shared-dev hosting (still open)
+The VPS attempt confirmed the dev stack is too heavy for 2GB RAM: 4 `next dev` + `nest start --watch` + tsx --watch + Docker (postgres/redis/mailpit) blew the heap. Possible follow-ups (capture into `Work/open-questions.md`):
+- Run only the API + worker in dev mode on the VPS, ship the frontends as Next `production` builds (`next build` once, then `next start`) — drastically cheaper
+- Bigger VPS (4 GB+ RAM)
+- Move dev/test to a cloud sandbox (Railway, Fly.io, Render) where build is offloaded
+- Stick to laptop-only for now and revisit shared-dev when team grows
+The staging-style production deploy path (image-based, GHCR push, no live source sync) was NOT tried — would be lighter at runtime since `next start` is ~10x cheaper than `next dev`
+
+
 
 ## Completed (2026-06-12, batch 20 — beta readiness sprint, 7 phases)
 - **Provider validation** (`scripts/provider-validation.ts`, report `bedrock/Evidence/PROVIDER_VALIDATION_2026-06-12.md`): 30/30 — genuinely signed webhooks (real Stripe HMAC secrets; Wise via local RSA keypair as WISE_WEBHOOK_PUBLIC_KEY) through full path API→queue→worker→DB→reconciliation. Stripe deposit/dup/tamper/chargeback won+lost lifecycle; Wise complete/replay/cancelled/reverse; Stripe payout paid. Stripe test key verified live vs api.stripe.com. NOT covered (needs real creds): Wise sandbox API transfers, Stripe Connect transfers

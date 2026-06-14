@@ -404,7 +404,6 @@ export const ModelName = {
   Website: 'Website',
   Order: 'Order',
   Campaign: 'Campaign',
-  Service: 'Service',
   OrderItem: 'OrderItem',
   OrderEvent: 'OrderEvent',
   Publication: 'Publication',
@@ -437,9 +436,9 @@ export const ModelName = {
   MarketplaceCategory: 'MarketplaceCategory',
   MarketplaceTag: 'MarketplaceTag',
   MarketplaceListing: 'MarketplaceListing',
+  ListingService: 'ListingService',
   MarketplaceListingTag: 'MarketplaceListingTag',
   MarketplaceListingImage: 'MarketplaceListingImage',
-  MarketplacePricingTier: 'MarketplacePricingTier',
   MarketplaceReview: 'MarketplaceReview',
   MarketplaceFavorite: 'MarketplaceFavorite',
   MarketplaceSavedList: 'MarketplaceSavedList',
@@ -467,7 +466,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "service" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplacePricingTier" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings"
+    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1504,80 +1503,6 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.CampaignCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.CampaignCountAggregateOutputType> | number
-        }
-      }
-    }
-    Service: {
-      payload: Prisma.$ServicePayload<ExtArgs>
-      fields: Prisma.ServiceFieldRefs
-      operations: {
-        findUnique: {
-          args: Prisma.ServiceFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload> | null
-        }
-        findUniqueOrThrow: {
-          args: Prisma.ServiceFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload>
-        }
-        findFirst: {
-          args: Prisma.ServiceFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload> | null
-        }
-        findFirstOrThrow: {
-          args: Prisma.ServiceFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload>
-        }
-        findMany: {
-          args: Prisma.ServiceFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload>[]
-        }
-        create: {
-          args: Prisma.ServiceCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload>
-        }
-        createMany: {
-          args: Prisma.ServiceCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.ServiceCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload>[]
-        }
-        delete: {
-          args: Prisma.ServiceDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload>
-        }
-        update: {
-          args: Prisma.ServiceUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload>
-        }
-        deleteMany: {
-          args: Prisma.ServiceDeleteManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateMany: {
-          args: Prisma.ServiceUpdateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateManyAndReturn: {
-          args: Prisma.ServiceUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload>[]
-        }
-        upsert: {
-          args: Prisma.ServiceUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ServicePayload>
-        }
-        aggregate: {
-          args: Prisma.ServiceAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateService>
-        }
-        groupBy: {
-          args: Prisma.ServiceGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ServiceGroupByOutputType>[]
-        }
-        count: {
-          args: Prisma.ServiceCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ServiceCountAggregateOutputType> | number
         }
       }
     }
@@ -3949,6 +3874,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ListingService: {
+      payload: Prisma.$ListingServicePayload<ExtArgs>
+      fields: Prisma.ListingServiceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ListingServiceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ListingServiceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload>
+        }
+        findFirst: {
+          args: Prisma.ListingServiceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ListingServiceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload>
+        }
+        findMany: {
+          args: Prisma.ListingServiceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload>[]
+        }
+        create: {
+          args: Prisma.ListingServiceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload>
+        }
+        createMany: {
+          args: Prisma.ListingServiceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ListingServiceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload>[]
+        }
+        delete: {
+          args: Prisma.ListingServiceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload>
+        }
+        update: {
+          args: Prisma.ListingServiceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload>
+        }
+        deleteMany: {
+          args: Prisma.ListingServiceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ListingServiceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ListingServiceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload>[]
+        }
+        upsert: {
+          args: Prisma.ListingServiceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ListingServicePayload>
+        }
+        aggregate: {
+          args: Prisma.ListingServiceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateListingService>
+        }
+        groupBy: {
+          args: Prisma.ListingServiceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ListingServiceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ListingServiceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ListingServiceCountAggregateOutputType> | number
+        }
+      }
+    }
     MarketplaceListingTag: {
       payload: Prisma.$MarketplaceListingTagPayload<ExtArgs>
       fields: Prisma.MarketplaceListingTagFieldRefs
@@ -4094,80 +4093,6 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.MarketplaceListingImageCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.MarketplaceListingImageCountAggregateOutputType> | number
-        }
-      }
-    }
-    MarketplacePricingTier: {
-      payload: Prisma.$MarketplacePricingTierPayload<ExtArgs>
-      fields: Prisma.MarketplacePricingTierFieldRefs
-      operations: {
-        findUnique: {
-          args: Prisma.MarketplacePricingTierFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload> | null
-        }
-        findUniqueOrThrow: {
-          args: Prisma.MarketplacePricingTierFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload>
-        }
-        findFirst: {
-          args: Prisma.MarketplacePricingTierFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload> | null
-        }
-        findFirstOrThrow: {
-          args: Prisma.MarketplacePricingTierFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload>
-        }
-        findMany: {
-          args: Prisma.MarketplacePricingTierFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload>[]
-        }
-        create: {
-          args: Prisma.MarketplacePricingTierCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload>
-        }
-        createMany: {
-          args: Prisma.MarketplacePricingTierCreateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        createManyAndReturn: {
-          args: Prisma.MarketplacePricingTierCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload>[]
-        }
-        delete: {
-          args: Prisma.MarketplacePricingTierDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload>
-        }
-        update: {
-          args: Prisma.MarketplacePricingTierUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload>
-        }
-        deleteMany: {
-          args: Prisma.MarketplacePricingTierDeleteManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateMany: {
-          args: Prisma.MarketplacePricingTierUpdateManyArgs<ExtArgs>
-          result: BatchPayload
-        }
-        updateManyAndReturn: {
-          args: Prisma.MarketplacePricingTierUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload>[]
-        }
-        upsert: {
-          args: Prisma.MarketplacePricingTierUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketplacePricingTierPayload>
-        }
-        aggregate: {
-          args: Prisma.MarketplacePricingTierAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateMarketplacePricingTier>
-        }
-        groupBy: {
-          args: Prisma.MarketplacePricingTierGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.MarketplacePricingTierGroupByOutputType>[]
-        }
-        count: {
-          args: Prisma.MarketplacePricingTierCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.MarketplacePricingTierCountAggregateOutputType> | number
         }
       }
     }
@@ -5257,6 +5182,7 @@ export const WebsiteScalarFieldEnum = {
   isActive: 'isActive',
   publisherId: 'publisherId',
   ownershipType: 'ownershipType',
+  managedByUserId: 'managedByUserId',
   verificationStatus: 'verificationStatus',
   verificationMethod: 'verificationMethod',
   verificationToken: 'verificationToken',
@@ -5304,6 +5230,11 @@ export const OrderScalarFieldEnum = {
   idempotencyKey: 'idempotencyKey',
   version: 'version',
   activeDeliveryVersionId: 'activeDeliveryVersionId',
+  listingId: 'listingId',
+  listingServiceId: 'listingServiceId',
+  fulfillmentChannel: 'fulfillmentChannel',
+  turnaroundDays: 'turnaroundDays',
+  briefData: 'briefData',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -5322,20 +5253,6 @@ export const CampaignScalarFieldEnum = {
 } as const
 
 export type CampaignScalarFieldEnum = (typeof CampaignScalarFieldEnum)[keyof typeof CampaignScalarFieldEnum]
-
-
-export const ServiceScalarFieldEnum = {
-  id: 'id',
-  type: 'type',
-  name: 'name',
-  price: 'price',
-  currency: 'currency',
-  isActive: 'isActive',
-  createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
-} as const
-
-export type ServiceScalarFieldEnum = (typeof ServiceScalarFieldEnum)[keyof typeof ServiceScalarFieldEnum]
 
 
 export const OrderItemScalarFieldEnum = {
@@ -5413,6 +5330,11 @@ export const SettlementScalarFieldEnum = {
   reviewEndsAt: 'reviewEndsAt',
   settledAt: 'settledAt',
   version: 'version',
+  listingServiceId: 'listingServiceId',
+  serviceType: 'serviceType',
+  ownerType: 'ownerType',
+  fulfillmentChannel: 'fulfillmentChannel',
+  unitPrice: 'unitPrice',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -5701,6 +5623,11 @@ export const PlatformRevenueScalarFieldEnum = {
   netRevenue: 'netRevenue',
   recordedAt: 'recordedAt',
   reversedAt: 'reversedAt',
+  listingServiceId: 'listingServiceId',
+  serviceType: 'serviceType',
+  ownerType: 'ownerType',
+  fulfillmentChannel: 'fulfillmentChannel',
+  unitPrice: 'unitPrice',
   createdAt: 'createdAt'
 } as const
 
@@ -5748,6 +5675,9 @@ export const TicketScalarFieldEnum = {
   organizationId: 'organizationId',
   userId: 'userId',
   orderId: 'orderId',
+  fulfillmentChannel: 'fulfillmentChannel',
+  assignedToUserId: 'assignedToUserId',
+  assignedPublisherId: 'assignedPublisherId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -5828,10 +5758,9 @@ export const MarketplaceListingScalarFieldEnum = {
   slug: 'slug',
   description: 'description',
   shortDescription: 'shortDescription',
-  type: 'type',
   status: 'status',
   fulfillmentType: 'fulfillmentType',
-  price: 'price',
+  ownerType: 'ownerType',
   currency: 'currency',
   priceType: 'priceType',
   minPrice: 'minPrice',
@@ -5845,13 +5774,8 @@ export const MarketplaceListingScalarFieldEnum = {
   language: 'language',
   countries: 'countries',
   languages: 'languages',
-  turnaroundDays: 'turnaroundDays',
-  revisionRounds: 'revisionRounds',
-  warrantyDays: 'warrantyDays',
   featured: 'featured',
   verified: 'verified',
-  allowGuestPost: 'allowGuestPost',
-  allowNicheEdit: 'allowNicheEdit',
   doFollowOnly: 'doFollowOnly',
   websiteUrl: 'websiteUrl',
   sampleUrl: 'sampleUrl',
@@ -5870,6 +5794,26 @@ export const MarketplaceListingScalarFieldEnum = {
 } as const
 
 export type MarketplaceListingScalarFieldEnum = (typeof MarketplaceListingScalarFieldEnum)[keyof typeof MarketplaceListingScalarFieldEnum]
+
+
+export const ListingServiceScalarFieldEnum = {
+  id: 'id',
+  listingId: 'listingId',
+  serviceType: 'serviceType',
+  price: 'price',
+  currency: 'currency',
+  turnaroundDays: 'turnaroundDays',
+  revisionRounds: 'revisionRounds',
+  warrantyDays: 'warrantyDays',
+  requirements: 'requirements',
+  fulfillmentSettings: 'fulfillmentSettings',
+  availability: 'availability',
+  version: 'version',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ListingServiceScalarFieldEnum = (typeof ListingServiceScalarFieldEnum)[keyof typeof ListingServiceScalarFieldEnum]
 
 
 export const MarketplaceListingTagScalarFieldEnum = {
@@ -5893,20 +5837,6 @@ export const MarketplaceListingImageScalarFieldEnum = {
 export type MarketplaceListingImageScalarFieldEnum = (typeof MarketplaceListingImageScalarFieldEnum)[keyof typeof MarketplaceListingImageScalarFieldEnum]
 
 
-export const MarketplacePricingTierScalarFieldEnum = {
-  id: 'id',
-  listingId: 'listingId',
-  name: 'name',
-  price: 'price',
-  description: 'description',
-  features: 'features',
-  sortOrder: 'sortOrder',
-  createdAt: 'createdAt'
-} as const
-
-export type MarketplacePricingTierScalarFieldEnum = (typeof MarketplacePricingTierScalarFieldEnum)[keyof typeof MarketplacePricingTierScalarFieldEnum]
-
-
 export const MarketplaceReviewScalarFieldEnum = {
   id: 'id',
   listingId: 'listingId',
@@ -5928,6 +5858,7 @@ export const MarketplaceFavoriteScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
   listingId: 'listingId',
+  serviceType: 'serviceType',
   createdAt: 'createdAt'
 } as const
 
@@ -5979,6 +5910,7 @@ export const MarketplaceListingClickScalarFieldEnum = {
   sessionId: 'sessionId',
   ipAddress: 'ipAddress',
   action: 'action',
+  serviceType: 'serviceType',
   metadata: 'metadata',
   createdAt: 'createdAt'
 } as const
@@ -5993,6 +5925,7 @@ export const MarketplaceSearchHistoryScalarFieldEnum = {
   filters: 'filters',
   resultCount: 'resultCount',
   clickedId: 'clickedId',
+  serviceType: 'serviceType',
   createdAt: 'createdAt'
 } as const
 
@@ -6381,6 +6314,20 @@ export type ListEnumPaymentStatusFieldRefInput<$PrismaModel> = FieldRefInputType
 
 
 /**
+ * Reference to a field of type 'FulfillmentChannel'
+ */
+export type EnumFulfillmentChannelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FulfillmentChannel'>
+    
+
+
+/**
+ * Reference to a field of type 'FulfillmentChannel[]'
+ */
+export type ListEnumFulfillmentChannelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FulfillmentChannel[]'>
+    
+
+
+/**
  * Reference to a field of type 'CampaignStatus'
  */
 export type EnumCampaignStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CampaignStatus'>
@@ -6605,20 +6552,6 @@ export type ListEnumTicketStatusFieldRefInput<$PrismaModel> = FieldRefInputType<
 
 
 /**
- * Reference to a field of type 'ListingType'
- */
-export type EnumListingTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ListingType'>
-    
-
-
-/**
- * Reference to a field of type 'ListingType[]'
- */
-export type ListEnumListingTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ListingType[]'>
-    
-
-
-/**
  * Reference to a field of type 'ListingStatus'
  */
 export type EnumListingStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ListingStatus'>
@@ -6643,6 +6576,20 @@ export type EnumListingFulfillmentTypeFieldRefInput<$PrismaModel> = FieldRefInpu
  * Reference to a field of type 'ListingFulfillmentType[]'
  */
 export type ListEnumListingFulfillmentTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ListingFulfillmentType[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ServiceAvailability'
+ */
+export type EnumServiceAvailabilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ServiceAvailability'>
+    
+
+
+/**
+ * Reference to a field of type 'ServiceAvailability[]'
+ */
+export type ListEnumServiceAvailabilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ServiceAvailability[]'>
     
 
 
@@ -6760,7 +6707,6 @@ export type GlobalOmitConfig = {
   website?: Prisma.WebsiteOmit
   order?: Prisma.OrderOmit
   campaign?: Prisma.CampaignOmit
-  service?: Prisma.ServiceOmit
   orderItem?: Prisma.OrderItemOmit
   orderEvent?: Prisma.OrderEventOmit
   publication?: Prisma.PublicationOmit
@@ -6793,9 +6739,9 @@ export type GlobalOmitConfig = {
   marketplaceCategory?: Prisma.MarketplaceCategoryOmit
   marketplaceTag?: Prisma.MarketplaceTagOmit
   marketplaceListing?: Prisma.MarketplaceListingOmit
+  listingService?: Prisma.ListingServiceOmit
   marketplaceListingTag?: Prisma.MarketplaceListingTagOmit
   marketplaceListingImage?: Prisma.MarketplaceListingImageOmit
-  marketplacePricingTier?: Prisma.MarketplacePricingTierOmit
   marketplaceReview?: Prisma.MarketplaceReviewOmit
   marketplaceFavorite?: Prisma.MarketplaceFavoriteOmit
   marketplaceSavedList?: Prisma.MarketplaceSavedListOmit

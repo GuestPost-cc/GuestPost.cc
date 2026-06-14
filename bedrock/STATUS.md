@@ -8,7 +8,7 @@ local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
 last_backfill_import: 
-2026-06-13
+2026-06-15
 last_compaction: 2026-06-11
 last_validation: 2026-06-11
 last_validation_result: valid
@@ -33,7 +33,7 @@ last_system_refresh: 2026-06-11T12:30:00Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
-- Last project sync: `2026-06-13T05:24:44Z`
+- Last project sync: `2026-06-14T18:40:44Z`
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)
 - Last doctor: `2026-06-11` (`healthy`)

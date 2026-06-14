@@ -210,6 +210,7 @@ export type PublisherWhereInput = {
   transactions?: Prisma.TransactionListRelationFilter
   activeContexts?: Prisma.ActiveContextListRelationFilter
   orderReviews?: Prisma.OrderReviewListRelationFilter
+  tickets?: Prisma.TicketListRelationFilter
 }
 
 export type PublisherOrderByWithRelationInput = {
@@ -232,6 +233,7 @@ export type PublisherOrderByWithRelationInput = {
   transactions?: Prisma.TransactionOrderByRelationAggregateInput
   activeContexts?: Prisma.ActiveContextOrderByRelationAggregateInput
   orderReviews?: Prisma.OrderReviewOrderByRelationAggregateInput
+  tickets?: Prisma.TicketOrderByRelationAggregateInput
 }
 
 export type PublisherWhereUniqueInput = Prisma.AtLeast<{
@@ -257,6 +259,7 @@ export type PublisherWhereUniqueInput = Prisma.AtLeast<{
   transactions?: Prisma.TransactionListRelationFilter
   activeContexts?: Prisma.ActiveContextListRelationFilter
   orderReviews?: Prisma.OrderReviewListRelationFilter
+  tickets?: Prisma.TicketListRelationFilter
 }, "id">
 
 export type PublisherOrderByWithAggregationInput = {
@@ -304,6 +307,7 @@ export type PublisherCreateInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateInput = {
@@ -325,6 +329,7 @@ export type PublisherUncheckedCreateInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUpdateInput = {
@@ -346,6 +351,7 @@ export type PublisherUpdateInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateInput = {
@@ -367,6 +373,7 @@ export type PublisherUncheckedUpdateInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateManyInput = {
@@ -628,6 +635,22 @@ export type PublisherUpdateOneWithoutTransactionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.PublisherUpdateToOneWithWhereWithoutTransactionsInput, Prisma.PublisherUpdateWithoutTransactionsInput>, Prisma.PublisherUncheckedUpdateWithoutTransactionsInput>
 }
 
+export type PublisherCreateNestedOneWithoutTicketsInput = {
+  create?: Prisma.XOR<Prisma.PublisherCreateWithoutTicketsInput, Prisma.PublisherUncheckedCreateWithoutTicketsInput>
+  connectOrCreate?: Prisma.PublisherCreateOrConnectWithoutTicketsInput
+  connect?: Prisma.PublisherWhereUniqueInput
+}
+
+export type PublisherUpdateOneWithoutTicketsNestedInput = {
+  create?: Prisma.XOR<Prisma.PublisherCreateWithoutTicketsInput, Prisma.PublisherUncheckedCreateWithoutTicketsInput>
+  connectOrCreate?: Prisma.PublisherCreateOrConnectWithoutTicketsInput
+  upsert?: Prisma.PublisherUpsertWithoutTicketsInput
+  disconnect?: Prisma.PublisherWhereInput | boolean
+  delete?: Prisma.PublisherWhereInput | boolean
+  connect?: Prisma.PublisherWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PublisherUpdateToOneWithWhereWithoutTicketsInput, Prisma.PublisherUpdateWithoutTicketsInput>, Prisma.PublisherUncheckedUpdateWithoutTicketsInput>
+}
+
 export type PublisherCreateNestedOneWithoutMarketplaceListingsInput = {
   create?: Prisma.XOR<Prisma.PublisherCreateWithoutMarketplaceListingsInput, Prisma.PublisherUncheckedCreateWithoutMarketplaceListingsInput>
   connectOrCreate?: Prisma.PublisherCreateOrConnectWithoutMarketplaceListingsInput
@@ -676,6 +699,7 @@ export type PublisherCreateWithoutActiveContextsInput = {
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutActiveContextsInput = {
@@ -696,6 +720,7 @@ export type PublisherUncheckedCreateWithoutActiveContextsInput = {
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutActiveContextsInput = {
@@ -732,6 +757,7 @@ export type PublisherUpdateWithoutActiveContextsInput = {
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutActiveContextsInput = {
@@ -752,6 +778,7 @@ export type PublisherUncheckedUpdateWithoutActiveContextsInput = {
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateWithoutOrganizationInput = {
@@ -772,6 +799,7 @@ export type PublisherCreateWithoutOrganizationInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutOrganizationInput = {
@@ -792,6 +820,7 @@ export type PublisherUncheckedCreateWithoutOrganizationInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutOrganizationInput = {
@@ -851,6 +880,7 @@ export type PublisherCreateWithoutPublisherMembershipsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutPublisherMembershipsInput = {
@@ -871,6 +901,7 @@ export type PublisherUncheckedCreateWithoutPublisherMembershipsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutPublisherMembershipsInput = {
@@ -907,6 +938,7 @@ export type PublisherUpdateWithoutPublisherMembershipsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutPublisherMembershipsInput = {
@@ -927,6 +959,7 @@ export type PublisherUncheckedUpdateWithoutPublisherMembershipsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateWithoutWebsitesInput = {
@@ -947,6 +980,7 @@ export type PublisherCreateWithoutWebsitesInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutWebsitesInput = {
@@ -967,6 +1001,7 @@ export type PublisherUncheckedCreateWithoutWebsitesInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutWebsitesInput = {
@@ -1003,6 +1038,7 @@ export type PublisherUpdateWithoutWebsitesInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutWebsitesInput = {
@@ -1023,6 +1059,7 @@ export type PublisherUncheckedUpdateWithoutWebsitesInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateWithoutSettlementsInput = {
@@ -1043,6 +1080,7 @@ export type PublisherCreateWithoutSettlementsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutSettlementsInput = {
@@ -1063,6 +1101,7 @@ export type PublisherUncheckedCreateWithoutSettlementsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutSettlementsInput = {
@@ -1099,6 +1138,7 @@ export type PublisherUpdateWithoutSettlementsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutSettlementsInput = {
@@ -1119,6 +1159,7 @@ export type PublisherUncheckedUpdateWithoutSettlementsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateWithoutOrderReviewsInput = {
@@ -1139,6 +1180,7 @@ export type PublisherCreateWithoutOrderReviewsInput = {
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutOrderReviewsInput = {
@@ -1159,6 +1201,7 @@ export type PublisherUncheckedCreateWithoutOrderReviewsInput = {
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutOrderReviewsInput = {
@@ -1195,6 +1238,7 @@ export type PublisherUpdateWithoutOrderReviewsInput = {
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutOrderReviewsInput = {
@@ -1215,6 +1259,7 @@ export type PublisherUncheckedUpdateWithoutOrderReviewsInput = {
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateWithoutBalanceInput = {
@@ -1235,6 +1280,7 @@ export type PublisherCreateWithoutBalanceInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutBalanceInput = {
@@ -1255,6 +1301,7 @@ export type PublisherUncheckedCreateWithoutBalanceInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutBalanceInput = {
@@ -1291,6 +1338,7 @@ export type PublisherUpdateWithoutBalanceInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutBalanceInput = {
@@ -1311,6 +1359,7 @@ export type PublisherUncheckedUpdateWithoutBalanceInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateWithoutWithdrawalsInput = {
@@ -1331,6 +1380,7 @@ export type PublisherCreateWithoutWithdrawalsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutWithdrawalsInput = {
@@ -1351,6 +1401,7 @@ export type PublisherUncheckedCreateWithoutWithdrawalsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutWithdrawalsInput = {
@@ -1387,6 +1438,7 @@ export type PublisherUpdateWithoutWithdrawalsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutWithdrawalsInput = {
@@ -1407,6 +1459,7 @@ export type PublisherUncheckedUpdateWithoutWithdrawalsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateWithoutPayoutMethodsInput = {
@@ -1427,6 +1480,7 @@ export type PublisherCreateWithoutPayoutMethodsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutPayoutMethodsInput = {
@@ -1447,6 +1501,7 @@ export type PublisherUncheckedCreateWithoutPayoutMethodsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutPayoutMethodsInput = {
@@ -1483,6 +1538,7 @@ export type PublisherUpdateWithoutPayoutMethodsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutPayoutMethodsInput = {
@@ -1503,6 +1559,7 @@ export type PublisherUncheckedUpdateWithoutPayoutMethodsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateWithoutTransactionsInput = {
@@ -1523,6 +1580,7 @@ export type PublisherCreateWithoutTransactionsInput = {
   profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutTransactionsInput = {
@@ -1543,6 +1601,7 @@ export type PublisherUncheckedCreateWithoutTransactionsInput = {
   profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutTransactionsInput = {
@@ -1579,6 +1638,7 @@ export type PublisherUpdateWithoutTransactionsInput = {
   profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutTransactionsInput = {
@@ -1597,6 +1657,107 @@ export type PublisherUncheckedUpdateWithoutTransactionsInput = {
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
   profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
+  activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
+  orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
+}
+
+export type PublisherCreateWithoutTicketsInput = {
+  id?: string
+  name: string
+  email?: string | null
+  tier?: $Enums.PublisherTier
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  organization: Prisma.OrganizationCreateNestedOneWithoutPublishersInput
+  websites?: Prisma.WebsiteCreateNestedManyWithoutPublisherInput
+  publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutPublisherInput
+  balance?: Prisma.PublisherBalanceCreateNestedOneWithoutPublisherInput
+  withdrawals?: Prisma.WithdrawalCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodCreateNestedManyWithoutPublisherInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutPublisherInput
+  marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutPublisherInput
+  profile?: Prisma.PublisherProfileCreateNestedOneWithoutPublisherInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
+  activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
+  orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+}
+
+export type PublisherUncheckedCreateWithoutTicketsInput = {
+  id?: string
+  name: string
+  email?: string | null
+  organizationId: string
+  tier?: $Enums.PublisherTier
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  websites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutPublisherInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutPublisherInput
+  balance?: Prisma.PublisherBalanceUncheckedCreateNestedOneWithoutPublisherInput
+  withdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutPublisherInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedCreateNestedManyWithoutPublisherInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutPublisherInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutPublisherInput
+  profile?: Prisma.PublisherProfileUncheckedCreateNestedOneWithoutPublisherInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
+  activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
+  orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+}
+
+export type PublisherCreateOrConnectWithoutTicketsInput = {
+  where: Prisma.PublisherWhereUniqueInput
+  create: Prisma.XOR<Prisma.PublisherCreateWithoutTicketsInput, Prisma.PublisherUncheckedCreateWithoutTicketsInput>
+}
+
+export type PublisherUpsertWithoutTicketsInput = {
+  update: Prisma.XOR<Prisma.PublisherUpdateWithoutTicketsInput, Prisma.PublisherUncheckedUpdateWithoutTicketsInput>
+  create: Prisma.XOR<Prisma.PublisherCreateWithoutTicketsInput, Prisma.PublisherUncheckedCreateWithoutTicketsInput>
+  where?: Prisma.PublisherWhereInput
+}
+
+export type PublisherUpdateToOneWithWhereWithoutTicketsInput = {
+  where?: Prisma.PublisherWhereInput
+  data: Prisma.XOR<Prisma.PublisherUpdateWithoutTicketsInput, Prisma.PublisherUncheckedUpdateWithoutTicketsInput>
+}
+
+export type PublisherUpdateWithoutTicketsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tier?: Prisma.EnumPublisherTierFieldUpdateOperationsInput | $Enums.PublisherTier
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutPublishersNestedInput
+  websites?: Prisma.WebsiteUpdateManyWithoutPublisherNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutPublisherNestedInput
+  balance?: Prisma.PublisherBalanceUpdateOneWithoutPublisherNestedInput
+  withdrawals?: Prisma.WithdrawalUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUpdateManyWithoutPublisherNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutPublisherNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutPublisherNestedInput
+  profile?: Prisma.PublisherProfileUpdateOneWithoutPublisherNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
+  activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
+  orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+}
+
+export type PublisherUncheckedUpdateWithoutTicketsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  tier?: Prisma.EnumPublisherTierFieldUpdateOperationsInput | $Enums.PublisherTier
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  websites?: Prisma.WebsiteUncheckedUpdateManyWithoutPublisherNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutPublisherNestedInput
+  balance?: Prisma.PublisherBalanceUncheckedUpdateOneWithoutPublisherNestedInput
+  withdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutPublisherNestedInput
+  payoutMethods?: Prisma.PayoutMethodUncheckedUpdateManyWithoutPublisherNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutPublisherNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutPublisherNestedInput
+  profile?: Prisma.PublisherProfileUncheckedUpdateOneWithoutPublisherNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
 }
@@ -1619,6 +1780,7 @@ export type PublisherCreateWithoutMarketplaceListingsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutMarketplaceListingsInput = {
@@ -1639,6 +1801,7 @@ export type PublisherUncheckedCreateWithoutMarketplaceListingsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutMarketplaceListingsInput = {
@@ -1675,6 +1838,7 @@ export type PublisherUpdateWithoutMarketplaceListingsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutMarketplaceListingsInput = {
@@ -1695,6 +1859,7 @@ export type PublisherUncheckedUpdateWithoutMarketplaceListingsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateWithoutProfileInput = {
@@ -1715,6 +1880,7 @@ export type PublisherCreateWithoutProfileInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherUncheckedCreateWithoutProfileInput = {
@@ -1735,6 +1901,7 @@ export type PublisherUncheckedCreateWithoutProfileInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutPublisherInput
   activeContexts?: Prisma.ActiveContextUncheckedCreateNestedManyWithoutActivePublisherInput
   orderReviews?: Prisma.OrderReviewUncheckedCreateNestedManyWithoutPublisherInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedPublisherInput
 }
 
 export type PublisherCreateOrConnectWithoutProfileInput = {
@@ -1771,6 +1938,7 @@ export type PublisherUpdateWithoutProfileInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutProfileInput = {
@@ -1791,6 +1959,7 @@ export type PublisherUncheckedUpdateWithoutProfileInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherCreateManyOrganizationInput = {
@@ -1820,6 +1989,7 @@ export type PublisherUpdateWithoutOrganizationInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateWithoutOrganizationInput = {
@@ -1840,6 +2010,7 @@ export type PublisherUncheckedUpdateWithoutOrganizationInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutPublisherNestedInput
   activeContexts?: Prisma.ActiveContextUncheckedUpdateManyWithoutActivePublisherNestedInput
   orderReviews?: Prisma.OrderReviewUncheckedUpdateManyWithoutPublisherNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedPublisherNestedInput
 }
 
 export type PublisherUncheckedUpdateManyWithoutOrganizationInput = {
@@ -1866,6 +2037,7 @@ export type PublisherCountOutputType = {
   transactions: number
   activeContexts: number
   orderReviews: number
+  tickets: number
 }
 
 export type PublisherCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1878,6 +2050,7 @@ export type PublisherCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensi
   transactions?: boolean | PublisherCountOutputTypeCountTransactionsArgs
   activeContexts?: boolean | PublisherCountOutputTypeCountActiveContextsArgs
   orderReviews?: boolean | PublisherCountOutputTypeCountOrderReviewsArgs
+  tickets?: boolean | PublisherCountOutputTypeCountTicketsArgs
 }
 
 /**
@@ -1953,6 +2126,13 @@ export type PublisherCountOutputTypeCountOrderReviewsArgs<ExtArgs extends runtim
   where?: Prisma.OrderReviewWhereInput
 }
 
+/**
+ * PublisherCountOutputType without action
+ */
+export type PublisherCountOutputTypeCountTicketsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TicketWhereInput
+}
+
 
 export type PublisherSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1974,6 +2154,7 @@ export type PublisherSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   transactions?: boolean | Prisma.Publisher$transactionsArgs<ExtArgs>
   activeContexts?: boolean | Prisma.Publisher$activeContextsArgs<ExtArgs>
   orderReviews?: boolean | Prisma.Publisher$orderReviewsArgs<ExtArgs>
+  tickets?: boolean | Prisma.Publisher$ticketsArgs<ExtArgs>
   _count?: boolean | Prisma.PublisherCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["publisher"]>
 
@@ -2023,6 +2204,7 @@ export type PublisherInclude<ExtArgs extends runtime.Types.Extensions.InternalAr
   transactions?: boolean | Prisma.Publisher$transactionsArgs<ExtArgs>
   activeContexts?: boolean | Prisma.Publisher$activeContextsArgs<ExtArgs>
   orderReviews?: boolean | Prisma.Publisher$orderReviewsArgs<ExtArgs>
+  tickets?: boolean | Prisma.Publisher$ticketsArgs<ExtArgs>
   _count?: boolean | Prisma.PublisherCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type PublisherIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2047,6 +2229,7 @@ export type $PublisherPayload<ExtArgs extends runtime.Types.Extensions.InternalA
     transactions: Prisma.$TransactionPayload<ExtArgs>[]
     activeContexts: Prisma.$ActiveContextPayload<ExtArgs>[]
     orderReviews: Prisma.$OrderReviewPayload<ExtArgs>[]
+    tickets: Prisma.$TicketPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2462,6 +2645,7 @@ export interface Prisma__PublisherClient<T, Null = never, ExtArgs extends runtim
   transactions<T extends Prisma.Publisher$transactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$transactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   activeContexts<T extends Prisma.Publisher$activeContextsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$activeContextsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ActiveContextPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   orderReviews<T extends Prisma.Publisher$orderReviewsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$orderReviewsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderReviewPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tickets<T extends Prisma.Publisher$ticketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Publisher$ticketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3145,6 +3329,30 @@ export type Publisher$orderReviewsArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   distinct?: Prisma.OrderReviewScalarFieldEnum | Prisma.OrderReviewScalarFieldEnum[]
+}
+
+/**
+ * Publisher.tickets
+ */
+export type Publisher$ticketsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Ticket
+   */
+  select?: Prisma.TicketSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Ticket
+   */
+  omit?: Prisma.TicketOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TicketInclude<ExtArgs> | null
+  where?: Prisma.TicketWhereInput
+  orderBy?: Prisma.TicketOrderByWithRelationInput | Prisma.TicketOrderByWithRelationInput[]
+  cursor?: Prisma.TicketWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TicketScalarFieldEnum | Prisma.TicketScalarFieldEnum[]
 }
 
 /**

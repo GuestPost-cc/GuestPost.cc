@@ -18,8 +18,11 @@ interface SavedListItem {
     id: string
     title: string
     slug: string
-    type: string
-    price: number
+    // Phase 7: legacy listing-level columns; prefer priceFrom + serviceTypes.
+    type?: string
+    price?: number
+    priceFrom?: number | null
+    serviceTypes?: string[]
     currency: string
     domainRating?: number
     image?: string
@@ -241,7 +244,8 @@ export default function SavedListsPage() {
                       )}
                     </div>
                     <div className="flex flex-col items-end justify-between">
-                      <span className="font-bold">{formatPrice(item.listing.price, item.listing.currency)}</span>
+                      {/* Phase 7: priceFrom + legacy fallback. */}
+                      <span className="font-bold">{formatPrice(((item.listing as any).priceFrom ?? item.listing.price ?? 0), item.listing.currency)}</span>
                       <div className="flex gap-2">
                         <Button variant="ghost" size="sm" onClick={() => removeFromList({ listId: selectedList.id, listingId: item.listing.id })}>
                           <Trash2 className="h-4 w-4" />

@@ -18,18 +18,23 @@ export class OrderFulfillmentAssignmentService {
       include: { website: { select: { ownershipType: true } } },
     })
     if (!order) throw new NotFoundException("Order not found")
-    if (order.website?.ownershipType !== "PLATFORM") {
+    const channel = order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    if (channel !== "PLATFORM") {
       throw new BadRequestException("Only platform-owned orders use fulfillment assignment")
     }
     return order
   }
 
   // Operations queue: platform orders awaiting fulfillment, grouped by their
-  // current assignment state.
+  // current assignment state. Reads order.fulfillmentChannel first, with the
+  // website.ownershipType clause as a Phase 2 fallback for legacy orders.
   async operationsQueue() {
     const orders = await this.prisma.order.findMany({
       where: {
-        website: { ownershipType: "PLATFORM" },
+        OR: [
+          { fulfillmentChannel: "PLATFORM" },
+          { fulfillmentChannel: null, website: { ownershipType: "PLATFORM" } },
+        ],
         status: { in: ["PAID", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW", "APPROVED", "PUBLISHED"] },
       },
       include: {

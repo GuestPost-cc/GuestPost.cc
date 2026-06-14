@@ -28,6 +28,12 @@ export class CreatePlatformWebsiteDto {
 
   @IsOptional() @Type(() => Number) @IsNumber() @Min(1)
   turnaroundDays?: number
+
+  // Phase 6.5: optional explicit owner. Service validates the target user has
+  // OPERATIONS staff role; omit to default to the creator (if they're OPS)
+  // or NULL (if they're SUPER_ADMIN).
+  @IsString() @IsOptional() @MaxLength(64)
+  managedByUserId?: string
 }
 
 export class UpdatePlatformWebsiteDto extends CreatePlatformWebsiteDto {}

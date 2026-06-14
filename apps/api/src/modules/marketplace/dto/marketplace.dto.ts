@@ -1,7 +1,109 @@
 import { Type } from "class-transformer"
-import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, IsEnum, IsUrl, Min, Max, MinLength, MaxLength } from "class-validator"
-import { ListingType, ListingStatus } from "@guestpost/database"
+import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, IsEnum, IsUrl, IsObject, ValidateNested, Min, Max, MinLength, MaxLength } from "class-validator"
+import { ListingStatus, ServiceType } from "@guestpost/database"
 import { WebsiteOwnershipType } from "@guestpost/shared"
+
+// Public-facing availability values must mirror the Prisma enum without
+// importing it as a type at runtime (Prisma re-exports it as a union).
+export const SERVICE_AVAILABILITY_VALUES = ["AVAILABLE", "PAUSED", "WAITLIST"] as const
+export type ServiceAvailability = typeof SERVICE_AVAILABILITY_VALUES[number]
+
+// One service offering on a listing. The same listing can carry many.
+// Price + turnaround are snapshotted onto the Order at creation, so
+// edits here never alter an in-flight contract.
+export class ListingServiceInput {
+  @IsEnum(ServiceType)
+  serviceType!: ServiceType
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  price!: number
+
+  @IsOptional()
+  @IsString()
+  currency?: string = "USD"
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  turnaroundDays!: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  revisionRounds?: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  warrantyDays?: number
+
+  @IsOptional()
+  @IsObject()
+  requirements?: Record<string, unknown>
+
+  @IsOptional()
+  @IsObject()
+  fulfillmentSettings?: Record<string, unknown>
+
+  @IsOptional()
+  @IsEnum(SERVICE_AVAILABILITY_VALUES)
+  availability?: ServiceAvailability
+}
+
+// Per-service PATCH — all fields optional; serviceType cannot be reassigned
+// after creation (would orphan the unique (listingId, serviceType) constraint
+// and any historical Order snapshot referring to a different intent).
+export class UpdateListingServiceInput {
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  price?: number
+
+  @IsOptional()
+  @IsString()
+  currency?: string
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  turnaroundDays?: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  revisionRounds?: number
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  warrantyDays?: number
+
+  @IsOptional()
+  @IsObject()
+  requirements?: Record<string, unknown>
+
+  @IsOptional()
+  @IsObject()
+  fulfillmentSettings?: Record<string, unknown>
+
+  @IsOptional()
+  @IsEnum(SERVICE_AVAILABILITY_VALUES)
+  availability?: ServiceAvailability
+
+  // Optimistic-lock guard — caller must pass the version they last read.
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  version!: number
+}
 
 export class SearchListingsDto {
   @IsOptional()
@@ -12,9 +114,12 @@ export class SearchListingsDto {
   @IsString()
   category?: string
 
+  // Phase 7: SearchListingsDto.type was a ListingType filter; now it's a
+  // ServiceType filter that matches listings with ≥1 AVAILABLE service of
+  // the given type.
   @IsOptional()
   @IsString()
-  type?: ListingType
+  type?: ServiceType
 
   @IsOptional()
   @IsArray()
@@ -103,17 +208,24 @@ export class CreateListingDto {
   @MaxLength(500)
   shortDescription?: string
 
-  @IsEnum(ListingType)
-  type!: ListingType
+  // Phase 7: listing-level `type` was dropped. We keep this optional input
+  // for one release as a no-op (server ignores it) so legacy clients that
+  // still send a top-level type don't get a 400. Will be removed entirely
+  // next release.
+  @IsOptional()
+  @IsString()
+  type?: string
 
   @IsOptional()
   @IsEnum(ListingStatus)
   status?: ListingStatus = ListingStatus.DRAFT
 
+  // Phase 7: also optional; per-service prices live on `services[]`.
+  @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
-  price!: number
+  price?: number
 
   @IsOptional()
   @IsString()
@@ -193,14 +305,9 @@ export class CreateListingDto {
   @IsBoolean()
   verified?: boolean
 
-  @IsOptional()
-  @IsBoolean()
-  allowGuestPost?: boolean
-
-  @IsOptional()
-  @IsBoolean()
-  allowNicheEdit?: boolean
-
+  // allowGuestPost / allowNicheEdit removed in Phase 5 cleanup — multi-service
+  // listings encode this via the presence of a ListingService row for each
+  // serviceType. doFollowOnly stays as a listing-level link policy flag.
   @IsOptional()
   @IsBoolean()
   doFollowOnly?: boolean
@@ -229,6 +336,16 @@ export class CreateListingDto {
   @IsOptional()
   @IsString()
   websiteId?: string
+
+  // New-shape multi-service input. When present, services[] is the source of
+  // truth; the listing-level `type` / `price` / `turnaroundDays` are still
+  // accepted for backward compatibility and used only when services[] is
+  // omitted (Phase 2 shim — removed in Phase 4).
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ListingServiceInput)
+  services?: ListingServiceInput[]
 }
 
 export class UpdateListingDto extends CreateListingDto {
@@ -294,9 +411,10 @@ export class GetListingFiltersDto {
   @IsString()
   category?: string
 
+  // Phase 7: same migration as SearchListingsDto.type — ServiceType filter.
   @IsOptional()
-  @IsEnum(ListingType)
-  type?: ListingType
+  @IsString()
+  type?: ServiceType
 
   @IsOptional()
   @IsString()

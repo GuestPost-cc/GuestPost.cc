@@ -50,13 +50,32 @@ import { format } from "date-fns"
 import { toast } from "sonner"
 import { flexRender } from "@tanstack/react-table"
 
+// Listing-service row (Phase 2). Mirrors the API response; staff view shows
+// ALL availability values (not just AVAILABLE) so reviewers can spot paused
+// rows during moderation.
+interface ListingServiceRow {
+  id: string
+  serviceType: string
+  price: number
+  currency: string
+  turnaroundDays: number
+  revisionRounds: number
+  warrantyDays?: number | null
+  availability: "AVAILABLE" | "PAUSED" | "WAITLIST"
+  version: number
+}
+
 interface Listing {
   id: string
   title: string
   slug: string
-  type: string
+  // Phase 7: type / price are LEGACY listing-level columns scheduled for
+  // drop. Prefer priceFrom + serviceTypes[] + services[].
+  type?: string
   status: string
-  price: number
+  price?: number
+  priceFrom?: number | null
+  serviceTypes?: string[]
   currency: string
   domainRating?: number
   traffic?: number
@@ -69,6 +88,8 @@ interface Listing {
   websiteVerifiedAt?: string | null
   websiteDomain?: string | null
   createdAt: string
+  ownerType?: "PUBLISHER" | "PLATFORM"
+  services?: ListingServiceRow[]
 }
 
 const verifyBadge: Record<string, string> = {
@@ -209,6 +230,49 @@ export default function AdminMarketplacePage() {
       toast.success("Listing deleted")
     },
     onError: () => toast.error("Failed to delete listing"),
+  })
+
+  // ── Per-service management for the listing under review ────────────────
+  // Same UX as publisher Services dialog (apps/publisher/listings) but
+  // routed through admin endpoints. assertListingWriteAccess on the server
+  // skips the publisher-membership check for staff actors.
+  type AdminService = {
+    listingId: string
+    serviceId: string
+    data: {
+      version: number
+      price?: number
+      turnaroundDays?: number
+      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
+    }
+  }
+  const [servicesForListing, setServicesForListing] = useState<{ id: string; title: string; services: ListingServiceRow[] } | null>(null)
+  const [newAdminService, setNewAdminService] = useState({ serviceType: "GUEST_POST", price: "", turnaroundDays: "7", revisionRounds: "2" })
+
+  const addAdminServiceMut = useMutation({
+    mutationFn: (vars: { listingId: string; data: { serviceType: string; price: number; turnaroundDays: number; revisionRounds?: number } }) =>
+      api.marketplace.addPlatformListingService(vars.listingId, vars.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+      setNewAdminService({ serviceType: "GUEST_POST", price: "", turnaroundDays: "7", revisionRounds: "2" })
+      toast.success("Service added")
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to add service"),
+  })
+  const updateAdminServiceMut = useMutation({
+    mutationFn: (vars: AdminService) =>
+      api.marketplace.updatePlatformListingService(vars.listingId, vars.serviceId, vars.data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] }),
+    onError: (e: Error) => toast.error(e.message || "Update failed"),
+  })
+  const pauseAdminServiceMut = useMutation({
+    mutationFn: (vars: { listingId: string; serviceId: string }) =>
+      api.marketplace.pausePlatformListingService(vars.listingId, vars.serviceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+      toast.success("Service paused")
+    },
+    onError: (e: Error) => toast.error(e.message || "Pause failed"),
   })
 
   function formatPrice(price: number, currency: string = "USD") {
@@ -414,7 +478,8 @@ export default function AdminMarketplacePage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{listing.type.replace("_", " ")}</Badge>
+                    {/* Phase 7: prefer the first AVAILABLE service. */}
+                    <Badge variant="outline">{(((listing as any).serviceTypes?.[0]) ?? listing.type ?? "").replace(/_/g, " ")}</Badge>
                   </TableCell>
                   <TableCell>
                     <Badge className={statusColors[listing.status] || "bg-gray-100"}>
@@ -433,7 +498,7 @@ export default function AdminMarketplacePage() {
                       <span className="text-xs text-muted-foreground">Platform</span>
                     )}
                   </TableCell>
-                  <TableCell>{formatPrice(listing.price, listing.currency)}</TableCell>
+                  <TableCell>{formatPrice((listing as any).priceFrom ?? listing.price ?? 0, listing.currency)}</TableCell>
                   <TableCell>{listing.domainRating || "-"}</TableCell>
                   <TableCell>
                     {listing.featured ? (
@@ -487,6 +552,18 @@ export default function AdminMarketplacePage() {
                           <a href={`/dashboard/marketplace/${listing.slug}`}>
                             View Public Page
                           </a>
+                        </DropdownMenuItem>
+                        {/* Manage services — visible for all listings; the
+                            server enforces staff-only for PUBLISHER-owned
+                            (admin can edit any listing's services from here). */}
+                        <DropdownMenuItem
+                          onClick={() => setServicesForListing({
+                            id: listing.id,
+                            title: listing.title,
+                            services: listing.services ?? [],
+                          })}
+                        >
+                          Manage Services ({listing.services?.length ?? 0})
                         </DropdownMenuItem>
                         {listing.status !== "ARCHIVED" && (
                           <>
@@ -586,6 +663,108 @@ export default function AdminMarketplacePage() {
           </Button>
         </div>
       )}
+
+      {/*
+        Admin Services dialog. Same shape as the publisher version but routes
+        through the staff-gated /admin/marketplace/listings/:id/services
+        endpoints. Pause is soft (PAUSED), preserving historical orders'
+        listingServiceId references.
+      */}
+      <Dialog open={!!servicesForListing} onOpenChange={(v) => { if (!v) setServicesForListing(null) }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Services on “{servicesForListing?.title}”</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Per-service prices, turnarounds, and availability. Pausing a service keeps it linked to historical orders.
+          </p>
+          <div className="space-y-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Service</TableHead>
+                  <TableHead>Price</TableHead>
+                  <TableHead>TAT</TableHead>
+                  <TableHead>Availability</TableHead>
+                  <TableHead className="text-right"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {servicesForListing?.services.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">No services configured yet.</TableCell>
+                  </TableRow>
+                )}
+                {servicesForListing?.services.map(s => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.serviceType.replace(/_/g, " ")}</TableCell>
+                    <TableCell className="font-mono text-sm">{formatPrice(Number(s.price), s.currency)}</TableCell>
+                    <TableCell>{s.turnaroundDays}d</TableCell>
+                    <TableCell>
+                      <Select
+                        value={s.availability}
+                        onValueChange={(v) => updateAdminServiceMut.mutate({
+                          listingId: servicesForListing!.id,
+                          serviceId: s.id,
+                          data: { version: s.version, availability: v as "AVAILABLE" | "PAUSED" | "WAITLIST" },
+                        })}
+                      >
+                        <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="AVAILABLE">Available</SelectItem>
+                          <SelectItem value="PAUSED">Paused</SelectItem>
+                          <SelectItem value="WAITLIST">Waitlist</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => pauseAdminServiceMut.mutate({ listingId: servicesForListing!.id, serviceId: s.id })}
+                        disabled={s.availability === "PAUSED"}
+                      >
+                        Pause
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <div className="border-t pt-4 space-y-3">
+              <div className="text-sm font-medium">Add a service</div>
+              <div className="grid grid-cols-4 gap-3">
+                <Select value={newAdminService.serviceType} onValueChange={(v) => setNewAdminService({ ...newAdminService, serviceType: v })}>
+                  <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
+                  <SelectContent>
+                    {(["GUEST_POST","NICHE_EDIT","EDITORIAL_LINK","OUTREACH_LINK","LOCAL_CITATION","FOUNDATION_LINK","BLOG_ARTICLE","SEO_CONTENT"] as const).map(t => (
+                      <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input type="number" min={1} step="0.01" placeholder="Price" value={newAdminService.price} onChange={(e) => setNewAdminService({ ...newAdminService, price: e.target.value })} />
+                <Input type="number" min={1} placeholder="TAT (days)" value={newAdminService.turnaroundDays} onChange={(e) => setNewAdminService({ ...newAdminService, turnaroundDays: e.target.value })} />
+                <Input type="number" min={0} placeholder="Revisions" value={newAdminService.revisionRounds} onChange={(e) => setNewAdminService({ ...newAdminService, revisionRounds: e.target.value })} />
+              </div>
+              <Button
+                size="sm"
+                disabled={!servicesForListing || !newAdminService.price || Number(newAdminService.price) <= 0 || addAdminServiceMut.isPending}
+                onClick={() => servicesForListing && addAdminServiceMut.mutate({
+                  listingId: servicesForListing.id,
+                  data: {
+                    serviceType: newAdminService.serviceType,
+                    price: Number(newAdminService.price),
+                    turnaroundDays: Number(newAdminService.turnaroundDays) || 7,
+                    revisionRounds: Number(newAdminService.revisionRounds) || 2,
+                  },
+                })}
+              >
+                {addAdminServiceMut.isPending ? "Adding..." : "Add service"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

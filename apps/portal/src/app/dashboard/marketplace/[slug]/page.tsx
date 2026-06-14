@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useState, useEffect, useMemo } from "react"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
@@ -31,9 +31,12 @@ interface Listing {
   slug: string
   description: string
   shortDescription?: string
-  type: string
+  // Phase 7: type / price / revisionRounds / turnaroundDays are LEGACY
+  // listing-level columns scheduled for drop. priceFrom + services[] are
+  // the new source of truth; see resolveDisplay* helpers in api-client.
+  type?: string
   status: string
-  price: number
+  price?: number
   currency: string
   priceType: string
   minPrice?: number
@@ -46,12 +49,12 @@ interface Listing {
   country?: string
   language?: string
   turnaroundDays?: number
-  revisionRounds: number
+  revisionRounds?: number
   featured: boolean
   verified: boolean
   fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
-  allowGuestPost: boolean
-  allowNicheEdit: boolean
+  // allowGuestPost / allowNicheEdit deprecated in Phase 5; the services[]
+  // array tells you which serviceTypes the listing offers.
   doFollowOnly: boolean
   websiteUrl?: string
   websiteId?: string | null
@@ -59,13 +62,30 @@ interface Listing {
   category?: { id: string; name: string; slug: string }
   tags: Array<{ id: string; name: string; slug: string }>
   images: Array<{ url: string; isPrimary: boolean }>
-  pricingTiers: Array<{ name: string; price: number; description?: string }>
+  // pricingTiers removed in Phase 5 — replaced by `services[]` (each row is
+  // its own purchasable offering with price/TAT/requirements).
   reviews: Array<{ id: string; rating: number; title?: string; content: string; user: { name?: string; image?: string }; createdAt: string }>
   publisher?: { id: string; name: string; profile?: { rating?: number; totalReviews?: number; responseTime?: number } }
   avgRating?: number
   reviewCount: number
   isFavorited?: boolean
   relatedListings: any[]
+  // Phase 2 fields. attribution drives the "Listed by …" header; services
+  // is the menu of orderable rows the customer must pick from before the
+  // wizard accepts a checkout. Both fall back gracefully on legacy listings.
+  ownerType?: "PUBLISHER" | "PLATFORM"
+  attribution?: { kind: "PUBLISHER" | "PLATFORM"; label: string }
+  services?: Array<{
+    id: string
+    serviceType: string
+    price: number
+    currency: string
+    turnaroundDays: number
+    revisionRounds: number
+    warrantyDays?: number | null
+    requirements?: Record<string, unknown> | null
+    availability: "AVAILABLE" | "PAUSED" | "WAITLIST"
+  }>
 }
 
 export default function ListingDetailPage() {
@@ -74,12 +94,40 @@ export default function ListingDetailPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [activeImage, setActiveImage] = useState(0)
+  // The customer's locked pick. URL-bound (?service=GUEST_POST) so deep
+  // links carry the choice; defaults to the first AVAILABLE row when the
+  // listing loads.
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
 
   const { data: listing, isLoading, error, refetch } = useQuery<Listing>({
     queryKey: ["listing", params.slug],
     queryFn: () => api.marketplace.getListing(params.slug as string).then(r => r as unknown as Listing),
     enabled: !!params.slug,
   })
+
+  // ── Service-picker state, URL-synced ──────────────────────────────────
+  const searchParams = useSearchParams()
+  const services = listing?.services ?? []
+  const orderableServices = useMemo(
+    () => services.filter(s => s.availability === "AVAILABLE"),
+    [services],
+  )
+  const selectedService = useMemo(
+    () => services.find(s => s.id === selectedServiceId) ?? null,
+    [services, selectedServiceId],
+  )
+
+  // Initial selection: respect ?service=GUEST_POST in the URL, else default
+  // to the first AVAILABLE row (cheapest, since the API sorts by price asc).
+  useEffect(() => {
+    if (!listing || services.length === 0) return
+    if (selectedServiceId && services.some(s => s.id === selectedServiceId)) return
+    const requested = searchParams?.get("service")
+    const fromUrl = requested ? services.find(s => s.serviceType === requested && s.availability === "AVAILABLE") : null
+    const fallback = orderableServices[0] ?? null
+    const picked = fromUrl ?? fallback
+    if (picked) setSelectedServiceId(picked.id)
+  }, [listing, services, orderableServices, searchParams, selectedServiceId])
 
   const { mutate: toggleFavorite, isPending: favoriting } = useMutation({
     mutationFn: () => {
@@ -197,7 +245,8 @@ export default function ListingDetailPage() {
               {listing.category && (
                 <Badge variant="secondary">{listing.category.name}</Badge>
               )}
-              <Badge variant="outline">{listing.type.replace(/_/g, " ")}</Badge>
+              {/* Phase 7: prefer the first AVAILABLE service. */}
+              <Badge variant="outline">{(((listing as any).serviceTypes?.[0]) ?? listing.type ?? "").replace(/_/g, " ")}</Badge>
               {listing.fulfillmentType === "INTERNAL" ? (
                 <Badge>Platform fulfilled</Badge>
               ) : listing.fulfillmentType === "HYBRID" ? (
@@ -233,12 +282,21 @@ export default function ListingDetailPage() {
           </div>
 
           <div className="p-6 border rounded-lg space-y-4">
+            {/* Phase 7: header price now reflects selected service when one
+                is picked, otherwise priceFrom (min AVAILABLE). Legacy
+                listing.price is the last-resort fallback. */}
             <div className="flex items-baseline justify-between">
-              <span className="text-3xl font-bold">{formatPrice(listing.price, listing.currency)}</span>
-              {listing.priceType !== "fixed" && (
-                <span className="text-muted-foreground text-sm">
-                  {listing.priceType === "starting_at" ? "Starting at" : listing.priceType}
-                </span>
+              <span className="text-3xl font-bold">{
+                formatPrice(
+                  selectedService?.price
+                    ?? (listing as any).priceFrom
+                    ?? listing.price
+                    ?? 0,
+                  listing.currency,
+                )
+              }</span>
+              {(listing as any).priceFrom != null && !selectedService && (
+                <span className="text-muted-foreground text-sm">starting at</span>
               )}
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -261,21 +319,77 @@ export default function ListingDetailPage() {
                 </div>
               )}
             </div>
+            {/*
+              Services picker. Replaces the single price/CTA block with a list
+              of orderable services. The customer's choice locks the
+              listingServiceId carried into the wizard — service is not
+              re-selectable downstream.
+            */}
+            {services.length > 0 && (
+              <div className="space-y-2" role="radiogroup" aria-label="Choose a service">
+                <div className="text-sm font-medium text-muted-foreground">Available services</div>
+                {services.map(svc => {
+                  const isSelected = svc.id === selectedServiceId
+                  const isWaitlist = svc.availability === "WAITLIST"
+                  return (
+                    <button
+                      key={svc.id}
+                      role="radio"
+                      aria-checked={isSelected}
+                      disabled={isWaitlist}
+                      onClick={() => setSelectedServiceId(svc.id)}
+                      className={`w-full text-left p-3 border rounded-lg transition-colors ${isSelected ? "border-primary ring-1 ring-primary" : "border-border hover:border-primary/50"} ${isWaitlist ? "opacity-60 cursor-not-allowed" : ""}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="font-medium text-sm">{svc.serviceType.replace(/_/g, " ")}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {svc.turnaroundDays}d turnaround · {svc.revisionRounds} revisions
+                            {isWaitlist && <span className="ml-2 text-amber-600">Waitlist</span>}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-semibold">{formatPrice(svc.price, svc.currency)}</div>
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
             <Button
               className="w-full"
               size="lg"
+              disabled={services.length > 0 && !selectedService}
               onClick={() => {
                 if (!listing) return
-                const params = new URLSearchParams({ type: listing.type, name: listing.title })
-                // Target the fulfillment website; publisher is auto-derived from it.
+                const params = new URLSearchParams({ name: listing.title })
+                // Phase 2 contract: when the listing carries services, the
+                // wizard MUST be locked to (listingServiceId, websiteId).
+                // The service type is carried for display only — server
+                // re-reads it from the snapshot.
+                if (selectedService) {
+                  params.set("listingServiceId", selectedService.id)
+                  params.set("type", selectedService.serviceType)
+                  params.set("price", String(selectedService.price))
+                  params.set("locked", "1")
+                } else {
+                  // No service picked yet — fall through to the first
+                  // AVAILABLE service's type, then the deprecated listing
+                  // column as a last resort.
+                  const fallbackType = (listing as any).serviceTypes?.[0] ?? listing.type
+                  if (fallbackType) params.set("type", fallbackType)
+                  const fallbackPrice = (listing as any).priceFrom ?? listing.price
+                  if (fallbackPrice != null) params.set("price", String(fallbackPrice))
+                }
                 if (listing.websiteId) params.set("websiteId", listing.websiteId)
                 if (listing.websiteUrl) params.set("url", listing.websiteUrl)
-                if (listing.price != null) params.set("price", String(listing.price))
-                params.set("fulfilledBy", listing.fulfillmentType === "INTERNAL" ? "Platform" : (listing.publisher?.name ?? "Publisher"))
+                const attributionLabel = listing.attribution?.label ?? (listing.fulfillmentType === "INTERNAL" ? "Platform" : (listing.publisher?.name ?? "Publisher"))
+                params.set("fulfilledBy", attributionLabel)
                 router.push(`/dashboard/orders/new?${params.toString()}`)
               }}
             >
-              Order Now
+              {services.length > 0 && !selectedService ? "Pick a service to continue" : "Order Now"}
             </Button>
             <Button
               variant="outline"
@@ -290,12 +404,19 @@ export default function ListingDetailPage() {
           </div>
 
           <div className="space-y-3">
-            {listing.turnaroundDays && (
-              <div className="flex items-center gap-3 text-sm">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>{listing.turnaroundDays} days turnaround</span>
-              </div>
-            )}
+            {/* Phase 7: prefer the selected service's TAT; fall back to the
+                first AVAILABLE service; last resort is the legacy column. */}
+            {(() => {
+              const td = selectedService?.turnaroundDays
+                ?? services.find(s => s.availability === "AVAILABLE")?.turnaroundDays
+                ?? listing.turnaroundDays
+              return td ? (
+                <div className="flex items-center gap-3 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground" />
+                  <span>{td} days turnaround</span>
+                </div>
+              ) : null
+            })()}
             {listing.country && (
               <div className="flex items-center gap-3 text-sm">
                 <Globe className="h-4 w-4 text-muted-foreground" />
@@ -308,10 +429,19 @@ export default function ListingDetailPage() {
                 <span>{listing.language}</span>
               </div>
             )}
-            <div className="flex items-center gap-3 text-sm">
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              <span>{listing.revisionRounds} revision rounds included</span>
-            </div>
+            {(() => {
+              // Phase 7: same fallback chain as turnaround days. Hide the
+              // row entirely if no service or legacy column declares it.
+              const rr = selectedService?.revisionRounds
+                ?? services.find(s => s.availability === "AVAILABLE")?.revisionRounds
+                ?? listing.revisionRounds
+              return rr != null ? (
+                <div className="flex items-center gap-3 text-sm">
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                  <span>{rr} revision rounds included</span>
+                </div>
+              ) : null
+            })()}
             {listing.websiteUrl && (
               <a
                 href={listing.websiteUrl}
@@ -378,19 +508,26 @@ export default function ListingDetailPage() {
           )}
         </TabsContent>
         <TabsContent value="pricing" className="mt-4">
-          {listing.pricingTiers.length > 0 ? (
+          {/*
+            Phase 5: the Pricing tab now mirrors the services panel — one card
+            per ListingService with its price + turnaround. The legacy
+            MarketplacePricingTier table has been removed; this is the only
+            "pricing schedule" the listing carries.
+          */}
+          {services.length > 0 ? (
             <div className="grid md:grid-cols-3 gap-4">
-              {listing.pricingTiers.map((tier, i) => (
-                <div key={i} className="p-6 border rounded-lg">
-                  <h3 className="font-semibold mb-2">{tier.name}</h3>
-                  <div className="text-2xl font-bold mb-4">{formatPrice(tier.price, listing.currency)}</div>
-                  {tier.description && <p className="text-sm text-muted-foreground">{tier.description}</p>}
+              {services.map(svc => (
+                <div key={svc.id} className="p-6 border rounded-lg">
+                  <h3 className="font-semibold mb-2">{svc.serviceType.replace(/_/g, " ")}</h3>
+                  <div className="text-2xl font-bold mb-2">{formatPrice(svc.price, svc.currency)}</div>
+                  <p className="text-sm text-muted-foreground">{svc.turnaroundDays}d turnaround · {svc.revisionRounds} revisions</p>
+                  {svc.availability === "WAITLIST" && <p className="text-xs text-amber-600 mt-2">Currently waitlisted</p>}
                 </div>
               ))}
             </div>
           ) : (
             <div className="p-6 border rounded-lg text-center">
-              <p className="text-lg font-medium">{formatPrice(listing.price, listing.currency)}</p>
+              <p className="text-lg font-medium">{formatPrice(listing.price ?? 0, listing.currency)}</p>
               <p className="text-muted-foreground">Fixed price</p>
             </div>
           )}

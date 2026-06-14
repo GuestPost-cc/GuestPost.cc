@@ -17,6 +17,14 @@ export interface CreateOrderData {
   instructions?: string
   campaignId?: string
   idempotencyKey?: string
+  // Phase 2 preferred: the customer's locked pick from the listing detail
+  // page. When present, the server snapshots price/TAT/serviceType/channel
+  // from this row and ignores any drift. Required in Phase 4.
+  listingServiceId?: string
+  // Phase 6: per-service structured brief. The server validates this against
+  // the @guestpost/shared registry for the resolved serviceType — clients
+  // should just JSON-stringify the form state.
+  briefData?: Record<string, unknown>
   items?: OrderItemData[]
 }
 

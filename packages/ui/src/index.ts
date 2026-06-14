@@ -97,4 +97,17 @@ export { ErrorState } from "./components/error-state"
 export { StatusBadge, statusBadgeVariants } from "./components/status-badge"
 export { NotificationBell } from "./components/notification-bell"
 export type { NotificationBellItem, NotificationBellProps } from "./components/notification-bell"
+export { BriefRenderer } from "./components/brief-renderer"
+export type { BriefRendererProps, LegacyBriefFallback } from "./components/brief-renderer"
+export { FulfillmentChannelBadge } from "./components/fulfillment-channel-badge"
+export type {
+  FulfillmentChannelBadgeProps,
+  FulfillmentChannelValue,
+} from "./components/fulfillment-channel-badge"
+export { SupportPanel } from "./components/support-panel"
+export type {
+  SupportPanelProps,
+  SupportPanelTicket,
+  SupportPanelActorScope,
+} from "./components/support-panel"
 export { downloadCsv } from "./lib/csv"

@@ -199,6 +199,24 @@ enum PublisherTier {
   VERIFIED
 }
 
+// Marketplace listing-service availability. WAITLIST is orderable=false but
+// favoritable (MarketplaceFavorite.serviceType captures interest); a worker
+// notifies interested users when the row flips to AVAILABLE.
+enum ServiceAvailability {
+  AVAILABLE
+  PAUSED
+  WAITLIST
+}
+
+// Snapshotted onto Order at creation. Downstream routing (publisher inbox vs
+// internal Ops queue, settlement vs PlatformRevenue) keys off this column,
+// never re-derives from Website.ownershipType — which can change after the
+// order exists.
+enum FulfillmentChannel {
+  PUBLISHER
+  PLATFORM
+}
+
 enum VerificationStatus {
   PENDING
   VERIFIED
@@ -237,6 +255,8 @@ model User {
   marketplaceReviews   MarketplaceReview[]
   marketplaceFavorites MarketplaceFavorite[]
   activeContext        ActiveContext?
+  managedWebsites      Website[]           @relation("WebsiteManager")
+  assignedTickets      Ticket[]            @relation("TicketAssignee")
 }
 
 model Session {
@@ -404,6 +424,7 @@ model Publisher {
   transactions        Transaction[]
   activeContexts      ActiveContext[]
   orderReviews        OrderReview[]
+  tickets             Ticket[]            @relation("TicketPublisher")
 
   @@index([organizationId])
 }
@@ -433,6 +454,12 @@ model Website {
   isActive        Boolean               @default(true)
   publisherId     String?
   ownershipType   WebsiteOwnershipType   @default(PUBLISHER)
+  // Phase 6.5: which OPERATIONS staff member manages this site. NULL for
+  // PUBLISHER sites (publisher org membership is the source of truth) and
+  // for PLATFORM sites that haven't been assigned yet (orders fall back to
+  // the shared Ops queue). Set on create when an OPERATIONS staffer adds the
+  // site, and admin-mutable via PATCH /admin/websites/:id/assign.
+  managedByUserId String?
 
   // ── Domain ownership verification (DNS TXT) ──
   // Publisher sites start PENDING_VERIFICATION and must prove control via a
@@ -466,6 +493,7 @@ model Website {
   updatedAt       DateTime              @updatedAt
 
   publisher  Publisher?  @relation(fields: [publisherId], references: [id])
+  managedBy  User?       @relation("WebsiteManager", fields: [managedByUserId], references: [id])
   orders     Order[]
   orderItems OrderItem[]
   marketplaceListings MarketplaceListing[]
@@ -478,6 +506,7 @@ model Website {
   @@index([verificationToken])
   @@index([verificationStatus])
   @@index([verifiedAt])
+  @@index([managedByUserId, ownershipType])
 }
 
 model Order {
@@ -508,6 +537,20 @@ model Order {
   // Points at the current OrderDeliveryVersion (source of truth for delivery).
   // Legacy publishedUrl/verifiedAt/deliveredAt are denormalized mirrors of it.
   activeDeliveryVersionId String?
+  // ── Listing-service snapshot (Phase 1 additive; required in Phase 4) ──
+  // Captured at order creation from the chosen MarketplaceListing →
+  // ListingService row so that subsequent price/TAT/availability edits on
+  // the live listing never alter the contract for in-flight orders. type,
+  // amount, websiteId, turnaroundDays are denormalized mirrors of the chosen
+  // ListingService at that moment.
+  listingId          String?
+  listingServiceId   String?
+  fulfillmentChannel FulfillmentChannel?
+  turnaroundDays     Int?
+  // Phase 6: per-service structured brief. Validated server-side against
+  // the @guestpost/shared briefSchemas registry keyed on serviceType. NULL
+  // for legacy orders (renderers fall back to title/instructions).
+  briefData          Json?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
@@ -516,6 +559,8 @@ model Order {
   website      Website?      @relation(fields: [websiteId], references: [id])
   organization Organization  @relation(fields: [organizationId], references: [id])
   campaign     Campaign?     @relation(fields: [campaignId], references: [id])
+  listing      MarketplaceListing? @relation(fields: [listingId], references: [id])
+  listingService ListingService?   @relation(fields: [listingServiceId], references: [id])
   contentOrder ContentOrder?
   revisions    Revision[]
   reports      Report[]
@@ -540,6 +585,9 @@ model Order {
   @@index([websiteId])
   @@index([campaignId])
   @@index([createdAt])
+  @@index([listingId])
+  @@index([listingServiceId])
+  @@index([fulfillmentChannel, status])
 }
 
 model Campaign {
@@ -557,16 +605,9 @@ model Campaign {
   @@index([organizationId])
 }
 
-model Service {
-  id        String      @id @default(cuid())
-  type      ServiceType
-  name      String
-  price     Decimal
-  currency  String      @default("USD")
-  isActive  Boolean     @default(true)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-}
+// Service model removed in Phase 7 cleanup — global per-type pricing was the
+// pre-marketplace fallback and is unused since the Phase 4 hard switch. See
+// migration 20260615120000_phase7_legacy_drop.
 
 model OrderItem {
   id          String      @id @default(cuid())
@@ -655,6 +696,15 @@ model Settlement {
   reviewEndsAt    DateTime?
   settledAt       DateTime?
   version         Int              @default(0)
+  // ── Phase 6 reporting snapshots (additive; NULL on legacy rows) ──
+  // Captured at settlement creation by joining the order's snapshot. Frozen
+  // forever so refunds, audits, and reports can re-derive the contract
+  // even after the publisher edits the listing.
+  listingServiceId   String?
+  serviceType        ServiceType?
+  ownerType          WebsiteOwnershipType?
+  fulfillmentChannel FulfillmentChannel?
+  unitPrice          Decimal?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -662,6 +712,7 @@ model Settlement {
   publisher  Publisher             @relation(fields: [publisherId], references: [id])
   approvals  SettlementApproval[]
   transactions Transaction[]
+  listingService ListingService?   @relation(fields: [listingServiceId], references: [id])
 
   // NOTE: a partial unique index "Settlement_orderId_active_key" on (orderId)
   // WHERE status != 'CANCELLED' exists via raw SQL migration — Prisma cannot
@@ -669,6 +720,9 @@ model Settlement {
   @@index([orderId])
   @@index([publisherId, status])
   @@index([status])
+  @@index([serviceType])
+  @@index([fulfillmentChannel])
+  @@index([listingServiceId])
 }
 
 enum SettlementApprovalType {
@@ -1042,11 +1096,21 @@ model PlatformRevenue {
   // Set on refund instead of deleting the row — financial records are
   // never destroyed. Revenue queries must filter reversedAt: null.
   reversedAt  DateTime?
+  // Phase 6 reporting snapshots — same shape as Settlement.
+  listingServiceId   String?
+  serviceType        ServiceType?
+  ownerType          WebsiteOwnershipType?
+  fulfillmentChannel FulfillmentChannel?
+  unitPrice          Decimal?
   createdAt   DateTime  @default(now())
 
   order Order @relation(fields: [orderId], references: [id])
+  listingService ListingService? @relation(fields: [listingServiceId], references: [id])
 
   @@index([recordedAt])
+  @@index([serviceType])
+  @@index([fulfillmentChannel])
+  @@index([listingServiceId])
 }
 
 model Wallet {
@@ -1123,18 +1187,34 @@ model Ticket {
   // Optional link to the order the ticket is about — lets customers get help
   // straight from an order and gives staff full context.
   orderId        String?
+  // Phase 6.5 channel-aware routing. Snapshotted from the linked order at
+  // ticket creation; subsequent website/listing edits never re-route an
+  // existing ticket (prevents accidental exposure to a new owner).
+  //   - PLATFORM channel: assignedToUserId = Website.managedByUserId at the
+  //     moment the ticket was opened. NULL falls back to the unassigned-Ops
+  //     queue surfaced to every OPERATIONS staffer.
+  //   - PUBLISHER channel: assignedPublisherId = Website.publisherId. Reply
+  //     access then keys off PublisherMembership rather than a single user.
+  fulfillmentChannel  FulfillmentChannel?
+  assignedToUserId    String?
+  assignedPublisherId String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   organization Organization  @relation(fields: [organizationId], references: [id])
   user         User          @relation(fields: [userId], references: [id])
   order        Order?        @relation(fields: [orderId], references: [id])
+  assignedTo   User?         @relation("TicketAssignee", fields: [assignedToUserId], references: [id])
+  assignedPublisher Publisher? @relation("TicketPublisher", fields: [assignedPublisherId], references: [id])
   messages     TicketMessage[]
 
   @@index([organizationId, status])
   @@index([userId])
   @@index([status])
   @@index([orderId])
+  @@index([assignedToUserId, status])
+  @@index([assignedPublisherId, status])
+  @@index([fulfillmentChannel, status])
 }
 
 model TicketMessage {
@@ -1197,20 +1277,9 @@ model AuditLog {
 // MARKETPLACE MODELS
 // =============================================================================
 
-enum ListingType {
-  INTERNAL_SERVICE
-  PUBLISHER_WEBSITE
-  GUEST_POST
-  NICHE_EDIT
-  EDITORIAL_LINK
-  DIGITAL_PR
-  SPONSORED_CONTENT
-  OUTREACH_LINK
-  LOCAL_CITATION
-  FOUNDATION_LINK
-  BLOG_ARTICLE
-  SEO_CONTENT
-}
+// Phase 7: enum ListingType removed. The deprecated MarketplaceListing.type
+// column it backed is gone; service offerings are now expressed as
+// ServiceType values on ListingService rows.
 
 enum ListingStatus {
   DRAFT
@@ -1262,38 +1331,41 @@ model MarketplaceListing {
   slug              String              @unique
   description       String
   shortDescription  String?
-  type              ListingType
+  // Phase 7 cleanup: `type` / `price` / `turnaroundDays` / `revisionRounds`
+  // / `warrantyDays` were dropped — per-service data lives on the
+  // ListingService child table. See migration 20260615130000_phase7_listing_columns.
   status            ListingStatus       @default(DRAFT)
   fulfillmentType   ListingFulfillmentType @default(PUBLISHER)
-  
-  // Pricing
-  price             Decimal
+  // Authoritative ownership at the listing layer. Backfilled in Phase 1 from
+  // (publisherId IS NOT NULL ? PUBLISHER : PLATFORM). Routing, attribution
+  // ("Listed by GuestPost.cc"), and approval-queue gating read this column.
+  ownerType         WebsiteOwnershipType @default(PUBLISHER)
+
+  // Pricing — listing-level columns dropped in Phase 7. Reads use priceFrom
+  // (computed from AVAILABLE ListingService rows).
   currency          String              @default("USD")
   priceType         String              @default("fixed") // fixed, starting_at, range, negotiable
   minPrice          Decimal?
   maxPrice          Decimal?
-  
+
   // Metrics
   domainRating      Int?
   domainAuthority   Int?
   traffic           Int?
   referringDomains  Int?
   spamScore         Int?
-  
+
   // Location & Language
   country           String?
   language          String?
   countries         String[]            @default([])
   languages         String[]            @default([])
-  
+
   // Features
-  turnaroundDays    Int?
-  revisionRounds   Int                  @default(2)
-  warrantyDays      Int?
   featured          Boolean              @default(false)
   verified          Boolean              @default(false)
-  allowGuestPost    Boolean              @default(true)
-  allowNicheEdit    Boolean              @default(true)
+  // allowGuestPost / allowNicheEdit removed in Phase 5 cleanup — multi-service
+  // listings encode service availability via the ListingService child table.
   doFollowOnly      Boolean              @default(false)
   
   // URLs
@@ -1326,23 +1398,71 @@ model MarketplaceListing {
   
   tags              MarketplaceListingTag[]
   images            MarketplaceListingImage[]
-  pricingTiers      MarketplacePricingTier[]
+  // pricingTiers removed in Phase 5 — replaced by per-service prices on the
+  // ListingService child table.
   reviews           MarketplaceReview[]
   favorites         MarketplaceFavorite[]
   savedLists        MarketplaceSavedListItem[]
   views             MarketplaceListingView[]
   clicks            MarketplaceListingClick[]
-  
+  services          ListingService[]
+  orders            Order[]
+
   categoryId        String?
 
   @@index([slug])
-  @@index([type])
+  // Phase 7: @@index([type]) dropped alongside MarketplaceListing.type.
   @@index([status])
   @@index([publisherId])
   @@index([categoryId])
   @@index([featured])
   @@index([createdAt])
-  @@index([price])
+  // Phase 7: @@index([price]) dropped alongside MarketplaceListing.price.
+  // Sorting/filtering by price now hits the ListingService(availability,
+  // serviceType, price) composite index.
+  @@index([ownerType, status])
+}
+
+// A purchasable service offering on a MarketplaceListing. One listing can
+// expose N service rows — e.g. GUEST_POST at $150 / 7d AND NICHE_EDIT at $80
+// / 3d on the same website — replacing the previous "one listing = one
+// service" model. Order.create snapshots the chosen row's serviceType,
+// price, currency, turnaroundDays onto the order, so later edits to this
+// row never change the contract for in-flight orders.
+model ListingService {
+  id                  String              @id @default(cuid())
+  listingId           String
+  serviceType         ServiceType
+  price               Decimal
+  currency            String              @default("USD")
+  turnaroundDays      Int
+  revisionRounds      Int                 @default(2)
+  warrantyDays        Int?
+  // JSON, free-form publisher-defined requirements (anchorPolicy,
+  // niches, min wordCount, do-follow only, content guidelines, ...).
+  requirements        Json?
+  // JSON, fulfillment configuration (autoAccept, internalSlaHours,
+  // requiresBrief, ...). Read by routing services; never exposed publicly.
+  fulfillmentSettings Json?
+  availability        ServiceAvailability @default(AVAILABLE)
+  // Optimistic-lock guard for concurrent edits + Order.create race.
+  version             Int                 @default(0)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  orders           Order[]
+  settlements      Settlement[]
+  platformRevenues PlatformRevenue[]
+
+  // A given service type can appear at most once per listing.
+  @@unique([listingId, serviceType])
+  @@index([listingId])
+  @@index([serviceType, availability])
+  @@index([availability])
+  // Phase 6 search hot-path indexes for `services.some({…})` filters.
+  @@index([availability, serviceType, price])
+  @@index([availability, turnaroundDays])
 }
 
 model MarketplaceListingTag {
@@ -1369,20 +1489,8 @@ model MarketplaceListingImage {
   @@index([listingId])
 }
 
-model MarketplacePricingTier {
-  id          String   @id @default(cuid())
-  listingId   String
-  name        String
-  price       Decimal
-  description String?
-  features    String[]
-  sortOrder   Int      @default(0)
-  createdAt   DateTime @default(now())
-
-  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-
-  @@index([listingId])
-}
+// MarketplacePricingTier removed in Phase 5 — fully replaced by per-service
+// pricing on ListingService rows. See migration 20260614040000_phase5_cleanup.
 
 model MarketplaceReview {
   id          String    @id @default(cuid())
@@ -1405,17 +1513,23 @@ model MarketplaceReview {
 }
 
 model MarketplaceFavorite {
-  id        String   @id @default(cuid())
-  userId    String
-  listingId String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  userId      String
+  listingId   String
+  // NULL = "favorite the whole listing" (legacy semantics). Non-NULL = scoped
+  // to a specific service on the listing — used by the WAITLIST notify-me
+  // CTA. When a ListingService flips WAITLIST -> AVAILABLE, a worker fans out
+  // to favorites where (listingId = X AND serviceType = Y OR serviceType IS NULL).
+  serviceType ServiceType?
+  createdAt   DateTime @default(now())
 
   user    User              @relation(fields: [userId], references: [id])
   listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, listingId])
+  @@unique([userId, listingId, serviceType])
   @@index([userId])
   @@index([listingId])
+  @@index([listingId, serviceType])
 }
 
 model MarketplaceSavedList {
@@ -1471,6 +1585,9 @@ model MarketplaceListingClick {
   sessionId String?
   ipAddress String?
   action    String   @default("view") // view, click, cta_click, favorite, share
+  // Phase 6: which service the user picked at click-time. NULL on listing-level
+  // events (`view`, `favorite`, `share`) and on legacy rows.
+  serviceType ServiceType?
   metadata  Json?
   createdAt DateTime @default(now())
 
@@ -1479,6 +1596,7 @@ model MarketplaceListingClick {
   @@index([listingId])
   @@index([createdAt])
   @@index([action])
+  @@index([serviceType])
 }
 
 model MarketplaceSearchHistory {
@@ -1488,10 +1606,14 @@ model MarketplaceSearchHistory {
   filters     Json?
   resultCount Int?
   clickedId   String?
+  // Phase 6: which service the user filtered for. Powers serviceType-aware
+  // recommendation training. NULL on legacy rows or untyped searches.
+  serviceType ServiceType?
   createdAt   DateTime @default(now())
 
   @@index([userId])
   @@index([query])
+  @@index([serviceType])
 }
 
 // AI Recommendations

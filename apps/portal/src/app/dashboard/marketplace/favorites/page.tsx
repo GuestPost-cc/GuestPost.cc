@@ -16,8 +16,12 @@ interface FavoriteListing {
     id: string
     title: string
     slug: string
-    type: string
-    price: number
+    // Phase 7: type/price are LEGACY listing-level columns scheduled for
+    // drop. Prefer (listing as any).serviceTypes[0] and .priceFrom.
+    type?: string
+    price?: number
+    priceFrom?: number | null
+    serviceTypes?: string[]
     currency: string
     domainRating?: number
     traffic?: number
@@ -122,7 +126,9 @@ export default function FavoritesPage() {
               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
                 {fav.listing.category && <span>{fav.listing.category.name}</span>}
                 <span>•</span>
-                <span>{fav.listing.type.replace("_", " ")}</span>
+                {/* Phase 7: read service type from the first AVAILABLE
+                    service, fall back to deprecated listing.type. */}
+                <span>{(((fav.listing as any).serviceTypes?.[0]) ?? fav.listing.type ?? "").replace(/_/g, " ")}</span>
                 {fav.listing.domainRating && (
                   <>
                     <span>•</span>
@@ -146,7 +152,9 @@ export default function FavoritesPage() {
               </div>
             </div>
             <div className="flex flex-col items-end justify-between">
-              <span className="font-bold text-lg">{formatPrice(fav.listing.price, fav.listing.currency)}</span>
+              {/* Phase 7: prefer priceFrom (min AVAILABLE service price)
+                  with a graceful fallback to the deprecated flat price. */}
+              <span className="font-bold text-lg">{formatPrice(((fav.listing as any).priceFrom ?? fav.listing.price ?? 0), fav.listing.currency)}</span>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" onClick={() => removeFavorite(fav.listing.id)}>
                   Remove

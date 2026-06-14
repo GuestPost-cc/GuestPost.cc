@@ -31,7 +31,12 @@ export class OrderOperationsService {
       include: { website: { select: { ownershipType: true, url: true } } },
     })
     if (!order) throw new NotFoundException("Order not found")
-    if (order.website?.ownershipType !== "PLATFORM") {
+    // Channel-first read. order.fulfillmentChannel is the Phase 2 snapshot
+    // and is authoritative — website.ownershipType is the legacy fallback
+    // for orders created before the snapshot existed. Once Phase 4 lands
+    // and the backfill runs, this fallback is dead code.
+    const channel = order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    if (channel !== "PLATFORM") {
       throw new BadRequestException("Only platform orders can be fulfilled via operations")
     }
     return order

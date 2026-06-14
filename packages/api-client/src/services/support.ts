@@ -13,10 +13,28 @@ export class SupportService {
     })
   }
 
-  listTickets() {
-    return this.client.get<Array<{ id: string; subject: string; status: TicketStatus; createdAt: string; order?: { id: string; title: string | null; status: string } | null }>>(
-      "/support/tickets",
+  // Phase 6.5: actor-aware. Customer sees their org; publisher sees their
+  // assigned tickets; staff sees the slice per role (see SupportService).
+  // Optional status filter.
+  listTickets(params?: { status?: string }) {
+    return this.client.get<Array<{
+      id: string
+      subject: string
+      status: TicketStatus
+      createdAt: string
+      updatedAt: string
+      fulfillmentChannel?: "PUBLISHER" | "PLATFORM" | null
+      assignedTo?: { id: string; name: string | null } | null
+      assignedPublisher?: { id: string; name: string | null } | null
+      order?: { id: string; title: string | null; status: string; type: string; fulfillmentChannel: string | null } | null
+    }>>(
+      "/support/tickets", { params: params as Record<string, any> },
     )
+  }
+
+  // Phase 6.5 admin-only reassignment.
+  reassignTicket(ticketId: string, body: { assignedToUserId?: string | null; assignedPublisherId?: string | null; reason?: string }) {
+    return this.client.patch(`/support/tickets/${ticketId}/reassign`, { json: body })
   }
 
   getTicket(id: string) {

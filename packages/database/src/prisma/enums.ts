@@ -261,6 +261,23 @@ export const PublisherTier = {
 export type PublisherTier = (typeof PublisherTier)[keyof typeof PublisherTier]
 
 
+export const ServiceAvailability = {
+  AVAILABLE: 'AVAILABLE',
+  PAUSED: 'PAUSED',
+  WAITLIST: 'WAITLIST'
+} as const
+
+export type ServiceAvailability = (typeof ServiceAvailability)[keyof typeof ServiceAvailability]
+
+
+export const FulfillmentChannel = {
+  PUBLISHER: 'PUBLISHER',
+  PLATFORM: 'PLATFORM'
+} as const
+
+export type FulfillmentChannel = (typeof FulfillmentChannel)[keyof typeof FulfillmentChannel]
+
+
 export const VerificationStatus = {
   PENDING: 'PENDING',
   VERIFIED: 'VERIFIED',
@@ -349,24 +366,6 @@ export const TransactionType = {
 } as const
 
 export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType]
-
-
-export const ListingType = {
-  INTERNAL_SERVICE: 'INTERNAL_SERVICE',
-  PUBLISHER_WEBSITE: 'PUBLISHER_WEBSITE',
-  GUEST_POST: 'GUEST_POST',
-  NICHE_EDIT: 'NICHE_EDIT',
-  EDITORIAL_LINK: 'EDITORIAL_LINK',
-  DIGITAL_PR: 'DIGITAL_PR',
-  SPONSORED_CONTENT: 'SPONSORED_CONTENT',
-  OUTREACH_LINK: 'OUTREACH_LINK',
-  LOCAL_CITATION: 'LOCAL_CITATION',
-  FOUNDATION_LINK: 'FOUNDATION_LINK',
-  BLOG_ARTICLE: 'BLOG_ARTICLE',
-  SEO_CONTENT: 'SEO_CONTENT'
-} as const
-
-export type ListingType = (typeof ListingType)[keyof typeof ListingType]
 
 
 export const ListingStatus = {
