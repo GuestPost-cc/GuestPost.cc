@@ -1,5 +1,17 @@
+import { isAuthEndpointPath } from "./auth-redirect"
+
 export interface ApiClientConfig {
   baseUrl: string
+  /**
+   * Invoked on a 401 from a NON-auth endpoint. The HttpClient skips this
+   * callback for sign-in / sign-up / magic-link / sign-out / verify-email
+   * paths where 401 is a happy-path response (wrong credentials, expired
+   * link, etc.) and the caller handles the error inline.
+   *
+   * Apps should wire this via `buildAuthErrorHandler(...)` from
+   * `./auth-redirect` to get idempotency + URL sanitization + same-page
+   * debounce. See that file for the contract.
+   */
   onAuthError?: () => void
 }
 
@@ -66,7 +78,19 @@ export class HttpClient {
 
     const res = await fetch(this.buildUrl(path, params), init)
     if (!res.ok) {
-      if (res.status === 401 && this.config.onAuthError) this.config.onAuthError()
+      // Phase 6.8 — Audit finding #7 closure.
+      // A 401 from an AUTH endpoint (sign-in / sign-up / magic-link / etc.)
+      // is the happy-path "wrong password" response — bouncing the user
+      // through a session-expired redirect there would be wrong. Skip the
+      // onAuthError handler for those paths; the caller handles the error
+      // inline (typically by surfacing "Invalid credentials").
+      //
+      // For every other 401, fire onAuthError. The handler is responsible
+      // for idempotency + same-page debounce + URL sanitization — see
+      // ./auth-redirect.ts buildAuthErrorHandler.
+      if (res.status === 401 && this.config.onAuthError && !isAuthEndpointPath(path)) {
+        this.config.onAuthError()
+      }
       let err: { message?: string; code?: string } = {}
       try { err = await res.json() } catch { }
       throw new ApiError(res.status, err.code ?? "UNKNOWN", err.message ?? res.statusText)

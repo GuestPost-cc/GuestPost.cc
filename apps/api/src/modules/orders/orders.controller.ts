@@ -89,13 +89,20 @@ export class OrdersController {
 
   // ─── CUSTOMER ACTIONS ─────────────────────────────────────
 
+  // Phase 6.9 — Audit finding #3 closure. submit-payment moves money out of
+  // the org wallet (reserve + capture in a single tx). MEMBER access used to
+  // mean any invited member could drain the wallet by submitting payment on
+  // any DRAFT order in their org. The fix is layered: the controller still
+  // accepts OWNER+MEMBER (so a MEMBER can submit payment on THEIR OWN draft)
+  // but the service enforces OWNER || creator. A non-creator MEMBER acting on
+  // a sibling MEMBER's draft is now refused at the service layer.
   @Post(":id/submit-payment")
   @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
   submitPayment(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.payment.submitPayment(id, user.id, user.organizationId)
+    return this.payment.submitPayment(id, user.id, user.organizationId, user.customerRole)
   }
 
   @Post(":id/cancel")
@@ -107,6 +114,10 @@ export class OrdersController {
     return this.orders.cancelOrder(id, user.organizationId, user.id)
   }
 
+  // Phase 6.9 — Audit finding R-3. approve-content advances an order toward
+  // settlement. Service layer enforces OWNER || creator (verified at
+  // order-review.service.ts:88); controller stays OWNER+MEMBER so a MEMBER
+  // who placed the order can still approve their own content.
   @Post(":id/approve-content")
   @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
   @MemberRoles("OWNER", "MEMBER")
@@ -125,6 +136,9 @@ export class OrdersController {
     return this.review.requestRevision(id, user.organizationId, user.id, notes)
   }
 
+  // Phase 6.9 — Audit finding R-3. confirm-delivery creates the Settlement
+  // (or PlatformRevenue) row. Service enforces OWNER || creator at
+  // order-review.service.ts:198-205.
   @Post(":id/confirm-delivery")
   @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
   @MemberRoles("OWNER", "MEMBER")
@@ -160,7 +174,7 @@ export class OrdersController {
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
   acceptDelivery(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.delivery.customerAcceptDelivery(id, user.organizationId, user.id)
+    return this.delivery.customerAcceptDelivery(id, user.organizationId, user.id, user.customerRole)
   }
 
   // Customer-facing delivery proof (verification checklist, no internal evidence)

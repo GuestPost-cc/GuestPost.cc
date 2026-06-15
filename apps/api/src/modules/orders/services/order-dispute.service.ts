@@ -3,6 +3,7 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
 import { RefundService } from "./refund.service"
+import { orderEventMetadata } from "@guestpost/shared"
 
 @Injectable()
 export class OrderDisputeService {
@@ -153,7 +154,7 @@ export class OrderDisputeService {
       action: "DISPUTE_OPENED",
       entityType: "Order",
       entityId: orderId,
-      metadata: { disputeId: dispute.id, reason },
+      metadata: { ...orderEventMetadata(order), disputeId: dispute.id, reason },
       userId,
       organizationId,
     })
@@ -169,7 +170,7 @@ export class OrderDisputeService {
       action: "DISPUTE_EVIDENCE_ATTACHED",
       entityType: "OrderDispute",
       entityId: dispute.id,
-      metadata: { orderId, deliveryVersions: versionCount, snapshots: snapshotCount, fraudFlags: fraudCount },
+      metadata: { ...orderEventMetadata(order), orderId, deliveryVersions: versionCount, snapshots: snapshotCount, fraudFlags: fraudCount },
       userId,
       organizationId,
     })
@@ -255,7 +256,7 @@ export class OrderDisputeService {
       action: "DISPUTE_" + action,
       entityType: "Dispute",
       entityId: disputeId,
-      metadata: { orderId: order.id, resolution },
+      metadata: { ...orderEventMetadata(order), orderId: order.id, resolution },
       userId,
       organizationId: order.organizationId,
     })

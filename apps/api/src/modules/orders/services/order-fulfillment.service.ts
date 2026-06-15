@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, orderEventMetadata } from "@guestpost/shared"
 import { OrderDeliveryService } from "./order-delivery.service"
 
 @Injectable()
@@ -50,7 +50,8 @@ export class OrderFulfillmentService {
       action: "ORDER_ACCEPTED",
       entityType: "Order",
       entityId: orderId,
-      metadata: { publisherId },
+      // Phase 6.9 — uniform Order-scoped audit metadata.
+      metadata: { ...orderEventMetadata(order), publisherId },
       userId,
       organizationId: order.organizationId,
     })

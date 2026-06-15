@@ -57,6 +57,13 @@ export interface GuestPostApi {
   notifications: NotificationsService
 }
 
+// Phase 6.8 — re-export the shared 401-redirect helpers so apps can build
+// the onAuthError callback without importing from a deep path. See
+// ./auth-redirect.ts for the security contract (URL sanitization,
+// idempotency guard, auth-endpoint skip).
+export { buildAuthErrorHandler, sanitizeReturnTo, isAuthEndpointPath } from "./auth-redirect"
+export type { AuthErrorHandlerConfig } from "./auth-redirect"
+
 export function createApiClient(config: ApiClientConfig): GuestPostApi {
   const client = new HttpClient(config)
   return {

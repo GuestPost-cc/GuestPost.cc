@@ -368,6 +368,34 @@ export const TransactionType = {
 export type TransactionType = (typeof TransactionType)[keyof typeof TransactionType]
 
 
+export const TicketMessageVisibility = {
+  PUBLIC: 'PUBLIC',
+  INTERNAL: 'INTERNAL'
+} as const
+
+export type TicketMessageVisibility = (typeof TicketMessageVisibility)[keyof typeof TicketMessageVisibility]
+
+
+export const TicketParticipantRole = {
+  CUSTOMER: 'CUSTOMER',
+  PUBLISHER: 'PUBLISHER',
+  OPS: 'OPS',
+  ADMIN: 'ADMIN',
+  FINANCE: 'FINANCE'
+} as const
+
+export type TicketParticipantRole = (typeof TicketParticipantRole)[keyof typeof TicketParticipantRole]
+
+
+export const TicketMessageType = {
+  MESSAGE: 'MESSAGE',
+  INTERNAL_NOTE: 'INTERNAL_NOTE',
+  SYSTEM_EVENT: 'SYSTEM_EVENT'
+} as const
+
+export type TicketMessageType = (typeof TicketMessageType)[keyof typeof TicketMessageType]
+
+
 export const ListingStatus = {
   DRAFT: 'DRAFT',
   PENDING_REVIEW: 'PENDING_REVIEW',

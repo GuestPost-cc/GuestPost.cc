@@ -19,6 +19,41 @@ import { ReconciliationService } from "./reconciliation.service"
 import { WebsiteVerificationService } from "./website-verification.service"
 import { MarketplaceService } from "../marketplace/marketplace.service"
 import { CreateListingDto, ListingServiceInput, UpdateListingServiceInput } from "../marketplace/dto/marketplace.dto"
+import { SupportService, type SupportActor } from "../support/support.service"
+import { AddTicketMessageDto } from "../support/dto/add-ticket-message.dto"
+import {
+  BulkRetryVerificationDto,
+  ExecuteWithdrawalDto,
+  ManualVerifyDto,
+  MarkPlatformPublishedDto,
+  PauseWebsiteDto,
+  ReasonRequiredDto,
+  ReassignWebsiteDto,
+  ResolveDisputeDto,
+  ReverseWithdrawalDto,
+  SubmitPlatformContentDto,
+  ToggleListingFeaturedDto,
+  ToggleListingVerifiedDto,
+  UpdateListingStatusDto,
+  UpdatePublisherTierDto,
+  UpdateStaffRoleDto,
+  UpdateSupportTicketStatusDto,
+  UpdateUserRoleDto,
+} from "./dto/admin-action-bodies.dto"
+
+// Build the staff actor from the authenticated user. The matrix lives in
+// SupportService — this just hands it the role context. customerRole +
+// publisherRole are intentionally left null for staff: they're acting in
+// their staff capacity, not as a member of any org / publisher.
+function staffActor(user: any): SupportActor {
+  return {
+    userId: user.id,
+    kind: "STAFF",
+    staffRole: user.staffRole ?? null,
+    customerRole: null,
+    publisherRole: null,
+  }
+}
 
 const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max)
 const parsePagination = (take?: string, skip?: string) => ({
@@ -26,9 +61,44 @@ const parsePagination = (take?: string, skip?: string) => ({
   skip: Math.max(0, skip ? parseInt(skip, 10) || 0 : 0),
 })
 
+// Phase 6.7 — Audit finding #2 remediation.
+//
+// IMPORTANT — RBAC contract for this controller:
+//
+//   Every handler MUST declare its own @StaffRoles(...). There is no
+//   class-level fallback. The previous class-level @StaffRoles was a footgun:
+//   StaffRolesGuard.canActivate returns `true` when no role metadata is
+//   present, so the class-level grant + getAllAndOverride pattern meant a
+//   handler missing its decorator silently inherited the broadest grant.
+//
+//   Without the class-level decorator, a missing per-handler @StaffRoles
+//   would ALSO fail open — so the rule is: if you add a new route here, you
+//   MUST add @StaffRoles(...). The lint sweep in __tests__/role-coverage.spec.ts
+//   asserts this contract at test time.
+//
+// Role-allocation guide (Finance retains the broad read access required for
+// refund / settlement / dispute / reconciliation work — narrower mutations
+// stay on the right team):
+//
+//   SUPER_ADMIN only          — high-blast-radius writes (force-cancel,
+//                                force-approve, staff-role changes, audit
+//                                logs, listing delete, tier override)
+//   SUPER_ADMIN + FINANCE     — money writes (refund, settlement approve /
+//                                cancel, withdrawal lifecycle, payout
+//                                execute / decrypt) + Finance-only reads
+//                                (settlement detail, withdrawal detail)
+//   SUPER_ADMIN + OPERATIONS  — fulfillment + inventory writes (accept /
+//                                submit-content / mark-published, listing
+//                                moderation, listing service CRUD, website
+//                                management, manual verify, dispute resolve)
+//   ALL THREE                 — broad reads that every role legitimately
+//                                needs (users, orgs, orders, publishers,
+//                                marketplace listings/stats, support inbox).
+//                                Channel-aware filtering lives in the
+//                                respective services (see SupportService for
+//                                the canonical pattern).
 @Controller("admin")
 @UseGuards(StaffRolesGuard)
-@StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
 export class AdminController {
   constructor(
     private readonly admin: AdminService,
@@ -42,6 +112,7 @@ export class AdminController {
     private readonly marketplace: MarketplaceService,
     private readonly websiteVerification: WebsiteVerificationService,
     private readonly orderReview: OrderReviewService,
+    private readonly support: SupportService,
   ) {}
 
   // Recompute a publisher's trust score + tier from their full track record.
@@ -72,8 +143,8 @@ export class AdminController {
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Post("websites/verification/bulk-retry")
-  bulkRetryVerification(@Body("websiteIds") websiteIds: string[], @CurrentUser() user: any) {
-    return this.websiteVerification.bulkRetry(websiteIds ?? [], user.id)
+  bulkRetryVerification(@Body() body: BulkRetryVerificationDto, @CurrentUser() user: any) {
+    return this.websiteVerification.bulkRetry(body.websiteIds, user.id)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
@@ -90,6 +161,7 @@ export class AdminController {
   }
 
   @Get("users")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listUsers(
     @Query("take") take?: string,
     @Query("skip") skip?: string,
@@ -100,23 +172,27 @@ export class AdminController {
   }
 
   @Get("users/:id")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   getUser(@Param("id") id: string, @CurrentUser() user?: any) {
     return this.admin.getUser(id, user)
   }
 
   @Patch("users/:id/role")
   @StaffRoles("SUPER_ADMIN")
-  updateUserRole(@Param("id") id: string, @Body("role") role: string, @CurrentUser() user?: any) {
+  updateUserRole(@Param("id") id: string, @Body() body: UpdateUserRoleDto, @CurrentUser() user?: any) {
+    const role = body.role
     return this.admin.updateUserRole(id, role, user)
   }
 
   @Patch("users/:id/staff-role")
   @StaffRoles("SUPER_ADMIN")
-  updateStaffRole(@Param("id") id: string, @Body("role") role: string, @CurrentUser() user?: any) {
+  updateStaffRole(@Param("id") id: string, @Body() body: UpdateStaffRoleDto, @CurrentUser() user?: any) {
+    const role = body.role
     return this.admin.updateStaffRole(id, role, user)
   }
 
   @Get("organizations")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listOrganizations(
     @Query("take") take?: string,
     @Query("skip") skip?: string,
@@ -127,6 +203,7 @@ export class AdminController {
   }
 
   @Get("orders")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listOrders(
     @Query("take") take?: string,
     @Query("skip") skip?: string,
@@ -138,13 +215,15 @@ export class AdminController {
 
   @Post("orders/:id/manual-verify")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  manualVerify(@Param("id") id: string, @Body("method") method: string, @CurrentUser() user: any) {
+  manualVerify(@Param("id") id: string, @Body() body: ManualVerifyDto, @CurrentUser() user: any) {
+    const method = body.method
     return this.admin.manualVerify(id, method, user.id)
   }
 
   @Post("orders/:id/refund")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  refundOrder(@Param("id") id: string, @Body("reason") reason: string, @CurrentUser() user: any) {
+  refundOrder(@Param("id") id: string, @Body() body: ReasonRequiredDto, @CurrentUser() user: any) {
+    const reason = body.reason
     return this.admin.refundOrder(id, reason, user.id)
   }
 
@@ -164,17 +243,16 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   resolveDispute(
     @Param("id") id: string,
-    @Body("resolution") resolution: string,
-    @Body("action") action: "RESTORE" | "REFUND" | "REJECT",
+    @Body() body: ResolveDisputeDto,
     @CurrentUser() user: any,
   ) {
-    if (!action) throw new BadRequestException("action is required (RESTORE, REFUND, or REJECT)")
-    return this.dispute.resolveDispute(id, user.id, user.role, resolution, action)
+    return this.dispute.resolveDispute(id, user.id, user.role, body.resolution, body.action)
   }
 
   @Post("orders/:id/force-cancel")
   @StaffRoles("SUPER_ADMIN")
-  forceCancelOrder(@Param("id") id: string, @Body("reason") reason: string, @CurrentUser() user: any) {
+  forceCancelOrder(@Param("id") id: string, @Body() body: ReasonRequiredDto, @CurrentUser() user: any) {
+    const reason = body.reason
     return this.admin.forceCancelOrder(id, reason, user.id)
   }
 
@@ -199,7 +277,8 @@ export class AdminController {
 
   @Post("orders/:id/submit-content")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  submitPlatformContent(@Param("id") id: string, @Body("content") content: string, @CurrentUser() user: any) {
+  submitPlatformContent(@Param("id") id: string, @Body() body: SubmitPlatformContentDto, @CurrentUser() user: any) {
+    const content = body.content
     return this.ops.submitContent(id, user.id, content)
   }
 
@@ -217,7 +296,8 @@ export class AdminController {
 
   @Post("orders/:id/mark-published")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  markPlatformPublished(@Param("id") id: string, @Body("url") url: string, @CurrentUser() user: any) {
+  markPlatformPublished(@Param("id") id: string, @Body() body: MarkPlatformPublishedDto, @CurrentUser() user: any) {
+    const url = body.url
     return this.ops.markPublished(id, user.id, url)
   }
 
@@ -297,7 +377,7 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   reverseFailedWithdrawal(
     @Param("id") id: string,
-    @Body() body: { reason?: string },
+    @Body() body: ReverseWithdrawalDto,
     @CurrentUser() user: any,
   ) {
     const reason = (body?.reason ?? "").trim()
@@ -311,7 +391,7 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   executePayout(
     @Param("id") id: string,
-    @Body() body: { providerName: string },
+    @Body() body: ExecuteWithdrawalDto,
     @CurrentUser() user: any,
   ) {
     return this.payoutExecution.executeWithdrawal(id, body.providerName, user.id)
@@ -379,6 +459,7 @@ export class AdminController {
 
   // ── Publisher directory ─────────────────────────────────────────────────
   @Get("publishers")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listPublishers(
     @Query("search") search?: string,
     @Query("page") page?: string,
@@ -395,42 +476,72 @@ export class AdminController {
   // a money-risk lever, so it is finance-controlled, not operations.
   @Patch("publishers/:id/tier")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  updatePublisherTier(@Param("id") id: string, @Body("tier") tier: string, @CurrentUser() user: any) {
+  updatePublisherTier(@Param("id") id: string, @Body() body: UpdatePublisherTierDto, @CurrentUser() user: any) {
+    const tier = body.tier
     return this.admin.updatePublisherTier(id, tier, user)
   }
 
-  // ── Support tickets (cross-organization) ────────────────────────────────
+  // ── Support tickets ─────────────────────────────────────────────────────
+  // Phase 6.6: every admin support endpoint delegates to SupportService with
+  // the staff actor. Channel-aware visibility + the reply matrix (Finance is
+  // read-only on PLATFORM tickets but can post internal notes; OPS can only
+  // act on tickets assigned to them) are enforced server-side — there is
+  // no longer a separate admin code path that bypasses the matrix. The
+  // class-level role grant is gone (Phase 6.7) so we declare ALL THREE here;
+  // the matrix slices the visible rows + reply gate per actor.
   @Get("support/tickets")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listSupportTickets(
+    @CurrentUser() user: any,
     @Query("status") status?: string,
     @Query("search") search?: string,
+    @Query("channel") channel?: string,
+    @Query("assignedToUserId") assignedToUserId?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
-    return this.admin.listTicketsAdmin({
+    const normalizedChannel = channel === "PLATFORM" || channel === "PUBLISHER" ? channel : undefined
+    return this.support.listTicketsDetailed(staffActor(user), {
       status,
       search,
+      channel: normalizedChannel,
+      assignedToUserId: assignedToUserId as any,
       page: page ? parseInt(page, 10) || 1 : 1,
       limit: limit ? parseInt(limit, 10) || 50 : 50,
     })
   }
 
   @Get("support/tickets/:id")
-  getSupportTicket(@Param("id") id: string) {
-    return this.admin.getTicketAdmin(id)
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  getSupportTicket(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.support.getTicket(id, staffActor(user))
   }
 
   @Patch("support/tickets/:id/status")
-  updateSupportTicketStatus(@Param("id") id: string, @Body("status") status: string, @CurrentUser() user: any) {
-    return this.admin.updateTicketStatusAdmin(id, status, user)
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  updateSupportTicketStatus(
+    @Param("id") id: string,
+    @Body() body: UpdateSupportTicketStatusDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.support.updateStatus(id, body.status, staffActor(user))
   }
 
   @Post("support/tickets/:id/messages")
-  addSupportTicketMessage(@Param("id") id: string, @Body("content") content: string, @CurrentUser() user: any) {
-    return this.admin.addTicketMessageAdmin(id, content, user)
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  addSupportTicketMessage(
+    @Param("id") id: string,
+    @Body() body: AddTicketMessageDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.support.addMessage(id, staffActor(user), {
+      content: body.content,
+      visibility: body.visibility,
+    })
   }
 
   @Get("marketplace/listings")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listMarketplaceListings(
     @Query("status") status?: string,
     @Query("type") type?: string,
@@ -446,12 +557,14 @@ export class AdminController {
   }
 
   @Get("marketplace/stats")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   getMarketplaceStats() {
     return this.admin.getMarketplaceStats()
   }
 
   // Staff listing preview — any status (for moderation of pending/draft/etc).
   @Get("marketplace/listings/by-slug/:slug")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   getListingForStaff(@Param("slug") slug: string) {
     return this.marketplace.getListingForStaff(slug)
   }
@@ -515,23 +628,22 @@ export class AdminController {
   @Patch("marketplace/listings/:id/status")
   updateListingStatus(
     @Param("id") id: string,
-    @Body("status") status: string,
-    @Body("force") force: boolean,
+    @Body() body: UpdateListingStatusDto,
     @CurrentUser() user: any,
   ) {
-    return this.admin.updateListingStatus(id, status, user, force)
+    return this.admin.updateListingStatus(id, body.status, user, body.force)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Patch("marketplace/listings/:id/featured")
-  toggleListingFeatured(@Param("id") id: string, @Body("featured") featured: boolean, @CurrentUser() user: any) {
-    return this.admin.toggleListingFeatured(id, featured, user)
+  toggleListingFeatured(@Param("id") id: string, @Body() body: ToggleListingFeaturedDto, @CurrentUser() user: any) {
+    return this.admin.toggleListingFeatured(id, body.featured, user)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Patch("marketplace/listings/:id/verified")
-  toggleListingVerified(@Param("id") id: string, @Body("verified") verified: boolean, @CurrentUser() user: any) {
-    return this.admin.toggleListingVerified(id, verified, user)
+  toggleListingVerified(@Param("id") id: string, @Body() body: ToggleListingVerifiedDto, @CurrentUser() user: any) {
+    return this.admin.toggleListingVerified(id, body.verified, user)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
@@ -560,7 +672,7 @@ export class AdminController {
   @Patch("websites/:id/assign")
   assignWebsite(
     @Param("id") id: string,
-    @Body() body: { managedByUserId: string | null; reason?: string },
+    @Body() body: ReassignWebsiteDto,
     @CurrentUser() user: any,
   ) {
     return this.admin.reassignPlatformWebsite(id, body, user)
@@ -587,7 +699,8 @@ export class AdminController {
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Patch("websites/:id/pause")
-  pauseWebsite(@Param("id") id: string, @Body("paused") paused: boolean, @CurrentUser() user: any) {
+  pauseWebsite(@Param("id") id: string, @Body() body: PauseWebsiteDto, @CurrentUser() user: any) {
+    const paused = body.paused
     return this.admin.pauseWebsite(id, paused, user)
   }
 

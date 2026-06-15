@@ -1,4 +1,4 @@
-import { createApiClient, setToken, clearToken, getToken } from "@guestpost/api-client"
+import { createApiClient, setToken, clearToken, getToken, buildAuthErrorHandler } from "@guestpost/api-client"
 
 export const getApiUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL
@@ -12,5 +12,11 @@ export const getApiUrl = () => {
   return "http://localhost:4000/api/v1"
 }
 
-export const api = createApiClient({ baseUrl: getApiUrl() })
+// Phase 6.8 — Audit finding #7 closure. See apps/portal/src/lib/api.ts for
+// the full rationale + packages/api-client/src/auth-redirect.ts for the
+// security contract (idempotency, URL sanitization, auth-endpoint skip).
+export const api = createApiClient({
+  baseUrl: getApiUrl(),
+  onAuthError: buildAuthErrorHandler({ signInPath: "/" }),
+})
 export { setToken, clearToken, getToken }

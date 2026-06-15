@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from "@nestjs/common"
 import { SupportService } from "./support.service"
+import { AddTicketMessageDto } from "./dto/add-ticket-message.dto"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
@@ -7,6 +8,7 @@ import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import { CreateTicketDto } from "./dto/create-ticket.dto"
 
 // The support API is now multi-actor: CUSTOMER, PUBLISHER, and STAFF all
 // read/write the same Ticket rows, but each sees a different slice based on
@@ -19,14 +21,26 @@ function buildActor(user: any): {
   organizationId?: string | null
   publisherId?: string | null
   staffRole?: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
+  customerRole?: "OWNER" | "MEMBER" | null
+  publisherRole?: "PUBLISHER_OWNER" | "PUBLISHER_MEMBER" | null
 } {
   if (user.userType === "STAFF") {
     return { userId: user.id, kind: "STAFF", staffRole: user.staffRole ?? null }
   }
   if (user.userType === "PUBLISHER") {
-    return { userId: user.id, kind: "PUBLISHER", publisherId: user.publisherId ?? null }
+    return {
+      userId: user.id,
+      kind: "PUBLISHER",
+      publisherId: user.publisherId ?? null,
+      publisherRole: user.publisherRole ?? null,
+    }
   }
-  return { userId: user.id, kind: "CUSTOMER", organizationId: user.organizationId ?? null }
+  return {
+    userId: user.id,
+    kind: "CUSTOMER",
+    organizationId: user.organizationId ?? null,
+    customerRole: user.customerRole ?? null,
+  }
 }
 
 @Controller("support")
@@ -40,7 +54,7 @@ export class SupportController {
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER", "MEMBER")
   createTicket(
-    @Body() body: { subject: string; description?: string; orderId?: string },
+    @Body() body: CreateTicketDto,
     @CurrentUser() user: any,
   ) {
     return this.support.createTicket({
@@ -73,10 +87,13 @@ export class SupportController {
   @ActorType("CUSTOMER", "PUBLISHER", "STAFF")
   addMessage(
     @Param("id") ticketId: string,
-    @Body() body: { content: string },
+    @Body() body: AddTicketMessageDto,
     @CurrentUser() user: any,
   ) {
-    return this.support.addMessage(ticketId, buildActor(user), { content: body.content })
+    return this.support.addMessage(ticketId, buildActor(user), {
+      content: body.content,
+      visibility: body.visibility,
+    })
   }
 
   // ── Admin-only reassignment ──────────────────────────────────────────────

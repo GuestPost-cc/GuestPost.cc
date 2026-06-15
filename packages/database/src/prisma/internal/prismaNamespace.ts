@@ -5689,6 +5689,10 @@ export const TicketMessageScalarFieldEnum = {
   id: 'id',
   content: 'content',
   files: 'files',
+  visibility: 'visibility',
+  participantRole: 'participantRole',
+  messageType: 'messageType',
+  actorSnapshot: 'actorSnapshot',
   userId: 'userId',
   ticketId: 'ticketId',
   createdAt: 'createdAt'
@@ -6548,6 +6552,48 @@ export type EnumTicketStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
  * Reference to a field of type 'TicketStatus[]'
  */
 export type ListEnumTicketStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TicketStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'TicketMessageVisibility'
+ */
+export type EnumTicketMessageVisibilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TicketMessageVisibility'>
+    
+
+
+/**
+ * Reference to a field of type 'TicketMessageVisibility[]'
+ */
+export type ListEnumTicketMessageVisibilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TicketMessageVisibility[]'>
+    
+
+
+/**
+ * Reference to a field of type 'TicketParticipantRole'
+ */
+export type EnumTicketParticipantRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TicketParticipantRole'>
+    
+
+
+/**
+ * Reference to a field of type 'TicketParticipantRole[]'
+ */
+export type ListEnumTicketParticipantRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TicketParticipantRole[]'>
+    
+
+
+/**
+ * Reference to a field of type 'TicketMessageType'
+ */
+export type EnumTicketMessageTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TicketMessageType'>
+    
+
+
+/**
+ * Reference to a field of type 'TicketMessageType[]'
+ */
+export type ListEnumTicketMessageTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TicketMessageType[]'>
     
 
 

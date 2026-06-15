@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ConflictException, 
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, orderEventMetadata } from "@guestpost/shared"
 import { presignGet } from "@guestpost/shared/dist/object-storage"
 
 const MIN_REASON = 20
@@ -36,13 +36,19 @@ export class DeliveryInterventionService {
     return { version, order }
   }
 
-  private auditMeta(order: any, version: any, extra: Record<string, unknown> = {}) {
+  // Phase 6.9 — Audit finding #4 closure. The legacy `auditMeta` helper has
+  // been retired in favor of `orderEventMetadata` from @guestpost/shared. The
+  // shared helper supplies the Phase 6 snapshot trio uniformly across every
+  // money-audit callsite; the delivery-specific extras (deliveryVersionId,
+  // publishedUrl, publisherId) are appended on top. Reports that group audit
+  // rows by serviceType / fulfillmentChannel / listingServiceId now see this
+  // surface consistently.
+  private deliveryAuditMeta(order: any, version: any, extra: Record<string, unknown> = {}) {
     return {
+      ...orderEventMetadata(order),
       orderId: order.id,
       deliveryVersionId: version.id,
-      websiteId: order.websiteId ?? null,
       publisherId: order.website?.publisherId ?? null,
-      organizationId: order.organizationId,
       publishedUrl: version.publishedUrl,
       ...extra,
     }
@@ -78,7 +84,7 @@ export class DeliveryInterventionService {
     // Approving makes the delivery settlement-eligible; mirror order to VERIFIED.
     await this.prisma.order.updateMany({ where: { id: order.id, status: "PUBLISHED" }, data: { status: "VERIFIED", verifiedAt: new Date(), verifiedBy: userId, verifyMethod: "manual" } })
 
-    await this.audit.log({ action: "ORDER_DELIVERY_MANUAL_APPROVED", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.auditMeta(order, version, { reason: r, roleAtTime: role }), userId, organizationId: order.organizationId })
+    await this.audit.log({ action: "ORDER_DELIVERY_MANUAL_APPROVED", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.deliveryAuditMeta(order, version, { reason: r, roleAtTime: role }), userId, organizationId: order.organizationId })
     await this.notifyOrderParties(order, "ORDER_DELIVERY_MANUAL_APPROVED", `Delivery for order ${order.id} was manually approved.`)
     return { status: "APPROVED" }
   }
@@ -92,7 +98,7 @@ export class DeliveryInterventionService {
     })
     if (upd.count === 0) throw new ConflictException("Delivery was modified by another request. Retry.")
 
-    await this.audit.log({ action: "ORDER_DELIVERY_MANUAL_REJECTED", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.auditMeta(order, version, { reason: r, roleAtTime: role }), userId, organizationId: order.organizationId })
+    await this.audit.log({ action: "ORDER_DELIVERY_MANUAL_REJECTED", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.deliveryAuditMeta(order, version, { reason: r, roleAtTime: role }), userId, organizationId: order.organizationId })
     await this.notifyOrderParties(order, "ORDER_DELIVERY_MANUAL_REJECTED", `Delivery for order ${order.id} was rejected: ${r}`)
     return { status: "REJECTED" }
   }
@@ -114,7 +120,7 @@ export class DeliveryInterventionService {
       await this.prisma.order.updateMany({ where: { id: order.id, status: "PUBLISHED" }, data: { status: "VERIFIED", verifiedAt: new Date(), verifiedBy: userId, verifyMethod: "override" } })
     }
 
-    await this.audit.log({ action: "ORDER_DELIVERY_OVERRIDDEN", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.auditMeta(order, version, { reason: r, targetStatus, roleAtTime: role }), userId, organizationId: order.organizationId })
+    await this.audit.log({ action: "ORDER_DELIVERY_OVERRIDDEN", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.deliveryAuditMeta(order, version, { reason: r, targetStatus, roleAtTime: role }), userId, organizationId: order.organizationId })
     await this.notifyOrderParties(order, "ORDER_DELIVERY_OVERRIDDEN", `Delivery for order ${order.id} verification was overridden to ${targetStatus}.`)
     return { status: targetStatus }
   }
@@ -127,7 +133,7 @@ export class DeliveryInterventionService {
       where: { id: version.id, verificationVersion: version.verificationVersion },
       data: { verificationStatus: "PENDING", verificationVersion: version.verificationVersion + 1 },
     })
-    await this.audit.log({ action: "ORDER_DELIVERY_VERIFICATION_STARTED", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.auditMeta(order, version, { reverify: true }), userId, organizationId: order.organizationId })
+    await this.audit.log({ action: "ORDER_DELIVERY_VERIFICATION_STARTED", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.deliveryAuditMeta(order, version, { reverify: true }), userId, organizationId: order.organizationId })
     await this.queue.addJob(QUEUES.DELIVERY_VERIFICATION, "delivery-verify", { deliveryVersionId: version.id, actorUserId: userId }, { jobId: `delivery-verify-${version.id}-${Date.now()}`, attempts: 3, backoff: { type: "custom" } })
     return { status: "PENDING" }
   }
@@ -145,7 +151,7 @@ export class DeliveryInterventionService {
       const upd = await tx.order.updateMany({ where: { id: orderId, version: order.version }, data: { status: "APPROVED", revisionCount: { increment: 1 }, version: { increment: 1 } } })
       if (upd.count === 0) throw new ConflictException("Order was modified by another request. Retry.")
       await tx.orderEvent.create({ data: { orderId, eventType: "REVISION_REQUESTED", actorId: userId, message: `Revision requested: ${notes}`, metadata: { notes } } })
-      await this.audit.log({ action: "ORDER_DELIVERY_REVISION_REQUESTED", entityType: "Order", entityId: orderId, metadata: this.auditMeta(order, { id: order.activeDeliveryVersionId ?? "", publishedUrl: order.publishedUrl }, { notes }), userId, organizationId }, tx)
+      await this.audit.log({ action: "ORDER_DELIVERY_REVISION_REQUESTED", entityType: "Order", entityId: orderId, metadata: this.deliveryAuditMeta(order, { id: order.activeDeliveryVersionId ?? "", publishedUrl: order.publishedUrl }, { notes }), userId, organizationId }, tx)
       return { status: "REVISION_REQUESTED" }
     })
   }

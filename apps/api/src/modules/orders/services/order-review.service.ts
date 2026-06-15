@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
-import { QUEUES, recomputePublisherTrustCore } from "@guestpost/shared"
+import { QUEUES, recomputePublisherTrustCore, orderEventMetadata } from "@guestpost/shared"
 import { resolvePlatformFeeFraction, splitPlatformFee } from "../../../common/platform-fee"
 
 @Injectable()
@@ -54,7 +54,7 @@ export class OrderReviewService {
       action: "ORDER_REVIEWED",
       entityType: "Order",
       entityId: orderId,
-      metadata: { rating, publisherId },
+      metadata: { ...orderEventMetadata(order), rating, publisherId },
       userId,
       organizationId,
     })
@@ -178,7 +178,7 @@ export class OrderReviewService {
       action: "REVISION_REQUESTED",
       entityType: "Order",
       entityId: orderId,
-      metadata: { revisionNumber: order.revisionCount + 1 },
+      metadata: { ...orderEventMetadata(order), revisionNumber: order.revisionCount + 1 },
       userId,
       organizationId,
     })
@@ -208,8 +208,16 @@ export class OrderReviewService {
     // a crash in between would leave a DELIVERED order with no settlement and
     // nothing to retry it.
     const updated = await this.prisma.$transaction(async (tx: any) => {
+      // Phase 6.9 — Audit finding #22 closure. The inner updateMany previously
+      // gated on (id, version) only. A race window existed where a parallel
+      // customer-accept-delivery (PUBLISHED → DELIVERED) could commit first,
+      // bumping `version` but ALSO leaving the row in DELIVERED state. Without
+      // the status guard, confirmDelivery's updateMany would still match (it
+      // re-reads the version on retry) and we'd attempt a second DELIVERED
+      // transition + duplicate settlement creation. The status guard makes
+      // this race deterministic — the second tx fails fast with 409.
       const r = await tx.order.updateMany({
-        where: { id: orderId, version: order.version },
+        where: { id: orderId, version: order.version, status: "VERIFIED" },
         data: { status: "DELIVERED", deliveredAt: new Date(), version: { increment: 1 } },
       })
       if (r.count === 0) {
@@ -232,7 +240,10 @@ export class OrderReviewService {
         action: "DELIVERY_CONFIRMED",
         entityType: "Order",
         entityId: orderId,
-        metadata: {},
+        // Use `fresh` so the audit row carries the post-transition state
+        // (status=DELIVERED, version+1). orderEventMetadata reads the
+        // snapshot trio which is immutable after creation either way.
+        metadata: { ...orderEventMetadata(fresh) },
         userId,
         organizationId,
       }, tx)

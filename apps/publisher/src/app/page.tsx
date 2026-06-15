@@ -1,8 +1,9 @@
 "use client"
 
-import { useState, Suspense } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect, Suspense } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@guestpost/ui"
+import { sanitizeReturnTo } from "@guestpost/api-client"
 import { useAuth } from "../lib/auth"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -11,9 +12,12 @@ import { z } from "zod"
 function LoginContent() {
   const { signIn, signUp } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [isSignUp, setIsSignUp] = useState(false)
   const [name, setName] = useState("")
   const [error, setError] = useState("")
+  // Phase 6.8 — banner copy stashed by the 401-redirect handler.
+  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<string | null>(null)
 
   const loginSchema = z.object({
     email: z.string().email("Valid email required"),
@@ -30,6 +34,16 @@ function LoginContent() {
     resolver: zodResolver(loginSchema),
   })
 
+  useEffect(() => {
+    try {
+      const reason = sessionStorage.getItem("guestpost:auth-redirect-reason")
+      if (reason) {
+        setSessionExpiredBanner(reason)
+        sessionStorage.removeItem("guestpost:auth-redirect-reason")
+      }
+    } catch { /* private mode */ }
+  }, [])
+
   const onSubmit = async (data: LoginFormData) => {
     setError("")
     try {
@@ -38,7 +52,10 @@ function LoginContent() {
       } else {
         await signIn(data.email, data.password)
       }
-      router.push("/dashboard")
+      // Phase 6.8 — honor sanitized returnTo so the user lands back where
+      // the 401 bounced them. The sanitizer rejects cross-origin paths.
+      const safeReturnTo = sanitizeReturnTo(searchParams.get("returnTo"))
+      router.push(safeReturnTo && safeReturnTo !== "/" ? safeReturnTo : "/dashboard")
     } catch (err: any) {
       setError(err.message ?? "Something went wrong")
     }
@@ -55,6 +72,16 @@ function LoginContent() {
             {isSignUp ? "Create an account to start publishing" : "Sign in to manage your orders and content"}
           </p>
         </div>
+
+        {sessionExpiredBanner && !isSignUp && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          >
+            {sessionExpiredBanner}
+          </div>
+        )}
 
         <form onSubmit={handleFormSubmit(onSubmit)} className="grid gap-4">
           {isSignUp && (

@@ -3,6 +3,7 @@ import { ApiKeysService } from "./api-keys.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import { CreateApiKeyDto } from "./dto/create-api-key.dto"
 
 @Controller("api-keys")
 @UseGuards(MemberRolesGuard)
@@ -12,7 +13,7 @@ export class ApiKeysController {
 
   @Post()
   create(
-    @Body() body: { name: string; permissions?: string[] },
+    @Body() body: CreateApiKeyDto,
     @CurrentUser() user: any,
   ) {
     return this.apiKeys.createKey(user.organizationId, body.name, body.permissions ?? ["orders:read"], user.id)

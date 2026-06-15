@@ -2,9 +2,10 @@
 
 import { useState } from "react"
 import Link from "next/link"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
+import { useAuth } from "../../../lib/auth"
+import { Card, CardContent } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Badge } from "@guestpost/ui"
@@ -29,11 +30,9 @@ import {
   RefreshCw,
   AlertCircle,
   HeadphonesIcon,
-  MessageSquare,
   ArrowRight,
 } from "lucide-react"
-import { format, formatDistanceToNow } from "date-fns"
-import { toast } from "sonner"
+import { formatDistanceToNow } from "date-fns"
 
 const STATUS_COLORS: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   OPEN: "secondary",
@@ -43,19 +42,54 @@ const STATUS_COLORS: Record<string, "default" | "secondary" | "outline" | "destr
   CLOSED: "destructive",
 }
 
+// Phase 6.6: PUBLISHER vs PLATFORM at a glance — finance / ops / admin all
+// triage off this. Keeps the design-system status table in mind (will be
+// centralized in @guestpost/ui per audit finding #28).
+function ChannelBadge({ channel }: { channel: "PUBLISHER" | "PLATFORM" | null }) {
+  if (!channel) return <span className="text-xs text-muted-foreground">—</span>
+  const cls =
+    channel === "PLATFORM"
+      ? "bg-violet-100 text-violet-800"
+      : "bg-sky-100 text-sky-800"
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
+      {channel === "PLATFORM" ? "Platform" : "Publisher"}
+    </span>
+  )
+}
+
 export default function AdminSupportPage() {
-  const queryClient = useQueryClient()
+  const { user } = useAuth()
+  const isFinance = user?.staffRole === "FINANCE"
+
   const [search, setSearch] = useState("")
-  const [statusFilter, setStatusFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [channelFilter, setChannelFilter] = useState<string>("all")
+  const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
   const [page, setPage] = useState(1)
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["admin", "tickets", search, statusFilter, page],
-    queryFn: () => api.admin.listTickets({ search: search || undefined, status: statusFilter || undefined, page, limit: 20 }),
+    queryKey: ["admin", "tickets", search, statusFilter, channelFilter, assigneeFilter, page],
+    queryFn: () =>
+      api.admin.listTickets({
+        search: search || undefined,
+        status: statusFilter === "all" ? undefined : statusFilter,
+        channel: channelFilter === "all" ? undefined : (channelFilter as "PLATFORM" | "PUBLISHER"),
+        assignedToUserId:
+          assigneeFilter === "all"
+            ? undefined
+            : assigneeFilter === "UNASSIGNED"
+              ? "UNASSIGNED"
+              : assigneeFilter,
+        page,
+        limit: 20,
+      }),
   })
 
   const tickets = data?.items ?? []
-  const pagination = data ? { page: data.page, totalPages: data.totalPages, total: data.total } : { page: 1, totalPages: 1, total: 0 }
+  const pagination = data
+    ? { page: data.page, totalPages: data.totalPages, total: data.total }
+    : { page: 1, totalPages: 1, total: 0 }
 
   if (error) {
     return (
@@ -63,7 +97,10 @@ export default function AdminSupportPage() {
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-semibold mb-2">Failed to load tickets</h2>
         <p className="text-muted-foreground mb-4">{(error as Error).message}</p>
-        <Button onClick={() => refetch()}><RefreshCw className="mr-2 h-4 w-4" />Retry</Button>
+        <Button onClick={() => refetch()}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Retry
+        </Button>
       </div>
     )
   }
@@ -73,17 +110,37 @@ export default function AdminSupportPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Support</h1>
-          <p className="text-muted-foreground">Customer support ticket queue</p>
+          <p className="text-muted-foreground">
+            {isFinance
+              ? "Read-only on Platform tickets; full reply on Publisher tickets. Internal notes available on every ticket."
+              : "Customer support ticket queue"}
+          </p>
         </div>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="relative flex-1 min-w-[220px] max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search tickets..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} className="pl-9" />
+          <Input
+            placeholder="Search tickets..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            className="pl-9"
+          />
         </div>
-        <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1) }}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="All status" /></SelectTrigger>
+        <Select
+          value={statusFilter}
+          onValueChange={(v) => {
+            setStatusFilter(v)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="All status" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All status</SelectItem>
             <SelectItem value="OPEN">Open</SelectItem>
@@ -93,68 +150,134 @@ export default function AdminSupportPage() {
             <SelectItem value="CLOSED">Closed</SelectItem>
           </SelectContent>
         </Select>
+        <Select
+          value={channelFilter}
+          onValueChange={(v) => {
+            setChannelFilter(v)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="All channels" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All channels</SelectItem>
+            <SelectItem value="PLATFORM">Platform</SelectItem>
+            <SelectItem value="PUBLISHER">Publisher</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={assigneeFilter}
+          onValueChange={(v) => {
+            setAssigneeFilter(v)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="All assignees" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All assignees</SelectItem>
+            <SelectItem value="UNASSIGNED">Unassigned platform pool</SelectItem>
+            {user?.id && <SelectItem value={user.id}>Assigned to me</SelectItem>}
+          </SelectContent>
+        </Select>
       </div>
 
       <Card>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="p-4 space-y-3">
-              {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full" />
+              ))}
             </div>
           ) : tickets.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <HeadphonesIcon className="h-12 w-12 text-muted-foreground/50" />
               <h3 className="mt-4 text-lg font-medium">No tickets found</h3>
-              <p className="text-sm text-muted-foreground">{search ? "Try a different search" : "No support tickets yet"}</p>
+              <p className="text-sm text-muted-foreground">
+                {search ? "Try a different search" : "No support tickets match these filters"}
+              </p>
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Customer</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Organization</TableHead>
-                  <TableHead>Messages</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                  <TableHead className="text-right" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {tickets.map((t: any) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-medium max-w-[300px] truncate">{t.subject}</TableCell>
-                    <TableCell className="text-muted-foreground">{t.customer.name || t.customer.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_COLORS[t.status] || "secondary"}>
-                        {t.status.replace(/_/g, " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{t.organization?.name || "—"}</TableCell>
-                    <TableCell className="text-center">{t.messageCount}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {formatDistanceToNow(new Date(t.updatedAt), { addSuffix: true })}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/dashboard/support/${t.id}`}>
-                          View <ArrowRight className="ml-1 h-4 w-4" />
-                        </Link>
-                      </Button>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Channel</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Assigned</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Messages</TableHead>
+                    <TableHead>Last Updated</TableHead>
+                    <TableHead className="text-right" />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {tickets.map((t) => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-medium max-w-[280px] truncate">{t.subject}</TableCell>
+                      <TableCell>
+                        <ChannelBadge channel={t.fulfillmentChannel} />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {t.customer.name || t.customer.email}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {t.fulfillmentChannel === "PLATFORM"
+                          ? t.assignedTo?.name || (
+                              <span className="text-amber-600">Unassigned</span>
+                            )
+                          : t.assignedPublisher?.name || "—"}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={STATUS_COLORS[t.status] || "secondary"}>
+                          {t.status.replace(/_/g, " ")}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">{t.messageCount}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDistanceToNow(new Date(t.updatedAt), { addSuffix: true })}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/dashboard/support/${t.id}`}>
+                            View <ArrowRight className="ml-1 h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={pagination.page <= 1} onClick={() => setPage(p => p - 1)}>Previous</Button>
-          <span className="text-sm text-muted-foreground">Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)</span>
-          <Button variant="outline" size="sm" disabled={pagination.page >= pagination.totalPages} onClick={() => setPage(p => p + 1)}>Next</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pagination.page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+          >
+            Previous
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={pagination.page >= pagination.totalPages}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </Button>
         </div>
       )}
     </div>

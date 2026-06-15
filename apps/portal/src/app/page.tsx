@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@guestpost/ui"
+import { sanitizeReturnTo } from "@guestpost/api-client"
 import { useAuth } from "../lib/auth"
 
 function LoginContent() {
@@ -16,11 +17,23 @@ function LoginContent() {
   const [name, setName] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  // Phase 6.8 — surface "Your session expired" copy when the 401-redirect
+  // handler bounced the user here. The handler stashes the reason in
+  // sessionStorage so it survives the page reload.
+  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<string | null>(null)
 
   useEffect(() => {
     if (searchParams.get("signup") === "true") {
       setIsSignUp(true)
     }
+    // Read + clear the reason in one tick so a refresh doesn't keep showing it.
+    try {
+      const reason = sessionStorage.getItem("guestpost:auth-redirect-reason")
+      if (reason) {
+        setSessionExpiredBanner(reason)
+        sessionStorage.removeItem("guestpost:auth-redirect-reason")
+      }
+    } catch { /* private mode */ }
   }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -33,7 +46,11 @@ function LoginContent() {
       } else {
         await signIn(email, password)
       }
-      router.push("/dashboard")
+      // Phase 6.8 — honor sanitized returnTo so the user lands back at the
+      // page that bounced them. The helper rejects cross-origin paths and
+      // protocol handlers so an attacker can't craft a poisoned link.
+      const safeReturnTo = sanitizeReturnTo(searchParams.get("returnTo"))
+      router.push(safeReturnTo && safeReturnTo !== "/" ? safeReturnTo : "/dashboard")
     } catch (err: any) {
       setError(err.message ?? "Something went wrong")
     } finally {
@@ -52,6 +69,16 @@ function LoginContent() {
             {isSignUp ? "Create an account to manage your campaigns" : "Sign in to your GuestPost account"}
           </p>
         </div>
+
+        {sessionExpiredBanner && !isSignUp && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          >
+            {sessionExpiredBanner}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="grid gap-4">
           {isSignUp && (

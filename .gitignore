@@ -9,6 +9,18 @@ packages/database/.env
 *.log
 .DS_Store
 
+# TypeScript incremental build cache
+*.tsbuildinfo
+
+# IDE/editor local configs
+.cursor/
+.vscode/
+.idea/
+
+# Local project context & data
+context.js
+data/
+
 # AI context and analysis (local only, not for CI)
 .ai/
 graphify-out/

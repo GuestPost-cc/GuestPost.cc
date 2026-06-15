@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ConflictException }
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, orderEventMetadata } from "@guestpost/shared"
 import { OrderDeliveryService } from "./order-delivery.service"
 
 @Injectable()
@@ -64,7 +64,7 @@ export class OrderOperationsService {
       action: "ORDER_ACCEPTED",
       entityType: "Order",
       entityId: orderId,
-      metadata: { fromStatus: order.status, fulfilledBy: "operations" },
+      metadata: { ...orderEventMetadata(order), fromStatus: order.status, fulfilledBy: "operations" },
       userId,
       organizationId: order.organizationId,
     })
@@ -102,7 +102,7 @@ export class OrderOperationsService {
       action: "CONTENT_SUBMITTED",
       entityType: "Order",
       entityId: orderId,
-      metadata: { fromStatus: order.status },
+      metadata: { ...orderEventMetadata(order), fromStatus: order.status },
       userId,
       organizationId: order.organizationId,
     })
@@ -131,7 +131,7 @@ export class OrderOperationsService {
       action: "CONTENT_MARKED_READY",
       entityType: "Order",
       entityId: orderId,
-      metadata: { fromStatus: order.status },
+      metadata: { ...orderEventMetadata(order), fromStatus: order.status },
       userId,
       organizationId: order.organizationId,
     })
@@ -167,7 +167,7 @@ export class OrderOperationsService {
       action: "CONTENT_SUBMITTED_FOR_REVIEW",
       entityType: "Order",
       entityId: orderId,
-      metadata: { fromStatus: order.status },
+      metadata: { ...orderEventMetadata(order), fromStatus: order.status },
       userId,
       organizationId: order.organizationId,
     })

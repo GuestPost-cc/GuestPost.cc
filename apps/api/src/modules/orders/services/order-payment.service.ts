@@ -3,6 +3,8 @@ import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { BillingService } from "../../billing/billing.service"
 import { Decimal } from "@prisma/client/runtime/library"
+import { assertOwnerOrCreator } from "./owner-or-creator"
+import { orderEventMetadata } from "@guestpost/shared"
 
 @Injectable()
 export class OrderPaymentService {
@@ -12,10 +14,23 @@ export class OrderPaymentService {
     private readonly billing: BillingService,
   ) {}
 
-  async submitPayment(orderId: string, userId: string, userOrgId: string) {
+  // Phase 6.9 — actorRole is the acting user's customerRole in `userOrgId`
+  // ("OWNER" | "MEMBER" | null). Used to enforce the OWNER||creator gate
+  // before money moves. Default `undefined` keeps tests / legacy callers
+  // from breaking — but the controller always passes user.customerRole now.
+  async submitPayment(orderId: string, userId: string, userOrgId: string, actorRole?: string | null) {
     return this.prisma.$transaction(async (tx: any) => {
       const order = await tx.order.findFirst({ where: { id: orderId, organizationId: userOrgId } })
       if (!order) throw new NotFoundException("Order not found")
+      // Phase 6.9 — Audit finding #3. Block non-creator MEMBERs from draining
+      // the wallet via someone else's DRAFT order. OWNER can always submit;
+      // a MEMBER can submit only on THEIR OWN draft (customerId === userId).
+      assertOwnerOrCreator({
+        customerId: order.customerId,
+        actorUserId: userId,
+        actorRole,
+        action: "submit payment",
+      })
       if (order.status !== "DRAFT") throw new BadRequestException("Order must be DRAFT to submit payment")
 
       const wallet = await tx.wallet.findFirst({ where: { organizationId: userOrgId } })
@@ -125,7 +140,8 @@ export class OrderPaymentService {
         action: "PAYMENT_CAPTURED",
         entityType: "Order",
         entityId: orderId,
-        metadata: { amount, from: "DRAFT", to: "SUBMITTED" },
+        // Phase 6.9 — uniform snapshot trio across every Order-scoped audit.
+        metadata: { ...orderEventMetadata(order), amount, from: "DRAFT", to: "SUBMITTED" },
         userId,
         organizationId: userOrgId,
       }, tx)

@@ -8,9 +8,10 @@ import { SettlementsModule } from "../settlements/settlements.module"
 import { PublisherPayoutsModule } from "../publisher-payouts/publisher-payouts.module"
 import { OrdersModule } from "../orders/orders.module"
 import { MarketplaceModule } from "../marketplace/marketplace.module"
+import { SupportModule } from "../support/support.module"
 
 @Module({
-  imports: [SettlementsModule, PublisherPayoutsModule, OrdersModule, MarketplaceModule],
+  imports: [SettlementsModule, PublisherPayoutsModule, OrdersModule, MarketplaceModule, SupportModule],
   controllers: [AdminController],
   providers: [AdminService, ReconciliationService, WebsiteVerificationService, PermissionsGuard],
 })

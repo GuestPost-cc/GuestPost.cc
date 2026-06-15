@@ -794,6 +794,10 @@ export const TicketMessageScalarFieldEnum = {
   id: 'id',
   content: 'content',
   files: 'files',
+  visibility: 'visibility',
+  participantRole: 'participantRole',
+  messageType: 'messageType',
+  actorSnapshot: 'actorSnapshot',
   userId: 'userId',
   ticketId: 'ticketId',
   createdAt: 'createdAt'

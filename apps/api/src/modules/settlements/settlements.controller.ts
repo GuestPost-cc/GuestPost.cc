@@ -22,7 +22,7 @@ export class SettlementsController {
   @MemberRoles("OWNER", "MEMBER")
   @RequireOrderOwnership()
   customerApprove(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.settlements.customerApprove(id, user.id, user.organizationId, user.role)
+    return this.settlements.customerApprove(id, user.id, user.organizationId, user.role, user.customerRole)
   }
 
   // Staff approves settlement

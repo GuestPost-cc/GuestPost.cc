@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { orderEventMetadata } from "@guestpost/shared"
 
 /**
  * Consumes Settlement.reviewEndsAt: settlements still awaiting the customer
@@ -46,7 +47,23 @@ export class SettlementAutoApproveService implements OnModuleInit, OnModuleDestr
         status: { in: ["PENDING", "UNDER_REVIEW"] },
         reviewEndsAt: { lte: new Date() },
       },
-      include: { order: { select: { id: true, organizationId: true } } },
+      // Phase 6.9 — include the snapshot trio so orderEventMetadata reads
+      // the same fields here as everywhere else. Adds 6 columns to the
+      // select; no extra query.
+      include: {
+        order: {
+          select: {
+            id: true,
+            organizationId: true,
+            listingId: true,
+            listingServiceId: true,
+            type: true,
+            fulfillmentChannel: true,
+            websiteId: true,
+            amount: true,
+          },
+        },
+      },
       take: 100,
     })
 
@@ -94,7 +111,11 @@ export class SettlementAutoApproveService implements OnModuleInit, OnModuleDestr
             action: "SETTLEMENT_AUTO_APPROVED",
             entityType: "Settlement",
             entityId: settlement.id,
-            metadata: { orderId: settlement.orderId, reviewEndsAt: settlement.reviewEndsAt?.toISOString() },
+            metadata: {
+              ...orderEventMetadata(settlement.order),
+              orderId: settlement.orderId,
+              reviewEndsAt: settlement.reviewEndsAt?.toISOString(),
+            },
             userId: null,
             organizationId: settlement.order.organizationId,
           }, tx)

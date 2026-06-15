@@ -214,19 +214,39 @@ export class AdminService {
   }
 
   async listOrganizations(take = 50, skip = 0, user?: any) {
+    // Phase 6.7 — explicit projection. Drops `settings` JSON (opaque config
+    // that might hold OAuth secrets, webhook URLs, etc.) and exposes only
+    // the fields a staff investigation needs.
     return this.prisma.organization.findMany({
       take,
       skip,
-      include: { _count: { select: { memberships: true, orders: true } } },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        plan: true,
+        createdAt: true,
+        _count: { select: { memberships: true, orders: true } },
+      },
     })
   }
 
   async listOrders(take = 50, skip = 0, user?: any) {
+    // Phase 6.7 — explicit projection. The previous `include: { website: true }`
+    // leaked Website.verificationToken (the DNS-TXT verification secret) to
+    // every Finance/Ops staffer. Customer is also narrowed (no banReason,
+    // no emailVerified internal field). Org excludes the opaque `settings`
+    // JSON. None of these are required for refund / dispute / fulfillment
+    // investigations — they exist on the Order row directly via FKs.
     return this.prisma.order.findMany({
       orderBy: { createdAt: "desc" },
       take,
       skip,
-      include: { organization: true, customer: true, website: true },
+      include: {
+        organization: { select: { id: true, name: true, slug: true } },
+        customer:     { select: { id: true, name: true, email: true, userType: true } },
+        website:      { select: { id: true, url: true, name: true, ownershipType: true, verificationStatus: true } },
+      },
     })
   }
 
@@ -1060,131 +1080,10 @@ export class AdminService {
     return updated
   }
 
-  // ── Support tickets (staff, cross-organization) ─────────────────────────
-
-  async listTicketsAdmin(params: { status?: string; search?: string; page?: number; limit?: number }) {
-    const page = Math.max(params.page ?? 1, 1)
-    const limit = Math.min(Math.max(params.limit ?? 50, 1), 100)
-    const where: any = {}
-    if (params.status) where.status = params.status
-    if (params.search) where.subject = { contains: params.search, mode: "insensitive" }
-
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.ticket.findMany({
-        where,
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-          organization: { select: { id: true, name: true } },
-          _count: { select: { messages: true } },
-        },
-        orderBy: { updatedAt: "desc" },
-        take: limit,
-        skip: (page - 1) * limit,
-      }),
-      this.prisma.ticket.count({ where }),
-    ])
-
-    return {
-      items: rows.map((t: any) => ({
-        id: t.id,
-        subject: t.subject,
-        status: t.status,
-        customer: { id: t.user.id, name: t.user.name, email: t.user.email },
-        organization: t.organization ? { id: t.organization.id, name: t.organization.name } : null,
-        messageCount: t._count.messages,
-        createdAt: t.createdAt,
-        updatedAt: t.updatedAt,
-      })),
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit) || 1,
-    }
-  }
-
-  async getTicketAdmin(id: string) {
-    const t = await this.prisma.ticket.findUnique({
-      where: { id },
-      include: {
-        user: { select: { id: true, name: true, email: true, userType: true } },
-        organization: { select: { id: true, name: true } },
-        messages: {
-          include: { user: { select: { id: true, name: true, email: true, userType: true } } },
-          orderBy: { createdAt: "asc" },
-        },
-      },
-    })
-    if (!t) throw new NotFoundException("Ticket not found")
-    return {
-      id: t.id,
-      subject: t.subject,
-      description: t.description,
-      status: t.status,
-      customer: { id: t.user.id, name: t.user.name, email: t.user.email },
-      organization: t.organization ? { id: t.organization.id, name: t.organization.name } : null,
-      messages: t.messages.map((m: any) => ({
-        id: m.id,
-        content: m.content,
-        author: m.user.name ?? m.user.email,
-        authorType: m.user.userType,
-        createdAt: m.createdAt,
-      })),
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-    }
-  }
-
-  async updateTicketStatusAdmin(id: string, status: string, actor: { id: string }) {
-    const valid = ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER", "RESOLVED", "CLOSED"]
-    if (!valid.includes(status)) {
-      throw new BadRequestException(`Invalid status — must be one of ${valid.join(", ")}`)
-    }
-    const ticket = await this.prisma.ticket.findUnique({ where: { id } })
-    if (!ticket) throw new NotFoundException("Ticket not found")
-
-    const updated = await this.prisma.ticket.update({
-      where: { id },
-      data: { status: status as any },
-    })
-
-    await this.audit.log({
-      action: "SUPPORT_TICKET_STATUS_CHANGED",
-      entityType: "Ticket",
-      entityId: id,
-      metadata: { from: ticket.status, to: status },
-      userId: actor.id,
-      organizationId: ticket.organizationId,
-    })
-
-    // The customer who opened the ticket learns about the status change
-    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: ticket.userId,
-      organizationId: ticket.organizationId,
-      type: "SUPPORT_TICKET_UPDATED",
-      message: `Your support ticket "${ticket.subject}" is now ${status.replace(/_/g, " ").toLowerCase()}.`,
-    })
-
-    return updated
-  }
-
-  async addTicketMessageAdmin(id: string, content: string, actor: { id: string }) {
-    const ticket = await this.prisma.ticket.findUnique({ where: { id } })
-    if (!ticket) throw new NotFoundException("Ticket not found")
-    if (!content?.trim()) throw new BadRequestException("Message content is required")
-
-    const message = await this.prisma.ticketMessage.create({
-      data: { ticketId: id, userId: actor.id, content: content.trim() },
-    })
-
-    await this.prisma.ticket.update({ where: { id }, data: { updatedAt: new Date() } })
-
-    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: ticket.userId,
-      organizationId: ticket.organizationId,
-      type: "SUPPORT_TICKET_REPLY",
-      message: `Support replied to your ticket "${ticket.subject}".`,
-    })
-
-    return message
-  }
+  // ── Support tickets ─────────────────────────────────────────────────────
+  // Phase 6.6: the four legacy bypass methods (listTicketsAdmin /
+  // getTicketAdmin / updateTicketStatusAdmin / addTicketMessageAdmin) were
+  // removed. The admin support routes now delegate to SupportService with
+  // the staff actor, so the channel-aware visibility matrix is the single
+  // code path used by customer/publisher/admin frontends.
 }

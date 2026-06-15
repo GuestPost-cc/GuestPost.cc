@@ -3,7 +3,7 @@ import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { RefundService } from "./services/refund.service"
-import { QUEUES, validateBrief, UnknownServiceTypeError } from "@guestpost/shared"
+import { QUEUES, validateBrief, UnknownServiceTypeError, orderEventMetadata } from "@guestpost/shared"
 import { ZodError } from "zod"
 import { Prisma } from "@guestpost/database"
 
@@ -478,7 +478,8 @@ export class OrdersService {
         action: "ORDER_CANCELLED",
         entityType: "Order",
         entityId: orderId,
-        metadata: { fromStatus: order.status },
+        // Phase 6.9 — uniform snapshot trio across every Order-scoped audit.
+        metadata: { ...orderEventMetadata(order), fromStatus: order.status },
         userId,
         organizationId,
       })

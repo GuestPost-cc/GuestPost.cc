@@ -417,16 +417,28 @@ export class AdminService {
   }
 
   // -- Support --
-  // Real Ticket model: subject/status/org/customer/messages. No priority or
-  // assignee fields exist in the backend — the previous types invented them.
-  listTickets(params?: { status?: string; search?: string; page?: number; limit?: number }) {
+  // Phase 6.6: admin endpoints delegate to the channel-aware SupportService.
+  // The participant matrix (Finance read-only on PLATFORM, INTERNAL notes
+  // staff-only, OPS limited to their assigned tickets) is enforced server-side.
+  listTickets(params?: {
+    status?: string
+    search?: string
+    channel?: "PLATFORM" | "PUBLISHER"
+    assignedToUserId?: string | "UNASSIGNED"
+    page?: number
+    limit?: number
+  }) {
     return this.client.get<{
       items: Array<{
         id: string
         subject: string
         status: TicketStatus
+        fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
+        assignedTo: { id: string; name: string | null } | null
+        assignedPublisher: { id: string; name: string | null } | null
         customer: { id: string; name: string | null; email: string }
         organization: { id: string; name: string } | null
+        order: { id: string; title: string | null; status: string; type: string; fulfillmentChannel: string | null } | null
         messageCount: number
         createdAt: string
         updatedAt: string
@@ -444,9 +456,30 @@ export class AdminService {
       subject: string
       description: string | null
       status: TicketStatus
-      customer: { id: string; name: string | null; email: string }
+      fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
+      assignedTo: { id: string; name: string | null } | null
+      assignedPublisher: { id: string; name: string | null } | null
+      user: { id: string; name: string | null; email: string; userType: string }
       organization: { id: string; name: string } | null
-      messages: Array<{ id: string; content: string; author: string; authorType: string; createdAt: string }>
+      order: { id: string; title: string | null; status: string; type: string; fulfillmentChannel: string | null } | null
+      messages: Array<{
+        id: string
+        content: string
+        visibility: "PUBLIC" | "INTERNAL"
+        // Phase 6.6.1: role-at-write-time + message classification snapshot.
+        participantRole: "CUSTOMER" | "PUBLISHER" | "OPS" | "ADMIN" | "FINANCE"
+        messageType: "MESSAGE" | "INTERNAL_NOTE" | "SYSTEM_EVENT"
+        // Phase 6.6.2: uncollapsed role snapshot for forensic queries.
+        // Nullable on pre-migration rows.
+        actorSnapshot: {
+          kind: "CUSTOMER" | "PUBLISHER" | "STAFF"
+          staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
+          organizationRole: "OWNER" | "MEMBER" | null
+          publisherRole: "PUBLISHER_OWNER" | "PUBLISHER_MEMBER" | null
+        } | null
+        createdAt: string
+        user: { id: string; name: string | null; email: string; userType: string } | null
+      }>
       createdAt: string
       updatedAt: string
     }>(`/admin/support/tickets/${id}`)
@@ -456,8 +489,21 @@ export class AdminService {
     return this.client.patch(`/admin/support/tickets/${ticketId}/status`, { json: { status } })
   }
 
-  addTicketMessage(ticketId: string, data: { content: string }) {
+  // Phase 6.6: visibility is optional; defaults to PUBLIC. Staff frontends
+  // pass "INTERNAL" to leave a note that's invisible to the customer and
+  // publisher.
+  addTicketMessage(
+    ticketId: string,
+    data: { content: string; visibility?: "PUBLIC" | "INTERNAL" },
+  ) {
     return this.client.post(`/admin/support/tickets/${ticketId}/messages`, { json: data })
+  }
+
+  reassignTicket(
+    ticketId: string,
+    body: { assignedToUserId?: string | null; assignedPublisherId?: string | null; reason?: string },
+  ) {
+    return this.client.patch(`/support/tickets/${ticketId}/reassign`, { json: body })
   }
 
   // -- Audit Logs --

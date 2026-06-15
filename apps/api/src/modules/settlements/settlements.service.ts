@@ -3,6 +3,7 @@ import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { QUEUES, evaluateSettlementEligibility, checkSeparationOfDuties, orderEventMetadata } from "@guestpost/shared"
+import { assertOwnerOrCreator } from "../orders/services/owner-or-creator"
 import { Decimal } from "@prisma/client/runtime/library"
 import { resolvePlatformFeeFraction, splitPlatformFee } from "../../common/platform-fee"
 
@@ -31,7 +32,7 @@ export class SettlementsService {
         action: "ORDER_DELIVERY_SETTLEMENT_BLOCKED",
         entityType: "Order",
         entityId: orderId,
-        metadata: { reasons: eligibility.reasons },
+        metadata: { ...orderEventMetadata(order), reasons: eligibility.reasons },
         userId,
         organizationId: order.organizationId,
       })
@@ -177,7 +178,7 @@ export class SettlementsService {
   }
 
   // Customer approves settlement
-  async customerApprove(id: string, userId: string, organizationId: string, role: string) {
+  async customerApprove(id: string, userId: string, organizationId: string, role: string, actorCustomerRole?: string | null) {
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -186,6 +187,17 @@ export class SettlementsService {
     if (settlement.order.organizationId !== organizationId) {
       throw new ForbiddenException("Settlement does not belong to your organization")
     }
+    // Phase 6.9 — Audit finding R-4. The customer side of dual approval
+    // releases publisher payment after admin signs off. Non-creator MEMBERs
+    // shouldn't be able to greenlight a sibling MEMBER's settlement.
+    // OWNER||creator only — service-layer enforcement on top of the
+    // controller's @MemberRoles("OWNER","MEMBER") broad gate.
+    assertOwnerOrCreator({
+      customerId: settlement.order.customerId,
+      actorUserId: userId,
+      actorRole: actorCustomerRole,
+      action: "approve this settlement",
+    })
     if (settlement.status !== "PENDING" && settlement.status !== "UNDER_REVIEW") {
       throw new BadRequestException(`Cannot approve settlement in ${settlement.status} status`)
     }
@@ -238,7 +250,11 @@ export class SettlementsService {
         action: "SETTLEMENT_CUSTOMER_APPROVED",
         entityType: "Settlement",
         entityId: id,
-        metadata: { orderId: settlement.orderId, publisherAmount: Number(settlement.publisherAmount) },
+        metadata: {
+          ...orderEventMetadata(settlement.order),
+          orderId: settlement.orderId,
+          publisherAmount: Number(settlement.publisherAmount),
+        },
         userId,
         organizationId,
       }, tx)
@@ -394,7 +410,11 @@ export class SettlementsService {
         action: "SETTLEMENT_CANCELLED",
         entityType: "Settlement",
         entityId: id,
-        metadata: { orderId: settlement.orderId, reason },
+        metadata: {
+          ...orderEventMetadata(settlement.order),
+          orderId: settlement.orderId,
+          reason,
+        },
         userId,
         organizationId: settlement.order.organizationId,
       }, tx)
@@ -487,7 +507,11 @@ export class SettlementsService {
           action: "ORDER_DELIVERY_SETTLEMENT_BLOCKED",
           entityType: "Settlement",
           entityId: settlementId,
-          metadata: { reason: violation, orderId: settlement.orderId },
+          metadata: {
+            ...orderEventMetadata(order),
+            reason: violation,
+            orderId: settlement.orderId,
+          },
           userId,
           organizationId: order.organizationId,
         }, tx)

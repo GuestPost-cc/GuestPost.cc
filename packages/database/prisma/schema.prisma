@@ -241,11 +241,11 @@ model User {
   memberships          Membership[]
   publisherMemberships PublisherMembership[]
   staffMemberships     StaffMembership[]
-  ownedOrders          Order[]            @relation("OrderCustomer")
-  assignedOrders       Order[]            @relation("OrderAssignee")
+  ownedOrders          Order[]               @relation("OrderCustomer")
+  assignedOrders       Order[]               @relation("OrderAssignee")
   orderEvents          OrderEvent[]
-  publications         Publication[]       @relation("PublicationVerifier")
-  approvedWithdrawals  Withdrawal[]        @relation("WithdrawalApprover")
+  publications         Publication[]         @relation("PublicationVerifier")
+  approvedWithdrawals  Withdrawal[]          @relation("WithdrawalApprover")
   tickets              Ticket[]
   messages             TicketMessage[]
   notifications        Notification[]
@@ -255,8 +255,8 @@ model User {
   marketplaceReviews   MarketplaceReview[]
   marketplaceFavorites MarketplaceFavorite[]
   activeContext        ActiveContext?
-  managedWebsites      Website[]           @relation("WebsiteManager")
-  assignedTickets      Ticket[]            @relation("TicketAssignee")
+  managedWebsites      Website[]             @relation("WebsiteManager")
+  assignedTickets      Ticket[]              @relation("TicketAssignee")
 }
 
 model Session {
@@ -275,19 +275,19 @@ model Session {
 }
 
 model Account {
-  id                        String    @id @default(cuid())
-  accountId                 String
-  providerId                String
-  userId                    String
-  accessToken               String?
-  refreshToken              String?
-  idToken                   String?
-  accessTokenExpiresAt      DateTime?
-  refreshTokenExpiresAt     DateTime?
-  scope                     String?
-  password                  String?
-  createdAt                 DateTime  @default(now())
-  updatedAt                 DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -296,7 +296,7 @@ model Account {
 }
 
 model Verification {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   identifier String
   value      String
   expiresAt  DateTime
@@ -305,12 +305,12 @@ model Verification {
 }
 
 model ActiveContext {
-  id                  String  @id @default(cuid())
-  userId              String  @unique
+  id                   String  @id @default(cuid())
+  userId               String  @unique
   activeOrganizationId String?
   activePublisherId    String?
 
-  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user               User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   activeOrganization Organization? @relation(fields: [activeOrganizationId], references: [id], onDelete: SetNull)
   activePublisher    Publisher?    @relation(fields: [activePublisherId], references: [id], onDelete: SetNull)
 
@@ -327,18 +327,18 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships    Membership[]
-  teams          Team[]
-  publishers     Publisher[]
-  campaigns      Campaign[]
-  wallets        Wallet[]
-  orders         Order[]
-  tickets        Ticket[]
-  notifications  Notification[]
-  auditLogs      AuditLog[]
-  apiKeys        ApiKey[]
+  memberships         Membership[]
+  teams               Team[]
+  publishers          Publisher[]
+  campaigns           Campaign[]
+  wallets             Wallet[]
+  orders              Order[]
+  tickets             Ticket[]
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  apiKeys             ApiKey[]
   marketplaceListings MarketplaceListing[]
-  activeContexts ActiveContext[]
+  activeContexts      ActiveContext[]
 }
 
 enum MembershipStatus {
@@ -384,7 +384,7 @@ model StaffMembership {
   id          String    @id @default(cuid())
   role        StaffRole @default(OPERATIONS)
   userId      String    @unique
-  permissions Json      @default("[]")  // String array of permission codes e.g. ["FINANCIAL_DATA_DECRYPT"]
+  permissions Json      @default("[]") // String array of permission codes e.g. ["FINANCIAL_DATA_DECRYPT"]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -404,27 +404,27 @@ model Team {
 }
 
 model Publisher {
-  id             String       @id @default(cuid())
+  id             String        @id @default(cuid())
   name           String
   email          String?
   organizationId String
   tier           PublisherTier @default(NEW)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  organization        Organization         @relation(fields: [organizationId], references: [id])
-  websites            Website[]
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  websites             Website[]
   publisherMemberships PublisherMembership[]
-  balance             PublisherBalance?
-  withdrawals         Withdrawal[]
-  payoutMethods       PayoutMethod[]
-  settlements         Settlement[]
-  marketplaceListings MarketplaceListing[]
-  profile             PublisherProfile?
-  transactions        Transaction[]
-  activeContexts      ActiveContext[]
-  orderReviews        OrderReview[]
-  tickets             Ticket[]            @relation("TicketPublisher")
+  balance              PublisherBalance?
+  withdrawals          Withdrawal[]
+  payoutMethods        PayoutMethod[]
+  settlements          Settlement[]
+  marketplaceListings  MarketplaceListing[]
+  profile              PublisherProfile?
+  transactions         Transaction[]
+  activeContexts       ActiveContext[]
+  orderReviews         OrderReview[]
+  tickets              Ticket[]              @relation("TicketPublisher")
 
   @@index([organizationId])
 }
@@ -441,8 +441,8 @@ enum VerificationMethod {
 }
 
 model Website {
-  id              String                @id @default(cuid())
-  url             String                @unique
+  id              String               @id @default(cuid())
+  url             String               @unique
   // Normalized hostname (lowercase, www-stripped) — dedupe key; URL
   // uniqueness alone is bypassed by www/trailing-slash variants.
   domain          String?
@@ -451,9 +451,9 @@ model Website {
   language        String?
   country         String?
   metrics         Json?
-  isActive        Boolean               @default(true)
+  isActive        Boolean              @default(true)
   publisherId     String?
-  ownershipType   WebsiteOwnershipType   @default(PUBLISHER)
+  ownershipType   WebsiteOwnershipType @default(PUBLISHER)
   // Phase 6.5: which OPERATIONS staff member manages this site. NULL for
   // PUBLISHER sites (publisher org membership is the source of truth) and
   // for PLATFORM sites that haven't been assigned yet (orders fall back to
@@ -465,37 +465,37 @@ model Website {
   // Publisher sites start PENDING_VERIFICATION and must prove control via a
   // DNS TXT record before any listing on them can be approved. Platform sites
   // are created VERIFIED (the platform owns them).
-  verificationStatus       WebsiteVerificationStatus @default(PENDING_VERIFICATION)
-  verificationMethod       VerificationMethod?
+  verificationStatus           WebsiteVerificationStatus @default(PENDING_VERIFICATION)
+  verificationMethod           VerificationMethod?
   // Token the publisher must currently publish in DNS (next verification cycle).
-  verificationToken        String?
+  verificationToken            String?
   // Token actually proven present in DNS — what the periodic sweep re-checks.
   // Kept separate from verificationToken so rotation never false-revokes a
   // domain whose published TXT still holds the previously-proven secret.
-  activeVerifiedToken      String?
-  verifiedAt               DateTime?
-  lastVerificationCheckAt  DateTime?
+  activeVerifiedToken          String?
+  verifiedAt                   DateTime?
+  lastVerificationCheckAt      DateTime?
   lastSuccessfulVerificationAt DateTime?
-  lastVerificationRequestAt DateTime?
-  verificationCheckCount   Int                       @default(0)
+  lastVerificationRequestAt    DateTime?
+  verificationCheckCount       Int                       @default(0)
   // Consecutive failed health checks. 3 in a row -> REVOKED (transient-tolerant).
-  consecutiveFailures      Int                       @default(0)
-  verificationFailureReason String?
+  consecutiveFailures          Int                       @default(0)
+  verificationFailureReason    String?
   // Canonical apex domain (protocol/path/www stripped, lowercase, punycode).
   // Unique per non-platform site — one verified domain = one publisher.
-  canonicalDomain          String?
+  canonicalDomain              String?
   // Internal moderation trust score 0-100 (never exposed publicly).
-  trustScore               Int?
+  trustScore                   Int?
   // Optimistic-lock guard for worker transitions
-  verificationVersion      Int                       @default(0)
+  verificationVersion          Int                       @default(0)
 
-  createdAt       DateTime              @default(now())
-  updatedAt       DateTime              @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  publisher  Publisher?  @relation(fields: [publisherId], references: [id])
-  managedBy  User?       @relation("WebsiteManager", fields: [managedByUserId], references: [id])
-  orders     Order[]
-  orderItems OrderItem[]
+  publisher           Publisher?           @relation(fields: [publisherId], references: [id])
+  managedBy           User?                @relation("WebsiteManager", fields: [managedByUserId], references: [id])
+  orders              Order[]
+  orderItems          OrderItem[]
   marketplaceListings MarketplaceListing[]
 
   @@index([publisherId])
@@ -510,30 +510,30 @@ model Website {
 }
 
 model Order {
-  id                 String        @id @default(cuid())
-  type               ServiceType
-  status             OrderStatus   @default(DRAFT)
-  amount             Decimal?
-  currency           String        @default("USD")
-  paymentStatus      PaymentStatus @default(PENDING)
-  title              String?
-  instructions       String?
-  targetUrl          String?
-  anchorText         String?
-  publishedUrl       String?
-  publishedAt        DateTime?
-  verifiedAt         DateTime?
-  verifiedBy         String?
-  verifyMethod       String?
-  deliveredAt        DateTime?
-  revisionCount      Int           @default(0)
-  customerId         String
-  assigneeId         String?
-  websiteId          String?
-  organizationId     String
-  campaignId         String?
-  idempotencyKey     String?
-  version            Int           @default(0)
+  id                      String              @id @default(cuid())
+  type                    ServiceType
+  status                  OrderStatus         @default(DRAFT)
+  amount                  Decimal?
+  currency                String              @default("USD")
+  paymentStatus           PaymentStatus       @default(PENDING)
+  title                   String?
+  instructions            String?
+  targetUrl               String?
+  anchorText              String?
+  publishedUrl            String?
+  publishedAt             DateTime?
+  verifiedAt              DateTime?
+  verifiedBy              String?
+  verifyMethod            String?
+  deliveredAt             DateTime?
+  revisionCount           Int                 @default(0)
+  customerId              String
+  assigneeId              String?
+  websiteId               String?
+  organizationId          String
+  campaignId              String?
+  idempotencyKey          String?
+  version                 Int                 @default(0)
   // Points at the current OrderDeliveryVersion (source of truth for delivery).
   // Legacy publishedUrl/verifiedAt/deliveredAt are denormalized mirrors of it.
   activeDeliveryVersionId String?
@@ -543,38 +543,38 @@ model Order {
   // the live listing never alter the contract for in-flight orders. type,
   // amount, websiteId, turnaroundDays are denormalized mirrors of the chosen
   // ListingService at that moment.
-  listingId          String?
-  listingServiceId   String?
-  fulfillmentChannel FulfillmentChannel?
-  turnaroundDays     Int?
+  listingId               String?
+  listingServiceId        String?
+  fulfillmentChannel      FulfillmentChannel?
+  turnaroundDays          Int?
   // Phase 6: per-service structured brief. Validated server-side against
   // the @guestpost/shared briefSchemas registry keyed on serviceType. NULL
   // for legacy orders (renderers fall back to title/instructions).
-  briefData          Json?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  briefData               Json?
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
 
-  customer     User          @relation("OrderCustomer", fields: [customerId], references: [id])
-  assignee     User?         @relation("OrderAssignee", fields: [assigneeId], references: [id])
-  website      Website?      @relation(fields: [websiteId], references: [id])
-  organization Organization  @relation(fields: [organizationId], references: [id])
-  campaign     Campaign?     @relation(fields: [campaignId], references: [id])
-  listing      MarketplaceListing? @relation(fields: [listingId], references: [id])
-  listingService ListingService?   @relation(fields: [listingServiceId], references: [id])
-  contentOrder ContentOrder?
-  revisions    Revision[]
-  reports      Report[]
-  transactions Transaction[]
-  items        OrderItem[]
-  events       OrderEvent[]
-  settlements  Settlement[]
-  dispute      OrderDispute?
-  platformRevenue PlatformRevenue?
-  deliveryVersions      OrderDeliveryVersion[]
+  customer               User                    @relation("OrderCustomer", fields: [customerId], references: [id])
+  assignee               User?                   @relation("OrderAssignee", fields: [assigneeId], references: [id])
+  website                Website?                @relation(fields: [websiteId], references: [id])
+  organization           Organization            @relation(fields: [organizationId], references: [id])
+  campaign               Campaign?               @relation(fields: [campaignId], references: [id])
+  listing                MarketplaceListing?     @relation(fields: [listingId], references: [id])
+  listingService         ListingService?         @relation(fields: [listingServiceId], references: [id])
+  contentOrder           ContentOrder?
+  revisions              Revision[]
+  reports                Report[]
+  transactions           Transaction[]
+  items                  OrderItem[]
+  events                 OrderEvent[]
+  settlements            Settlement[]
+  dispute                OrderDispute?
+  platformRevenue        PlatformRevenue?
+  deliveryVersions       OrderDeliveryVersion[]
   fulfillmentAssignments FulfillmentAssignment[]
-  fraudFlags            DeliveryFraudFlag[]
-  tickets               Ticket[]
-  review                OrderReview?
+  fraudFlags             DeliveryFraudFlag[]
+  tickets                Ticket[]
+  review                 OrderReview?
 
   // Scoped per organization — a globally unique key let one tenant replay
   // another tenant's key and read their order (cross-tenant leak).
@@ -591,13 +591,13 @@ model Order {
 }
 
 model Campaign {
-  id             String   @id @default(cuid())
+  id             String         @id @default(cuid())
   name           String
   description    String?
-  status         CampaignStatus   @default(ACTIVE)
+  status         CampaignStatus @default(ACTIVE)
   organizationId String
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
   orders       Order[]
@@ -621,8 +621,8 @@ model OrderItem {
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
-  order       Order         @relation(fields: [orderId], references: [id])
-  website     Website?      @relation(fields: [websiteId], references: [id])
+  order        Order         @relation(fields: [orderId], references: [id])
+  website      Website?      @relation(fields: [websiteId], references: [id])
   publications Publication[]
 
   @@index([orderId])
@@ -660,8 +660,8 @@ model Publication {
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  orderItem OrderItem @relation(fields: [orderItemId], references: [id])
-  verifiedByUser User? @relation("PublicationVerifier", fields: [verifiedBy], references: [id])
+  orderItem      OrderItem @relation(fields: [orderItemId], references: [id])
+  verifiedByUser User?     @relation("PublicationVerifier", fields: [verifiedBy], references: [id])
 
   @@index([orderItemId])
   @@index([verifiedBy])
@@ -669,33 +669,33 @@ model Publication {
 }
 
 model OrderDispute {
-  id         String        @id @default(cuid())
-  orderId    String        @unique
-  order      Order         @relation(fields: [orderId], references: [id])
-  raisedBy   String
-  reason     String
-  status     DisputeStatus @default(OPEN)
+  id             String        @id @default(cuid())
+  orderId        String        @unique
+  order          Order         @relation(fields: [orderId], references: [id])
+  raisedBy       String
+  reason         String
+  status         DisputeStatus @default(OPEN)
   // Order status at dispute open — RESTORE/REJECT resolutions return the
   // order to this exact status, not a hardcoded guess.
   previousStatus OrderStatus?
-  resolvedBy String?
-  resolvedAt DateTime?
-  resolution String?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  resolution     String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 }
 
 model Settlement {
-  id              String           @id @default(cuid())
-  orderId         String
-  publisherId     String
-  grossAmount     Decimal
-  platformFee     Decimal          @default(0)
-  publisherAmount Decimal
-  status          SettlementStatus @default(PENDING)
-  reviewEndsAt    DateTime?
-  settledAt       DateTime?
-  version         Int              @default(0)
+  id                 String                @id @default(cuid())
+  orderId            String
+  publisherId        String
+  grossAmount        Decimal
+  platformFee        Decimal               @default(0)
+  publisherAmount    Decimal
+  status             SettlementStatus      @default(PENDING)
+  reviewEndsAt       DateTime?
+  settledAt          DateTime?
+  version            Int                   @default(0)
   // ── Phase 6 reporting snapshots (additive; NULL on legacy rows) ──
   // Captured at settlement creation by joining the order's snapshot. Frozen
   // forever so refunds, audits, and reports can re-derive the contract
@@ -705,14 +705,14 @@ model Settlement {
   ownerType          WebsiteOwnershipType?
   fulfillmentChannel FulfillmentChannel?
   unitPrice          Decimal?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
-  order      Order                 @relation(fields: [orderId], references: [id])
-  publisher  Publisher             @relation(fields: [publisherId], references: [id])
-  approvals  SettlementApproval[]
-  transactions Transaction[]
-  listingService ListingService?   @relation(fields: [listingServiceId], references: [id])
+  order          Order                @relation(fields: [orderId], references: [id])
+  publisher      Publisher            @relation(fields: [publisherId], references: [id])
+  approvals      SettlementApproval[]
+  transactions   Transaction[]
+  listingService ListingService?      @relation(fields: [listingServiceId], references: [id])
 
   // NOTE: a partial unique index "Settlement_orderId_active_key" on (orderId)
   // WHERE status != 'CANCELLED' exists via raw SQL migration — Prisma cannot
@@ -731,13 +731,13 @@ enum SettlementApprovalType {
 }
 
 model SettlementApproval {
-  id           String   @id @default(cuid())
+  id           String                 @id @default(cuid())
   settlementId String
-  settlement   Settlement @relation(fields: [settlementId], references: [id])
+  settlement   Settlement             @relation(fields: [settlementId], references: [id])
   type         SettlementApprovalType
   approvedBy   String
   roleAtTime   String
-  approvedAt   DateTime @default(now())
+  approvedAt   DateTime               @default(now())
 
   @@unique([settlementId, type])
   @@index([settlementId])
@@ -813,9 +813,9 @@ model OrderDeliveryVersion {
   verificationVersion       Int                        @default(0)
   createdAt                 DateTime                   @default(now())
 
-  order    Order                          @relation(fields: [orderId], references: [id])
-  evidence DeliveryVerificationEvidence[]
-  snapshots DeliverySnapshot[]
+  order      Order                          @relation(fields: [orderId], references: [id])
+  evidence   DeliveryVerificationEvidence[]
+  snapshots  DeliverySnapshot[]
   fraudFlags DeliveryFraudFlag[]
 
   @@unique([orderId, version])
@@ -826,22 +826,22 @@ model OrderDeliveryVersion {
 
 // Immutable verification evidence — survives disputes + revisions forever.
 model DeliveryVerificationEvidence {
-  id                String   @id @default(cuid())
-  deliveryVersionId String
-  pageTitle         String?
-  metaTitle         String?
-  canonicalUrl      String?
-  resolvedUrl       String
-  httpStatus        Int
-  anchorFound       Boolean  @default(false)
-  linkFound         Boolean  @default(false)
-  targetUrlMatched  Boolean  @default(false)
+  id                 String   @id @default(cuid())
+  deliveryVersionId  String
+  pageTitle          String?
+  metaTitle          String?
+  canonicalUrl       String?
+  resolvedUrl        String
+  httpStatus         Int
+  anchorFound        Boolean  @default(false)
+  linkFound          Boolean  @default(false)
+  targetUrlMatched   Boolean  @default(false)
   verifiedAnchorText String?
-  verifiedTargetUrl String?
-  htmlHash          String?
-  redirectChain     Json?
-  checkedAt         DateTime @default(now())
-  createdAt         DateTime @default(now())
+  verifiedTargetUrl  String?
+  htmlHash           String?
+  redirectChain      Json?
+  checkedAt          DateTime @default(now())
+  createdAt          DateTime @default(now())
 
   deliveryVersion OrderDeliveryVersion @relation(fields: [deliveryVersionId], references: [id])
 
@@ -885,7 +885,7 @@ model OrderReview {
   orderId     String   @unique
   publisherId String?
   customerId  String
-  rating      Int      // 1..5
+  rating      Int // 1..5
   comment     String?
   createdAt   DateTime @default(now())
 
@@ -897,46 +897,46 @@ model OrderReview {
 }
 
 model PublisherBalance {
-  id                 String  @id @default(cuid())
-  publisherId        String  @unique
-  pendingBalance     Decimal @default(0)
-  approvedBalance    Decimal @default(0)
-  withdrawableBalance Decimal @default(0)
+  id                  String   @id @default(cuid())
+  publisherId         String   @unique
+  pendingBalance      Decimal  @default(0)
+  approvedBalance     Decimal  @default(0)
+  withdrawableBalance Decimal  @default(0)
   // Owed back to the platform (refund clawback exceeded withdrawable).
   // Netted against future settlement releases before crediting withdrawable.
-  debtBalance        Decimal @default(0)
-  lifetimeEarnings   Decimal @default(0)
-  lifetimePaid       Decimal @default(0)
-  version            Int     @default(0)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  debtBalance         Decimal  @default(0)
+  lifetimeEarnings    Decimal  @default(0)
+  lifetimePaid        Decimal  @default(0)
+  version             Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   publisher Publisher @relation(fields: [publisherId], references: [id])
 }
 
 model Withdrawal {
-  id          String           @id @default(cuid())
-  publisherId String
-  amount      Decimal
-  method      String           @default("bank_transfer")
-  status      WithdrawalStatus @default(PENDING)
+  id             String           @id @default(cuid())
+  publisherId    String
+  amount         Decimal
+  method         String           @default("bank_transfer")
+  status         WithdrawalStatus @default(PENDING)
   // Tier-based hold: approval is rejected before this timestamp.
-  availableAt DateTime?
+  availableAt    DateTime?
   // Client-supplied dedup key — scoped per publisher, never used as PK.
   idempotencyKey String?
   payoutMethodId String?
-  payoutBatchId String?
-  approvedBy  String?
-  approvedAt  DateTime?
-  version     Int              @default(0)
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  payoutBatchId  String?
+  approvedBy     String?
+  approvedAt     DateTime?
+  version        Int              @default(0)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  publisher   Publisher @relation(fields: [publisherId], references: [id])
-  approvedByUser User?  @relation("WithdrawalApprover", fields: [approvedBy], references: [id])
-  payoutMethod PayoutMethod? @relation(fields: [payoutMethodId], references: [id])
-  payoutBatch PayoutBatch? @relation(fields: [payoutBatchId], references: [id])
-  executions PayoutExecution[]
+  publisher      Publisher         @relation(fields: [publisherId], references: [id])
+  approvedByUser User?             @relation("WithdrawalApprover", fields: [approvedBy], references: [id])
+  payoutMethod   PayoutMethod?     @relation(fields: [payoutMethodId], references: [id])
+  payoutBatch    PayoutBatch?      @relation(fields: [payoutBatchId], references: [id])
+  executions     PayoutExecution[]
 
   @@unique([publisherId, idempotencyKey])
   @@index([publisherId, status])
@@ -949,10 +949,10 @@ model Withdrawal {
 model PayoutMethod {
   id                   String   @id @default(cuid())
   publisherId          String
-  type                 String   // bank_transfer, paypal, wise
+  type                 String // bank_transfer, paypal, wise
   label                String
-  details              Json     // AES-256-GCM encrypted via PayoutEncryptionService
-  displayDetails       Json?    // Non-sensitive display fields (bank name, last4) — unencrypted, safe for list endpoints
+  details              Json // AES-256-GCM encrypted via PayoutEncryptionService
+  displayDetails       Json? // Non-sensitive display fields (bank name, last4) — unencrypted, safe for list endpoints
   encryptionKeyVersion Int      @default(0)
   isDefault            Boolean  @default(false)
   isActive             Boolean  @default(true)
@@ -967,15 +967,15 @@ model PayoutMethod {
 }
 
 model PayoutProvider {
-  id                       String   @id @default(cuid())
-  name                     String   @unique // "manual", "wise", "stripe_connect"
-  displayName              String
-  config                   Json     // Provider-specific config (API keys, webhook secrets) — AES-256-GCM encrypted
-  configEncryptionKeyVersion Int    @default(0)
-  isActive                 Boolean  @default(true)
-  version                  Int      @default(0)
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
+  id                         String   @id @default(cuid())
+  name                       String   @unique // "manual", "wise", "stripe_connect"
+  displayName                String
+  config                     Json // Provider-specific config (API keys, webhook secrets) — AES-256-GCM encrypted
+  configEncryptionKeyVersion Int      @default(0)
+  isActive                   Boolean  @default(true)
+  version                    Int      @default(0)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 
   executions PayoutExecution[]
 
@@ -983,19 +983,19 @@ model PayoutProvider {
 }
 
 model PayoutExecution {
-  id                 String               @id @default(cuid())
-  withdrawalId       String
-  providerId         String
-  status             PayoutExecutionStatus @default(PENDING)
-  providerExecutionId String?              // Provider's reference ID (transfer ID, payment ID)
-  amount             Decimal
-  fee                Decimal              @default(0)
-  errorMessage       String?
-  providerMetadata   Json?
-  idempotencyKey     String?
-  version            Int                  @default(0)
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
+  id                  String                @id @default(cuid())
+  withdrawalId        String
+  providerId          String
+  status              PayoutExecutionStatus @default(PENDING)
+  providerExecutionId String? // Provider's reference ID (transfer ID, payment ID)
+  amount              Decimal
+  fee                 Decimal               @default(0)
+  errorMessage        String?
+  providerMetadata    Json?
+  idempotencyKey      String?
+  version             Int                   @default(0)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 
   withdrawal Withdrawal     @relation(fields: [withdrawalId], references: [id])
   provider   PayoutProvider @relation(fields: [providerId], references: [id])
@@ -1008,19 +1008,19 @@ model PayoutExecution {
 }
 
 model PayoutBatch {
-  id                 String             @id @default(cuid())
-  name               String
-  status             PayoutBatchStatus  @default(PENDING)
-  totalAmount        Decimal            @default(0)
-  totalCount         Int                @default(0)
-  completedAmount    Decimal            @default(0)
-  completedCount     Int                @default(0)
-  failedCount        Int                @default(0)
-  notes              String?
-  metadata           Json?
-  createdBy          String
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
+  id              String            @id @default(cuid())
+  name            String
+  status          PayoutBatchStatus @default(PENDING)
+  totalAmount     Decimal           @default(0)
+  totalCount      Int               @default(0)
+  completedAmount Decimal           @default(0)
+  completedCount  Int               @default(0)
+  failedCount     Int               @default(0)
+  notes           String?
+  metadata        Json?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   withdrawals Withdrawal[]
 
@@ -1029,15 +1029,15 @@ model PayoutBatch {
 }
 
 model ApiKey {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   organizationId String
   name           String
-  keyHash        String   @unique
-  permissions    Json     @default("[]")
+  keyHash        String    @unique
+  permissions    Json      @default("[]")
   lastUsedAt     DateTime?
   expiresAt      DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id])
 
@@ -1045,26 +1045,26 @@ model ApiKey {
 }
 
 model ContentOrder {
-  id          String   @id @default(cuid())
+  id          String             @id @default(cuid())
   title       String
   brief       String?
-  status      ContentOrderStatus   @default(PENDING)
+  status      ContentOrderStatus @default(PENDING)
   deliverable String?
-  orderId     String   @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  orderId     String             @unique
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   order Order @relation(fields: [orderId], references: [id])
 }
 
 model Revision {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   notes     String?
   files     Json?
-  status    RevisionStatus   @default(REQUESTED)
+  status    RevisionStatus @default(REQUESTED)
   orderId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   order Order @relation(fields: [orderId], references: [id])
 
@@ -1072,14 +1072,14 @@ model Revision {
 }
 
 model Report {
-  id        String   @id @default(cuid())
-  type      String
-  data      Json?
-  format    String   @default("pdf")
+  id         String    @id @default(cuid())
+  type       String
+  data       Json?
+  format     String    @default("pdf")
   exportedAt DateTime?
-  orderId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  orderId    String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   order Order @relation(fields: [orderId], references: [id])
 
@@ -1087,24 +1087,24 @@ model Report {
 }
 
 model PlatformRevenue {
-  id          String   @id @default(cuid())
-  orderId     String   @unique
-  amount      Decimal
-  platformFee Decimal   @default(0)
-  netRevenue  Decimal
-  recordedAt  DateTime  @default(now())
+  id                 String                @id @default(cuid())
+  orderId            String                @unique
+  amount             Decimal
+  platformFee        Decimal               @default(0)
+  netRevenue         Decimal
+  recordedAt         DateTime              @default(now())
   // Set on refund instead of deleting the row — financial records are
   // never destroyed. Revenue queries must filter reversedAt: null.
-  reversedAt  DateTime?
+  reversedAt         DateTime?
   // Phase 6 reporting snapshots — same shape as Settlement.
   listingServiceId   String?
   serviceType        ServiceType?
   ownerType          WebsiteOwnershipType?
   fulfillmentChannel FulfillmentChannel?
   unitPrice          Decimal?
-  createdAt   DateTime  @default(now())
+  createdAt          DateTime              @default(now())
 
-  order Order @relation(fields: [orderId], references: [id])
+  order          Order           @relation(fields: [orderId], references: [id])
   listingService ListingService? @relation(fields: [listingServiceId], references: [id])
 
   @@index([recordedAt])
@@ -1114,18 +1114,18 @@ model PlatformRevenue {
 }
 
 model Wallet {
-  id                String   @id @default(cuid())
-  availableBalance  Decimal  @default(0)
-  reservedBalance   Decimal  @default(0)
-  currency          String   @default("USD")
-  organizationId    String?
-  userId            String?
-  version           Int      @default(0)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id               String   @id @default(cuid())
+  availableBalance Decimal  @default(0)
+  reservedBalance  Decimal  @default(0)
+  currency         String   @default("USD")
+  organizationId   String?
+  userId           String?
+  version          Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  organization  Organization? @relation(fields: [organizationId], references: [id])
-  transactions  Transaction[]
+  organization Organization? @relation(fields: [organizationId], references: [id])
+  transactions Transaction[]
 
   @@unique([organizationId])
   @@index([userId])
@@ -1147,24 +1147,24 @@ enum TransactionType {
 }
 
 model Transaction {
-  id          String   @id @default(cuid())
-  amount      Decimal
-  currency    String   @default("USD")
-  type        TransactionType
-  reference   String?
+  id           String          @id @default(cuid())
+  amount       Decimal
+  currency     String          @default("USD")
+  type         TransactionType
+  reference    String?
   // External provider linkage (e.g. Stripe payment_intent for deposits) —
   // lets chargeback webhooks find the originating deposit + wallet.
-  providerRef String?
-  description String?
-  walletId    String?
-  orderId     String?
-  publisherId String?
+  providerRef  String?
+  description  String?
+  walletId     String?
+  orderId      String?
+  publisherId  String?
   settlementId String?
-  createdAt   DateTime @default(now())
+  createdAt    DateTime        @default(now())
 
-  wallet     Wallet?    @relation(fields: [walletId], references: [id])
-  order      Order?     @relation(fields: [orderId], references: [id])
-  publisher  Publisher? @relation(fields: [publisherId], references: [id])
+  wallet     Wallet?     @relation(fields: [walletId], references: [id])
+  order      Order?      @relation(fields: [orderId], references: [id])
+  publisher  Publisher?  @relation(fields: [publisherId], references: [id])
   settlement Settlement? @relation(fields: [settlementId], references: [id])
 
   @@unique([reference])
@@ -1178,15 +1178,15 @@ model Transaction {
 }
 
 model Ticket {
-  id             String       @id @default(cuid())
-  subject        String
-  description    String?
-  status         TicketStatus @default(OPEN)
-  organizationId String
-  userId         String
+  id                  String              @id @default(cuid())
+  subject             String
+  description         String?
+  status              TicketStatus        @default(OPEN)
+  organizationId      String
+  userId              String
   // Optional link to the order the ticket is about — lets customers get help
   // straight from an order and gives staff full context.
-  orderId        String?
+  orderId             String?
   // Phase 6.5 channel-aware routing. Snapshotted from the linked order at
   // ticket creation; subsequent website/listing edits never re-route an
   // existing ticket (prevents accidental exposure to a new owner).
@@ -1198,15 +1198,15 @@ model Ticket {
   fulfillmentChannel  FulfillmentChannel?
   assignedToUserId    String?
   assignedPublisherId String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
 
-  organization Organization  @relation(fields: [organizationId], references: [id])
-  user         User          @relation(fields: [userId], references: [id])
-  order        Order?        @relation(fields: [orderId], references: [id])
-  assignedTo   User?         @relation("TicketAssignee", fields: [assignedToUserId], references: [id])
-  assignedPublisher Publisher? @relation("TicketPublisher", fields: [assignedPublisherId], references: [id])
-  messages     TicketMessage[]
+  organization      Organization    @relation(fields: [organizationId], references: [id])
+  user              User            @relation(fields: [userId], references: [id])
+  order             Order?          @relation(fields: [orderId], references: [id])
+  assignedTo        User?           @relation("TicketAssignee", fields: [assignedToUserId], references: [id])
+  assignedPublisher Publisher?      @relation("TicketPublisher", fields: [assignedPublisherId], references: [id])
+  messages          TicketMessage[]
 
   @@index([organizationId, status])
   @@index([userId])
@@ -1217,18 +1217,88 @@ model Ticket {
   @@index([fulfillmentChannel, status])
 }
 
+// Phase 6.6: every ticket message carries a visibility scope. PUBLIC is the
+// historical default and what every existing row gets at migration time;
+// INTERNAL is staff-only — invisible to the ticket's customer and to any
+// publisher member, and used by Finance (who is read-only on PLATFORM tickets)
+// + Admin + Ops as an escape valve to coordinate without writing to the
+// customer-facing thread.
+enum TicketMessageVisibility {
+  PUBLIC
+  INTERNAL
+}
+
+// Phase 6.6.1: which "hat" the author was wearing at write time. Snapshotted
+// onto every TicketMessage row — never derived dynamically from current
+// memberships, so historical audit trails remain accurate even after a
+// staffer's role changes. This is the same forensic discipline as
+// SettlementApproval.roleAtTime.
+//
+// Used for:
+//   - Dispute / refund / settlement investigations ("who said what in what
+//     capacity?")
+//   - Staff QA reviews ("Finance posted on a Platform ticket — that's the
+//     internal-note escape valve in action")
+//   - Audit log enrichment (TICKET_MESSAGE_ADDED metadata carries this so
+//     reports can group by role without a join through StaffMembership)
+enum TicketParticipantRole {
+  CUSTOMER
+  PUBLISHER
+  OPS
+  ADMIN
+  FINANCE
+}
+
+// Phase 6.6.1: orthogonal to visibility. MESSAGE = human reply (default);
+// INTERNAL_NOTE = staff-only note (visibility is always INTERNAL); SYSTEM_EVENT
+// = machine-emitted thread entry (reassigned, status changed, auto-resolved).
+// SYSTEM_EVENT is schema-ready but not yet emitted by any service path; it
+// lets the UI render system entries distinctly from human messages without
+// requiring a parallel "events" table.
+enum TicketMessageType {
+  MESSAGE
+  INTERNAL_NOTE
+  SYSTEM_EVENT
+}
+
 model TicketMessage {
-  id        String   @id @default(cuid())
-  content   String
-  files     Json?
-  userId    String
-  ticketId  String
-  createdAt DateTime @default(now())
+  id              String                  @id @default(cuid())
+  content         String
+  files           Json?
+  visibility      TicketMessageVisibility @default(PUBLIC)
+  // Phase 6.6.1: role-at-write-time + message classification snapshot.
+  participantRole TicketParticipantRole
+  messageType     TicketMessageType       @default(MESSAGE)
+  // Phase 6.6.2: full actor context snapshot — uncollapsed companion to
+  // participantRole. Captures the raw schema-level roles the actor held at
+  // write time so investigations can answer "was this CUSTOMER an OWNER or
+  // MEMBER?" / "was this STAFF SUPER_ADMIN or FINANCE?" without joining
+  // through StaffMembership/Membership (which mutate over time and would
+  // lie about historical authority).
+  //
+  // Shape (open — future fields like permissions[] can be added without a
+  // migration):
+  //   { kind: "CUSTOMER" | "PUBLISHER" | "STAFF",
+  //     staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null,
+  //     organizationRole: "OWNER" | "MEMBER" | null,
+  //     publisherRole: "PUBLISHER_OWNER" | "PUBLISHER_MEMBER" | null }
+  //
+  // Nullable for backward compat — pre-migration rows have NULL.
+  actorSnapshot   Json?
+  userId          String
+  ticketId        String
+  createdAt       DateTime                @default(now())
 
   user   User   @relation(fields: [userId], references: [id])
   ticket Ticket @relation(fields: [ticketId], references: [id])
 
   @@index([ticketId])
+  // Composite covers the "show me the customer-visible thread" read path
+  // (ticketId + visibility=PUBLIC) without a separate scan.
+  @@index([ticketId, visibility])
+  // Audit / investigation filter: "all FINANCE messages on this ticket",
+  // "all OPS replies in this window".
+  @@index([ticketId, participantRole])
 }
 
 model Notification {
@@ -1326,89 +1396,89 @@ model MarketplaceTag {
 }
 
 model MarketplaceListing {
-  id                String              @id @default(cuid())
-  title             String
-  slug              String              @unique
-  description       String
-  shortDescription  String?
+  id               String                 @id @default(cuid())
+  title            String
+  slug             String                 @unique
+  description      String
+  shortDescription String?
   // Phase 7 cleanup: `type` / `price` / `turnaroundDays` / `revisionRounds`
   // / `warrantyDays` were dropped — per-service data lives on the
   // ListingService child table. See migration 20260615130000_phase7_listing_columns.
-  status            ListingStatus       @default(DRAFT)
-  fulfillmentType   ListingFulfillmentType @default(PUBLISHER)
+  status           ListingStatus          @default(DRAFT)
+  fulfillmentType  ListingFulfillmentType @default(PUBLISHER)
   // Authoritative ownership at the listing layer. Backfilled in Phase 1 from
   // (publisherId IS NOT NULL ? PUBLISHER : PLATFORM). Routing, attribution
   // ("Listed by GuestPost.cc"), and approval-queue gating read this column.
-  ownerType         WebsiteOwnershipType @default(PUBLISHER)
+  ownerType        WebsiteOwnershipType   @default(PUBLISHER)
 
   // Pricing — listing-level columns dropped in Phase 7. Reads use priceFrom
   // (computed from AVAILABLE ListingService rows).
-  currency          String              @default("USD")
-  priceType         String              @default("fixed") // fixed, starting_at, range, negotiable
-  minPrice          Decimal?
-  maxPrice          Decimal?
+  currency  String   @default("USD")
+  priceType String   @default("fixed") // fixed, starting_at, range, negotiable
+  minPrice  Decimal?
+  maxPrice  Decimal?
 
   // Metrics
-  domainRating      Int?
-  domainAuthority   Int?
-  traffic           Int?
-  referringDomains  Int?
-  spamScore         Int?
+  domainRating     Int?
+  domainAuthority  Int?
+  traffic          Int?
+  referringDomains Int?
+  spamScore        Int?
 
   // Location & Language
-  country           String?
-  language          String?
-  countries         String[]            @default([])
-  languages         String[]            @default([])
+  country   String?
+  language  String?
+  countries String[] @default([])
+  languages String[] @default([])
 
   // Features
-  featured          Boolean              @default(false)
-  verified          Boolean              @default(false)
+  featured     Boolean @default(false)
+  verified     Boolean @default(false)
   // allowGuestPost / allowNicheEdit removed in Phase 5 cleanup — multi-service
   // listings encode service availability via the ListingService child table.
-  doFollowOnly      Boolean              @default(false)
-  
-  // URLs
-  websiteUrl        String?
-  sampleUrl         String?
-  signupUrl         String?
-  
-  // Metrics data (JSON for flexibility)
-  metricsData       Json?
-  trafficData       Json?
-  semrushData       Json?
-  
-  // Publisher reference (for PUBLISHER type)
-  publisherId       String?
-  websiteId         String?
-  
-  // Organization reference (for INTERNAL and publisher listings)
-  organizationId    String?
-  
-  // Timestamps
-  publishedAt       DateTime?
-  expiresAt         DateTime?
-  createdAt         DateTime            @default(now())
-  updatedAt         DateTime            @updatedAt
+  doFollowOnly Boolean @default(false)
 
-  publisher         Publisher?          @relation(fields: [publisherId], references: [id])
-  website           Website?           @relation(fields: [websiteId], references: [id])
-  organization       Organization?       @relation(fields: [organizationId], references: [id])
-  category          MarketplaceCategory? @relation(fields: [categoryId], references: [id])
-  
-  tags              MarketplaceListingTag[]
-  images            MarketplaceListingImage[]
+  // URLs
+  websiteUrl String?
+  sampleUrl  String?
+  signupUrl  String?
+
+  // Metrics data (JSON for flexibility)
+  metricsData Json?
+  trafficData Json?
+  semrushData Json?
+
+  // Publisher reference (for PUBLISHER type)
+  publisherId String?
+  websiteId   String?
+
+  // Organization reference (for INTERNAL and publisher listings)
+  organizationId String?
+
+  // Timestamps
+  publishedAt DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  publisher    Publisher?           @relation(fields: [publisherId], references: [id])
+  website      Website?             @relation(fields: [websiteId], references: [id])
+  organization Organization?        @relation(fields: [organizationId], references: [id])
+  category     MarketplaceCategory? @relation(fields: [categoryId], references: [id])
+
+  tags       MarketplaceListingTag[]
+  images     MarketplaceListingImage[]
   // pricingTiers removed in Phase 5 — replaced by per-service prices on the
   // ListingService child table.
-  reviews           MarketplaceReview[]
-  favorites         MarketplaceFavorite[]
-  savedLists        MarketplaceSavedListItem[]
-  views             MarketplaceListingView[]
-  clicks            MarketplaceListingClick[]
-  services          ListingService[]
-  orders            Order[]
+  reviews    MarketplaceReview[]
+  favorites  MarketplaceFavorite[]
+  savedLists MarketplaceSavedListItem[]
+  views      MarketplaceListingView[]
+  clicks     MarketplaceListingClick[]
+  services   ListingService[]
+  orders     Order[]
 
-  categoryId        String?
+  categoryId String?
 
   @@index([slug])
   // Phase 7: @@index([type]) dropped alongside MarketplaceListing.type.
@@ -1450,7 +1520,7 @@ model ListingService {
   createdAt           DateTime            @default(now())
   updatedAt           DateTime            @updatedAt
 
-  listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  listing          MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
   orders           Order[]
   settlements      Settlement[]
   platformRevenues PlatformRevenue[]
@@ -1467,10 +1537,10 @@ model ListingService {
 
 model MarketplaceListingTag {
   listingId String
-  tagId    String
+  tagId     String
 
   listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  tag      MarketplaceTag    @relation(fields: [tagId], references: [id])
+  tag     MarketplaceTag     @relation(fields: [tagId], references: [id])
 
   @@id([listingId, tagId])
 }
@@ -1506,14 +1576,14 @@ model MarketplaceReview {
   updatedAt   DateTime  @updatedAt
 
   listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
-  user    User              @relation(fields: [userId], references: [id])
+  user    User               @relation(fields: [userId], references: [id])
 
   @@index([listingId])
   @@index([userId])
 }
 
 model MarketplaceFavorite {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   userId      String
   listingId   String
   // NULL = "favorite the whole listing" (legacy semantics). Non-NULL = scoped
@@ -1521,9 +1591,9 @@ model MarketplaceFavorite {
   // CTA. When a ListingService flips WAITLIST -> AVAILABLE, a worker fans out
   // to favorites where (listingId = X AND serviceType = Y OR serviceType IS NULL).
   serviceType ServiceType?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime     @default(now())
 
-  user    User              @relation(fields: [userId], references: [id])
+  user    User               @relation(fields: [userId], references: [id])
   listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@unique([userId, listingId, serviceType])
@@ -1554,8 +1624,8 @@ model MarketplaceSavedListItem {
   note      String?
   addedAt   DateTime @default(now())
 
-  list    MarketplaceSavedList   @relation(fields: [listId], references: [id], onDelete: Cascade)
-  listing MarketplaceListing     @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  list    MarketplaceSavedList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  listing MarketplaceListing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@unique([listId, listingId])
   @@index([listingId])
@@ -1579,17 +1649,17 @@ model MarketplaceListingView {
 }
 
 model MarketplaceListingClick {
-  id        String   @id @default(cuid())
-  listingId String
-  userId    String?
-  sessionId String?
-  ipAddress String?
-  action    String   @default("view") // view, click, cta_click, favorite, share
+  id          String       @id @default(cuid())
+  listingId   String
+  userId      String?
+  sessionId   String?
+  ipAddress   String?
+  action      String       @default("view") // view, click, cta_click, favorite, share
   // Phase 6: which service the user picked at click-time. NULL on listing-level
   // events (`view`, `favorite`, `share`) and on legacy rows.
   serviceType ServiceType?
-  metadata  Json?
-  createdAt DateTime @default(now())
+  metadata    Json?
+  createdAt   DateTime     @default(now())
 
   listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
@@ -1600,7 +1670,7 @@ model MarketplaceListingClick {
 }
 
 model MarketplaceSearchHistory {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   userId      String?
   query       String
   filters     Json?
@@ -1609,7 +1679,7 @@ model MarketplaceSearchHistory {
   // Phase 6: which service the user filtered for. Powers serviceType-aware
   // recommendation training. NULL on legacy rows or untyped searches.
   serviceType ServiceType?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime     @default(now())
 
   @@index([userId])
   @@index([query])
@@ -1618,14 +1688,14 @@ model MarketplaceSearchHistory {
 
 // AI Recommendations
 model MarketplaceRecommendation {
-  id          String   @id @default(cuid())
-  userId      String
-  listingId   String
-  type        String   // similar, recommended, frequently_bought, trending, because_you_viewed
-  score       Float
-  reason      String?
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  type      String // similar, recommended, frequently_bought, trending, because_you_viewed
+  score     Float
+  reason    String?
+  metadata  Json?
+  createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([listingId])
@@ -1634,33 +1704,33 @@ model MarketplaceRecommendation {
 
 // Publisher Profiles for Marketplace
 model PublisherProfile {
-  id           String   @id @default(cuid())
-  publisherId  String   @unique
-  bio          String?
-  stats        Json?    // aggregated stats
-  responseTime Int?     // avg response time in hours
-  completionRate Float?  // order completion rate
-  rating       Float?
+  id             String   @id @default(cuid())
+  publisherId    String   @unique
+  bio            String?
+  stats          Json? // aggregated stats
+  responseTime   Int? // avg response time in hours
+  completionRate Float? // order completion rate
+  rating         Float?
   // Internal publisher trust score 0-100 (folds in reviews, link uptime,
   // disputes, refunds, completion). Drives the publisher tier.
-  trustScore   Int?
-  totalReviews Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  trustScore     Int?
+  totalReviews   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   publisher Publisher @relation(fields: [publisherId], references: [id])
 }
 
 // Fraud Detection
 model MarketplaceFlag {
-  id        String   @id @default(cuid())
-  type      String   // duplicate_domain, fake_traffic, spam_reviews, suspicious_pattern, mass_listing
-  severity  String   // low, medium, high, critical
-  status    String   @default("OPEN") // OPEN, REVIEWING, RESOLVED, DISMISSED
-  data      Json?
+  id         String    @id @default(cuid())
+  type       String // duplicate_domain, fake_traffic, spam_reviews, suspicious_pattern, mass_listing
+  severity   String // low, medium, high, critical
+  status     String    @default("OPEN") // OPEN, REVIEWING, RESOLVED, DISMISSED
+  data       Json?
   resolvedBy String?
   resolvedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
 
   @@index([type])
   @@index([status])
@@ -1669,13 +1739,13 @@ model MarketplaceFlag {
 
 // Fulfillment Rules
 model ListingFulfillmentRule {
-  id          String   @id @default(cuid())
-  listingId   String
-  type        String   // auto_assign, manual_review, price_threshold
-  config      Json
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  listingId String
+  type      String // auto_assign, manual_review, price_threshold
+  config    Json
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([listingId])
 }

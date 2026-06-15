@@ -2,7 +2,8 @@ import { Injectable, BadRequestException, NotFoundException, ConflictException }
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
-import { QUEUES, normalizeUrl } from "@guestpost/shared"
+import { QUEUES, normalizeUrl, orderEventMetadata } from "@guestpost/shared"
+import { assertOwnerOrCreator } from "./owner-or-creator"
 
 // Rejected placeholder "deliveries" — a human typing "done" is not a delivery.
 const PLACEHOLDER_VALUES = new Set(["done", "n/a", "na", "none", "-", "tbd", "pending", "complete", "completed"])
@@ -105,9 +106,9 @@ export class OrderDeliveryService {
           entityType: "OrderDeliveryVersion",
           entityId: version.id,
           metadata: {
+            ...orderEventMetadata(order),
             orderId: order.id,
             deliveryVersionId: version.id,
-            websiteId: order.websiteId,
             version: nextVersion,
             publishedUrl,
             submittedByUserId: actorUserId,
@@ -188,12 +189,21 @@ export class OrderDeliveryService {
   // FAILED or needs MANUAL_REVIEW. A VERIFIED delivery uses Confirm Delivery
   // instead; a still-running check must be waited out. Accepting completes the
   // order (DELIVERED) so settlement can proceed.
-  async customerAcceptDelivery(orderId: string, organizationId: string, userId: string) {
+  async customerAcceptDelivery(orderId: string, organizationId: string, userId: string, actorRole?: string | null) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
       include: { website: { select: { publisherId: true } } },
     })
     if (!order) throw new NotFoundException("Order not found")
+    // Phase 6.9 — Audit finding R-3. Manual customer-accept-delivery commits
+    // a delivery as APPROVED, unblocking the settlement path. OWNER||creator
+    // only — non-creator MEMBER cannot accept someone else's order delivery.
+    assertOwnerOrCreator({
+      customerId: order.customerId,
+      actorUserId: userId,
+      actorRole,
+      action: "accept delivery",
+    })
     if (!order.activeDeliveryVersionId) throw new BadRequestException("There is no delivery to accept yet")
 
     const v = await this.prisma.orderDeliveryVersion.findUnique({ where: { id: order.activeDeliveryVersionId } })
@@ -237,7 +247,13 @@ export class OrderDeliveryService {
           action: "ORDER_DELIVERY_CUSTOMER_ACCEPTED",
           entityType: "OrderDeliveryVersion",
           entityId: v.id,
-          metadata: { orderId, publishedUrl: v.publishedUrl, priorVerification: v.verificationStatus, publisherId: order.website?.publisherId ?? null },
+          metadata: {
+            ...orderEventMetadata(order),
+            orderId,
+            publishedUrl: v.publishedUrl,
+            priorVerification: v.verificationStatus,
+            publisherId: order.website?.publisherId ?? null,
+          },
           userId,
           organizationId,
         },
