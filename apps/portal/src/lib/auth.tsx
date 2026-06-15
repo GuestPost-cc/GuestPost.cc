@@ -1,6 +1,8 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
+import * as Sentry from "@sentry/nextjs"
+import { setBusinessContext } from "@guestpost/shared"
 import { api, setToken, clearToken, getToken } from "./api"
 
 const getBaseUrl = () => {
@@ -65,6 +67,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => { refresh().finally(() => setLoading(false)) }, [refresh])
+
+  // Phase 7.0 — keep Sentry scope tagged with the identifying business
+  // context so every captured exception (network error in a query, render
+  // throw caught by error.tsx, etc.) surfaces with WHO it happened to.
+  useEffect(() => {
+    const scope = Sentry.getCurrentScope()
+    if (user) {
+      Sentry.setUser({ id: user.id })
+      setBusinessContext(scope, {
+        userType: user.userType,
+        customerRole: user.customerRole ?? undefined,
+        organizationId: user.organizationId ?? undefined,
+      })
+    } else {
+      Sentry.setUser(null)
+      scope.setTag("userType", undefined)
+      scope.setTag("customerRole", undefined)
+      scope.setTag("organizationId", undefined)
+    }
+  }, [user])
 
   const signIn = async (email: string, password: string) => {
     setLoading(true)

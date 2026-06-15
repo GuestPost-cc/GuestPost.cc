@@ -1,6 +1,6 @@
-import { Worker } from "bullmq"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload, runWebsiteVerify, runWebsiteReverifySweep } from "@guestpost/shared"
+import { createObservableWorker } from "../lib/queue-observability"
 // Node-only DNS lookup — deep import keeps node `dns` out of the shared index
 // (which the browser apps bundle).
 import { checkDnsTxtToken } from "@guestpost/shared/dist/dns-lookup"
@@ -22,7 +22,7 @@ interface VerifyJobData {
 
 export function createWebsiteVerificationWorker() {
   const deps = { prisma, checkDns: checkDnsTxtToken, onTrustEvent: enqueueTrustRecompute }
-  const worker = new Worker(
+  const worker = createObservableWorker(
     QUEUES.WEBSITE_VERIFICATION,
     async (job) => {
       // Reject anything not HMAC-signed by the API — blocks forged/injected jobs.

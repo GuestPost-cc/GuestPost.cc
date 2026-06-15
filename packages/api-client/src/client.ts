@@ -27,10 +27,27 @@ export class ApiError extends Error {
     public status: number,
     public code: string,
     message: string,
+    // Phase 7.0 — request ID echoed back by the API (response header or
+    // generated client-side if the API didn't echo it). Surface in toasts /
+    // error reports so a customer can quote it to support.
+    public requestId?: string,
   ) {
     super(message)
     this.name = "ApiError"
   }
+}
+
+// Phase 7.0 — generate an X-Request-ID per request. crypto.randomUUID() is
+// available in every supported browser (Web Crypto) and Node 19+. If absent
+// (older runtime), fall back to a Math.random-based UUIDv4 — observability
+// does not require cryptographic randomness.
+function generateRequestId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
+  if (typeof c?.randomUUID === "function") return c.randomUUID()
+  const hex = "0123456789abcdef"
+  let out = ""
+  for (let i = 0; i < 32; i++) out += hex[Math.floor(Math.random() * 16)]
+  return `${out.slice(0, 8)}-${out.slice(8, 12)}-4${out.slice(13, 16)}-${out.slice(16, 20)}-${out.slice(20, 32)}`
 }
 
 let _token: string | null = null
@@ -60,6 +77,11 @@ export class HttpClient {
     const { params, body, json, ...rest } = opts
     const headers: Record<string, string> = { "Content-Type": "application/json" }
     if (_token) headers["Authorization"] = `Bearer ${_token}`
+    // Phase 7.0 — every request carries an X-Request-ID. The API echoes it in
+    // the response (or replaces with its own if malformed). On failure we
+    // attach it to the ApiError so toasts/error reports can surface it.
+    const requestId = generateRequestId()
+    headers["X-Request-ID"] = requestId
     const init: RequestInit = {
       ...rest,
       method,
@@ -77,6 +99,7 @@ export class HttpClient {
     }
 
     const res = await fetch(this.buildUrl(path, params), init)
+    const responseRequestId = res.headers.get("X-Request-ID") ?? requestId
     if (!res.ok) {
       // Phase 6.8 — Audit finding #7 closure.
       // A 401 from an AUTH endpoint (sign-in / sign-up / magic-link / etc.)
@@ -93,7 +116,7 @@ export class HttpClient {
       }
       let err: { message?: string; code?: string } = {}
       try { err = await res.json() } catch { }
-      throw new ApiError(res.status, err.code ?? "UNKNOWN", err.message ?? res.statusText)
+      throw new ApiError(res.status, err.code ?? "UNKNOWN", err.message ?? res.statusText, responseRequestId)
     }
     if (res.status === 204) return undefined as T
     return res.json()

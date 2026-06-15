@@ -1,7 +1,7 @@
-import { Worker } from "bullmq"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload, checkProviderTransferStatus, normalizeProviderWebhook } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
+import { createObservableWorker } from "../lib/queue-observability"
 
 // Shared state transitions for "the provider says this transfer finished".
 // Used by both the webhook path and the status poller. All guards are
@@ -190,7 +190,7 @@ async function handleWebhook(job: any) {
 }
 
 export function createPayoutWorker() {
-  const worker = new Worker(
+  const worker = createObservableWorker(
     QUEUES.PAYOUT,
     async (job) => {
       if (!verifyJobPayload(job.data)) {

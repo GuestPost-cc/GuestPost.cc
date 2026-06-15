@@ -1,8 +1,8 @@
-import { Worker } from "bullmq"
 import { isIP } from "net"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
+import { createObservableWorker } from "../lib/queue-observability"
 
 const PRIVATE_IP_PATTERNS = [
   /^127\./, /^10\./, /^192\.168\./, /^169\.254\./,
@@ -58,7 +58,7 @@ function escapeRegex(str: string): string {
 }
 
 export function createVerificationWorker() {
-  const worker = new Worker(
+  const worker = createObservableWorker(
     QUEUES.VERIFICATION,
     async (job) => {
       const { orderId, targetUrl, anchorText, organizationId } = job.data

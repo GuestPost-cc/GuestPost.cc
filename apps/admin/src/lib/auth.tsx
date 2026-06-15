@@ -1,6 +1,8 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
+import * as Sentry from "@sentry/nextjs"
+import { setBusinessContext } from "@guestpost/shared"
 import { api, setToken, clearToken, getToken } from "./api"
 
 const getBaseUrl = () => {
@@ -55,6 +57,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => { refresh().finally(() => setLoading(false)) }, [refresh])
+
+  // Phase 7.0 — tag Sentry scope with staff identity. Staff role is the most
+  // useful tag for triage (FINANCE vs OPERATIONS vs SUPER_ADMIN actions).
+  useEffect(() => {
+    const scope = Sentry.getCurrentScope()
+    if (user) {
+      Sentry.setUser({ id: user.id })
+      setBusinessContext(scope, {
+        userType: user.userType,
+        staffRole: user.staffRole ?? undefined,
+      })
+    } else {
+      Sentry.setUser(null)
+      scope.setTag("userType", undefined)
+      scope.setTag("staffRole", undefined)
+    }
+  }, [user])
 
   const signIn = async (email: string, password: string) => {
     setLoading(true)

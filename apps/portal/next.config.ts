@@ -1,7 +1,16 @@
 import type { NextConfig } from "next"
+import { withSentryConfig } from "@sentry/nextjs"
 
 const nextConfig: NextConfig = {
   transpilePackages: ["@guestpost/ui", "@guestpost/shared", "@guestpost/api-client"],
 }
 
-export default nextConfig
+// Phase 7.0 — Sentry plugin. Safe to call unconditionally; without SENTRY_DSN
+// the runtime instrumentation no-ops, and without SENTRY_AUTH_TOKEN the source-map
+// upload phase is skipped (deferred to Phase 7.0.1).
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  disableLogger: true,
+})

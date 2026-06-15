@@ -4,6 +4,15 @@ import { config } from "dotenv"
 if (process.env.NODE_ENV === "development") {
   config({ path: require("path").resolve(__dirname, "../../../.env.development") })
 }
+// Sentry must initialize BEFORE any other module so its auto-instrumentation
+// can wrap http / pg / undici. Phase 7.0.
+import * as Sentry from "@sentry/node"
+import { initSentry } from "@guestpost/shared"
+initSentry(Sentry, { runtime: "worker" })
+
+import { validateEnv } from "./lib/env"
+validateEnv()
+
 import { createEmailWorker } from "./processors/email.processor"
 import { createReportWorker } from "./processors/report.processor"
 import { createNotificationWorker } from "./processors/notification.processor"
@@ -17,6 +26,7 @@ import { connection } from "./redis"
 import { prisma } from "@guestpost/database"
 import { Queue } from "bullmq"
 import { QUEUES, signJobPayload } from "@guestpost/shared"
+import { startHealthServer, type HealthServerHandle } from "./lib/health-server"
 
 // Stuck-payout safety net: webhooks are the primary completion signal, this
 // poll catches transfers whose webhook was lost or never configured.
@@ -111,8 +121,51 @@ async function checkConnections() {
 }
 
 const workers: Array<{ close: () => Promise<void> }> = []
+let healthServer: HealthServerHandle | undefined
 
-checkConnections().then(() => {
+// Phase 7.0 — unhandledRejection policy.
+//
+// Default: capture to Sentry, flush, exit(1). Let the orchestrator restart.
+// Override with UNHANDLED_REJECTION_EXIT=false for dev convenience (e.g.
+// debugging a hanging Promise without losing the worker process).
+//
+// Why exit by default in a worker handling money: a worker mid-processing a
+// settlement-release or refund clawback that suffers an unhandled rejection
+// has potentially-corrupted in-memory state. Continuing to process the next
+// job risks committing inconsistent state. A pod restart loses one in-flight
+// job (BullMQ retries it); continuing in a bad state loses N future ones.
+const SHOULD_EXIT_ON_UNHANDLED_REJECTION = process.env.UNHANDLED_REJECTION_EXIT !== "false"
+
+async function flushAndExit(code: number, reason: string, err: unknown): Promise<never> {
+  console.error(`[WORKER] FATAL: ${reason}:`, err)
+  Sentry.captureException(err)
+  try {
+    await Sentry.flush(2000)
+  } catch {
+    /* nothing we can do — exiting anyway */
+  }
+  process.exit(code)
+}
+
+process.on("unhandledRejection", (reason: unknown) => {
+  if (SHOULD_EXIT_ON_UNHANDLED_REJECTION) {
+    void flushAndExit(1, "unhandledRejection", reason)
+    return
+  }
+  console.error("[WORKER] unhandledRejection (continuing — UNHANDLED_REJECTION_EXIT=false):", reason)
+  Sentry.captureException(reason)
+})
+
+process.on("uncaughtException", (err: Error) => {
+  // uncaughtException ALWAYS exits — Node's default is exit, and a worker
+  // with a corrupt V8 state cannot be trusted to continue regardless of env.
+  void flushAndExit(1, "uncaughtException", err)
+})
+
+async function bootstrap() {
+  await checkConnections()
+  healthServer = await startHealthServer()
+
   workers.push(
     createEmailWorker(),
     createReportWorker(),
@@ -125,28 +178,41 @@ checkConnections().then(() => {
     createPublisherTrustWorker(),
   )
   console.log(`[WORKER] Started ${workers.length} workers`)
-  registerPayoutStatusPoll().catch((err) => {
-    console.error("[WORKER] Failed to register payout status poll:", err)
-  })
-  registerReconciliationSweep().catch((err) => {
-    console.error("[WORKER] Failed to register reconciliation sweep:", err)
-  })
-  registerWebsiteReverifySweep().catch((err) => {
-    console.error("[WORKER] Failed to register website re-verify sweep:", err)
-  })
-  registerSettlementHoldLinkSweep().catch((err) => {
-    console.error("[WORKER] Failed to register settlement-hold link sweep:", err)
-  })
+  await Promise.all([
+    registerPayoutStatusPoll().catch((err) =>
+      console.error("[WORKER] Failed to register payout status poll:", err),
+    ),
+    registerReconciliationSweep().catch((err) =>
+      console.error("[WORKER] Failed to register reconciliation sweep:", err),
+    ),
+    registerWebsiteReverifySweep().catch((err) =>
+      console.error("[WORKER] Failed to register website re-verify sweep:", err),
+    ),
+    registerSettlementHoldLinkSweep().catch((err) =>
+      console.error("[WORKER] Failed to register settlement-hold link sweep:", err),
+    ),
+  ])
+}
+
+bootstrap().catch((err) => {
+  console.error("[WORKER] FATAL: bootstrap failed:", err)
+  Sentry.captureException(err)
+  void Sentry.flush(2000).finally(() => process.exit(1))
 })
 
-process.on("SIGTERM", async () => {
-  console.log("[WORKER] Shutting down...")
-  await Promise.all(workers.map((w) => w.close()))
+async function shutdown(signal: string): Promise<void> {
+  console.log(`[WORKER] ${signal} received — draining workers...`)
+  await Promise.all(workers.map((w) => w.close().catch((err) => console.error("[WORKER] worker close error:", err))))
+  if (healthServer) {
+    await healthServer.close().catch((err) => console.error("[WORKER] health server close error:", err))
+  }
+  try {
+    await Sentry.flush(2000)
+  } catch {
+    /* best-effort */
+  }
   process.exit(0)
-})
+}
 
-process.on("SIGINT", async () => {
-  console.log("[WORKER] Shutting down...")
-  await Promise.all(workers.map((w) => w.close()))
-  process.exit(0)
-})
+process.on("SIGTERM", () => void shutdown("SIGTERM"))
+process.on("SIGINT", () => void shutdown("SIGINT"))

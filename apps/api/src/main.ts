@@ -7,6 +7,10 @@ if (process.env.NODE_ENV === "development") {
     path: require("path").resolve(__dirname, "../../../.env.development"),
   });
 }
+// Sentry instrumentation MUST be imported before any other module so its
+// auto-instrumentation can wrap http / express / pg / undici. Importing it
+// later silently no-ops the wrappers.
+import "./instrument";
 import { NestFactory } from "@nestjs/core";
 import { ExpressAdapter } from "@nestjs/platform-express";
 import { ValidationPipe } from "@nestjs/common";
@@ -17,7 +21,8 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { toNodeHandler, auth } from "@guestpost/auth";
 import { AppModule } from "./app.module";
-import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
+import { SentryExceptionFilter } from "./common/filters/sentry-exception.filter";
+import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-business-context.interceptor";
 
 const REQUIRED_ENV_VARS = ["DATABASE_URL", "REDIS_URL", "JWT_SECRET"] as const;
 
@@ -426,7 +431,8 @@ async function bootstrap() {
       transform: true,
     }),
   );
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalFilters(new SentryExceptionFilter());
+  app.useGlobalInterceptors(new SentryBusinessContextInterceptor());
 
   const port = process.env.PORT ?? 4000;
   await app.listen(port);

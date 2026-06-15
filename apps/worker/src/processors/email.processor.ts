@@ -1,6 +1,6 @@
-import { Worker } from "bullmq"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
+import { createObservableWorker } from "../lib/queue-observability"
 import * as nodemailer from "nodemailer"
 
 const transporter = nodemailer.createTransport({
@@ -39,7 +39,7 @@ function validateEmailJob(to: unknown, subject: unknown, html: unknown): string 
 }
 
 export function createEmailWorker() {
-  const worker = new Worker(
+  const worker = createObservableWorker(
     QUEUES.EMAIL,
     async (job) => {
       if (!verifyJobPayload(job.data)) {

@@ -1,7 +1,7 @@
 ---
 note_type: project-overview
 project: guestpost-platform
-updated: 2026-06-11
+updated: 2026-06-15
 memory_branches:
   - identity-auth.md
   - billing-payments.md
@@ -33,6 +33,14 @@ Stack: Node.js 22, TypeScript, NestJS 11 API + Next.js 15 frontends (portal, pub
 - **ActorTypeGuard**: separates CUSTOMER, PUBLISHER, and STAFF domains at controller/endpoint level
 - **In-transaction audit logging**: all hot money paths pass `tx` to `audit.log` to prevent pool-deadlock
 - **HMAC-signed queue payloads**: BullMQ jobs signed via `QUEUE_SIGNING_SECRET`
+- **Phase 7.0 observability triad** (find / understand / trace failures):
+  - **Sentry across all 3 runtimes** — API, worker, browser+server+edge per Next.js app. DSN-controlled (no-op without `SENTRY_DSN`/`NEXT_PUBLIC_SENTRY_DSN`). Shared `initSentry()` in `packages/shared/src/observability/` accepts the consumer's Sentry module as a parameter so packages/shared takes no SDK dep. Closed runtime-tag registry (14 literals) — wrong tag = compile error.
+  - **X-Request-ID correlation** via `AsyncLocalStorage` in `packages/shared/src/observability/request-context.ts`. NestJS middleware validates incoming header against `^[A-Za-z0-9_-]{1,128}$` (rejects control chars, newlines for log poisoning, non-ASCII, overlong), generates fresh `crypto.randomUUID()` if absent. ID propagates: API middleware → `AuditLog.metadata.requestId` (no migration — uses existing JSON column) → enqueued worker job (signed payload) → worker `runWithRequestId` wrapper → worker-side audit writes inherit it → Sentry scope tag on all 3 runtimes.
+  - **Business-context tagging** — `setBusinessContext()` sets Sentry tags from `{userType, staffRole, customerRole, publisherRole, organizationId, publisherId, orderId, ticketId, settlementId, fulfillmentChannel, serviceType}`. Wired in NestJS interceptor (API), `attachObservability` factory (worker), `AuthProvider useEffect` (each frontend app).
+  - **Worker health server** — raw `node:http` on `WORKER_HEALTH_PORT` (default 3004): `/health` (liveness), `/ready` (Redis ping + Prisma SELECT 1, 503 on failure), `/metrics/queues` (per-queue + totals via BullMQ `getJobCounts`). No Express dep.
+  - **Worker `unhandledRejection` policy** — exit-after-flush by default (money-worker safety: corrupt in-memory state should not continue). Override via `UNHANDLED_REJECTION_EXIT=false` for dev. `uncaughtException` always exits.
+  - **`beforeSend` redaction filter** — strips 3 headers (`Authorization`, `Cookie`, `Set-Cookie`) + redacts 10 key names (`password`, `accessToken`, `refreshToken`, `apiKey`, `paymentMethod`, `paymentMethodId`, `verificationToken`, `encryptedPayload`, `webhookSecret`, `signature`) recursively. New sensitive fields must be added to `REDACTED_KEYS` in `sentry-init.ts`.
+  - **Self-test log on startup** — every runtime emits exactly one `[SENTRY] enabled runtime=X release=Y environment=Z` or `[SENTRY] disabled (no DSN) runtime=X` line for deploy-time grep verification.
 
 ## Project structure
 

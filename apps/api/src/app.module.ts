@@ -1,5 +1,6 @@
-import { Module } from "@nestjs/common";
+import { Module, MiddlewareConsumer, NestModule } from "@nestjs/common";
 import { PrismaModule } from "./common/prisma.module";
+import { RequestIdMiddleware } from "./common/middleware/request-id.middleware";
 import { AuthModule } from "./modules/auth/auth.module";
 import { ActiveContextModule } from "./modules/active-context/active-context.module";
 import { IdentityModule } from "./modules/identity/identity.module";
@@ -40,4 +41,11 @@ import { NotificationsModule } from "./modules/notifications/notifications.modul
     NotificationsModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    // RequestIdMiddleware mounts before all routes — establishes the
+    // AsyncLocalStorage frame that audit logs / Sentry tags / worker
+    // enqueue all read from.
+    consumer.apply(RequestIdMiddleware).forRoutes("*");
+  }
+}

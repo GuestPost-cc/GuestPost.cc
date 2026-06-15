@@ -1,10 +1,10 @@
-import { Worker } from "bullmq"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
+import { createObservableWorker } from "../lib/queue-observability"
 
 export function createReportWorker() {
-  const worker = new Worker(
+  const worker = createObservableWorker(
     QUEUES.REPORT,
     async (job) => {
       if (!verifyJobPayload(job.data)) {

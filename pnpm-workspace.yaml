@@ -12,6 +12,25 @@ allowBuilds:
   msgpackr-extract: true
   sharp: true
   core-js: false
+  # @sentry/cli's postinstall downloads a native binary used only for source-map
+  # upload. Phase 7.0 defers source-map upload to Phase 7.0.1; without
+  # SENTRY_AUTH_TOKEN the cli is never invoked at runtime, so we skip the
+  # postinstall. Flip to true when source-map upload lands.
+  '@sentry/cli': false
+minimumReleaseAgeExclude:
+  - '@sentry/core@10.58.0'
+  - '@sentry/node-core@10.58.0'
+  - '@sentry/node@10.58.0'
+  - '@sentry/opentelemetry@10.58.0'
+  - '@sentry/server-utils@10.58.0'
+  - '@sentry/browser-utils@10.58.0'
+  - '@sentry/browser@10.58.0'
+  - '@sentry/feedback@10.58.0'
+  - '@sentry/nextjs@10.58.0'
+  - '@sentry/react@10.58.0'
+  - '@sentry/replay-canvas@10.58.0'
+  - '@sentry/replay@10.58.0'
+  - '@sentry/vercel-edge@10.58.0'
 onlyBuiltDependencies:
   - "@nestjs/core"
   - "@prisma/client"

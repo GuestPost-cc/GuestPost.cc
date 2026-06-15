@@ -1,14 +1,14 @@
-import { Worker } from "bullmq"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload, recomputePublisherTrustCore } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
+import { createObservableWorker } from "../lib/queue-observability"
 
 // Event-driven publisher trust recompute. Any trust-affecting event enqueues a
 // debounced, deduped job here; this re-scores the publisher from live data and
 // syncs tier + audit + ops notification. Concurrency 1 per publisher is already
 // guaranteed by the jobId dedup at enqueue time.
 export function createPublisherTrustWorker() {
-  const worker = new Worker(
+  const worker = createObservableWorker(
     QUEUES.PUBLISHER_TRUST,
     async (job) => {
       if (!verifyJobPayload(job.data)) {

@@ -33,7 +33,8 @@ last_system_refresh: 2026-06-11T12:30:00Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
-- Last project sync: `2026-06-15T13:07:30Z`
+- Last project sync: `2026-06-15T17:49:43Z`
+- Last phase landed: `7.0 — production observability foundation (audit #8 + #11 + API + correlation IDs)` on 2026-06-15
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)
 - Last doctor: `2026-06-11` (`healthy`)

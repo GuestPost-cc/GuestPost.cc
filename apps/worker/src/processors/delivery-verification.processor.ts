@@ -1,7 +1,7 @@
-import { Worker } from "bullmq"
 import { isIP } from "net"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
+import { createObservableWorker } from "../lib/queue-observability"
 // Node-only deep imports keep cheerio + aws-sdk out of the shared index.
 import { runDeliveryVerification, runSettlementHoldLinkSweep, FetchResult } from "@guestpost/shared/dist/delivery-verification-core"
 import { putObject } from "@guestpost/shared/dist/object-storage"
@@ -84,7 +84,7 @@ async function fetchWithChain(startUrl: string): Promise<FetchResult> {
 
 export function createDeliveryVerificationWorker() {
   const deps = { prisma, fetchUrl: fetchWithChain, putObject, onTrustEvent: enqueueTrustRecompute }
-  const worker = new Worker(
+  const worker = createObservableWorker(
     QUEUES.DELIVERY_VERIFICATION,
     async (job) => {
       if (!verifyJobPayload(job.data)) {

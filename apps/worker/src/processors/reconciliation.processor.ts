@@ -1,7 +1,7 @@
-import { Worker } from "bullmq"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload, runReconciliation } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
+import { createObservableWorker } from "../lib/queue-observability"
 
 // Scheduled financial drift sweep. Same core checks as the API's on-demand
 // GET /admin/reconciliation. On any finding: audit row + in-app notification
@@ -57,7 +57,7 @@ async function handleReconciliationRun() {
 }
 
 export function createReconciliationWorker() {
-  const worker = new Worker(
+  const worker = createObservableWorker(
     QUEUES.RECONCILIATION,
     async (job) => {
       if (!verifyJobPayload(job.data)) {

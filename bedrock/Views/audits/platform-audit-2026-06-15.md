@@ -801,15 +801,15 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 | Status | Count | Share |
 |---|---|---|
-| ✅ Fully closed | **10** | 32% |
+| ✅ Fully closed | **12** | 39% |
 | ⚠️ Partially closed | **1** | 3% |
-| ⛔ Still open | **20** | 65% |
+| ⛔ Still open | **18** | 58% |
 
 **By severity:**
 
 | Severity | Total | Closed | Partial | Open |
 |---|---|---|---|---|
-| Critical (production-blocker) | 11 | **5** (#1, #2, #3, #4, #7) | — | 6 |
+| Critical (production-blocker) | 11 | **7** (#1, #2, #3, #4, #7, #8, #11) | — | 4 |
 | High | 14 | **4** (#19, #22, V-1, R-3+R-4) | — | 10 |
 | Medium | 5 | — | — | 5 |
 
@@ -828,10 +828,10 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | #4 | orderEventMetadata helper underused | Critical | ✅ FIXED | 6.9 | Swept 20+ callsites + retired competing `auditMeta` + coverage test prevents regressions |
 | #22 | confirm-delivery status guard | High | ✅ FIXED | 6.9 | `status: "VERIFIED"` added to inner updateMany.where |
 | R-3 / R-4 | MEMBER-allowed money endpoints | High | ✅ FIXED | 6.9 | Service-layer OWNER‖creator gate on customerAcceptDelivery + customerApprove (already inline on others) |
-| #8 | No error boundaries / no Sentry | Critical | ⛔ open | — | error.tsx per app + @sentry/nextjs |
+| #8 | No error boundaries / no Sentry | Critical | ✅ FIXED | 7.0 | error.tsx + global-error.tsx + Sentry across all 4 apps + browser/server/edge runtimes |
 | #9 | Publisher/admin no mobile sidebar | Critical | ⛔ open | — | Drawer pattern from portal |
 | #10 | SettlementAutoApproveService in API setInterval | Critical | ⛔ open | — | Move to worker repeatable |
-| #11 | Worker no health/metrics/errors | Critical | ⛔ open | — | Express health endpoint + Sentry |
+| #11 | Worker no health/metrics/errors | Critical | ✅ FIXED | 7.0 | Raw node:http server (`/health`, `/ready`, `/metrics/queues`) + BullMQ failed-event Sentry hook across all 9 processors + unhandledRejection exit-after-flush |
 | #12 | Notification duplicates on retry | High | ⚠️ PARTIAL | 6.6 | Support fan-out deduped (Map keyed). Other queues (email/report/reconciliation) still duplicate. |
 | #19 | Support fan-out Set<object> bug | High | ✅ FIXED | 6.6 | `Map<userId, organizationId>` + test |
 | V-1 | Inline body types on support routes | High | ✅ FIXED | 6.6 + 6.7 | `AddTicketMessageDto`, `CreateTicketDto`, `CreateApiKeyDto`, 18 admin-action DTOs |
@@ -864,13 +864,123 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | Frontend reliability (errors/loading/empties) | C+ | C+ | Not touched |
 | Reporting + finance visibility | D | D | Not touched (#5 PlatformRevenue still open) |
 
-**What to ship next** (in priority order):
+**What to ship next** (in priority order, post-Phase-7.0):
 
-1. **#8** — `error.tsx` per app + Sentry (1 day). Catches every other UI error consistently; pairs with the Phase 6.8 redirect work.
-2. **#11** — worker health endpoint + Sentry hook (half day).
-3. **#5** — PlatformRevenue reporting endpoint + Revenue tab (1–2 days; highest finance-visibility win).
-4. **#12** — broader notification dedup across email/report/reconciliation queues.
+1. **#5** — PlatformRevenue reporting endpoint + Revenue tab (1–2 days; highest finance-visibility win in remaining backlog).
+2. **#6** — Settlement review window tier-awareness (resolve 7-vs-14 default drift; lift tier table to shared constant).
+3. **#10** — Auto-approve worker migration (move `SettlementAutoApproveService` `setInterval` out of every API pod into a worker repeatable job).
+4. **#12** — Broader notification dedup across email/report/reconciliation queues.
 5. **#21** — Phase 6 snapshot backfill for historical Settlement/PlatformRevenue rows.
+6. **#9** — Mobile UX (publisher + admin sidebar collapse to drawer below `lg`).
+
+---
+
+### 2026-06-15 — Phase 7.0: Production observability foundation (#8 + #11 + API gap + correlation IDs)
+
+**Findings resolved:**
+
+| # | Status | Notes |
+|---|---|---|
+| **#8** | ✅ Fully fixed | `error.tsx` + `global-error.tsx` per app (4 apps) + Sentry across browser + server + edge runtimes. Branded `ErrorState` fallback; Reset button maps to Next's `reset()`. |
+| **#11** | ✅ Fully fixed | Raw `node:http` health server on port 3004: `/health` (K8s liveness), `/ready` (Redis + Prisma checks → 503 on failure), `/metrics/queues` (per-queue counts via BullMQ `getJobCounts` + totals aggregate). BullMQ `failed`/`error`/`stalled` events on all 9 workers route to Sentry with `{queue, jobId, attemptsMade, requestId}` tags. |
+
+**Beyond-audit improvements landed** (user-requested during planning, integrated as Phase 7.0 scope):
+
+| Improvement | Why it matters |
+|---|---|
+| **API Sentry integration** | `apps/api/src/instrument.ts` (first import in main.ts so `@sentry/node` auto-instrumentation can wrap http/express/pg). `SentryExceptionFilter` extends existing `AllExceptionsFilter` — captures 5xx + non-HttpException, skips 4xx user errors. `SentryBusinessContextInterceptor` populates Sentry scope from `req.user` + route params on every request. Without this, the API — the most consequential of the 3 runtimes — would have been left on `console.log`. |
+| **X-Request-ID correlation across runtimes** | NestJS middleware reads incoming header, validates against allowlist regex `^[A-Za-z0-9_-]{1,128}$` (rejects control chars, newlines, non-ASCII, overlong values), generates fresh UUID v4 via `crypto.randomUUID()` if absent or invalid, echoes in response, wraps request in AsyncLocalStorage frame. ID flows: API middleware → `AuditLog.metadata.requestId` (no migration — uses existing JSON column) → enqueued worker job (signed payload) → worker processor wrapper re-enters ALS frame → worker-side audit writes inherit it → Sentry scope tag on all 3 runtimes. Frontend `HttpClient` generates per-request and attaches to `ApiError`. |
+| **Business-context tagging** | `setBusinessContext()` helper sets Sentry scope tags from `{userType, staffRole, customerRole, publisherRole, organizationId, publisherId, orderId, ticketId, settlementId, fulfillmentChannel, serviceType}`. Called from: NestJS interceptor (API), `attachObservability` wrapper (worker), `AuthProvider` `useEffect` (each of 4 frontend apps). Every captured exception surfaces with WHO it happened to and WHAT they were doing. |
+| **`unhandledRejection` exit-after-flush policy** | A worker mid-processing a money job that hits an unhandled rejection has potentially-corrupted in-memory state. Default behavior: capture to Sentry, flush, exit(1) — let orchestrator restart. Loses one in-flight job (BullMQ retries); continuing in bad state loses N future ones. Override via `UNHANDLED_REJECTION_EXIT=false` for dev convenience. `uncaughtException` always exits regardless. |
+| **`initSentry()` startup self-test log** | Always emits one line — `[SENTRY] enabled runtime=X release=Y environment=Z` (DSN set) or `[SENTRY] disabled (no DSN) runtime=X` (DSN unset). Grep-able at deploy time to confirm Sentry actually wired in prod. |
+| **Closed runtime-tag registry** | TypeScript union of 14 allowed values (`api`, `worker`, `portal-client/server/edge`, etc.). `initSentry` throws at startup on anything else. Prevents future drift like a stray `web-client` or `marketing` tag silently breaking Sentry filters. |
+| **Body redaction filter** | `beforeSend` strips `Authorization`/`Cookie`/`Set-Cookie` headers (case-insensitive) + redacts 10 sensitive key names (`password`, `accessToken`, `refreshToken`, `apiKey`, `paymentMethod`, `paymentMethodId`, `verificationToken`, `encryptedPayload`, `webhookSecret`, `signature`) anywhere in the event tree (recursive). The only line of defense between leaked PII/secrets and the Sentry dashboard. |
+
+**What landed:**
+
+1. **Shared observability core** — `packages/shared/src/observability/` (4 files):
+   - `sentry-init.ts` — SDK-agnostic init (consumer passes own Sentry module); runtime-tag registry; `beforeSend` redaction; release/environment/sample-rate resolution; self-test log
+   - `request-context.ts` — AsyncLocalStorage primitive (`runWithRequestId`, `getRequestId`, `requireRequestId`); allowlist validation regex; `crypto.randomUUID()` generator with Math.random fallback
+   - `business-context.ts` — `setBusinessContext(scope, ctx)` that only sets defined string/number/boolean fields
+   - `index.ts` barrel + re-export from `packages/shared/src/index.ts`
+   - **packages/shared takes no `@sentry/*` dependency** — each consumer brings its own SDK; the helper accepts the imported Sentry module as a parameter
+
+2. **API observability** (`apps/api/`):
+   - `src/instrument.ts` — first import in `main.ts`
+   - `src/common/middleware/request-id.middleware.ts` — global X-Request-ID handling
+   - `src/common/filters/sentry-exception.filter.ts` — extends `AllExceptionsFilter`, only captures 5xx + non-HttpException
+   - `src/common/interceptors/sentry-business-context.interceptor.ts` — pulls `req.user` + route params onto Sentry scope
+   - `app.module.ts` mounts middleware globally via `forRoutes("*")`
+   - `audit.service.ts` spreads `requestId` from ALS into `metadata` JSON automatically
+   - `queues/queue.service.ts` injects `requestId` into every signed job payload at the central `addJob()` chokepoint
+
+3. **Worker observability** (`apps/worker/`):
+   - `src/lib/env.ts` — `validateEnv()` consolidation
+   - `src/lib/queue-observability.ts` — `createObservableWorker(queueName, processor, opts)` factory that wraps processor in `runWithRequestId` + Sentry scope tagging, attaches `failed`/`error`/`stalled` event listeners
+   - `src/lib/health-server.ts` — raw `node:http` server on `WORKER_HEALTH_PORT` (default 3004), three routes
+   - `src/index.ts` rewritten — orchestrated bootstrap: `validateEnv()` → `initSentry()` → `checkConnections()` → `startHealthServer()` → register processors → register crons → graceful shutdown closes HTTP server too. `unhandledRejection` / `uncaughtException` handlers with documented exit-after-flush policy
+   - All 9 processors migrated from `new Worker(...)` → `createObservableWorker(...)` (2-line change each)
+
+4. **Frontend observability** (4 × `apps/{portal,publisher,admin,website}/`):
+   - `sentry.client.config.ts` (browser init)
+   - `src/instrumentation.ts` (Next 15 hook — server + edge init; exports `captureRequestError` as `onRequestError`)
+   - `next.config.ts` wrapped with `withSentryConfig` (no source-map upload tokens — deferred to Phase 7.0.1)
+   - `src/app/error.tsx` — uses `<ErrorState>`, reports to Sentry via `useEffect`
+   - `src/app/global-error.tsx` — minimal inline HTML (cannot assume layout loaded), reports to Sentry
+   - `src/app/not-found.tsx` — branded 404 (Priority 7 — shipped)
+   - `src/lib/auth.tsx` `AuthProvider` wires Sentry scope tags from current user via `useEffect`
+
+5. **Frontend api-client** (`packages/api-client/src/client.ts`):
+   - `HttpClient.request()` generates `X-Request-ID` per request via `crypto.randomUUID()`, sends as header
+   - Echoed-back ID (or fallback to generated) attached to `ApiError` so toasts/error reports can surface it for support tickets
+
+6. **Env + deps**:
+   - `.env.example` extended with `SENTRY_DSN`, `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ENVIRONMENT`, `WORKER_HEALTH_PORT`, `UNHANDLED_REJECTION_EXIT`, `GIT_COMMIT_SHA`
+   - `@sentry/node@10.58.0` added to `apps/api` + `apps/worker`
+   - `@sentry/nextjs@10.58.0` added to all 4 frontend apps
+   - `pnpm-workspace.yaml` sets `@sentry/cli: false` — its postinstall downloads a native binary used only for source-map upload, which Phase 7.0 defers
+
+7. **39-test coverage** — `apps/api/src/__tests__/phase-7-0-observability.spec.ts`:
+   - `sentry-init` (11 tests): runtime tag enum, DSN resolution, release resolution, environment resolution, sample rate logic, self-test log shape (both forms), `initSentry` no-op without DSN, full options pass-through with DSN
+   - `beforeSend` redaction (5 tests): all 10 REDACTED_KEYS, all 3 headers (case-insensitive), recursive on nested objects + arrays, no mutation of input, null/undefined/primitive safety
+   - `request-context` (8 tests): null outside frame, throw outside frame, frame visibility, sibling isolation, concurrent async frame isolation, nested frame stacking, generator shape
+   - `isValidRequestId` (11 tests): UUIDv4/UUIDv7/short-trusted/ULID acceptance, empty/control-char/newline-log-poisoning/non-ASCII/overlong rejection, exactly-128-chars acceptance, non-string rejection, allowlist-only character set
+   - `business-context` (4 tests): only sets defined fields, empty context noop, idempotent overwrite, null skip
+
+**Phase 7.0 mission ceiling held:** OpenTelemetry / Prometheus / Grafana / ELK / structured-logger all explicitly deferred per the plan. Phase 7.0 does three things and only three things — find failures, understand failures, trace failures.
+
+**Verification:**
+- 39/39 Phase 7.0 observability unit tests pass
+- All 6 packages (shared, api-client, api, worker, 4 apps × typecheck) build clean
+- 3 pre-existing test failures (`order-payment.service.spec.ts`, `prebeta-audit-regression.spec.ts`, `staff-roles.guard.spec.ts`) unchanged — none touch Phase 7.0 code
+- Self-test log smoke test confirms both `[SENTRY] enabled runtime=worker release=phase-7-0-smoke environment=production` and `[SENTRY] disabled (no DSN) runtime=api` forms; invalid runtime tag throws with the expected allowlist message
+- Pre-existing Phase 6.8 portal `priority` type drift unchanged
+- Live smoke tests for worker health endpoints (curl /health/ready/metrics, stop Redis to verify 503), BullMQ failed-event Sentry capture, and release-tag round-trip against a real DSN are documented in the plan as user-side pre-merge checks (require live Redis/Postgres/Sentry project that aren't available in this sandbox)
+
+**Phase 7.0.1 follow-up (named, not abandoned):**
+
+- Promote `requestId` from `AuditLog.metadata` JSON to a dedicated indexed column + backfill (defer until production query patterns reveal which indexes pay off)
+- Structured logger to replace `console.log` (then `requestId` becomes grep-able in plain logs, not just Sentry context + audit DB)
+- Source-map upload via `SENTRY_AUTH_TOKEN` in CI (single-line config flip + CI secret — flip `@sentry/cli` to `true` in `pnpm-workspace.yaml` at the same time)
+
+**Updated production-readiness scorecard (deltas):**
+
+| Dimension | Was | Now | Why |
+|---|---|---|---|
+| Frontend reliability (errors/loading/empties) | B− | **A−** | error.tsx + global-error.tsx + Sentry across all 4 apps; auth-redirect from Phase 6.8 covers 401s; only loading.tsx + per-page bespoke error states remain |
+| Worker observability | D | **A−** | Health endpoint + readiness + queue metrics + Sentry on all `failed`/`error`/`stalled` events across all 9 processors + unhandledRejection exit-after-flush + graceful shutdown |
+| API observability | (no row) | **A−** | Sentry exception filter + business-context interceptor + request-ID correlation. Previously console-log only. |
+| Documentation + audit-trail uniformity | A− | **A** | Every audit log now auto-inherits `requestId` from ALS — single source of truth for "what request triggered this state change" |
+
+**What to ship next** (Phase 7.1 trigger):
+
+The audit's §11 progress dashboard's prior "next" list pointed to #8 + #11 + #5 + #12 + #21. With #8 + #11 closed, the new top of the list is:
+
+1. **#5 — PlatformRevenue dashboard.** Finance has no live revenue view today; the data exists in `PlatformRevenue` rows but no endpoint reads it. Biggest finance-visibility win in the remaining backlog. Audit's user-aligned post-7.0 roadmap.
+2. **#6 — Settlement review window tier-awareness.** Resolve 7-vs-14 default drift; lift tier table to shared constant.
+3. **#10 — Auto-approve worker migration.** Move `SettlementAutoApproveService` `setInterval` out of every API pod and into a worker repeatable job.
+4. **#12 — Notification dedup.** Extend Phase 6.6's support-fan-out fix to email/report/reconciliation queues.
+5. **#9 — Mobile UX.** Publisher + admin sidebar drawer below `lg`.
 
 ---
 

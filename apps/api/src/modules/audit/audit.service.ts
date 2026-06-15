@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
+import { getRequestId } from "@guestpost/shared"
 
 @Injectable()
 export class AuditService {
@@ -14,6 +15,11 @@ export class AuditService {
   // For financial mutations, pass the surrounding Prisma transaction as `tx`
   // so the audit row commits atomically with the money movement instead of
   // being best-effort.
+  //
+  // Phase 7.0: requestId is auto-injected from AsyncLocalStorage into the
+  // metadata JSON when present (set by RequestIdMiddleware). Worker-side
+  // audit writes inherit the same ID after the processor wrapper re-enters
+  // the ALS frame from the signed job payload.
   async log(
     params: {
       action: string
@@ -27,11 +33,18 @@ export class AuditService {
     },
     tx?: any,
   ) {
+    const requestId = getRequestId()
+    const metadata =
+      requestId && params.metadata
+        ? { ...params.metadata, requestId }
+        : requestId
+          ? { requestId }
+          : params.metadata
     const data = {
       action: params.action,
       entityType: params.entityType,
       entityId: params.entityId ?? null,
-      metadata: (params.metadata ?? undefined) as any,
+      metadata: (metadata ?? undefined) as any,
       userId: params.userId ?? null,
       organizationId: params.organizationId ?? null,
       ipAddress: params.ipAddress ?? null,

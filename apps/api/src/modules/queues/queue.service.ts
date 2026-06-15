@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { Queue, QueueOptions, JobsOptions } from "bullmq"
 import IORedis from "ioredis"
-import { QUEUES, QUEUE_JOBS, signJobPayload, trustRecomputeJobOptions } from "@guestpost/shared"
+import { QUEUES, QUEUE_JOBS, signJobPayload, trustRecomputeJobOptions, getRequestId } from "@guestpost/shared"
 
 let connection: IORedis | null = null
 
@@ -87,8 +87,15 @@ export class QueueService {
     // Per-call overrides (e.g. jobId for dedupe) merge over the queue defaults.
     const opts = { ...base, ...(overrides ?? {}) }
     // Every job is HMAC-signed — workers reject anything not enqueued by the
-    // API (anyone with Redis network access could otherwise inject jobs)
-    const payload = signJobPayload(data as Record<string, unknown>)
+    // API (anyone with Redis network access could otherwise inject jobs).
+    // Phase 7.0: requestId from AsyncLocalStorage is included so worker-side
+    // logs + Sentry events + audit writes share the originating request's ID.
+    const requestId = getRequestId()
+    const dataWithRequestId =
+      requestId && !((data as Record<string, unknown>).requestId)
+        ? { ...(data as Record<string, unknown>), requestId }
+        : (data as Record<string, unknown>)
+    const payload = signJobPayload(dataWithRequestId)
     const job = await this.getQueue(queueName).add(jobName, payload, opts)
     this.logger.log(`Job queued: ${queueName}/${jobName} (job ${job.id})`)
     return job
