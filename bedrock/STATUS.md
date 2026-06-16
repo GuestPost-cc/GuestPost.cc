@@ -34,7 +34,7 @@ last_system_refresh: 2026-06-11T12:30:00Z
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
 - Last project sync: `2026-06-16T08:25:59Z`
-- Last phase landed: `7.3 — Settlement auto-approve migrated from per-pod setInterval to single worker BullMQ job (audit #10)` on 2026-06-16
+- Last phase landed: `7.4 — Notification dedup via partial-unique index + drift-keyed reconciliation alerts (audit #12)` on 2026-06-16
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)
 - Last doctor: `2026-06-11` (`healthy`)

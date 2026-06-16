@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Logger, ConflictException } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
+import { isUniqueViolation } from "@guestpost/shared"
 import { Decimal } from "@prisma/client/runtime/library"
 import Stripe from "stripe"
 
@@ -208,6 +209,7 @@ export class BillingService {
     await this.notifyStaff(
       "STRIPE_CHARGEBACK",
       `Chargeback ${dispute.id} for ${disputedAmount.toFixed(2)} ${String(dispute.currency).toUpperCase()} — ${summary}. Respond in Stripe dashboard.`,
+      `chargeback:${dispute.id}:opened`,
     )
   }
 
@@ -232,6 +234,7 @@ export class BillingService {
       await this.notifyStaff(
         "STRIPE_CHARGEBACK",
         `Chargeback ${dispute.id} closed (${dispute.status}) — no hold on record, reconcile manually`,
+        `chargeback:${dispute.id}:closed-unlinked`,
       )
       return
     }
@@ -255,6 +258,7 @@ export class BillingService {
       await this.notifyStaff(
         "STRIPE_CHARGEBACK",
         `Chargeback ${dispute.id} closed with unrecognized status "${dispute.status}" — hold of ${held.toFixed(2)} left in place, resolve manually`,
+        `chargeback:${dispute.id}:closed-unrecognized`,
       )
       return
     }
@@ -321,15 +325,29 @@ export class BillingService {
       won
         ? `Chargeback ${dispute.id} WON — ${held.toFixed(2)} released back to the wallet`
         : `Chargeback ${dispute.id} LOST — ${held.toFixed(2)} debited`,
+      `chargeback:${dispute.id}:${won ? "won" : "lost"}`,
     )
   }
 
-  private async notifyStaff(type: string, message: string) {
+  // Phase 7.4 (audit #12) — optional `dedupKeyPrefix` enables per-(event, staff)
+  // idempotency. Callers that have a stable identifier for the event (chargeback
+  // dispute id, etc.) supply the prefix; per-staff suffix is added automatically.
+  // Callers without a stable identifier omit it — legacy NULL dedup applies.
+  private async notifyStaff(type: string, message: string, dedupKeyPrefix?: string) {
     const staff = await this.prisma.staffMembership.findMany({ select: { userId: true } })
     for (const s of staff) {
-      await this.prisma.notification.create({
-        data: { userId: s.userId, organizationId: null, type, message },
-      }).catch((err: any) => this.logger.error(`Failed to notify staff ${s.userId}: ${err}`))
+      const dedupKey = dedupKeyPrefix ? `${dedupKeyPrefix}:${s.userId}` : null
+      try {
+        await this.prisma.notification.create({
+          data: { userId: s.userId, organizationId: null, type, message, dedupKey },
+        })
+      } catch (err) {
+        if (isUniqueViolation(err)) {
+          // Idempotent retry — another worker pod already wrote this notification.
+          continue
+        }
+        this.logger.error(`Failed to notify staff ${s.userId}: ${err}`)
+      }
     }
   }
 

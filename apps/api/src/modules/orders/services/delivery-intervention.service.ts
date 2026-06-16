@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ConflictException, 
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
-import { QUEUES, orderEventMetadata } from "@guestpost/shared"
+import { QUEUES, orderEventMetadata, notificationDedupKey, isUniqueViolation } from "@guestpost/shared"
 import { presignGet } from "@guestpost/shared/dist/object-storage"
 
 const MIN_REASON = 20
@@ -54,7 +54,15 @@ export class DeliveryInterventionService {
     }
   }
 
-  private async notifyOrderParties(order: any, type: string, message: string) {
+  // Phase 7.4 (audit #12) — `deliveryVersionId` flows in so we can key the
+  // dedup uniquely per (version, recipient). A worker retry of the same
+  // delivery decision writes the row once.
+  private async notifyOrderParties(
+    order: any,
+    deliveryVersionId: string,
+    type: string,
+    message: string,
+  ) {
     const ids = new Set<string>([order.customerId])
     if (order.website?.publisherId) {
       const owners = await this.prisma.publisherMembership.findMany({
@@ -64,7 +72,17 @@ export class DeliveryInterventionService {
       owners.forEach((o: any) => ids.add(o.userId))
     }
     for (const userId of ids) {
-      await this.prisma.notification.create({ data: { userId, organizationId: order.organizationId, type, message } }).catch(() => undefined)
+      const dedupKey = notificationDedupKey.deliveryManual(deliveryVersionId, userId)
+      try {
+        await this.prisma.notification.create({
+          data: { userId, organizationId: order.organizationId, type, message, dedupKey },
+        })
+      } catch (err) {
+        // P2002 = already notified for this (version, user). Idempotent retry.
+        if (!isUniqueViolation(err)) {
+          // swallow other errors as before — notification is best-effort
+        }
+      }
     }
   }
 
@@ -85,7 +103,7 @@ export class DeliveryInterventionService {
     await this.prisma.order.updateMany({ where: { id: order.id, status: "PUBLISHED" }, data: { status: "VERIFIED", verifiedAt: new Date(), verifiedBy: userId, verifyMethod: "manual" } })
 
     await this.audit.log({ action: "ORDER_DELIVERY_MANUAL_APPROVED", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.deliveryAuditMeta(order, version, { reason: r, roleAtTime: role }), userId, organizationId: order.organizationId })
-    await this.notifyOrderParties(order, "ORDER_DELIVERY_MANUAL_APPROVED", `Delivery for order ${order.id} was manually approved.`)
+    await this.notifyOrderParties(order, version.id, "ORDER_DELIVERY_MANUAL_APPROVED", `Delivery for order ${order.id} was manually approved.`)
     return { status: "APPROVED" }
   }
 
@@ -99,7 +117,7 @@ export class DeliveryInterventionService {
     if (upd.count === 0) throw new ConflictException("Delivery was modified by another request. Retry.")
 
     await this.audit.log({ action: "ORDER_DELIVERY_MANUAL_REJECTED", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.deliveryAuditMeta(order, version, { reason: r, roleAtTime: role }), userId, organizationId: order.organizationId })
-    await this.notifyOrderParties(order, "ORDER_DELIVERY_MANUAL_REJECTED", `Delivery for order ${order.id} was rejected: ${r}`)
+    await this.notifyOrderParties(order, version.id, "ORDER_DELIVERY_MANUAL_REJECTED", `Delivery for order ${order.id} was rejected: ${r}`)
     return { status: "REJECTED" }
   }
 
@@ -121,7 +139,7 @@ export class DeliveryInterventionService {
     }
 
     await this.audit.log({ action: "ORDER_DELIVERY_OVERRIDDEN", entityType: "OrderDeliveryVersion", entityId: version.id, metadata: this.deliveryAuditMeta(order, version, { reason: r, targetStatus, roleAtTime: role }), userId, organizationId: order.organizationId })
-    await this.notifyOrderParties(order, "ORDER_DELIVERY_OVERRIDDEN", `Delivery for order ${order.id} verification was overridden to ${targetStatus}.`)
+    await this.notifyOrderParties(order, version.id, "ORDER_DELIVERY_OVERRIDDEN", `Delivery for order ${order.id} verification was overridden to ${targetStatus}.`)
     return { status: targetStatus }
   }
 

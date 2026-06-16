@@ -813,6 +813,7 @@ export const NotificationScalarFieldEnum = {
   read: 'read',
   userId: 'userId',
   organizationId: 'organizationId',
+  dedupKey: 'dedupKey',
   createdAt: 'createdAt'
 } as const
 

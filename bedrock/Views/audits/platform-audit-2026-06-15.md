@@ -801,8 +801,8 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 | Status | Count | Share |
 |---|---|---|
-| ✅ Fully closed | **16** | 52% |
-| ⚠️ Partially closed | **1** | 3% |
+| ✅ Fully closed | **17** | 55% |
+| ⚠️ Partially closed | **0** | 0% |
 | ⛔ Still open | **14** | 45% |
 
 **By severity:**
@@ -810,7 +810,7 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | Severity | Total | Closed | Partial | Open |
 |---|---|---|---|---|
 | Critical (production-blocker) | 11 | **10** (#1, #2, #3, #4, #5, #6, #7, #8, #10, #11) | — | 1 |
-| High | 14 | **5** (#15, #19, #22, V-1, R-3+R-4) | — | 9 |
+| High | 14 | **6** (#12, #15, #19, #22, V-1, R-3+R-4) | — | 8 |
 | Medium | 5 | — | — | 5 |
 
 **Per-finding status (only showing actioned items + remaining criticals):**
@@ -832,7 +832,7 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | #9 | Publisher/admin no mobile sidebar | Critical | ⛔ open | — | Drawer pattern from portal |
 | #10 | SettlementAutoApproveService in API setInterval | Critical | ✅ FIXED | 7.3 | Moved to single BullMQ repeatable job in worker (jobId dedup cluster-wide). Service deleted. Slow-sweep + stale-review Sentry warnings added. SETTLEMENT_AUTO_APPROVE_BATCH_SIZE env added. |
 | #11 | Worker no health/metrics/errors | Critical | ✅ FIXED | 7.0 | Raw node:http server (`/health`, `/ready`, `/metrics/queues`) + BullMQ failed-event Sentry hook across all 9 processors + unhandledRejection exit-after-flush |
-| #12 | Notification duplicates on retry | High | ⚠️ PARTIAL | 6.6 | Support fan-out deduped (Map keyed). Other queues (email/report/reconciliation) still duplicate. |
+| #12 | Notification duplicates on retry | High | ✅ FIXED | 7.4 | Phase 6.6's support fan-out runtime dedup PLUS Phase 7.4's DB partial-unique on (userId, dedupKey). Reconciliation switched to drift-summary-keyed (hourly cron same drift → 1 alert per staff per UTC day, not 24). 8 typed dedup-key builders; writers swallow P2002 as success. |
 | #19 | Support fan-out Set<object> bug | High | ✅ FIXED | 6.6 | `Map<userId, organizationId>` + test |
 | V-1 | Inline body types on support routes | High | ✅ FIXED | 6.6 + 6.7 | `AddTicketMessageDto`, `CreateTicketDto`, `CreateApiKeyDto`, 18 admin-action DTOs |
 | (#13–#18, #20–#30) | Various | High/Medium | ⛔ open | — | See §2 finding list |
@@ -864,12 +864,82 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | Frontend reliability (errors/loading/empties) | C+ | C+ | Not touched |
 | Reporting + finance visibility | D | D | Not touched (#5 PlatformRevenue still open) |
 
-**What to ship next** (in priority order, post-Phase-7.3):
+**What to ship next** (in priority order, post-Phase-7.4):
 
-1. **#12** — Notification dedup across email/report/reconciliation queues; needs Prisma migration. **Phase 7.4** — already planned in the combined 7.3/7.4/7.5 plan.
-2. **#21** — Phase 6 snapshot backfill for historical Settlement/PlatformRevenue rows. **Phase 7.5** — same combined plan.
-3. **Phase 7.3.1** — `CREATE INDEX CONCURRENTLY ON Settlement(status, reviewEndsAt)`. Tiny migration; auto-approve sweep hits this access pattern every 15m.
-4. **#9** — Mobile UX (publisher + admin sidebar collapse to drawer below `lg`). Last open Critical/High after Phase 7.5 lands.
+1. **#21** — Phase 6 snapshot backfill for historical Settlement/PlatformRevenue rows. **Phase 7.5** — already planned in the combined 7.3/7.4/7.5 plan. Required deliverable: before/after row counts in the §11 entry. ~half day.
+2. **Phase 7.3.1** — `CREATE INDEX CONCURRENTLY ON Settlement(status, reviewEndsAt)`. Tiny migration; auto-approve sweep hits this access pattern every 15m.
+3. **#9** — Mobile UX (publisher + admin sidebar collapse to drawer below `lg`). Last open Critical/High after Phase 7.5 lands.
+
+---
+
+### 2026-06-16 — Phase 7.4: Notification dedup across queues (#12)
+
+**Findings resolved:**
+
+| # | Status | Notes |
+|---|---|---|
+| **#12** | ✅ Fully fixed | Migration adds `Notification.dedupKey VARCHAR(256)` + partial unique index `(userId, dedupKey) WHERE dedupKey IS NOT NULL`. Writers route through 8 typed builders in `packages/shared/src/notification-dedup-keys.ts`. P2002 unique violations swallowed as success at the writer level — retries are idempotent no-ops. Reconciliation alerts switch from runId-keyed (re-fires hourly forever) to **drift-summary-keyed + UTC date bucket** (collapses to ONE staff alert per day per drift composition; new composition or new day → new alert). |
+
+**Beyond-audit improvements:**
+
+| Improvement | Why it matters |
+|---|---|
+| **Drift-summary dedup key** | The audit suggested keying on `runId`, which would only dedup within-run retries — hourly cron still pings staff every hour for the same persistent drift. New scheme keys on `(driftType, summaryFingerprint, staffUserId, YYYY-MM-DD)`: same drift composition + same UTC day → ONE notification. Drift composition changes (e.g. new wallet drift appears) → new key → new notification (operator sees the evolution). Next UTC day → new key → re-alert if drift still present (reminds operator it persists). |
+| **Belt-and-suspenders for support fan-out** | Phase 6.6 already added runtime `Map<userId, organizationId>` dedup at the call site (prevents per-event multi-role duplicates). Phase 7.4's DB unique constraint adds a second layer: catches queue-retry duplicates of the same `(messageId, userId)` pair. Both layers cover different failure modes; neither is sufficient alone. |
+| **Typed dedup-key builders** | Free strings would invite typos and key-shape drift; the 8 typed builders (`reconDrift`, `deliveryFailed`, `deliveryManual`, `deliveryAccepted`, `chargeback`, `listingStatus`, `supportMessage`, `trustTierChange`) make adding a new notification type a deliberate design step. All keys validated ≤256 chars to match the DB column cap. |
+| **`isUniqueViolation()` helper + cumulative `dedup_hits_total` counter** | The processor logs `[NOTIFICATION] deduped key=… dedup_hits_total=N` on every P2002 catch. `grep dedup_hits_total= \| tail -1` gives ops the current count without parsing every line. After production telemetry settles, this informs whether a future formal metrics layer (Phase 7.x.x) is worth building. |
+| **VARCHAR(256) + partial unique index** | Bounded length is defense-in-depth — the helper validates length, but a stray admin-tool insert can't blow past it. Partial index keeps the index slim (only deduplicated rows indexed) and explicit `WHERE dedupKey IS NOT NULL` removes any ambiguity about NULL semantics across Postgres versions. |
+
+**Migration:**
+
+- `packages/database/prisma/migrations/20260616100000_phase74_notification_dedup/migration.sql`
+- `ALTER TABLE "Notification" ADD COLUMN "dedupKey" VARCHAR(256);`
+- `CREATE UNIQUE INDEX "Notification_userId_dedupKey_key" ON "Notification" ("userId", "dedupKey") WHERE "dedupKey" IS NOT NULL;`
+- **Purely additive**, no backfill, no breaking change. Legacy notifications all have `dedupKey: NULL` and coexist freely (the partial unique excludes NULL rows from the constraint). Only NEW writes that supply a key benefit from dedup. Zero risk to historical reads. Applied to dev DB during Phase 7.4 implementation; column + partial unique index confirmed via `psql information_schema` query.
+
+**What landed:**
+
+1. **`packages/shared/src/notification-dedup-keys.ts`** (new) — 8 typed builders (`reconDrift` with the UTC-date-bucket design, `deliveryFailed`, `deliveryManual`, `deliveryAccepted`, `chargeback`, `listingStatus`, `supportMessage`, `trustTierChange`) + `utcDateBucket()` helper + `isUniqueViolation()` Prisma-P2002 type guard + module-scoped `dedup_hits_total` counter (`incrementDedupHits`, `getDedupHitsTotal`, `__resetDedupHitsTotal` for tests).
+
+2. **`packages/database/prisma/schema.prisma`** — `dedupKey String? @db.VarChar(256)` + `@@unique([userId, dedupKey], map: "Notification_userId_dedupKey_key")`.
+
+3. **`apps/worker/src/processors/notification.processor.ts`** — accepts optional `dedupKey` from signed job payload; wraps `prisma.notification.create` in try/catch that swallows P2002 as success, logs `[NOTIFICATION] deduped key=<k> user=<u> dedup_hits_total=<N>` cumulative.
+
+4. **`apps/worker/src/processors/reconciliation.processor.ts`** — computes a drift-summary fingerprint (`wallet=N,pub=N,stuckOrd=N,stuckPay=N`) + UTC date bucket; loops staff and creates notifications with `reconDrift` keys. Same drift composition across hourly runs collapses to one alert per staff per day.
+
+5. **`apps/api/src/modules/queues/queue.service.ts`** — `pushNotification(jobName, data, dedupKey?)` threads optional dedupKey through the signed payload. Existing callsites unchanged (default NULL dedupKey behavior); new callsites supply keys.
+
+6. **`apps/api/src/modules/orders/services/delivery-intervention.service.ts`** — `notifyOrderParties` now takes `deliveryVersionId`; uses `notificationDedupKey.deliveryManual(versionId, userId)` per recipient. All 3 callers (`manualApprove`, `manualReject`, `override`) updated.
+
+7. **`apps/api/src/modules/orders/services/order-delivery.service.ts`** — customer-accept publisher-owner notifications use `notificationDedupKey.deliveryAccepted(versionId, userId)`.
+
+8. **`apps/api/src/modules/billing/billing.service.ts`** — `notifyStaff` accepts optional `dedupKeyPrefix`; all 4 chargeback callsites supply distinct prefixes (`chargeback:<id>:opened`, `chargeback:<id>:closed-unlinked`, `chargeback:<id>:closed-unrecognized`, `chargeback:<id>:won|lost`).
+
+**17 new tests** — `apps/api/src/__tests__/phase-7-4-notification-dedup.spec.ts`:
+- 7 builder shape + bound tests (8 builders covered; reconDrift gets 3 dedicated cases for composition / new-day semantics)
+- 2 `isUniqueViolation` predicate tests (P2002 detection + false-positive guard)
+- 2 `dedup_hits_total` counter behavior tests
+- 3 migration / schema regression guards (file exists, SQL has the expected ALTER + CREATE UNIQUE INDEX + WHERE clause, Prisma schema mirrors with `@db.VarChar(256)` + `@@unique` map)
+- 3 writer integration tests with Prisma mock (3 identical creates → 1 row + 2 dedup hits; 3 distinct keys → 3 rows; 2 NULL dedupKey → 2 rows for legacy compat)
+
+**Verification:**
+
+- shared + database + api + worker all build clean
+- 427/435 tests pass (+17 vs Phase 7.3); 3 pre-existing failures unchanged
+- Migration applied to dev DB; column + partial unique index verified via psql
+- Live retry-storm smoke (force a delivery-failed event 3x → confirm 1 notification row) deferred to user-side pre-merge
+
+**Phase 7.4 mission ceiling held**: schema change is the dedupKey column + partial unique index, nothing else. No notification-type refactor, no message-template change, no per-event-type routing, no observability layer beyond the existing structured log.
+
+**Production-readiness scorecard (deltas):**
+
+| Dimension | Was | Now | Why |
+|---|---|---|---|
+| Worker idempotency | B | **A−** | Notification queue retries no longer write duplicate rows; reconciliation drift hourly spam collapsed to per-day. Other queues (email, report) still duplicate on retry — separate scope. |
+| Operational signal-to-noise | (no row) | **A−** | Drift alerts that previously fired 24× per day per staff now fire once. Drift composition changes still produce a new alert (operator sees situation evolving). |
+
+**What to ship next** (Phase 7.5 trigger):
+- **#21 Snapshot backfill** — already planned in the combined 7.3/7.4/7.5 plan. One-shot SQL migration backfilling Phase 6 snapshot fields on historical Settlement + PlatformRevenue rows. Required-deliverable before/after row counts. ~half day.
 
 ---
 

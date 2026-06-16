@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ConflictException }
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
-import { QUEUES, normalizeUrl, orderEventMetadata } from "@guestpost/shared"
+import { QUEUES, normalizeUrl, orderEventMetadata, notificationDedupKey, isUniqueViolation } from "@guestpost/shared"
 import { assertOwnerOrCreator } from "./owner-or-creator"
 
 // Rejected placeholder "deliveries" — a human typing "done" is not a delivery.
@@ -261,10 +261,22 @@ export class OrderDeliveryService {
       )
 
       // Best-effort notify the publisher owners.
+      // Phase 7.4 (audit #12) — dedupKey per (delivery version, owner) means
+      // a worker retry of this customer-accept flow produces ONE notification
+      // per publisher owner, not three.
       if (order.website?.publisherId) {
         const owners = await tx.publisherMembership.findMany({ where: { publisherId: order.website.publisherId, role: "PUBLISHER_OWNER" }, select: { userId: true } })
         for (const o of owners) {
-          await tx.notification.create({ data: { userId: o.userId, organizationId, type: "ORDER_DELIVERY_CUSTOMER_ACCEPTED", message: `Customer manually accepted delivery for order ${orderId}.` } }).catch(() => undefined)
+          const dedupKey = notificationDedupKey.deliveryAccepted(v.id, o.userId)
+          try {
+            await tx.notification.create({
+              data: { userId: o.userId, organizationId, type: "ORDER_DELIVERY_CUSTOMER_ACCEPTED", message: `Customer manually accepted delivery for order ${orderId}.`, dedupKey },
+            })
+          } catch (err) {
+            if (!isUniqueViolation(err)) {
+              // best-effort path: swallow other errors as before
+            }
+          }
         }
       }
 

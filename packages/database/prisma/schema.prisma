@@ -1309,6 +1309,12 @@ model Notification {
   userId         String
   // Nullable: staff/system notifications (e.g. chargeback alerts) have no org.
   organizationId String?
+  // Phase 7.4 (audit #12) — when writers supply a deterministic key (e.g.
+  // `recon:walletDrift:wallet-abc:user-xyz:2026-06-16`), the unique constraint
+  // below catches BullMQ-retry duplicates. NULL = no dedup applies (legacy
+  // path; the partial unique index below excludes NULL rows, so multiple
+  // NULLs coexist freely). Builders live in packages/shared/src/notification-dedup-keys.ts.
+  dedupKey       String?  @db.VarChar(256)
   createdAt      DateTime @default(now())
 
   user         User          @relation(fields: [userId], references: [id])
@@ -1317,6 +1323,10 @@ model Notification {
   @@index([userId, read, createdAt])
   @@index([organizationId, createdAt])
   @@index([read])
+  // Partial unique — see migration 20260616100000_phase74_notification_dedup.
+  // Prisma doesn't model partial uniques directly; this @@unique mirrors the
+  // SQL constraint name. NULL dedupKey rows are exempt.
+  @@unique([userId, dedupKey], map: "Notification_userId_dedupKey_key")
 }
 
 model AuditLog {

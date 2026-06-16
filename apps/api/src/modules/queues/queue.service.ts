@@ -79,9 +79,21 @@ export class QueueService {
     return job
   }
 
-  async pushNotification(jobName: string, data: { userId: string; organizationId: string; type: string; message: string }) {
-    const job = await this.addJob(QUEUES.NOTIFICATION, jobName, data)
-    this.logger.log(`Notification queued: ${jobName} (job ${job.id})`)
+  // Phase 7.4 (audit #12) — `dedupKey` is optional. When supplied (preferred
+  // for retry-prone events: reconciliation drift, support fan-out, etc.),
+  // the worker's notification processor catches Prisma P2002 unique-violation
+  // as success — so a BullMQ retry of the same logical event produces ONE
+  // notification, not three. Builders in @guestpost/shared notificationDedupKey.*.
+  // Absent dedupKey = legacy NULL path; the partial unique index excludes
+  // NULL rows so writes always succeed.
+  async pushNotification(
+    jobName: string,
+    data: { userId: string; organizationId: string | null; type: string; message: string },
+    dedupKey?: string,
+  ) {
+    const payload = dedupKey ? { ...data, dedupKey } : data
+    const job = await this.addJob(QUEUES.NOTIFICATION, jobName, payload)
+    this.logger.log(`Notification queued: ${jobName}${dedupKey ? ` dedupKey=${dedupKey}` : ""} (job ${job.id})`)
     return job
   }
 
