@@ -801,16 +801,16 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 | Status | Count | Share |
 |---|---|---|
-| ✅ Fully closed | **12** | 39% |
+| ✅ Fully closed | **16** | 52% |
 | ⚠️ Partially closed | **1** | 3% |
-| ⛔ Still open | **18** | 58% |
+| ⛔ Still open | **14** | 45% |
 
 **By severity:**
 
 | Severity | Total | Closed | Partial | Open |
 |---|---|---|---|---|
-| Critical (production-blocker) | 11 | **7** (#1, #2, #3, #4, #7, #8, #11) | — | 4 |
-| High | 14 | **4** (#19, #22, V-1, R-3+R-4) | — | 10 |
+| Critical (production-blocker) | 11 | **10** (#1, #2, #3, #4, #5, #6, #7, #8, #10, #11) | — | 1 |
+| High | 14 | **5** (#15, #19, #22, V-1, R-3+R-4) | — | 9 |
 | Medium | 5 | — | — | 5 |
 
 **Per-finding status (only showing actioned items + remaining criticals):**
@@ -821,8 +821,8 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | #2 | AdminController class-decorator override | Critical | ✅ FIXED | 6.7 | Fail-closed guard + per-handler decorators + coverage test |
 | #3 | submitPayment allows MEMBER | Critical | ⛔ open | — | One-line decorator change still pending |
 | #4 | orderEventMetadata helper underused | Critical | ⛔ open | — | 2 of ~30 callsites; sweep + lint rule needed |
-| #5 | No PlatformRevenue surfacing | Critical | ⛔ open | — | Endpoint + admin tab needed |
-| #6 | Settlement review window not tier-aware | Critical | ⛔ open | — | Lift tier table to shared constant |
+| #5 | No PlatformRevenue surfacing | Critical | ✅ FIXED | 7.1 | `GET /admin/finance/revenue` with 4 groupings + period comparison + CSV. RBAC = SUPER_ADMIN+FINANCE (Category B). #15 bundled. |
+| #6 | Settlement review window not tier-aware | Critical | ✅ FIXED | 7.2 | Shared `publisher-tier-policy` module. Both writers use `getSettlementReviewDays(tier, env)`. TIER_WITHDRAWAL_HOLDS lifted as sibling rider. Grep guards prevent regression. |
 | #7 | No 401-redirect in frontend | Critical | ✅ FIXED | 6.8 | Shared `buildAuthErrorHandler` with idempotency + URL sanitization + same-page debounce |
 | #3 | submitPayment allows MEMBER | Critical | ✅ FIXED | 6.9 | Layered: controller stays OWNER+MEMBER, service enforces OWNER‖creator via `assertOwnerOrCreator` |
 | #4 | orderEventMetadata helper underused | Critical | ✅ FIXED | 6.9 | Swept 20+ callsites + retired competing `auditMeta` + coverage test prevents regressions |
@@ -830,7 +830,7 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | R-3 / R-4 | MEMBER-allowed money endpoints | High | ✅ FIXED | 6.9 | Service-layer OWNER‖creator gate on customerAcceptDelivery + customerApprove (already inline on others) |
 | #8 | No error boundaries / no Sentry | Critical | ✅ FIXED | 7.0 | error.tsx + global-error.tsx + Sentry across all 4 apps + browser/server/edge runtimes |
 | #9 | Publisher/admin no mobile sidebar | Critical | ⛔ open | — | Drawer pattern from portal |
-| #10 | SettlementAutoApproveService in API setInterval | Critical | ⛔ open | — | Move to worker repeatable |
+| #10 | SettlementAutoApproveService in API setInterval | Critical | ✅ FIXED | 7.3 | Moved to single BullMQ repeatable job in worker (jobId dedup cluster-wide). Service deleted. Slow-sweep + stale-review Sentry warnings added. SETTLEMENT_AUTO_APPROVE_BATCH_SIZE env added. |
 | #11 | Worker no health/metrics/errors | Critical | ✅ FIXED | 7.0 | Raw node:http server (`/health`, `/ready`, `/metrics/queues`) + BullMQ failed-event Sentry hook across all 9 processors + unhandledRejection exit-after-flush |
 | #12 | Notification duplicates on retry | High | ⚠️ PARTIAL | 6.6 | Support fan-out deduped (Map keyed). Other queues (email/report/reconciliation) still duplicate. |
 | #19 | Support fan-out Set<object> bug | High | ✅ FIXED | 6.6 | `Map<userId, organizationId>` + test |
@@ -864,14 +864,217 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | Frontend reliability (errors/loading/empties) | C+ | C+ | Not touched |
 | Reporting + finance visibility | D | D | Not touched (#5 PlatformRevenue still open) |
 
-**What to ship next** (in priority order, post-Phase-7.0):
+**What to ship next** (in priority order, post-Phase-7.3):
 
-1. **#5** — PlatformRevenue reporting endpoint + Revenue tab (1–2 days; highest finance-visibility win in remaining backlog).
-2. **#6** — Settlement review window tier-awareness (resolve 7-vs-14 default drift; lift tier table to shared constant).
-3. **#10** — Auto-approve worker migration (move `SettlementAutoApproveService` `setInterval` out of every API pod into a worker repeatable job).
-4. **#12** — Broader notification dedup across email/report/reconciliation queues.
-5. **#21** — Phase 6 snapshot backfill for historical Settlement/PlatformRevenue rows.
-6. **#9** — Mobile UX (publisher + admin sidebar collapse to drawer below `lg`).
+1. **#12** — Notification dedup across email/report/reconciliation queues; needs Prisma migration. **Phase 7.4** — already planned in the combined 7.3/7.4/7.5 plan.
+2. **#21** — Phase 6 snapshot backfill for historical Settlement/PlatformRevenue rows. **Phase 7.5** — same combined plan.
+3. **Phase 7.3.1** — `CREATE INDEX CONCURRENTLY ON Settlement(status, reviewEndsAt)`. Tiny migration; auto-approve sweep hits this access pattern every 15m.
+4. **#9** — Mobile UX (publisher + admin sidebar collapse to drawer below `lg`). Last open Critical/High after Phase 7.5 lands.
+
+---
+
+### 2026-06-16 — Phase 7.3: Settlement auto-approve worker migration (#10)
+
+**Findings resolved:**
+
+| # | Status | Notes |
+|---|---|---|
+| **#10** | ✅ Fully fixed | Auto-approve sweep moved from `OnModuleInit + setInterval` in every API pod to a single BullMQ repeatable job in the worker. `jobId: "settlement-auto-approve"` provides cluster-wide dedup — 3 pods = 1 sweep per cadence (was: 3 sweeps). DB load decoupled from API pod count. Per-row write semantics unchanged (status + version guard, transactional approval upsert + orderEvent + auditLog). |
+
+**Beyond-audit operational improvements:**
+
+| Improvement | Why it matters |
+|---|---|
+| **Slow-sweep warning to Sentry** | When `duration_ms > SETTLEMENT_AUTO_APPROVE_SLOW_MS` (default 30s), the processor fires `Sentry.captureMessage("Settlement auto-approve sweep slow", { level: "warning" })`. Catches a future backlog or DB-stall scenario BEFORE the sweep overruns its own 15m cadence. Configurable via env. |
+| **Stale-review detector** | `countStaleReviewSettlements()` runs after each sweep and counts settlements >24h past `reviewEndsAt` still in PENDING/UNDER_REVIEW. Non-zero count → Sentry warning. Catches a stuck sweeper / schema drift / dispute-path wedge that's silently leaving settlements in limbo — independent failure mode from "the sweep itself errored." |
+| **Configurable batch size** | New `SETTLEMENT_AUTO_APPROVE_BATCH_SIZE` env (default 100, clamped to [1, 10_000]) lets ops dial up during backlog recovery without releasing new code. Defensive clamp on both the worker registration side and the processor's signed payload read. |
+| **Structured counters log line** | One grep-able line per sweep: `[SETTLEMENT_AUTO_APPROVE] runs_total=N scanned=M approved=K skipped=L stale=S duration_ms=D`. Cumulative counters from worker start visible without parsing every line. No prom-client / OpenTelemetry — Phase 7.0 mission ceiling held; a future Phase 7.x.x metrics layer can scrape these structured logs. |
+| **Dead-letter alerting free from Phase 7.0** | `createObservableWorker` already wires the `failed` event on every queue → `Sentry.captureException` with `attemptsMade` tag. Operators filter `attemptsMade >= 3` for final-failure events. The new SETTLEMENT queue inherits this automatically. |
+
+**What landed:**
+
+1. **`packages/shared/src/settlement-auto-approve-core.ts`** (new) — pure function `runSettlementAutoApprove(prisma, { batchSize?, now? })` returns `{ scanned, approved, skipped, durationMs }`. Plus `countStaleReviewSettlements(prisma, { now?, staleThresholdHours? })`. No NestJS dependency; writes audit via direct `tx.auditLog.create()`. `AnyPrisma = any` matches the existing reconciliation-core / website-verification-core convention.
+
+2. **`packages/shared/src/queues.ts`** — added `SETTLEMENT: "settlement"` to `QUEUES` const + `AUTO_APPROVE: "settlement-auto-approve"` to `QUEUE_JOBS`. 12 queues total (was 11).
+
+3. **`apps/worker/src/processors/settlement-auto-approve.processor.ts`** (new) — uses `createObservableWorker` (Phase 7.0). Logs structured counters, fires slow-sweep + stale-review Sentry warnings, validates signed payload. `clampBatchSize` defensive helper exported for internal use.
+
+4. **`apps/worker/src/index.ts`** — `registerSettlementAutoApproveSweep()` registers the BullMQ repeatable cron with `jobId: "settlement-auto-approve"` for cluster-wide dedup. Honors the 3 existing env vars (`SETTLEMENT_AUTO_APPROVE_INTERVAL_MS`, `SETTLEMENT_AUTO_APPROVE_DISABLED`, plus the new `_BATCH_SIZE`). Pushes the new worker into the bootstrap workers list (10 workers total now).
+
+5. **`apps/api/src/modules/settlements/settlements.module.ts`** — removed import + providers entry for `SettlementAutoApproveService`. Module is leaner; module comment explains the architectural move.
+
+6. **`apps/api/src/modules/settlements/settlement-auto-approve.service.ts`** — **DELETED entirely** (was 129 lines). Zero external callers verified via Phase 0 grep; logic now lives in shared.
+
+7. **`.env.example`** — updated comments for the 3 settlement-auto-approve env vars (note that they now affect worker behavior, not API), added new `SETTLEMENT_AUTO_APPROVE_BATCH_SIZE` + `SETTLEMENT_AUTO_APPROVE_SLOW_MS`.
+
+8. **`apps/api/src/__tests__/phase-6-9-money-path-rbac.spec.ts`** — removed the deleted file from the audit-coverage walker's hard-coded list. Comment explains the migration: audit-log coverage for the auto-approve action is preserved (still spreads `orderEventMetadata(settlement.order)`) but now lives in shared via `tx.auditLog.create()` rather than the AuditService wrapper that the Phase 6.9 walker parses.
+
+**14 new tests** — `apps/api/src/__tests__/phase-7-3-auto-approve-worker.spec.ts`:
+- 7 `runSettlementAutoApprove` tests: empty result, multi-settlement commit, active-dispute skip, version-guard race, per-row error tolerance, batchSize honored, now override
+- 3 `countStaleReviewSettlements` tests: default 24h threshold, count returned verbatim, custom threshold
+- 4 file-deletion + module-wiring regression guards: deleted file is gone, settlements.module.ts no longer imports/registers the service, new processor file exists, worker/index.ts registers the cron + adds the worker
+
+**Verification:**
+
+- **shared + api + worker build**: clean
+- **Test suite**: 410/418 pass (+14 vs Phase 7.2); 3 pre-existing failures unchanged (`order-payment.service.spec.ts`, `prebeta-audit-regression.spec.ts`, `staff-roles.guard.spec.ts`)
+- **Phase 7.0 / 7.1 / 7.2 / 6.9 tests still green** — no regressions
+- Live manual smokes (worker starts → cron registers → sweep log line within 15m; two workers → ONE log line per cadence; `_DISABLED=true` → no registration) deferred to user-side pre-merge per the same pattern as prior phases.
+
+**Phase 7.3 mission ceiling held**: no new metrics library, no Prisma migration, no schema change, no behavior change to per-row settlement logic, no audit/AuditService refactor.
+
+**Production-readiness scorecard (deltas):**
+
+| Dimension | Was | Now | Why |
+|---|---|---|---|
+| Worker architecture | B | **A−** | Cron work no longer multiplied by pod count; new pattern matches the existing reconciliation / settlement-hold-sweep / website-reverify-sweep cron family |
+| Operational observability (settlement sweep) | (no row) | **B+** | Structured counter line + slow-sweep warn + stale-review warn + dead-letter via Phase 7.0's failed-event wiring. Full metrics layer deferred to Phase 7.x.x. |
+
+**What to ship next** (Phase 7.4 trigger):
+- **#12 Notification dedup** — already planned in the combined 7.3/7.4/7.5 plan. Adds `Notification.dedupKey` partial-unique-index migration; updates 6+ writer callsites with deterministic keys via the new shared builder. Stops worker-retry notification duplicates. ~1 day.
+
+**Phase 7.3.1 follow-up (named, not abandoned):** add `CREATE INDEX CONCURRENTLY ON Settlement(status, reviewEndsAt)` — the new worker sweep hits this access pattern every 15m. Tiny migration; immediately after 7.3 lands. Note: must use `CONCURRENTLY` (Prisma migration needs the transaction-disable directive) to avoid table-write lockout on prod-sized tables.
+
+---
+
+### 2026-06-16 — Phase 7.2: Tier-aware settlement review window + lift TIER_WITHDRAWAL_HOLDS to shared (#6)
+
+**Findings resolved:**
+
+| # | Status | Notes |
+|---|---|---|
+| **#6** | ✅ Fully fixed | Settlement review window now respects publisher tier per spec: NEW=30d / TRUSTED=14d / VERIFIED=7d. Both writers (`order-review.service.ts:336` and `settlements.service.ts:80`) route through the new `getSettlementReviewDays(tier, env)` helper. Default drift (7 in one file, 14 in the other) closed. Env override preserved (incident-response escape hatch). |
+
+**Sibling rider landed:**
+
+| Improvement | Why bundled |
+|---|---|
+| **Lift `TIER_WITHDRAWAL_HOLDS` → `packages/shared/src/publisher-tier-policy.ts`** | Same product concept ("what does each publisher tier mean numerically"), same shape, same risk of silent drift if kept fragmented. Zero behavioral diff. Pure structural cleanup; introduces single source of truth via `getWithdrawalHoldDays(tier, env)`. |
+
+**Beyond-audit safety improvements:**
+
+1. **Empty-string parsing trap** — `Number("")` returns `0` in JavaScript. The initial helper draft would have parsed `SETTLEMENT_REVIEW_DAYS=` (empty value, common ops typo) as 0 and **silently auto-approved every new settlement on the next sweep**. The test case `getSettlementReviewDays("VERIFIED", "")` → 7 caught this; the helper was tightened to trim and reject empty / whitespace-only env values before parsing. Exactly the failure mode the helper's design rationale was meant to prevent; the test caught it on first run.
+
+2. **Ops-visibility warning on invalid override** (post-Phase-7.2 rider) — when an env override is set to an unparseable value (e.g. `SETTLEMENT_REVIEW_DAYS=garbage`), the helper now emits one `console.warn` per `(envKey, value)` pair: `[publisher-tier-policy] Invalid SETTLEMENT_REVIEW_DAYS override "garbage"; falling back to per-tier default.` Dedupe rules: same invalid value never re-warns (no spam); a *different* invalid value DOES re-warn (someone tried to fix it and got it wrong again — worth surfacing). Empty / whitespace-only env never warns (common "declared but blank" state). Builds on the Phase 7.0 observability foundation by making configuration mistakes immediately visible at first call rather than silently degrading to the tier default. `MinimalLogger` parameter makes the helper testable without monkey-patching `console`; packages/shared stays SDK-agnostic (no Sentry coupling).
+
+**What landed:**
+
+1. **`packages/shared/src/publisher-tier-policy.ts`** (new) — single source of truth:
+   - Reuses existing `PublisherTier` type from `./types`
+   - `TIER_SETTLEMENT_REVIEW_DAYS = {NEW:30, TRUSTED:14, VERIFIED:7}` with `satisfies Record<PublisherTier, number>` compile-time exhaustiveness
+   - `TIER_WITHDRAWAL_HOLD_DAYS` = same values today; kept as a separate constant so future per-tier divergence is a one-line edit
+   - `getSettlementReviewDays(tier, envOverride?)` — env trimmed first (empty/whitespace → fall back to tier), then `Number.isFinite` gate, then `Math.max(value, 0)` clamp. Invalid input (`"garbage"`, `""`, `"  "`) safely falls back to tier — never silently collapses the review window.
+   - `getWithdrawalHoldDays(tier, envOverride?)` — same shape
+
+2. **`apps/api/src/modules/orders/services/order-review.service.ts:336`** — adopted helper. Publisher already loaded at line 329, so `.tier` flows directly. No extra query.
+
+3. **`apps/api/src/modules/settlements/settlements.service.ts:80-101`** — moved the `reviewDays`/`reviewEndsAt` calculation INSIDE the existing transaction, added a focused `tx.publisher.findUnique({ where: { id: publisherId }, select: { tier: true } })` lookup (Option B per plan Key decision #6 — cheaper than cascading nested includes). Tier defaults to `"NEW"` (most conservative) if the publisher row can't be loaded.
+
+4. **`apps/api/src/modules/publisher-payouts/publisher-payouts.service.ts:10-14, 173`** — local `TIER_WITHDRAWAL_HOLDS` constant deleted; replaced with `getWithdrawalHoldDays(publisher.tier ?? "NEW", process.env.WITHDRAWAL_HOLD_DAYS)`. New env-override hook for `WITHDRAWAL_HOLD_DAYS` (matches the existing `SETTLEMENT_REVIEW_DAYS` escape-hatch pattern).
+
+**21 new tests** — `apps/api/src/__tests__/phase-7-2-tier-policy.spec.ts`:
+- 3 tier defaults; env override wins when parseable (`"42"` → 42); `"0"` → 0 (deliberate); `"-1"` → 0 (clamp); 4 invalid-input cases (`"garbage"`, `"abc"`, `""`, `"  "`) → tier default; `undefined` → tier; fractional accepted; `getWithdrawalHoldDays` mirror; 2 exhaustive-coverage checks
+- **7 warning-behavior tests** for the post-Phase-7.2 ops-visibility rider: warns once on first invalid value; no re-warn on identical repeats; re-warns on a *different* invalid value; never warns on empty/whitespace/undefined; never warns on valid numeric overrides; dedupes `SETTLEMENT_REVIEW_DAYS` and `WITHDRAWAL_HOLD_DAYS` keys independently; falls back to `console.warn` when no logger supplied
+- **3 grep regression guards** asserting source files no longer contain `SETTLEMENT_REVIEW_DAYS ?? 7`, `SETTLEMENT_REVIEW_DAYS ?? 14`, or `const TIER_WITHDRAWAL_HOLDS: Record` — catches future silent regression to hardcoded fallbacks (same pattern as Phase 6.9 race-guard literal assertions)
+
+**Verification:**
+
+- **API + shared + worker build**: clean
+- **Test suite**: 389/397 pass (+14 vs Phase 7.1); 3 pre-existing failures unchanged
+- **Phase 7.0 + 7.1 + 6.9 tests still green** — no regressions
+- Live manual smoke (seed one publisher per tier, create orders, verify `reviewEndsAt - createdAt` = 30d/14d/7d respectively) deferred to user-side pre-merge.
+
+**Phase 7.2 mission ceiling held**: no migration, no index addition, no per-tier env overrides, no retroactive recompute, no channel-aware review policy.
+
+**Behavioral note for ops**: today's default for NEW publishers was 7d in one path and 14d in another. After this lands, all NEW publishers get 30d — the intended spec behavior. If Finance / Ops were used to faster clearance for NEW publishers, this is a deliberate per-spec tightening. The `SETTLEMENT_REVIEW_DAYS` env override remains available for incident-response global freezes.
+
+**Updated production-readiness scorecard (deltas):**
+
+| Dimension | Was | Now | Why |
+|---|---|---|---|
+| Trust / tier policy uniformity | (no row) | **A−** | Single shared module for tier numerics; future drift requires deliberate edits, not silent fragmentation. Grep regression guards prevent reverts. |
+| Money invariants | A− | A− (unchanged but tighter) | Settlement review matches spec; default-drift bug closed |
+
+**What to ship next** (post-Phase-7.2):
+
+1. **#10** — Auto-approve worker migration. Move `SettlementAutoApproveService` `setInterval` out of every API pod into a single worker repeatable job.
+2. **#12** — Notification dedup. Extend Phase 6.6's support-fan-out fix to email/report/reconciliation queues; needs migration.
+3. **#9** — Mobile UX (publisher + admin sidebar drawer).
+4. **#21** — Phase 6 snapshot backfill for historical Settlement/PlatformRevenue rows.
+
+---
+
+### 2026-06-16 — Phase 7.1: PlatformRevenue dashboard + CSV export (#5 + #15 bundled)
+
+**Findings resolved:**
+
+| # | Status | Notes |
+|---|---|---|
+| **#5** | ✅ Fully fixed | `GET /admin/finance/revenue` reads PlatformRevenue with 4 groupings (channel / month / serviceType / listing) + same-duration previous-period KPIs + currency-mismatch warning + RFC 4180 CSV streaming. Admin Finance "Revenue" tab uses the typed `api.admin.getRevenue(...)` method (Phase 7.0 X-Request-ID propagation inherited). RBAC: `@StaffRoles("SUPER_ADMIN", "FINANCE")` — Category B Financial, tighter than Category A universal-staff to match the `reconciliation` precedent. |
+| **#15** | ✅ Fully fixed | `reporting.service.ts:32` + `getCampaignReport` channel-split now read `order.fulfillmentChannel ?? website.ownershipType` (snapshot-first / ownership-fallback). Matches `refund.service.ts:68` and `order-review.service.ts:289`. Bundled with #5 because same domain. |
+
+**Beyond-audit improvements landed** (user-requested during planning):
+
+| Improvement | Why it matters |
+|---|---|
+| **`groupBy=listing` first-class** | Finance's recurring question isn't "how much did we make" but "what makes us money." Sorted by `_sum.netRevenue` DESC so top earners surface first. Structured `listingServiceId` + `listingId` + `listingTitle` fields on every bucket (not a concatenated string) — future drill-down reads them directly with no regex parsing. Robust to soft-deleted Listings (`listingTitle: null`, `bucket: "(listing not found)"`, row preserved) and NULL pre-Phase-6 snapshots (`"(unknown)"` bucket). |
+| **Previous-period comparison on KPIs** | Server-side computes a same-duration prior window. `totals.deltaPct` returned with the response; KPI cards render `+18.2%` style deltas. Zero-denominator returns `null` (no `+∞%` / `NaN%` artifacts). When `from`/`to` both unset, `previous: null` (whole-history view has no prior window). |
+| **Explicit `Timezone: UTC` label** | Rendered as a small caption under the filter row. Pre-empts "why doesn't June 30 match my spreadsheet" tickets. |
+| **Currency-mismatch detection at the Order layer** | Phase 0 verification caught: `PlatformRevenue` has NO `currency` column (audit assumed it did). Currency lives on `Order` and isn't propagated. Defense in depth: parallel `prisma.order.findMany({ currency: { not: "USD" }, status: DELIVERED/COMPLETED/REFUNDED, deliveredAt: rangeFilter })` populates `meta.currencyMismatch = { rowCount, distinctCurrencies }` when any non-USD order exists in the range. UI surfaces an amber banner. A future bug that introduces an EUR order is caught visibly on the next dashboard load, not silently muddled. |
+| **`Phase 0` pre-implementation verification step** | New plan-workflow norm: before any code is written, verify schema + writer + sample-rows assumptions actually hold today. Caught the `currency`-field assumption error that would have produced wrong results in prod. |
+| **api-client method required from day one** | Typed `api.admin.getRevenue(...)` ships with the endpoint; no raw `fetch()` in the UI. Inherits Phase 7.0's X-Request-ID and ApiError-with-requestId machinery — every Revenue page load is correlatable to its API + audit log + Sentry events. |
+| **CSV trailer rows (`TOTAL_CURRENT`, `TOTAL_PREVIOUS`)** | The exported CSV alone tells the same story as the UI. Finance can email a spreadsheet to a stakeholder without having to attach a screenshot. |
+| **Cache key `["admin", "revenue", filters]`** | Sets the consistent admin-cache-key pattern audit §7.3 called out. Sweeping the existing Finance tabs is a separate Phase 7.1.x ergonomic PR. |
+
+**Sibling-fix riders** (bundled because they blocked the build):
+
+| File | Change | Why bundled |
+|---|---|---|
+| `apps/admin/src/app/page.tsx` | Wrap `LoginPage` in `<Suspense>` per Next 15 strict-mode `useSearchParams` requirement | Pre-existing Phase 6.8 leftover; blocked `next build` for admin. Portal + publisher already had this pattern. |
+| `apps/portal/src/app/dashboard/support/[id]/page.tsx` | Cast `getTicket(...)` via `unknown` per TS's own remediation; mark local `priority` field optional | Pre-existing Phase 6.6/6.8 type drift (audit §11 called it out as "unrelated"); blocked `next build` for portal. Reconciling the two `TicketDetail` shapes is its own Phase 7.1.x follow-up. |
+| `packages/shared/src/observability/index.ts` | Drop `./request-context` from the browser-safe barrel | Phase 7.0 regression caught by Phase 7.1 verification. `request-context.ts` uses `node:async_hooks`; bundling it into the website's client build threw `node:async_hooks` import errors. Fixed by following the established pattern (deep imports for Node-only modules). 5 API + 1 worker import sites updated; jest moduleNameMapper extended to match. |
+
+**What landed:**
+
+1. **`apps/api/src/modules/admin/dto/get-revenue-query.dto.ts`** — `GetRevenueQueryDto` with `@IsISO8601() from/to`, `@IsIn(["channel","month","serviceType","listing"]) groupBy`, `@IsIn(["json","csv"]) format`.
+2. **`apps/api/src/modules/admin/finance/revenue.service.ts`** — pure aggregation service. Prisma `groupBy` for channel/serviceType/listing; raw `$queryRawUnsafe` for month-bucketing via `date_trunc('month', "recordedAt" AT TIME ZONE 'UTC')`. All Decimals serialized as strings. Listing-grouping joins `ListingService → MarketplaceListing` for human title + structured `listingId`. Currency-mismatch checks `Order.currency` (Phase 0 finding).
+3. **`apps/api/src/modules/admin/finance/csv-stream.ts`** — RFC 4180 streamer (~30 LOC). No new dep.
+4. **`apps/api/src/modules/admin/admin.controller.ts`** — new `GET /admin/finance/revenue` handler `@StaffRoles("SUPER_ADMIN", "FINANCE")`. Branches on `format=csv`; maps known service-layer date errors to 400.
+5. **`packages/api-client/src/services/admin.ts`** — `getRevenue(params)` + `exportRevenueCsv(params)` + typed `RevenueResponse` shape.
+6. **`apps/admin/src/app/dashboard/finance/_revenue-panel.tsx`** — extracted panel: filter row + Timezone caption + currency-mismatch banner + KPI strip via shared `<KpiCard>` with trend deltas + grouped table with per-row listing drill-down `<a>`. CSV export hits `?format=csv` directly (server-side streaming).
+7. **`apps/admin/src/app/dashboard/finance/page.tsx`** — `"revenue"` appended to `TABS`.
+8. **`apps/api/src/modules/reporting/reporting.service.ts`** — both call sites (single-order `getOrder` + `getCampaignReport`) now read snapshot-first with ownership fallback.
+
+**36 new tests:**
+- `apps/api/src/modules/admin/__tests__/revenue.service.spec.ts` (17): empty result; channel + serviceType + month + listing groupings; soft-deleted listing fallback; NULL snapshot bucket; reversed-row exclusion + reversed-only bucket preservation; Decimal precision; previous-period math + zero-denominator + missing-window; currency-mismatch + currency-clean; date validation (reversed range + malformed).
+- `apps/api/src/__tests__/phase-7-1-revenue-reporting.spec.ts` (19): csvCell quoting (6); csvRow (2); buildRevenueCsvFilename (2); streamRevenueCsv header+bucket+TOTAL_CURRENT (1); TOTAL_PREVIOUS trailer (1); RFC 4180 comma + embedded-quote in bucket names (2); reporting.service channel-snapshot resolution (4); grep-style regression guard for snapshot-first literal in source (1).
+
+**Verification:**
+
+- **API typecheck + build**: clean
+- **All 4 Next.js apps build**: clean (after sibling Suspense wrap + portal type cast)
+- **Worker build**: clean
+- **Test suite**: 375/383 pass (+36 vs Phase 7.0); the 3 pre-existing failed suites are unchanged — none touch Phase 7.1 code
+- **Phase 6.7 `admin-rbac-coverage.spec.ts` passes** — confirms `@StaffRoles` declared correctly (Category B Financial)
+- **Phase 7.0 + Phase 6.9 tests still green** — no regressions
+- Live manual smoke deferred to user-side pre-merge (same pattern as Phase 7.0 smoke 17/18); requires seeded DELIVERED orders in DB
+
+**Phase 7.1 mission ceiling held**: no charts, no per-publisher grouping, no scheduled reports, no multi-currency, no user-timezone toggle, no global cache-key sweep, no pre-Phase-6 snapshot backfill.
+
+**Updated production-readiness scorecard (deltas):**
+
+| Dimension | Was | Now | Why |
+|---|---|---|---|
+| Reporting + finance visibility | **D** | **B+** | Live revenue dashboard with 4 groupings, period comparison, CSV export. Only remaining gaps are visual trend charts and per-publisher breakdown — both Phase 7.1.x deferrals. |
+| Channel-aware routing (Phase 6/6.5) | A | **A** (now more uniform) | `reporting.service.ts` now reads `fulfillmentChannel` first across both call sites. Last known divergence closed. |
+
+**What to ship next** (post-Phase-7.1):
+
+1. **#6** — Settlement review window tier-awareness (half-day scope).
+2. **#10** — Auto-approve worker migration.
+3. **#12** — Broader notification dedup.
+4. **#9** — Mobile UX.
+5. **#21** — Phase 6 snapshot backfill.
 
 ---
 

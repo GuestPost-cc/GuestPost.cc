@@ -14,6 +14,7 @@ module.exports = {
     "^@guestpost/shared/dist/dns-lookup$": "<rootDir>/../../../packages/shared/src/dns-lookup",
     "^@guestpost/shared/dist/delivery-verification-core$": "<rootDir>/../../../packages/shared/src/delivery-verification-core",
     "^@guestpost/shared/dist/object-storage$": "<rootDir>/../../../packages/shared/src/object-storage",
+    "^@guestpost/shared/dist/observability/request-context$": "<rootDir>/../../../packages/shared/src/observability/request-context",
     "^@guestpost/shared$": "<rootDir>/../../../packages/shared/src",
     "^@guestpost/auth$": "<rootDir>/../../../packages/auth/src",
   },

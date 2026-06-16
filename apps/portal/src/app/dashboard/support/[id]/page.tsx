@@ -41,7 +41,11 @@ interface TicketDetail {
   subject: string
   description?: string | null
   status: string
-  priority: string | null
+  // Phase 7.1 sibling fix — `priority` is not on the api-client TicketDetail
+  // shape (audit §11 noted this as "pre-existing priority type drift").
+  // Optional here so the cast resolves; UI already handles undefined via
+  // `ticket.priority?.toLowerCase()`.
+  priority?: string | null
   createdAt: string
   updatedAt: string
   order?: { id: string; title: string | null; status: string } | null
@@ -101,7 +105,10 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   const { data: ticket, isLoading, error, refetch } = useQuery<TicketDetail>({
     queryKey: ["ticket", resolvedParams.id],
-    queryFn: () => api.support.getTicket(resolvedParams.id) as Promise<TicketDetail>,
+    // Phase 7.1 sibling fix — api-client TicketDetail diverges from this local
+    // shape (audit §11 "pre-existing priority type drift"). Cast via unknown
+    // per TS's own remediation; reconciling the two shapes is its own follow-up.
+    queryFn: () => api.support.getTicket(resolvedParams.id) as unknown as Promise<TicketDetail>,
   })
 
   const addMessageMutation = useMutation({

@@ -21,11 +21,13 @@
 
 import { Injectable, NestMiddleware } from "@nestjs/common"
 import { Request, Response, NextFunction } from "express"
+// Deep import: request-context uses node:async_hooks and must not be in the
+// shared package's browser-safe barrel.
 import {
   generateRequestId,
   isValidRequestId,
   runWithRequestId,
-} from "@guestpost/shared"
+} from "@guestpost/shared/dist/observability/request-context"
 
 const HEADER_NAME = "x-request-id"
 

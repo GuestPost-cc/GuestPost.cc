@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Patch, Post, Put, Delete, Body, Query, UseGuards, BadRequestException, Req, Headers, Header } from "@nestjs/common"
+import { Controller, Get, Param, Patch, Post, Put, Delete, Body, Query, UseGuards, BadRequestException, Req, Res, Headers, Header } from "@nestjs/common"
 import { AdminService } from "./admin.service"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
@@ -16,6 +16,10 @@ import { OrderReviewService } from "../orders/services/order-review.service"
 import { SettlementReasonDto } from "../settlements/dto/settlement-reason.dto"
 import { CreatePlatformWebsiteDto, UpdatePlatformWebsiteDto } from "./dto/create-platform-website.dto"
 import { ReconciliationService } from "./reconciliation.service"
+import { RevenueService } from "./finance/revenue.service"
+import { buildRevenueCsvFilename, streamRevenueCsv } from "./finance/csv-stream"
+import { GetRevenueQueryDto } from "./dto/get-revenue-query.dto"
+import type { Response } from "express"
 import { WebsiteVerificationService } from "./website-verification.service"
 import { MarketplaceService } from "../marketplace/marketplace.service"
 import { CreateListingDto, ListingServiceInput, UpdateListingServiceInput } from "../marketplace/dto/marketplace.dto"
@@ -113,6 +117,7 @@ export class AdminController {
     private readonly websiteVerification: WebsiteVerificationService,
     private readonly orderReview: OrderReviewService,
     private readonly support: SupportService,
+    private readonly revenue: RevenueService,
   ) {}
 
   // Recompute a publisher's trust score + tier from their full track record.
@@ -158,6 +163,33 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   runReconciliation() {
     return this.reconciliation.run()
+  }
+
+  // Phase 7.1 — PlatformRevenue dashboard. Category B (Financial); matches the
+  // `reconciliation` precedent. Revenue inspection is a Finance concern with
+  // no operational use case for Operations.
+  @Get("finance/revenue")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  async getRevenue(@Query() query: GetRevenueQueryDto, @Res() res: Response) {
+    try {
+      const data = await this.revenue.getRevenue({
+        from: query.from,
+        to: query.to,
+        groupBy: query.groupBy,
+      })
+      if (query.format === "csv") {
+        const filename = buildRevenueCsvFilename({ from: query.from, to: query.to, groupBy: query.groupBy })
+        streamRevenueCsv(res, data, filename)
+        return
+      }
+      res.json(data)
+    } catch (err) {
+      // Date-range validation lives in the service; surface as 400 not 500.
+      if (err instanceof Error && /Invalid date|must be on or after/.test(err.message)) {
+        throw new BadRequestException(err.message)
+      }
+      throw err
+    }
   }
 
   @Get("users")

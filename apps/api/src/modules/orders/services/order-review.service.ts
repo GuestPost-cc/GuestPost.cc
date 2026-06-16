@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
-import { QUEUES, recomputePublisherTrustCore, orderEventMetadata } from "@guestpost/shared"
+import { QUEUES, recomputePublisherTrustCore, orderEventMetadata, getSettlementReviewDays, type PublisherTier } from "@guestpost/shared"
 import { resolvePlatformFeeFraction, splitPlatformFee } from "../../../common/platform-fee"
 
 @Injectable()
@@ -333,7 +333,10 @@ export class OrderReviewService {
 
     const feeFraction = await resolvePlatformFeeFraction(tx)
     const { fee: platformFee, net: publisherAmount } = splitPlatformFee(order.amount, feeFraction)
-    const reviewDays = Math.max(Number(process.env.SETTLEMENT_REVIEW_DAYS ?? 7), 0)
+    // Phase 7.2 — tier-aware review window (audit #6). Helper applies env
+    // override when set (incident-response escape hatch); otherwise per-tier
+    // table in packages/shared/src/publisher-tier-policy.ts.
+    const reviewDays = getSettlementReviewDays(publisher.tier as PublisherTier, process.env.SETTLEMENT_REVIEW_DAYS)
     const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
 
     await tx.settlement.create({

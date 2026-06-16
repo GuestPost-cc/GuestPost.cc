@@ -22,6 +22,7 @@ import { createReconciliationWorker } from "./processors/reconciliation.processo
 import { createWebsiteVerificationWorker } from "./processors/website-verification.processor"
 import { createDeliveryVerificationWorker } from "./processors/delivery-verification.processor"
 import { createPublisherTrustWorker } from "./processors/publisher-trust.processor"
+import { createSettlementAutoApproveWorker } from "./processors/settlement-auto-approve.processor"
 import { connection } from "./redis"
 import { prisma } from "@guestpost/database"
 import { Queue } from "bullmq"
@@ -104,6 +105,42 @@ async function registerSettlementHoldLinkSweep() {
   console.log(`[WORKER] Registered settlement-hold link sweep (every ${everyMs / 3600000}h)`)
 }
 
+// Phase 7.3 — settlement review window auto-approval. Replaces the per-API-pod
+// setInterval; one worker, one cron, one sweep per cadence cluster-wide via
+// BullMQ jobId dedup. Preserves the two existing env vars
+// (SETTLEMENT_AUTO_APPROVE_INTERVAL_MS, SETTLEMENT_AUTO_APPROVE_DISABLED) so
+// ops muscle memory keeps working. Adds SETTLEMENT_AUTO_APPROVE_BATCH_SIZE
+// for tuning during backlog recovery.
+async function registerSettlementAutoApproveSweep() {
+  if (process.env.SETTLEMENT_AUTO_APPROVE_DISABLED === "true") {
+    console.log("[WORKER] Settlement auto-approve disabled via SETTLEMENT_AUTO_APPROVE_DISABLED — skipping cron registration")
+    return
+  }
+  const everyMs = Math.max(
+    Number(process.env.SETTLEMENT_AUTO_APPROVE_INTERVAL_MS ?? 15 * 60 * 1000),
+    60_000,
+  )
+  const batchSize = Math.min(
+    Math.max(Number(process.env.SETTLEMENT_AUTO_APPROVE_BATCH_SIZE) || 100, 1),
+    10_000,
+  )
+  const queue = new Queue(QUEUES.SETTLEMENT, { connection })
+  await queue.add(
+    "settlement-auto-approve",
+    signJobPayload({ batchSize }),
+    {
+      repeat: { every: everyMs },
+      jobId: "settlement-auto-approve",
+      removeOnComplete: { count: 24 },
+      removeOnFail: { count: 24 },
+    },
+  )
+  await queue.close()
+  console.log(
+    `[WORKER] Registered settlement auto-approve sweep (every ${everyMs / 60000}m, batchSize=${batchSize})`,
+  )
+}
+
 async function checkConnections() {
   try {
     await connection.ping()
@@ -176,6 +213,7 @@ async function bootstrap() {
     createWebsiteVerificationWorker(),
     createDeliveryVerificationWorker(),
     createPublisherTrustWorker(),
+    createSettlementAutoApproveWorker(),
   )
   console.log(`[WORKER] Started ${workers.length} workers`)
   await Promise.all([
@@ -190,6 +228,9 @@ async function bootstrap() {
     ),
     registerSettlementHoldLinkSweep().catch((err) =>
       console.error("[WORKER] Failed to register settlement-hold link sweep:", err),
+    ),
+    registerSettlementAutoApproveSweep().catch((err) =>
+      console.error("[WORKER] Failed to register settlement auto-approve sweep:", err),
     ),
   ])
 }

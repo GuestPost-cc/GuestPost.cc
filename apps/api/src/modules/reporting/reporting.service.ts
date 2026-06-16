@@ -29,7 +29,14 @@ export class ReportingService {
     if (!order) throw new NotFoundException("Order not found")
     return {
       ...order,
-      ownershipType: (order.website as any)?.ownershipType ?? "PUBLISHER",
+      // Phase 7.1 — audit #15 fix. Snapshot wins; fallback only for pre-Phase-6
+      // legacy rows. Matches refund.service.ts:68 and order-review.service.ts:289.
+      // A site reassigned mid-flight after the snapshot must NOT re-attribute
+      // historical revenue — that's the entire point of Phase 6's channel snapshot.
+      ownershipType:
+        (order as { fulfillmentChannel?: string | null }).fulfillmentChannel ??
+        (order.website as { ownershipType?: string | null } | null)?.ownershipType ??
+        "PUBLISHER",
     }
   }
 
@@ -48,9 +55,16 @@ export class ReportingService {
     })
     if (!campaign) throw new NotFoundException("Campaign not found")
 
+    // Phase 7.1 — audit #15 fix. Channel-split must read the snapshotted
+    // `fulfillmentChannel` first; the live `website.ownershipType` is only a
+    // legacy-row fallback. Otherwise a site reassigned mid-flight re-attributes
+    // historical campaign revenue — the exact bug Phase 6's snapshot prevents.
+    const resolveChannel = (o: { fulfillmentChannel?: string | null; website?: { ownershipType?: string | null } | null }): string =>
+      o.fulfillmentChannel ?? o.website?.ownershipType ?? "PUBLISHER"
+
     const orders = campaign.orders as any[]
-    const platformOrders = orders.filter((o: any) => o.website?.ownershipType === "PLATFORM")
-    const publisherOrders = orders.filter((o: any) => o.website?.ownershipType !== "PLATFORM")
+    const platformOrders = orders.filter((o: any) => resolveChannel(o) === "PLATFORM")
+    const publisherOrders = orders.filter((o: any) => resolveChannel(o) !== "PLATFORM")
 
     return {
       ...campaign,

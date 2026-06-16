@@ -20,7 +20,9 @@
 
 import { Worker, type Processor, type WorkerOptions, type Job } from "bullmq"
 import * as Sentry from "@sentry/node"
-import { runWithRequestId } from "@guestpost/shared"
+// Deep import: request-context uses node:async_hooks and is not in the
+// shared barrel.
+import { runWithRequestId } from "@guestpost/shared/dist/observability/request-context"
 
 type RequestIdCarrier = { requestId?: unknown }
 

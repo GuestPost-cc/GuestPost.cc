@@ -4,14 +4,13 @@ import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
 import { PayoutExecutionService } from "./payout-execution.service"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, getWithdrawalHoldDays, type PublisherTier } from "@guestpost/shared"
 import { Decimal } from "@prisma/client/runtime/library"
 
-const TIER_WITHDRAWAL_HOLDS: Record<string, number> = {
-  NEW: 30,
-  TRUSTED: 14,
-  VERIFIED: 7,
-}
+// Phase 7.2 — TIER_WITHDRAWAL_HOLDS lifted to packages/shared/src/publisher-tier-policy.ts
+// (audit #6 sibling rider). Single source of truth across the platform for
+// "what does each publisher tier mean numerically" — see TIER_WITHDRAWAL_HOLD_DAYS
+// and TIER_SETTLEMENT_REVIEW_DAYS in that file.
 
 @Injectable()
 export class PublisherPayoutsService {
@@ -170,7 +169,13 @@ export class PublisherPayoutsService {
     }
 
     // Tier hold: fraud window before staff may approve the payout.
-    const holdDays = TIER_WITHDRAWAL_HOLDS[publisher.tier] ?? 7
+    // Values: NEW=30d / TRUSTED=14d / VERIFIED=7d. Helper applies
+    // WITHDRAWAL_HOLD_DAYS env override when set (incident-response escape
+    // hatch). Falls back to NEW (most conservative) if tier is somehow null.
+    const holdDays = getWithdrawalHoldDays(
+      (publisher.tier ?? "NEW") as PublisherTier,
+      process.env.WITHDRAWAL_HOLD_DAYS,
+    )
     const availableAt = new Date(Date.now() + holdDays * 24 * 60 * 60 * 1000)
 
     const withdrawal = await this.prisma.$transaction(async (tx: any) => {

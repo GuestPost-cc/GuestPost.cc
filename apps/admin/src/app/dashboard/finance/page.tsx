@@ -29,8 +29,9 @@ import {
 } from "@guestpost/ui"
 import { AlertCircle, DollarSign, RefreshCw, ShieldAlert, Eye, CheckCircle2, XCircle } from "lucide-react"
 import { useRequireRole, ForbiddenPage } from "../../../lib/use-require-role"
+import { RevenuePanel } from "./_revenue-panel"
 
-const TABS = ["settlements", "withdrawals", "payouts", "reconciliation"] as const
+const TABS = ["settlements", "withdrawals", "payouts", "reconciliation", "revenue"] as const
 type Tab = (typeof TABS)[number]
 
 function StatusBadge({ status }: { status: string }) {
@@ -453,6 +454,8 @@ function FinancePageInner() {
           )}
         </div>
       )}
+
+      {activeTab === "revenue" && <RevenuePanel />}
 
       {/* Executions drill-down */}
       <Dialog open={!!executionsFor} onOpenChange={(open) => !open && setExecutionsFor(null)}>

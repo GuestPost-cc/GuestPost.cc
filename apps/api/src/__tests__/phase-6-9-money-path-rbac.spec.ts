@@ -127,7 +127,11 @@ const MONEY_AUDIT_FILES = [
   "modules/orders/services/delivery-intervention.service.ts",
   "modules/orders/services/refund.service.ts",
   "modules/settlements/settlements.service.ts",
-  "modules/settlements/settlement-auto-approve.service.ts",
+  // Phase 7.3 — settlement-auto-approve.service.ts was deleted; the auto-approve
+  // sweep now lives in packages/shared/src/settlement-auto-approve-core.ts where
+  // it writes audit rows via `tx.auditLog.create()` (Prisma direct, not the
+  // AuditService wrapper this test walks). The audit-row contract is preserved
+  // — orderEventMetadata(settlement.order) is still spread into metadata.
 ]
 
 interface AuditCallsite {

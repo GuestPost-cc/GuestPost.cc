@@ -13,13 +13,15 @@ import {
   redactSensitiveData,
   type SentryRuntimeTag,
 } from "@guestpost/shared"
+// Deep import — request-context uses node:async_hooks; not in the shared
+// browser-safe barrel.
 import {
   generateRequestId,
   getRequestId,
   isValidRequestId,
   requireRequestId,
   runWithRequestId,
-} from "@guestpost/shared"
+} from "@guestpost/shared/dist/observability/request-context"
 import { setBusinessContext, type SentryScopeLike } from "@guestpost/shared"
 
 describe("Phase 7.0 — sentry-init", () => {

@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
-import { QUEUES, evaluateSettlementEligibility, checkSeparationOfDuties, orderEventMetadata } from "@guestpost/shared"
+import { QUEUES, evaluateSettlementEligibility, checkSeparationOfDuties, orderEventMetadata, getSettlementReviewDays, type PublisherTier } from "@guestpost/shared"
 import { assertOwnerOrCreator } from "../orders/services/owner-or-creator"
 import { Decimal } from "@prisma/client/runtime/library"
 import { resolvePlatformFeeFraction, splitPlatformFee } from "../../common/platform-fee"
@@ -74,11 +74,14 @@ export class SettlementsService {
     const feeFraction = await resolvePlatformFeeFraction(this.prisma)
     const { fee: platformFee, net: publisherAmount } = splitPlatformFee(order.amount, feeFraction)
 
-    // 14-day hold: the publisher's payout is held while we keep re-checking the
-    // live link. If it's removed during the window, the link sweep raises a
-    // fraud flag and settlement gating blocks release.
-    const reviewDays = Math.max(Number(process.env.SETTLEMENT_REVIEW_DAYS ?? 14), 0)
-    const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
+    // Tier-aware review window (Phase 7.2 — audit #6). The publisher's payout
+    // is held while we keep re-checking the live link. If it's removed during
+    // the window, the link sweep raises a fraud flag and settlement gating
+    // blocks release. Window length: NEW=30d / TRUSTED=14d / VERIFIED=7d per
+    // packages/shared/src/publisher-tier-policy.ts; env override wins when set.
+    // Tier resolved inside the transaction via a focused PK lookup (Option B
+    // per Phase 7.2 Key decision #6 — cheaper than cascading nested includes
+    // into the existing include chain).
 
     return this.prisma.$transaction(async (tx: any) => {
       // Re-check inside transaction; partial unique index on Settlement.orderId
@@ -87,6 +90,16 @@ export class SettlementsService {
         where: { orderId, status: { not: "CANCELLED" } },
       })
       if (existing) throw new BadRequestException("Settlement already exists for this order")
+
+      const publisherTierRow = await tx.publisher.findUnique({
+        where: { id: publisherId },
+        select: { tier: true },
+      })
+      const reviewDays = getSettlementReviewDays(
+        (publisherTierRow?.tier ?? "NEW") as PublisherTier,
+        process.env.SETTLEMENT_REVIEW_DAYS,
+      )
+      const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
 
       let settlement: any
       try {

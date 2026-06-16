@@ -526,4 +526,90 @@ export class AdminService {
       totalPages: number
     }>("/admin/audit-logs", { params: params as Record<string, string | number | undefined> })
   }
+
+  // ── Phase 7.1 — PlatformRevenue dashboard (GET /admin/finance/revenue) ──
+
+  /**
+   * Aggregated platform revenue. Buckets grouped per `groupBy`. Totals carry
+   * a same-duration previous-period comparison and `deltaPct` (null when the
+   * previous window has zero gross — UI hides the delta cap instead of
+   * showing "+∞%" / "NaN%"). `meta.currencyMismatch` is populated when any
+   * Order in the range was non-USD (PlatformRevenue itself has no currency
+   * column today; the safety check lives at the Order layer).
+   */
+  getRevenue(params: {
+    from?: string
+    to?: string
+    groupBy: "channel" | "month" | "serviceType" | "listing"
+  }) {
+    return this.client.get<RevenueResponse>("/admin/finance/revenue", {
+      params: params as Record<string, string | number | undefined>,
+    })
+  }
+
+  /**
+   * CSV export — same filters/grouping; returns the raw CSV text. Caller is
+   * responsible for triggering a download (e.g. `Blob` + `URL.createObjectURL`).
+   *
+   * Use this for in-memory exports. For large date ranges, prefer hitting
+   * `/api/v1/admin/finance/revenue?format=csv&...` directly via a link so the
+   * browser streams it without ever materializing the full body in JS.
+   */
+  exportRevenueCsv(params: { from?: string; to?: string; groupBy: "channel" | "month" | "serviceType" | "listing" }) {
+    return this.client.get<string>("/admin/finance/revenue", {
+      params: { ...params, format: "csv" } as Record<string, string | number | undefined>,
+    })
+  }
+}
+
+// Response shape — kept in sync with apps/api/src/modules/admin/finance/revenue.service.ts
+export interface RevenueBucket {
+  bucket: string
+  bucketKey: string
+  // Populated only when groupBy="listing"
+  listingServiceId?: string | null
+  listingId?: string | null
+  listingTitle?: string | null
+  grossAmount: string
+  platformFee: string
+  netRevenue: string
+  rowCount: number
+  reversedCount: number
+  currency: string
+}
+
+export interface RevenueTotalsSlice {
+  grossAmount: string
+  platformFee: string
+  netRevenue: string
+  rowCount: number
+  reversedCount: number
+  currency: string
+}
+
+export interface RevenueDeltaPct {
+  grossAmount: number
+  platformFee: number
+  netRevenue: number
+}
+
+export interface RevenueCurrencyMismatch {
+  rowCount: number
+  distinctCurrencies: string[]
+}
+
+export interface RevenueResponse {
+  buckets: RevenueBucket[]
+  totals: {
+    current: RevenueTotalsSlice
+    previous: RevenueTotalsSlice | null
+    deltaPct: RevenueDeltaPct | null
+  }
+  meta: {
+    from: string | null
+    to: string | null
+    groupBy: "channel" | "month" | "serviceType" | "listing"
+    timezone: "UTC"
+    currencyMismatch: RevenueCurrencyMismatch | null
+  }
 }

@@ -1,6 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
-import { getRequestId } from "@guestpost/shared"
+// Deep import: request-context uses node:async_hooks and is not in the
+// shared barrel (Next.js client bundles can't tolerate it).
+import { getRequestId } from "@guestpost/shared/dist/observability/request-context"
 
 @Injectable()
 export class AuditService {

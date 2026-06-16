@@ -1,7 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { Queue, QueueOptions, JobsOptions } from "bullmq"
 import IORedis from "ioredis"
-import { QUEUES, QUEUE_JOBS, signJobPayload, trustRecomputeJobOptions, getRequestId } from "@guestpost/shared"
+import { QUEUES, QUEUE_JOBS, signJobPayload, trustRecomputeJobOptions } from "@guestpost/shared"
+// Deep import: request-context uses node:async_hooks and is not in the
+// shared barrel.
+import { getRequestId } from "@guestpost/shared/dist/observability/request-context"
 
 let connection: IORedis | null = null
 

@@ -1,12 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { Suspense, useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@guestpost/ui"
 import { sanitizeReturnTo } from "@guestpost/api-client"
 import { useAuth } from "../lib/auth"
 
+// Phase 7.1 sibling fix — Next 15 strict mode requires useSearchParams() to be
+// wrapped in <Suspense> so the page can be prerendered. Without this, the
+// admin/portal/publisher builds fail at "Generating static pages" with a
+// "missing-suspense-with-csr-bailout" error. Pre-existing Phase 6.8 leftover.
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  )
+}
+
+function LoginPageInner() {
   const { signIn, user, loading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()

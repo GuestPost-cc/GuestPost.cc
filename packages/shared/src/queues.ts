@@ -10,6 +10,7 @@ export const QUEUES = {
   PUBLISHER_TRUST: "publisher-trust",
   PAYOUT: "payout",
   RECONCILIATION: "reconciliation",
+  SETTLEMENT: "settlement",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
@@ -60,5 +61,11 @@ export const QUEUE_JOBS = {
   },
   [QUEUES.RECONCILIATION]: {
     RUN: "reconciliation-run",
+  },
+  [QUEUES.SETTLEMENT]: {
+    // Phase 7.3 — the only job on this queue today. Repeatable; jobId
+    // "settlement-auto-approve" dedups cluster-wide so only one instance
+    // runs per cadence regardless of pod count.
+    AUTO_APPROVE: "settlement-auto-approve",
   },
 } as const
