@@ -1,5 +1,44 @@
 # Current Focus
-**Status: Marketplace listing-service redesign complete + multi-actor support tickets shipped (2026-06-14, batch 21–24). 14 Prisma migrations applied through Phase 7; full backend + frontend audited and migrated off the deprecated `MarketplaceListing.type/price/turnaroundDays/revisionRounds` columns; 1543 historical orders backfilled with `listingServiceId` / `fulfillmentChannel`; 60 Settlement rows backfilled with snapshot trio. VPS-staging attempt rolled back — VPS too weak for the full dev stack, all VPS files purged.**
+
+**Status (2026-06-16): Phases 6.6 → 7.6 complete. 11/11 Critical audit findings closed (100%) — production-blocker queue fully cleared. 19/31 total findings closed (61%). Per-phase details live in `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log.**
+
+## Completed since last NOW update (2026-06-15 → 06-16, batches 25–32)
+
+Nine phases shipped, each as its own commit (Phase 7.1–7.3 bundled due to file overlap; 7.4, 7.5, 7.6 separate):
+
+| Phase | Audit # | One-liner | Tests added |
+|---|---|---|---|
+| **6.6 / 6.6.1 / 6.6.2** | #1, #19 | Admin support endpoints route through `SupportService`; channel-aware ticket matrix; `TicketMessageVisibility` (PUBLIC/INTERNAL); `TicketParticipantRole` + `actorSnapshot` for forensics | 46 |
+| **6.7** | #2, V-1 | `StaffRolesGuard` fail-closed; class-level `@StaffRoles` on AdminController removed (per-handler declarations + metadata-coverage test); 18-DTO sweep across admin action bodies; Finance data-exposure narrowing | 12 |
+| **6.8** | #7 | `buildAuthErrorHandler` 401→sign-in redirect with idempotency + URL sanitization + same-page debounce; `returnTo` sanitizer rejects open-redirect attacks | 48 |
+| **6.9** | #3, #4, #22, R-3/R-4 | `assertOwnerOrCreator` helper for money-path role tightening; `orderEventMetadata()` sweep at 20+ callsites; confirm-delivery status guard; reflection-based coverage test | 17 |
+| **7.0** | #8, #11 | Production observability foundation: Sentry across API + worker + 4 Next apps; request correlation IDs (`X-Request-ID` middleware + AsyncLocalStorage + propagation to audit logs + worker jobs); business-context Sentry tags; worker health endpoint (`/health` `/ready` `/metrics/queues`); `unhandledRejection` exit-after-flush | 39 |
+| **7.1** | #5, #15 | `GET /admin/finance/revenue` with 4 groupings (channel/month/serviceType/listing) + period comparison + CSV export; structured listing-drill-down meta; reporting.service channel-snapshot fix | 36 |
+| **7.2** | #6 | Tier-aware settlement review (NEW=30/TRUSTED=14/VERIFIED=7); `publisher-tier-policy` shared module; `TIER_WITHDRAWAL_HOLDS` lifted as sibling rider; ops-visibility warning on invalid env override | 21 |
+| **7.3** | #10 | `SettlementAutoApproveService` deleted; sweep moved to BullMQ repeatable in worker (`jobId` cluster-wide dedup); slow-sweep + stale-review Sentry warnings; `SETTLEMENT_AUTO_APPROVE_BATCH_SIZE` env | 14 |
+| **7.4** | #12 | `Notification.dedupKey VARCHAR(256)` + partial unique index; 8 typed dedup-key builders; drift-summary-keyed reconciliation alerts (collapses hourly cron spam to one alert per staff per day); P2002 catch-and-swallow | 17 |
+| **7.5** | #21 | Phase 6 snapshot backfill migration (Settlement + PlatformRevenue via Order→ListingService+Website JOIN); COALESCE + WHERE IS NULL idempotency; 4-scenario JS-reimplementation test. Dev DB 0 rows affected (all post-Phase-6); future-proofs prod | 14 |
+| **7.6** | #9 | Mobile UX: ported portal's drawer pattern (fixed `translate-x` + backdrop + sticky mobile-only header with hamburger) into admin + publisher layouts. Pathname auto-close + `type="button"` defense + ARIA labels. **Closes the last open Critical — 11/11 now done.** Manual responsive smoke pending operator at a browser; typecheck + build clean (admin 19/19, publisher 13/13 static pages). | 0 (visual port; covered by manual smoke) |
+
+**Cumulative test growth across this batch**: ~339 → 441 passing (+102 new tests across phases 7.0–7.5). 3 pre-existing test suites still failing — confirmed unrelated (predate this work).
+
+## What's next
+
+Per the audit's "what to ship next" pointer (post-Phase-7.6):
+
+1. **Phase 7.3.1** — `CREATE INDEX CONCURRENTLY ON Settlement(status, reviewEndsAt)`. Tiny migration; the Phase 7.3 auto-approve worker sweep hits this query every 15m. MUST use `CONCURRENTLY` (Prisma needs transaction-disable directive at the migration top) to avoid table-write lockout on prod-sized tables.
+2. **Phase 7.6.1** — Drawer a11y polish across all three apps (portal + admin + publisher): escape-to-close, focus trap, body-scroll-lock. None of the three have these today; uniform polish pass is the right scope.
+3. **Phase 7.0.1** — observability follow-ups: `requestId` indexed column + backfill, structured logger (replacing `console.log` across api+worker), Sentry source-map upload (`SENTRY_AUTH_TOKEN` + `withSentryConfig` flip).
+4. **Remaining 5 Medium findings** — see audit §2 list (#26 email-keyed rate limiter, #27 job-signing `iat` for replay protection, #28 status-color drift, #29 unused shared components, #30 hooks-rule violation in publisher listings page).
+
+## Pinned reminders (from prior session)
+
+- Run servers via `pnpm dev:all` for a stable local stack — session-started foreground processes die with the shell.
+- Worker fleet: `pgrep -f 'worker/dist' | wc -l` must be exactly 1 (pre-Phase-7.3 batch 20 found stale leaked workers).
+
+---
+
+**Prior status (2026-06-14, batch 24)**: Marketplace listing-service redesign complete + multi-actor support tickets shipped. 14 Prisma migrations through Phase 7; 1543 historical orders backfilled. VPS-staging attempt rolled back. Details preserved in batches 21–24 below.
 
 ## Completed (2026-06-14, batch 24 — VPS staging abandoned, files removed)
 - Provisioned a Hetzner-class VPS to host dev/test workflow: rsync from laptop → tmux-managed `pnpm dev:all` → Caddy reverse proxy + auto-HTTPS, R2 replacing MinIO, Mailpit behind Caddy basicauth, GitHub kept as the "verified code" store

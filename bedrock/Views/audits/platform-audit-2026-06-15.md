@@ -801,15 +801,15 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 | Status | Count | Share |
 |---|---|---|
-| ✅ Fully closed | **18** | 58% |
+| ✅ Fully closed | **19** | 61% |
 | ⚠️ Partially closed | **0** | 0% |
-| ⛔ Still open | **13** | 42% |
+| ⛔ Still open | **12** | 39% |
 
 **By severity:**
 
 | Severity | Total | Closed | Partial | Open |
 |---|---|---|---|---|
-| Critical (production-blocker) | 11 | **10** (#1, #2, #3, #4, #5, #6, #7, #8, #10, #11) | — | 1 |
+| Critical (production-blocker) | 11 | **11** (#1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11) | — | **0** |
 | High | 14 | **7** (#12, #15, #19, #21, #22, V-1, R-3+R-4) | — | 7 |
 | Medium | 5 | — | — | 5 |
 
@@ -829,7 +829,7 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | #22 | confirm-delivery status guard | High | ✅ FIXED | 6.9 | `status: "VERIFIED"` added to inner updateMany.where |
 | R-3 / R-4 | MEMBER-allowed money endpoints | High | ✅ FIXED | 6.9 | Service-layer OWNER‖creator gate on customerAcceptDelivery + customerApprove (already inline on others) |
 | #8 | No error boundaries / no Sentry | Critical | ✅ FIXED | 7.0 | error.tsx + global-error.tsx + Sentry across all 4 apps + browser/server/edge runtimes |
-| #9 | Publisher/admin no mobile sidebar | Critical | ⛔ open | — | Drawer pattern from portal |
+| #9 | Publisher/admin no mobile sidebar | Critical | ✅ FIXED | 7.6 | Ported portal's drawer pattern (fixed translate-x + backdrop + sticky mobile-only header with hamburger) into admin + publisher layouts. Pathname auto-close + `type="button"` defense + ARIA labels. Builds clean (admin 19/19 static, publisher 13/13). |
 | #10 | SettlementAutoApproveService in API setInterval | Critical | ✅ FIXED | 7.3 | Moved to single BullMQ repeatable job in worker (jobId dedup cluster-wide). Service deleted. Slow-sweep + stale-review Sentry warnings added. SETTLEMENT_AUTO_APPROVE_BATCH_SIZE env added. |
 | #11 | Worker no health/metrics/errors | Critical | ✅ FIXED | 7.0 | Raw node:http server (`/health`, `/ready`, `/metrics/queues`) + BullMQ failed-event Sentry hook across all 9 processors + unhandledRejection exit-after-flush |
 | #12 | Notification duplicates on retry | High | ✅ FIXED | 7.4 | Phase 6.6's support fan-out runtime dedup PLUS Phase 7.4's DB partial-unique on (userId, dedupKey). Reconciliation switched to drift-summary-keyed (hourly cron same drift → 1 alert per staff per UTC day, not 24). 8 typed dedup-key builders; writers swallow P2002 as success. |
@@ -864,14 +864,47 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | Frontend reliability (errors/loading/empties) | C+ | C+ | Not touched |
 | Reporting + finance visibility | D | D | Not touched (#5 PlatformRevenue still open) |
 
-**What to ship next** (in priority order, post-Phase-7.5):
+**What to ship next** (in priority order, post-Phase-7.6):
 
 1. **Phase 7.3.1** — `CREATE INDEX CONCURRENTLY ON Settlement(status, reviewEndsAt)`. Tiny migration; the Phase 7.3 worker sweep hits this access pattern every 15m. Must use `CONCURRENTLY` (Prisma migration needs transaction-disable directive) to avoid table-write lockout on prod-sized tables.
-2. **#9** — Mobile UX (publisher + admin sidebar collapse to drawer below `lg`). Last open Critical/High.
+2. **Phase 7.6.1** — Drawer a11y polish (escape-to-close, focus trap, body-scroll-lock) applied uniformly across portal + admin + publisher. None of the three apps have these today; consistent polish pass is the right scope.
 3. **Phase 7.0.1** — Observability follow-ups (`requestId` indexed column + backfill, structured logger, Sentry source-map upload).
 4. **Remaining Medium findings** (5 still open per the §2 list).
 
-**Production-blocker status**: 10 of 11 Criticals closed; only #9 Mobile UX remains. The platform is no longer blocked on architectural concerns — only UX polish + small migration follow-ups.
+**Production-blocker status**: **11 of 11 Criticals closed (100%)**. The platform no longer has any production-blocker finding from the 2026-06-15 audit. Remaining work is High/Medium polish + observability cleanup.
+
+---
+
+### 2026-06-16 — Phase 7.6: Mobile UX for admin + publisher sidebars (#9) — closes last open Critical
+
+**Findings resolved:**
+
+| # | Status | Notes |
+|---|---|---|
+| **#9** | ✅ Fully fixed | Ported portal's working mobile-drawer pattern (fixed `translate-x` aside + backdrop overlay + sticky mobile-only header with hamburger) into admin + publisher dashboard layouts. Below `lg` the sidebar slides in via `mobileOpen` state and closes on: X-button tap, backdrop tap, nav-link click, or any `pathname` change (covers `router.push` / browser back-forward / deep-link arrivals). At `≥lg` the desktop layout is unchanged via `lg:translate-x-0` + `lg:hidden` on the mobile shell elements. |
+
+**Implementation details:**
+
+- **Pattern source**: `apps/portal/src/app/dashboard/layout.tsx` (lines 59, 86–168, 170–175, 177–184). No new dependencies; standard Tailwind responsive classes only.
+- **Files modified** (2 total):
+  - `apps/admin/src/app/dashboard/layout.tsx` — sidebar `sticky lg:fixed` → `fixed translate-x` drawer; added X-close in restructured brand row; backdrop + mobile-header wrapper. Role-gated `navItems.filter(...)` preserved.
+  - `apps/publisher/src/app/dashboard/layout.tsx` — same port; X-close added to existing brand-row header (which already had `flex items-center justify-between`); preserved `overflow-auto` on `<main>` to avoid double-scrollbars at desktop widths.
+- **Pathname auto-close**: `useEffect(() => { setMobileOpen(false) }, [pathname])` on both apps. Closes drawer on any navigation source, not just `<Link onClick>`.
+- **Button hygiene**: every new `<button>` carries `type="button"` (defensive against accidental form-submit if the layout is ever rendered inside a `<form>` ancestor) and an `aria-label` (`"Open menu"` / `"Close menu"`). Bonus: also added `type="button"` to the pre-existing sign-out buttons that were touched.
+- **A11y baseline**: matches the portal reference exactly — no escape-to-close, no focus trap, no body-scroll-lock. These polish items captured as Phase 7.6.1 follow-up to apply uniformly across all three apps.
+- **Mission ceiling held**: did NOT consolidate to `packages/ui/src/components/layout/` stubs (separate cleanup), did NOT add new shared components, did NOT touch `<Notifications />` / `<OrgSwitcher />` shell components.
+
+**Verification:**
+
+- **Typecheck**: `pnpm --filter @guestpost/admin typecheck` + `pnpm --filter @guestpost/publisher typecheck` — clean (`$ tsc --noEmit`, exit 0).
+- **Build**: `pnpm --filter @guestpost/admin build` → 19/19 static pages, exit 0. `pnpm --filter @guestpost/publisher build` → 13/13 static pages, exit 0. No new warnings vs. the pre-7.6 baseline (Sentry `disableLogger` deprecation + workspace lockfile inference are pre-existing).
+- **Manual responsive smoke** (pending operator at a browser): per the plan's Priority 4 checklist — 375px / 768px / ≥1024px DevTools sweep; drawer slide-in + backdrop tap close + link-tap auto-close + X-button close + resize-to-desktop hides drawer/backdrop/mobile-header; admin role-gate sanity (sign in as OPERATIONS vs FINANCE); long-page single-scrollbar regression check; long-nav internal scroll at 568px viewport-height.
+
+**Production-blocker outcome:**
+
+- **Audit progress: 19/31 closed (61%)** — 11/11 Critical findings now closed (100%).
+- **The 2026-06-15 platform audit no longer has any open production-blocker finding.** First time since the audit landed that the "Critical" column reads 0 open.
+- **What ships next**: pointer rolls to Phase 7.3.1 (Settlement index migration), Phase 7.6.1 (drawer a11y polish across all three apps), Phase 7.0.1 (observability follow-ups), or the 5 remaining Medium findings — operator's choice.
 
 ---
 
