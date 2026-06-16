@@ -12,6 +12,15 @@ packages/database/.env
 # TypeScript incremental build cache
 *.tsbuildinfo
 
+# Stray compiled JS in TS source trees (build cruft from running tsc with
+# wrong cwd / outDir). Real compiled output lives in dist/ per each
+# tsconfig — these patterns catch files that accidentally land alongside
+# their .ts source.
+apps/*/src/**/*.js
+apps/*/src/**/*.js.map
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+
 # IDE/editor local configs
 .cursor/
 .vscode/
