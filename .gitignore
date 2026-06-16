@@ -1,50 +1,46 @@
-node_modules/
-.next/
-dist/
-.turbo/
-.env
-.env.local
-.env.development
-packages/database/.env
-*.log
-.DS_Store
-
-# TypeScript incremental build cache
-*.tsbuildinfo
-
-# Stray compiled JS in TS source trees (build cruft from running tsc with
-# wrong cwd / outDir). Real compiled output lives in dist/ per each
-# tsconfig — these patterns catch files that accidentally land alongside
-# their .ts source.
-apps/*/src/**/*.js
-apps/*/src/**/*.js.map
-packages/*/src/**/*.js
-packages/*/src/**/*.js.map
-
-# IDE/editor local configs
-.cursor/
-.vscode/
-.idea/
-
-# Local project context & data
-context.js
-data/
 
 # AI context and analysis (local only, not for CI)
-.ai/
-graphify-out/
-.opencode
-
-# bedrock: noisy auto-generated content excluded from git
 # Curated knowledge (Memory/, Work/, History/, Evidence/imports/) IS tracked.
-bedrock/Evidence/raw/
-bedrock/Views/site/
-bedrock/Views/graph/*.json
-bedrock/Views/graph/*.md
-bedrock/Views/graph/*.canvas
-bedrock/Outputs/absorb-manifest.md
+# IDE/editor local configs
+# Local project context & data
+# Stray compiled JS in TS source trees (build cruft from running tsc with
+# TypeScript incremental build cache
+# bedrock: noisy auto-generated content excluded from git
+# their .ts source.
+# tsconfig — these patterns catch files that accidentally land alongside
+# wrong cwd / outDir). Real compiled output lives in dist/ per each
+*.log
+*.tsbuildinfo
+.DS_Store
+.ai/
+.cursor/
+.env
+.env.development
+.env.local
+.idea/
+.next/
+.opencode
+.turbo/
+.vscode/
+apps/*/src/**/*.js
+apps/*/src/**/*.js.map
 bedrock/.obsidian/workspace
 bedrock/.obsidian/workspace.json
 bedrock/.obsidian/workspaces.json
+bedrock/Evidence/raw/
+bedrock/Outputs/absorb-manifest.md
+bedrock/Views/graph/*.canvas
+bedrock/Views/graph/*.json
+bedrock/Views/graph/*.md
+bedrock/Views/site/
+context.js
+data/
+dist/
+graphify-out/
+node_modules/
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/database/.env
+packages/ui/coverage/
 scripts/.wise-validation-key*
 test-results/
