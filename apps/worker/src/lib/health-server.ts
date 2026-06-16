@@ -20,10 +20,18 @@ import { createServer, type IncomingMessage, type ServerResponse, type Server } 
 import { connection } from "../redis"
 import { prisma } from "@guestpost/database"
 import { Queue } from "bullmq"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, getDedupHitsTotal } from "@guestpost/shared"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { getStalledHitsTotal } from "./queue-observability"
 
 const logger = createLogger("worker.health-server")
+
+// Phase 7.7 D — service block exposed on /metrics/queues. Captured at module
+// init so uptime can be computed on every request without per-request work.
+const SERVICE_NAME = "guestpost-worker"
+const SERVICE_VERSION = process.env.npm_package_version ?? "unknown"
+const STARTED_AT = new Date()
+const PROCESS_PID = process.pid
 
 interface ReadinessCheck {
   status: "ok" | "error"
@@ -126,7 +134,21 @@ async function buildQueueMetrics() {
       totals.paused += counts.paused
     }
   }
-  return { queues, totals }
+  // Phase 7.7 D — extended payload: cumulative counters + service block.
+  const uptimeMs = Date.now() - STARTED_AT.getTime()
+  return {
+    service: {
+      name: SERVICE_NAME,
+      version: SERVICE_VERSION,
+      pid: PROCESS_PID,
+      started_at: STARTED_AT.toISOString(),
+      uptime_s: Math.floor(uptimeMs / 1000),
+    },
+    queues,
+    totals,
+    dedupHitsTotal: getDedupHitsTotal(),
+    stalledHitsTotal: getStalledHitsTotal(),
+  }
 }
 
 function writeJson(res: ServerResponse, status: number, body: unknown): void {

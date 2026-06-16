@@ -27,6 +27,14 @@ import { createLogger } from "@guestpost/shared/dist/observability/structured-lo
 
 const logger = createLogger("worker.queue-observability")
 
+// Phase 7.7 D — cumulative stall counter exposed via /metrics/queues.
+// Increments on every BullMQ 'stalled' event across all queues. Resets on
+// worker restart; long-term aggregation is the log-retention layer's job.
+let stalledHitsTotal = 0
+export function getStalledHitsTotal(): number {
+  return stalledHitsTotal
+}
+
 type RequestIdCarrier = { requestId?: unknown }
 
 function extractRequestId(job: Job | undefined): string | undefined {
@@ -97,7 +105,8 @@ export function createObservableWorker<TData = any, TResult = any>(
   // but the pattern usually indicates a processor hang or a pod evict — worth
   // logging even if not capturing as an exception.
   worker.on("stalled", (jobId) => {
-    logger.warn("job stalled", { queue: queueName, jobId })
+    stalledHitsTotal++
+    logger.warn("job stalled", { queue: queueName, jobId, stalled_hits_total: stalledHitsTotal })
   })
 
   return worker
