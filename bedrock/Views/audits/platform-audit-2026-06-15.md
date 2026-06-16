@@ -875,6 +875,80 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 ---
 
+### 2026-06-16 — Phase 7.7: Operations & Observability Hardening (Phase 7.0 follow-ups)
+
+Four-workstream observability bundle. **Does not close a numbered audit finding** — the observability section was already marked closed by Phase 7.0 — but completes the deferred "Phase 7.0.1 follow-up" trio plus a /metrics extension. Audit dashboard counts stay 19/31 closed (61%); 11/11 Critical at 100%.
+
+**Mission**: end-to-end production-incident traceability via one ID.
+
+```
+Sentry Event → requestId → structured logs → audit trail
+```
+
+**5 commits on one branch (one PR):**
+
+| Commit | Workstream | One-liner |
+|---|---|---|
+| `4ffb3c5` | A1 | Promote AuditLog.requestId → indexed top-level column (VARCHAR(128) + partial btree); backfill from `metadata->>'requestId'`; AuditService.log dual-writes column + metadata mirror |
+| `7fa068a` | A2 | Admin audit-logs `?requestId=` filter (EXACT-MATCH only; never substring) + per-row Copy button + CSV column |
+| `a01802d` | B  | New `packages/shared/src/observability/structured-logger.ts` (Node-only, deep-import) with JSON + pretty modes, auto-injects requestId from ALS frame, `environment` + `release` env-resolved at module init. 13 unit tests + grep regression guard. 8 worker files swept (~23 callsites); remaining ~85 tracked in `CURRENTLY_ALLOWED_WITH_CONSOLE` map for Phase 7.7.x continuation |
+| `6d82473` | C  | Sentry source-map upload enabled: `@sentry/cli: true` in workspace, `widenClientFileUpload` + `sourcemaps.deleteSourcemapsAfterUpload` on all 4 next.configs, `SENTRY_AUTH_TOKEN` threaded into CI build env (silently skipped without secret) |
+| `4bf4ece` | D  | `/metrics/queues` extended with `service: { name, version, pid, started_at, uptime_s }` block + cumulative `dedupHitsTotal` (Phase 7.4 counter) + new `stalledHitsTotal` counter |
+
+**Workstream A — Indexed AuditLog.requestId**:
+
+- Migration `20260616130000_phase77_audit_request_id_column`: ALTER TABLE + UPDATE backfill + CREATE INDEX (partial, WHERE requestId IS NOT NULL), all three with `IF NOT EXISTS` for re-apply safety.
+- VARCHAR(128) matches the `isValidRequestId` allowlist regex.
+- **CONCURRENTLY NOT used** — Prisma 6.19.3 blocker carries over from Phase 7.3.1; brief ACCESS EXCLUSIVE on AuditLog during prod apply, acceptable since AuditLog isn't on the order-fulfillment hot path.
+- **Dev DB migration apply deferred** — pre-existing dev DB has 5 missing migration files (`20260613*_*`); operator opted "skip dev migration, trust the SQL" per session decision. Apply on staging/prod where history is clean; record EXPLAIN ANALYZE planner-uses-index proof + before/after counts at that time.
+- Dual-write (column + metadata.requestId mirror) is **permanent**, not transitional — storage cost trivial, downstream JSON readers stay supported.
+- Admin filter EXACT-MATCH only (`equals`); never `contains`/`startsWith`/`endsWith`. Documented in code as stable design constraint.
+
+**Workstream B — Structured logger (partial sweep)**:
+
+- 8 worker files converted to `logger.*` (trust-enqueue, env, health-server, queue-observability, settlement-auto-approve, publisher-trust, notification + partial). Logger ships as `packages/shared/src/observability/structured-logger.ts`.
+- JSON-mode schema: `{ ts, level, service, environment, release, requestId, msg, ...ctx }`. Pretty mode for dev (ANSI-colored, rid shortened to first 8 chars).
+- `environment` resolves: `SENTRY_ENVIRONMENT` → `NODE_ENV` → `"development"`.
+- `release` resolves: `SENTRY_RELEASE` → `npm_package_version` → `"unknown"`.
+- 13/13 unit tests pass (JSON shape, env/release three-tier fallback, pretty mode, child() merge, stderr routing, ALS requestId injection).
+- **Sweep regression guard** (`phase-7-7-structured-logger-sweep.spec.ts`) — `CURRENTLY_ALLOWED_WITH_CONSOLE` map snapshots remaining 7 files' console.* counts. New `console.*` in any non-listed file fails; counts dropping below baselines fail (forces allowlist to stay tight as 7.7.x sweeps land).
+- Always-allowed forever: `apps/api/src/main.ts` (6 calls, boot last-resort), `structured-logger.ts` itself (impl module), test files, scripts.
+
+**Workstream C — Sentry source-map upload**:
+
+- All 4 Next.js apps now upload source maps on `pnpm build` (silently skipped without `SENTRY_AUTH_TOKEN`).
+- `deleteSourcemapsAfterUpload: true` prevents `.map` files leaking source via the browser bundle.
+- CI build job threads `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` from GitHub secrets.
+- **Operator action required** to fully activate: generate token at https://sentry.io with `project:releases` scope, add as repo secret named `SENTRY_AUTH_TOKEN`.
+
+**Workstream D — /metrics/queues extension**:
+
+- New top-level `service: { name, version, pid, started_at, uptime_s }` block.
+- `dedupHitsTotal` (Phase 7.4 notification dedup-key counter, was logged-only) now also exposed.
+- `stalledHitsTotal` cumulative counter added to `queue-observability.ts`; increments on every BullMQ `stalled` event across all queues. Both counters reset on worker restart.
+
+**Phase 7.7.x backlog** (continuation):
+
+- Complete the structured-logger sweep on the remaining 7 worker files (~85 callsites). Each commit removes its file's entry from `CURRENTLY_ALLOWED_WITH_CONSOLE` until the map only contains forever-allowed entries.
+
+**Verification highlights:**
+
+- Typecheck clean on api + worker + shared + admin
+- 13/13 structured-logger unit tests + 3/3 sweep regression tests pass
+- Full API jest suite — 453/461 pass (3 pre-existing failures unchanged by Phase 7.7)
+- `pnpm install` confirms `@sentry/cli` binary downloads after workspace flip
+- `pnpm --filter @guestpost/portal build` confirms `withSentryConfig` opts parse; source-map upload silently skipped without token (as designed)
+
+**Production cutover checklist for operator** (post-merge):
+
+1. Apply migration `20260616130000_phase77_audit_request_id_column` on staging/prod (clean migration history; off-peak recommended). Record before-count of `metadata->>'requestId' IS NOT NULL` and after-count of `requestId IS NOT NULL` — they should match.
+2. Run `EXPLAIN ANALYZE SELECT * FROM "AuditLog" WHERE "requestId" = '<sample id>'` and confirm plan node includes `Index Scan using "AuditLog_requestId_idx"`. Paste output here.
+3. Generate `SENTRY_AUTH_TOKEN` with `project:releases` scope; add as GitHub repo secret. Next CI build will upload maps.
+4. Curl `/metrics/queues` on a running worker pod; confirm new fields present.
+5. Trace one production requestId end-to-end (log line → audit row → worker job → Sentry tag) to validate the Phase 7.7 spine.
+
+---
+
 ### 2026-06-16 — Phase 7.6: Mobile UX for admin + publisher sidebars (#9) — closes last open Critical
 
 **Findings resolved:**

@@ -1,10 +1,10 @@
 # Current Focus
 
-**Status (2026-06-16): Phases 6.6 → 7.6 complete. 11/11 Critical audit findings closed (100%) — production-blocker queue fully cleared. 19/31 total findings closed (61%). Per-phase details live in `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log.**
+**Status (2026-06-16): Phases 6.6 → 7.7 complete. 11/11 Critical audit findings closed (100%) — production-blocker queue fully cleared. 19/31 audit findings closed (61%); Phase 7.7 adds the full observability spine (requestId → structured logs → audit → Sentry source-maps) without closing a new numbered finding. Per-phase details live in `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log.**
 
 ## Completed since last NOW update (2026-06-15 → 06-16, batches 25–32)
 
-Nine phases shipped, each as its own commit (Phase 7.1–7.3 bundled due to file overlap; 7.4, 7.5, 7.6 separate):
+Ten phases shipped (Phase 7.1–7.3 bundled due to file overlap; 7.4, 7.5, 7.6 separate; 7.7 is 5 commits on one branch):
 
 | Phase | Audit # | One-liner | Tests added |
 |---|---|---|---|
@@ -19,17 +19,24 @@ Nine phases shipped, each as its own commit (Phase 7.1–7.3 bundled due to file
 | **7.4** | #12 | `Notification.dedupKey VARCHAR(256)` + partial unique index; 8 typed dedup-key builders; drift-summary-keyed reconciliation alerts (collapses hourly cron spam to one alert per staff per day); P2002 catch-and-swallow | 17 |
 | **7.5** | #21 | Phase 6 snapshot backfill migration (Settlement + PlatformRevenue via Order→ListingService+Website JOIN); COALESCE + WHERE IS NULL idempotency; 4-scenario JS-reimplementation test. Dev DB 0 rows affected (all post-Phase-6); future-proofs prod | 14 |
 | **7.6** | #9 | Mobile UX: ported portal's drawer pattern (fixed `translate-x` + backdrop + sticky mobile-only header with hamburger) into admin + publisher layouts. Pathname auto-close + `type="button"` defense + ARIA labels. **Closes the last open Critical — 11/11 now done.** Manual responsive smoke pending operator at a browser; typecheck + build clean (admin 19/19, publisher 13/13 static pages). | 0 (visual port; covered by manual smoke) |
+| **7.7** | — | Observability hardening (5-commit bundle, no new audit finding closed — extends Phase 7.0). **A1** AuditLog.requestId promoted to indexed VARCHAR(128) column + partial btree + backfill + AuditService dual-write. **A2** admin audit-logs `?requestId=` exact-match filter + per-row Copy button + CSV column. **B** structured logger (`packages/shared/src/observability/structured-logger.ts`) — JSON + pretty modes, auto-injects requestId from ALS, includes `environment` + `release` tags. 8 worker files swept (~23 callsites); remaining ~85 tracked in sweep regression guard for Phase 7.7.x. **C** Sentry source-map upload enabled across all 4 Next.js apps (`@sentry/cli: true` + `widenClientFileUpload` + `deleteSourcemapsAfterUpload`); CI secret threaded. **D** `/metrics/queues` extended with `service` block + `dedupHitsTotal` + new `stalledHitsTotal`. | +16 (logger unit + sweep regression + A1 request-id-column suite) |
 
 **Cumulative test growth across this batch**: ~339 → 441 passing (+102 new tests across phases 7.0–7.5). 3 pre-existing test suites still failing — confirmed unrelated (predate this work).
 
 ## What's next
 
-Per the audit's "what to ship next" pointer (post-Phase-7.6):
+Per the 2026-06-16 roadmap (post-Phase-7.7):
 
-1. **Phase 7.3.1** — `CREATE INDEX CONCURRENTLY ON Settlement(status, reviewEndsAt)`. Tiny migration; the Phase 7.3 auto-approve worker sweep hits this query every 15m. MUST use `CONCURRENTLY` (Prisma needs transaction-disable directive at the migration top) to avoid table-write lockout on prod-sized tables.
-2. **Phase 7.6.1** — Drawer a11y polish across all three apps (portal + admin + publisher): escape-to-close, focus trap, body-scroll-lock. None of the three have these today; uniform polish pass is the right scope.
-3. **Phase 7.0.1** — observability follow-ups: `requestId` indexed column + backfill, structured logger (replacing `console.log` across api+worker), Sentry source-map upload (`SENTRY_AUTH_TOKEN` + `withSentryConfig` flip).
-4. **Remaining 5 Medium findings** — see audit §2 list (#26 email-keyed rate limiter, #27 job-signing `iat` for replay protection, #28 status-color drift, #29 unused shared components, #30 hooks-rule violation in publisher listings page).
+1. **Phase 7.7.x — complete structured-logger sweep**. Continue from B's partial sweep: convert remaining ~85 console.* callsites in 7 worker files (worker/index.ts, payout, verification, reconciliation, email, website-verification, delivery-verification, report) to `logger.*`. Each commit removes its file's entry from `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`. Mechanical work; can ship file-by-file as small PRs.
+2. **Phase 7.8 — Security Hardening Batch** (per roadmap): #26 email-keyed rate limiter + #27 job-signing `iat` replay protection + related auth/session follow-ups. Bundle as one cohesive phase.
+3. **Phase 7.9 — Frontend Quality & Accessibility** (per roadmap): #28 status-color centralization + #29 unused shared component adoption + #30 hooks-rule violation + the deferred Phase 7.6.1 drawer a11y polish (status: Approved, Deferred). Dedicated frontend cleanup phase.
+4. **Phase 7.3.1 — `CREATE INDEX CONCURRENTLY` on Settlement** — blocked on Prisma 6 → 7.4+ upgrade. Out of scope until that upgrade lands.
+
+**Phase 7.7 operator cutover** (separate from the above roadmap, needed before Phase 7.7's value lands in prod):
+
+1. Apply migration `20260616130000_phase77_audit_request_id_column` on staging/prod (off-peak; brief ACCESS EXCLUSIVE lock during partial-index build).
+2. Record before-count of `metadata->>'requestId' IS NOT NULL` vs after-count of `requestId IS NOT NULL` — should match exactly. Run EXPLAIN ANALYZE on a sample requestId query; confirm `Index Scan using "AuditLog_requestId_idx"`. Paste both into the audit §11 Phase 7.7 entry.
+3. Generate `SENTRY_AUTH_TOKEN` with `project:releases` scope; add as GitHub repo secret. Next CI build uploads source maps automatically.
 
 ## Pinned reminders (from prior session)
 

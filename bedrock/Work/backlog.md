@@ -6,14 +6,37 @@ updated: 2026-06-16
 
 # Backlog
 
-Forward roadmap after the Phases 6.6 → 7.6 audit batch. Canonical source for per-finding status is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11.
+Forward roadmap after the Phases 6.6 → 7.7 audit batch. Canonical source for per-finding status is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11.
 
 **Critical-finding status: 11/11 closed** (Phase 7.6 closed the last one, #9 Mobile UX). All remaining items are High / Medium / strategic.
 
+**2026-06-16 roadmap pivot** (post-Phase-7.7): future work is bundled into Phase 7.8 (Security Hardening) and Phase 7.9 (Frontend Quality & Accessibility) per the project-direction prompt. Phase 7.6.1 is approved but deferred into 7.9.
+
 ## Next (named follow-ups from the batch)
 
-- [ ] **Phase 7.3.1 — `(status, reviewEndsAt)` index on Settlement.** Tiny migration. The Phase 7.3 auto-approve worker sweep hits this access pattern every 15m. Must use `CREATE INDEX CONCURRENTLY` (Prisma migration needs `-- prisma+postgresql migrate.transaction = false` directive at the top of the SQL) to avoid table-write lockout on prod-sized tables.
-- [ ] **Phase 7.6.1 — Drawer a11y polish.** Apply uniformly across portal + admin + publisher: escape-to-close (`useEffect` keydown listener), focus trap (move focus into drawer on open + restore on close), body-scroll-lock (toggle `overflow:hidden` on `<html>` while open), and consider `role="dialog"` + `aria-modal="true"` + `aria-expanded` on the hamburger. None of the three apps have these today; uniform polish pass is right scope.
+- [ ] **Phase 7.7.x — complete structured-logger sweep.** Continue from Phase 7.7 B's partial sweep: convert remaining ~85 `console.*` callsites in 7 worker files to `logger.*`. Files (per `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`): `worker/index.ts` (21), `payout.processor.ts` (19), `verification.processor.ts` (12), `reconciliation.processor.ts` (8), `email.processor.ts` (8), `website-verification.processor.ts` (6), `delivery-verification.processor.ts` (6), `report.processor.ts` (5). Each commit removes its file's entry from the allowlist; spec enforces both directions (no new `console.*` outside allowlist AND counts can't drop below baseline without updating the map). Mechanical work; can ship file-by-file as small PRs.
+- [ ] **Phase 7.3.1 — `(status, reviewEndsAt)` index on Settlement.** Tiny migration. The Phase 7.3 auto-approve worker sweep hits this access pattern every 15m. **Blocked on Prisma 6.19.3 → 7.4+ upgrade** (Prisma 6 wraps migrations in a transaction; `CREATE INDEX CONCURRENTLY` rejects with `cannot run inside a transaction block` per prisma#14456, fixed in 7.4). Out of scope until Prisma is upgraded.
+
+## Phase 7.8 — Security Hardening Batch (per 2026-06-16 roadmap)
+
+Bundle these together as one cohesive phase:
+
+- [ ] **#26 — Email-keyed rate limiter** on auth endpoints. Per-IP-only limits today don't stop credential stuffing across an IP pool.
+- [ ] **#27 — Job-signing `iat` validation / replay protection.** Add issued-at timestamp to signed queue payloads + freshness window.
+- [ ] **Related auth/session follow-ups** discovered during implementation.
+
+Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase.
+
+## Phase 7.9 — Frontend Quality & Accessibility (per 2026-06-16 roadmap)
+
+Bundle these together as one cohesive phase:
+
+- [ ] **#28 — Status-color centralization** in `@guestpost/ui` (`STATUS_PRESENTATION`). `PUBLISHED` currently renders as 3 different greens across pages.
+- [ ] **#29 — Unused shared component adoption.** Phase A components (`<BriefRenderer>`, `<FulfillmentChannelBadge>`, `<SupportPanel>`) shipped in batch 22 with zero imports today.
+- [ ] **#30 — Hooks-rule violation in publisher listings page** (`apps/publisher/src/app/dashboard/listings/page.tsx:182-195`). Inline the 4 `useMutation` calls; works today but is a time-bomb.
+- [ ] **Phase 7.6.1 — Drawer a11y polish** (status: Approved, Deferred — full plan preserved in `~/.claude/plans/read-the-bedrock-views-audits-platform-a-typed-spark.md` appendix). Escape-to-close + focus trap + body-scroll-lock + ARIA dialog semantics applied uniformly across portal + admin + publisher via a shared `useDrawerA11y` hook.
+
+Mission: Frontend consistency / Accessibility / Maintainability / Shared patterns.
 - [ ] **Phase 7.0.1 observability follow-ups.** Three small items, can batch into one migration / one PR:
   - Promote `requestId` from `AuditLog.metadata` JSON to a dedicated indexed column + backfill
   - Structured logger to replace `console.log` across api+worker (then `requestId` is grep-able in plain logs, not just Sentry context + audit DB)

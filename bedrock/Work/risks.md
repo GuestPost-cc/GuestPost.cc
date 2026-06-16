@@ -6,7 +6,7 @@ updated: 2026-06-16
 
 # Risks
 
-Updated 2026-06-16 after Phases 6.6–7.6 audit batch closed 19/31 findings (**11/11 Critical**, 7/14 High). Original 2026-06-11 architecture review risks reassessed below.
+Updated 2026-06-16 after Phases 6.6–7.7 audit batch closed 19/31 findings (**11/11 Critical**, 7/14 High). Phase 7.7 adds the observability spine (requestId → structured logs → audit → Sentry source-maps) without closing a numbered finding. Original 2026-06-11 architecture review risks reassessed below.
 
 The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
 
@@ -30,6 +30,10 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 | Frontend 401 storms (no `onAuthError` redirect handler) | Phase 6.8 (`buildAuthErrorHandler` with idempotency + URL sanitization + same-page debounce) |
 | Reporting service channel split uses live `ownershipType` instead of snapshot | Phase 7.1 (#15 bundled — `order.fulfillmentChannel ?? website.ownershipType` snapshot-first) |
 | Admin + publisher apps are desktop-only (no mobile sidebar) | Phase 7.6 (ported portal's `translate-x` drawer + backdrop + sticky mobile-only header with hamburger; pathname auto-close; `type="button"` defense; ARIA labels) |
+| `requestId` lived only in `AuditLog.metadata` JSON (unqueryable, unindexed, no admin UI access) | Phase 7.7 A1 + A2 (indexed `VARCHAR(128)` column + partial btree + backfill + admin filter + Copy button) |
+| API + worker logs were unstructured `console.*` calls — log aggregators couldn't parse, requestId not embedded in log lines | Phase 7.7 B (structured-logger module: JSON + pretty modes, auto-injects requestId from ALS, includes `environment` + `release` tags. 8 worker files swept; ~85 callsites remain on a tracked allowlist for Phase 7.7.x continuation) |
+| Sentry production stack traces showed minified bundle offsets (no source-map upload) | Phase 7.7 C (`@sentry/cli: true` + `widenClientFileUpload` + `sourcemaps.deleteSourcemapsAfterUpload` on all 4 Next.js apps + `SENTRY_AUTH_TOKEN` threaded in CI) |
+| Worker `/metrics/queues` had no service identity + missing the Phase 7.4 `dedupHitsTotal` counter | Phase 7.7 D (extended payload with `service: { name, version, pid, started_at, uptime_s }` + `dedupHitsTotal` + new `stalledHitsTotal`) |
 
 ## Still open (residual + new)
 
@@ -37,7 +41,9 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 
 - **No open Criticals remain.** Phase 7.6 closed #9 (mobile UX), the last one. The 2026-06-15 platform audit has zero open production-blocker findings.
 - **5 Medium findings** still open: #26 (per-IP-only auth rate limits enable credential stuffing across IP pools), #27 (job signing has no `iat` for replay protection), #28 (status-color drift across pages), #29 (shared Phase A components shipped but zero imports across apps), #30 (hooks-rule violation in publisher listings page).
-- **Drawer a11y polish gap (introduced by Phase 7.6, captured as Phase 7.6.1)**: matches portal's reference exactly, which means no escape-to-close, focus trap, or body-scroll-lock on any of the three drawers. Functional and visually correct, but keyboard-only users + screen-reader users have a degraded experience. Polish-tier risk; not a Critical.
+- **Drawer a11y polish gap (introduced by Phase 7.6, captured as Phase 7.6.1)**: matches portal's reference exactly, which means no escape-to-close, focus trap, or body-scroll-lock on any of the three drawers. Functional and visually correct, but keyboard-only users + screen-reader users have a degraded experience. Polish-tier risk; deferred to Phase 7.9 per 2026-06-16 roadmap.
+- **Partial structured-logger sweep (Phase 7.7 B)**: ~85 `console.*` callsites remain in 7 worker files (`worker/index.ts`, payout, verification, reconciliation, email, website-verification, delivery-verification, report). These still emit unstructured strings — log aggregators see them as opaque text without `requestId` / `environment` / `release` JSON keys. Mitigated by the sweep regression test (new `console.*` outside the allowlist fails CI; counts dropping below baseline also fail). Continuation tracked as Phase 7.7.x.
+- **Phase 7.7 A1 dev DB drift (operator action required)**: pre-existing dev DB has 5 missing migration files from 2026-06-13; Phase 7.7 A1 migration was NOT applied to dev (operator opted to skip). Must apply on staging/prod via `prisma migrate deploy` (clean history) + record EXPLAIN ANALYZE planner-uses-index proof + before/after counts in the audit §11 Phase 7.7 entry. Until prod cutover, requestId column queries seq-scan (or return empty for pre-7.7 rows).
 
 ### Pre-existing risks unchanged by this batch (still on the radar)
 
