@@ -946,6 +946,7 @@ export class AdminService {
     entityType?: string
     entityId?: string
     userId?: string
+    requestId?: string
     startDate?: string
     endDate?: string
     page?: number
@@ -958,6 +959,10 @@ export class AdminService {
     if (params.entityType) where.entityType = params.entityType
     if (params.entityId) where.entityId = params.entityId
     if (params.userId) where.userId = params.userId
+    // Phase 7.7 A2: EXACT-MATCH ONLY on requestId (identifier, not searchable
+    // text). Substring search would seq-scan AuditLog_requestId_idx and
+    // encourage operators to guess at IDs.
+    if (params.requestId) where.requestId = { equals: params.requestId }
     if (params.startDate || params.endDate) {
       where.createdAt = {}
       if (params.startDate) where.createdAt.gte = new Date(params.startDate)
@@ -984,6 +989,10 @@ export class AdminService {
         actorId: r.userId,
         actorName: r.user?.name ?? r.user?.email ?? null,
         metadata: r.metadata,
+        // Phase 7.7 A2: surface the indexed column so the FE copy button has
+        // a stable field to render. Falls back to metadata.requestId for legacy
+        // rows where backfill couldn't fill the column (pre-Phase-7.0).
+        requestId: r.requestId ?? (r.metadata?.requestId as string | undefined) ?? null,
         ipAddress: r.ipAddress,
         createdAt: r.createdAt,
       })),

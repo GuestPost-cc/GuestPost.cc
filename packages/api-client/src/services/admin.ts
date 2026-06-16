@@ -507,7 +507,11 @@ export class AdminService {
   }
 
   // -- Audit Logs --
-  listAuditLogs(params?: { actorId?: string; action?: string; entity?: string; entityId?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) {
+  // Phase 7.7 A2: requestId filter is EXACT-MATCH only (identifier, not text);
+  // backend rejects fuzzy operators. The returned `requestId` field carries
+  // the indexed column value (Phase 7.7 A1) with fallback to legacy
+  // metadata.requestId for pre-backfill rows.
+  listAuditLogs(params?: { actorId?: string; action?: string; entity?: string; entityId?: string; requestId?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) {
     return this.client.get<{
       items: Array<{
         id: string
@@ -517,6 +521,7 @@ export class AdminService {
         actorId: string
         actorName: string | null
         metadata: Record<string, unknown> | null
+        requestId: string | null
         ipAddress: string | null
         createdAt: string
       }>

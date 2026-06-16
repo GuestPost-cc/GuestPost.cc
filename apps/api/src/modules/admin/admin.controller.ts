@@ -465,6 +465,10 @@ export class AdminController {
   }
 
   // ── Audit log browsing — staff-action forensics is SUPER_ADMIN-only ────
+  // Phase 7.7 A2: requestId filter added. EXACT-MATCH ONLY — never accept
+  // contains/startsWith/endsWith operators here. RequestIds are identifiers,
+  // not searchable text; substring search would seq-scan the index and
+  // encourage operators to guess at IDs.
   @Get("audit-logs")
   @StaffRoles("SUPER_ADMIN")
   listAuditLogs(
@@ -472,6 +476,7 @@ export class AdminController {
     @Query("entity") entity?: string,
     @Query("entityId") entityId?: string,
     @Query("actorId") actorId?: string,
+    @Query("requestId") requestId?: string,
     @Query("startDate") startDate?: string,
     @Query("endDate") endDate?: string,
     @Query("page") page?: string,
@@ -482,6 +487,7 @@ export class AdminController {
       entityType: entity,
       entityId,
       userId: actorId,
+      requestId,
       startDate,
       endDate,
       page: page ? parseInt(page, 10) || 1 : 1,
