@@ -26,6 +26,9 @@ import {
 import { prisma } from "@guestpost/database"
 import { connection } from "../redis"
 import { createObservableWorker } from "../lib/queue-observability"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.settlement-auto-approve")
 
 const SLOW_SWEEP_DEFAULT_MS = 30_000
 
@@ -38,12 +41,12 @@ export function createSettlementAutoApproveWorker() {
     QUEUES.SETTLEMENT,
     async (job) => {
       if (!verifyJobPayload(job.data)) {
-        console.error(`[SETTLEMENT_AUTO_APPROVE] Job ${job.id} has missing/invalid signature — rejecting`)
+        logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
 
       if (job.name !== "settlement-auto-approve") {
-        console.warn(`[SETTLEMENT_AUTO_APPROVE] Unexpected job name '${job.name}' — skipping`)
+        logger.warn("unexpected job name — skipping", { jobName: job.name })
         return
       }
 
@@ -54,9 +57,14 @@ export function createSettlementAutoApproveWorker() {
       const result = await runSettlementAutoApprove(prisma, { batchSize })
       const stale = await countStaleReviewSettlements(prisma)
 
-      console.log(
-        `[SETTLEMENT_AUTO_APPROVE] runs_total=${runsTotal} scanned=${result.scanned} approved=${result.approved} skipped=${result.skipped} stale=${stale} duration_ms=${result.durationMs}`,
-      )
+      logger.info("sweep complete", {
+        runs_total: runsTotal,
+        scanned: result.scanned,
+        approved: result.approved,
+        skipped: result.skipped,
+        stale,
+        duration_ms: result.durationMs,
+      })
 
       if (result.durationMs > slowMs) {
         Sentry.captureMessage("Settlement auto-approve sweep slow", {

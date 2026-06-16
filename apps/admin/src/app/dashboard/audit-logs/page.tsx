@@ -78,16 +78,22 @@ function AuditLogsPageInner() {
   const [search, setSearch] = useState("")
   const [actionFilter, setActionFilter] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
+  const [requestIdFilter, setRequestIdFilter] = useState("")
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [page, setPage] = useState(1)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
+  // Phase 7.7 A2: requestId is server-filtered (indexed exact-match), unlike
+  // free-text `search` which is client-side over the loaded page.
+  const trimmedRequestId = requestIdFilter.trim()
+
   const { data, isLoading, error, refetch, isFetching } = useQuery({
-    queryKey: ["admin", "audit-logs", actionFilter, startDate, endDate, page],
+    queryKey: ["admin", "audit-logs", actionFilter, trimmedRequestId, startDate, endDate, page],
     queryFn: () =>
       api.admin.listAuditLogs({
         action: actionFilter || undefined,
+        requestId: trimmedRequestId || undefined,
         startDate: startDate || undefined,
         endDate: endDate ? `${endDate}T23:59:59` : undefined,
         page,
@@ -130,7 +136,7 @@ function AuditLogsPageInner() {
   const exportCsv = () => {
     downloadCsv(
       `audit-logs-page${pagination.page}-${new Date().toISOString().slice(0, 10)}.csv`,
-      ["Timestamp", "Category", "Action", "Actor", "ActorId", "Entity", "EntityId", "IP", "Metadata"],
+      ["Timestamp", "Category", "Action", "Actor", "ActorId", "Entity", "EntityId", "RequestId", "IP", "Metadata"],
       filteredLogs.map((l: any) => [
         l.createdAt,
         actionCategory(l.action).label,
@@ -139,6 +145,7 @@ function AuditLogsPageInner() {
         l.actorId ?? "",
         l.entity ?? "",
         l.entityId ?? "",
+        l.requestId ?? "",
         l.ipAddress ?? "",
         JSON.stringify(l.metadata ?? {}),
       ]),
@@ -187,6 +194,15 @@ function AuditLogsPageInner() {
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Action contains</label>
             <Input placeholder="e.g. SETTLEMENT" value={actionFilter} onChange={(e) => { setActionFilter(e.target.value); setPage(1) }} />
           </div>
+          <div className="w-full lg:w-56">
+            <label className="mb-1 block text-xs font-medium text-muted-foreground" title="Exact-match only — paste a full requestId">Request ID (exact)</label>
+            <Input
+              placeholder="paste from Sentry / logs"
+              value={requestIdFilter}
+              onChange={(e) => { setRequestIdFilter(e.target.value); setPage(1) }}
+              className="font-mono text-xs"
+            />
+          </div>
           <div className="w-full lg:w-44">
             <label className="mb-1 block text-xs font-medium text-muted-foreground">Category</label>
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
@@ -205,8 +221,8 @@ function AuditLogsPageInner() {
             <label className="mb-1 block text-xs font-medium text-muted-foreground">To</label>
             <Input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setPage(1) }} />
           </div>
-          {(actionFilter || startDate || endDate || categoryFilter !== "all" || search) && (
-            <Button variant="ghost" onClick={() => { setSearch(""); setActionFilter(""); setCategoryFilter("all"); setStartDate(""); setEndDate(""); setPage(1) }}>
+          {(actionFilter || requestIdFilter || startDate || endDate || categoryFilter !== "all" || search) && (
+            <Button variant="ghost" onClick={() => { setSearch(""); setActionFilter(""); setCategoryFilter("all"); setRequestIdFilter(""); setStartDate(""); setEndDate(""); setPage(1) }}>
               Clear
             </Button>
           )}
@@ -293,6 +309,7 @@ function AuditLogsPageInner() {
                                 <Field label="Entity ID" value={log.entityId ?? "—"} mono onCopy={log.entityId ? copy : undefined} />
                                 <Field label="IP address" value={log.ipAddress ?? "—"} mono />
                                 <Field label="Event ID" value={log.id} mono onCopy={copy} />
+                                <Field label="Request ID" value={log.requestId ?? "—"} mono onCopy={log.requestId ? copy : undefined} />
                               </div>
                               {log.metadata && (
                                 <div className="mt-3">

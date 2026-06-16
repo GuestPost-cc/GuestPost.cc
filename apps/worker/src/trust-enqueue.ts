@@ -1,6 +1,9 @@
 import { Queue } from "bullmq"
 import { connection } from "./redis"
 import { QUEUES, QUEUE_JOBS, signJobPayload, trustRecomputeJobOptions } from "@guestpost/shared"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.trust-enqueue")
 
 // Single shared producer for worker-side trust recompute events (link removal/
 // restoration, website revoke/reverify). Signed + jobId-deduped so bursts
@@ -23,8 +26,8 @@ export async function enqueueTrustRecompute(
       signJobPayload({ publisherId, sourceEvent, reason: reason ?? sourceEvent }),
       trustRecomputeJobOptions(publisherId),
     )
-    console.log(`[TRUST] enqueued recompute publisher=${publisherId} source=${sourceEvent}`)
+    logger.info("trust recompute enqueued", { publisherId, sourceEvent })
   } catch (err) {
-    console.error(`[TRUST] failed to enqueue recompute for ${publisherId}:`, err)
+    logger.error("trust recompute enqueue failed", { publisherId, err: String(err) })
   }
 }

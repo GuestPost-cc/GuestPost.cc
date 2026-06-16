@@ -801,15 +801,15 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 | Status | Count | Share |
 |---|---|---|
-| ✅ Fully closed | **18** | 58% |
+| ✅ Fully closed | **19** | 61% |
 | ⚠️ Partially closed | **0** | 0% |
-| ⛔ Still open | **13** | 42% |
+| ⛔ Still open | **12** | 39% |
 
 **By severity:**
 
 | Severity | Total | Closed | Partial | Open |
 |---|---|---|---|---|
-| Critical (production-blocker) | 11 | **10** (#1, #2, #3, #4, #5, #6, #7, #8, #10, #11) | — | 1 |
+| Critical (production-blocker) | 11 | **11** (#1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11) | — | **0** |
 | High | 14 | **7** (#12, #15, #19, #21, #22, V-1, R-3+R-4) | — | 7 |
 | Medium | 5 | — | — | 5 |
 
@@ -829,7 +829,7 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | #22 | confirm-delivery status guard | High | ✅ FIXED | 6.9 | `status: "VERIFIED"` added to inner updateMany.where |
 | R-3 / R-4 | MEMBER-allowed money endpoints | High | ✅ FIXED | 6.9 | Service-layer OWNER‖creator gate on customerAcceptDelivery + customerApprove (already inline on others) |
 | #8 | No error boundaries / no Sentry | Critical | ✅ FIXED | 7.0 | error.tsx + global-error.tsx + Sentry across all 4 apps + browser/server/edge runtimes |
-| #9 | Publisher/admin no mobile sidebar | Critical | ⛔ open | — | Drawer pattern from portal |
+| #9 | Publisher/admin no mobile sidebar | Critical | ✅ FIXED | 7.6 | Ported portal's drawer pattern (fixed translate-x + backdrop + sticky mobile-only header with hamburger) into admin + publisher layouts. Pathname auto-close + `type="button"` defense + ARIA labels. Builds clean (admin 19/19 static, publisher 13/13). |
 | #10 | SettlementAutoApproveService in API setInterval | Critical | ✅ FIXED | 7.3 | Moved to single BullMQ repeatable job in worker (jobId dedup cluster-wide). Service deleted. Slow-sweep + stale-review Sentry warnings added. SETTLEMENT_AUTO_APPROVE_BATCH_SIZE env added. |
 | #11 | Worker no health/metrics/errors | Critical | ✅ FIXED | 7.0 | Raw node:http server (`/health`, `/ready`, `/metrics/queues`) + BullMQ failed-event Sentry hook across all 9 processors + unhandledRejection exit-after-flush |
 | #12 | Notification duplicates on retry | High | ✅ FIXED | 7.4 | Phase 6.6's support fan-out runtime dedup PLUS Phase 7.4's DB partial-unique on (userId, dedupKey). Reconciliation switched to drift-summary-keyed (hourly cron same drift → 1 alert per staff per UTC day, not 24). 8 typed dedup-key builders; writers swallow P2002 as success. |
@@ -858,20 +858,152 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | Dimension | Original | Now | Change |
 |---|---|---|---|
 | RBAC granularity | C | **B+** | Phase 6.7 closure of #2 + fail-closed guard + matrix |
-| Documentation + audit-trail uniformity | C+ | **B** | participantRole + actorSnapshot on every ticket message |
+| Documentation + audit-trail uniformity | C+ | **A−** | participantRole + actorSnapshot on every ticket message; Phase 7.7 A1 indexed `AuditLog.requestId` makes the trail SQL-queryable end-to-end |
 | Input validation | (no row) | **A−** | 18 DTOs + class-validator coverage on every admin action body |
-| Worker idempotency | B | B | Support fan-out deduped; other queues unchanged |
-| Frontend reliability (errors/loading/empties) | C+ | C+ | Not touched |
-| Reporting + finance visibility | D | D | Not touched (#5 PlatformRevenue still open) |
+| Worker idempotency | B | **B+** | Phase 7.4 notification dedup (partial unique on `(userId, dedupKey)`); Phase 7.3 settlement auto-approve cluster-wide `jobId` dedup |
+| Frontend reliability (errors/loading/empties) | C+ | **B** | Phase 7.0 `error.tsx` + `global-error.tsx` + Sentry across all 4 apps; Phase 7.7 C source-maps unminify production stack traces |
+| Reporting + finance visibility | D | **B** | Phase 7.1 `GET /admin/finance/revenue` with 4 groupings + CSV + period comparison |
+| Observability + correlation | (no row) | **B+** | Phase 7.0 Sentry + request-IDs + worker `/health` `/ready` `/metrics/queues`; Phase 7.7 indexed `requestId` column + admin filter + structured logger (partial) + source-map upload + extended `/metrics` |
+| Mobile UX | (no row) | **B** | Phase 7.6 closed #9 — drawer ported into admin + publisher; a11y polish (escape/focus-trap/scroll-lock) deferred to Phase 7.9 |
 
-**What to ship next** (in priority order, post-Phase-7.5):
+---
 
-1. **Phase 7.3.1** — `CREATE INDEX CONCURRENTLY ON Settlement(status, reviewEndsAt)`. Tiny migration; the Phase 7.3 worker sweep hits this access pattern every 15m. Must use `CONCURRENTLY` (Prisma migration needs transaction-disable directive) to avoid table-write lockout on prod-sized tables.
-2. **#9** — Mobile UX (publisher + admin sidebar collapse to drawer below `lg`). Last open Critical/High.
-3. **Phase 7.0.1** — Observability follow-ups (`requestId` indexed column + backfill, structured logger, Sentry source-map upload).
-4. **Remaining Medium findings** (5 still open per the §2 list).
+**Forward roadmap** — the post-Phase-7.7 work, organized by lane so it's clear what's mid-flight vs blocked vs queued:
 
-**Production-blocker status**: 10 of 11 Criticals closed; only #9 Mobile UX remains. The platform is no longer blocked on architectural concerns — only UX polish + small migration follow-ups.
+### Active — partial, continuing as small follow-up commits
+
+- **Phase 7.7.x — Structured logger sweep continuation.** Phase 7.7 B landed the logger module + 13 unit tests + the sweep regression guard, then converted 8 worker files (~23 of 114 `console.*` callsites). The remaining ~85 callsites across 7 worker files (`worker/index.ts` (21), `payout` (19), `verification` (12), `reconciliation` (8), `email` (8), `website-verification` (6), `delivery-verification` (6), `report` (5)) stay snapshotted in `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`. Guard enforces both directions: new `console.*` in a non-listed file fails CI; counts dropping below baseline also fail (forces the allowlist to stay tight as sweeps land). Mechanical work; ships file-by-file. Split intentional — full sweep was 3× the original Phase 7.7 plan estimate.
+
+### Blocked — designed + approved, waiting on upstream
+
+- **Phase 7.3.1 — `Settlement(status, reviewEndsAt)` composite index.** Status: **designed, approved, NOT implemented**. The most valuable uncompleted roadmap item. Phase 7.3's auto-approve worker sweep hits this access pattern every 15m, so the index pays off immediately at prod scale. **Blocked on Prisma 6.19.3 → 7.4+ upgrade**: Prisma 6 wraps each migration in a transaction and `CREATE INDEX CONCURRENTLY` cannot run inside one (prisma#14456, fixed in Prisma 7.4). Out of scope until the Prisma version upgrade lands as its own (week-scale) project.
+
+### Deferred — approved plan moved into a later phase
+
+- **Phase 7.6.1 — Drawer a11y polish.** Approved plan preserved verbatim in `~/.claude/plans/read-the-bedrock-views-audits-platform-a-typed-spark.md` appendix. Outstanding: focus trap, escape-to-close, focus restoration on close, body scroll-lock, plus `role="dialog"` / `aria-modal` / `aria-expanded` semantics. Implementation = a single shared `useDrawerA11y` hook in `@guestpost/ui/hooks/` wired into all three layouts. **Bundled into Phase 7.9** per the 2026-06-16 roadmap pivot — accessibility work groups naturally with the other frontend polish items (#28/#29/#30).
+
+### Queued — next two cohesive phases (per 2026-06-16 roadmap)
+
+- **Phase 7.8 — Security Hardening Batch.** Bundle: #26 (email-keyed rate limiter; current per-IP-only limits don't stop credential stuffing across an IP pool) + #27 (job-signing `iat` validation / replay protection) + related auth/session follow-ups discovered during implementation. Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase.
+- **Phase 7.9 — Frontend Quality & Accessibility.** Bundle: #28 (status-color centralization in `@guestpost/ui` — `PUBLISHED` currently renders as 3 different greens) + #29 (adopt the Phase A shared components — `<BriefRenderer>` / `<FulfillmentChannelBadge>` / `<SupportPanel>` shipped batch 22 with zero imports today) + #30 (publisher listings hooks-rule violation at `apps/publisher/src/app/dashboard/listings/page.tsx:182-195`) + **Phase 7.6.1** (drawer a11y polish). Mission: Frontend consistency / Accessibility / Maintainability / Shared patterns.
+
+### Future minimal updates (after specific work lands)
+
+- **After Phase 7.7 A1 prod migration applied** — paste before/after `requestId`-coverage counts + `EXPLAIN ANALYZE` plan node showing `Index Scan using "AuditLog_requestId_idx"` into the Phase 7.7 §11 entry.
+- **After Phase 7.7 C operator adds `SENTRY_AUTH_TOKEN`** — confirm first post-merge CI build uploaded source maps; check Sentry → Releases → artifact list; add a one-line "source-maps live" note to Phase 7.7 §11 entry.
+- **After each Phase 7.7.x sweep commit** — remove the swept file's entry from `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`; update the count in this dashboard if convenient.
+- **After Prisma 6 → 7.4+ upgrade** — unblock Phase 7.3.1; ship the composite index migration; record planner-usage proof per the deferred plan's verification checklist.
+- **After Phase 7.8 lands** — append new §11 entry; update scorecard's "Rate limiting" / "Replay protection" rows.
+- **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
+
+**Production-blocker status**: **11 of 11 Criticals closed (100%)**. No production-blocker finding from the 2026-06-15 audit remains open. All remaining work is High/Medium polish, security hardening, or accessibility — none gate production.
+
+---
+
+### 2026-06-16 — Phase 7.7: Operations & Observability Hardening (Phase 7.0 follow-ups)
+
+Four-workstream observability bundle. **Does not close a numbered audit finding** — the observability section was already marked closed by Phase 7.0 — but completes the deferred "Phase 7.0.1 follow-up" trio plus a /metrics extension. Audit dashboard counts stay 19/31 closed (61%); 11/11 Critical at 100%.
+
+**Mission**: end-to-end production-incident traceability via one ID.
+
+```
+Sentry Event → requestId → structured logs → audit trail
+```
+
+**5 commits on one branch (one PR):**
+
+| Commit | Workstream | One-liner |
+|---|---|---|
+| `4ffb3c5` | A1 | Promote AuditLog.requestId → indexed top-level column (VARCHAR(128) + partial btree); backfill from `metadata->>'requestId'`; AuditService.log dual-writes column + metadata mirror |
+| `7fa068a` | A2 | Admin audit-logs `?requestId=` filter (EXACT-MATCH only; never substring) + per-row Copy button + CSV column |
+| `a01802d` | B  | New `packages/shared/src/observability/structured-logger.ts` (Node-only, deep-import) with JSON + pretty modes, auto-injects requestId from ALS frame, `environment` + `release` env-resolved at module init. 13 unit tests + grep regression guard. 8 worker files swept (~23 callsites); remaining ~85 tracked in `CURRENTLY_ALLOWED_WITH_CONSOLE` map for Phase 7.7.x continuation |
+| `6d82473` | C  | Sentry source-map upload enabled: `@sentry/cli: true` in workspace, `widenClientFileUpload` + `sourcemaps.deleteSourcemapsAfterUpload` on all 4 next.configs, `SENTRY_AUTH_TOKEN` threaded into CI build env (silently skipped without secret) |
+| `4bf4ece` | D  | `/metrics/queues` extended with `service: { name, version, pid, started_at, uptime_s }` block + cumulative `dedupHitsTotal` (Phase 7.4 counter) + new `stalledHitsTotal` counter |
+
+**Workstream A — Indexed AuditLog.requestId**:
+
+- Migration `20260616130000_phase77_audit_request_id_column`: ALTER TABLE + UPDATE backfill + CREATE INDEX (partial, WHERE requestId IS NOT NULL), all three with `IF NOT EXISTS` for re-apply safety.
+- VARCHAR(128) matches the `isValidRequestId` allowlist regex.
+- **CONCURRENTLY NOT used** — Prisma 6.19.3 blocker carries over from Phase 7.3.1; brief ACCESS EXCLUSIVE on AuditLog during prod apply, acceptable since AuditLog isn't on the order-fulfillment hot path.
+- **Dev DB migration apply deferred** — pre-existing dev DB has 5 missing migration files (`20260613*_*`); operator opted "skip dev migration, trust the SQL" per session decision. Apply on staging/prod where history is clean; record EXPLAIN ANALYZE planner-uses-index proof + before/after counts at that time.
+- Dual-write (column + metadata.requestId mirror) is **permanent**, not transitional — storage cost trivial, downstream JSON readers stay supported.
+- Admin filter EXACT-MATCH only (`equals`); never `contains`/`startsWith`/`endsWith`. Documented in code as stable design constraint.
+
+**Workstream B — Structured logger (partial sweep)**:
+
+- 8 worker files converted to `logger.*` (trust-enqueue, env, health-server, queue-observability, settlement-auto-approve, publisher-trust, notification + partial). Logger ships as `packages/shared/src/observability/structured-logger.ts`.
+- JSON-mode schema: `{ ts, level, service, environment, release, requestId, msg, ...ctx }`. Pretty mode for dev (ANSI-colored, rid shortened to first 8 chars).
+- `environment` resolves: `SENTRY_ENVIRONMENT` → `NODE_ENV` → `"development"`.
+- `release` resolves: `SENTRY_RELEASE` → `npm_package_version` → `"unknown"`.
+- 13/13 unit tests pass (JSON shape, env/release three-tier fallback, pretty mode, child() merge, stderr routing, ALS requestId injection).
+- **Sweep regression guard** (`phase-7-7-structured-logger-sweep.spec.ts`) — `CURRENTLY_ALLOWED_WITH_CONSOLE` map snapshots remaining 7 files' console.* counts. New `console.*` in any non-listed file fails; counts dropping below baselines fail (forces allowlist to stay tight as 7.7.x sweeps land).
+- Always-allowed forever: `apps/api/src/main.ts` (6 calls, boot last-resort), `structured-logger.ts` itself (impl module), test files, scripts.
+
+**Workstream C — Sentry source-map upload**:
+
+- All 4 Next.js apps now upload source maps on `pnpm build` (silently skipped without `SENTRY_AUTH_TOKEN`).
+- `deleteSourcemapsAfterUpload: true` prevents `.map` files leaking source via the browser bundle.
+- CI build job threads `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT` from GitHub secrets.
+- **Operator action required** to fully activate: generate token at https://sentry.io with `project:releases` scope, add as repo secret named `SENTRY_AUTH_TOKEN`.
+
+**Workstream D — /metrics/queues extension**:
+
+- New top-level `service: { name, version, pid, started_at, uptime_s }` block.
+- `dedupHitsTotal` (Phase 7.4 notification dedup-key counter, was logged-only) now also exposed.
+- `stalledHitsTotal` cumulative counter added to `queue-observability.ts`; increments on every BullMQ `stalled` event across all queues. Both counters reset on worker restart.
+
+**Phase 7.7.x backlog** (continuation):
+
+- Complete the structured-logger sweep on the remaining 7 worker files (~85 callsites). Each commit removes its file's entry from `CURRENTLY_ALLOWED_WITH_CONSOLE` until the map only contains forever-allowed entries.
+
+**Verification highlights:**
+
+- Typecheck clean on api + worker + shared + admin
+- 13/13 structured-logger unit tests + 3/3 sweep regression tests pass
+- Full API jest suite — 453/461 pass (3 pre-existing failures unchanged by Phase 7.7)
+- `pnpm install` confirms `@sentry/cli` binary downloads after workspace flip
+- `pnpm --filter @guestpost/portal build` confirms `withSentryConfig` opts parse; source-map upload silently skipped without token (as designed)
+
+**Production cutover checklist for operator** (post-merge):
+
+1. Apply migration `20260616130000_phase77_audit_request_id_column` on staging/prod (clean migration history; off-peak recommended). Record before-count of `metadata->>'requestId' IS NOT NULL` and after-count of `requestId IS NOT NULL` — they should match.
+2. Run `EXPLAIN ANALYZE SELECT * FROM "AuditLog" WHERE "requestId" = '<sample id>'` and confirm plan node includes `Index Scan using "AuditLog_requestId_idx"`. Paste output here.
+3. Generate `SENTRY_AUTH_TOKEN` with `project:releases` scope; add as GitHub repo secret. Next CI build will upload maps.
+4. Curl `/metrics/queues` on a running worker pod; confirm new fields present.
+5. Trace one production requestId end-to-end (log line → audit row → worker job → Sentry tag) to validate the Phase 7.7 spine.
+
+---
+
+### 2026-06-16 — Phase 7.6: Mobile UX for admin + publisher sidebars (#9) — closes last open Critical
+
+**Findings resolved:**
+
+| # | Status | Notes |
+|---|---|---|
+| **#9** | ✅ Fully fixed | Ported portal's working mobile-drawer pattern (fixed `translate-x` aside + backdrop overlay + sticky mobile-only header with hamburger) into admin + publisher dashboard layouts. Below `lg` the sidebar slides in via `mobileOpen` state and closes on: X-button tap, backdrop tap, nav-link click, or any `pathname` change (covers `router.push` / browser back-forward / deep-link arrivals). At `≥lg` the desktop layout is unchanged via `lg:translate-x-0` + `lg:hidden` on the mobile shell elements. |
+
+**Implementation details:**
+
+- **Pattern source**: `apps/portal/src/app/dashboard/layout.tsx` (lines 59, 86–168, 170–175, 177–184). No new dependencies; standard Tailwind responsive classes only.
+- **Files modified** (2 total):
+  - `apps/admin/src/app/dashboard/layout.tsx` — sidebar `sticky lg:fixed` → `fixed translate-x` drawer; added X-close in restructured brand row; backdrop + mobile-header wrapper. Role-gated `navItems.filter(...)` preserved.
+  - `apps/publisher/src/app/dashboard/layout.tsx` — same port; X-close added to existing brand-row header (which already had `flex items-center justify-between`); preserved `overflow-auto` on `<main>` to avoid double-scrollbars at desktop widths.
+- **Pathname auto-close**: `useEffect(() => { setMobileOpen(false) }, [pathname])` on both apps. Closes drawer on any navigation source, not just `<Link onClick>`.
+- **Button hygiene**: every new `<button>` carries `type="button"` (defensive against accidental form-submit if the layout is ever rendered inside a `<form>` ancestor) and an `aria-label` (`"Open menu"` / `"Close menu"`). Bonus: also added `type="button"` to the pre-existing sign-out buttons that were touched.
+- **A11y baseline**: matches the portal reference exactly — no escape-to-close, no focus trap, no body-scroll-lock. These polish items captured as Phase 7.6.1 follow-up to apply uniformly across all three apps.
+- **Mission ceiling held**: did NOT consolidate to `packages/ui/src/components/layout/` stubs (separate cleanup), did NOT add new shared components, did NOT touch `<Notifications />` / `<OrgSwitcher />` shell components.
+
+**Verification:**
+
+- **Typecheck**: `pnpm --filter @guestpost/admin typecheck` + `pnpm --filter @guestpost/publisher typecheck` — clean (`$ tsc --noEmit`, exit 0).
+- **Build**: `pnpm --filter @guestpost/admin build` → 19/19 static pages, exit 0. `pnpm --filter @guestpost/publisher build` → 13/13 static pages, exit 0. No new warnings vs. the pre-7.6 baseline (Sentry `disableLogger` deprecation + workspace lockfile inference are pre-existing).
+- **Manual responsive smoke** (pending operator at a browser): per the plan's Priority 4 checklist — 375px / 768px / ≥1024px DevTools sweep; drawer slide-in + backdrop tap close + link-tap auto-close + X-button close + resize-to-desktop hides drawer/backdrop/mobile-header; admin role-gate sanity (sign in as OPERATIONS vs FINANCE); long-page single-scrollbar regression check; long-nav internal scroll at 568px viewport-height.
+
+**Production-blocker outcome:**
+
+- **Audit progress: 19/31 closed (61%)** — 11/11 Critical findings now closed (100%).
+- **The 2026-06-15 platform audit no longer has any open production-blocker finding.** First time since the audit landed that the "Critical" column reads 0 open.
+- **What ships next**: pointer rolls to Phase 7.3.1 (Settlement index migration), Phase 7.6.1 (drawer a11y polish across all three apps), Phase 7.0.1 (observability follow-ups), or the 5 remaining Medium findings — operator's choice.
 
 ---
 

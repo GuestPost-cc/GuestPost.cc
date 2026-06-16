@@ -34,6 +34,15 @@ jobs:
       REDIS_URL: redis://localhost:6379
       JWT_SECRET: ci-only-jwt-secret-not-used-in-prod-0123456789
       QUEUE_SIGNING_SECRET: ci-only-queue-secret-not-used-in-prod-012345
+      # Phase 7.7 C — Sentry source-map upload. When SENTRY_AUTH_TOKEN is
+      # configured as a repo secret, `pnpm build` uploads source maps for
+      # each Next.js app's bundle so production Sentry traces show source-
+      # line + filename instead of minified offsets. When the secret is
+      # unset (e.g. forks, PRs from external contributors), the upload step
+      # is silently skipped and the build still succeeds.
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

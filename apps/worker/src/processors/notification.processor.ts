@@ -8,13 +8,16 @@ import {
 import { prisma } from "@guestpost/database"
 import { connection } from "../redis"
 import { createObservableWorker } from "../lib/queue-observability"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.notification")
 
 export function createNotificationWorker() {
   const worker = createObservableWorker(
     QUEUES.NOTIFICATION,
     async (job) => {
       if (!verifyJobPayload(job.data)) {
-        console.error(`[NOTIFICATION] Job ${job.id} has missing/invalid signature — rejecting`)
+        logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
 
@@ -36,23 +39,25 @@ export function createNotificationWorker() {
             await prisma.notification.create({
               data: { userId, organizationId, type, message, dedupKey: dedupKey ?? null },
             })
-            console.log(`[NOTIFICATION] In-app notification for user ${userId}`)
+            logger.info("in-app notification created", { userId })
           } catch (err) {
             if (isUniqueViolation(err)) {
               // Phase 7.4 — a retry of this same logical event already wrote
               // the row. Treat as success; the notification has been delivered
               // to this user for this (dedupKey) and the retry is a no-op.
               const total = incrementDedupHits()
-              console.log(
-                `[NOTIFICATION] deduped key=${dedupKey} user=${userId} dedup_hits_total=${total}`,
-              )
+              logger.info("notification deduped (P2002)", {
+                dedupKey,
+                userId,
+                dedup_hits_total: total,
+              })
               break
             }
             throw err
           }
           break
         default:
-          console.warn(`[NOTIFICATION] Unknown job: ${job.name}`)
+          logger.warn("unknown job name", { jobName: job.name })
       }
 
       return { notified: true, dedupHitsTotal: getDedupHitsTotal() }
@@ -61,11 +66,11 @@ export function createNotificationWorker() {
   )
 
   worker.on("completed", (job) => {
-    console.log(`[NOTIFICATION] Job ${job.id} completed`)
+    logger.info("job completed", { jobId: job.id })
   })
 
   worker.on("failed", (job, err) => {
-    console.error(`[NOTIFICATION] Job ${job?.id} failed:`, err)
+    logger.error("job failed", { jobId: job?.id, err: err?.message })
   })
 
   return worker

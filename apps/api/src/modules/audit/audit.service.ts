@@ -22,6 +22,11 @@ export class AuditService {
   // metadata JSON when present (set by RequestIdMiddleware). Worker-side
   // audit writes inherit the same ID after the processor wrapper re-enters
   // the ALS frame from the signed job payload.
+  //
+  // Phase 7.7 A1: requestId additionally written to the indexed top-level
+  // column. The metadata.requestId mirror is kept indefinitely (not
+  // transitional) — storage cost is trivial and downstream readers
+  // (Sentry exports, ad-hoc scripts) may still parse the JSON.
   async log(
     params: {
       action: string
@@ -47,6 +52,7 @@ export class AuditService {
       entityType: params.entityType,
       entityId: params.entityId ?? null,
       metadata: (metadata ?? undefined) as any,
+      requestId: requestId ?? null,
       userId: params.userId ?? null,
       organizationId: params.organizationId ?? null,
       ipAddress: params.ipAddress ?? null,

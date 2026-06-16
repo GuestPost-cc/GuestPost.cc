@@ -12,11 +12,12 @@ allowBuilds:
   msgpackr-extract: true
   sharp: true
   core-js: false
-  # @sentry/cli's postinstall downloads a native binary used only for source-map
-  # upload. Phase 7.0 defers source-map upload to Phase 7.0.1; without
-  # SENTRY_AUTH_TOKEN the cli is never invoked at runtime, so we skip the
-  # postinstall. Flip to true when source-map upload lands.
-  '@sentry/cli': false
+  # Phase 7.7 C — @sentry/cli's postinstall downloads a native binary used
+  # to upload source maps after each Next.js build (one-time ~10MB download
+  # per fresh install). At build time the cli is invoked but the upload step
+  # is silently skipped when SENTRY_AUTH_TOKEN is unset, so devs running
+  # `pnpm build` locally without the token are unaffected.
+  '@sentry/cli': true
 minimumReleaseAgeExclude:
   - '@sentry/core@10.58.0'
   - '@sentry/node-core@10.58.0'
