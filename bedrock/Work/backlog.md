@@ -14,7 +14,7 @@ Forward roadmap after the Phases 6.6 → 7.7 audit batch. Canonical source for p
 
 ## Next (named follow-ups from the batch)
 
-- [ ] **Phase 7.7.x — complete structured-logger sweep.** Continue from Phase 7.7 B's partial sweep: convert remaining ~85 `console.*` callsites in 7 worker files to `logger.*`. Files (per `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`): `worker/index.ts` (21), `payout.processor.ts` (19), `verification.processor.ts` (12), `reconciliation.processor.ts` (8), `email.processor.ts` (8), `website-verification.processor.ts` (6), `delivery-verification.processor.ts` (6), `report.processor.ts` (5). Each commit removes its file's entry from the allowlist; spec enforces both directions (no new `console.*` outside allowlist AND counts can't drop below baseline without updating the map). Mechanical work; can ship file-by-file as small PRs.
+- [x] **Phase 7.7.x — complete structured-logger sweep.** ✅ DONE 2026-06-16 (commit `5af902c` on PR #1). All 8 worker files swept (85 callsites → logger.*); 4 stale `.js`/`.map` build artifacts removed; allowlist trimmed to forever-allowed entries only (`apps/api/src/main.ts` boot fallback + 3 browser `auth.tsx`).
 - [ ] **Phase 7.3.1 — `(status, reviewEndsAt)` index on Settlement.** Tiny migration. The Phase 7.3 auto-approve worker sweep hits this access pattern every 15m. **Blocked on Prisma 6.19.3 → 7.4+ upgrade** (Prisma 6 wraps migrations in a transaction; `CREATE INDEX CONCURRENTLY` rejects with `cannot run inside a transaction block` per prisma#14456, fixed in 7.4). Out of scope until Prisma is upgraded.
 
 ## Phase 7.8 — Security Hardening Batch (per 2026-06-16 roadmap)

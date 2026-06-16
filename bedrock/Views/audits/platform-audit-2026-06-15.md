@@ -872,7 +872,7 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 ### Active — partial, continuing as small follow-up commits
 
-- **Phase 7.7.x — Structured logger sweep continuation.** Phase 7.7 B landed the logger module + 13 unit tests + the sweep regression guard, then converted 8 worker files (~23 of 114 `console.*` callsites). The remaining ~85 callsites across 7 worker files (`worker/index.ts` (21), `payout` (19), `verification` (12), `reconciliation` (8), `email` (8), `website-verification` (6), `delivery-verification` (6), `report` (5)) stay snapshotted in `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`. Guard enforces both directions: new `console.*` in a non-listed file fails CI; counts dropping below baseline also fail (forces the allowlist to stay tight as sweeps land). Mechanical work; ships file-by-file. Split intentional — full sweep was 3× the original Phase 7.7 plan estimate.
+_(none — Phase 7.7.x sweep landed as commit `5af902c` on PR #1; allowlist now contains only forever-allowed entries: `apps/api/src/main.ts` boot fallback + 3 browser-side `auth.tsx`)_
 
 ### Blocked — designed + approved, waiting on upstream
 
@@ -891,7 +891,7 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 - **After Phase 7.7 A1 prod migration applied** — paste before/after `requestId`-coverage counts + `EXPLAIN ANALYZE` plan node showing `Index Scan using "AuditLog_requestId_idx"` into the Phase 7.7 §11 entry.
 - **After Phase 7.7 C operator adds `SENTRY_AUTH_TOKEN`** — confirm first post-merge CI build uploaded source maps; check Sentry → Releases → artifact list; add a one-line "source-maps live" note to Phase 7.7 §11 entry.
-- **After each Phase 7.7.x sweep commit** — remove the swept file's entry from `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`; update the count in this dashboard if convenient.
+- ~~After each Phase 7.7.x sweep commit~~ — **DONE** (commit `5af902c`). Allowlist now at its forever-allowed steady state.
 - **After Prisma 6 → 7.4+ upgrade** — unblock Phase 7.3.1; ship the composite index migration; record planner-usage proof per the deferred plan's verification checklist.
 - **After Phase 7.8 lands** — append new §11 entry; update scorecard's "Rate limiting" / "Replay protection" rows.
 - **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
