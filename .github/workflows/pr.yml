@@ -42,9 +42,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Version comes from `packageManager: pnpm@11.5.1` in package.json.
+      # Specifying `version:` here ALSO triggers pnpm/action-setup@v4 to error
+      # with "Multiple versions of pnpm specified" — package.json is the
+      # single source of truth.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 11
 
       - uses: actions/setup-node@v4
         with:
