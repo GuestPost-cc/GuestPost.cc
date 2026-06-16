@@ -26,6 +26,9 @@ function makePrismaMock() {
     "settlementApproval", "publisherBalance", "withdrawal", "payoutExecution",
     "publisher", "publisherMembership", "staffMembership", "notification",
     "orderDispute", "auditLog", "marketplaceListing", "service",
+    // Phase 6 — production orders.service.ts calls tx.listingService.findUnique
+    // on the snapshot path; F-3 needs this model to be on the mock.
+    "listingService",
   ]
   const mock: any = {}
   for (const t of tables) {
@@ -388,10 +391,40 @@ describe("F-3: tenant-scoped order idempotency", () => {
 
   it("another tenant reusing the same key gets its OWN order, not the other tenant's", async () => {
     prisma.order.findUnique.mockResolvedValue(null) // scoped lookup: no hit for org-B
+
+    // Phase 6 — orders.service.ts:99–132 requires the listingServiceId snapshot
+    // to resolve before order creation. Mock shape mirrors the production
+    // findUnique({ where, include: { listing: { include: { website } } } })
+    // query so the snapshot block can read availability + listing.status +
+    // listing.ownerType + listing.website.{id,ownershipType,verificationStatus,managedByUserId}.
+    prisma.listingService.findUnique.mockResolvedValue({
+      id: "ls-B",
+      listingId: "listing-B",
+      serviceType: "GUEST_POST",
+      price: 500,
+      availability: "AVAILABLE",
+      turnaroundDays: 7,
+      listing: {
+        status: "APPROVED",
+        ownerType: "PUBLISHER",
+        website: {
+          id: "site-B",
+          ownershipType: "PUBLISHER",
+          verificationStatus: "VERIFIED",
+          managedByUserId: null,
+        },
+      },
+    })
     prisma.order.create.mockResolvedValue({ id: "order-B", organizationId: "org-B" })
 
     const result = await service.createOrder(
-      { type: "GUEST_POST", customerId: "u2", organizationId: "org-B", idempotencyKey: "key-1" } as any,
+      {
+        type: "GUEST_POST",
+        customerId: "u2",
+        organizationId: "org-B",
+        idempotencyKey: "key-1",
+        listingServiceId: "ls-B", // Phase 6 snapshot requirement
+      } as any,
       "u2",
     )
 

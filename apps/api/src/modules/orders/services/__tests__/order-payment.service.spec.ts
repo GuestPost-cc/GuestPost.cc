@@ -11,6 +11,17 @@ describe("OrderPaymentService", () => {
   const mockOrder = {
     id: "order-1",
     organizationId: "org-1",
+    // Phase 6.9 — assertOwnerOrCreator runs before any status/amount check.
+    // customerId == userId ("user-1") makes the actor the creator, which
+    // passes the gate so the BadRequest/Conflict paths below can actually
+    // fire. (Alternative: pass actorRole: "OWNER" as a 4th arg to
+    // submitPayment — both paths exercise the same downstream code.)
+    customerId: "user-1",
+    // Phase 6 snapshot — submitPayment's price-drift check reads
+    // tx.listingService.findUnique({ where: { id: order.listingServiceId } }).
+    // Without this field the service throws BadRequestException at
+    // order-payment.service.ts:64 ("Order has no listingServiceId snapshot").
+    listingServiceId: "ls-1",
     status: "DRAFT",
     amount: new Decimal(500),
     version: 1,
@@ -49,7 +60,10 @@ describe("OrderPaymentService", () => {
         findUniqueOrThrow: jest.fn(),
       },
       orderItem: { findMany: jest.fn() },
-      marketplaceListing: { findFirst: jest.fn() },
+      // Phase 6 — production uses tx.listingService.findUnique on the snapshotted
+      // listingServiceId. marketplaceListing.findFirst is the legacy fallback path
+      // that orders.service.ts uses at create time, not order-payment.
+      listingService: { findUnique: jest.fn() },
       orderEvent: { create: jest.fn() },
       $transaction: jest.fn(),
     }
@@ -63,7 +77,10 @@ describe("OrderPaymentService", () => {
         prismaMock.order.findFirst.mockResolvedValue(mockOrder)
         prismaMock.wallet.findFirst.mockResolvedValue(mockWallet)
         prismaMock.orderItem.findMany.mockResolvedValue(mockItems)
-        prismaMock.marketplaceListing.findFirst.mockResolvedValue({ price: new Decimal(500) })
+        prismaMock.listingService.findUnique.mockResolvedValue({
+          price: new Decimal(500),
+          availability: "AVAILABLE",
+        })
         prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
         prismaMock.order.updateMany
           .mockResolvedValue({ count: 1 }) // captured
@@ -143,7 +160,7 @@ describe("OrderPaymentService", () => {
         prismaMock.order.findFirst.mockResolvedValue(mockOrder)
         prismaMock.wallet.findFirst.mockResolvedValue(mockWallet)
         prismaMock.orderItem.findMany.mockResolvedValue(mockItems)
-        prismaMock.marketplaceListing.findFirst.mockResolvedValue(null)
+        prismaMock.listingService.findUnique.mockResolvedValue(null)
         return cb(prismaMock)
       })
 
@@ -157,7 +174,10 @@ describe("OrderPaymentService", () => {
         prismaMock.order.findFirst.mockResolvedValue(mockOrder)
         prismaMock.wallet.findFirst.mockResolvedValue(mockWallet)
         prismaMock.orderItem.findMany.mockResolvedValue(mockItems)
-        prismaMock.marketplaceListing.findFirst.mockResolvedValue({ price: new Decimal(500) })
+        prismaMock.listingService.findUnique.mockResolvedValue({
+          price: new Decimal(500),
+          availability: "AVAILABLE",
+        })
         prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
         prismaMock.order.updateMany.mockResolvedValue({ count: 0 })
         return cb(prismaMock)
