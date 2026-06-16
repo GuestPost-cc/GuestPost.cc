@@ -9,6 +9,7 @@ env:
   DATABASE_URL: postgresql://guestpost:guestpost@localhost:5432/guestpost_test
   REDIS_URL: redis://localhost:6379
   JWT_SECRET: test-secret-for-ci-only
+  QUEUE_SIGNING_SECRET: ci-only-queue-secret-not-used-in-prod-012345
   BETTER_AUTH_URL: http://localhost:3000
   CORS_ORIGIN: http://localhost:3000
 

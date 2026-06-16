@@ -5,6 +5,24 @@ on:
     branches: [main]
   pull_request:
 
+env:
+  NODE_ENV: test
+  DATABASE_URL: postgresql://guestpost:guestpost@localhost:5432/guestpost?schema=public
+  REDIS_URL: redis://localhost:6379
+  JWT_SECRET: ci-only-jwt-secret-not-used-in-prod-0123456789
+  QUEUE_SIGNING_SECRET: ci-only-queue-secret-not-used-in-prod-012345
+  BETTER_AUTH_URL: http://localhost:3000
+  CORS_ORIGIN: http://localhost:3000
+  # Phase 7.7 C — Sentry source-map upload. When SENTRY_AUTH_TOKEN is
+  # configured as a repo secret, `pnpm build` uploads source maps for
+  # each Next.js app's bundle so production Sentry traces show source-
+  # line + filename instead of minified offsets. When the secret is
+  # unset (e.g. forks, PRs from external contributors), the upload step
+  # is silently skipped and the build still succeeds.
+  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+  SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+  SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -29,20 +47,6 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-    env:
-      DATABASE_URL: postgresql://guestpost:guestpost@localhost:5432/guestpost?schema=public
-      REDIS_URL: redis://localhost:6379
-      JWT_SECRET: ci-only-jwt-secret-not-used-in-prod-0123456789
-      QUEUE_SIGNING_SECRET: ci-only-queue-secret-not-used-in-prod-012345
-      # Phase 7.7 C — Sentry source-map upload. When SENTRY_AUTH_TOKEN is
-      # configured as a repo secret, `pnpm build` uploads source maps for
-      # each Next.js app's bundle so production Sentry traces show source-
-      # line + filename instead of minified offsets. When the secret is
-      # unset (e.g. forks, PRs from external contributors), the upload step
-      # is silently skipped and the build still succeeds.
-      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-      SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
     steps:
       - uses: actions/checkout@v4
       # Version comes from `packageManager: pnpm@11.5.1` in package.json.
@@ -56,12 +60,19 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
+      # Build every workspace package the Next.js apps import at compile time.
+      # Without ui + api-client built, tsc --noEmit on the apps fails with
+      # "Cannot find module '@guestpost/ui'" because the dist/ outputs don't
+      # exist yet for TypeScript path resolution.
+      - run: pnpm run build --filter=@guestpost/shared --filter=@guestpost/database --filter=@guestpost/auth --filter=@guestpost/ui --filter=@guestpost/api-client
+        name: Build dependencies
+
       - name: Apply migrations
         run: npx prisma migrate deploy
         working-directory: packages/database
 
-      - name: Build all targets
-        run: pnpm build
+      - name: TypeScript check
+        run: pnpm run typecheck
 
       - name: API unit tests
         run: pnpm test
@@ -70,6 +81,9 @@ jobs:
       - name: UI component tests (coverage)
         run: pnpm test:coverage
         working-directory: packages/ui
+
+      - name: Build all targets
+        run: pnpm build
 
       # Playwright journeys need the full app stack; they run in the
       # heavier nightly job / locally via `npx playwright test`.
