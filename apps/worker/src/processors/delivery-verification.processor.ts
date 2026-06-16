@@ -5,8 +5,11 @@ import { createObservableWorker } from "../lib/queue-observability"
 // Node-only deep imports keep cheerio + aws-sdk out of the shared index.
 import { runDeliveryVerification, runSettlementHoldLinkSweep, FetchResult } from "@guestpost/shared/dist/delivery-verification-core"
 import { putObject } from "@guestpost/shared/dist/object-storage"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { prisma } from "@guestpost/database"
 import { enqueueTrustRecompute } from "../trust-enqueue"
+
+const logger = createLogger("worker.delivery-verification")
 
 // Delivery verification worker. Fetches the published page (SSRF-guarded,
 // redirect chain resolved manually), then delegates to the pure core which
@@ -88,24 +91,29 @@ export function createDeliveryVerificationWorker() {
     QUEUES.DELIVERY_VERIFICATION,
     async (job) => {
       if (!verifyJobPayload(job.data)) {
-        console.error(`[DELIVERY_VERIFY] Job ${job.id} missing/invalid signature — rejecting`)
+        logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
       // Settlement-hold link monitoring sweep (repeatable).
       if (job.name === "settlement-hold-sweep") {
         const res = await runSettlementHoldLinkSweep(deps)
-        console.log(`[DELIVERY_VERIFY] hold link sweep: ${JSON.stringify(res)}`)
+        logger.info("settlement-hold link sweep complete", { result: res })
         return res
       }
       if (job.name !== "delivery-verify") {
-        console.warn(`[DELIVERY_VERIFY] Unknown job: ${job.name}`)
+        logger.warn("unknown job name", { jobName: job.name })
         return
       }
       const { deliveryVersionId, actorUserId } = job.data as { deliveryVersionId: string; actorUserId?: string }
       const maxAttempts = job.opts.attempts ?? 1
       const isFinalAttempt = job.attemptsMade >= maxAttempts - 1
       const res = await runDeliveryVerification(deps, deliveryVersionId, { actorUserId, isFinalAttempt })
-      console.log(`[DELIVERY_VERIFY] ${deliveryVersionId} (attempt ${job.attemptsMade + 1}/${maxAttempts}): ${JSON.stringify(res)}`)
+      logger.info("delivery verification complete", {
+        deliveryVersionId,
+        attempt: job.attemptsMade + 1,
+        maxAttempts,
+        result: res,
+      })
       return res
     },
     {
@@ -121,7 +129,7 @@ export function createDeliveryVerificationWorker() {
     },
   )
 
-  worker.on("completed", (job) => console.log(`[DELIVERY_VERIFY] Job ${job.id} completed`))
-  worker.on("failed", (job, err) => console.error(`[DELIVERY_VERIFY] Job ${job?.id} failed:`, err?.message))
+  worker.on("completed", (job) => logger.info("job completed", { jobId: job.id }))
+  worker.on("failed", (job, err) => logger.error("job failed", { jobId: job?.id, err: err?.message }))
   return worker
 }

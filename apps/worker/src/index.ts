@@ -27,7 +27,10 @@ import { connection } from "./redis"
 import { prisma } from "@guestpost/database"
 import { Queue } from "bullmq"
 import { QUEUES, signJobPayload } from "@guestpost/shared"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { startHealthServer, type HealthServerHandle } from "./lib/health-server"
+
+const logger = createLogger("worker.bootstrap")
 
 // Stuck-payout safety net: webhooks are the primary completion signal, this
 // poll catches transfers whose webhook was lost or never configured.
@@ -44,7 +47,7 @@ async function registerPayoutStatusPoll() {
     },
   )
   await queue.close()
-  console.log("[WORKER] Registered payout status poll (every 10m)")
+  logger.info("registered payout status poll", { intervalMs: 10 * 60 * 1000 })
 }
 
 // Scheduled drift sweep — alerting must not depend on a human remembering to
@@ -63,7 +66,7 @@ async function registerReconciliationSweep() {
     },
   )
   await queue.close()
-  console.log(`[WORKER] Registered reconciliation sweep (every ${everyMs / 60000}m)`)
+  logger.info("registered reconciliation sweep", { intervalMs: everyMs, intervalMin: everyMs / 60000 })
 }
 
 // Domain re-verification sweep — every VERIFIED site is re-checked every 30d
@@ -82,7 +85,7 @@ async function registerWebsiteReverifySweep() {
     },
   )
   await queue.close()
-  console.log(`[WORKER] Registered website re-verify sweep (every ${everyMs / 86400000}d)`)
+  logger.info("registered website re-verify sweep", { intervalMs: everyMs, intervalDays: everyMs / 86400000 })
 }
 
 // Settlement-hold link monitoring — re-check the live link for every order
@@ -102,7 +105,7 @@ async function registerSettlementHoldLinkSweep() {
     },
   )
   await queue.close()
-  console.log(`[WORKER] Registered settlement-hold link sweep (every ${everyMs / 3600000}h)`)
+  logger.info("registered settlement-hold link sweep", { intervalMs: everyMs, intervalHours: everyMs / 3600000 })
 }
 
 // Phase 7.3 — settlement review window auto-approval. Replaces the per-API-pod
@@ -113,7 +116,9 @@ async function registerSettlementHoldLinkSweep() {
 // for tuning during backlog recovery.
 async function registerSettlementAutoApproveSweep() {
   if (process.env.SETTLEMENT_AUTO_APPROVE_DISABLED === "true") {
-    console.log("[WORKER] Settlement auto-approve disabled via SETTLEMENT_AUTO_APPROVE_DISABLED — skipping cron registration")
+    logger.info("settlement auto-approve disabled — skipping cron registration", {
+      env: "SETTLEMENT_AUTO_APPROVE_DISABLED",
+    })
     return
   }
   const everyMs = Math.max(
@@ -136,25 +141,27 @@ async function registerSettlementAutoApproveSweep() {
     },
   )
   await queue.close()
-  console.log(
-    `[WORKER] Registered settlement auto-approve sweep (every ${everyMs / 60000}m, batchSize=${batchSize})`,
-  )
+  logger.info("registered settlement auto-approve sweep", {
+    intervalMs: everyMs,
+    intervalMin: everyMs / 60000,
+    batchSize,
+  })
 }
 
 async function checkConnections() {
   try {
     await connection.ping()
   } catch (err) {
-    console.error("[WORKER] FATAL: Redis connection failed:", err)
+    logger.error("FATAL: Redis connection failed", { err: err instanceof Error ? err.message : String(err) })
     process.exit(1)
   }
   try {
     await prisma.$queryRaw`SELECT 1`
   } catch (err) {
-    console.error("[WORKER] FATAL: Database connection failed:", err)
+    logger.error("FATAL: Database connection failed", { err: err instanceof Error ? err.message : String(err) })
     process.exit(1)
   }
-  console.log("[WORKER] Redis + database connections verified")
+  logger.info("Redis + database connections verified")
 }
 
 const workers: Array<{ close: () => Promise<void> }> = []
@@ -174,7 +181,7 @@ let healthServer: HealthServerHandle | undefined
 const SHOULD_EXIT_ON_UNHANDLED_REJECTION = process.env.UNHANDLED_REJECTION_EXIT !== "false"
 
 async function flushAndExit(code: number, reason: string, err: unknown): Promise<never> {
-  console.error(`[WORKER] FATAL: ${reason}:`, err)
+  logger.error("FATAL: process exit", { reason, err: err instanceof Error ? err.message : String(err) })
   Sentry.captureException(err)
   try {
     await Sentry.flush(2000)
@@ -189,7 +196,9 @@ process.on("unhandledRejection", (reason: unknown) => {
     void flushAndExit(1, "unhandledRejection", reason)
     return
   }
-  console.error("[WORKER] unhandledRejection (continuing — UNHANDLED_REJECTION_EXIT=false):", reason)
+  logger.error("unhandledRejection (continuing — UNHANDLED_REJECTION_EXIT=false)", {
+    reason: reason instanceof Error ? reason.message : String(reason),
+  })
   Sentry.captureException(reason)
 })
 
@@ -215,37 +224,41 @@ async function bootstrap() {
     createPublisherTrustWorker(),
     createSettlementAutoApproveWorker(),
   )
-  console.log(`[WORKER] Started ${workers.length} workers`)
+  logger.info("workers started", { count: workers.length })
   await Promise.all([
     registerPayoutStatusPoll().catch((err) =>
-      console.error("[WORKER] Failed to register payout status poll:", err),
+      logger.error("failed to register payout status poll", { err: err instanceof Error ? err.message : String(err) }),
     ),
     registerReconciliationSweep().catch((err) =>
-      console.error("[WORKER] Failed to register reconciliation sweep:", err),
+      logger.error("failed to register reconciliation sweep", { err: err instanceof Error ? err.message : String(err) }),
     ),
     registerWebsiteReverifySweep().catch((err) =>
-      console.error("[WORKER] Failed to register website re-verify sweep:", err),
+      logger.error("failed to register website re-verify sweep", { err: err instanceof Error ? err.message : String(err) }),
     ),
     registerSettlementHoldLinkSweep().catch((err) =>
-      console.error("[WORKER] Failed to register settlement-hold link sweep:", err),
+      logger.error("failed to register settlement-hold link sweep", { err: err instanceof Error ? err.message : String(err) }),
     ),
     registerSettlementAutoApproveSweep().catch((err) =>
-      console.error("[WORKER] Failed to register settlement auto-approve sweep:", err),
+      logger.error("failed to register settlement auto-approve sweep", { err: err instanceof Error ? err.message : String(err) }),
     ),
   ])
 }
 
 bootstrap().catch((err) => {
-  console.error("[WORKER] FATAL: bootstrap failed:", err)
+  logger.error("FATAL: bootstrap failed", { err: err instanceof Error ? err.message : String(err) })
   Sentry.captureException(err)
   void Sentry.flush(2000).finally(() => process.exit(1))
 })
 
 async function shutdown(signal: string): Promise<void> {
-  console.log(`[WORKER] ${signal} received — draining workers...`)
-  await Promise.all(workers.map((w) => w.close().catch((err) => console.error("[WORKER] worker close error:", err))))
+  logger.info("signal received — draining workers", { signal })
+  await Promise.all(workers.map((w) => w.close().catch((err) =>
+    logger.error("worker close error", { err: err instanceof Error ? err.message : String(err) })
+  )))
   if (healthServer) {
-    await healthServer.close().catch((err) => console.error("[WORKER] health server close error:", err))
+    await healthServer.close().catch((err) =>
+      logger.error("health server close error", { err: err instanceof Error ? err.message : String(err) })
+    )
   }
   try {
     await Sentry.flush(2000)

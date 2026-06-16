@@ -2,13 +2,16 @@ import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.report")
 
 export function createReportWorker() {
   const worker = createObservableWorker(
     QUEUES.REPORT,
     async (job) => {
       if (!verifyJobPayload(job.data)) {
-        console.error(`[REPORT] Job ${job.id} has missing/invalid signature — rejecting`)
+        logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
 
@@ -65,11 +68,11 @@ export function createReportWorker() {
             },
           })
 
-          console.log(`[REPORT] ${format ?? "pdf"} report generated for order ${orderId}`)
+          logger.info("report generated", { orderId, format: format ?? "pdf" })
           break
         }
         default:
-          console.warn(`[REPORT] Unknown job: ${job.name}`)
+          logger.warn("unknown job name", { jobName: job.name })
       }
 
       return { generated: true, orderId }
@@ -78,11 +81,11 @@ export function createReportWorker() {
   )
 
   worker.on("completed", (job) => {
-    console.log(`[REPORT] Job ${job.id} completed`)
+    logger.info("job completed", { jobId: job.id })
   })
 
   worker.on("failed", (job, err) => {
-    console.error(`[REPORT] Job ${job?.id} failed:`, err)
+    logger.error("job failed", { jobId: job?.id, err: err?.message })
   })
 
   return worker
