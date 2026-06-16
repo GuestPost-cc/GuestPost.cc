@@ -858,20 +858,45 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | Dimension | Original | Now | Change |
 |---|---|---|---|
 | RBAC granularity | C | **B+** | Phase 6.7 closure of #2 + fail-closed guard + matrix |
-| Documentation + audit-trail uniformity | C+ | **B** | participantRole + actorSnapshot on every ticket message |
+| Documentation + audit-trail uniformity | C+ | **A−** | participantRole + actorSnapshot on every ticket message; Phase 7.7 A1 indexed `AuditLog.requestId` makes the trail SQL-queryable end-to-end |
 | Input validation | (no row) | **A−** | 18 DTOs + class-validator coverage on every admin action body |
-| Worker idempotency | B | B | Support fan-out deduped; other queues unchanged |
-| Frontend reliability (errors/loading/empties) | C+ | C+ | Not touched |
-| Reporting + finance visibility | D | D | Not touched (#5 PlatformRevenue still open) |
+| Worker idempotency | B | **B+** | Phase 7.4 notification dedup (partial unique on `(userId, dedupKey)`); Phase 7.3 settlement auto-approve cluster-wide `jobId` dedup |
+| Frontend reliability (errors/loading/empties) | C+ | **B** | Phase 7.0 `error.tsx` + `global-error.tsx` + Sentry across all 4 apps; Phase 7.7 C source-maps unminify production stack traces |
+| Reporting + finance visibility | D | **B** | Phase 7.1 `GET /admin/finance/revenue` with 4 groupings + CSV + period comparison |
+| Observability + correlation | (no row) | **B+** | Phase 7.0 Sentry + request-IDs + worker `/health` `/ready` `/metrics/queues`; Phase 7.7 indexed `requestId` column + admin filter + structured logger (partial) + source-map upload + extended `/metrics` |
+| Mobile UX | (no row) | **B** | Phase 7.6 closed #9 — drawer ported into admin + publisher; a11y polish (escape/focus-trap/scroll-lock) deferred to Phase 7.9 |
 
-**What to ship next** (in priority order, post-Phase-7.6):
+---
 
-1. **Phase 7.3.1** — `CREATE INDEX CONCURRENTLY ON Settlement(status, reviewEndsAt)`. Tiny migration; the Phase 7.3 worker sweep hits this access pattern every 15m. Must use `CONCURRENTLY` (Prisma migration needs transaction-disable directive) to avoid table-write lockout on prod-sized tables.
-2. **Phase 7.6.1** — Drawer a11y polish (escape-to-close, focus trap, body-scroll-lock) applied uniformly across portal + admin + publisher. None of the three apps have these today; consistent polish pass is the right scope.
-3. **Phase 7.0.1** — Observability follow-ups (`requestId` indexed column + backfill, structured logger, Sentry source-map upload).
-4. **Remaining Medium findings** (5 still open per the §2 list).
+**Forward roadmap** — the post-Phase-7.7 work, organized by lane so it's clear what's mid-flight vs blocked vs queued:
 
-**Production-blocker status**: **11 of 11 Criticals closed (100%)**. The platform no longer has any production-blocker finding from the 2026-06-15 audit. Remaining work is High/Medium polish + observability cleanup.
+### Active — partial, continuing as small follow-up commits
+
+- **Phase 7.7.x — Structured logger sweep continuation.** Phase 7.7 B landed the logger module + 13 unit tests + the sweep regression guard, then converted 8 worker files (~23 of 114 `console.*` callsites). The remaining ~85 callsites across 7 worker files (`worker/index.ts` (21), `payout` (19), `verification` (12), `reconciliation` (8), `email` (8), `website-verification` (6), `delivery-verification` (6), `report` (5)) stay snapshotted in `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`. Guard enforces both directions: new `console.*` in a non-listed file fails CI; counts dropping below baseline also fail (forces the allowlist to stay tight as sweeps land). Mechanical work; ships file-by-file. Split intentional — full sweep was 3× the original Phase 7.7 plan estimate.
+
+### Blocked — designed + approved, waiting on upstream
+
+- **Phase 7.3.1 — `Settlement(status, reviewEndsAt)` composite index.** Status: **designed, approved, NOT implemented**. The most valuable uncompleted roadmap item. Phase 7.3's auto-approve worker sweep hits this access pattern every 15m, so the index pays off immediately at prod scale. **Blocked on Prisma 6.19.3 → 7.4+ upgrade**: Prisma 6 wraps each migration in a transaction and `CREATE INDEX CONCURRENTLY` cannot run inside one (prisma#14456, fixed in Prisma 7.4). Out of scope until the Prisma version upgrade lands as its own (week-scale) project.
+
+### Deferred — approved plan moved into a later phase
+
+- **Phase 7.6.1 — Drawer a11y polish.** Approved plan preserved verbatim in `~/.claude/plans/read-the-bedrock-views-audits-platform-a-typed-spark.md` appendix. Outstanding: focus trap, escape-to-close, focus restoration on close, body scroll-lock, plus `role="dialog"` / `aria-modal` / `aria-expanded` semantics. Implementation = a single shared `useDrawerA11y` hook in `@guestpost/ui/hooks/` wired into all three layouts. **Bundled into Phase 7.9** per the 2026-06-16 roadmap pivot — accessibility work groups naturally with the other frontend polish items (#28/#29/#30).
+
+### Queued — next two cohesive phases (per 2026-06-16 roadmap)
+
+- **Phase 7.8 — Security Hardening Batch.** Bundle: #26 (email-keyed rate limiter; current per-IP-only limits don't stop credential stuffing across an IP pool) + #27 (job-signing `iat` validation / replay protection) + related auth/session follow-ups discovered during implementation. Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase.
+- **Phase 7.9 — Frontend Quality & Accessibility.** Bundle: #28 (status-color centralization in `@guestpost/ui` — `PUBLISHED` currently renders as 3 different greens) + #29 (adopt the Phase A shared components — `<BriefRenderer>` / `<FulfillmentChannelBadge>` / `<SupportPanel>` shipped batch 22 with zero imports today) + #30 (publisher listings hooks-rule violation at `apps/publisher/src/app/dashboard/listings/page.tsx:182-195`) + **Phase 7.6.1** (drawer a11y polish). Mission: Frontend consistency / Accessibility / Maintainability / Shared patterns.
+
+### Future minimal updates (after specific work lands)
+
+- **After Phase 7.7 A1 prod migration applied** — paste before/after `requestId`-coverage counts + `EXPLAIN ANALYZE` plan node showing `Index Scan using "AuditLog_requestId_idx"` into the Phase 7.7 §11 entry.
+- **After Phase 7.7 C operator adds `SENTRY_AUTH_TOKEN`** — confirm first post-merge CI build uploaded source maps; check Sentry → Releases → artifact list; add a one-line "source-maps live" note to Phase 7.7 §11 entry.
+- **After each Phase 7.7.x sweep commit** — remove the swept file's entry from `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`; update the count in this dashboard if convenient.
+- **After Prisma 6 → 7.4+ upgrade** — unblock Phase 7.3.1; ship the composite index migration; record planner-usage proof per the deferred plan's verification checklist.
+- **After Phase 7.8 lands** — append new §11 entry; update scorecard's "Rate limiting" / "Replay protection" rows.
+- **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
+
+**Production-blocker status**: **11 of 11 Criticals closed (100%)**. No production-blocker finding from the 2026-06-15 audit remains open. All remaining work is High/Medium polish, security hardening, or accessibility — none gate production.
 
 ---
 
