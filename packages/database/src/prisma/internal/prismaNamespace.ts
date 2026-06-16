@@ -5721,6 +5721,7 @@ export const AuditLogScalarFieldEnum = {
   entityType: 'entityType',
   entityId: 'entityId',
   metadata: 'metadata',
+  requestId: 'requestId',
   userId: 'userId',
   organizationId: 'organizationId',
   ipAddress: 'ipAddress',

@@ -1320,13 +1320,13 @@ model Notification {
   user         User          @relation(fields: [userId], references: [id])
   organization Organization? @relation(fields: [organizationId], references: [id])
 
-  @@index([userId, read, createdAt])
-  @@index([organizationId, createdAt])
-  @@index([read])
   // Partial unique — see migration 20260616100000_phase74_notification_dedup.
   // Prisma doesn't model partial uniques directly; this @@unique mirrors the
   // SQL constraint name. NULL dedupKey rows are exempt.
   @@unique([userId, dedupKey], map: "Notification_userId_dedupKey_key")
+  @@index([userId, read, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([read])
 }
 
 model AuditLog {
@@ -1335,6 +1335,12 @@ model AuditLog {
   entityType     String
   entityId       String?
   metadata       Json?
+  // Phase 7.7 A1 — requestId promoted to indexed top-level column for
+  // forensic SQL queries (WHERE requestId = '<id>'). Continues to be
+  // mirrored into metadata.requestId for downstream consumers; both
+  // writes happen in AuditService.log(). VARCHAR(128) matches the
+  // isValidRequestId allowlist regex in shared/observability/request-context.
+  requestId      String?  @db.VarChar(128)
   // Nullable: system/webhook actions and platform-scope actions have no
   // real user/org. Sentinel strings ("SYSTEM") violated the FK and were
   // silently dropped by the audit service — never reintroduce them.
@@ -1351,6 +1357,10 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([userId])
   @@index([action])
+  // Partial unique index (WHERE requestId IS NOT NULL) — see migration
+  // 20260616130000_phase77_audit_request_id_column. Prisma doesn't model
+  // partial predicates; this @@index mirrors the SQL constraint name.
+  @@index([requestId], map: "AuditLog_requestId_idx")
 }
 
 // =============================================================================
