@@ -3,6 +3,10 @@
 // Consolidates ad-hoc process.env reads that were scattered across processors.
 // Hard-required vars cause exit(1) on startup. Optional vars warn once.
 
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.env")
+
 const REQUIRED = ["DATABASE_URL", "REDIS_URL"] as const
 
 const PRODUCTION_REQUIRED = ["QUEUE_SIGNING_SECRET"] as const
@@ -18,7 +22,7 @@ export function validateEnv(): void {
     if (!process.env[key]) missing.push(key)
   }
   if (missing.length > 0) {
-    console.error(`[WORKER] FATAL: missing required env vars: ${missing.join(", ")}`)
+    logger.error("FATAL: missing required env vars", { missing })
     process.exit(1)
   }
 
@@ -28,14 +32,14 @@ export function validateEnv(): void {
       if (!process.env[key]) missingProd.push(key)
     }
     if (missingProd.length > 0) {
-      console.error(`[WORKER] FATAL: missing production-required env vars: ${missingProd.join(", ")}`)
+      logger.error("FATAL: missing production-required env vars", { missing: missingProd })
       process.exit(1)
     }
   }
 
   for (const key of OPTIONAL_WARN) {
     if (!process.env[key]) {
-      console.warn(`[WORKER] optional env var '${key}' not set — feature will be disabled`)
+      logger.warn("optional env var not set — feature will be disabled", { key })
     }
   }
 }

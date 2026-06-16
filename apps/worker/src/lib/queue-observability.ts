@@ -23,6 +23,9 @@ import * as Sentry from "@sentry/node"
 // Deep import: request-context uses node:async_hooks and is not in the
 // shared barrel.
 import { runWithRequestId } from "@guestpost/shared/dist/observability/request-context"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.queue-observability")
 
 type RequestIdCarrier = { requestId?: unknown }
 
@@ -70,9 +73,13 @@ export function createObservableWorker<TData = any, TResult = any>(
       if (requestId) scope.setTag("requestId", requestId)
       Sentry.captureException(err)
     })
-    console.error(
-      `[OBSERVABILITY] captured job failure: queue=${queueName} jobId=${job?.id ?? "?"} attempts=${job?.attemptsMade ?? "?"} requestId=${requestId ?? "-"} err=${err.message}`,
-    )
+    logger.error("captured job failure", {
+      queue: queueName,
+      jobId: job?.id ?? null,
+      attemptsMade: job?.attemptsMade ?? null,
+      requestId: requestId ?? null,
+      err: err.message,
+    })
   })
 
   // BullMQ emits 'error' for worker-level failures (Redis disconnect, etc.) —
@@ -83,14 +90,14 @@ export function createObservableWorker<TData = any, TResult = any>(
       scope.setTag("source", "worker-error")
       Sentry.captureException(err)
     })
-    console.error(`[OBSERVABILITY] worker error: queue=${queueName} err=${err.message}`)
+    logger.error("worker error (Redis/connection-level)", { queue: queueName, err: err.message })
   })
 
   // 'stalled' jobs are recovered automatically by BullMQ on the next sweep,
   // but the pattern usually indicates a processor hang or a pod evict — worth
   // logging even if not capturing as an exception.
   worker.on("stalled", (jobId) => {
-    console.warn(`[OBSERVABILITY] job stalled: queue=${queueName} jobId=${jobId}`)
+    logger.warn("job stalled", { queue: queueName, jobId })
   })
 
   return worker

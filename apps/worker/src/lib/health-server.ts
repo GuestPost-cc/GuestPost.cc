@@ -21,6 +21,9 @@ import { connection } from "../redis"
 import { prisma } from "@guestpost/database"
 import { Queue } from "bullmq"
 import { QUEUES } from "@guestpost/shared"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.health-server")
 
 interface ReadinessCheck {
   status: "ok" | "error"
@@ -178,7 +181,7 @@ export async function startHealthServer(): Promise<HealthServerHandle> {
   const port = Number(process.env.WORKER_HEALTH_PORT) || 3004
   const server: Server = createServer((req, res) => {
     handleRequest(req, res).catch((err) => {
-      console.error("[HEALTH] handler crashed:", err)
+      logger.error("health handler crashed", { err: err instanceof Error ? err.message : String(err) })
       if (!res.headersSent) {
         writeJson(res, 500, { error: "internal server error" })
       }
@@ -197,7 +200,7 @@ export async function startHealthServer(): Promise<HealthServerHandle> {
     server.once("listening", onListening)
     server.listen(port)
   })
-  console.log(`[HEALTH] worker health server listening on :${port} (/health /ready /metrics/queues)`)
+  logger.info("worker health server listening", { port, routes: ["/health", "/ready", "/metrics/queues"] })
   return {
     port,
     close: () =>
