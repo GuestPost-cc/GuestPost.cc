@@ -24,29 +24,27 @@ const repoRoot = path.resolve(__dirname, "..", "..", "..", "..")
 // Map of repo-relative path → max allowed console.* call count.
 // Files NOT in this map MUST have zero console.* calls.
 //
-// "Always-allowed" entries (these stay forever):
-//   - structured-logger.ts: the implementation itself may reference console
-//     in fallback paths; the impl writes to process.stdout/stderr but the
-//     allowlist tolerates incidental console mentions in comments.
+// Post-Phase-7.7.x state: the worker sweep is complete (all 8 files cleared).
+// Only forever-allowed entries remain:
+//
 //   - apps/api/src/main.ts: absolute-last-resort boot/startup error handlers.
 //     These fire BEFORE the Nest app + logger module are guaranteed to be
 //     initialized — must remain console.* so a crashing boot still produces
 //     visible diagnostics.
 //
-// "Phase 7.7.x sweep candidates" — to be removed as they're swept:
-//   - The remaining worker processors + apps/worker/src/index.ts
+//   - apps/{admin,portal,publisher}/src/lib/auth.tsx: browser-side session-
+//     refresh error handler. The structured-logger module is Node-only (uses
+//     process.stdout/stderr); a browser-safe logger is a separate concern.
+//     console.error is the correct API here. One call per file.
+//
+// If any other file appears with console.*, either sweep it to use createLogger
+// from @guestpost/shared/dist/observability/structured-logger (preferred) or
+// add to this map with a comment justifying why it's exempt.
 const CURRENTLY_ALLOWED_WITH_CONSOLE: Record<string, number> = {
-  // Always-allowed.
   "apps/api/src/main.ts": 6, // boot/startup last-resort
-  // Phase 7.7.x sweep candidates — REMOVE THESE ENTRIES AS THEY'RE SWEPT.
-  "apps/worker/src/index.ts": 21,
-  "apps/worker/src/processors/payout.processor.ts": 19,
-  "apps/worker/src/processors/verification.processor.ts": 12,
-  "apps/worker/src/processors/reconciliation.processor.ts": 8,
-  "apps/worker/src/processors/email.processor.ts": 8,
-  "apps/worker/src/processors/website-verification.processor.ts": 6,
-  "apps/worker/src/processors/delivery-verification.processor.ts": 6,
-  "apps/worker/src/processors/report.processor.ts": 5,
+  "apps/admin/src/lib/auth.tsx": 1, // browser-side session-refresh error
+  "apps/portal/src/lib/auth.tsx": 1, // browser-side session-refresh error
+  "apps/publisher/src/lib/auth.tsx": 1, // browser-side session-refresh error
 }
 
 function countConsoleCalls(filepath: string): number {

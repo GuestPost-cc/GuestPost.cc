@@ -1,7 +1,10 @@
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { createObservableWorker } from "../lib/queue-observability"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import * as nodemailer from "nodemailer"
+
+const logger = createLogger("worker.email")
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "localhost",
@@ -43,7 +46,7 @@ export function createEmailWorker() {
     QUEUES.EMAIL,
     async (job) => {
       if (!verifyJobPayload(job.data)) {
-        console.error(`[EMAIL] Job ${job.id} has missing/invalid signature — rejecting`)
+        logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
 
@@ -51,7 +54,7 @@ export function createEmailWorker() {
 
       const validationError = validateEmailJob(to, subject, html)
       if (validationError) {
-        console.error(`[EMAIL] Job ${job.id} rejected: ${validationError}`)
+        logger.error("job rejected by validator", { jobId: job.id, error: validationError })
         throw new Error(validationError)
       }
 
@@ -62,16 +65,16 @@ export function createEmailWorker() {
         case "send-welcome":
           finalSubject = finalSubject || "Welcome to GuestPost.cc"
           finalHtml = finalHtml || `<h1>Welcome to GuestPost.cc</h1><p>We are glad you are here.</p>`
-          console.log(`[EMAIL] Welcome email to ${to}`)
+          logger.info("sending welcome email", { to })
           break
         case "send-invoice":
-          console.log(`[EMAIL] Invoice to ${to}: ${subject}`)
+          logger.info("sending invoice email", { to, subject })
           break
         case "send-magic-link":
-          console.log(`[EMAIL] Magic link to ${to}`)
+          logger.info("sending magic-link email", { to })
           break
         default:
-          console.log(`[EMAIL] ${subject} to ${to}`)
+          logger.info("sending email", { to, subject, jobName: job.name })
           break
       }
 
@@ -88,11 +91,11 @@ export function createEmailWorker() {
   )
 
   worker.on("completed", (job) => {
-    console.log(`[EMAIL] Job ${job.id} completed`)
+    logger.info("job completed", { jobId: job.id })
   })
 
   worker.on("failed", (job, err) => {
-    console.error(`[EMAIL] Job ${job?.id} failed:`, err)
+    logger.error("job failed", { jobId: job?.id, err: err?.message })
   })
 
   return worker

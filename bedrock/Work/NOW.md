@@ -27,7 +27,7 @@ Ten phases shipped (Phase 7.1–7.3 bundled due to file overlap; 7.4, 7.5, 7.6 s
 
 Per the 2026-06-16 roadmap (post-Phase-7.7):
 
-1. **Phase 7.7.x — complete structured-logger sweep**. Continue from B's partial sweep: convert remaining ~85 console.* callsites in 7 worker files (worker/index.ts, payout, verification, reconciliation, email, website-verification, delivery-verification, report) to `logger.*`. Each commit removes its file's entry from `CURRENTLY_ALLOWED_WITH_CONSOLE` in `phase-7-7-structured-logger-sweep.spec.ts`. Mechanical work; can ship file-by-file as small PRs.
+1. ~~**Phase 7.7.x — complete structured-logger sweep**~~ ✅ DONE 2026-06-16 (commit `5af902c` on PR #1). All 8 worker files swept; `apps/worker/src` has zero production console.* calls; allowlist at forever-allowed steady state.
 2. **Phase 7.8 — Security Hardening Batch** (per roadmap): #26 email-keyed rate limiter + #27 job-signing `iat` replay protection + related auth/session follow-ups. Bundle as one cohesive phase.
 3. **Phase 7.9 — Frontend Quality & Accessibility** (per roadmap): #28 status-color centralization + #29 unused shared component adoption + #30 hooks-rule violation + the deferred Phase 7.6.1 drawer a11y polish (status: Approved, Deferred). Dedicated frontend cleanup phase.
 4. **Phase 7.3.1 — `CREATE INDEX CONCURRENTLY` on Settlement** — blocked on Prisma 6 → 7.4+ upgrade. Out of scope until that upgrade lands.

@@ -3,6 +3,9 @@ import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.verification")
 
 const PRIVATE_IP_PATTERNS = [
   /^127\./, /^10\./, /^192\.168\./, /^169\.254\./,
@@ -40,7 +43,7 @@ async function verifyLinkOnPage(targetUrl: string, anchorText?: string): Promise
     headers: { "User-Agent": "GuestPost-Verification/1.0" },
   })
   if (!response.ok) {
-    console.warn(`[VERIFICATION] HTTP ${response.status} fetching ${targetUrl}`)
+    logger.warn("HTTP non-OK fetching target", { status: response.status, targetUrl })
     return null
   }
   const html = await response.text()
@@ -68,7 +71,7 @@ export function createVerificationWorker() {
           // Reject jobs not signed by the API — anyone with Redis access could
           // otherwise enqueue arbitrary URL fetches (SSRF)
           if (!verifyJobPayload(job.data)) {
-            console.error(`[VERIFICATION] Job ${job.id} has missing/invalid signature — rejecting`)
+            logger.error("job signature invalid — rejecting", { jobId: job.id })
             throw new Error("Invalid job signature")
           }
 
@@ -77,7 +80,7 @@ export function createVerificationWorker() {
           }
 
           if (!isSafePublicUrl(targetUrl)) {
-            console.error(`[VERIFICATION] Unsafe target URL rejected for order ${orderId}: ${targetUrl}`)
+            logger.error("unsafe target URL rejected (SSRF guard)", { orderId, targetUrl })
             return { verified: false, orderId, reason: "Target URL is not a safe public URL" }
           }
 
@@ -88,21 +91,21 @@ export function createVerificationWorker() {
           if (!order) throw new Error(`Order ${orderId} not found`)
 
           if (order.website?.url && !hostMatchesWebsite(targetUrl, order.website.url)) {
-            console.warn(`[VERIFICATION] Target URL host does not match order website for order ${orderId}`)
+            logger.warn("target URL host does not match order website", { orderId, targetUrl, websiteUrl: order.website.url })
             return { verified: false, orderId, reason: "Published URL does not match the order's website domain" }
           }
           if (order.status !== "PUBLISHED") {
-            console.warn(`[VERIFICATION] Order ${orderId} is ${order.status}, not PUBLISHED — skipping`)
+            logger.warn("order not PUBLISHED — skipping", { orderId, status: order.status })
             return { verified: false, orderId, reason: `Status is ${order.status}, expected PUBLISHED` }
           }
 
           const orgId = organizationId || order.organizationId
           if (orgId && order.organizationId !== orgId) {
-            console.warn(`[VERIFICATION] Organization mismatch for order ${orderId}`)
+            logger.warn("organization mismatch", { orderId, expectedOrg: orgId, actualOrg: order.organizationId })
             return { verified: false, orderId, reason: "Organization mismatch" }
           }
 
-          console.log(`[VERIFICATION] Verifying link for order ${orderId} at ${targetUrl}`)
+          logger.info("verifying link", { orderId, targetUrl, anchorText: anchorText ?? null })
           const evidence = await verifyLinkOnPage(targetUrl, anchorText)
 
           if (evidence) {
@@ -132,7 +135,7 @@ export function createVerificationWorker() {
               },
             })
 
-            console.log(`[VERIFICATION] Link verified for order ${orderId}${anchorText ? ` (anchor: "${anchorText}")` : ""}`)
+            logger.info("link verified", { orderId, targetUrl, anchorText: anchorText ?? null })
           } else {
             await prisma.orderEvent.create({
               data: {
@@ -147,13 +150,13 @@ export function createVerificationWorker() {
                 },
               },
             })
-            console.warn(`[VERIFICATION] Link NOT found on ${targetUrl} for order ${orderId}${anchorText ? ` (anchor: "${anchorText}")` : ""}`)
+            logger.warn("link NOT found", { orderId, targetUrl, anchorText: anchorText ?? null })
           }
 
           return { verified: !!evidence, orderId, evidence }
         }
         default:
-          console.warn(`[VERIFICATION] Unknown job: ${job.name}`)
+          logger.warn("unknown job name", { jobName: job.name })
       }
 
       return { verified: false, orderId }
@@ -162,11 +165,11 @@ export function createVerificationWorker() {
   )
 
   worker.on("completed", (job) => {
-    console.log(`[VERIFICATION] Job ${job.id} completed`)
+    logger.info("job completed", { jobId: job.id })
   })
 
   worker.on("failed", (job, err) => {
-    console.error(`[VERIFICATION] Job ${job?.id} failed:`, err)
+    logger.error("job failed", { jobId: job?.id, err: err?.message })
   })
 
   return worker

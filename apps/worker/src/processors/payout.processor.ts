@@ -2,6 +2,9 @@ import { connection } from "../redis"
 import { QUEUES, verifyJobPayload, checkProviderTransferStatus, normalizeProviderWebhook } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.payout")
 
 // Shared state transitions for "the provider says this transfer finished".
 // Used by both the webhook path and the status poller. All guards are
@@ -80,13 +83,13 @@ async function handleExecute(job: any) {
   if (!withdrawalId || !providerName) {
     throw new Error("Missing withdrawalId or providerName in job data")
   }
-  console.log(`[PAYOUT] Processing withdrawal ${withdrawalId} via ${providerName}`)
+  logger.info("processing withdrawal", { withdrawalId, providerName })
   const withdrawal = await prisma.withdrawal.findUnique({
     where: { id: withdrawalId },
   })
   if (!withdrawal) throw new Error(`Withdrawal ${withdrawalId} not found`)
   if (withdrawal.status !== "APPROVED" && withdrawal.status !== "PROCESSING") {
-    console.warn(`[PAYOUT] Withdrawal ${withdrawalId} is ${withdrawal.status} — skipping`)
+    logger.warn("withdrawal not eligible — skipping", { withdrawalId, status: withdrawal.status })
     return { skipped: true, reason: `Status is ${withdrawal.status}` }
   }
   return { withdrawalId, providerName, queued: true }
@@ -100,7 +103,7 @@ async function handleCheckStatus(job: any) {
     orderBy: { createdAt: "asc" },
     include: { provider: true, withdrawal: { include: { publisher: true } } },
   })
-  console.log(`[PAYOUT] Polling provider status for ${pendingExecutions.length} PROCESSING executions`)
+  logger.info("polling provider status", { pendingCount: pendingExecutions.length })
 
   let completed = 0
   let failed = 0
@@ -111,7 +114,7 @@ async function handleCheckStatus(job: any) {
       result = await checkProviderTransferStatus(execution.provider.name, execution.providerExecutionId!)
     } catch (err: any) {
       // Provider API hiccup on one transfer must not abort the sweep
-      console.error(`[PAYOUT] Status check failed for execution ${execution.id}: ${err.message}`)
+      logger.error("status check failed", { executionId: execution.id, err: err?.message ?? String(err) })
       skipped++
       continue
     }
@@ -125,15 +128,15 @@ async function handleCheckStatus(job: any) {
       if (result.status === "COMPLETED") {
         await completeExecution(execution, "status-poll", { ...result.metadata, fee: result.fee })
         completed++
-        console.log(`[PAYOUT] Execution ${execution.id} completed via status poll`)
+        logger.info("execution completed via status poll", { executionId: execution.id })
       } else if (result.status === "FAILED") {
         await failExecution(execution, "status-poll", "Provider reports transfer failed/cancelled", result.metadata ?? {})
         failed++
-        console.log(`[PAYOUT] Execution ${execution.id} failed via status poll`)
+        logger.info("execution failed via status poll", { executionId: execution.id })
       }
     } catch (err: any) {
       // Lost a race against a webhook — fine, the state already moved
-      console.warn(`[PAYOUT] Transition skipped for execution ${execution.id}: ${err.message}`)
+      logger.warn("transition skipped (lost race against webhook)", { executionId: execution.id, err: err?.message ?? String(err) })
       skipped++
     }
   }
@@ -147,10 +150,10 @@ async function handleWebhook(job: any) {
     throw new Error("Missing provider, event, or data in webhook job")
   }
   if (!verified) {
-    console.error(`[PAYOUT] Unverified webhook job rejected — must be verified by API before queueing`)
+    logger.error("unverified webhook job rejected — must be verified by API before queueing", { provider, event })
     throw new Error("Unverified webhook — signature check required before enqueueing")
   }
-  console.log(`[PAYOUT] Processing ${provider} webhook event: ${event}`)
+  logger.info("processing webhook event", { provider, event })
 
   // Real Wise payloads carry the transfer id at data.resource.id and state at
   // current_state; Stripe at data.object.id / status. The normalizer maps both
@@ -159,7 +162,7 @@ async function handleWebhook(job: any) {
   // genuine webhook was skipped.
   const normalized = normalizeProviderWebhook(provider, data)
   if (!normalized.providerExecutionId) {
-    console.warn(`[PAYOUT] No providerExecutionId in webhook data`)
+    logger.warn("no providerExecutionId in webhook data", { provider, event })
     return { skipped: true, reason: "No providerExecutionId" }
   }
   const execution = await prisma.payoutExecution.findFirst({
@@ -167,24 +170,24 @@ async function handleWebhook(job: any) {
     include: { withdrawal: { include: { publisher: true } } },
   })
   if (!execution) {
-    console.warn(`[PAYOUT] No execution found for providerExecutionId: ${normalized.providerExecutionId}`)
+    logger.warn("no execution found for providerExecutionId", { providerExecutionId: normalized.providerExecutionId })
     return { skipped: true, reason: "Execution not found" }
   }
 
   if (execution.status !== "PROCESSING") {
-    console.warn(`[PAYOUT] Execution ${execution.id} is ${execution.status}, not PROCESSING — ignoring webhook`)
+    logger.warn("execution not PROCESSING — ignoring webhook", { executionId: execution.id, status: execution.status })
     return { skipped: true, reason: `Execution is ${execution.status}, not PROCESSING` }
   }
 
   const webhookStatus = normalized.status
   if (webhookStatus === "COMPLETED") {
     await completeExecution(execution, "webhook", { provider, event, rawStatus: normalized.rawStatus })
-    console.log(`[PAYOUT] Withdrawal ${execution.withdrawalId} completed via webhook`)
+    logger.info("withdrawal completed via webhook", { withdrawalId: execution.withdrawalId, executionId: execution.id })
   } else if (webhookStatus === "FAILED") {
     await failExecution(execution, "webhook", normalized.error ?? "Provider reported failure", { provider, event, rawStatus: normalized.rawStatus })
-    console.log(`[PAYOUT] Withdrawal ${execution.withdrawalId} failed via webhook`)
+    logger.info("withdrawal failed via webhook", { withdrawalId: execution.withdrawalId, executionId: execution.id })
   } else {
-    console.log(`[PAYOUT] Webhook state "${normalized.rawStatus}" is non-terminal — no transition`)
+    logger.info("webhook state non-terminal — no transition", { rawStatus: normalized.rawStatus, executionId: execution.id })
   }
   return { executionId: execution.id, webhookStatus, rawStatus: normalized.rawStatus }
 }
@@ -194,7 +197,7 @@ export function createPayoutWorker() {
     QUEUES.PAYOUT,
     async (job) => {
       if (!verifyJobPayload(job.data)) {
-        console.error(`[PAYOUT] Job ${job.id} has missing/invalid signature — rejecting`)
+        logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
       switch (job.name) {
@@ -202,13 +205,13 @@ export function createPayoutWorker() {
         case "payout-check-status": return handleCheckStatus(job)
         case "payout-webhook": return handleWebhook(job)
         default:
-          console.warn(`[PAYOUT] Unknown job: ${job.name}`)
+          logger.warn("unknown job name", { jobName: job.name })
       }
     },
     { connection, concurrency: 5 },
   )
 
-  worker.on("completed", (job) => console.log(`[PAYOUT] Job ${job.id} completed`))
-  worker.on("failed", (job, err) => console.error(`[PAYOUT] Job ${job?.id} failed:`, err))
+  worker.on("completed", (job) => logger.info("job completed", { jobId: job.id }))
+  worker.on("failed", (job, err) => logger.error("job failed", { jobId: job?.id, err: err?.message }))
   return worker
 }

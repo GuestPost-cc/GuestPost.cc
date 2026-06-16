@@ -10,6 +10,9 @@ import {
 import { prisma } from "@guestpost/database"
 import { connection } from "../redis"
 import { createObservableWorker } from "../lib/queue-observability"
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+
+const logger = createLogger("worker.reconciliation")
 
 // Scheduled financial drift sweep. Same core checks as the API's on-demand
 // GET /admin/reconciliation. On any finding: audit row + in-app notification
@@ -19,7 +22,7 @@ async function handleReconciliationRun() {
   const report = await runReconciliation(prisma)
 
   if (report.ok) {
-    console.log(`[RECONCILIATION] Sweep clean at ${report.ranAt}`)
+    logger.info("sweep clean", { ranAt: report.ranAt })
     return { ok: true, ranAt: report.ranAt }
   }
 
@@ -29,7 +32,7 @@ async function handleReconciliationRun() {
     stuckOrders: report.stuckOrders.length,
     stuckPayouts: report.stuckPayouts.length,
   }
-  console.error(`[RECONCILIATION] DRIFT DETECTED: ${JSON.stringify(problems)}`)
+  logger.error("DRIFT DETECTED", problems)
 
   await prisma.auditLog.create({
     data: {
@@ -87,12 +90,10 @@ async function handleReconciliationRun() {
     } catch (err) {
       if (isUniqueViolation(err)) {
         const total = incrementDedupHits()
-        console.log(
-          `[RECONCILIATION] deduped key=${dedupKey} user=${s.userId} dedup_hits_total=${total}`,
-        )
+        logger.info("notification deduped (P2002)", { dedupKey, userId: s.userId, dedup_hits_total: total })
         continue
       }
-      console.error(`[RECONCILIATION] Failed to notify staff ${s.userId}:`, err)
+      logger.error("failed to notify staff", { userId: s.userId, err: err instanceof Error ? err.message : String(err) })
     }
   }
 
@@ -104,20 +105,20 @@ export function createReconciliationWorker() {
     QUEUES.RECONCILIATION,
     async (job) => {
       if (!verifyJobPayload(job.data)) {
-        console.error(`[RECONCILIATION] Job ${job.id} has missing/invalid signature — rejecting`)
+        logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
       switch (job.name) {
         case "reconciliation-run":
           return handleReconciliationRun()
         default:
-          console.warn(`[RECONCILIATION] Unknown job: ${job.name}`)
+          logger.warn("unknown job name", { jobName: job.name })
       }
     },
     { connection, concurrency: 1 },
   )
 
-  worker.on("completed", (job) => console.log(`[RECONCILIATION] Job ${job.id} completed`))
-  worker.on("failed", (job, err) => console.error(`[RECONCILIATION] Job ${job?.id} failed:`, err))
+  worker.on("completed", (job) => logger.info("job completed", { jobId: job.id }))
+  worker.on("failed", (job, err) => logger.error("job failed", { jobId: job?.id, err: err?.message }))
   return worker
 }

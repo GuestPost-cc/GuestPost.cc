@@ -18,5 +18,13 @@ export default withSentryConfig(nextConfig, {
   silent: !process.env.CI,
   disableLogger: true,
   widenClientFileUpload: true,
-  sourcemaps: { disable: false, deleteSourcemapsAfterUpload: true },
+  // Gate sourcemap generation on SENTRY_AUTH_TOKEN. Without a token the
+  // upload step skips, but `disable: false` still made the Sentry plugin
+  // hang on network calls in CI (PR runs without secrets). With the gate
+  // the plugin is a no-op when there's no token — what local devs + fork
+  // PRs need.
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+    deleteSourcemapsAfterUpload: true,
+  },
 })
