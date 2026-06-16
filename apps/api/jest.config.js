@@ -35,11 +35,5 @@ module.exports = {
     // ConflictException paths the tests want to exercise. Update mocks
     // to set actorId = creatorId (or actorRole = "OWNER") in beforeEach.
     "modules/orders/services/__tests__/order-payment\\.service\\.spec\\.ts$",
-    // Phase 6.7 hardening: StaffRolesGuard fails closed when @StaffRoles
-    // metadata is missing/empty. "allows access when no roles are required"
-    // test expects the old permissive behavior. Either remove the test
-    // (the new behavior is intentional + covered by admin-rbac-coverage)
-    // or add @StaffRoles to the mock route.
-    "common/guards/__tests__/staff-roles\\.guard\\.spec\\.ts$",
   ],
 }

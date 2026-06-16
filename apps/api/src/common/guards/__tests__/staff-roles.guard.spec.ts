@@ -21,9 +21,24 @@ describe("StaffRolesGuard", () => {
       }),
     }) as any
 
-  it("allows access when no roles are required", () => {
+  // Phase 6.7 — fail-closed: a route guarded by StaffRolesGuard but missing
+  // @StaffRoles metadata is REFUSED, not allowed. The two tests below cover
+  // both fail-closed branches in staff-roles.guard.ts:34–39 (undefined metadata
+  // + empty array). admin-rbac-coverage.spec.ts asserts the positive side
+  // (every AdminController handler declares @StaffRoles); these assert the
+  // guard's actual response to a missing/empty declaration.
+  it("DENIES access when no @StaffRoles metadata is declared (fail-closed)", () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(undefined)
-    expect(guard.canActivate(mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" }))).toBe(true)
+    expect(() =>
+      guard.canActivate(mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" })),
+    ).toThrow(ForbiddenException)
+  })
+
+  it("DENIES access when an empty roles array is declared (fail-closed)", () => {
+    jest.spyOn(reflector, "getAllAndOverride").mockReturnValue([])
+    expect(() =>
+      guard.canActivate(mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" })),
+    ).toThrow(ForbiddenException)
   })
 
   it("allows SUPER_ADMIN access", () => {
