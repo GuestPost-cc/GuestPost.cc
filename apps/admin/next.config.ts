@@ -12,5 +12,10 @@ export default withSentryConfig(nextConfig, {
   silent: !process.env.CI,
   disableLogger: true,
   widenClientFileUpload: true,
-  sourcemaps: { disable: false, deleteSourcemapsAfterUpload: true },
+  // Without SENTRY_AUTH_TOKEN the plugin hangs on network calls in CI;
+  // gating `disable` on token presence keeps fork PRs + local dev no-op.
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+    deleteSourcemapsAfterUpload: true,
+  },
 })
