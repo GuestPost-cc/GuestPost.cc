@@ -29,11 +29,5 @@ module.exports = {
     // F-3 test fixture predates the requirement and constructs orders
     // without one. Add listingServiceId to the per-tenant fixtures to fix.
     "modules/billing/__tests__/prebeta-audit-regression\\.spec\\.ts$",
-    // Phase 6.9 hardening: assertOwnerOrCreator now runs before any other
-    // validation in submitPayment. Test mocks set actorId !== creatorId
-    // so the role check fires first, masking the actual BadRequest /
-    // ConflictException paths the tests want to exercise. Update mocks
-    // to set actorId = creatorId (or actorRole = "OWNER") in beforeEach.
-    "modules/orders/services/__tests__/order-payment\\.service\\.spec\\.ts$",
   ],
 }
