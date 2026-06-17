@@ -24,12 +24,9 @@ Forward roadmap after the Phases 6.6 → 7.7 audit batch. Canonical source for p
 - [x] **#27 — Job-signing `iat` validation / replay protection** ✅ DONE 2026-06-17 (**Deploy A**; commits `058fa7e` + `f489e2e`). `signJobPayload` injects `iat`+`v: 1`; `verifyJobPayload` enforces 24h default freshness (per-queue overrides: delivery-verification 96h, payout 72h). Centralized `apps/worker/src/repeatable-job-registry.ts` with drift guard handles cron-payload reuse via `maxAgeMs: 0` bypass.
 - [x] **§5.8 sub-finding — `hasAuthCredentials()` cookie sniff** ✅ DONE 2026-06-17 (commit `81174ee`). Regex written against captured Better Auth signed-cookie shape; 14-case unit test.
 - [x] **#25 — Email-verification gate** ✅ DONE 2026-06-17 (commit `4dbfd67`). AuthGuard rejects state-changing methods on non-exempt customer routes when `emailVerified=false`. Bundled into Phase 7.8 per "related auth/session follow-ups".
+- [x] **Deploy B — flip `allowMissingIat` default to `false`** ✅ DONE 2026-06-18 (commit `0e9eca1`). One-line flip in `ROLLOUT_DEFAULTS` plus docblock + 2 spec assertions rebadged. Pre-flight greps confirmed (a) no production callsite passes `allowMissingIat` explicitly and (b) all 10 worker processors emit the standard `"job signature invalid — rejecting"` log on a verify-failure (set-equality with `verifyJobPayload` callsites). The opt-in survives as an explicit emergency-rollback arg on `verifyJobPayload`. PR scheduled to merge ≥48h after Phase 7.8 (i.e. ≥ 2026-06-19 17:38 UTC).
 
-**Phase 7.8 Deploy B follow-up** (separate PR ≥48h after Phase 7.8 merges):
-
-- [ ] **Flip `allowMissingIat` default to `false`** in `packages/shared/src/job-signing.ts` `ROLLOUT_DEFAULTS`. One-line change. By then the longest-backoff queue (delivery-verification 60m × 3 = ~3h) has long since drained all pre-Phase-7.8 payloads. Frees the rollout escape hatch and makes freshness strict.
-
-Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase. **Status: complete except for Deploy B follow-up.**
+Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase. **Status: complete (Deploy A + Deploy B both shipped).**
 
 ## Phase 7.9 — Frontend Quality & Accessibility (per 2026-06-16 roadmap) ✅ DONE
 
@@ -45,7 +42,7 @@ Mission: Frontend consistency / Accessibility / Maintainability / Shared pattern
   - Structured logger to replace `console.log` across api+worker (then `requestId` is grep-able in plain logs, not just Sentry context + audit DB)
   - Source-map upload via `SENTRY_AUTH_TOKEN` in CI (one-line `withSentryConfig` flip + `@sentry/cli` `pnpm-workspace.yaml` true-flip)
 - ~~**#26** Email-keyed rate limiter~~ — **CLOSED** by Phase 7.8.
-- ~~**#27** Job-signing `iat`~~ — **CLOSED** by Phase 7.8 (Deploy A).
+- ~~**#27** Job-signing `iat`~~ — **CLOSED** by Phase 7.8 (Deploy A + Deploy B).
 - ~~**#28** Status-color centralization~~ — **CLOSED** by Phase 7.9.
 - ~~**#29** Unused shared component adoption~~ — **CLOSED** by Phase 7.9.
 - ~~**#30** Hooks-rule violation~~ — **CLOSED** by Phase 7.9.
