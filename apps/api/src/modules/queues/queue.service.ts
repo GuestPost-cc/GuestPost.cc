@@ -1,21 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { Queue, QueueOptions, JobsOptions } from "bullmq"
-import IORedis from "ioredis"
 import { QUEUES, QUEUE_JOBS, signJobPayload, trustRecomputeJobOptions } from "@guestpost/shared"
 // Deep import: request-context uses node:async_hooks and is not in the
 // shared barrel.
 import { getRequestId } from "@guestpost/shared/dist/observability/request-context"
+import { getRedisClient } from "../../common/redis-client"
 
-let connection: IORedis | null = null
-
-function getConnection() {
-  if (!connection) {
-    connection = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      maxRetriesPerRequest: null,
-    })
-  }
-  return connection as IORedis
-}
+const getConnection = getRedisClient
 
 const DEFAULT_JOB_OPTIONS: JobsOptions = {
   attempts: 3,
