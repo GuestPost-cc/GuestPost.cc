@@ -23,6 +23,7 @@ import { toNodeHandler, auth } from "@guestpost/auth";
 import { AppModule } from "./app.module";
 import { SentryExceptionFilter } from "./common/filters/sentry-exception.filter";
 import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-business-context.interceptor";
+import { hasAuthCredentials } from "./common/has-auth-credentials";
 
 const REQUIRED_ENV_VARS = ["DATABASE_URL", "REDIS_URL", "JWT_SECRET"] as const;
 
@@ -123,13 +124,8 @@ async function bootstrap() {
 
   // ── Environment-aware rate limiting ──────────────────────────────────────
 
-  function hasAuthCredentials(req: express.Request): boolean {
-    if (req.headers.authorization?.startsWith("Bearer ")) return true;
-    const cookie = req.headers.cookie;
-    if (typeof cookie === "string" && cookie.includes("guestpost-session"))
-      return true;
-    return false;
-  }
+  // hasAuthCredentials is extracted to common/has-auth-credentials.ts so it
+  // can be unit-tested in isolation (cookie-shape regression coverage).
 
   interface EnvLimits {
     auth: {
@@ -230,6 +226,30 @@ async function bootstrap() {
     });
   }
 
+  // Mirrors better-auth@1.6.14 rateLimitResponse() exactly so the IP-layer
+  // and the email-layer (Phase 7.8 Better Auth plugin) return identical 429s.
+  // Account-enumeration safeguard: an attacker comparing the two responses
+  // must not be able to tell "IP limit" from "email limit" from the wire
+  // shape.
+  const BETTER_AUTH_429_BODY = {
+    message: "Too many requests. Please try again later.",
+  };
+  function createAuthLimiter(max: number) {
+    return rateLimit({
+      windowMs: 60 * 1000,
+      max,
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (_req, res, _next, options) => {
+        const retryAfterSec = Math.ceil(options.windowMs / 1000);
+        res
+          .status(429)
+          .setHeader("X-Retry-After", String(retryAfterSec))
+          .json(BETTER_AUTH_429_BODY);
+      },
+    });
+  }
+
   function createTieredLimiters(
     anonMax: number,
     authMax: number,
@@ -262,34 +282,25 @@ async function bootstrap() {
 
   const envLimits = getEnvLimits();
 
-  // Auth endpoints — one limiter per path, same limit for all users
+  // Auth endpoints — one limiter per path, same limit for all users.
+  // Response shape mirrors better-auth's built-in 429 so the IP-layer here
+  // is indistinguishable from the email-layer plugin (#26 enumeration
+  // safeguard).
   server.use(
     "/api/v1/auth/sign-in",
-    createLimiter(
-      envLimits.auth.signIn,
-      "Too many auth attempts, try again later",
-    ),
+    createAuthLimiter(envLimits.auth.signIn),
   );
   server.use(
     "/api/v1/auth/sign-up",
-    createLimiter(
-      envLimits.auth.signUp,
-      "Too many auth attempts, try again later",
-    ),
+    createAuthLimiter(envLimits.auth.signUp),
   );
   server.use(
     "/api/v1/auth/magic-link",
-    createLimiter(
-      envLimits.auth.magicLink,
-      "Too many auth attempts, try again later",
-    ),
+    createAuthLimiter(envLimits.auth.magicLink),
   );
   server.use(
     "/api/v1/auth/reset-password",
-    createLimiter(
-      envLimits.auth.resetPassword,
-      "Too many auth attempts, try again later",
-    ),
+    createAuthLimiter(envLimits.auth.resetPassword),
   );
 
   // Billing — webhook exempt from rate limit (Stripe retries on failure; protected by signature verification instead)
