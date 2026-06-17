@@ -1,5 +1,6 @@
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload, checkProviderTransferStatus, normalizeProviderWebhook } from "@guestpost/shared"
+import { isRepeatableJob } from "../repeatable-job-registry"
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
@@ -196,7 +197,11 @@ export function createPayoutWorker() {
   const worker = createObservableWorker(
     QUEUES.PAYOUT,
     async (job) => {
-      if (!verifyJobPayload(job.data)) {
+      // Phase 7.8 #27 — payout-check-status (repeatable) bypasses
+      // freshness; ad-hoc payout-execute jobs get a 72h window to
+      // accommodate Wise-outage retry storms across long weekends.
+      const maxAgeMs = isRepeatableJob(job.name) ? 0 : 72 * 60 * 60 * 1000
+      if (!verifyJobPayload(job.data, { maxAgeMs })) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }

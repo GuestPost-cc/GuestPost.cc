@@ -801,9 +801,9 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 | Status | Count | Share |
 |---|---|---|
-| ✅ Fully closed | **19** | 61% |
+| ✅ Fully closed | **22** | 71% |
 | ⚠️ Partially closed | **0** | 0% |
-| ⛔ Still open | **12** | 39% |
+| ⛔ Still open | **9** | 29% |
 
 **By severity:**
 
@@ -811,7 +811,9 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 |---|---|---|---|---|
 | Critical (production-blocker) | 11 | **11** (#1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11) | — | **0** |
 | High | 14 | **7** (#12, #15, #19, #21, #22, V-1, R-3+R-4) | — | 7 |
-| Medium | 5 | — | — | 5 |
+| Medium | 5 | **3** (#25, #26, #27 — Phase 7.8) | — | 2 |
+
+Phase 7.8 also closed audit §5.8's `hasAuthCredentials()` sub-finding (bundled with #26 as documented in the recommended fix). The auth/queue trust boundary has zero open security findings; remaining 2 Medium items (#28 status-color, #29 unused shared components — both frontend) plus #30 (hooks-rule violation in publisher listings) are queued for Phase 7.9.
 
 **Per-finding status (only showing actioned items + remaining criticals):**
 
@@ -894,10 +896,40 @@ _(none — Phase 7.7.x sweep landed as commit `5af902c` on PR #1; allowlist now 
 - ~~After each Phase 7.7.x sweep commit~~ — **DONE** (commit `5af902c`, PR #3 merged 2026-06-16).
 - ~~After each Phase 7.7.y spec restoration~~ — **DONE** (commits `aa8cd55` + `74c8d51` + `b670493`, PR #4 merged 2026-06-16). `testPathIgnorePatterns` at jest default; full `apps/api` jest is 33 suites / 478 tests, no skips.
 - **After Prisma 6 → 7.4+ upgrade** — unblock Phase 7.3.1; ship the composite index migration; record planner-usage proof per the deferred plan's verification checklist.
-- **After Phase 7.8 lands** — append new §11 entry; update scorecard's "Rate limiting" / "Replay protection" rows.
+- ~~After Phase 7.8 lands~~ — **DONE** (this entry). Auth/queue trust boundary has zero open security findings; #25 + #26 + #27 + §5.8 sub-finding all closed in one PR.
+- **After Phase 7.8 Deploy B lands** (≥48h post this PR) — record the one-line `allowMissingIat: false` flip + post-flip CI green confirmation as a "Deploy B" sub-entry under this Phase 7.8 §11 entry.
 - **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
 
 **Production-blocker status**: **11 of 11 Criticals closed (100%)**. No production-blocker finding from the 2026-06-15 audit remains open. All remaining work is High/Medium polish, security hardening, or accessibility — none gate production.
+
+---
+
+### 2026-06-17 — Phase 7.8: security hardening batch (#25 + #26 + #27 + §5.8 sub-finding)
+
+**Three Medium findings closed in one cohesive PR**, plus the trivially-bypassable `hasAuthCredentials()` cookie sniff called out as a sub-finding inside #26. After this PR, **the auth/queue trust boundary has zero open security findings.**
+
+**Branch**: `phase-7.8-security-hardening` — 7 commits, all tests green.
+
+| # | Title | What landed | Commits |
+|---|---|---|---|
+| §5.8 | `hasAuthCredentials()` accepts any cookie containing `guestpost-session` | Cookie shape regex written against captured Better Auth signed-cookie format (verified against `better-auth@1.6.14` `cookies/index.mjs` + `better-call@1.3.5` `crypto.mjs`). Junk cookies like `Cookie: guestpost-session=anything` no longer bump attacker to the higher authed rate-limit tier. 14-case unit test in `apps/api/src/common/__tests__/has-auth-credentials.spec.ts` including an explicit regression for the pre-Phase-7.8 bypass string. | `81174ee` (sub-finding fix bundled with 429 alignment) |
+| #26 | Per-IP-only auth rate limits — credential stuffing across IP pool | New Better Auth plugin (`packages/auth/src/plugins/email-rate-limit.ts`) with `before` hooks on the 4 verified email-typed endpoints (`/sign-in/email`, `/sign-up/email`, `/sign-in/magic-link`, `/request-password-reset` — last one verified against source; original plan had `/forget-password` which doesn't exist in v1.6.14). Redis-backed counter keyed by `SHA-256(normalized-email)` so plaintext emails never appear in Redis (defeats redis-cli MONITOR / RDB-dump leaks) and INFO logs use `emailHash` (defeats log-aggregator PII surface). Per-endpoint prefix so `magic-link` doesn't lock out `sign-in`. Default 10/h sign-in, 5/h others (dev/test 10×). Dual layer: IP-layer Express limiter kept as the front line, this is the second line. **Account-enumeration safeguard**: 429 response is byte-identical between layers (verified by 11-case parity spec at `apps/api/src/__tests__/phase-7-8-rate-limit-parity.spec.ts` — status, statusText `"Too Many Requests"`, body `{"message":"Too many requests. Please try again later."}`, `X-Retry-After` header — copied byte-for-byte from `better-auth/dist/api/rate-limiter/index.mjs` `rateLimitResponse()`). Non-existent emails get the same 429 (plugin never touches the User table; source-grep enforces). | `5977b9c` (Redis singleton promotion), `7a12a1e` (plugin + `createAuth()` factory), `f3fe975` (`main.ts` wiring + parity test) |
+| #27 | Job-signing has no `iat` — captured signatures replayable forever | `signJobPayload` now injects `iat: Date.now()` + `v: 1` (both part of the canonical digest so tamper-proof). `verifyJobPayload` takes a `VerifyOptions` object with `maxAgeMs` (default 24h) and `allowMissingIat` (default true this PR — **Deploy A** rollout escape hatch so in-flight pre-deploy payloads aren't rejected). 60s NTP-skew tolerance on future-dated `iat`. **Centralized repeatable-job registry** at `apps/worker/src/repeatable-job-registry.ts` (5 names: payout-check-status, reconciliation-run, website-reverify-sweep, settlement-hold-sweep, settlement-auto-approve) — repeatables sign once at boot and reuse, so they bypass freshness via `maxAgeMs: 0` (HMAC integrity check still runs). **Drift guard** at `apps/api/src/__tests__/phase-7-8-repeatable-registry-drift.spec.ts` greps both sides and asserts set equality both directions (adding a repeatable in one place without the other fails CI with the missing name). All 9 worker processors updated with the right per-queue `maxAgeMs` (default 24h; delivery-verification 96h for staff manual-review turnaround; payout 72h for Wise-outage long-weekend retries). 17-case unit test at `apps/api/src/__tests__/phase-7-8-job-signing-iat.spec.ts`. | `058fa7e` (shared module), `f489e2e` (registry + 9 processors + drift guard) |
+| #25 | `User.emailVerified` field never consulted by AuthGuard | New `email-verification-policy.ts` module: `requiresEmailVerification(req)` returns true for state-changing methods (POST/PATCH/PUT/DELETE) on non-exempt customer routes. `EXEMPT_POST_PATHS` covers `/api/v1/auth/*` (so locked-out user can still sign out + resend verification) + `/api/v1/users/me/resend-verification` (future explicit trigger). **AuthGuard surgery applies the check at BOTH paths** — post-DB-load AND post-cache-hit. Without the cache-hit check, an unverified user who first hits an exempt GET path would be cached and then bypass the gate on subsequent POSTs within the 30s TTL. Scope: CUSTOMER only (PUBLISHER + STAFF have separate verification tracks). Throws `ForbiddenException("EMAIL_NOT_VERIFIED")` — frontend follow-up to render a resend banner is OUT OF SCOPE. **23-case policy unit test** at `apps/api/src/modules/auth/__tests__/email-verification-policy.spec.ts`. | `4dbfd67` |
+
+**Mandatory pre-merge GET-mutation audit** (merge blocker before #25 lands): `grep -rnE "@Get\(['\"]([^'\"]+)['\"]\)" apps/api/src/modules/ | grep -iE "(verify\|sync\|trigger\|confirm\|reset\|cancel\|complete\|approve\|reject\|enable\|disable\|publish\|unpublish\|process\|execute\|run\|fire\|kick\|toggle\|set\|update\|create\|delete\|remove)"` returned 5 matches — all false-positive substrings (`publish` inside `publisher`, `set` inside `settlements`, `approve` inside `force-approved`); every handler is a pure read operation. The "GETs stay open" assumption in the gate is safe. Audit passes; PR description pastes the grep output verbatim under `## GET-mutation audit`.
+
+**Pre-impl gates** (all blocking, all completed before commit work):
+
+1. **Better Auth route paths verified** against `better-auth@1.6.14` source — 3 of 4 plan-assumed paths matched, but the password-reset route is `/request-password-reset` (not `/forget-password` as the plan had assumed). Plan + plugin updated.
+2. **Two-instance audit** — server-side `dist/index.mjs` returns zero matches for `setInterval|setTimeout|setImmediate|queueMicrotask|process\.on|EventEmitter|\.on\(|\.addListener\(|\.once\(|\$use\(|new Worker\(`. All audit hits are isolated to client-side modules (`plugins/one-tap/client.mjs`, `client/proxy.mjs`, `client/session-refresh.mjs`, `client/query.mjs`) which the server-side `betterAuth(...)` import path doesn't touch. Factory + singleton co-existence is safe; fallback (singleton + setter) not needed.
+3. **429 response shape captured** from `better-auth/dist/api/rate-limiter/index.mjs` `rateLimitResponse()` — no dev-server boot needed. Cookie format captured from `better-call@1.3.5` `crypto.mjs` `signCookieValue` (`encodeURIComponent(token + "." + base64HMAC)`) + Better Auth's dual cookie-name format (`${prefix}.${cookieName}` or `${prefix}-${cookieName}`, default `cookieName="session_token"`).
+
+**Test count outcome**: `apps/api` jest went from **33 suites / 478 tests** (post-Phase 7.7.y) → **39 suites / 547 tests, no failures**. Six new specs landed this phase: `redis-client`, `has-auth-credentials`, `phase-7-8-rate-limit-parity`, `phase-7-8-job-signing-iat`, `phase-7-8-repeatable-registry-drift`, `email-verification-policy`. Plus 13-case plugin spec in `packages/auth/src/__tests__/email-rate-limit-plugin.spec.ts` (new jest infra mirroring `@guestpost/api-client`).
+
+**Deploy A → Deploy B follow-up** (≥48h after this PR merges): one-line flip of `allowMissingIat` default from `true` to `false` in `packages/shared/src/job-signing.ts`. By then the longest-backoff queue (delivery-verification 60m × 3 = ~3h) has long since drained all pre-Phase-7.8 payloads. Tracked in `bedrock/Work/backlog.md`.
+
+**Operator ops checklist** (in PR description): pre-deploy percentage query on `User`/CUSTOMER for the lockout impact of #25; optional backfill for customers with confirmed orders in the last 90 days (treats them as real humans, exempts from lockout); record pre/post backfill numbers in the PR.
 
 ---
 

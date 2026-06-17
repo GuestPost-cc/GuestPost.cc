@@ -32,6 +32,16 @@ import { startHealthServer, type HealthServerHandle } from "./lib/health-server"
 
 const logger = createLogger("worker.bootstrap")
 
+// Phase 7.8 #27 — IF YOU ADD A NEW REPEATABLE BELOW, add its job name
+// to REPEATABLE_JOB_NAMES in apps/worker/src/repeatable-job-registry.ts.
+// The drift-guard spec at __tests__/repeatable-job-registry.spec.ts
+// asserts both directions and will fail CI loudly if either side moves
+// without the other. Reason: the iat freshness check in
+// verifyJobPayload rejects payloads older than maxAgeMs, and a
+// repeatable's payload is signed ONCE at boot then reused across
+// recurrences — so without the bypass, every recurrence after the
+// window expires fails verification.
+
 // Stuck-payout safety net: webhooks are the primary completion signal, this
 // poll catches transfers whose webhook was lost or never configured.
 async function registerPayoutStatusPoll() {

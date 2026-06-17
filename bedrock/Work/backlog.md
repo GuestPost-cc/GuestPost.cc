@@ -18,15 +18,18 @@ Forward roadmap after the Phases 6.6 → 7.7 audit batch. Canonical source for p
 - [x] **Phase 7.7.y — fix 3 pre-existing failing test specs** ✅ DONE 2026-06-16 (PR #4 merged, 3 commits `aa8cd55` + `74c8d51` + `b670493`). All 3 specs' mocks updated to match Phase 6.x production behavior; `testPathIgnorePatterns` back at jest default; apps/api jest now 33 suites / 478 tests with zero skips. No production code changed.
 - [ ] **Phase 7.3.1 — `(status, reviewEndsAt)` index on Settlement.** Tiny migration. The Phase 7.3 auto-approve worker sweep hits this access pattern every 15m. **Blocked on Prisma 6.19.3 → 7.4+ upgrade** (Prisma 6 wraps migrations in a transaction; `CREATE INDEX CONCURRENTLY` rejects with `cannot run inside a transaction block` per prisma#14456, fixed in 7.4). Out of scope until Prisma is upgraded.
 
-## Phase 7.8 — Security Hardening Batch (per 2026-06-16 roadmap)
+## Phase 7.8 — Security Hardening Batch (per 2026-06-16 roadmap) ✅ DONE
 
-Bundle these together as one cohesive phase:
+- [x] **#26 — Email-keyed rate limiter** on auth endpoints. ✅ DONE 2026-06-17 (PR pending; commits `7a12a1e` + `f3fe975`). Better Auth plugin layers per-`SHA-256(email)` Redis counter on 4 verified endpoints (`/sign-in/email`, `/sign-up/email`, `/sign-in/magic-link`, `/request-password-reset`) on top of the existing per-IP Express limiter. Generic 429 byte-identical between layers (no enumeration oracle).
+- [x] **#27 — Job-signing `iat` validation / replay protection** ✅ DONE 2026-06-17 (**Deploy A**; commits `058fa7e` + `f489e2e`). `signJobPayload` injects `iat`+`v: 1`; `verifyJobPayload` enforces 24h default freshness (per-queue overrides: delivery-verification 96h, payout 72h). Centralized `apps/worker/src/repeatable-job-registry.ts` with drift guard handles cron-payload reuse via `maxAgeMs: 0` bypass.
+- [x] **§5.8 sub-finding — `hasAuthCredentials()` cookie sniff** ✅ DONE 2026-06-17 (commit `81174ee`). Regex written against captured Better Auth signed-cookie shape; 14-case unit test.
+- [x] **#25 — Email-verification gate** ✅ DONE 2026-06-17 (commit `4dbfd67`). AuthGuard rejects state-changing methods on non-exempt customer routes when `emailVerified=false`. Bundled into Phase 7.8 per "related auth/session follow-ups".
 
-- [ ] **#26 — Email-keyed rate limiter** on auth endpoints. Per-IP-only limits today don't stop credential stuffing across an IP pool.
-- [ ] **#27 — Job-signing `iat` validation / replay protection.** Add issued-at timestamp to signed queue payloads + freshness window.
-- [ ] **Related auth/session follow-ups** discovered during implementation.
+**Phase 7.8 Deploy B follow-up** (separate PR ≥48h after Phase 7.8 merges):
 
-Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase.
+- [ ] **Flip `allowMissingIat` default to `false`** in `packages/shared/src/job-signing.ts` `ROLLOUT_DEFAULTS`. One-line change. By then the longest-backoff queue (delivery-verification 60m × 3 = ~3h) has long since drained all pre-Phase-7.8 payloads. Frees the rollout escape hatch and makes freshness strict.
+
+Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase. **Status: complete except for Deploy B follow-up.**
 
 ## Phase 7.9 — Frontend Quality & Accessibility (per 2026-06-16 roadmap)
 

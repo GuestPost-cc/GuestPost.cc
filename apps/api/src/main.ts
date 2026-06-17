@@ -19,10 +19,13 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { toNodeHandler, auth } from "@guestpost/auth";
+import { toNodeHandler, createAuth } from "@guestpost/auth";
 import { AppModule } from "./app.module";
 import { SentryExceptionFilter } from "./common/filters/sentry-exception.filter";
 import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-business-context.interceptor";
+import { hasAuthCredentials } from "./common/has-auth-credentials";
+import { getRedisClient } from "./common/redis-client";
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger";
 
 const REQUIRED_ENV_VARS = ["DATABASE_URL", "REDIS_URL", "JWT_SECRET"] as const;
 
@@ -123,13 +126,8 @@ async function bootstrap() {
 
   // ── Environment-aware rate limiting ──────────────────────────────────────
 
-  function hasAuthCredentials(req: express.Request): boolean {
-    if (req.headers.authorization?.startsWith("Bearer ")) return true;
-    const cookie = req.headers.cookie;
-    if (typeof cookie === "string" && cookie.includes("guestpost-session"))
-      return true;
-    return false;
-  }
+  // hasAuthCredentials is extracted to common/has-auth-credentials.ts so it
+  // can be unit-tested in isolation (cookie-shape regression coverage).
 
   interface EnvLimits {
     auth: {
@@ -230,6 +228,30 @@ async function bootstrap() {
     });
   }
 
+  // Mirrors better-auth@1.6.14 rateLimitResponse() exactly so the IP-layer
+  // and the email-layer (Phase 7.8 Better Auth plugin) return identical 429s.
+  // Account-enumeration safeguard: an attacker comparing the two responses
+  // must not be able to tell "IP limit" from "email limit" from the wire
+  // shape.
+  const BETTER_AUTH_429_BODY = {
+    message: "Too many requests. Please try again later.",
+  };
+  function createAuthLimiter(max: number) {
+    return rateLimit({
+      windowMs: 60 * 1000,
+      max,
+      standardHeaders: true,
+      legacyHeaders: false,
+      handler: (_req, res, _next, options) => {
+        const retryAfterSec = Math.ceil(options.windowMs / 1000);
+        res
+          .status(429)
+          .setHeader("X-Retry-After", String(retryAfterSec))
+          .json(BETTER_AUTH_429_BODY);
+      },
+    });
+  }
+
   function createTieredLimiters(
     anonMax: number,
     authMax: number,
@@ -262,34 +284,25 @@ async function bootstrap() {
 
   const envLimits = getEnvLimits();
 
-  // Auth endpoints — one limiter per path, same limit for all users
+  // Auth endpoints — one limiter per path, same limit for all users.
+  // Response shape mirrors better-auth's built-in 429 so the IP-layer here
+  // is indistinguishable from the email-layer plugin (#26 enumeration
+  // safeguard).
   server.use(
     "/api/v1/auth/sign-in",
-    createLimiter(
-      envLimits.auth.signIn,
-      "Too many auth attempts, try again later",
-    ),
+    createAuthLimiter(envLimits.auth.signIn),
   );
   server.use(
     "/api/v1/auth/sign-up",
-    createLimiter(
-      envLimits.auth.signUp,
-      "Too many auth attempts, try again later",
-    ),
+    createAuthLimiter(envLimits.auth.signUp),
   );
   server.use(
     "/api/v1/auth/magic-link",
-    createLimiter(
-      envLimits.auth.magicLink,
-      "Too many auth attempts, try again later",
-    ),
+    createAuthLimiter(envLimits.auth.magicLink),
   );
   server.use(
     "/api/v1/auth/reset-password",
-    createLimiter(
-      envLimits.auth.resetPassword,
-      "Too many auth attempts, try again later",
-    ),
+    createAuthLimiter(envLimits.auth.resetPassword),
   );
 
   // Billing — webhook exempt from rate limit (Stripe retries on failure; protected by signature verification instead)
@@ -407,8 +420,33 @@ async function bootstrap() {
     }),
   );
 
+  // Phase 7.8 #26 — Better Auth instance with the email-keyed rate-limit
+  // plugin. The IP-layer limiter (createAuthLimiter above) is the first
+  // line; this plugin adds a second layer keyed by SHA-256(email) so
+  // credential-stuffing across IP pools (one email, many source IPs)
+  // gets caught here. Response shape is byte-identical to better-auth's
+  // built-in 429 → no enumeration oracle.
+  //
+  // Limits are env-tunable. Defaults: dev/test 10x looser to keep
+  // integration suites comfortable; staging/prod 10/5/5/5 per hour.
+  const isAuthRateLimitDev = process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "staging";
+  const authRateLimitMultiplier = isAuthRateLimitDev ? 10 : 1;
+  const authLogger = createLogger("api");
+  const authWithRateLimit = createAuth({
+    emailRateLimit: {
+      redis: getRedisClient(),
+      windowMs: Number(process.env.AUTH_EMAIL_RATE_LIMIT_WINDOW_MS) || 3_600_000,
+      limits: {
+        signIn:        (Number(process.env.AUTH_EMAIL_RATE_LIMIT_SIGN_IN_MAX)        || 10) * authRateLimitMultiplier,
+        signUp:        (Number(process.env.AUTH_EMAIL_RATE_LIMIT_SIGN_UP_MAX)        || 5)  * authRateLimitMultiplier,
+        magicLink:     (Number(process.env.AUTH_EMAIL_RATE_LIMIT_MAGIC_LINK_MAX)     || 5)  * authRateLimitMultiplier,
+        resetPassword: (Number(process.env.AUTH_EMAIL_RATE_LIMIT_RESET_PASSWORD_MAX) || 5)  * authRateLimitMultiplier,
+      },
+      logger: authLogger,
+    },
+  });
   // Better Auth handler must be before body parsers so it can read raw bodies
-  server.use("/api/v1/auth", toNodeHandler(auth));
+  server.use("/api/v1/auth", toNodeHandler(authWithRateLimit));
 
   server.use(
     express.json({

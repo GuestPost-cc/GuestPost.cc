@@ -27,6 +27,7 @@ import { prisma } from "@guestpost/database"
 import { connection } from "../redis"
 import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.settlement-auto-approve")
 
@@ -40,7 +41,9 @@ export function createSettlementAutoApproveWorker() {
   return createObservableWorker(
     QUEUES.SETTLEMENT,
     async (job) => {
-      if (!verifyJobPayload(job.data)) {
+      // Phase 7.8 #27 — settlement-auto-approve (repeatable) bypasses
+      // freshness; payload is signed once at boot and reused per cron tick.
+      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }

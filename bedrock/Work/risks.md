@@ -1,12 +1,12 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-06-16
+updated: 2026-06-17
 ---
 
 # Risks
 
-Updated 2026-06-16 after Phases 6.6–7.7 audit batch closed 19/31 findings (**11/11 Critical**, 7/14 High). Phase 7.7 adds the observability spine (requestId → structured logs → audit → Sentry source-maps) without closing a numbered finding. Original 2026-06-11 architecture review risks reassessed below.
+Updated 2026-06-17 after Phase 7.8 closed 22/31 findings (**11/11 Critical**, 7/14 High, **3/5 Medium** — #25, #26, #27). The auth/queue trust boundary has zero open security findings; remaining work is frontend polish (#28/#29/#30 → Phase 7.9). Original 2026-06-11 architecture review risks reassessed below.
 
 The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
 
@@ -34,6 +34,10 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 | API + worker logs were unstructured `console.*` calls — log aggregators couldn't parse, requestId not embedded in log lines | Phase 7.7 B + 7.7.x (structured-logger module: JSON + pretty modes, auto-injects requestId from ALS, includes `environment` + `release` tags. **All 8 worker files swept** in 7.7.x — `apps/worker/src` now has zero production `console.*` calls; allowlist contains only forever-allowed entries) |
 | CI workflows (`ci.yml`, `pr.yml`) were broken in 5 latent ways masked behind earlier pnpm-action failure | Phase 7.7.x batch 2 (PR #3): turbo env passthrough + pnpm version conflict + missing root typecheck script + missing ui/api-client build dep + Sentry source-map network hang. All five fixed in one PR; CI green end-to-end on main. |
 | 3 pre-existing failing test specs skipped via `testPathIgnorePatterns` to unblock PR #3 merge | Phase 7.7.y (PR #4): all 3 specs' mocks updated to match Phase 6.x production behavior; allowlist back at jest default. apps/api jest 33 suites / 478 tests, no skips. |
+| Per-IP-only auth rate limits enable credential stuffing across an IP pool (#26) | Phase 7.8: Better Auth plugin layers per-`SHA-256(email)` Redis-backed counter on top of the per-IP limit. Generic 429 response is byte-identical between layers (no enumeration oracle). |
+| `hasAuthCredentials()` cookie sniff trivially bypassable (audit §5.8 sub-finding) | Phase 7.8: regex written against captured Better Auth signed-cookie shape; 14-case unit test including regression for the pre-fix bypass string. |
+| HMAC-signed queue payloads have no `iat` — captured signatures replayable indefinitely (#27) | Phase 7.8 **Deploy A**: `signJobPayload` injects `iat`+`v: 1` (tamper-proof — part of canonical digest); `verifyJobPayload` enforces freshness (24h default, per-queue overrides). Centralized repeatable-job registry with drift guard handles cron-payload reuse. **Deploy B** (≥48h after merge): flip `allowMissingIat` default to false. |
+| `User.emailVerified` schema field never consulted (#25) — newly-registered customers could submit money-path orders without verification | Phase 7.8: AuthGuard rejects state-changing methods on non-exempt customer routes when `emailVerified=false`. Check applies at both cache-miss + cache-hit paths. Mandatory pre-merge GET-mutation audit confirmed zero state-changing GETs. CUSTOMER only (PUBLISHER + STAFF have separate verification tracks). |
 | Sentry production stack traces showed minified bundle offsets (no source-map upload) | Phase 7.7 C (`@sentry/cli: true` + `widenClientFileUpload` + `sourcemaps.deleteSourcemapsAfterUpload` on all 4 Next.js apps + `SENTRY_AUTH_TOKEN` threaded in CI) |
 | Worker `/metrics/queues` had no service identity + missing the Phase 7.4 `dedupHitsTotal` counter | Phase 7.7 D (extended payload with `service: { name, version, pid, started_at, uptime_s }` + `dedupHitsTotal` + new `stalledHitsTotal`) |
 
@@ -42,7 +46,7 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 ### Critical / High that survived this batch
 
 - **No open Criticals remain.** Phase 7.6 closed #9 (mobile UX), the last one. The 2026-06-15 platform audit has zero open production-blocker findings.
-- **5 Medium findings** still open: #26 (per-IP-only auth rate limits enable credential stuffing across IP pools), #27 (job signing has no `iat` for replay protection), #28 (status-color drift across pages), #29 (shared Phase A components shipped but zero imports across apps), #30 (hooks-rule violation in publisher listings page).
+- **2 Medium findings** still open (both frontend, queued for Phase 7.9): #28 (status-color drift across pages), #29 (shared Phase A components shipped but zero imports across apps). Plus #30 (hooks-rule violation in publisher listings page) — also Phase 7.9. Phase 7.8 closed #25 + #26 + #27.
 - **Drawer a11y polish gap (introduced by Phase 7.6, captured as Phase 7.6.1)**: matches portal's reference exactly, which means no escape-to-close, focus trap, or body-scroll-lock on any of the three drawers. Functional and visually correct, but keyboard-only users + screen-reader users have a degraded experience. Polish-tier risk; deferred to Phase 7.9 per 2026-06-16 roadmap.
 - ~~Partial structured-logger sweep (Phase 7.7 B)~~ — **CLOSED** by Phase 7.7.x (PR #3, commit `5af902c`). All 8 worker files swept; allowlist at its forever-allowed steady state.
 - ~~3 pre-existing failing test specs skipped in CI~~ — **CLOSED** by Phase 7.7.y (PR #4, commits `aa8cd55`+`74c8d51`+`b670493`). All 3 specs run again; `testPathIgnorePatterns` back at jest default.
