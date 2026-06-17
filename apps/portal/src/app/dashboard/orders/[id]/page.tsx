@@ -5,7 +5,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
+import { Badge, StatusBadge as UIStatusBadge, getOrderStatusPresentation } from "@guestpost/ui"
+import type { OrderStatus } from "@guestpost/database"
 import { Skeleton, ErrorState } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
@@ -51,25 +52,43 @@ import { toast } from "sonner"
 import { useState } from "react"
 import { LifeBuoy } from "lucide-react"
 
-const statusConfig: Record<string, { color: string; icon: React.ElementType; description: string }> = {
-  DRAFT: { color: "bg-gray-100 text-gray-700", icon: FileText, description: "Order is in draft state" },
-  PENDING_PAYMENT: { color: "bg-amber-100 text-amber-700", icon: Clock, description: "Awaiting payment" },
-  PAID: { color: "bg-blue-100 text-blue-700", icon: CheckCircle, description: "Payment received" },
-  SUBMITTED: { color: "bg-indigo-100 text-indigo-700", icon: CheckCircle, description: "Order submitted" },
-  ACCEPTED: { color: "bg-blue-100 text-blue-700", icon: CheckCircle, description: "Order accepted" },
-  ASSIGNED: { color: "bg-purple-100 text-purple-700", icon: User, description: "Order assigned to writer" },
-  CONTENT_REQUESTED: { color: "bg-cyan-100 text-cyan-700", icon: FileText, description: "Content requested" },
-  CONTENT_CREATION: { color: "bg-cyan-100 text-cyan-700", icon: FileText, description: "Creating content" },
-  CONTENT_READY: { color: "bg-teal-100 text-teal-700", icon: Check, description: "Content ready" },
-  REVIEW: { color: "bg-orange-100 text-orange-700", icon: AlertCircle, description: "Reviewing content" },
-  OUTREACH: { color: "bg-pink-100 text-pink-700", icon: Globe, description: "Outreach in progress" },
-  PUBLISHED: { color: "bg-green-100 text-green-700", icon: Check, description: "Content published" },
-  VERIFIED: { color: "bg-green-100 text-green-700", icon: ShieldCheck, description: "Content verified" },
-  DELIVERED: { color: "bg-emerald-100 text-emerald-700", icon: CheckCircle, description: "Order delivered" },
-  UNDER_REVIEW: { color: "bg-orange-100 text-orange-700", icon: AlertCircle, description: "Awaiting your review" },
-  COMPLETED: { color: "bg-emerald-100 text-emerald-700", icon: CheckCircle, description: "Order completed" },
-  CANCELLED: { color: "bg-red-100 text-red-700", icon: XCircle, description: "Order cancelled" },
-  REFUNDED: { color: "bg-gray-100 text-gray-500", icon: RefreshCw, description: "Refund issued" },
+// Phase 7.9 #28 — color + label live in the central STATUS_PRESENTATION
+// table now (@guestpost/ui). This local map keeps only the page-specific
+// concerns: which icon to render alongside the badge + a one-line
+// description. Per the table's header comment, icons stay local rather
+// than polluting the cross-page table.
+//
+// The colored circle around the icon (used in the "current status"
+// header card, line ~870) uses the same variant -> Tailwind palette
+// that `<StatusBadge>` does internally, so visuals stay aligned with
+// the badge inside the card.
+const VARIANT_CIRCLE_BG: Record<string, string> = {
+  default:     "bg-primary/10 text-primary",
+  success:     "bg-emerald-100 text-emerald-700",
+  warning:     "bg-amber-100 text-amber-700",
+  destructive: "bg-red-100 text-red-700",
+  info:        "bg-blue-100 text-blue-700",
+  pending:     "bg-gray-100 text-gray-700",
+}
+const statusConfig: Record<string, { icon: React.ElementType; description: string }> = {
+  DRAFT:             { icon: FileText,    description: "Order is in draft state" },
+  PENDING_PAYMENT:   { icon: Clock,       description: "Awaiting payment" },
+  PAID:              { icon: CheckCircle, description: "Payment received" },
+  SUBMITTED:         { icon: CheckCircle, description: "Order submitted" },
+  ACCEPTED:          { icon: CheckCircle, description: "Order accepted" },
+  CONTENT_REQUESTED: { icon: FileText,    description: "Content requested" },
+  CONTENT_CREATION:  { icon: FileText,    description: "Creating content" },
+  CONTENT_READY:     { icon: Check,       description: "Content ready" },
+  CUSTOMER_REVIEW:   { icon: AlertCircle, description: "Awaiting your review" },
+  APPROVED:          { icon: Check,       description: "Content approved" },
+  PUBLISHED:         { icon: Check,       description: "Content published" },
+  VERIFIED:          { icon: ShieldCheck, description: "Content verified" },
+  DELIVERED:         { icon: CheckCircle, description: "Order delivered" },
+  SETTLED:           { icon: CheckCircle, description: "Settlement processed" },
+  COMPLETED:         { icon: CheckCircle, description: "Order completed" },
+  CANCELLED:         { icon: XCircle,     description: "Order cancelled" },
+  REFUNDED:          { icon: RefreshCw,   description: "Refund issued" },
+  DISPUTED:          { icon: AlertCircle, description: "Order disputed" },
 }
 
 const eventLabels: Record<string, string> = {
@@ -254,14 +273,14 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const config = statusConfig[status] || statusConfig.DRAFT
-  const Icon = config.icon
+  const local = statusConfig[status] || statusConfig.DRAFT
+  const p = getOrderStatusPresentation(status as OrderStatus)
+  const Icon = local.icon
 
   return (
-    <Badge className={`${config.color} gap-1.5 capitalize`}>
+    <UIStatusBadge variant={p.variant} className="gap-1.5">
       <Icon className="h-3.5 w-3.5" />
-      {status.replace(/_/g, " ").toLowerCase()}
-    </Badge>
+      {p.label}</UIStatusBadge>
   )
 }
 
@@ -857,7 +876,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-3">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-full ${currentStatusConfig.color}`}>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-full ${VARIANT_CIRCLE_BG[getOrderStatusPresentation(order.status as OrderStatus).variant]}`}>
                   {(() => {
                     const Icon = currentStatusIcon
                     return Icon ? <Icon className="h-6 w-6" /> : null

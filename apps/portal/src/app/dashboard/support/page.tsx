@@ -8,7 +8,8 @@ import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
 import { Textarea } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
+import { Badge, getTicketStatusPresentation } from "@guestpost/ui"
+import type { TicketStatus } from "@guestpost/database"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@guestpost/ui"
 import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
@@ -76,12 +77,23 @@ interface Ticket {
   }>
 }
 
-const statusConfig: Record<string, { color: string; icon: React.ElementType }> = {
-  OPEN: { color: "bg-blue-100 text-blue-700", icon: AlertCircle },
-  IN_PROGRESS: { color: "bg-amber-100 text-amber-700", icon: Clock },
-  WAITING_ON_CUSTOMER: { color: "bg-purple-100 text-purple-700", icon: Clock },
-  RESOLVED: { color: "bg-green-100 text-green-700", icon: CheckCircle },
-  CLOSED: { color: "bg-gray-100 text-gray-500", icon: CheckCircle },
+// Phase 7.9 #28 — color + label live in @guestpost/ui's STATUS_PRESENTATION
+// (see getTicketStatusPresentation). This local map only keeps the page-
+// specific icon choice. Per the table's header: icons stay local.
+const ticketIcon: Record<TicketStatus, React.ElementType> = {
+  OPEN:                AlertCircle,
+  IN_PROGRESS:         Clock,
+  WAITING_ON_CUSTOMER: Clock,
+  RESOLVED:            CheckCircle,
+  CLOSED:              CheckCircle,
+}
+const VARIANT_CIRCLE_BG: Record<string, string> = {
+  default:     "bg-primary/10 text-primary",
+  success:     "bg-emerald-100 text-emerald-700",
+  warning:     "bg-amber-100 text-amber-700",
+  destructive: "bg-red-100 text-red-700",
+  info:        "bg-blue-100 text-blue-700",
+  pending:     "bg-gray-100 text-gray-700",
 }
 
 function TicketsTableSkeleton() {
@@ -351,8 +363,8 @@ export default function SupportPage() {
           ) : (
             <div className="space-y-2">
               {filteredTickets.map((ticket: Ticket) => {
-                const config = statusConfig[ticket.status] || statusConfig.OPEN
-                const StatusIcon = config.icon
+                const p = getTicketStatusPresentation(ticket.status as TicketStatus)
+                const StatusIcon = ticketIcon[ticket.status as TicketStatus] || AlertCircle
 
                 return (
                   <div
@@ -360,7 +372,7 @@ export default function SupportPage() {
                     className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-full ${config.color}`}>
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full ${VARIANT_CIRCLE_BG[p.variant]}`}>
                         <StatusIcon className="h-5 w-5" />
                       </div>
                       <div>
@@ -377,8 +389,8 @@ export default function SupportPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge className={`${config.color} capitalize`}>
-                        {ticket.status.replace(/_/g, " ").toLowerCase()}
+                      <Badge className={VARIANT_CIRCLE_BG[p.variant]}>
+                        {p.label}
                       </Badge>
                       <Button variant="ghost" size="icon" asChild>
                         <Link href={`/dashboard/support/${ticket.id}`}>

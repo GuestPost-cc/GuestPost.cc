@@ -5,7 +5,8 @@ import { useQuery } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
+import { Badge, StatusBadge, getCampaignStatusPresentation } from "@guestpost/ui"
+import type { CampaignStatus } from "@guestpost/database"
 import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
   Table,
@@ -48,12 +49,6 @@ interface Order {
   createdAt: string
 }
 
-const statusColors: Record<string, string> = {
-  ACTIVE: "bg-green-100 text-green-700",
-  PAUSED: "bg-amber-100 text-amber-700",
-  COMPLETED: "bg-blue-100 text-blue-700",
-  ARCHIVED: "bg-gray-100 text-gray-500",
-}
 
 function CampaignDetailSkeleton() {
   return (
@@ -144,9 +139,10 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight">{campaign.name}</h1>
-              <Badge className={`${statusColors[campaign.status] || "bg-gray-100 text-gray-700"} capitalize`}>
-                {campaign.status.toLowerCase()}
-              </Badge>
+              {(() => {
+                const p = getCampaignStatusPresentation(campaign.status as CampaignStatus)
+                return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+              })()}
             </div>
             <p className="text-sm text-muted-foreground">
               Created {format(new Date(campaign.createdAt), "PP")}

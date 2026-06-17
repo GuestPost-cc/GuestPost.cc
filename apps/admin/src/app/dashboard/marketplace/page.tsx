@@ -7,7 +7,8 @@ import { useAuth } from "../../../lib/auth"
 import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
+import { Badge, StatusBadge, getListingStatusPresentation } from "@guestpost/ui"
+import type { ListingStatus } from "@guestpost/database"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@guestpost/ui"
 import {
   Table,
@@ -99,14 +100,9 @@ const verifyBadge: Record<string, string> = {
   REVOKED: "bg-red-100 text-red-800",
 }
 
-const statusColors: Record<string, string> = {
-  APPROVED: "bg-green-100 text-green-800",
-  DRAFT: "bg-gray-100 text-gray-800",
-  PENDING_REVIEW: "bg-yellow-100 text-yellow-800",
-  PAUSED: "bg-orange-100 text-orange-800",
-  REJECTED: "bg-red-100 text-red-800",
-  ARCHIVED: "bg-gray-100 text-gray-500",
-}
+// Phase 7.9 #28 — ListingStatus colors come from the centralized table.
+// `verifyBadge` above maps the WebsiteVerificationStatus enum (a different
+// enum, not in scope for the Phase 7.9 sweep — kept inline for now).
 
 const LISTING_TYPES = ["GUEST_POST", "NICHE_EDIT", "EDITORIAL_LINK", "SPONSORED_CONTENT", "DIGITAL_PR", "BLOG_ARTICLE", "SEO_CONTENT"] as const
 
@@ -482,9 +478,10 @@ export default function AdminMarketplacePage() {
                     <Badge variant="outline">{(((listing as any).serviceTypes?.[0]) ?? listing.type ?? "").replace(/_/g, " ")}</Badge>
                   </TableCell>
                   <TableCell>
-                    <Badge className={statusColors[listing.status] || "bg-gray-100"}>
-                      {listing.status.replace("_", " ")}
-                    </Badge>
+                    {(() => {
+                      const p = getListingStatusPresentation(listing.status as ListingStatus)
+                      return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+                    })()}
                   </TableCell>
                   <TableCell>
                     {listing.websiteVerificationStatus ? (

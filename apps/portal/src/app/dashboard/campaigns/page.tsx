@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@gues
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
+import { Badge, StatusBadge, getCampaignStatusPresentation } from "@guestpost/ui"
+import type { CampaignStatus } from "@guestpost/database"
 import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
   Table,
@@ -68,13 +69,6 @@ interface Campaign {
   createdAt: string
   updatedAt?: string
   orderCount?: number
-}
-
-const statusColors: Record<string, string> = {
-  ACTIVE: "bg-green-100 text-green-700",
-  PAUSED: "bg-amber-100 text-amber-700",
-  COMPLETED: "bg-blue-100 text-blue-700",
-  ARCHIVED: "bg-gray-100 text-gray-500",
 }
 
 function CampaignsTableSkeleton() {
@@ -297,9 +291,10 @@ export default function CampaignsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Badge className={`${statusColors[campaign.status] || "bg-gray-100 text-gray-700"} capitalize`}>
-                      {campaign.status.toLowerCase()}
-                    </Badge>
+                    {(() => {
+                      const p = getCampaignStatusPresentation(campaign.status as CampaignStatus)
+                      return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+                    })()}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8">

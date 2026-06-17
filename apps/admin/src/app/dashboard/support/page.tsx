@@ -8,7 +8,8 @@ import { useAuth } from "../../../lib/auth"
 import { Card, CardContent } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
+import { Badge, StatusBadge, getTicketStatusPresentation } from "@guestpost/ui"
+import type { TicketStatus } from "@guestpost/database"
 import { Skeleton } from "@guestpost/ui"
 import {
   Table,
@@ -34,17 +35,11 @@ import {
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
-const STATUS_COLORS: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
-  OPEN: "secondary",
-  IN_PROGRESS: "default",
-  WAITING_ON_CUSTOMER: "outline",
-  RESOLVED: "default",
-  CLOSED: "destructive",
-}
+// Phase 7.9 #28 — ticket status presentation comes from
+// getTicketStatusPresentation in @guestpost/ui. Local STATUS_COLORS deleted.
 
 // Phase 6.6: PUBLISHER vs PLATFORM at a glance — finance / ops / admin all
-// triage off this. Keeps the design-system status table in mind (will be
-// centralized in @guestpost/ui per audit finding #28).
+// triage off this.
 function ChannelBadge({ channel }: { channel: "PUBLISHER" | "PLATFORM" | null }) {
   if (!channel) return <span className="text-xs text-muted-foreground">—</span>
   const cls =
@@ -233,9 +228,10 @@ export default function AdminSupportPage() {
                           : t.assignedPublisher?.name || "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_COLORS[t.status] || "secondary"}>
-                          {t.status.replace(/_/g, " ")}
-                        </Badge>
+                        {(() => {
+                          const p = getTicketStatusPresentation(t.status as TicketStatus)
+                          return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+                        })()}
                       </TableCell>
                       <TableCell className="text-center">{t.messageCount}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">

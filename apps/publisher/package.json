@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@guestpost/api-client": "workspace:*",
+    "@guestpost/database": "workspace:*",
     "@guestpost/shared": "workspace:*",
     "@guestpost/ui": "workspace:*",
     "@hookform/resolvers": "^3.0.0",

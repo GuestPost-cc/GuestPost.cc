@@ -8,7 +8,8 @@ import { Button } from "@guestpost/ui"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
 import { Label } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
+import { Badge, StatusBadge, getOrderStatusPresentation } from "@guestpost/ui"
+import type { OrderStatus } from "@guestpost/database"
 import { Skeleton } from "@guestpost/ui"
 import {
   Table,
@@ -98,19 +99,6 @@ const SERVICE_TYPES = [
   "SEO_CONTENT",
 ] as const
 
-const statusColors: Record<string, string> = {
-  DRAFT: "bg-gray-100 text-gray-700",
-  PENDING_PAYMENT: "bg-amber-100 text-amber-700",
-  PAID: "bg-blue-100 text-blue-700",
-  ASSIGNED: "bg-purple-100 text-purple-700",
-  CONTENT_CREATION: "bg-cyan-100 text-cyan-700",
-  OUTREACH: "bg-pink-100 text-pink-700",
-  PUBLISHED: "bg-green-100 text-green-700",
-  UNDER_REVIEW: "bg-orange-100 text-orange-700",
-  COMPLETED: "bg-emerald-100 text-emerald-700",
-  CANCELLED: "bg-red-100 text-red-700",
-  REFUNDED: "bg-gray-100 text-gray-500",
-}
 
 const createOrderSchema = z.object({
   campaignId: z.string().min(1, "Campaign is required"),
@@ -290,12 +278,8 @@ export default function OrdersPage() {
         </Button>
       ),
       cell: ({ row }) => {
-        const status = row.original.status
-        return (
-          <Badge className={`${statusColors[status] || "bg-gray-100 text-gray-700"} capitalize`}>
-            {status.replace(/_/g, " ").toLowerCase()}
-          </Badge>
-        )
+        const p = getOrderStatusPresentation(row.original.status as OrderStatus)
+        return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
       },
     },
     {
