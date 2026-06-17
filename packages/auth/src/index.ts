@@ -56,8 +56,15 @@ export interface AuthFactoryOptions {
   onEmailVerified?: (userId: string) => void
 }
 
-export function createAuth(opts: AuthFactoryOptions = {}) {
-  return betterAuth({
+/**
+ * Phase 7.10 test seam — builds the option object passed to betterAuth().
+ * Exposed so unit tests can inspect what we wire (`emailVerification` block,
+ * `sendOnSignUp`, `afterEmailVerification`, etc.) without standing up a
+ * real Better Auth runtime + Prisma adapter. The production path stays
+ * `createAuth(opts) → betterAuth(buildAuthOptions(opts))`.
+ */
+export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
+  return {
     baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:4000",
     basePath: "/api/v1/auth",
     database: prismaAdapter(prisma, {
@@ -71,7 +78,7 @@ export function createAuth(opts: AuthFactoryOptions = {}) {
     // `emailVerified: false` (the pre-7.10 broken state) and Better
     // Auth's `/send-verification-email` route returns NOT_ENABLED.
     emailVerification: opts.sendEmail ? {
-      sendVerificationEmail: async ({ user, url }) => {
+      sendVerificationEmail: async ({ user, url }: { user: { email: string; name?: string | null }; url: string; token?: string }) => {
         await opts.sendEmail!({
           to: user.email,
           subject: "Verify your email — GuestPost.cc",
@@ -93,7 +100,7 @@ export function createAuth(opts: AuthFactoryOptions = {}) {
       // verification transition. Replaces the noisier
       // `databaseHooks.user.update.after` approach considered earlier.
       afterEmailVerification: opts.onEmailVerified
-        ? async (user) => { opts.onEmailVerified!(user.id) }
+        ? async (user: { id: string }) => { opts.onEmailVerified!(user.id) }
         : undefined,
     } : undefined,
     socialProviders: {
@@ -125,7 +132,11 @@ export function createAuth(opts: AuthFactoryOptions = {}) {
       bearer(),
       ...(opts.emailRateLimit ? [emailRateLimitPlugin(opts.emailRateLimit)] : []),
     ],
-  })
+  }
+}
+
+export function createAuth(opts: AuthFactoryOptions = {}) {
+  return betterAuth(buildAuthOptions(opts) as any)
 }
 
 // Back-compat singleton — used by AuthGuard (auth.api.getSession), which
