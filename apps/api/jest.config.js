@@ -20,4 +20,12 @@ module.exports = {
     "^@guestpost/auth$": "<rootDir>/../../../packages/auth/src",
   },
   testPathIgnorePatterns: ["/node_modules/"],
+  // CI hang protection — without this, jest waits indefinitely for
+  // open handles to close (Redis sockets, BullMQ connections, etc).
+  // Locally the worker-process auto-timeout eventually force-exits
+  // after ~60s; CI runners give up much later or not at all. Phase
+  // 7.8 PR #5 stalled on this for 40+ min before being cancelled.
+  // Tracking down individual leaks is a separate cleanup pass —
+  // `--detectOpenHandles` exposes them when you want to chase them.
+  forceExit: true,
 }
