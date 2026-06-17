@@ -19,11 +19,13 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import { toNodeHandler, auth } from "@guestpost/auth";
+import { toNodeHandler, createAuth } from "@guestpost/auth";
 import { AppModule } from "./app.module";
 import { SentryExceptionFilter } from "./common/filters/sentry-exception.filter";
 import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-business-context.interceptor";
 import { hasAuthCredentials } from "./common/has-auth-credentials";
+import { getRedisClient } from "./common/redis-client";
+import { createLogger } from "@guestpost/shared/dist/observability/structured-logger";
 
 const REQUIRED_ENV_VARS = ["DATABASE_URL", "REDIS_URL", "JWT_SECRET"] as const;
 
@@ -418,8 +420,33 @@ async function bootstrap() {
     }),
   );
 
+  // Phase 7.8 #26 — Better Auth instance with the email-keyed rate-limit
+  // plugin. The IP-layer limiter (createAuthLimiter above) is the first
+  // line; this plugin adds a second layer keyed by SHA-256(email) so
+  // credential-stuffing across IP pools (one email, many source IPs)
+  // gets caught here. Response shape is byte-identical to better-auth's
+  // built-in 429 → no enumeration oracle.
+  //
+  // Limits are env-tunable. Defaults: dev/test 10x looser to keep
+  // integration suites comfortable; staging/prod 10/5/5/5 per hour.
+  const isAuthRateLimitDev = process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "staging";
+  const authRateLimitMultiplier = isAuthRateLimitDev ? 10 : 1;
+  const authLogger = createLogger("api");
+  const authWithRateLimit = createAuth({
+    emailRateLimit: {
+      redis: getRedisClient(),
+      windowMs: Number(process.env.AUTH_EMAIL_RATE_LIMIT_WINDOW_MS) || 3_600_000,
+      limits: {
+        signIn:        (Number(process.env.AUTH_EMAIL_RATE_LIMIT_SIGN_IN_MAX)        || 10) * authRateLimitMultiplier,
+        signUp:        (Number(process.env.AUTH_EMAIL_RATE_LIMIT_SIGN_UP_MAX)        || 5)  * authRateLimitMultiplier,
+        magicLink:     (Number(process.env.AUTH_EMAIL_RATE_LIMIT_MAGIC_LINK_MAX)     || 5)  * authRateLimitMultiplier,
+        resetPassword: (Number(process.env.AUTH_EMAIL_RATE_LIMIT_RESET_PASSWORD_MAX) || 5)  * authRateLimitMultiplier,
+      },
+      logger: authLogger,
+    },
+  });
   // Better Auth handler must be before body parsers so it can read raw bodies
-  server.use("/api/v1/auth", toNodeHandler(auth));
+  server.use("/api/v1/auth", toNodeHandler(authWithRateLimit));
 
   server.use(
     express.json({
