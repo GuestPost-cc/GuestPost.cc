@@ -34,6 +34,7 @@ import {
 import { Notifications } from "../../components/notifications"
 import { CreateOrgGate } from "../../components/create-org-gate"
 import { OrgSwitcher } from "../../components/org-switcher"
+import { EmailVerificationBannerContainer } from "../../components/email-verification-banner-container"
 
 // ownerOnly items hit OWNER-gated backend routes (wallet deposit/checkout/
 // withdraw, org member/team management) — hiding them from MEMBER avoids
@@ -201,6 +202,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="ml-auto"><Notifications /></div>
         </header>
 
+        {/* Phase 7.10 — Banner short-circuits to null for verified/non-CUSTOMER users. */}
+        <EmailVerificationBannerContainer />
         <main className="flex-1 p-6 lg:p-8">
           {children}
         </main>

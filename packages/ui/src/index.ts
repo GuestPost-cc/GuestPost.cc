@@ -136,3 +136,5 @@ export type {
   StatusVariant,
   StatusPresentation,
 } from "./lib/status-presentation"
+export { EmailVerificationBanner } from "./components/email-verification-banner"
+export type { EmailVerificationBannerProps } from "./components/email-verification-banner"

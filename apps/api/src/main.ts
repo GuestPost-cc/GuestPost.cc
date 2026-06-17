@@ -26,6 +26,8 @@ import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-b
 import { hasAuthCredentials } from "./common/has-auth-credentials";
 import { getRedisClient } from "./common/redis-client";
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger";
+import { invalidateAuthContext } from "./common/auth-context-cache";
+import { QueueService } from "./modules/queues/queue.service";
 
 const REQUIRED_ENV_VARS = ["DATABASE_URL", "REDIS_URL", "JWT_SECRET"] as const;
 
@@ -432,6 +434,15 @@ async function bootstrap() {
   const isAuthRateLimitDev = process.env.NODE_ENV !== "production" && process.env.NODE_ENV !== "staging";
   const authRateLimitMultiplier = isAuthRateLimitDev ? 10 : 1;
   const authLogger = createLogger("api");
+
+  // Phase 7.10 — lazy ref to QueueService. The Better Auth handler is
+  // mounted on `server` BEFORE NestFactory.create() runs (line ~462), so
+  // the DI container doesn't exist yet at this point. By the time any
+  // request reaches Better Auth's sendVerificationEmail callback, Nest
+  // has booted and the ref is populated. Throw loudly if it isn't (in
+  // practice means a misordering bug introduced by a future edit).
+  let queueServiceRef: QueueService | null = null;
+
   const authWithRateLimit = createAuth({
     emailRateLimit: {
       redis: getRedisClient(),
@@ -443,6 +454,23 @@ async function bootstrap() {
         resetPassword: (Number(process.env.AUTH_EMAIL_RATE_LIMIT_RESET_PASSWORD_MAX) || 5)  * authRateLimitMultiplier,
       },
       logger: authLogger,
+    },
+    // Phase 7.10 — wire the verification flow. sendEmail is captured by
+    // closure over the lazy ref. onEmailVerified is synchronous and
+    // self-contained (just clears a Map), so it can run safely the
+    // moment Better Auth fires it.
+    sendEmail: async (args) => {
+      if (!queueServiceRef) {
+        throw new Error("QueueService not yet available — Better Auth handler invoked before NestFactory boot completed");
+      }
+      await queueServiceRef.sendEmail(args.jobName ?? "send-email", {
+        to: args.to,
+        subject: args.subject,
+        html: args.html,
+      });
+    },
+    onEmailVerified: (userId) => {
+      invalidateAuthContext(userId);
     },
   });
   // Better Auth handler must be before body parsers so it can read raw bodies
@@ -460,6 +488,11 @@ async function bootstrap() {
   server.use(cookieParser());
 
   const app = await NestFactory.create(AppModule, new ExpressAdapter(server));
+
+  // Phase 7.10 — populate the lazy QueueService ref now that DI is live.
+  // Any inbound HTTP request that reaches Better Auth's sendVerificationEmail
+  // callback after this point sees a populated ref.
+  queueServiceRef = app.get(QueueService);
 
   app.setGlobalPrefix("api/v1");
   app.useGlobalPipes(
