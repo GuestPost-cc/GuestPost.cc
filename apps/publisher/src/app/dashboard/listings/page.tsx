@@ -176,23 +176,26 @@ export default function PublisherListingsPage() {
   })
 
   // ── Phase 6 lifecycle mutations (publisher-side) ────────────────────────
+  // Phase 7.9 #30 — inlined the 4 useMutation calls (was a
+  // makeLifecycleMutation factory that wrapped useMutation inside a
+  // regular function; technically functioned but violated the
+  // rules-of-hooks because the hook is called via a non-hook helper).
   // Each transition refreshes the listings query so the phase badge moves
   // immediately. Errors surface with the server's friendly message
   // (NO_AVAILABLE_SERVICES, WEBSITE_NOT_VERIFIED, etc.).
-  function makeLifecycleMutation(fn: (id: string) => Promise<any>, label: string) {
-    return useMutation({
-      mutationFn: fn,
+  function lifecycleOpts(label: string) {
+    return {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
         toast.success(label)
       },
       onError: (e: any) => toast.error(e?.message || `${label} failed`),
-    })
+    }
   }
-  const submitMut  = makeLifecycleMutation((id) => api.marketplace.submitListing(id),  "Submitted for review")
-  const pauseMut   = makeLifecycleMutation((id) => api.marketplace.pauseListing(id),   "Listing paused")
-  const unpauseMut = makeLifecycleMutation((id) => api.marketplace.unpauseListing(id), "Listing unpaused")
-  const archiveMut = makeLifecycleMutation((id) => api.marketplace.archiveListing(id), "Listing archived")
+  const submitMut  = useMutation({ mutationFn: (id: string) => api.marketplace.submitListing(id),  ...lifecycleOpts("Submitted for review") })
+  const pauseMut   = useMutation({ mutationFn: (id: string) => api.marketplace.pauseListing(id),   ...lifecycleOpts("Listing paused") })
+  const unpauseMut = useMutation({ mutationFn: (id: string) => api.marketplace.unpauseListing(id), ...lifecycleOpts("Listing unpaused") })
+  const archiveMut = useMutation({ mutationFn: (id: string) => api.marketplace.archiveListing(id), ...lifecycleOpts("Listing archived") })
 
   const listings = (listingsQ.data ?? []) as any[]
   const canSubmit =

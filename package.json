@@ -7,6 +7,7 @@
     "dev": "turbo dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
+    "lint": "pnpm -r --filter @guestpost/portal --filter @guestpost/admin --filter @guestpost/publisher run lint",
     "services:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d",
     "services:down": "docker compose -f infrastructure/docker/docker-compose.yml down",
     "dev:all": "pnpm services:up && pnpm build && concurrently --names 'api,worker,site,portal,pub,admin' --prefix-colors 'blue,green,yellow,magenta,cyan,red' 'cd apps/api && NODE_ENV=development node dist/main.js' 'cd apps/worker && NODE_ENV=development node dist/index.js' 'cd apps/website && npx next dev --port 3000' 'cd apps/portal && npx next dev --port 3001' 'cd apps/publisher && npx next dev --port 3002' 'cd apps/admin && npx next dev --port 3003'",
@@ -28,10 +29,16 @@
   "license": "ISC",
   "packageManager": "pnpm@11.5.1",
   "devDependencies": {
+    "@eslint/js": "^9.0.0",
     "@playwright/test": "^1.60.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
     "concurrently": "^10.0.3",
+    "eslint": "^9.0.0",
+    "eslint-plugin-react-hooks": "^5.0.0",
     "tsx": "^4.22.4",
-    "turbo": "^2.9.16"
+    "turbo": "^2.9.16",
+    "typescript-eslint": "^8.0.0"
   },
   "dependencies": {
     "next": "^16.2.7"

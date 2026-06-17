@@ -74,6 +74,13 @@ jobs:
       - name: TypeScript check
         run: pnpm run typecheck
 
+      # Phase 7.9 #30 — ESLint with react-hooks/rules-of-hooks across the
+      # 3 frontend apps. Tight rule set (see eslint.config.mjs): only
+      # @eslint/js recommended + typescript-eslint recommended +
+      # rules-of-hooks. Catches the next #30-class regression at PR time.
+      - name: ESLint (hooks + TS)
+        run: pnpm run lint
+
       - name: API unit tests
         run: pnpm test
         working-directory: apps/api

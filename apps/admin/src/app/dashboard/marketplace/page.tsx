@@ -164,20 +164,6 @@ export default function AdminMarketplacePage() {
   })
 
   const queryError = listingsError || statsError
-
-  if (queryError) {
-    return (
-      <ErrorState
-        title="Failed to load marketplace"
-        description={queryError instanceof Error ? queryError.message : "An unexpected error occurred"}
-        onRetry={() => {
-          queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
-          queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
-        }}
-      />
-    )
-  }
-
   const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
 
   const updateStatus = useMutation({
@@ -273,6 +259,23 @@ export default function AdminMarketplacePage() {
 
   function formatPrice(price: number, currency: string = "USD") {
     return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(price)
+  }
+
+  // Phase 7.9 #30 — early returns moved AFTER all hook calls (was before
+  // 9 hooks at line 168 pre-fix, which violates rules-of-hooks: on the
+  // queryError render the later hooks would be skipped, breaking React's
+  // hook-ordering invariant).
+  if (queryError) {
+    return (
+      <ErrorState
+        title="Failed to load marketplace"
+        description={queryError instanceof Error ? queryError.message : "An unexpected error occurred"}
+        onRetry={() => {
+          queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+          queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
+        }}
+      />
+    )
   }
 
   const listings = data?.listings || []
