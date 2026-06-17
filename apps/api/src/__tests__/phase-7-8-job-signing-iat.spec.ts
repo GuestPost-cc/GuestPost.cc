@@ -117,13 +117,13 @@ describe("Phase 7.8 #27 — job-signing iat + replay protection", () => {
       return { ...data, signature: sig }
     }
 
-    it("Deploy A default (allowMissingIat: true) accepts payloads with no iat", () => {
+    it("post-Deploy B default rejects payloads with no iat", () => {
       const legacy = signLegacy({ foo: "bar" })
-      expect(verifyJobPayload(legacy)).toBe(true)
+      expect(verifyJobPayload(legacy)).toBe(false)
     })
-    it("Deploy B flip (allowMissingIat: false) rejects payloads with no iat", () => {
+    it("explicit allowMissingIat: true opts in to legacy acceptance (emergency rollback)", () => {
       const legacy = signLegacy({ foo: "bar" })
-      expect(verifyJobPayload(legacy, { allowMissingIat: false })).toBe(false)
+      expect(verifyJobPayload(legacy, { allowMissingIat: true })).toBe(true)
     })
   })
 

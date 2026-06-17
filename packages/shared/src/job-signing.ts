@@ -59,20 +59,19 @@ export interface VerifyOptions {
    */
   maxAgeMs?: number
   /**
-   * Phase 7.8 Deploy A → Deploy B rollout escape hatch. When true,
-   * payloads without an `iat` field still verify (HMAC alone).
-   * Deploy A ships with the default `true` so in-flight pre-deploy
-   * payloads aren't rejected. Deploy B (separate PR, ≥48h later) flips
-   * the default to `false` and the freshness check becomes strict.
+   * Emergency-rollback opt-in. When true, payloads without an `iat`
+   * field still verify (HMAC alone). Deploy B (2026-06-19+) ships
+   * with the default `false`; pre-Phase-7.8 payloads (lacking `iat`)
+   * had drained from all queues during the ≥48 h gap after Deploy A.
+   * Pass `true` only as an explicit emergency rollback on a specific
+   * processor — never as the global default again.
    */
   allowMissingIat?: boolean
 }
 
 const ROLLOUT_DEFAULTS: Required<VerifyOptions> = {
   maxAgeMs: DEFAULT_MAX_AGE_MS,
-  // TODO(Phase 7.8 Deploy B): flip default to false. See
-  // bedrock/Work/backlog.md "Phase 7.8 Deploy B" line for the schedule.
-  allowMissingIat: true,
+  allowMissingIat: false,
 }
 
 export function signJobPayload<T extends Record<string, unknown>>(
