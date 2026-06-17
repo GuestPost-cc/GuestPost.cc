@@ -76,6 +76,14 @@ export function createEmailWorker() {
         case "send-magic-link":
           logger.info("sending magic-link email", { to })
           break
+        case "send-verification-email":
+          // Phase 7.10 — email-verification flow. Template is rendered
+          // by Better Auth's emailVerification.sendVerificationEmail
+          // callback (in packages/auth/src/index.ts); the worker just
+          // ships it. Tagged for log-search parity with the other
+          // template-named job kinds.
+          logger.info("sending verification email", { to })
+          break
         default:
           logger.info("sending email", { to, subject, jobName: job.name })
           break
