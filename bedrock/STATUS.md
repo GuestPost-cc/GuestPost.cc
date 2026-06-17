@@ -34,7 +34,7 @@ last_system_refresh: 2026-06-11T12:30:00Z
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
 - Last project sync: `2026-06-16T21:42:10Z`
-- Last phase landed: `7.7 — Operations & Observability Hardening (4 workstreams: requestId column + admin UI + structured logger + Sentry source-maps + /metrics extension)` on 2026-06-16
+- Last phase landed: `7.7.y — restored 3 pre-existing failing test specs (Phase 6.x fixture drift); apps/api jest now 33 suites / 478 tests, no skips` on 2026-06-16
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)
 - Last doctor: `2026-06-11` (`healthy`)

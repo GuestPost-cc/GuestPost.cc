@@ -891,12 +891,60 @@ _(none — Phase 7.7.x sweep landed as commit `5af902c` on PR #1; allowlist now 
 
 - **After Phase 7.7 A1 prod migration applied** — paste before/after `requestId`-coverage counts + `EXPLAIN ANALYZE` plan node showing `Index Scan using "AuditLog_requestId_idx"` into the Phase 7.7 §11 entry.
 - **After Phase 7.7 C operator adds `SENTRY_AUTH_TOKEN`** — confirm first post-merge CI build uploaded source maps; check Sentry → Releases → artifact list; add a one-line "source-maps live" note to Phase 7.7 §11 entry.
-- ~~After each Phase 7.7.x sweep commit~~ — **DONE** (commit `5af902c`). Allowlist now at its forever-allowed steady state.
+- ~~After each Phase 7.7.x sweep commit~~ — **DONE** (commit `5af902c`, PR #3 merged 2026-06-16).
+- ~~After each Phase 7.7.y spec restoration~~ — **DONE** (commits `aa8cd55` + `74c8d51` + `b670493`, PR #4 merged 2026-06-16). `testPathIgnorePatterns` at jest default; full `apps/api` jest is 33 suites / 478 tests, no skips.
 - **After Prisma 6 → 7.4+ upgrade** — unblock Phase 7.3.1; ship the composite index migration; record planner-usage proof per the deferred plan's verification checklist.
 - **After Phase 7.8 lands** — append new §11 entry; update scorecard's "Rate limiting" / "Replay protection" rows.
 - **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
 
 **Production-blocker status**: **11 of 11 Criticals closed (100%)**. No production-blocker finding from the 2026-06-15 audit remains open. All remaining work is High/Medium polish, security hardening, or accessibility — none gate production.
+
+---
+
+### 2026-06-17 — Phase 7.7.y: restored 3 pre-existing failing test specs (Phase 6.x fixture drift)
+
+**Closure of the Phase 7.7.x IOU.** PR #3 had to skip 3 specs via `testPathIgnorePatterns` to green CI; each spec covered a real money-path / RBAC invariant but had mocks that predated Phase 6.x hardening. Phase 7.7.y removed the IOU — mocks updated to match current production behavior, specs re-enabled.
+
+**PR**: [#4](https://github.com/GuestPost-cc/GuestPost.cc/pull/4) — 3 commits, merged 2026-06-16 22:24 UTC. **No production code changed; mock-fixture surgery only.**
+
+| Commit | Spec | Phase 6.x change it caught up to |
+|---|---|---|
+| `aa8cd55` | `staff-roles.guard.spec.ts` | Phase 6.7 fail-closed guard. Replaced the "allows access when no roles are required" test (asserted pre-Phase-6.7 permissive behavior) with two new fail-closed tests covering both branches: undefined metadata + empty roles array. `admin-rbac-coverage.spec.ts` covers the positive side; these now explicitly verify the guard's deny response. **10/10 pass.** |
+| `74c8d51` | `order-payment.service.spec.ts` | Phase 6.9 `assertOwnerOrCreator` + Phase 6 `listingServiceId` snapshot. `mockOrder` gained `customerId: "user-1"` (matches actorUserId so isCreator passes) + `listingServiceId: "ls-1"`. Swapped `marketplaceListing.findFirst` → `listingService.findUnique` to match the production query. Per-test resolves updated. All 6 BadRequest/Conflict assertions now actually fire instead of being masked by Forbidden. **6/6 pass.** |
+| `b670493` | `prebeta-audit-regression.spec.ts` F-3 | Phase 6 `Order.listingServiceId` invariant. Added `listingService` to the mock factory's table list (was missing entirely) + mocked the full `findUnique({ where, include: { listing: { include: { website: { select: {...} } } } } })` shape that `orders.service.ts:99-132` queries. Sibling test "replays via the composite lookup" left untouched (returns early from `prisma.order.findUnique` before reaching the listingService check). **28/28 pass.** |
+
+**Trace-check discipline**: before editing Spec B and Spec C, ran each ignored spec via `jest --testPathIgnorePatterns="node_modules"` to capture the actual first thrown exception. Spec B's first failure was confirmed as `ForbiddenException` from `assertOwnerOrCreator` (matched prediction); Spec C's was `BadRequestException` with `code: "LISTING_SERVICE_REQUIRED"` (matched prediction). The `--listTests` re-enable check caught one mid-flight issue — the prebeta mock factory was missing `listingService`, surfacing as `TypeError: Cannot read properties of undefined (reading 'findUnique')` instead of leaving the spec silently broken.
+
+**Allowlist final state**: `apps/api/jest.config.js` `testPathIgnorePatterns` now contains exactly `["/node_modules/"]` — the jest default with no Phase 6.x/7.7.y carve-outs left.
+
+**Test count outcome**: `apps/api` jest went from 30 suites / 434 tests with 3 skips → **33 suites / 478 tests, no skips**.
+
+---
+
+### 2026-06-16 — Phase 7.7.x: structured-logger sweep completion + CI green (5 latent issues)
+
+**Two intertwined batches** shipped on a single branch + merged as one PR ([#3](https://github.com/GuestPost-cc/GuestPost.cc/pull/3), 7 commits, merged 2026-06-16 21:44 UTC).
+
+**Batch 1 — Logger sweep completion** (commits `5af902c` + `45ef221`):
+- Phase 7.7 B left ~85 `console.*` callsites across 7 worker files on a regression-test allowlist as a tracked carry-forward.
+- Phase 7.7.x converted all 8 remaining files (worker/index.ts, payout, verification, reconciliation, email, website-verification, delivery-verification, report) to `logger.*` — 85 callsites in one mechanical pass. Entity IDs and key=val pairs moved into JSON ctx, not flattened into msg strings (per plan principle).
+- Removed 4 stale `.js` + `.map` build artifacts in `apps/worker/src/` (escaped earlier `19a859f` cleanup).
+- Allowlist tightened to forever-allowed entries only: `apps/api/src/main.ts` (boot fallback, 6 calls) + 3 browser-side `apps/*/src/lib/auth.tsx` session-refresh handlers (structured-logger is Node-only; browser-safe logger is a separate concern).
+- **Outcome**: `apps/worker/src` now contains **zero production `console.*` calls**.
+
+**Batch 2 — 5 latent CI breakages diagnosed + fixed** (commits `76442ad`, `e07abd8`, `534ef58`, `6271af4`, `69b4409`):
+
+| Commit | Latent issue (pre-existed PR #1, masked until prior step ran) |
+|---|---|
+| `76442ad` | `turbo.json` build task had no `env:` declaration. Turbo 2+ sandboxes env vars, so `prisma generate` inside `@guestpost/database#build` couldn't see `DATABASE_URL` even though the GitHub Actions job had it set. Added `env: [DATABASE_URL, SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT, SENTRY_DSN, SENTRY_ENVIRONMENT, SENTRY_RELEASE, NEXT_PUBLIC_*]` + `globalEnv: [NODE_ENV, CI]`. |
+| `e07abd8` | `pnpm/action-setup@v4` errored with "Multiple versions of pnpm specified" because both `version:` (in workflow) and `packageManager:` (in package.json) were set. Dropped the redundant `version:` from `ci.yml` + `pr.yml`; package.json's `packageManager: pnpm@11.5.1` is now the single source of truth. |
+| `534ef58` | Validate workflow ran `pnpm run typecheck` but root package.json had no such script. Added `typecheck: turbo typecheck` to root scripts. |
+| `6271af4` | Once typecheck ran, Next.js apps' `tsc --noEmit` failed with `Cannot find module '@guestpost/ui'` because the "Build dependencies" step only built shared/database/auth. Expanded the build filter to include `@guestpost/ui` + `@guestpost/api-client`. |
+| `69b4409` | `pnpm build` job hung indefinitely (timed out) — Phase 7.7 C's `sourcemaps: { disable: false }` made the Sentry plugin attempt to contact api.sentry.io even without `SENTRY_AUTH_TOKEN`, hanging on a network call. Fix: gate `disable` on token presence in all 4 `next.config.ts` (`disable: !process.env.SENTRY_AUTH_TOKEN`). Also skipped 3 pre-existing failing test specs via `testPathIgnorePatterns` in `apps/api/jest.config.js` (handed off to Phase 7.7.y above). |
+
+**CI failure peel-back pattern**: each fix surfaced the next latent issue. None caused by Phase 7.7's mainline work — all five had been broken since Phase 7.0 era but masked because validate kept failing at the pnpm step before reaching the deeper layers. The peel-back logic is documented in each commit's body for future forensic work.
+
+**Post-merge harmonization** (commits `5eff2a1`, `7695046`, `07ce6c5` — landed directly on main by repo owner): harmonized the three workflow files (`ci.yml`, `pr.yml`, `main.yml`) for consistency, added `QUEUE_SIGNING_SECRET` to pr.yml, gitignored `packages/ui/coverage`.
 
 ---
 
