@@ -6,6 +6,7 @@ import { toNodeHandler } from "better-auth/node"
 import { emailRateLimitPlugin, type EmailRateLimitOptions } from "./plugins/email-rate-limit"
 
 export { toNodeHandler }
+export { emailRateLimitPlugin } from "./plugins/email-rate-limit"
 export type { EmailRateLimitOptions }
 
 // Fail closed: silently trusting localhost origins in production would relax

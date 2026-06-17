@@ -33,19 +33,81 @@ function canonicalize(value: unknown): string {
   return `{${entries.join(",")}}`
 }
 
-export function signJobPayload<T extends Record<string, unknown>>(data: T): T & { signature: string } {
-  const signature = createHmac("sha256", getSecret()).update(canonicalize(data)).digest("hex")
-  return { ...data, signature }
+// Phase 7.8 #27 — replay protection via issued-at + version.
+// Both fields are part of the canonical digest, so they're tamper-proof.
+// No nonce: the threat is a *leaked* signature replayed later, and a
+// freshness window solves that without per-job Redis SET-NX overhead. If
+// a real replay-during-window attack emerges, add nonces in a follow-up.
+export const SIGNED_PAYLOAD_VERSION = 1 as const
+
+// Default freshness window. Generous enough for the longest natural
+// retry chains (delivery-verification's 60m × 3 = ~3h) without
+// requiring per-queue overrides for typical use. Repeatable cron jobs
+// must explicitly pass `maxAgeMs: 0` to bypass — their payload is
+// signed once at worker boot and reused for every recurrence.
+const DEFAULT_MAX_AGE_MS = 24 * 60 * 60 * 1000 // 24h
+
+// Tolerates ~1 min of NTP drift between signer and verifier; catches
+// payloads with grossly-future iat (malformed signer or clock attack).
+const CLOCK_SKEW_TOLERANCE_MS = 60 * 1000
+
+export interface VerifyOptions {
+  /**
+   * Max age in ms. 0 disables the freshness check (used by repeatable
+   * cron jobs whose signed payload is reused across recurrences).
+   * Default: 24h.
+   */
+  maxAgeMs?: number
+  /**
+   * Phase 7.8 Deploy A → Deploy B rollout escape hatch. When true,
+   * payloads without an `iat` field still verify (HMAC alone).
+   * Deploy A ships with the default `true` so in-flight pre-deploy
+   * payloads aren't rejected. Deploy B (separate PR, ≥48h later) flips
+   * the default to `false` and the freshness check becomes strict.
+   */
+  allowMissingIat?: boolean
 }
 
-export function verifyJobPayload(data: Record<string, unknown> | null | undefined): boolean {
+const ROLLOUT_DEFAULTS: Required<VerifyOptions> = {
+  maxAgeMs: DEFAULT_MAX_AGE_MS,
+  // TODO(Phase 7.8 Deploy B): flip default to false. See
+  // bedrock/Work/backlog.md "Phase 7.8 Deploy B" line for the schedule.
+  allowMissingIat: true,
+}
+
+export function signJobPayload<T extends Record<string, unknown>>(
+  data: T,
+): T & { signature: string; iat: number; v: typeof SIGNED_PAYLOAD_VERSION } {
+  const enriched = { ...data, iat: Date.now(), v: SIGNED_PAYLOAD_VERSION }
+  const signature = createHmac("sha256", getSecret()).update(canonicalize(enriched)).digest("hex")
+  return { ...enriched, signature }
+}
+
+export function verifyJobPayload(
+  data: Record<string, unknown> | null | undefined,
+  opts: VerifyOptions = {},
+): boolean {
   if (!data || typeof data !== "object") return false
   const { signature, ...payload } = data as Record<string, unknown> & { signature?: string }
   if (typeof signature !== "string" || signature.length !== 64) return false
   const expected = createHmac("sha256", getSecret()).update(canonicalize(payload)).digest("hex")
+  let hmacValid: boolean
   try {
-    return timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"))
+    hmacValid = timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"))
   } catch {
     return false
   }
+  if (!hmacValid) return false
+
+  const maxAgeMs = opts.maxAgeMs ?? ROLLOUT_DEFAULTS.maxAgeMs
+  if (maxAgeMs === 0) return true // explicit bypass — repeatable cron
+
+  const allowMissingIat = opts.allowMissingIat ?? ROLLOUT_DEFAULTS.allowMissingIat
+  const iat = (payload as { iat?: unknown }).iat
+  if (typeof iat !== "number") return allowMissingIat
+
+  const now = Date.now()
+  if (iat > now + CLOCK_SKEW_TOLERANCE_MS) return false
+  if (now - iat > maxAgeMs) return false
+  return true
 }
