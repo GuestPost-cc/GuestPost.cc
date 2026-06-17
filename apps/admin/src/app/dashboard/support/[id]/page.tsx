@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
+import { Card, CardContent, CardHeader, CardTitle, FulfillmentChannelBadge } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Skeleton } from "@guestpost/ui"
 import { Textarea } from "@guestpost/ui"
@@ -56,19 +56,8 @@ function describeActorSnapshot(snap: ActorSnapshot): string {
   return `Role at write time: CUSTOMER · ${snap.organizationRole ?? "(no role)"}`
 }
 
-// Channel badge — shared visual language with the inbox.
-function ChannelBadge({ channel }: { channel: "PUBLISHER" | "PLATFORM" | null }) {
-  if (!channel) return <span className="text-xs text-muted-foreground">No channel</span>
-  const cls =
-    channel === "PLATFORM"
-      ? "bg-violet-100 text-violet-800"
-      : "bg-sky-100 text-sky-800"
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
-      {channel === "PLATFORM" ? "Platform" : "Publisher"}
-    </span>
-  )
-}
+// Phase 7.9 #29 — local ChannelBadge replaced by shared
+// <FulfillmentChannelBadge> from @guestpost/ui.
 
 // Phase 6.6.1: role-at-write-time badge. Distinct colors per role so a
 // dispute reviewer can scan a long thread and immediately see "Finance
@@ -191,7 +180,7 @@ export default function AdminTicketDetailPage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <CardTitle className="text-xl">{ticket.subject}</CardTitle>
-                <ChannelBadge channel={ticket.fulfillmentChannel} />
+                <FulfillmentChannelBadge channel={ticket.fulfillmentChannel as any} />
               </div>
               <p className="text-sm text-muted-foreground">
                 by {ticket.user.name || ticket.user.email} — Created{" "}

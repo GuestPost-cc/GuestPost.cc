@@ -801,9 +801,9 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 | Status | Count | Share |
 |---|---|---|
-| ✅ Fully closed | **22** | 71% |
+| ✅ Fully closed | **25** | 81% |
 | ⚠️ Partially closed | **0** | 0% |
-| ⛔ Still open | **9** | 29% |
+| ⛔ Still open | **6** | 19% |
 
 **By severity:**
 
@@ -811,7 +811,7 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 |---|---|---|---|---|
 | Critical (production-blocker) | 11 | **11** (#1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11) | — | **0** |
 | High | 14 | **7** (#12, #15, #19, #21, #22, V-1, R-3+R-4) | — | 7 |
-| Medium | 5 | **3** (#25, #26, #27 — Phase 7.8) | — | 2 |
+| Medium | 5 | **5** (#25, #26, #27 — Phase 7.8; #28, #29, #30 — Phase 7.9) | — | **0** |
 
 Phase 7.8 also closed audit §5.8's `hasAuthCredentials()` sub-finding (bundled with #26 as documented in the recommended fix). The auth/queue trust boundary has zero open security findings; remaining 2 Medium items (#28 status-color, #29 unused shared components — both frontend) plus #30 (hooks-rule violation in publisher listings) are queued for Phase 7.9.
 
@@ -901,6 +901,30 @@ _(none — Phase 7.7.x sweep landed as commit `5af902c` on PR #1; allowlist now 
 - **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
 
 **Production-blocker status**: **11 of 11 Criticals closed (100%)**. No production-blocker finding from the 2026-06-15 audit remains open. All remaining work is High/Medium polish, security hardening, or accessibility — none gate production.
+
+---
+
+### 2026-06-18 — Phase 7.9: Frontend Quality & Accessibility (#28 + #29 + #30 + Phase 7.6.1 drawer a11y)
+
+**All remaining Medium audit findings closed in one cohesive PR**, plus the Phase 7.6.1 drawer-accessibility polish that was deferred from Phase 7.6. ESLint with `react-hooks/rules-of-hooks` added to CI as a bundled rider so the #30-class regression gets caught at PR time going forward.
+
+**Branch**: `phase-7.9-frontend-quality-accessibility` — 7 commits + bedrock-update commit, all tests green.
+
+| # | Title | What landed | Commits |
+|---|---|---|---|
+| #28 | Status-color drift (`PUBLISHED` rendered as 3 different greens across 9 pages) | New `packages/ui/src/lib/status-presentation.ts` exports 5 typed `Record<XStatus, StatusPresentation>` tables (Order/Ticket/Dispute/Listing/Campaign) backed by Prisma-generated enums (`import type { OrderStatus, ... } from "@guestpost/database"` — a schema-side enum rename/add fails `tsc` immediately, not silently at runtime). 5 per-family typed accessors (`getOrderStatusPresentation` etc.) — cross-family confusion like `getTicketStatusPresentation("PUBLISHED")` rejected at COMPILE time. 11-case Vitest spec covers runtime-shape sanity + deliberate cross-family divergence (ticket OPEN = info/blue, dispute OPEN = destructive/red — preserved with regression guard). 9 status pages migrated: `apps/portal/src/app/dashboard/{page,orders/page,orders/[id]/page,campaigns/page,campaigns/[id]/page,support/page}.tsx` + `apps/admin/src/app/dashboard/{marketplace,support,disputes}/page.tsx`. ~29 inline `statusColors` consts deleted; page-local icon maps + `VARIANT_CIRCLE_BG` helpers retained where pages render icons or icon-circles (per the table's explicit "no icon field — stays local" design). Stale legacy enum entries (ASSIGNED, OUTREACH, UNDER_REVIEW, REVIEW) cleaned up incidentally. | `0a48f23` (table + spec), `ea29e26` (9-page sweep) |
+| Phase 7.6.1 | Drawer a11y missing across 3 dashboards (no escape close, no focus trap, no scroll-lock, no ARIA) | New `<Drawer>` component at `packages/ui/src/components/drawer.tsx` built on `@radix-ui/react-dialog@1.1.0` (already a dep — no new package). Radix Dialog provides `role="dialog"` + `aria-modal` + focus trap + focus restore + Escape close + body scroll-lock + inert background ALL for free. Exports Drawer/DrawerTrigger/DrawerPortal/DrawerClose/DrawerOverlay/DrawerContent/DrawerTitle, mirroring the existing `dialog.tsx` shape. `lg:hidden` on overlay + content keeps desktop sidebar a static `<aside>`. 7-case Vitest spec covers controlled-mode rendering, `role="dialog"`, accessible-name from DrawerTitle, Escape close, overlay-rendered-on-open. The 3 dashboard layouts (`apps/{portal,admin,publisher}/src/app/dashboard/layout.tsx`) ported: sidebar JSX extracted into `function SidebarContents({ inDrawer })`, rendered twice — static desktop `<aside className="hidden lg:flex ...">` + mobile `<Drawer open={...} onOpenChange={...}><DrawerContent><SidebarContents inDrawer /></DrawerContent></Drawer>`. Hand-rolled backdrop divs deleted. Portal layout finally gets the pathname-auto-close (`useEffect(() => setOpen(false), [pathname])`) that admin + publisher got in Phase 7.6 but portal was missing. | `8c9d868` (Drawer + spec), `e90ea34` (3 layouts ported) |
+| #29 | Three Phase A components (`<BriefRenderer>`, `<FulfillmentChannelBadge>`, `<SupportPanel>`) shipped with zero imports | **SupportPanel**: portal `OrderSupportPanel` hand-roll at `apps/portal/src/app/dashboard/orders/[id]/page.tsx:1057-1112` deleted; query lifted to parent `OrderDetailPage` (same `queryKey: ["order-tickets", id]` — TanStack Query dedupes). **FulfillmentChannelBadge**: 2 local `ChannelBadge` components deleted (`apps/admin/src/app/dashboard/support/page.tsx` + same file's `[id]/page.tsx`); 3 inline `<ChannelBadge>` use sites swapped to `<FulfillmentChannelBadge>`. **BriefRenderer**: portal order-detail "Content Brief" card wrapped — the component falls back to the legacy single-string display when `briefData` is NULL, so no regression for existing orders + automatic structured-brief rendering for new ones. **Adoption regression guard** at `packages/ui/src/components/__tests__/shared-component-adoption.test.ts` greps `apps/**/src/**/*.{ts,tsx}` for 3 forbidden patterns (`OrderSupportPanel` reintroduced, badge-label ternary `fulfillmentChannel === "PLATFORM" ? "Platform"`, local `ChannelBadge` definitions) with scope discipline excluding `node_modules`/`.next`/`dist`/`build`/`coverage`/`__tests__`/`__mocks__`/`__fixtures__`/`*.test.*`/`*.spec.*`. Same defense-in-depth pattern as Phase 7.7's structured-logger guard and Phase 7.8's repeatable-job-registry guard. | `36fc4ee` |
+| #30 | Hooks-rule violation in publisher listings page (factory-wrapped useMutation) | Replaced `makeLifecycleMutation` factory + 4 calls at `apps/publisher/src/app/dashboard/listings/page.tsx:182-195` with 4 inline `useMutation` calls + a `lifecycleOpts(label)` helper that returns the options object (not a hook). Matches the file's existing convention. **Plus**: 9 latent rules-of-hooks violations surfaced by the new ESLint setup in `apps/admin/src/app/dashboard/marketplace/page.tsx` — an `if (queryError) return <ErrorState />` early-return at line 168 sat BEFORE 9 later useMutation/useState calls. Fixed by moving the early-return AFTER all hook declarations. | `510993b` |
+| **Rider** | No ESLint anywhere in CI — `react-hooks/rules-of-hooks` regressions were undetectable | New root `eslint.config.mjs` (flat config, ESLint 9). Tight rule set on purpose: `@eslint/js recommended` + `typescript-eslint recommended` + ONLY `react-hooks/rules-of-hooks`. Explicitly NOT enabled: `react-hooks/exhaustive-deps`, `next/core-web-vitals`, `react/recommended`, Tailwind plugins — each would surface dozens of pre-existing warnings unrelated to this PR. Inline-disabled TS-eslint rules each named explicitly so the rationale is auditable. New scripts: `apps/portal` (replaces `next lint`), `apps/admin`, `apps/publisher`, root (`pnpm -r --filter ... run lint`). CI step added to **both** `.github/workflows/ci.yml` and `.github/workflows/pr.yml` right after the TypeScript check. Catches the next #30-class regression at PR time. Future broader rule expansion is one config edit. | `510993b` |
+
+**Test count outcome**: `packages/ui` Vitest went from **2 suites / 13 tests** (pre-Phase-7.9) → **5 suites / 40 tests** (added: status-presentation spec, drawer spec, shared-component-adoption guard). `apps/api` jest unchanged at **39 suites / 547 tests**.
+
+**Pre-impl gate**: confirmed `@guestpost/database` already re-exports all 5 Prisma enums (`OrderStatus`, `TicketStatus`, `DisputeStatus`, `ListingStatus`, `CampaignStatus`) via the chain `packages/database/src/index.ts` → `export * from "./prisma/client"` → `client.ts:22 export * from "./enums"` → typed `(typeof X)[keyof typeof X]` string-literal unions. No changes needed to the database package.
+
+**Architecture impact**: zero — Phase 7.9 is presentational. The status table is a constant lookup; the Drawer wraps an existing Radix dep; the shared-component adoption is API-shape-compatible; the hooks fix preserves runtime behavior.
+
+**Visual diff note (for PR review)**: pages that used `green-700` vs `emerald-700` for the same status now render the same shade — that unification is the whole point of #28. Cross-family deliberate divergence preserved (ticket OPEN = blue/info, dispute OPEN = red/destructive — documented in the module header + regression-guarded).
 
 ---
 

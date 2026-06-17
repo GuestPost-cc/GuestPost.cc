@@ -4,7 +4,8 @@ import { useState } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
-import { Card, CardContent, CardHeader, CardTitle, ErrorState, Button, Badge, Skeleton, Textarea } from "@guestpost/ui"
+import { Card, CardContent, CardHeader, CardTitle, ErrorState, Button, Badge, Skeleton, Textarea, StatusBadge, getDisputeStatusPresentation } from "@guestpost/ui"
+import type { DisputeStatus } from "@guestpost/database"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@guestpost/ui"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@guestpost/ui"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@guestpost/ui"
@@ -12,13 +13,8 @@ import { AlertTriangle, Scale, FileSearch, RotateCcw, DollarSign, XCircle, Clock
 import { format, formatDistanceToNow } from "date-fns"
 import { toast } from "sonner"
 
-const statusBadge: Record<string, { label: string; cls: string }> = {
-  OPEN: { label: "Open", cls: "bg-red-100 text-red-700" },
-  UNDER_REVIEW: { label: "Under Review", cls: "bg-amber-100 text-amber-700" },
-  RESOLVED_REFUNDED: { label: "Refunded", cls: "bg-blue-100 text-blue-700" },
-  RESOLVED_REJECTED: { label: "Rejected", cls: "bg-gray-100 text-gray-600" },
-  RESOLVED_RESTORED: { label: "Restored", cls: "bg-emerald-100 text-emerald-700" },
-}
+// Phase 7.9 #28 — dispute status presentation comes from
+// getDisputeStatusPresentation in @guestpost/ui. Local map deleted.
 
 type ResolveAction = "RESTORE" | "REFUND" | "REJECT"
 
@@ -113,7 +109,7 @@ export default function DisputesPage() {
               </TableHeader>
               <TableBody>
                 {items.map((d: any) => {
-                  const sb = statusBadge[d.status] ?? { label: d.status, cls: "bg-gray-100" }
+                  const sb = getDisputeStatusPresentation(d.status as DisputeStatus)
                   const active = d.status === "OPEN" || d.status === "UNDER_REVIEW"
                   return (
                     <TableRow key={d.id}>
@@ -130,7 +126,7 @@ export default function DisputesPage() {
                         <div className="text-xs text-muted-foreground">{d.order?.customer?.email}</div>
                       </TableCell>
                       <TableCell className="font-mono text-sm">{d.order?.amount != null ? `$${d.order.amount.toLocaleString()}` : "—"}</TableCell>
-                      <TableCell><Badge className={sb.cls}>{sb.label}</Badge></TableCell>
+                      <TableCell><StatusBadge variant={sb.variant}>{sb.label}</StatusBadge></TableCell>
                       <TableCell className="max-w-[240px]"><span className="block truncate text-sm" title={d.reason}>{d.reason}</span></TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1.5">

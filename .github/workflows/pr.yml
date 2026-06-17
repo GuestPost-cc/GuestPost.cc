@@ -69,5 +69,10 @@ jobs:
       - run: pnpm run typecheck
         name: TypeScript check
 
+      # Phase 7.9 #30 — ESLint with react-hooks/rules-of-hooks across the
+      # 3 frontend apps. See ci.yml for rationale + scope.
+      - run: pnpm run lint
+        name: ESLint (hooks + TS)
+
       - run: pnpm -F @guestpost/api test
         name: Run tests

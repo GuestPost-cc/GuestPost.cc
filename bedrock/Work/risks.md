@@ -6,7 +6,7 @@ updated: 2026-06-17
 
 # Risks
 
-Updated 2026-06-17 after Phase 7.8 closed 22/31 findings (**11/11 Critical**, 7/14 High, **3/5 Medium** — #25, #26, #27). The auth/queue trust boundary has zero open security findings; remaining work is frontend polish (#28/#29/#30 → Phase 7.9). Original 2026-06-11 architecture review risks reassessed below.
+Updated 2026-06-18 after Phase 7.9 closed 25/31 findings (**11/11 Critical**, 7/14 High, **5/5 Medium**). All audit findings at Medium severity or above are now closed; the 6 still-open items are all High severity strategic/long-horizon items + the operator-action follow-ups. Original 2026-06-11 architecture review risks reassessed below.
 
 The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
 
@@ -40,14 +40,19 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 | `User.emailVerified` schema field never consulted (#25) — newly-registered customers could submit money-path orders without verification | Phase 7.8: AuthGuard rejects state-changing methods on non-exempt customer routes when `emailVerified=false`. Check applies at both cache-miss + cache-hit paths. Mandatory pre-merge GET-mutation audit confirmed zero state-changing GETs. CUSTOMER only (PUBLISHER + STAFF have separate verification tracks). |
 | Sentry production stack traces showed minified bundle offsets (no source-map upload) | Phase 7.7 C (`@sentry/cli: true` + `widenClientFileUpload` + `sourcemaps.deleteSourcemapsAfterUpload` on all 4 Next.js apps + `SENTRY_AUTH_TOKEN` threaded in CI) |
 | Worker `/metrics/queues` had no service identity + missing the Phase 7.4 `dedupHitsTotal` counter | Phase 7.7 D (extended payload with `service: { name, version, pid, started_at, uptime_s }` + `dedupHitsTotal` + new `stalledHitsTotal`) |
+| Status-color drift (#28): `PUBLISHED` rendered as 3 different greens across 9 pages | Phase 7.9 (`0a48f23` + `ea29e26`): typed `STATUS_PRESENTATION` tables backed by Prisma enums + 5 per-family accessors; cross-family confusion fails `tsc`. 9 status pages migrated; ~29 inline `statusColors` consts deleted. |
+| Three Phase A components shipped with zero imports (#29): `<BriefRenderer>`, `<FulfillmentChannelBadge>`, `<SupportPanel>` | Phase 7.9 (`36fc4ee`): all 3 adopted; portal `OrderSupportPanel` hand-roll deleted; 2 local `ChannelBadge` definitions deleted. Adoption regression spec greps `apps/**/src/**/*.{ts,tsx}` for the deleted patterns with scope discipline. |
+| Hooks-rule violation in publisher listings page (#30) — factory function wrapped `useMutation` then was called 4× at scope | Phase 7.9 (`510993b`): 4 inline `useMutation` calls + `lifecycleOpts(label)` helper that returns the options object (not a hook). **Bonus**: ESLint rider surfaced 9 additional latent rules-of-hooks violations in `apps/admin/marketplace/page.tsx` (early-return before later hooks); all 9 fixed in the same commit. |
+| No ESLint anywhere in CI — `react-hooks/rules-of-hooks` regressions undetectable | Phase 7.9 (`510993b`): root `eslint.config.mjs` with tight rule set (`@eslint/js recommended` + `typescript-eslint recommended` + ONLY `react-hooks/rules-of-hooks`); scripts on portal/admin/publisher; CI step on both `ci.yml` and `pr.yml`. Future broader rule expansion is one config edit. |
+| Drawer a11y missing across 3 dashboards (Phase 7.6.1) — no Escape, no focus trap, no scroll-lock, no ARIA | Phase 7.9 (`8c9d868` + `e90ea34`): new `<Drawer>` component on `@radix-ui/react-dialog`. Radix provides focus trap + Escape close + body scroll-lock + `aria-modal` + focus restore + inert background. Portal layout also gained pathname-auto-close. |
 
 ## Still open (residual + new)
 
 ### Critical / High that survived this batch
 
 - **No open Criticals remain.** Phase 7.6 closed #9 (mobile UX), the last one. The 2026-06-15 platform audit has zero open production-blocker findings.
-- **2 Medium findings** still open (both frontend, queued for Phase 7.9): #28 (status-color drift across pages), #29 (shared Phase A components shipped but zero imports across apps). Plus #30 (hooks-rule violation in publisher listings page) — also Phase 7.9. Phase 7.8 closed #25 + #26 + #27.
-- **Drawer a11y polish gap (introduced by Phase 7.6, captured as Phase 7.6.1)**: matches portal's reference exactly, which means no escape-to-close, focus trap, or body-scroll-lock on any of the three drawers. Functional and visually correct, but keyboard-only users + screen-reader users have a degraded experience. Polish-tier risk; deferred to Phase 7.9 per 2026-06-16 roadmap.
+- **Zero open Medium findings.** Phase 7.9 closed #28 (status-color drift), #29 (unused shared components), #30 (hooks-rule violation). Phase 7.8 closed #25 + #26 + #27.
+- ~~**Drawer a11y polish gap (Phase 7.6.1)**~~ — **CLOSED** by Phase 7.9 (`8c9d868` + `e90ea34`). New `<Drawer>` component on `@radix-ui/react-dialog` gives all 3 dashboards focus trap, Escape close, body scroll-lock, focus restore, and `aria-modal` for free. Portal layout also gained the pathname-auto-close it was missing since Phase 7.6.
 - ~~Partial structured-logger sweep (Phase 7.7 B)~~ — **CLOSED** by Phase 7.7.x (PR #3, commit `5af902c`). All 8 worker files swept; allowlist at its forever-allowed steady state.
 - ~~3 pre-existing failing test specs skipped in CI~~ — **CLOSED** by Phase 7.7.y (PR #4, commits `aa8cd55`+`74c8d51`+`b670493`). All 3 specs run again; `testPathIgnorePatterns` back at jest default.
 - **Phase 7.7 A1 dev DB drift (operator action required)**: pre-existing dev DB has 5 missing migration files from 2026-06-13; Phase 7.7 A1 migration was NOT applied to dev (operator opted to skip). Must apply on staging/prod via `prisma migrate deploy` (clean history) + record EXPLAIN ANALYZE planner-uses-index proof + before/after counts in the audit §11 Phase 7.7 entry. Until prod cutover, requestId column queries seq-scan (or return empty for pre-7.7 rows).

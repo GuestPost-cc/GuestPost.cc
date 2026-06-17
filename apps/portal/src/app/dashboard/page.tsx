@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query"
 import { api } from "../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
 import { Skeleton, ErrorState } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
+import { Badge, getOrderStatusPresentation } from "@guestpost/ui"
+import type { OrderStatus } from "@guestpost/database"
 import { Button } from "@guestpost/ui"
 import {
   Table,
@@ -44,17 +45,15 @@ import {
   Cell,
 } from "recharts"
 
-const ORDER_STATUS_COLORS: Record<string, string> = {
-  PENDING_PAYMENT: "#f59e0b",
-  PAID: "#3b82f6",
-  ASSIGNED: "#8b5cf6",
-  CONTENT_CREATION: "#06b6d4",
-  OUTREACH: "#ec4899",
-  PUBLISHED: "#22c55e",
-  UNDER_REVIEW: "#f97316",
-  COMPLETED: "#10b981",
-  CANCELLED: "#ef4444",
-  REFUNDED: "#6b7280",
+// Phase 7.9 #28 — chart colors come from the centralized table via
+// getOrderStatusPresentation(...).chartColor. Local helper memoizes the
+// lookup since the chart re-renders frequently.
+function orderChartColor(name: string): string {
+  try {
+    return getOrderStatusPresentation(name as OrderStatus).chartColor
+  } catch {
+    return "#6b7280"
+  }
 }
 
 function KPICard({
@@ -402,7 +401,7 @@ export default function DashboardPage() {
                     {statusDistribution.map((entry, index) => (
                       <Cell 
                         key={`cell-${index}`} 
-                        fill={ORDER_STATUS_COLORS[entry.name] || "#6b7280"} 
+                        fill={orderChartColor(entry.name)}
                       />
                     ))}
                   </Pie>
@@ -421,7 +420,7 @@ export default function DashboardPage() {
                 <div key={item.name} className="flex items-center gap-2">
                   <div 
                     className="h-3 w-3 rounded-full" 
-                    style={{ backgroundColor: ORDER_STATUS_COLORS[item.name] || "#6b7280" }}
+                    style={{ backgroundColor: orderChartColor(item.name) }}
                   />
                   <span className="flex-1 text-sm text-muted-foreground">
                     {item.name.replace(/_/g, " ")}

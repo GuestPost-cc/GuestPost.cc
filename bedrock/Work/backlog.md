@@ -31,25 +31,24 @@ Forward roadmap after the Phases 6.6 → 7.7 audit batch. Canonical source for p
 
 Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase. **Status: complete except for Deploy B follow-up.**
 
-## Phase 7.9 — Frontend Quality & Accessibility (per 2026-06-16 roadmap)
+## Phase 7.9 — Frontend Quality & Accessibility (per 2026-06-16 roadmap) ✅ DONE
 
-Bundle these together as one cohesive phase:
-
-- [ ] **#28 — Status-color centralization** in `@guestpost/ui` (`STATUS_PRESENTATION`). `PUBLISHED` currently renders as 3 different greens across pages.
-- [ ] **#29 — Unused shared component adoption.** Phase A components (`<BriefRenderer>`, `<FulfillmentChannelBadge>`, `<SupportPanel>`) shipped in batch 22 with zero imports today.
-- [ ] **#30 — Hooks-rule violation in publisher listings page** (`apps/publisher/src/app/dashboard/listings/page.tsx:182-195`). Inline the 4 `useMutation` calls; works today but is a time-bomb.
-- [ ] **Phase 7.6.1 — Drawer a11y polish** (status: Approved, Deferred — full plan preserved in `~/.claude/plans/read-the-bedrock-views-audits-platform-a-typed-spark.md` appendix). Escape-to-close + focus trap + body-scroll-lock + ARIA dialog semantics applied uniformly across portal + admin + publisher via a shared `useDrawerA11y` hook.
+- [x] **#28 — Status-color centralization** ✅ DONE 2026-06-18 (commits `0a48f23` + `ea29e26`). Typed `STATUS_PRESENTATION` tables backed by Prisma enums + 5 per-family accessors in `@guestpost/ui`. Cross-family confusion fails `tsc`. 9 status pages migrated.
+- [x] **#29 — Unused shared component adoption** ✅ DONE 2026-06-18 (commit `36fc4ee`). `<SupportPanel>`, `<FulfillmentChannelBadge>`, `<BriefRenderer>` all have real consumers; `OrderSupportPanel` hand-roll + 2 local `ChannelBadge` definitions deleted. Adoption regression guard at `packages/ui/src/components/__tests__/shared-component-adoption.test.ts`.
+- [x] **#30 — Hooks-rule violation in publisher listings page** ✅ DONE 2026-06-18 (commit `510993b`). 4 inline `useMutation` calls + `lifecycleOpts(label)` helper. Bonus: ESLint rider surfaced + fixed 9 additional latent rules-of-hooks violations in `apps/admin/marketplace/page.tsx`.
+- [x] **Phase 7.6.1 — Drawer a11y polish** ✅ DONE 2026-06-18 (commits `8c9d868` + `e90ea34`). New `<Drawer>` on Radix Dialog provides focus trap + Escape + scroll-lock + `aria-modal` + focus restore. 3 dashboards ported; portal layout also gained the pathname-auto-close it was missing since Phase 7.6.
+- [x] **ESLint rider** ✅ DONE 2026-06-18 (commit `510993b`). Root `eslint.config.mjs` (tight rule set) + `lint` scripts on portal/admin/publisher + CI steps in both workflows. Catches future rules-of-hooks regressions at PR time.
 
 Mission: Frontend consistency / Accessibility / Maintainability / Shared patterns.
 - [ ] **Phase 7.0.1 observability follow-ups.** Three small items, can batch into one migration / one PR:
   - Promote `requestId` from `AuditLog.metadata` JSON to a dedicated indexed column + backfill
   - Structured logger to replace `console.log` across api+worker (then `requestId` is grep-able in plain logs, not just Sentry context + audit DB)
   - Source-map upload via `SENTRY_AUTH_TOKEN` in CI (one-line `withSentryConfig` flip + `@sentry/cli` `pnpm-workspace.yaml` true-flip)
-- [ ] **#26** Add email-keyed rate limiter on auth endpoints (per-IP-only today; credential stuffing across an IP pool bypasses).
-- [ ] **#27** Add `iat` (issued-at) timestamp to signed queue payloads + freshness window. Captured signed payloads otherwise stay replayable indefinitely.
-- [ ] **#28** Centralize status-color table in `@guestpost/ui` (`STATUS_PRESENTATION`). `PUBLISHED` currently renders as 3 different greens across pages.
-- [ ] **#29** Adopt the shared Phase A components (`<BriefRenderer>`, `<FulfillmentChannelBadge>`, `<SupportPanel>`) in portal / publisher / admin order detail pages. Shipped in batch 22, exported from `@guestpost/ui`, zero imports today.
-- [ ] **#30** Inline the 4 `useMutation` calls in publisher listings page (`apps/publisher/src/app/dashboard/listings/page.tsx:182-195`). Hooks-rule violation works today but is a time-bomb.
+- ~~**#26** Email-keyed rate limiter~~ — **CLOSED** by Phase 7.8.
+- ~~**#27** Job-signing `iat`~~ — **CLOSED** by Phase 7.8 (Deploy A).
+- ~~**#28** Status-color centralization~~ — **CLOSED** by Phase 7.9.
+- ~~**#29** Unused shared component adoption~~ — **CLOSED** by Phase 7.9.
+- ~~**#30** Hooks-rule violation~~ — **CLOSED** by Phase 7.9.
 
 ## Later (Phase 7.x.x candidates — only if asked)
 
