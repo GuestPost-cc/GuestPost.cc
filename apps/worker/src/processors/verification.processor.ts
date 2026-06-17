@@ -4,6 +4,7 @@ import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.verification")
 
@@ -69,8 +70,10 @@ export function createVerificationWorker() {
       switch (job.name) {
         case "verify-link": {
           // Reject jobs not signed by the API — anyone with Redis access could
-          // otherwise enqueue arbitrary URL fetches (SSRF)
-          if (!verifyJobPayload(job.data)) {
+          // otherwise enqueue arbitrary URL fetches (SSRF).
+          // Phase 7.8 #27 — repeatable cron jobs bypass freshness (none today
+          // in this queue, but the helper future-proofs new repeatables).
+          if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
             logger.error("job signature invalid — rejecting", { jobId: job.id })
             throw new Error("Invalid job signature")
           }

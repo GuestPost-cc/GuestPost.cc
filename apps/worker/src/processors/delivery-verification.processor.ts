@@ -1,6 +1,7 @@
 import { isIP } from "net"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
+import { isRepeatableJob } from "../repeatable-job-registry"
 import { createObservableWorker } from "../lib/queue-observability"
 // Node-only deep imports keep cheerio + aws-sdk out of the shared index.
 import { runDeliveryVerification, runSettlementHoldLinkSweep, FetchResult } from "@guestpost/shared/dist/delivery-verification-core"
@@ -90,7 +91,12 @@ export function createDeliveryVerificationWorker() {
   const worker = createObservableWorker(
     QUEUES.DELIVERY_VERIFICATION,
     async (job) => {
-      if (!verifyJobPayload(job.data)) {
+      // Phase 7.8 #27 — settlement-hold-sweep (repeatable) bypasses
+      // freshness; ad-hoc verify jobs get a 96h window to accommodate
+      // manual-review re-verify after a delivery dispute (backoff cap
+      // is 60m × 3 attempts plus staff turnaround time).
+      const maxAgeMs = isRepeatableJob(job.name) ? 0 : 96 * 60 * 60 * 1000
+      if (!verifyJobPayload(job.data, { maxAgeMs })) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }

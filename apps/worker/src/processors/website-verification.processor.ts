@@ -5,6 +5,7 @@ import { createObservableWorker } from "../lib/queue-observability"
 // (which the browser apps bundle).
 import { checkDnsTxtToken } from "@guestpost/shared/dist/dns-lookup"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { isRepeatableJob } from "../repeatable-job-registry"
 import { enqueueTrustRecompute } from "../trust-enqueue"
 import { prisma } from "@guestpost/database"
 
@@ -29,7 +30,8 @@ export function createWebsiteVerificationWorker() {
     QUEUES.WEBSITE_VERIFICATION,
     async (job) => {
       // Reject anything not HMAC-signed by the API — blocks forged/injected jobs.
-      if (!verifyJobPayload(job.data)) {
+      // Phase 7.8 #27 — website-reverify-sweep (repeatable) bypasses freshness.
+      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }

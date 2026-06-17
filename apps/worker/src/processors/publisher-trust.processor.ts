@@ -3,6 +3,7 @@ import { QUEUES, verifyJobPayload, recomputePublisherTrustCore } from "@guestpos
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.publisher-trust")
 
@@ -14,7 +15,9 @@ export function createPublisherTrustWorker() {
   const worker = createObservableWorker(
     QUEUES.PUBLISHER_TRUST,
     async (job) => {
-      if (!verifyJobPayload(job.data)) {
+      // Phase 7.8 #27 — repeatable cron jobs bypass freshness (none today
+      // in this queue, but the helper future-proofs new repeatables).
+      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }

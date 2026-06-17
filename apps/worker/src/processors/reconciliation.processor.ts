@@ -11,6 +11,7 @@ import { prisma } from "@guestpost/database"
 import { connection } from "../redis"
 import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.reconciliation")
 
@@ -104,7 +105,8 @@ export function createReconciliationWorker() {
   const worker = createObservableWorker(
     QUEUES.RECONCILIATION,
     async (job) => {
-      if (!verifyJobPayload(job.data)) {
+      // Phase 7.8 #27 — reconciliation-run (repeatable) bypasses freshness.
+      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }

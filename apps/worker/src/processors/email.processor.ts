@@ -2,6 +2,7 @@ import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { isRepeatableJob } from "../repeatable-job-registry"
 import * as nodemailer from "nodemailer"
 
 const logger = createLogger("worker.email")
@@ -45,7 +46,9 @@ export function createEmailWorker() {
   const worker = createObservableWorker(
     QUEUES.EMAIL,
     async (job) => {
-      if (!verifyJobPayload(job.data)) {
+      // Phase 7.8 #27 — repeatable cron jobs bypass freshness (their
+      // payload is signed once at boot and reused across recurrences).
+      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
