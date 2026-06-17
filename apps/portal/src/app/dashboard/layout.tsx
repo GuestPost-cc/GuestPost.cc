@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect } from "react"
-import { cn } from "@guestpost/ui"
+import { cn, Drawer, DrawerContent, DrawerTitle } from "@guestpost/ui"
 import { useAuth } from "../../lib/auth"
 import {
   LayoutDashboard,
@@ -62,6 +62,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!loading && !user) router.push("/")
   }, [user, loading, router])
 
+  // Phase 7.9 — pathname-auto-close added to the portal layout. Admin +
+  // publisher already had this from Phase 7.6; portal was missing it.
+  useEffect(() => { setMobileOpen(false) }, [pathname])
+
   if (loading) return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="flex flex-col items-center gap-4">
@@ -77,44 +81,44 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return <CreateOrgGate onCreated={() => refresh()} />
   }
 
-  const userInitials = user.name
-    ? user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-    : user.email?.[0]?.toUpperCase() ?? "U"
+  // Local non-null alias for the nested SidebarContents closure.
+  const u = user
 
-  return (
-    <div className="flex min-h-screen">
-      <aside className={cn(
-        // Fixed full-viewport column on every breakpoint — never scrolls off
-        // with long pages and immune to ancestor overflow/transform (which
-        // break `sticky`). Desktop content is offset by lg:pl-64; mobile slides
-        // in as an overlay. Nav scrolls internally on short screens.
-        "fixed inset-y-0 left-0 z-50 w-64 border-r bg-card transform transition-transform duration-200 lg:translate-x-0",
-        mobileOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between border-b px-6 py-5">
-            <Link href="/dashboard" className="flex items-center gap-2 text-lg font-bold tracking-tight">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <span className="text-sm font-bold">GP</span>
-              </div>
-              GuestPost
-            </Link>
-            <button onClick={() => setMobileOpen(false)} className="lg:hidden">
+  const userInitials = u.name
+    ? u.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
+    : u.email?.[0]?.toUpperCase() ?? "U"
+
+  function SidebarContents({ inDrawer = false }: { inDrawer?: boolean }) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between border-b px-6 py-5">
+          <Link href="/dashboard" className="flex items-center gap-2 text-lg font-bold tracking-tight">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <span className="text-sm font-bold">GP</span>
+            </div>
+            GuestPost
+          </Link>
+          {inDrawer && (
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
+            >
               <X className="h-5 w-5" />
             </button>
-          </div>
-          
-          <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-            {navItems
-              .filter((item) => !item.ownerOnly || user.customerRole === "OWNER")
-              .map((item) => {
+          )}
+        </div>
+
+        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+          {navItems
+            .filter((item) => !item.ownerOnly || u.customerRole === "OWNER")
+            .map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
               const Icon = item.icon
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setMobileOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
                     isActive
@@ -127,56 +131,70 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Link>
               )
             })}
-          </nav>
-          
-          <div className="border-t p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="min-w-0 flex-1">
-                <OrgSwitcher />
-              </div>
-              <Notifications />
+        </nav>
+
+        <div className="border-t p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <OrgSwitcher />
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-accent">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                      {userInitials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 text-left">
-                    <p className="font-medium">{user.name ?? "User"}</p>
-                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-                  </div>
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings">Settings</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <Notifications />
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-accent">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 text-left">
+                  <p className="font-medium">{u.name ?? "User"}</p>
+                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/settings">Settings</Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer">
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-screen">
+      {/* Desktop sidebar — static <aside>, lg+ only. */}
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-64 border-r bg-card">
+        <SidebarContents />
       </aside>
 
-      {mobileOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      {/* Mobile drawer — Phase 7.6.1 a11y from Radix Dialog. */}
+      <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
+        <DrawerContent side="left" className="bg-card">
+          <DrawerTitle className="sr-only">Navigation</DrawerTitle>
+          <SidebarContents inDrawer />
+        </DrawerContent>
+      </Drawer>
 
       <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:hidden">
-          <button onClick={() => setMobileOpen(true)} className="lg:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+            className="lg:hidden"
+          >
             <Menu className="h-5 w-5" />
           </button>
           <span className="font-semibold">GuestPost</span>

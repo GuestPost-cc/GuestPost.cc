@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
-import { cn } from "@guestpost/ui"
+import { cn, Drawer, DrawerContent, DrawerTitle } from "@guestpost/ui"
 import { LayoutDashboard, Users, Building, ShoppingCart, Landmark, Settings, LogOut, Store, Newspaper, HeadphonesIcon, ScrollText, ClipboardList, Scale, ShieldCheck, AlertTriangle, Menu, X } from "lucide-react"
 import { useAuth } from "../../lib/auth"
 import { Notifications } from "../../components/notifications"
@@ -48,42 +48,46 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!loading && !user) router.push("/")
   }, [user, loading, router])
 
+  // Pathname-auto-close — drawer closes when the user navigates inside it.
+  // Lives at the layout level (not in the Drawer component) so
+  // @guestpost/ui stays framework-agnostic.
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
   if (loading) return <div className="flex min-h-screen items-center justify-center">Loading...</div>
   if (!user) return null
+  // Local non-null alias so the nested SidebarContents closure has a
+  // narrowed type without each ref needing a `!` non-null assertion.
+  const u = user
 
-  return (
-    <div className="flex min-h-screen">
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-screen w-64 flex-col border-r bg-muted/30 p-6 transform transition-transform duration-200 lg:translate-x-0",
-          mobileOpen ? "translate-x-0" : "-translate-x-full",
-        )}
-      >
+  // Same nav body for desktop sidebar + mobile drawer. Extracting it
+  // local-to-this-file rather than promoting to @guestpost/ui — the
+  // staff-role allowlist + sign-out handler are this layout's concerns.
+  function SidebarContents({ inDrawer = false }: { inDrawer?: boolean }) {
+    return (
+      <div className="flex h-full flex-col p-6">
         <div className="mb-8 flex items-center justify-between">
           <Link href="/dashboard" className="text-lg font-bold tracking-tight">
             GuestPost Admin
           </Link>
-          <button
-            type="button"
-            onClick={() => setMobileOpen(false)}
-            aria-label="Close menu"
-            className="lg:hidden"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          {inDrawer && (
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              aria-label="Close menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
         <nav className="flex flex-1 flex-col gap-2 overflow-y-auto">
           {navItems
-            .filter(item => !item.roles || (user.staffRole && item.roles.includes(user.staffRole as StaffRole)))
+            .filter(item => !item.roles || (u.staffRole && item.roles.includes(u.staffRole as StaffRole)))
             .map((item) => {
               const Icon = item.icon
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  onClick={() => setMobileOpen(false)}
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                     pathname === item.href
@@ -99,9 +103,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
         <div className="border-t pt-6">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">{user.name ?? user.email}</span>
+            <span className="text-sm font-medium">{u.name ?? u.email}</span>
             <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary uppercase tracking-wider">
-              {ROLE_LABELS[user.staffRole as StaffRole] ?? "Staff"}
+              {ROLE_LABELS[u.staffRole as StaffRole] ?? "Staff"}
             </span>
             <span className="ml-auto"><Notifications /></span>
           </div>
@@ -114,14 +118,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             Sign out
           </button>
         </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex min-h-screen">
+      {/* Desktop sidebar — static <aside>, lg+ only. */}
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 h-screen w-64 flex-col border-r bg-muted/30">
+        <SidebarContents />
       </aside>
 
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      {/* Mobile drawer — Phase 7.6.1 a11y: escape close, focus trap,
+          scroll-lock, ARIA dialog semantics all from Radix Dialog. */}
+      <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
+        <DrawerContent side="left" className="bg-muted/30">
+          <DrawerTitle className="sr-only">Navigation</DrawerTitle>
+          <SidebarContents inDrawer />
+        </DrawerContent>
+      </Drawer>
 
       <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:hidden">
