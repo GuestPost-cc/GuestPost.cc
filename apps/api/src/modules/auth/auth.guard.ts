@@ -5,6 +5,7 @@ import { prisma } from "@guestpost/database"
 import { IS_PUBLIC_KEY } from "../../common/decorators/public.decorator"
 import { ActiveContextService } from "../active-context/active-context.service"
 import { getCachedAuthContext, setCachedAuthContext } from "../../common/auth-context-cache"
+import { requiresEmailVerification } from "./email-verification-policy"
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -32,6 +33,16 @@ export class AuthGuard implements CanActivate {
     // change it call invalidateAuthContext().
     const cached = getCachedAuthContext(session.user.id)
     if (cached) {
+      // Phase 7.8 #25 — verification gate runs on the cache-hit path too;
+      // otherwise an unverified user who first hits an exempt GET path
+      // could bypass the gate on subsequent POSTs within the 30s TTL.
+      if (
+        cached.userType === "CUSTOMER" &&
+        !cached.emailVerified &&
+        requiresEmailVerification(request)
+      ) {
+        throw new ForbiddenException("EMAIL_NOT_VERIFIED")
+      }
       request.user = cached
       request.session = session.session
       return true
@@ -40,6 +51,19 @@ export class AuthGuard implements CanActivate {
     const user = await prisma.user.findUnique({ where: { id: session.user.id } })
     if (!user) throw new UnauthorizedException("User not found")
     if (user.banned) throw new ForbiddenException("Account is banned")
+
+    // Phase 7.8 #25 — CUSTOMER state-changing routes require a verified
+    // email. GET reads + sign-out + verification-resend endpoints stay
+    // open so locked-out users can act on the lockout. PUBLISHER/STAFF
+    // unaffected (different verification tracks). Frontend should detect
+    // the `EMAIL_NOT_VERIFIED` code and render a resend-banner.
+    if (
+      user.userType === "CUSTOMER" &&
+      !user.emailVerified &&
+      requiresEmailVerification(request)
+    ) {
+      throw new ForbiddenException("EMAIL_NOT_VERIFIED")
+    }
 
     let activeOrganizationId: string | null = null
     let activePublisherId: string | null = null
