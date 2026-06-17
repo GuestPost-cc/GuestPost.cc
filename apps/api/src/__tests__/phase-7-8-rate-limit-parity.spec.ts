@@ -17,19 +17,9 @@
  * (verified during Phase 7.8 pre-impl).
  */
 
-// Mock every better-auth submodule that the @guestpost/auth barrel pulls
-// in at module-load time. Better Auth ships ESM (.mjs) and Jest's CJS
-// loader can't require it. The mocks are minimal — createAuthMiddleware
-// is identity (matches its v1.6.14 runtime behavior, verified in pre-impl),
-// the rest are unused by this test.
-jest.mock("better-auth", () => ({ betterAuth: () => ({}) }))
-jest.mock("better-auth/adapters/prisma", () => ({ prismaAdapter: () => ({}) }))
-jest.mock("better-auth/plugins/bearer", () => ({ bearer: () => ({}) }))
-jest.mock("better-auth/node", () => ({ toNodeHandler: (x: any) => x }))
-jest.mock("better-auth/api", () => ({
-  createAuthMiddleware: (fn: any) => fn,
-}))
-
+// better-auth ESM modules are stubbed globally via jest.config.js
+// moduleNameMapper → apps/api/src/__mocks__/better-auth.ts. No per-spec
+// jest.mock calls needed.
 import { emailRateLimitPlugin } from "@guestpost/auth"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"

@@ -18,6 +18,15 @@ module.exports = {
     "^@guestpost/shared/dist/observability/structured-logger$": "<rootDir>/../../../packages/shared/src/observability/structured-logger",
     "^@guestpost/shared$": "<rootDir>/../../../packages/shared/src",
     "^@guestpost/auth$": "<rootDir>/../../../packages/auth/src",
+    // Better Auth ships ESM (.mjs) which Jest's CJS loader can't require.
+    // The @guestpost/auth source transitively imports several submodules
+    // at load time. Map them all to the shared CJS stub so any spec that
+    // touches @guestpost/auth works without per-file jest.mock calls.
+    "^better-auth$": "<rootDir>/__mocks__/better-auth",
+    "^better-auth/adapters/prisma$": "<rootDir>/__mocks__/better-auth",
+    "^better-auth/plugins/bearer$": "<rootDir>/__mocks__/better-auth",
+    "^better-auth/node$": "<rootDir>/__mocks__/better-auth",
+    "^better-auth/api$": "<rootDir>/__mocks__/better-auth",
   },
   testPathIgnorePatterns: ["/node_modules/"],
   // CI hang protection — without this, jest waits indefinitely for
