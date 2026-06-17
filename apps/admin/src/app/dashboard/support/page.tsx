@@ -8,7 +8,7 @@ import { useAuth } from "../../../lib/auth"
 import { Card, CardContent } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
-import { Badge, StatusBadge, getTicketStatusPresentation } from "@guestpost/ui"
+import { Badge, StatusBadge, getTicketStatusPresentation, FulfillmentChannelBadge } from "@guestpost/ui"
 import type { TicketStatus } from "@guestpost/database"
 import { Skeleton } from "@guestpost/ui"
 import {
@@ -38,20 +38,9 @@ import { formatDistanceToNow } from "date-fns"
 // Phase 7.9 #28 — ticket status presentation comes from
 // getTicketStatusPresentation in @guestpost/ui. Local STATUS_COLORS deleted.
 
-// Phase 6.6: PUBLISHER vs PLATFORM at a glance — finance / ops / admin all
-// triage off this.
-function ChannelBadge({ channel }: { channel: "PUBLISHER" | "PLATFORM" | null }) {
-  if (!channel) return <span className="text-xs text-muted-foreground">—</span>
-  const cls =
-    channel === "PLATFORM"
-      ? "bg-violet-100 text-violet-800"
-      : "bg-sky-100 text-sky-800"
-  return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${cls}`}>
-      {channel === "PLATFORM" ? "Platform" : "Publisher"}
-    </span>
-  )
-}
+// Phase 7.9 #29 — local ChannelBadge deleted; using shared
+// <FulfillmentChannelBadge> from @guestpost/ui (channel snapshot per
+// Phase 6.5). Same visual category, single source of truth.
 
 export default function AdminSupportPage() {
   const { user } = useAuth()
@@ -215,7 +204,7 @@ export default function AdminSupportPage() {
                     <TableRow key={t.id}>
                       <TableCell className="font-medium max-w-[280px] truncate">{t.subject}</TableCell>
                       <TableCell>
-                        <ChannelBadge channel={t.fulfillmentChannel} />
+                        <FulfillmentChannelBadge channel={t.fulfillmentChannel as any} />
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {t.customer.name || t.customer.email}

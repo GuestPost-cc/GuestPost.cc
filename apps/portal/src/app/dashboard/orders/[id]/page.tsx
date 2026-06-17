@@ -5,7 +5,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
 import { Button } from "@guestpost/ui"
-import { Badge, StatusBadge as UIStatusBadge, getOrderStatusPresentation } from "@guestpost/ui"
+import { Badge, StatusBadge as UIStatusBadge, getOrderStatusPresentation, SupportPanel, BriefRenderer } from "@guestpost/ui"
 import type { OrderStatus } from "@guestpost/database"
 import { Skeleton, ErrorState } from "@guestpost/ui"
 import { Input } from "@guestpost/ui"
@@ -378,6 +378,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     queryKey: ["order-proof", resolvedParams.id],
     queryFn: () => api.orders.deliveryProof(resolvedParams.id),
     enabled: !!order && ["PUBLISHED", "VERIFIED", "DELIVERED", "SETTLED", "COMPLETED", "DISPUTED"].includes(order.status),
+  })
+
+  // Phase 7.9 #29 — lifted from OrderSupportPanel (now deleted). Shared
+  // <SupportPanel> is presentational; parent owns the fetch.
+  const { data: orderTickets = [], isLoading: ticketsLoading } = useQuery<any[]>({
+    queryKey: ["order-tickets", resolvedParams.id],
+    queryFn: async () => {
+      const all = await api.support.listTickets()
+      return ((all ?? []) as any[]).filter((t: any) => t.order?.id === resolvedParams.id)
+    },
   })
 
   const reviewable = !!order && ["DELIVERED", "SETTLED", "COMPLETED"].includes(order.status)
@@ -856,14 +866,27 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </CardContent>
           </Card>
 
-          {order.items?.[0]?.instructions && (
+          {(order.items?.[0]?.instructions || (order as any).briefData) && (
             <Card>
               <CardHeader>
                 <CardTitle>Content Brief</CardTitle>
                 <CardDescription>Original content requirements</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="whitespace-pre-wrap text-sm">{order.items[0].instructions}</p>
+                {/* Phase 7.9 #29 — adopt shared <BriefRenderer> (was: inline
+                    instructions text). The component falls back to the
+                    legacy single-string display when briefData is NULL,
+                    so this is a no-regression swap for existing orders. */}
+                <BriefRenderer
+                  serviceType={(order.items?.[0] as any)?.serviceType ?? (order as any).type}
+                  briefData={(order as any).briefData}
+                  fallback={{
+                    title: (order.items?.[0] as any)?.title,
+                    instructions: order.items?.[0]?.instructions,
+                    targetUrl: (order.items?.[0] as any)?.targetUrl,
+                    anchorText: (order.items?.[0] as any)?.anchorText,
+                  }}
+                />
               </CardContent>
             </Card>
           )}
@@ -959,7 +982,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </DialogContent>
       </Dialog>
 
-      <OrderSupportPanel orderId={order.id} onOpenNew={() => setShowSupportDialog(true)} />
+      <SupportPanel
+        tickets={orderTickets}
+        isLoading={ticketsLoading}
+        onOpenNew={() => setShowSupportDialog(true)}
+        linkHref={(ticketId) => `/dashboard/support/${ticketId}`}
+        actorScope="customer"
+      />
 
       <Dialog open={showSupportDialog} onOpenChange={setShowSupportDialog}>
         <DialogContent>
@@ -1038,59 +1067,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   )
 }
 
-// Phase 6.5: in-context support panel for an order. Lists any tickets the
-// customer has opened for THIS order, deep-links into them, and surfaces an
-// "Open ticket" CTA that pre-fills the orderId via the parent dialog. Falls
-// back to a tasteful empty state when there are no tickets yet.
-function OrderSupportPanel({ orderId, onOpenNew }: { orderId: string; onOpenNew(): void }) {
-  const { data: tickets, isLoading } = useQuery({
-    queryKey: ["order-tickets", orderId],
-    queryFn: async () => {
-      const all = await api.support.listTickets()
-      return ((all ?? []) as any[]).filter((t: any) => t.order?.id === orderId)
-    },
-  })
-
-  return (
-    <Card className="mt-6">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-base">Support</CardTitle>
-            <CardDescription className="text-xs">Open or follow up on tickets for this order.</CardDescription>
-          </div>
-          <Button size="sm" variant="outline" onClick={onOpenNew}>Open ticket</Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {isLoading ? (
-          <Skeleton className="h-16 w-full" />
-        ) : (tickets ?? []).length === 0 ? (
-          <p className="text-sm text-muted-foreground">No tickets yet for this order.</p>
-        ) : (
-          <div className="space-y-2">
-            {((tickets ?? []) as any[]).map((t: any) => (
-              <Link
-                key={t.id}
-                href={`/dashboard/support/${t.id}`}
-                className="block p-3 border rounded-md hover:bg-muted/40"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="font-medium text-sm truncate">{t.subject}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {t.fulfillmentChannel === "PLATFORM" ? "Platform support" : t.fulfillmentChannel === "PUBLISHER" ? "Publisher support" : "Support"}
-                      {" · "}
-                      Updated {new Date(t.updatedAt ?? t.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="capitalize">{String(t.status).toLowerCase().replace(/_/g, " ")}</Badge>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
+// Phase 7.9 #29 — OrderSupportPanel (hand-rolled in-component fetch +
+// filter + render) replaced by shared <SupportPanel> from @guestpost/ui.
+// Parent now owns the fetch via useQuery; SupportPanel stays
+// presentational. See adoption-regression spec in packages/ui for the
+// guard that prevents reintroduction.
