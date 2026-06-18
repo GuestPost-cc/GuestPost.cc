@@ -28,6 +28,15 @@ Forward roadmap after the Phases 6.6 → 7.7 audit batch. Canonical source for p
 
 Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase. **Status: complete (Deploy A + Deploy B both shipped).**
 
+## Phase 7.11 — Worker SSRF + DoS Hardening (#13 + #14) ✅ DONE
+
+- [x] **#13 — Delivery-verification no response-body size cap** ✅ DONE 2026-06-18 (commits `0d954c5` + `5c5090d`). New `readBodyWithCap(res, maxBytes)` in `@guestpost/shared` streams the body, cancels the reader on overrun, throws `SafeFetchError("BODY_TOO_LARGE")`. Cap = 5MB in both worker fetch processors.
+- [x] **#14 — DNS rebinding in SSRF guard** ✅ DONE 2026-06-18 (commits `0d954c5` + `5c5090d`). New `safeFetch()` in `@guestpost/shared` uses an undici Agent whose `connect.lookup` callback resolves DNS AND validates the resolved IP against `PRIVATE_IP_PATTERNS` inside the same callback. Connection binds to the validated IP — no TOCTOU window for AWS metadata bypass. Pure `validateResolvedAddress(hostname, address)` function lifted out for direct testability.
+- [x] **Bonus — IPv4-mapped IPv6 patterns** ✅ DONE 2026-06-18. `PRIVATE_IP_PATTERNS` gains 6 new patterns covering `::ffff:127.0.0.1` style addresses that the legacy local duplicates missed.
+- [x] **Adoption regression guard** ✅ DONE 2026-06-18 (commit `5c5090d`). `apps/api/src/__tests__/phase-7-11-safe-fetch-adoption.spec.ts` greps `apps/worker/src/processors/*.ts` for the deleted forbidden patterns + bare `await res.text()`. Failure message includes the rule's `why` so a future copy-paster sees the explanation.
+
+Mission: Worker security hardening / shared safe-fetch primitive / defense-in-depth against SSRF + DoS.
+
 ## Phase 7.10 — Email Verification Flow (closes the Phase 7.8 #25 loop) ✅ DONE
 
 - [x] **Wire Better Auth `emailVerification` block end-to-end** ✅ DONE 2026-06-18 (commits `77aeb99` + `882fc99` + `b0bd628`). Phase 7.8 #25 shipped the AuthGuard gate as a one-way trapdoor — no verification email was ever sent, so email/password signups were locked out indefinitely with no recovery path. Phase 7.10 wires `sendEmail` + `onEmailVerified` factory options on `createAuth` → Better Auth's `emailVerification.sendVerificationEmail` enqueues via the worker email queue; `sendOnSignUp: true` triggers automatically; `autoSignInAfterVerification: true` lands users back in `/dashboard`; `afterEmailVerification` invalidates the AuthGuard auth-context-cache immediately (no 30s stale-cache window). Customer-facing banner with 60s client cooldown + Resend button mounted in portal dashboard layout. Presentational shell at `packages/ui/src/components/email-verification-banner.tsx` so future publisher/admin verification gates (KYC, 2FA) can reuse without copy-paste.
