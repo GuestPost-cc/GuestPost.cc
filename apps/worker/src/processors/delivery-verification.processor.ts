@@ -1,18 +1,16 @@
 import { connection } from "../redis"
-import {
-  QUEUES,
-  verifyJobPayload,
-  safeFetch,
-  readBodyWithCap,
-  isSafePublicUrl,
-  SafeFetchError,
-} from "@guestpost/shared"
+import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { isRepeatableJob } from "../repeatable-job-registry"
 import { createObservableWorker } from "../lib/queue-observability"
-// Node-only deep imports keep cheerio + aws-sdk out of the shared index.
+// Node-only deep imports keep cheerio + aws-sdk + undici/dns out of the
+// shared package's public index — the Next.js apps' webpack chokes on
+// `node:*` schemes when bundling. safe-fetch (undici Agent + dns) joins
+// the same convention as delivery-verification-core, object-storage,
+// observability/structured-logger.
 import { runDeliveryVerification, runSettlementHoldLinkSweep, FetchResult } from "@guestpost/shared/dist/delivery-verification-core"
 import { putObject } from "@guestpost/shared/dist/object-storage"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { safeFetch, readBodyWithCap, isSafePublicUrl, SafeFetchError } from "@guestpost/shared/dist/safe-fetch"
 import { prisma } from "@guestpost/database"
 import { enqueueTrustRecompute } from "../trust-enqueue"
 

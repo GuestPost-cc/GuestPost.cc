@@ -7,13 +7,16 @@
  * adopt these in commit 2; the adoption regression guard at
  * phase-7-11-safe-fetch-adoption.spec.ts ensures they stay adopted.
  */
+// Deep import: safe-fetch is intentionally NOT re-exported from
+// @guestpost/shared's root index (it imports node:dns + undici, which
+// the Next.js apps can't bundle). See packages/shared/src/index.ts.
 import {
   isSafePublicUrl,
   validateResolvedAddress,
   readBodyWithCap,
   SafeFetchError,
   PRIVATE_IP_PATTERNS,
-} from "@guestpost/shared"
+} from "@guestpost/shared/dist/safe-fetch"
 
 describe("Phase 7.11 — isSafePublicUrl (pre-flight URL check)", () => {
   describe("protocol enforcement", () => {

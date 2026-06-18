@@ -1,15 +1,11 @@
 import { connection } from "../redis"
-import {
-  QUEUES,
-  verifyJobPayload,
-  safeFetch,
-  readBodyWithCap,
-  isSafePublicUrl,
-  SafeFetchError,
-} from "@guestpost/shared"
+import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+// Node-only deep import — undici + dns must stay out of the shared
+// package's public index so the Next.js apps can bundle @guestpost/shared.
+import { safeFetch, readBodyWithCap, isSafePublicUrl, SafeFetchError } from "@guestpost/shared/dist/safe-fetch"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.verification")
