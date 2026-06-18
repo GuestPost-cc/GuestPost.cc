@@ -801,16 +801,16 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 | Status | Count | Share |
 |---|---|---|
-| ✅ Fully closed | **25** | 81% |
+| ✅ Fully closed | **27** | 87% |
 | ⚠️ Partially closed | **0** | 0% |
-| ⛔ Still open | **6** | 19% |
+| ⛔ Still open | **4** | 13% |
 
 **By severity:**
 
 | Severity | Total | Closed | Partial | Open |
 |---|---|---|---|---|
 | Critical (production-blocker) | 11 | **11** (#1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11) | — | **0** |
-| High | 14 | **7** (#12, #15, #19, #21, #22, V-1, R-3+R-4) | — | 7 |
+| High | 14 | **9** (#12, #13, #14, #15, #19, #21, #22, V-1, R-3+R-4) | — | 5 |
 | Medium | 5 | **5** (#25, #26, #27 — Phase 7.8; #28, #29, #30 — Phase 7.9) | — | **0** |
 
 Phase 7.8 also closed audit §5.8's `hasAuthCredentials()` sub-finding (bundled with #26 as documented in the recommended fix). The auth/queue trust boundary has zero open security findings; remaining 2 Medium items (#28 status-color, #29 unused shared components — both frontend) plus #30 (hooks-rule violation in publisher listings) are queued for Phase 7.9.
@@ -837,7 +837,9 @@ Phase 7.8 also closed audit §5.8's `hasAuthCredentials()` sub-finding (bundled 
 | #12 | Notification duplicates on retry | High | ✅ FIXED | 7.4 | Phase 6.6's support fan-out runtime dedup PLUS Phase 7.4's DB partial-unique on (userId, dedupKey). Reconciliation switched to drift-summary-keyed (hourly cron same drift → 1 alert per staff per UTC day, not 24). 8 typed dedup-key builders; writers swallow P2002 as success. |
 | #19 | Support fan-out Set<object> bug | High | ✅ FIXED | 6.6 | `Map<userId, organizationId>` + test |
 | V-1 | Inline body types on support routes | High | ✅ FIXED | 6.6 + 6.7 | `AddTicketMessageDto`, `CreateTicketDto`, `CreateApiKeyDto`, 18 admin-action DTOs |
-| (#13–#18, #20–#30) | Various | High/Medium | ⛔ open | — | See §2 finding list |
+| #13 | Delivery-verification no response-body size cap | High | ✅ FIXED | 7.11 | `readBodyWithCap(res, 5MB)` adopted in both worker fetch processors; cancels reader on overrun, throws SafeFetchError(BODY_TOO_LARGE); core treats as verification failure → retry → MANUAL_REVIEW. |
+| #14 | DNS rebinding in SSRF guard (TOCTOU → AWS metadata leak) | High | ✅ FIXED | 7.11 | `safeFetch()` uses undici Agent whose `connect.lookup` resolves DNS + validates the IP against `PRIVATE_IP_PATTERNS` inside the same callback — connection binds to the validated IP, no rebinding window. Bonus: IPv4-mapped IPv6 patterns added. |
+| (#16–#18, #20, #23, #24) | Various | High | ⛔ open | — | See §2 finding list |
 
 **Bonus improvements landed beyond the audit's scope** (these strengthen posture but weren't in the original 30 findings):
 
@@ -901,6 +903,40 @@ _(none — Phase 7.7.x sweep landed as commit `5af902c` on PR #1; allowlist now 
 - **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
 
 **Production-blocker status**: **11 of 11 Criticals closed (100%)**. No production-blocker finding from the 2026-06-15 audit remains open. All remaining work is High/Medium polish, security hardening, or accessibility — none gate production.
+
+---
+
+### 2026-06-18 — Phase 7.11: Worker SSRF + DoS Hardening (#13 + #14)
+
+**Two open High audit findings closed in one cohesive PR**, both in the worker's URL-fetching code paths. Recon found the same vulnerable pattern in the second processor (`verification.processor.ts`) that the audit only named in the first (`delivery-verification.processor.ts`) — fixed both, lifted the hardened utility into `@guestpost/shared` so a future processor inherits it for free.
+
+**Branch**: `phase-7.11-worker-ssrf-dos-hardening` — 3 commits + bedrock-update commit, all tests green.
+
+| # | Title | What landed | Commits |
+|---|---|---|---|
+| **#13** | Delivery-verification has no response-body size cap (1GB malicious response at concurrency 4 OOMs the worker pod) | `readBodyWithCap(res, maxBytes)` streams the body via `getReader()` + UTF-8 streaming `TextDecoder`, increments a running byte counter, cancels the reader and throws `SafeFetchError("BODY_TOO_LARGE")` the moment `total > maxBytes`. Cap set to 5 MB in both processors — well above typical guest-post pages (~200 KB) and well below pod-OOM threshold even at concurrency 4. In delivery-verification, oversize routes to MANUAL_REVIEW via the existing backoff chain (5m/15m/60m × 3). In verification, oversize returns `null` (existing failure path). | `0d954c5` (utility + spec), `5c5090d` (adoption) |
+| **#14** | DNS rebinding bypass in SSRF guard (hostname check then `fetch()` resolves DNS later → TOCTOU → attacker A-record can resolve to `169.254.169.254` at fetch-time → AWS IAM credential leak → account takeover) | `safeFetch(url, init)` uses a single shared undici `Agent` whose `connect.lookup` callback resolves DNS via `dns.lookup({all: false})` AND validates the resolved IP against `PRIVATE_IP_PATTERNS` BEFORE returning to undici's connection layer. undici binds the connection to that validated IP — no time-of-check-to-time-of-use gap to exploit. Validation logic lives in a pure `validateResolvedAddress(hostname, address)` function (lifted out of the Agent wiring) so it's unit-testable without undici/dns mocking. Single Agent instance reused across all fetches; connection pool intact. | `0d954c5` (utility + spec), `5c5090d` (adoption) |
+| **Bonus** | IPv4-mapped IPv6 bypass (`::ffff:127.0.0.1` style addresses) | Added 6 new patterns to `PRIVATE_IP_PATTERNS` covering loopback, RFC1918, AWS-metadata, and unspecified IPv4 ranges wrapped in `::ffff:` IPv6 form. The legacy duplicate `PRIVATE_IP_PATTERNS` arrays in both processors missed these — lifted shared module gets it for free. | `0d954c5` |
+| **Defense-in-depth** | Adoption regression guard | `apps/api/src/__tests__/phase-7-11-safe-fetch-adoption.spec.ts` greps `apps/worker/src/processors/*.ts` for 3 forbidden patterns: local `function/const isSafePublicUrl`, local `PRIVATE_IP_PATTERNS = [`, and bare `await res.text()` / `response.text()`. Failure message includes file:line + the **rule's `why`** so a future copy-paster sees the explanation, not just a regex hit. Same defense-in-depth class as Phase 7.7's structured-logger sweep guard and Phase 7.9's shared-component-adoption guard. | `5c5090d` |
+
+**Pre-flight greps (post-commit-2)**:
+```
+git grep -nE "(function|const)\s+isSafePublicUrl|PRIVATE_IP_PATTERNS\s*=" apps/worker/src
+  → no hits
+git grep -nE "await\s+(res|response|resp)\.text\(\)" apps/worker/src/processors
+  → no hits
+```
+Both vulnerable patterns fully eradicated from the worker; the adoption guard prevents regression at PR-review time.
+
+**Pre-impl version pin**: `undici` was added as a direct dep on `@guestpost/shared` (where `safe-fetch.ts` lives). Pinned to `^7.27.2` — matches the version pnpm-lock already resolved as a transitive dep, so the runtime undici (used implicitly by Node 22's `globalThis.fetch`) and the explicitly-imported one stay on the same major. Avoids two-undici-instances-in-process surprises. The `// TODO when upgrading Node:` reminder in the dep entry tells future-you to re-check the pin during a Node major-version bump.
+
+**Test count outcome**: `apps/api` jest **40 suites / 557 tests → 42 suites / 611 tests** (+2 suites: `phase-7-11-safe-fetch.spec.ts` with 53 cases covering `isSafePublicUrl` / `validateResolvedAddress` / `readBodyWithCap` / `PRIVATE_IP_PATTERNS` sanity; `phase-7-11-safe-fetch-adoption.spec.ts` with the 1-case grep guard). Zero regressions in the existing 557. Workspace typecheck + worker tsc + ESLint clean.
+
+**Architecture impact**: zero structural changes. New shared utility (purely additive — both processors use it via standard imports). undici Agent runs in the same Node process, sharing the same `globalThis.fetch` undici instance via the pinned version. The body-cap path always returns control to the existing core (which already handles `html: ""` as a verification failure). No DB migrations, no Better Auth changes, no Sentry config touch.
+
+**End-to-end HTTP test note**: the spec covers the primitives at function level (53 cases) + the adoption guard catches regression. Full end-to-end "stand up a local 100MB server, dispatch a delivery-verify job, observe BODY_TOO_LARGE in logs + retry chain → MANUAL_REVIEW" is documented in the PR body as a manual smoke; production-grade DNS-rebinding tests require an attacker-controlled domain and are out of scope (covered by the dispatcher contract itself). The Phase 7.10.2 follow-up (Nest+supertest harness) would let case (e)-style HTTP integration tests run automatically once that infra exists.
+
+**Dashboard impact**: 25/31 → **27/31 closed (87%)**; High: 7/14 → **9/14 closed**. Remaining open Highs: #16 (favorites scope), #17 (waitlist endpoint), #18 (assignedByUserId), #20 (favorites $0 display), #23 (claim race), #24 (platform listing defaults) — all marketplace correctness, no security.
 
 ---
 

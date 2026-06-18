@@ -1,32 +1,17 @@
-import { isIP } from "net"
 import { connection } from "../redis"
 import { QUEUES, verifyJobPayload } from "@guestpost/shared"
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+// Node-only deep import — undici + dns must stay out of the shared
+// package's public index so the Next.js apps can bundle @guestpost/shared.
+import { safeFetch, readBodyWithCap, isSafePublicUrl, SafeFetchError } from "@guestpost/shared/dist/safe-fetch"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.verification")
 
-const PRIVATE_IP_PATTERNS = [
-  /^127\./, /^10\./, /^192\.168\./, /^169\.254\./,
-  /^172\.(1[6-9]|2\d|3[01])\./, /^0\./,
-  /^::1$/, /^f[cd]/i, /^fe80:/i,
-]
-
-function isSafePublicUrl(rawUrl: string): boolean {
-  let url: URL
-  try {
-    url = new URL(rawUrl)
-  } catch {
-    return false
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return false
-  const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "")
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false
-  if (isIP(host) && PRIVATE_IP_PATTERNS.some((p) => p.test(host))) return false
-  return true
-}
+// Phase 7.11 (#13): 5MB cap matches delivery-verification.processor.ts.
+const MAX_HTML_BYTES = 5 * 1024 * 1024
 
 function hostMatchesWebsite(targetUrl: string, websiteUrl: string): boolean {
   try {
@@ -39,15 +24,39 @@ function hostMatchesWebsite(targetUrl: string, websiteUrl: string): boolean {
 }
 
 async function verifyLinkOnPage(targetUrl: string, anchorText?: string): Promise<string | null> {
-  const response = await fetch(targetUrl, {
-    signal: AbortSignal.timeout(15000),
-    headers: { "User-Agent": "GuestPost-Verification/1.0" },
-  })
+  let response: Response
+  try {
+    // Phase 7.11 (#14): safeFetch resolves DNS inside the dispatcher
+    // and binds the connection to the validated IP — no TOCTOU window
+    // for an attacker-controlled A record to flip to a private IP.
+    response = await safeFetch(targetUrl, {
+      signal: AbortSignal.timeout(15000),
+      headers: { "User-Agent": "GuestPost-Verification/1.0" },
+    })
+  } catch (err: any) {
+    if (err instanceof SafeFetchError) {
+      logger.warn("safeFetch rejected target", { code: err.code, targetUrl })
+    } else {
+      logger.warn("fetch threw", { err: err?.message, targetUrl })
+    }
+    return null
+  }
   if (!response.ok) {
     logger.warn("HTTP non-OK fetching target", { status: response.status, targetUrl })
     return null
   }
-  const html = await response.text()
+  // Phase 7.11 (#13): capped read — 5MB ceiling prevents OOM on a
+  // malicious oversized response. Cap exceeded → null (caller treats
+  // as "not found", same as any other failure path).
+  let html: string
+  try {
+    html = await readBodyWithCap(response, MAX_HTML_BYTES)
+  } catch (err: any) {
+    if (err instanceof SafeFetchError && err.code === "BODY_TOO_LARGE") {
+      logger.warn("response body cap exceeded", { url: targetUrl, maxBytes: MAX_HTML_BYTES })
+    }
+    return null
+  }
   const lowerHtml = html.toLowerCase()
   if (!anchorText) return "found"
   const lowerAnchor = anchorText.toLowerCase()
