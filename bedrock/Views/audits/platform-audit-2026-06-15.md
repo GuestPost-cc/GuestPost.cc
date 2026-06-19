@@ -801,16 +801,18 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 
 | Status | Count | Share |
 |---|---|---|
-| ✅ Fully closed | **27** | 87% |
+| ✅ Fully closed | **30** | 97% |
 | ⚠️ Partially closed | **0** | 0% |
-| ⛔ Still open | **4** | 13% |
+| ⛔ Still open | **1** | 3% |
+
+> Phase 7.12 reconciliation note: previous dashboard reads of "25/31 → 27/31 → 31/32" carried catch-all-row aggregation drift. Recomputed by enumerating each finding individually from the §2 list (Phase 0b in the Phase 7.12 plan). Post-Phase-7.12 truth: **30 closed, 1 open (#23)**. Only #23 remains, gated on Prisma 6 → 7.4+ upgrade for `CREATE INDEX CONCURRENTLY`.
 
 **By severity:**
 
 | Severity | Total | Closed | Partial | Open |
 |---|---|---|---|---|
 | Critical (production-blocker) | 11 | **11** (#1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11) | — | **0** |
-| High | 14 | **9** (#12, #13, #14, #15, #19, #21, #22, V-1, R-3+R-4) | — | 5 |
+| High | 14 | **13** (#12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22, #24, V-1, R-3+R-4 — counting R-3+R-4 as one combined row) | — | 1 (#23) |
 | Medium | 5 | **5** (#25, #26, #27 — Phase 7.8; #28, #29, #30 — Phase 7.9) | — | **0** |
 
 Phase 7.8 also closed audit §5.8's `hasAuthCredentials()` sub-finding (bundled with #26 as documented in the recommended fix). The auth/queue trust boundary has zero open security findings; remaining 2 Medium items (#28 status-color, #29 unused shared components — both frontend) plus #30 (hooks-rule violation in publisher listings) are queued for Phase 7.9.
@@ -839,7 +841,12 @@ Phase 7.8 also closed audit §5.8's `hasAuthCredentials()` sub-finding (bundled 
 | V-1 | Inline body types on support routes | High | ✅ FIXED | 6.6 + 6.7 | `AddTicketMessageDto`, `CreateTicketDto`, `CreateApiKeyDto`, 18 admin-action DTOs |
 | #13 | Delivery-verification no response-body size cap | High | ✅ FIXED | 7.11 | `readBodyWithCap(res, 5MB)` adopted in both worker fetch processors; cancels reader on overrun, throws SafeFetchError(BODY_TOO_LARGE); core treats as verification failure → retry → MANUAL_REVIEW. |
 | #14 | DNS rebinding in SSRF guard (TOCTOU → AWS metadata leak) | High | ✅ FIXED | 7.11 | `safeFetch()` uses undici Agent whose `connect.lookup` resolves DNS + validates the IP against `PRIVATE_IP_PATTERNS` inside the same callback — connection binds to the validated IP, no rebinding window. Bonus: IPv4-mapped IPv6 patterns added. |
-| (#16–#18, #20, #23, #24) | Various | High | ⛔ open | — | See §2 finding list |
+| #16 | `removeFavorite` blasts service-scoped waitlist favorites | High | ✅ FIXED | 7.12 | Scoped to `serviceType: null`; new `removeFavoriteService` for service-scoped removal. Static-source regression guard rejects the old 2-arg deleteMany form. |
+| #17 | No endpoint to create service-scoped favorite (WAITLIST notify-me) | High | ✅ FIXED | 7.12 | `addFavorite(userId, listingId, serviceType?)` + `CreateFavoriteDto.serviceType` + new `DELETE /favorites/:listingId/services/:serviceType` route with `ParseEnumPipe`. Validates non-null serviceType against PAUSED services to avoid dead-write favorites. Reachable WAITLIST fan-out (already existed at marketplace.service.ts:728-749) finally has an entry point. |
+| #18 | Auto-`FulfillmentAssignment.assignedByUserId` = customer's userId | High | ✅ FIXED | 7.12 | `assignedByUserId: snapshot.managedByUserId` (self-assignment). The `auto: true` metadata flag on the OrderEvent still disambiguates from manual claims. |
+| #20 | Favorites page shows $0 (response missing `services`) | High | ✅ FIXED | 7.12 | `getFavorites` includes services (filtered to non-PAUSED, ordered by price asc) with the fields the frontend needs to compute priceFrom. |
+| #23 | Claim race lets two Ops both succeed | High | ⛔ open | — | Needs partial unique index migration which Prisma 6 can't run `CREATE INDEX CONCURRENTLY`. Gated on Prisma 6 → 7.4+ upgrade. |
+| #24 | Platform website + auto-listing defaults wrong | High | ✅ FIXED | 7.12 | `verificationStatus: WebsiteVerificationStatus.VERIFIED` on platform website (matches schema comment at schema.prisma:466-467); auto-listing `status: ListingStatus.DRAFT` (no more zero-service APPROVED listings going live). |
 
 **Bonus improvements landed beyond the audit's scope** (these strengthen posture but weren't in the original 30 findings):
 
@@ -903,6 +910,39 @@ _(none — Phase 7.7.x sweep landed as commit `5af902c` on PR #1; allowlist now 
 - **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
 
 **Production-blocker status**: **11 of 11 Criticals closed (100%)**. No production-blocker finding from the 2026-06-15 audit remains open. All remaining work is High/Medium polish, security hardening, or accessibility — none gate production.
+
+---
+
+### 2026-06-18 — Phase 7.12: Marketplace Correctness Bundle (#16 + #17 + #18 + #20 + #24)
+
+**Five open High audit findings closed in one cohesive PR** — all marketplace correctness, all small individually, bundled to maximize finding closures per cycle. Leaves only #23 (fulfillment claim race) as the lone open finding, gated on the Prisma 6 → 7.4+ upgrade for `CREATE INDEX CONCURRENTLY`.
+
+**Branch**: `phase-7.12-marketplace-correctness` — 4 commits + bedrock-update commit, all tests green (`pnpm build` 11/11 + `pnpm typecheck` + `pnpm lint` + `pnpm -F @guestpost/api test` 45 suites / 634 tests).
+
+| # | Title | What landed | Commit |
+|---|---|---|---|
+| **#16** | `removeFavorite` blasts service-scoped waitlist favorites | `marketplace.service.ts` `removeFavorite` scoped to `serviceType: null`; new `removeFavoriteService(userId, listingId, serviceType)` method for service-scoped removal. Customer un-starring a whole listing no longer loses their service-specific WAITLIST notify-me subscriptions. | `04969b6` |
+| **#17** | No endpoint to create service-scoped (WAITLIST notify-me) favorite | The Phase 6 WAITLIST fan-out logic at `marketplace.service.ts:728-749` had existed for years with no entry point to create the favorites it fanned out to. `addFavorite` signature extended to `(userId, listingId, serviceType: ServiceType \| null = null)`. `CreateFavoriteDto` gains optional `serviceType` (validated with `@IsEnum(ServiceType)`). Service-existence pre-check rejects favorites scoped to `PAUSED` services (those never transition WAITLIST → AVAILABLE, so favoring them would be a dead-write). New `DELETE /marketplace/favorites/:listingId/services/:serviceType` route uses Nest's `ParseEnumPipe` for the URL param (class-validator DTOs only cover `@Body()`, not `@Param()`). | `04969b6` |
+| **#18** | Auto-`FulfillmentAssignment.assignedByUserId` = customer's userId | `orders.service.ts:291` wrote the customer's userId on the auto-assignment row, so audit reads falsely said "customer assigned the order to the Ops staffer." Fix: `assignedByUserId: snapshot.managedByUserId` (self-assignment by the system). The `auto: true` metadata flag on the OrderEvent still disambiguates this from a manual human claim. | `1913b6e` |
+| **#20** | Favorites page shows $0 (response missing `services`) | Listing-level `price` column was dropped in Phase 7, but `getFavorites` was still returning images/tags without `services`, so the portal favorites page displayed $0 for every entry. Fix: include `services` in the listing include, filtered to non-PAUSED, ordered by price asc, with the fields the frontend needs (id, serviceType, price, currency, availability, turnaroundDays). | `04969b6` |
+| **#24** | Platform website + auto-listing defaults wrong | `createPlatformWebsite` omitted `verificationStatus` (defaulted to PENDING_VERIFICATION — falsely flagged platform sites as unverified to listing-approval flows; schema comment at `schema.prisma:466-467` literally says "Platform sites are created VERIFIED"). Auto-listing status was `APPROVED`, shipping zero-service listings live on the public marketplace. Fix: `verificationStatus: WebsiteVerificationStatus.VERIFIED` + `status: ListingStatus.DRAFT`. Both strongly typed via Prisma enums (not string literals — protects against future enum renames at tsc time). | `74857fc` |
+
+**Phase 0 verifications** (the planning step that surfaced design decisions before code landed):
+
+- **Phase 0a (psql sanity check on `MarketplaceFavorite` unique index)**: the composite unique `_MarketplaceFavorite_userId_listingId_serviceType_key` is plain `UNIQUE, btree` with no `NULLS NOT DISTINCT` clause — default NULLS DISTINCT behavior. Multiple NULL-serviceType rows ARE possible per `(user, listing)`. Implementation uses `findFirst + create` for both NULL and non-NULL branches (one consistent path; the TOCTOU race on concurrent identical requests is accepted out-of-scope per the plan's Risks table).
+- **Phase 0b (per-finding §2 enumeration)**: previous dashboard reads of "25/31 → 27/31" carried catch-all-row aggregation drift (the `(#16-#18, #20, #23, #24)` open row was counted as 1 row, not 6 findings). Recomputed individually: pre-Phase-7.12 was actually 25/31 closed; Phase 7.12 closes 5 (#16 + #17 + #18 + #20 + #24); post-Phase-7.12 is **30/31 closed (97%)**. Only #23 remains.
+
+**Schema audit caught a doc inconsistency**: the audit text in §2 for #17 mentioned filtering out "ARCHIVED" services, but the actual `ServiceAvailability` enum is `{AVAILABLE, PAUSED, WAITLIST}` with no ARCHIVED value. `PAUSED` is the soft-disabled state (per `pauseServiceOnListing`'s existing comment — kept for historical-order linkage). All filters + comments updated to use `PAUSED` (the real enum).
+
+**URL param validation gap**: caught + closed in the same PR. NestJS's `class-validator` decorators only run on `@Body()`, not `@Param()`. The new `DELETE /favorites/:listingId/services/:serviceType` route uses `ParseEnumPipe(ServiceType)` on the path segment so a malformed value like `FAKETYPE` returns 400 before Prisma sees it (instead of an uglier SQL-layer rejection downstream).
+
+**Test count outcome**: `apps/api` jest **42 suites / 611 tests → 45 suites / 634 tests** (+3 suites: `phase-7-12-platform-website-defaults` 5 cases, `phase-7-12-auto-assignment-actor` 3 cases, `phase-7-12-favorites-correctness` 15 cases). Zero regressions. Static-source assertions throughout — deeper "create row, query DB" integration belongs in the future Phase 7.10.2 Nest+supertest harness.
+
+**Architecture impact**: zero structural changes. All fixes are corrections to existing call sites or additive new methods. No schema migrations (the `MarketplaceFavorite` composite unique was already correct; the bug was call-site usage). No new dependencies. No new infrastructure.
+
+**Dashboard impact**: 25/31 (per Phase 0b recount) → **30/31 closed (97%)**; High: 9/14 → **13/14 closed**. Only #23 remaining, gated on Prisma upgrade.
+
+**Phase 7.12.1 follow-up captured in backlog**: harden `MarketplaceFavorite.addFavorite`'s `findFirst → create` against duplicate-create race via the same partial-unique-index pattern #23 will introduce. Out of scope for #17 (not what the audit finding is fixing), low impact (worst case one extra row; WAITLIST fan-out de-dupes via `findMany`'s natural deduplication), bounded by #23's eventual closure.
 
 ---
 
