@@ -11,7 +11,7 @@ import {
   GetListingFiltersDto,
   GetRecommendationsDto
 } from "./dto/marketplace.dto"
-import { ListingStatus, ServiceType, Prisma } from "@guestpost/database"
+import { ListingStatus, ServiceType, ServiceAvailability, Prisma } from "@guestpost/database"
 import { slugify } from "../../common/utils/slugify"
 import { ListingServiceInput, UpdateListingServiceInput } from "./dto/marketplace.dto"
 import { computeListingPhase, QUEUES } from "@guestpost/shared"
@@ -1003,27 +1003,71 @@ export class MarketplaceService {
             category: true,
             images: { where: { isPrimary: true }, take: 1 },
             tags: { include: { tag: true } },
+            // Phase 7.12 (#20): include services so the favorites page can
+            // compute price-from-services. The listing-level `price` column
+            // was dropped in Phase 7; without `services` the page falls
+            // back to $0 for every entry. Filter out PAUSED (soft-disabled
+            // by the publisher, kept for historical-order linkage —
+            // shouldn't surface as a current price option). Strongly typed
+            // via the Prisma enum so a future rename fails tsc instead of
+            // silently letting rows through.
+            services: {
+              where: { availability: { not: ServiceAvailability.PAUSED } },
+              orderBy: { price: "asc" },
+              select: {
+                id: true,
+                serviceType: true,
+                price: true,
+                currency: true,
+                availability: true,
+                turnaroundDays: true,
+              },
+            },
           },
         },
       },
     })
   }
 
-  async addFavorite(userId: string, listingId: string) {
+  async addFavorite(userId: string, listingId: string, serviceType: ServiceType | null = null) {
     const listing = await this.prisma.marketplaceListing.findUnique({ where: { id: listingId } })
     if (!listing) {
       throw new NotFoundException("Listing not found")
     }
 
-    // Whole-listing favorite = serviceType NULL. Composite unique
-    // (userId, listingId, serviceType) cannot identify NULL-serviceType rows
-    // via Prisma's WhereUniqueInput (NULL ≠ NULL in SQL), so emulate upsert
-    // with findFirst + conditional create.
+    // Phase 7.12 (#17): if a non-NULL serviceType is supplied, verify the
+    // service exists on the listing AND isn't paused. PAUSED services
+    // never transition WAITLIST → AVAILABLE (the publisher took them down,
+    // they only stay around for historical-order linkage per
+    // pauseServiceOnListing's comment), so a favorite scoped to a paused
+    // service is a dead-write — the WAITLIST fan-out would never fire for
+    // it. Reject up-front instead of writing a useless row.
+    if (serviceType !== null) {
+      const service = await this.prisma.listingService.findFirst({
+        where: {
+          listingId,
+          serviceType,
+          availability: { not: ServiceAvailability.PAUSED },
+        },
+      })
+      if (!service) {
+        throw new NotFoundException(`Service ${serviceType} not found on this listing`)
+      }
+    }
+
+    // Composite unique (userId, listingId, serviceType) handles dedup. For
+    // NULL serviceType the WhereUniqueInput cannot match (NULL ≠ NULL in
+    // SQL — Phase 7.12 Phase 0a confirmed the dev DB is NULLS DISTINCT),
+    // so emulate upsert with findFirst + conditional create for BOTH
+    // branches. Concurrent identical requests can race here and create
+    // duplicate NULL-serviceType rows; out of scope for #17, captured as
+    // a Phase 7.12.1 backlog item to harden later via the same partial-
+    // unique-index pattern #23 will introduce.
     const existing = await this.prisma.marketplaceFavorite.findFirst({
-      where: { userId, listingId, serviceType: null },
+      where: { userId, listingId, serviceType },
     })
     const favorite = existing ?? await this.prisma.marketplaceFavorite.create({
-      data: { userId, listingId, serviceType: null },
+      data: { userId, listingId, serviceType },
     })
 
     // Track click
@@ -1035,8 +1079,24 @@ export class MarketplaceService {
   }
 
   async removeFavorite(userId: string, listingId: string) {
+    // Phase 7.12 (#16): scope to the NULL-serviceType row only. The
+    // previous unscoped deleteMany silently destroyed any service-scoped
+    // WAITLIST notify-me favorites for the same listing — meaning a
+    // customer who un-starred the whole listing lost their service-
+    // specific subscriptions too. Service-scoped removal goes through
+    // removeFavoriteService below.
     await this.prisma.marketplaceFavorite.deleteMany({
-      where: { userId, listingId },
+      where: { userId, listingId, serviceType: null },
+    })
+  }
+
+  async removeFavoriteService(userId: string, listingId: string, serviceType: ServiceType) {
+    // Phase 7.12 (#16 sibling): scoped removal for service-specific
+    // (WAITLIST notify-me) favorites. Mirrors removeFavorite but for the
+    // serviceType-scoped rows that the new addFavorite(serviceType) path
+    // creates.
+    await this.prisma.marketplaceFavorite.deleteMany({
+      where: { userId, listingId, serviceType },
     })
   }
 
