@@ -5,7 +5,7 @@ import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { QueueService } from "../queues/queue.service"
 import { RefundService } from "../orders/services/refund.service"
 import { StaffRole, QUEUES } from "@guestpost/shared"
-import { ListingStatus, WebsiteOwnershipType } from "@guestpost/database"
+import { ListingStatus, WebsiteOwnershipType, WebsiteVerificationStatus } from "@guestpost/database"
 import { normalizeDomain } from "../../common/domain"
 
 const VALID_STAFF_ROLES: StaffRole[] = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
@@ -656,6 +656,13 @@ export class AdminService {
         ownershipType: WebsiteOwnershipType.PLATFORM,
         isActive: true,
         managedByUserId,
+        // Phase 7.12 (#24): platform-owned sites bypass DNS verification —
+        // the platform inherently owns them (matches the schema comment at
+        // schema.prisma:466-467 "Platform sites are created VERIFIED").
+        // Previously inherited the default PENDING_VERIFICATION which
+        // falsely flagged platform sites as unverified to listing-approval
+        // flows. Strongly typed via the Prisma-generated enum.
+        verificationStatus: WebsiteVerificationStatus.VERIFIED,
       },
     })
 
@@ -668,7 +675,11 @@ export class AdminService {
         title: dto.url,
         slug: `platform-${website.id.slice(0, 8)}`,
         description: dto.name ?? dto.url,
-        status: ListingStatus.APPROVED,
+        // Phase 7.12 (#24): start in DRAFT — admin must explicitly add
+        // services + approve before going live on the public marketplace.
+        // The previous APPROVED default shipped zero-service listings live,
+        // surfacing "no services available" to customers.
+        status: ListingStatus.DRAFT,
         fulfillmentType: "INTERNAL",
         currency: "USD",
         domainRating: dto.domainRating ?? 0,
