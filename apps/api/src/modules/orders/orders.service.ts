@@ -284,11 +284,14 @@ export class OrdersService {
           data: {
             orderId: order.id,
             assignedToUserId: snapshot.managedByUserId,
-            // assignedByUserId is the order's customer — same row currently
-            // used by manual claims tracks who initiated the assignment. The
-            // metadata flag `auto: true` (on the OrderEvent below) signals
-            // "system-driven, not a human claim" for audit reads.
-            assignedByUserId: userId,
+            // Phase 7.12 (#18): self-assignment by the system. Previously
+            // wrote `userId` (the order's customer), which falsely said in
+            // audit reads "the customer assigned the order to the Ops
+            // staffer." Now points at the same staffer who's receiving the
+            // assignment — semantically "self-assigned by the system."
+            // The `auto: true` metadata flag on the OrderEvent below still
+            // disambiguates this from a manual human claim.
+            assignedByUserId: snapshot.managedByUserId,
             status: "ASSIGNED",
           },
         })

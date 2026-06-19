@@ -378,6 +378,15 @@ export class CreateReviewDto {
 export class CreateFavoriteDto {
   @IsString()
   listingId!: string
+
+  // Phase 7.12 (#17): when set, creates a service-scoped favorite — the
+  // existing WAITLIST fan-out logic in MarketplaceService.updateServiceOnListing
+  // already fires for (listingId, serviceType) tuples; this DTO field wires
+  // the missing entry point. When omitted, default whole-listing favorite
+  // (serviceType: null) is preserved for back-compat.
+  @IsOptional()
+  @IsEnum(ServiceType)
+  serviceType?: ServiceType
 }
 
 export class CreateSavedListDto {

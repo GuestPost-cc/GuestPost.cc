@@ -28,6 +28,17 @@ Forward roadmap after the Phases 6.6 → 7.7 audit batch. Canonical source for p
 
 Mission: Authentication / Authorization / Replay protection / Anti-abuse in one cohesive phase. **Status: complete (Deploy A + Deploy B both shipped).**
 
+## Phase 7.12 — Marketplace Correctness Bundle (#16 + #17 + #18 + #20 + #24) ✅ DONE
+
+- [x] **#16 — `removeFavorite` blasts service-scoped waitlist favorites** ✅ DONE 2026-06-18 (commit `04969b6`). Scoped to `serviceType: null`; new `removeFavoriteService` for service-scoped removal.
+- [x] **#17 — No endpoint to create service-scoped (WAITLIST notify-me) favorite** ✅ DONE 2026-06-18 (commit `04969b6`). `addFavorite(userId, listingId, serviceType?)` + `CreateFavoriteDto.serviceType` + new `DELETE /favorites/:listingId/services/:serviceType` route with `ParseEnumPipe`. Service-existence pre-check rejects favorites scoped to PAUSED services. Phase 6 WAITLIST fan-out logic (existed for years at `marketplace.service.ts:728-749`) finally has an entry point.
+- [x] **#18 — Auto-assignment writes customer's userId instead of the staffer** ✅ DONE 2026-06-18 (commit `1913b6e`). `assignedByUserId: snapshot.managedByUserId` (self-assignment by the system). The `auto: true` metadata flag still disambiguates.
+- [x] **#20 — Favorites page shows $0 (response missing `services`)** ✅ DONE 2026-06-18 (commit `04969b6`). `getFavorites` includes services filtered to non-PAUSED, ordered by price asc.
+- [x] **#24 — Platform website + auto-listing defaults wrong** ✅ DONE 2026-06-18 (commit `74857fc`). `verificationStatus: WebsiteVerificationStatus.VERIFIED` on platform website (matches schema comment); auto-listing `status: ListingStatus.DRAFT` (no more zero-service APPROVED listings going live).
+- [ ] **Phase 7.12.1 follow-up — harden `MarketplaceFavorite` against duplicate-create race.** `addFavorite`'s `findFirst + create` pattern has a TOCTOU window if two concurrent identical requests arrive — Phase 0a confirmed dev DB is NULLS DISTINCT, so duplicate NULL-serviceType rows are possible. Out of scope for #17 (not the audit finding being fixed); low impact (WAITLIST fan-out de-dupes via findMany). Apply the same partial-unique-index pattern #23 will introduce when Prisma 6 → 7.4+ lands.
+
+Mission: Marketplace correctness / closing the audit's remaining High findings except #23 / closing audit dashboard from 25/31 → 30/31 (97%).
+
 ## Phase 7.11 — Worker SSRF + DoS Hardening (#13 + #14) ✅ DONE
 
 - [x] **#13 — Delivery-verification no response-body size cap** ✅ DONE 2026-06-18 (commits `0d954c5` + `5c5090d`). New `readBodyWithCap(res, maxBytes)` in `@guestpost/shared` streams the body, cancels the reader on overrun, throws `SafeFetchError("BODY_TOO_LARGE")`. Cap = 5MB in both worker fetch processors.

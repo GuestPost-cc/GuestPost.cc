@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards } from "@nestjs/common"
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, ParseEnumPipe } from "@nestjs/common"
+import { ServiceType } from "@guestpost/database"
 import { MarketplaceService } from "./marketplace.service"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { Public } from "../../common/decorators/public.decorator"
@@ -120,7 +121,11 @@ export class MarketplaceController {
   @MemberRoles("OWNER", "MEMBER")
   @Post("favorites")
   async addFavorite(@Body() body: CreateFavoriteDto, @CurrentUser() user: any) {
-    return this.marketplaceService.addFavorite(user.id, body.listingId)
+    // Phase 7.12 (#17): thread body.serviceType through to the service.
+    // When undefined, the service defaults to null (whole-listing favorite,
+    // legacy behavior). When set, creates a service-scoped WAITLIST
+    // notify-me favorite.
+    return this.marketplaceService.addFavorite(user.id, body.listingId, body.serviceType ?? null)
   }
 
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
@@ -129,6 +134,24 @@ export class MarketplaceController {
   @Delete("favorites/:listingId")
   async removeFavorite(@Param("listingId") listingId: string, @CurrentUser() user: any) {
     await this.marketplaceService.removeFavorite(user.id, listingId)
+    return { success: true }
+  }
+
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER", "MEMBER")
+  @Delete("favorites/:listingId/services/:serviceType")
+  async removeFavoriteService(
+    @Param("listingId") listingId: string,
+    // Phase 7.12 (#17 sibling): URL params are NOT covered by class-validator
+    // DTOs, only @Body() is. ParseEnumPipe rejects an invalid enum value
+    // with a clean 400 before the handler runs — without it, a malformed
+    // serviceType like `FAKETYPE` would reach Prisma and fail at the SQL
+    // layer with an uglier error.
+    @Param("serviceType", new ParseEnumPipe(ServiceType)) serviceType: ServiceType,
+    @CurrentUser() user: any,
+  ) {
+    await this.marketplaceService.removeFavoriteService(user.id, listingId, serviceType)
     return { success: true }
   }
 
