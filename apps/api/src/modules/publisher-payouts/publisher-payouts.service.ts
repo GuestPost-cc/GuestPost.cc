@@ -5,7 +5,7 @@ import { QueueService } from "../queues/queue.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
 import { PayoutExecutionService } from "./payout-execution.service"
 import { QUEUES, getWithdrawalHoldDays, type PublisherTier } from "@guestpost/shared"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 
 // Phase 7.2 — TIER_WITHDRAWAL_HOLDS lifted to packages/shared/src/publisher-tier-policy.ts
 // (audit #6 sibling rider). Single source of truth across the platform for

@@ -1,6 +1,6 @@
 import { BadRequestException } from "@nestjs/common"
 import { PublisherPayoutsService } from "../publisher-payouts.service"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 
 describe("PublisherPayoutsService", () => {
   let service: PublisherPayoutsService

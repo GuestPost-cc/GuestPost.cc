@@ -2,7 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ConflictException }
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { BillingService } from "../../billing/billing.service"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 import { assertOwnerOrCreator } from "./owner-or-creator"
 import { orderEventMetadata } from "@guestpost/shared"
 

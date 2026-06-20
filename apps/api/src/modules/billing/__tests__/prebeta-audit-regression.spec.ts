@@ -13,7 +13,7 @@
  *      debit it idempotently.
  */
 import { BadRequestException, ConflictException } from "@nestjs/common"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 import { normalizeProviderWebhook } from "@guestpost/shared"
 import { BillingService } from "../billing.service"
 import { OrdersService } from "../../orders/orders.service"

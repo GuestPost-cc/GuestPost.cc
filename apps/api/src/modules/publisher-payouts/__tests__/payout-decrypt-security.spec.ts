@@ -3,7 +3,7 @@ import { PublisherPayoutsService } from "../publisher-payouts.service"
 import { PayoutEncryptionService } from "../payout-encryption.service"
 import { PayoutExecutionService } from "../payout-execution.service"
 import { PermissionsGuard } from "../../../common/guards/permissions.guard"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 
 const SECRET_DETAILS = { accountNumber: "DE89370400440532013000", routingNumber: "021000021", bankName: "Test Bank" }
 
