@@ -1,0 +1,31 @@
+-- Phase 7.13.1 — composite index for Settlement auto-approve sweep.
+-- First production use of Prisma 7's non-transactional migration model.
+--
+-- The sweep at packages/shared/src/settlement-auto-approve-core.ts queries
+-- `status IN ('PENDING','UNDER_REVIEW') AND reviewEndsAt <= now()` every
+-- 15 minutes. The existing Settlement_status_idx (status alone) forces the
+-- planner to index-scan by status then row-filter reviewEndsAt. A composite
+-- (status, "reviewEndsAt") lets the planner do a single index-range-scan
+-- combining both predicates.
+--
+-- CONCURRENTLY: builds without blocking writes. Postgres requires CONCURRENTLY
+-- run OUTSIDE a transaction. Prisma 6 wrapped every migration in an implicit
+-- transaction (prisma#14456) — Phase 7.13 unblocked this by upgrading to
+-- Prisma 7.4+, which inverted the default: migrations are NO LONGER
+-- transaction-wrapped by default in 7.x (see
+-- https://github.com/prisma/prisma-engines/blob/main/schema-engine/ARCHITECTURE.md#why-does-migrate-not-run-migrations-in-a-transaction-by-default).
+-- That's why this file has no directive header — none is needed. Future
+-- migrations that want transactional behavior must opt IN by adding their
+-- own BEGIN; / COMMIT;.
+--
+-- Migration cost: builds online; expect ~seconds on dev (~1k Settlement rows),
+-- low-seconds-to-minutes on prod (Settlement grows monotonically with
+-- completed orders). Zero write blocking. Safe to run during business hours.
+--
+-- Recovery if the CONCURRENTLY build fails mid-flight: Postgres leaves an
+-- INVALID index (indisvalid=false) that the planner ignores. To clean up:
+--   DROP INDEX CONCURRENTLY IF EXISTS "Settlement_status_reviewEndsAt_idx";
+-- Then re-run the migration via `prisma migrate deploy`.
+
+CREATE INDEX CONCURRENTLY "Settlement_status_reviewEndsAt_idx"
+  ON "Settlement"(status, "reviewEndsAt");
