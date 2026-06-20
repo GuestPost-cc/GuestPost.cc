@@ -1,0 +1,30 @@
+-- Phase 7.13.2B (part 1 of 2) — drop the original NULLS-DISTINCT unique.
+-- Closes the Phase 7.13.2 umbrella in two pieces; this part runs first.
+--
+-- Why split into two migrations: Gate 0.5B (probe against prisma@7.8.0)
+-- proved that the migrate runner wraps MULTI-statement migration files
+-- in a transaction, which causes DROP INDEX CONCURRENTLY to error with
+-- "DROP INDEX CONCURRENTLY cannot run inside a transaction block". A
+-- single-statement migration file is NOT wrapped (verified by Phase
+-- 7.13.1 + 7.13.2A which both shipped single-statement CREATE INDEX
+-- CONCURRENTLY successfully). Splitting DROP and RENAME into two
+-- single-statement files sidesteps the issue entirely.
+--
+-- Pre-flight (Gate 0): operator confirmed via pg_constraint on dev that
+-- `MarketplaceFavorite_userId_listingId_serviceType_key` is a stand-alone
+-- UNIQUE INDEX (no contype='u' row). Operator MUST re-verify on staging
+-- + prod before applying this migration; if any env has a CONSTRAINT row
+-- for this name, replace the DROP INDEX line with
+-- `ALTER TABLE "MarketplaceFavorite" DROP CONSTRAINT "MarketplaceFavorite_userId_listingId_serviceType_key";`
+-- (brief ACCESS EXCLUSIVE; schedule outside peak hours).
+--
+-- IF EXISTS makes re-runs idempotent — operator retry after a partial
+-- failure is safe.
+--
+-- Race-proofing remains intact across this migration: the sibling
+-- _uniq_nullsnotdistinct index (created in 7.13.2A) keeps enforcing
+-- uniqueness over (userId, listingId, serviceType) with NULLS NOT
+-- DISTINCT semantics. The DROP only removes the now-redundant
+-- NULLS-DISTINCT index.
+
+DROP INDEX CONCURRENTLY IF EXISTS "MarketplaceFavorite_userId_listingId_serviceType_key";
