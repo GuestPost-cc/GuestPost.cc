@@ -887,7 +887,7 @@ _(none — Phase 7.7.x sweep landed as commit `5af902c` on PR #1; allowlist now 
 
 ### Blocked — designed + approved, waiting on upstream
 
-- **Phase 7.3.1 — `Settlement(status, reviewEndsAt)` composite index.** Status: **designed, approved, NOT implemented**. The most valuable uncompleted roadmap item. Phase 7.3's auto-approve worker sweep hits this access pattern every 15m, so the index pays off immediately at prod scale. **Blocked on Prisma 6.19.3 → 7.4+ upgrade**: Prisma 6 wraps each migration in a transaction and `CREATE INDEX CONCURRENTLY` cannot run inside one (prisma#14456, fixed in Prisma 7.4). Out of scope until the Prisma version upgrade lands as its own (week-scale) project.
+_(none — Phase 7.13 landed the Prisma 6→7 upgrade 2026-06-20, unblocking Phase 7.3.1 + Phase 7.12.1 + #23. Re-queued as 7.13.1 / 7.13.2 / 7.14 under "Next up" below.)_
 
 ### Deferred — approved plan moved into a later phase
 
@@ -904,12 +904,69 @@ _(none — Phase 7.7.x sweep landed as commit `5af902c` on PR #1; allowlist now 
 - **After Phase 7.7 C operator adds `SENTRY_AUTH_TOKEN`** — confirm first post-merge CI build uploaded source maps; check Sentry → Releases → artifact list; add a one-line "source-maps live" note to Phase 7.7 §11 entry.
 - ~~After each Phase 7.7.x sweep commit~~ — **DONE** (commit `5af902c`, PR #3 merged 2026-06-16).
 - ~~After each Phase 7.7.y spec restoration~~ — **DONE** (commits `aa8cd55` + `74c8d51` + `b670493`, PR #4 merged 2026-06-16). `testPathIgnorePatterns` at jest default; full `apps/api` jest is 33 suites / 478 tests, no skips.
-- **After Prisma 6 → 7.4+ upgrade** — unblock Phase 7.3.1; ship the composite index migration; record planner-usage proof per the deferred plan's verification checklist.
+- ~~After Prisma 6 → 7.4+ upgrade~~ — **DONE** 2026-06-20 (Phase 7.13, see §11 entry above). Next sub-deliverables: 7.13.1 Settlement composite index, 7.13.2 favorites partial unique, 7.14 #23 fulfillment race fix.
 - ~~After Phase 7.8 lands~~ — **DONE** (this entry). Auth/queue trust boundary has zero open security findings; #25 + #26 + #27 + §5.8 sub-finding all closed in one PR.
 - ~~After Phase 7.8 Deploy B lands~~ — **DONE** 2026-06-18 (commit `0e9eca1`). Deploy B sub-entry appended to the 2026-06-17 Phase 7.8 §11 entry. PR scheduled to merge ≥2026-06-19 17:38 UTC (48h post-Deploy-A).
 - **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
 
 **Production-blocker status**: **11 of 11 Criticals closed (100%)**. No production-blocker finding from the 2026-06-15 audit remains open. All remaining work is High/Medium polish, security hardening, or accessibility — none gate production.
+
+---
+
+### 2026-06-20 — Phase 7.13: Prisma 6.19.3 → 7.8.0 with driver-adapter migration (unblocks 7.13.1 / 7.13.2 / 7.14)
+
+**Foundational dep upgrade.** Audit line 890 had named this work the "most valuable uncompleted roadmap item": Prisma 6's transaction wrapper rejects `CREATE INDEX CONCURRENTLY` ([prisma#14456](https://github.com/prisma/prisma/issues/14456), fixed in 7.4). The upgrade gates three queued items — Phase 7.3.1 Settlement composite index, Phase 7.12.1 favorites partial unique, and #23 fulfillment claim race. Now unblocked.
+
+**Branch**: `phase-7.13-prisma-7-upgrade` — 3 production commits + 1 docs, single PR. Scorecard unchanged at 30/31 (#23 closes in fast-follow Phase 7.14).
+
+**Plan churn note** — the first approved Phase 7.13 plan died at Phase 0 spike. Recon assumed Prisma 7 was a version bump with mechanical tsc fixes; spike surfaced three architectural breaking changes: (a) `datasource.url` removed from `schema.prisma`, (b) `PrismaClientOptions` is now `{ adapter } XOR { accelerateUrl }` (no `datasourceUrl`, no `datasources`), (c) native query-engine `.dylib.node` deleted in favour of a WASM Query Compiler. User confirmed re-plan with full adapter-migration scope; the revised plan + 11 user-driven refinements landed before commit work began.
+
+| # | Title | What landed |
+|---|---|---|
+| **Commit 1** | `feat(database): adopt Prisma 7 + @prisma/adapter-pg` (`2ca6f70`) | The breaking change in one tightly-coupled commit. (a) Bump `prisma` + `@prisma/client` 6.19.3 → 7.8.0 in `packages/database` + `apps/api`. (b) Add `@prisma/adapter-pg` + `pg` deps + `@types/pg` devDep to `packages/database`; add `@prisma/adapter-pg` to `apps/api`. (c) Remove `url = env("DATABASE_URL")` line from `schema.prisma` (Prisma 7 reads from `prisma.config.ts` for Migrate + from adapter for runtime). (d) Remove `engine: "classic"` line from `prisma.config.ts` (6.x-only option). (e) Remove `cp src/prisma/*.node dist/prisma/` step from `packages/database/package.json` `build` + `db:generate` scripts (no native binary under WASM). (f) Rewrite `packages/database/src/index.ts` singleton: `new PrismaClient({ adapter: new PrismaPg({ connectionString }) })`. (g) Rewrite `apps/api/src/common/prisma.service.ts` constructor: pool tuning (`max: 25`, `idleTimeoutMillis: 20_000`) moves from `?connection_limit=25&pool_timeout=20` URL params into the `PrismaPg(PoolConfig)` form; preserves the burst-money-ops comment as the only non-obvious detail; deletes the `buildDatasourceUrl` helper entirely (only consumer was the constructor). (h) Regenerate Prisma client (67 files modified; `libquery_engine-darwin-arm64.dylib.node` deleted). 74 files / +1152 −383. |
+| **Commit 1a** | `fix(api): rename Decimal import path for Prisma 7 (runtime/library → runtime/client)` (`5d6f49b`) | Mechanical sweep across 15 `apps/api` files (4 production services: `platform-fee.ts`, `billing.service.ts`, `order-payment.service.ts`, `refund.service.ts`, `publisher-payouts.service.ts`, `settlements.service.ts` + 9 specs/tests). Prisma 7 reorganised runtime subpath exports — `Decimal` class identical (re-export of decimal.js@10.x), only the import path changed. Single-pattern sed, 15 files / +15 −15. |
+| **Commit 2** | `fix(worker): $disconnect Prisma on graceful shutdown` (`73b88cd`) | Pre-existing gap surfaced + made load-bearing by the adapter migration. `apps/worker/src/index.ts:263-279` shutdown sequence never released PrismaClient connections — fine under Prisma 6's classic Rust engine (process exit closed them forcibly), but under the node-pg Pool the idle connections linger past process exit unless `$disconnect` is called. Slotted between health-server close and Sentry.flush; same best-effort try/catch+logger.error pattern as surrounding code. 1 file / +5 lines. Kept separate from Commit 1 for independent revertibility — adapter migration is the high-risk change; this is a small correctness fix that builds on it. |
+| **Commit 3** | `docs(bedrock): record Phase 7.13 closure + unblock 3 follow-up items` | This entry + backlog promotion of 7.13.1 / 7.13.2 / 7.14 from blocked to next-up + risks closure of the Prisma-6-blocks-CONCURRENTLY row + new low-sev "WASM Query Compiler unproven under sustained production load" row (mitigated by 24h staging soak). |
+
+**Phase 0 v2 outcome (the load-bearing measurement)**:
+
+- **Adapter constructor verified via installed types** — `node_modules/.pnpm/@prisma+adapter-pg@7.8.0/.../index.d.ts` shows `constructor(poolOrConfig: pg.Pool | pg.PoolConfig | string, options?: PrismaPgOptions)`. The unionized signature meant Pattern A (PoolConfig form) worked without needing a pre-built Pool import.
+- **Hidden-callsite grep** — `git grep "new PrismaClient("` outside generated tree returned exactly the 1 expected match (the new singleton). The PrismaService extends-and-supers pattern doesn't match the grep but is the second known site; recon's 2-site count held.
+- **Typecheck** — initially 11 errors all in `apps/api`: 8 × `Cannot find module '@prisma/client/runtime/library'` (the Decimal sweep target) + 3 × implicit-any cascades from the Decimal failures. After the sweep + adding `@prisma/adapter-pg` as a direct dep on `apps/api`: **0 errors** across api + worker + database + 4 Next.js apps.
+- **Migration replay** — fresh `prisma7_spike` DB; `EXPECTED_MIGRATIONS=20` from dynamic `find`; **all 20 applied cleanly**; `prisma validate` passes; `prisma db pull` round-trips.
+- **pg_dump diff vs pre-upgrade snapshot** — 151-line diff that is **pre-existing schema drift, NOT caused by Prisma 7**: an orphaned `EscrowStatus` enum lives in the live dev DB but no current migration creates it (leftover from `migrations_archive/`). Worth its own cleanup PR; flagged on `risks.md` but not a Phase 7.13 blocker.
+- **Runtime smoke against live dev DB** (1386 users / 1551 orders / 4166 transactions) — `$connect → user.count → order.count → transaction.count → transaction.findFirst select { id, amount }` all green; **`amount instanceof Decimal === true, value === "5000"`** confirms the WASM compiler round-trips the financial Decimal column correctly; `$disconnect` releases the pool cleanly.
+
+**What did NOT land in this PR (deliberate mission-ceiling)**:
+
+- The CONCURRENTLY migrations themselves — those are Phase 7.13.1 (Settlement index), 7.13.2 (favorites unique), and 7.14 (#23 race fix). Conflating "upgrade Prisma" with "use the new capability" would have made both PRs harder to review and revert.
+- Unifying adapter construction behind a `createPrismaClient()` helper in `packages/database` — both PrismaClient sites currently duplicate the adapter wiring (~3 lines each). Right long-term shape, but doing it in this PR amplifies the diff on a sensitive upgrade. Will land as a small follow-up after Prisma 7 is proven stable in production.
+- Cleaning up the orphaned `EscrowStatus` enum + `migrations_archive/` schema drift — separate concern surfaced by the pg_dump check.
+- Other dep upgrades (turbo, next, jest, NestJS) — bundling deps amplifies rollback blast radius.
+
+**Pre-flight gates** (all blocking, all completed before push):
+
+1. Workspace typecheck — `pnpm run typecheck` (4 Next.js apps) + `pnpm -F @guestpost/{api,worker,database} exec tsc --noEmit` — all clean.
+2. Workspace lint — `pnpm -w run lint` — 3 frontend apps clean.
+3. apps/api jest baseline — 45 suites / 634 tests, no failures (carried forward unchanged from Phase 7.12).
+4. `pnpm build` — 11/11 workspace targets.
+5. Migration runner verification on fresh DB — `prisma migrate deploy` with `EXPECTED==APPLIED` drift check.
+6. Docker build verification — both `apps/api/Dockerfile` + `apps/worker/Dockerfile` (confirms the removed `cp src/prisma/*.node` doesn't break multi-stage builds + the WASM file makes it into the runner image).
+7. Runtime startup gate — `pnpm dev` boots both apps clean; no `PrismaClientInitializationError`/`PrismaClientRustPanicError`/`Cannot find module @prisma/adapter-pg` in logs.
+8. Worker SIGTERM disconnect check — `$disconnect` log line appears + pg_stat_activity count parity between baseline (before worker boot) and after-SIGTERM (no leaked pool connections).
+9. Financial regression smoke — canonical money path walked end-to-end against fresh dev DB (deposit → pay → refund → settlement → withdrawal → reconciliation).
+
+**Rollout sequence**: PR merged → staging deploy → 24h soak under real-ish load (monitor Sentry `PrismaClient*` error rate vs baseline, worker `/metrics/queues` for transaction-semantics drift, p95 API latency for WASM perf regression, reconciliation cron drift) → promote to production. **Rollback procedure** documented on the PR — single revert of the merge + `pnpm install --frozen-lockfile` + redeploy; **no DB rollback required** since this PR ships zero schema changes.
+
+**Follow-up roadmap (post-merge sequencing)**:
+
+| # | Phase | Scope | Risk |
+|---|---|---|---|
+| 1 | **7.13.1** | `Settlement(status, reviewEndsAt)` composite index via `CREATE INDEX CONCURRENTLY` | Low — pure read-path optimization, no app-layer change. Proves the new Prisma 7 directive works in production on a low-stakes change. |
+| 2 | **7.13.2** | `MarketplaceFavorite(userId, listingId, serviceType)` partial unique index closing Phase 7.12.1's TOCTOU race | Low — index addition + simplifies code (deletes `findFirst+create` emulation). |
+| 3 | **7.14** | #23 fulfillment claim race fix | Medium — migration (partial unique on `FulfillmentAssignment(orderId)` WHERE status IN (ASSIGNED, IN_PROGRESS)) AND app-layer change (constraint-enforced upsert + P2002 handling + user-facing error). Highest business impact; lands after the two index-only PRs prove the new directive works. |
+
+Plus follow-up housekeeping: `createPrismaClient()` unification helper; `EscrowStatus` orphan + `migrations_archive/` schema-drift cleanup.
 
 ---
 

@@ -1,7 +1,7 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-06-17
+updated: 2026-06-20
 ---
 
 # Risks
@@ -49,6 +49,7 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 | Hooks-rule violation in publisher listings page (#30) — factory function wrapped `useMutation` then was called 4× at scope | Phase 7.9 (`510993b`): 4 inline `useMutation` calls + `lifecycleOpts(label)` helper that returns the options object (not a hook). **Bonus**: ESLint rider surfaced 9 additional latent rules-of-hooks violations in `apps/admin/marketplace/page.tsx` (early-return before later hooks); all 9 fixed in the same commit. |
 | No ESLint anywhere in CI — `react-hooks/rules-of-hooks` regressions undetectable | Phase 7.9 (`510993b`): root `eslint.config.mjs` with tight rule set (`@eslint/js recommended` + `typescript-eslint recommended` + ONLY `react-hooks/rules-of-hooks`); scripts on portal/admin/publisher; CI step on both `ci.yml` and `pr.yml`. Future broader rule expansion is one config edit. |
 | Drawer a11y missing across 3 dashboards (Phase 7.6.1) — no Escape, no focus trap, no scroll-lock, no ARIA | Phase 7.9 (`8c9d868` + `e90ea34`): new `<Drawer>` component on `@radix-ui/react-dialog`. Radix provides focus trap + Escape close + body scroll-lock + `aria-modal` + focus restore + inert background. Portal layout also gained pathname-auto-close. |
+| Prisma 6 wraps every migration in a transaction → `CREATE INDEX CONCURRENTLY` rejected (`cannot run inside a transaction block` per prisma#14456, fixed in 7.4). Gated Phase 7.3.1 Settlement composite index + Phase 7.12.1 favorites partial unique + #23 fulfillment claim race — three queued items the audit flagged as the most valuable uncompleted roadmap work. | **Phase 7.13** (commits `2ca6f70` + `5d6f49b` + `73b88cd`, 2026-06-20): bumped to Prisma 7.8.0; adopted `@prisma/adapter-pg` (node-postgres) as the driver adapter; rewrote both PrismaClient instantiation sites; removed schema `url=` + config `engine: "classic"` + build's `cp *.node`; renamed Decimal import path runtime/library → runtime/client across 15 files; added worker `$disconnect` on graceful shutdown (closes pre-existing pool-leak gap surfaced by the adapter migration). 20/20 migrations replay clean on Prisma 7 runner; runtime smoke against live dev DB (1386 users / 1551 orders / 4166 txns) confirms Decimal round-trips correctly via WASM compiler. Unblocks Phase 7.13.1 + 7.13.2 + 7.14 fast-follows. |
 
 ## Still open (residual + new)
 
