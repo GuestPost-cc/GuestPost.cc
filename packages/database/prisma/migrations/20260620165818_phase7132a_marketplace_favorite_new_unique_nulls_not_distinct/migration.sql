@@ -1,0 +1,42 @@
+-- Phase 7.13.2A — close MarketplaceFavorite TOCTOU race (Phase 7.12.1 follow-up).
+-- Step 1 of 2: build a new NULLS NOT DISTINCT unique alongside the existing one.
+--
+-- The existing UNIQUE index on (userId, listingId, serviceType) is
+-- NULLS DISTINCT (Postgres default). Because serviceType is nullable AND
+-- two NULLs compare as NOT-equal in SQL, the unique constraint does NOT
+-- prevent duplicate (userId, listingId, NULL) rows. Phase 7.12 confirmed
+-- this in dev (Phase 0a) and captured the race as Phase 7.12.1.
+--
+-- This migration creates a SECOND unique index on the same columns with
+-- NULLS NOT DISTINCT semantics (PG 15+ feature; verified on dev PG 17.10).
+-- The old NULLS DISTINCT index stays in place — both fire on insert
+-- between this migration and Phase 7.13.2B. The new one is strictly
+-- stricter, so the NULL-dupe race is structurally prevented as soon as
+-- this lands. App-layer rewrite in the sibling commit relies on either
+-- index to reject duplicate inserts; only the new one catches the NULL
+-- case, but both catch non-NULL.
+--
+-- The old index is dropped + new index renamed to canonical in 7.13.2B
+-- (separate PR, separate deploy) — keeps CONCURRENTLY index build
+-- isolated from constraint manipulation. Inspection confirmed via
+-- pg_constraint that the original is a stand-alone UNIQUE INDEX (no
+-- contype='u' row), so 7.13.2B will use DROP INDEX CONCURRENTLY (online,
+-- no ACCESS EXCLUSIVE lock).
+--
+-- Prisma 7.4+ runs migrations OUTSIDE a transaction by default
+-- (https://github.com/prisma/prisma-engines/blob/main/schema-engine/ARCHITECTURE.md#why-does-migrate-not-run-migrations-in-a-transaction-by-default)
+-- so no directive header is needed for CONCURRENTLY.
+--
+-- Pre-flight: operator MUST run the dupe-count query (see PR description)
+-- against staging + prod BEFORE applying. If non-zero, collapse manually
+-- first — otherwise the CREATE here errors at build time because the new
+-- constraint cannot be enforced against existing dupes.
+--
+-- Recovery if build fails mid-flight: Postgres leaves indisvalid=false;
+-- planner ignores. Clean up:
+--   DROP INDEX CONCURRENTLY IF EXISTS "MarketplaceFavorite_uniq_nullsnotdistinct";
+-- Then re-run the migration.
+
+CREATE UNIQUE INDEX CONCURRENTLY "MarketplaceFavorite_uniq_nullsnotdistinct"
+  ON "MarketplaceFavorite" ("userId", "listingId", "serviceType")
+  NULLS NOT DISTINCT;
