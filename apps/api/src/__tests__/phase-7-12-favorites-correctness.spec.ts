@@ -199,7 +199,7 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       expect(migSql).toMatch(/NULLS NOT DISTINCT/)
     })
 
-    it("schema.prisma MarketplaceFavorite model NOTE documents both indexes", () => {
+    it("schema.prisma MarketplaceFavorite model NOTE documents the post-7.13.2B canonical-name + NULLS NOT DISTINCT state", () => {
       const fs = require("fs") as typeof import("fs")
       const path = require("path") as typeof import("path")
       const schema = fs.readFileSync(
@@ -209,9 +209,38 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       const modelIdx = schema.indexOf("model MarketplaceFavorite {")
       expect(modelIdx).toBeGreaterThan(-1)
       const modelBlock = schema.slice(modelIdx, modelIdx + 2000)
-      expect(modelBlock).toMatch(/MarketplaceFavorite_uniq_nullsnotdistinct/)
+      // Post-7.13.2B: NOTE mentions the canonical name (the new index was
+      // renamed to take over the original's _key name) + NULLS NOT DISTINCT
+      // + the Phase 7.13.2A/B migration history.
+      expect(modelBlock).toMatch(/MarketplaceFavorite_userId_listingId_serviceType_key/)
       expect(modelBlock).toMatch(/NULLS NOT DISTINCT/)
       expect(modelBlock).toMatch(/Phase 7\.13\.2[AB]/)
+    })
+
+    it("Phase 7.13.2B migrations exist — part-1 DROP + part-2 RENAME (split for prisma@7.8.0 single-statement requirement)", () => {
+      const fs = require("fs") as typeof import("fs")
+      const path = require("path") as typeof import("path")
+      const migrationsDir = path.join(__dirname, "..", "..", "..", "..", "packages", "database", "prisma", "migrations")
+      const part1Dirs = fs.readdirSync(migrationsDir).filter((d: string) =>
+        d.includes("phase7132b_part1_drop_marketplace_favorite_original_unique"),
+      )
+      const part2Dirs = fs.readdirSync(migrationsDir).filter((d: string) =>
+        d.includes("phase7132b_part2_rename_marketplace_favorite_new_unique_to_canonical"),
+      )
+      expect(part1Dirs.length).toBe(1)
+      expect(part2Dirs.length).toBe(1)
+
+      // Part-1: single DROP INDEX CONCURRENTLY IF EXISTS statement.
+      const dropSql = fs.readFileSync(path.join(migrationsDir, part1Dirs[0], "migration.sql"), "utf-8")
+      expect(dropSql).toMatch(/DROP INDEX CONCURRENTLY IF EXISTS "MarketplaceFavorite_userId_listingId_serviceType_key"/)
+
+      // Part-2: single ALTER INDEX RENAME statement targeting canonical name.
+      const renameSql = fs.readFileSync(path.join(migrationsDir, part2Dirs[0], "migration.sql"), "utf-8")
+      expect(renameSql).toMatch(/ALTER INDEX "MarketplaceFavorite_uniq_nullsnotdistinct"[\s\S]*RENAME TO "MarketplaceFavorite_userId_listingId_serviceType_key"/)
+
+      // Order check: part-1 timestamp prefix must lexicographically precede part-2's,
+      // so the runner applies DROP before RENAME (or part-2 errors on name conflict).
+      expect(part1Dirs[0] < part2Dirs[0]).toBe(true)
     })
   })
 
