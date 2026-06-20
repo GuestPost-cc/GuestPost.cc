@@ -1055,20 +1055,29 @@ export class MarketplaceService {
       }
     }
 
-    // Composite unique (userId, listingId, serviceType) handles dedup. For
-    // NULL serviceType the WhereUniqueInput cannot match (NULL ≠ NULL in
-    // SQL — Phase 7.12 Phase 0a confirmed the dev DB is NULLS DISTINCT),
-    // so emulate upsert with findFirst + conditional create for BOTH
-    // branches. Concurrent identical requests can race here and create
-    // duplicate NULL-serviceType rows; out of scope for #17, captured as
-    // a Phase 7.12.1 backlog item to harden later via the same partial-
-    // unique-index pattern #23 will introduce.
-    const existing = await this.prisma.marketplaceFavorite.findFirst({
-      where: { userId, listingId, serviceType },
-    })
-    const favorite = existing ?? await this.prisma.marketplaceFavorite.create({
-      data: { userId, listingId, serviceType },
-    })
+    // Phase 7.13.2A: race-proofed via the NULLS NOT DISTINCT unique
+    // (MarketplaceFavorite_uniq_nullsnotdistinct). Try the create; if
+    // a concurrent request beat us to the same (userId, listingId,
+    // serviceType) row, the DB rejects with P2002 — we re-fetch the
+    // winning row and return it (Plan B; Gate 0.5 ruled out Plan A
+    // because Prisma 7's WhereUniqueInput validator rejects `null`
+    // for nullable composite-key parts before any SQL is emitted).
+    let favorite
+    try {
+      favorite = await this.prisma.marketplaceFavorite.create({
+        data: { userId, listingId, serviceType },
+      })
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        const existing = await this.prisma.marketplaceFavorite.findFirst({
+          where: { userId, listingId, serviceType },
+        })
+        if (!existing) throw e
+        favorite = existing
+      } else {
+        throw e
+      }
+    }
 
     // Track click
     await this.prisma.marketplaceListingClick.create({
