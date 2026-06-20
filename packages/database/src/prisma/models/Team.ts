@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -158,7 +158,7 @@ export type TeamGroupByOutputType = {
   _max: TeamMaxAggregateOutputType | null
 }
 
-type GetTeamGroupByPayload<T extends TeamGroupByArgs> = Prisma.PrismaPromise<
+export type GetTeamGroupByPayload<T extends TeamGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<TeamGroupByOutputType, T['by']> &
       {
@@ -1122,6 +1122,11 @@ export type TeamFindManyArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
    * Skip the first `n` Teams.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of Teams.
+   */
   distinct?: Prisma.TeamScalarFieldEnum | Prisma.TeamScalarFieldEnum[]
 }
 

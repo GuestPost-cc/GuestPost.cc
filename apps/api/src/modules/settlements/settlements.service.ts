@@ -4,7 +4,7 @@ import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { QUEUES, evaluateSettlementEligibility, checkSeparationOfDuties, orderEventMetadata, getSettlementReviewDays, type PublisherTier } from "@guestpost/shared"
 import { assertOwnerOrCreator } from "../orders/services/owner-or-creator"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 import { resolvePlatformFeeFraction, splitPlatformFee } from "../../common/platform-fee"
 
 @Injectable()

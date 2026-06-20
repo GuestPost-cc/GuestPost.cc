@@ -5,19 +5,22 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "prisma generate && tsc && mkdir -p dist/prisma && cp src/prisma/*.node dist/prisma/",
+    "build": "prisma generate && tsc",
     "dev": "tsc --watch",
-    "db:generate": "prisma generate && mkdir -p dist/prisma && cp src/prisma/*.node dist/prisma/ 2>/dev/null || true",
+    "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio"
   },
   "dependencies": {
-    "@prisma/client": "^6.0.0"
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
-    "prisma": "^6.0.0",
+    "prisma": "^7.8.0",
     "typescript": "^5.7.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.16.0"
   }
 }

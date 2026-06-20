@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -151,7 +151,7 @@ export type ActiveContextGroupByOutputType = {
   _max: ActiveContextMaxAggregateOutputType | null
 }
 
-type GetActiveContextGroupByPayload<T extends ActiveContextGroupByArgs> = Prisma.PrismaPromise<
+export type GetActiveContextGroupByPayload<T extends ActiveContextGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ActiveContextGroupByOutputType, T['by']> &
       {
@@ -1288,6 +1288,11 @@ export type ActiveContextFindManyArgs<ExtArgs extends runtime.Types.Extensions.I
    * Skip the first `n` ActiveContexts.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of ActiveContexts.
+   */
   distinct?: Prisma.ActiveContextScalarFieldEnum | Prisma.ActiveContextScalarFieldEnum[]
 }
 

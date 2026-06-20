@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -179,7 +179,7 @@ export type ContentOrderGroupByOutputType = {
   _max: ContentOrderMaxAggregateOutputType | null
 }
 
-type GetContentOrderGroupByPayload<T extends ContentOrderGroupByArgs> = Prisma.PrismaPromise<
+export type GetContentOrderGroupByPayload<T extends ContentOrderGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<ContentOrderGroupByOutputType, T['by']> &
       {
@@ -1172,6 +1172,11 @@ export type ContentOrderFindManyArgs<ExtArgs extends runtime.Types.Extensions.In
    * Skip the first `n` ContentOrders.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of ContentOrders.
+   */
   distinct?: Prisma.ContentOrderScalarFieldEnum | Prisma.ContentOrderScalarFieldEnum[]
 }
 

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -209,7 +209,7 @@ export type MarketplaceRecommendationGroupByOutputType = {
   _max: MarketplaceRecommendationMaxAggregateOutputType | null
 }
 
-type GetMarketplaceRecommendationGroupByPayload<T extends MarketplaceRecommendationGroupByArgs> = Prisma.PrismaPromise<
+export type GetMarketplaceRecommendationGroupByPayload<T extends MarketplaceRecommendationGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<MarketplaceRecommendationGroupByOutputType, T['by']> &
       {
@@ -1084,6 +1084,11 @@ export type MarketplaceRecommendationFindManyArgs<ExtArgs extends runtime.Types.
    * Skip the first `n` MarketplaceRecommendations.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of MarketplaceRecommendations.
+   */
   distinct?: Prisma.MarketplaceRecommendationScalarFieldEnum | Prisma.MarketplaceRecommendationScalarFieldEnum[]
 }
 

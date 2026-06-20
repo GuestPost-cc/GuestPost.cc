@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -227,7 +227,7 @@ export type FulfillmentAssignmentGroupByOutputType = {
   _max: FulfillmentAssignmentMaxAggregateOutputType | null
 }
 
-type GetFulfillmentAssignmentGroupByPayload<T extends FulfillmentAssignmentGroupByArgs> = Prisma.PrismaPromise<
+export type GetFulfillmentAssignmentGroupByPayload<T extends FulfillmentAssignmentGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<FulfillmentAssignmentGroupByOutputType, T['by']> &
       {
@@ -1345,6 +1345,11 @@ export type FulfillmentAssignmentFindManyArgs<ExtArgs extends runtime.Types.Exte
    * Skip the first `n` FulfillmentAssignments.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of FulfillmentAssignments.
+   */
   distinct?: Prisma.FulfillmentAssignmentScalarFieldEnum | Prisma.FulfillmentAssignmentScalarFieldEnum[]
 }
 

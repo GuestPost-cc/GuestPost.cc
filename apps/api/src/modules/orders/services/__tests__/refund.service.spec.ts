@@ -1,6 +1,6 @@
 import { BadRequestException } from "@nestjs/common"
 import { RefundService } from "../refund.service"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 
 describe("RefundService", () => {
   let service: RefundService

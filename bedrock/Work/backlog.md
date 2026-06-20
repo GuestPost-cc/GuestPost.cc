@@ -1,7 +1,7 @@
 ---
 note_type: backlog
 project: guestpost-platform
-updated: 2026-06-16
+updated: 2026-06-20
 ---
 
 # Backlog
@@ -16,7 +16,19 @@ Forward roadmap after the Phases 6.6 → 7.7 audit batch. Canonical source for p
 
 - [x] **Phase 7.7.x — complete structured-logger sweep.** ✅ DONE 2026-06-16 (commit `5af902c` on PR #1). All 8 worker files swept (85 callsites → logger.*); 4 stale `.js`/`.map` build artifacts removed; allowlist trimmed to forever-allowed entries only (`apps/api/src/main.ts` boot fallback + 3 browser `auth.tsx`).
 - [x] **Phase 7.7.y — fix 3 pre-existing failing test specs** ✅ DONE 2026-06-16 (PR #4 merged, 3 commits `aa8cd55` + `74c8d51` + `b670493`). All 3 specs' mocks updated to match Phase 6.x production behavior; `testPathIgnorePatterns` back at jest default; apps/api jest now 33 suites / 478 tests with zero skips. No production code changed.
-- [ ] **Phase 7.3.1 — `(status, reviewEndsAt)` index on Settlement.** Tiny migration. The Phase 7.3 auto-approve worker sweep hits this access pattern every 15m. **Blocked on Prisma 6.19.3 → 7.4+ upgrade** (Prisma 6 wraps migrations in a transaction; `CREATE INDEX CONCURRENTLY` rejects with `cannot run inside a transaction block` per prisma#14456, fixed in 7.4). Out of scope until Prisma is upgraded.
+- [ ] **Phase 7.13.1 — `Settlement(status, reviewEndsAt)` composite index** via `CREATE INDEX CONCURRENTLY`. Tiny migration. Phase 7.3 auto-approve worker sweep hits this every 15m. **Unblocked by Phase 7.13** (Prisma 7 landed 2026-06-20). Next-up: simplest possible use of the new directive, pure read-path optimization with no app-layer change — surfaces any 7.x CONCURRENTLY behavior surprises on a low-stakes change.
+- [ ] **Phase 7.13.2 — `MarketplaceFavorite(userId, listingId, serviceType)` partial unique index** via `CREATE INDEX CONCURRENTLY`. Closes the Phase 7.12.1 `addFavorite` TOCTOU race. Index addition + simplifies code (deletes the existing `findFirst + create` emulation in `marketplace.service.ts`). **Unblocked by Phase 7.13.**
+- [ ] **Phase 7.14 — #23 fulfillment claim race fix.** Partial unique index on `FulfillmentAssignment(orderId)` WHERE status IN (ASSIGNED, IN_PROGRESS) via `CREATE INDEX CONCURRENTLY`, AND app-layer change at `order-fulfillment-assignment.service.ts:50-72` (constraint-enforced upsert + P2002 handling + user-facing error). **Unblocked by Phase 7.13**; highest business impact; lands LAST in the sequence after 7.13.1 + 7.13.2 prove the new directive works in production.
+
+## Phase 7.13 — Prisma 6.19.3 → 7.8.0 + driver-adapter migration ✅ DONE
+
+- [x] **Bump prisma + @prisma/client 6.19.3 → 7.8.0; add @prisma/adapter-pg + pg + @types/pg** ✅ DONE 2026-06-20 (commit `2ca6f70`). Touched both PrismaClient instantiation sites: `packages/database/src/index.ts` singleton + `apps/api/src/common/prisma.service.ts` NestJS service. Pool tuning (`max: 25`, `idleTimeoutMillis: 20_000`) moves from `?connection_limit=25&pool_timeout=20` URL params into the `PrismaPg(PoolConfig)` form. `buildDatasourceUrl` helper deleted. Removed `url = env("DATABASE_URL")` from `schema.prisma` + `engine: "classic"` from `prisma.config.ts` + `cp src/prisma/*.node` from `db:build` (no native binary under WASM Query Compiler). 74 files / +1152 −383.
+- [x] **Rename Decimal import path: runtime/library → runtime/client** ✅ DONE 2026-06-20 (commit `5d6f49b`). Mechanical sweep across 15 apps/api files (4 production services + 11 specs). Single-pattern sed, 15/+15/-15.
+- [x] **Worker `$disconnect` on graceful shutdown** ✅ DONE 2026-06-20 (commit `73b88cd`). Pre-existing gap surfaced + made load-bearing by the adapter migration — `apps/worker/src/index.ts:263-279` shutdown never released PrismaClient connections (fine under classic Rust engine, leaks under node-pg Pool). Slotted between health-server close and Sentry.flush. 1 file / +5 lines.
+- [ ] **Phase 7.13.x follow-up — `createPrismaClient()` unification helper.** Both PrismaClient sites currently duplicate the adapter wiring (~3 lines each). Right long-term shape; deferred from this PR to avoid scope creep on a sensitive upgrade. Will land as a small follow-up once Prisma 7 is proven stable in production.
+- [ ] **Schema-drift cleanup follow-up — orphaned `EscrowStatus` enum.** Phase 0 v2 pg_dump diff vs fresh-DB snapshot surfaced 151 lines of pre-existing drift: an `EscrowStatus` enum lives in the live dev DB but no current migration creates it (left over from `migrations_archive/`). Separate concern; not a Phase 7.13 blocker. Should land as a `DROP TYPE IF EXISTS "EscrowStatus" CASCADE` migration or as part of a broader `migrations_archive/` review.
+
+Mission: Foundational dep upgrade / unlocks the audit's named "most valuable uncompleted roadmap item" / enables 7.13.1 + 7.13.2 + 7.14 fast-follows via `CREATE INDEX CONCURRENTLY` (prisma#14456).
 
 ## Phase 7.8 — Security Hardening Batch (per 2026-06-16 roadmap) ✅ DONE
 

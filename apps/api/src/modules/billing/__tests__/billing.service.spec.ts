@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, ForbiddenException } from "@nestjs/common"
 import { BillingService } from "../billing.service"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 
 describe("BillingService", () => {
   let service: BillingService

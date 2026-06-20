@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -182,7 +182,7 @@ export type MarketplaceListingClickGroupByOutputType = {
   _max: MarketplaceListingClickMaxAggregateOutputType | null
 }
 
-type GetMarketplaceListingClickGroupByPayload<T extends MarketplaceListingClickGroupByArgs> = Prisma.PrismaPromise<
+export type GetMarketplaceListingClickGroupByPayload<T extends MarketplaceListingClickGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<MarketplaceListingClickGroupByOutputType, T['by']> &
       {
@@ -1256,6 +1256,11 @@ export type MarketplaceListingClickFindManyArgs<ExtArgs extends runtime.Types.Ex
    * Skip the first `n` MarketplaceListingClicks.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of MarketplaceListingClicks.
+   */
   distinct?: Prisma.MarketplaceListingClickScalarFieldEnum | Prisma.MarketplaceListingClickScalarFieldEnum[]
 }
 

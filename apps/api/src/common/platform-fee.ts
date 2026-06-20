@@ -1,4 +1,4 @@
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 
 // Splits a gross amount into platform fee and net using exact Decimal math.
 // Fee is rounded to cents; net is gross MINUS fee (never a second

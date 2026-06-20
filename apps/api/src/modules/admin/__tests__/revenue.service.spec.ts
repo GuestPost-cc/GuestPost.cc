@@ -5,7 +5,7 @@
 // PlatformRevenue — Phase 0 finding), previous-period math, zero-denominator
 // handling, Decimal precision.
 
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 import { RevenueService } from "../finance/revenue.service"
 
 type AnyMock = jest.Mock

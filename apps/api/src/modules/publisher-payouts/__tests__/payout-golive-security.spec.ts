@@ -4,7 +4,7 @@ import { PayoutWebhookController } from "../payout-webhook.controller"
 import { WisePayoutAdapter, idempotencyKeyToUuid } from "../providers/wise-payout.adapter"
 import { StripeConnectPayoutAdapter } from "../providers/stripe-connect-payout.adapter"
 import { PayoutExecutionService } from "../payout-execution.service"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 
 const ORIGINAL_ENV = { ...process.env }
 

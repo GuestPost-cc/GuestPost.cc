@@ -271,6 +271,11 @@ async function shutdown(signal: string): Promise<void> {
     )
   }
   try {
+    await prisma.$disconnect()
+  } catch (err) {
+    logger.error("prisma $disconnect error", { err: err instanceof Error ? err.message : String(err) })
+  }
+  try {
     await Sentry.flush(2000)
   } catch {
     /* best-effort */

@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
 import { OrderPaymentService } from "../order-payment.service"
-import { Decimal } from "@prisma/client/runtime/library"
+import { Decimal } from "@prisma/client/runtime/client"
 
 describe("OrderPaymentService", () => {
   let service: OrderPaymentService

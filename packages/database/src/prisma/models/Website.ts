@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -361,7 +361,7 @@ export type WebsiteGroupByOutputType = {
   _max: WebsiteMaxAggregateOutputType | null
 }
 
-type GetWebsiteGroupByPayload<T extends WebsiteGroupByArgs> = Prisma.PrismaPromise<
+export type GetWebsiteGroupByPayload<T extends WebsiteGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<WebsiteGroupByOutputType, T['by']> &
       {
@@ -2872,6 +2872,11 @@ export type WebsiteFindManyArgs<ExtArgs extends runtime.Types.Extensions.Interna
    * Skip the first `n` Websites.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of Websites.
+   */
   distinct?: Prisma.WebsiteScalarFieldEnum | Prisma.WebsiteScalarFieldEnum[]
 }
 

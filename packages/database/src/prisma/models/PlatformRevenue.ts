@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -260,7 +260,7 @@ export type PlatformRevenueGroupByOutputType = {
   _max: PlatformRevenueMaxAggregateOutputType | null
 }
 
-type GetPlatformRevenueGroupByPayload<T extends PlatformRevenueGroupByArgs> = Prisma.PrismaPromise<
+export type GetPlatformRevenueGroupByPayload<T extends PlatformRevenueGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<PlatformRevenueGroupByOutputType, T['by']> &
       {
@@ -1587,6 +1587,11 @@ export type PlatformRevenueFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` PlatformRevenues.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of PlatformRevenues.
+   */
   distinct?: Prisma.PlatformRevenueScalarFieldEnum | Prisma.PlatformRevenueScalarFieldEnum[]
 }
 

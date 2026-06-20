@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -175,7 +175,7 @@ export type MarketplaceFlagGroupByOutputType = {
   _max: MarketplaceFlagMaxAggregateOutputType | null
 }
 
-type GetMarketplaceFlagGroupByPayload<T extends MarketplaceFlagGroupByArgs> = Prisma.PrismaPromise<
+export type GetMarketplaceFlagGroupByPayload<T extends MarketplaceFlagGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<MarketplaceFlagGroupByOutputType, T['by']> &
       {
@@ -1032,6 +1032,11 @@ export type MarketplaceFlagFindManyArgs<ExtArgs extends runtime.Types.Extensions
    * Skip the first `n` MarketplaceFlags.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of MarketplaceFlags.
+   */
   distinct?: Prisma.MarketplaceFlagScalarFieldEnum | Prisma.MarketplaceFlagScalarFieldEnum[]
 }
 

@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -161,7 +161,7 @@ export type DeliverySnapshotGroupByOutputType = {
   _max: DeliverySnapshotMaxAggregateOutputType | null
 }
 
-type GetDeliverySnapshotGroupByPayload<T extends DeliverySnapshotGroupByArgs> = Prisma.PrismaPromise<
+export type GetDeliverySnapshotGroupByPayload<T extends DeliverySnapshotGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DeliverySnapshotGroupByOutputType, T['by']> &
       {
@@ -1151,6 +1151,11 @@ export type DeliverySnapshotFindManyArgs<ExtArgs extends runtime.Types.Extension
    * Skip the first `n` DeliverySnapshots.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of DeliverySnapshots.
+   */
   distinct?: Prisma.DeliverySnapshotScalarFieldEnum | Prisma.DeliverySnapshotScalarFieldEnum[]
 }
 

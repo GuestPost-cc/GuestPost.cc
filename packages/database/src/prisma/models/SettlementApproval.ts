@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -165,7 +165,7 @@ export type SettlementApprovalGroupByOutputType = {
   _max: SettlementApprovalMaxAggregateOutputType | null
 }
 
-type GetSettlementApprovalGroupByPayload<T extends SettlementApprovalGroupByArgs> = Prisma.PrismaPromise<
+export type GetSettlementApprovalGroupByPayload<T extends SettlementApprovalGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<SettlementApprovalGroupByOutputType, T['by']> &
       {
@@ -1167,6 +1167,11 @@ export type SettlementApprovalFindManyArgs<ExtArgs extends runtime.Types.Extensi
    * Skip the first `n` SettlementApprovals.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of SettlementApprovals.
+   */
   distinct?: Prisma.SettlementApprovalScalarFieldEnum | Prisma.SettlementApprovalScalarFieldEnum[]
 }
 
