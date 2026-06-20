@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -206,7 +206,7 @@ export type OrderReviewGroupByOutputType = {
   _max: OrderReviewMaxAggregateOutputType | null
 }
 
-type GetOrderReviewGroupByPayload<T extends OrderReviewGroupByArgs> = Prisma.PrismaPromise<
+export type GetOrderReviewGroupByPayload<T extends OrderReviewGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<OrderReviewGroupByOutputType, T['by']> &
       {
@@ -1335,6 +1335,11 @@ export type OrderReviewFindManyArgs<ExtArgs extends runtime.Types.Extensions.Int
    * Skip the first `n` OrderReviews.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of OrderReviews.
+   */
   distinct?: Prisma.OrderReviewScalarFieldEnum | Prisma.OrderReviewScalarFieldEnum[]
 }
 

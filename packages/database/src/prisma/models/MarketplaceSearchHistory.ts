@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -209,7 +209,7 @@ export type MarketplaceSearchHistoryGroupByOutputType = {
   _max: MarketplaceSearchHistoryMaxAggregateOutputType | null
 }
 
-type GetMarketplaceSearchHistoryGroupByPayload<T extends MarketplaceSearchHistoryGroupByArgs> = Prisma.PrismaPromise<
+export type GetMarketplaceSearchHistoryGroupByPayload<T extends MarketplaceSearchHistoryGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<MarketplaceSearchHistoryGroupByOutputType, T['by']> &
       {
@@ -1076,6 +1076,11 @@ export type MarketplaceSearchHistoryFindManyArgs<ExtArgs extends runtime.Types.E
    * Skip the first `n` MarketplaceSearchHistories.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of MarketplaceSearchHistories.
+   */
   distinct?: Prisma.MarketplaceSearchHistoryScalarFieldEnum | Prisma.MarketplaceSearchHistoryScalarFieldEnum[]
 }
 

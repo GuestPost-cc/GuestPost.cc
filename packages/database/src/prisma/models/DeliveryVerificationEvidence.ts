@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -265,7 +265,7 @@ export type DeliveryVerificationEvidenceGroupByOutputType = {
   _max: DeliveryVerificationEvidenceMaxAggregateOutputType | null
 }
 
-type GetDeliveryVerificationEvidenceGroupByPayload<T extends DeliveryVerificationEvidenceGroupByArgs> = Prisma.PrismaPromise<
+export type GetDeliveryVerificationEvidenceGroupByPayload<T extends DeliveryVerificationEvidenceGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<DeliveryVerificationEvidenceGroupByOutputType, T['by']> &
       {
@@ -1545,6 +1545,11 @@ export type DeliveryVerificationEvidenceFindManyArgs<ExtArgs extends runtime.Typ
    * Skip the first `n` DeliveryVerificationEvidences.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of DeliveryVerificationEvidences.
+   */
   distinct?: Prisma.DeliveryVerificationEvidenceScalarFieldEnum | Prisma.DeliveryVerificationEvidenceScalarFieldEnum[]
 }
 

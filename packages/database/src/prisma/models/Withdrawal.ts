@@ -8,7 +8,7 @@
  *
  * 🟢 You can import this file directly.
  */
-import type * as runtime from "@prisma/client/runtime/library"
+import type * as runtime from "@prisma/client/runtime/client"
 import type * as $Enums from "../enums"
 import type * as Prisma from "../internal/prismaNamespace"
 
@@ -259,7 +259,7 @@ export type WithdrawalGroupByOutputType = {
   _max: WithdrawalMaxAggregateOutputType | null
 }
 
-type GetWithdrawalGroupByPayload<T extends WithdrawalGroupByArgs> = Prisma.PrismaPromise<
+export type GetWithdrawalGroupByPayload<T extends WithdrawalGroupByArgs> = Prisma.PrismaPromise<
   Array<
     Prisma.PickEnumerable<WithdrawalGroupByOutputType, T['by']> &
       {
@@ -2180,6 +2180,11 @@ export type WithdrawalFindManyArgs<ExtArgs extends runtime.Types.Extensions.Inte
    * Skip the first `n` Withdrawals.
    */
   skip?: number
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+   * 
+   * Filter by unique combinations of Withdrawals.
+   */
   distinct?: Prisma.WithdrawalScalarFieldEnum | Prisma.WithdrawalScalarFieldEnum[]
 }
 
