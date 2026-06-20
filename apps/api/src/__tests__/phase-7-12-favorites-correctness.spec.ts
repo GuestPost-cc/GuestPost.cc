@@ -162,4 +162,74 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       )
     })
   })
+
+  // ─── Phase 7.13.2A: race-proofing via NULLS NOT DISTINCT unique ──────
+  // Static-source assertions verify the app-layer rewrite. The DB-level
+  // race-proofing is exercised separately in the runtime suite below.
+  describe("Phase 7.13.2A — addFavorite race-proofing", () => {
+    it("addFavorite uses try/create/catch (Plan B), not findFirst+create emulation", () => {
+      const startIdx = serviceSource.indexOf("async addFavorite(")
+      expect(startIdx).toBeGreaterThan(-1)
+      const block = serviceSource.slice(startIdx, startIdx + 2500)
+      // Plan B markers: try { create }, catch (P2002), findFirst-on-catch
+      expect(block).toMatch(/try\s*\{[\s\S]*?marketplaceFavorite\.create/)
+      expect(block).toMatch(/catch\s*\([^)]+\)\s*\{[\s\S]*?P2002/)
+      expect(block).toMatch(/marketplaceFavorite\.findFirst\(\{[\s\S]*?serviceType[\s\S]*?\}\)/)
+    })
+
+    it("addFavorite NO LONGER contains the pre-7.13.2A findFirst-then-create emulation pattern (regression guard)", () => {
+      const startIdx = serviceSource.indexOf("async addFavorite(")
+      const endIdx = serviceSource.indexOf("async removeFavorite(", startIdx)
+      expect(startIdx).toBeGreaterThan(-1)
+      expect(endIdx).toBeGreaterThan(startIdx)
+      const block = serviceSource.slice(startIdx, endIdx)
+      // The old emulation: `const existing = ... findFirst({where: { userId, listingId, serviceType }}); const favorite = existing ?? await ... create(...)`
+      // Regression guard: the `?? await this.prisma.marketplaceFavorite.create` literal must not reappear.
+      expect(block).not.toMatch(/existing\s*\?\?\s*await\s+this\.prisma\.marketplaceFavorite\.create/)
+    })
+
+    it("Phase 7.13.2A migration exists with NULLS NOT DISTINCT clause", () => {
+      const fs = require("fs") as typeof import("fs")
+      const path = require("path") as typeof import("path")
+      const migrationsDir = path.join(__dirname, "..", "..", "..", "..", "packages", "database", "prisma", "migrations")
+      const migDirs = fs.readdirSync(migrationsDir).filter((d: string) => d.includes("phase7132a_marketplace_favorite_new_unique_nulls_not_distinct"))
+      expect(migDirs.length).toBe(1)
+      const migSql = fs.readFileSync(path.join(migrationsDir, migDirs[0], "migration.sql"), "utf-8")
+      expect(migSql).toMatch(/CREATE UNIQUE INDEX CONCURRENTLY "MarketplaceFavorite_uniq_nullsnotdistinct"/)
+      expect(migSql).toMatch(/NULLS NOT DISTINCT/)
+    })
+
+    it("schema.prisma MarketplaceFavorite model NOTE documents both indexes", () => {
+      const fs = require("fs") as typeof import("fs")
+      const path = require("path") as typeof import("path")
+      const schema = fs.readFileSync(
+        path.join(__dirname, "..", "..", "..", "..", "packages", "database", "prisma", "schema.prisma"),
+        "utf-8",
+      )
+      const modelIdx = schema.indexOf("model MarketplaceFavorite {")
+      expect(modelIdx).toBeGreaterThan(-1)
+      const modelBlock = schema.slice(modelIdx, modelIdx + 2000)
+      expect(modelBlock).toMatch(/MarketplaceFavorite_uniq_nullsnotdistinct/)
+      expect(modelBlock).toMatch(/NULLS NOT DISTINCT/)
+      expect(modelBlock).toMatch(/Phase 7\.13\.2[AB]/)
+    })
+  })
+
+  // The 5-caller runtime stress test the Phase 7.13.2A plan called for
+  // ("Promise.all of 5 concurrent INSERTs, assert exactly 1 row + 4 P2002")
+  // is NOT shipped as a jest case — apps/api jest has no DATABASE_URL +
+  // no Nest+supertest harness today (Phase 7.10 spec header documents this
+  // convention; Phase 7.10.2 backlog item tracks the harness). Instead the
+  // race-proof guarantee is verified out-of-band at PR-review + deploy time:
+  //
+  //   1. The migration verification runs a manual duplicate-NULL-INSERT
+  //      sequence against a fresh DB via psql — proves the constraint
+  //      rejects the second INSERT with P2002 on
+  //      MarketplaceFavorite_uniq_nullsnotdistinct (see PR body).
+  //   2. The pg_indexes catalog check confirms indnullsnotdistinct=t.
+  //   3. The static-source assertions above confirm addFavorite's catch
+  //      path handles the P2002 (re-fetch + return existing).
+  //
+  // Once the Phase 7.10.2 harness lands, a `Promise.all of 5 creates`
+  // jest case becomes trivial to add as a follow-up.
 })

@@ -913,6 +913,41 @@ _(none — Phase 7.13 landed the Prisma 6→7 upgrade 2026-06-20, unblocking Pha
 
 ---
 
+### 2026-06-20 — Phase 7.13.2A: MarketplaceFavorite gains NULLS NOT DISTINCT companion unique (closes Phase 7.12.1 TOCTOU race; 7.13.2B drops original next)
+
+**Closes the Phase 7.12.1 TOCTOU race at the DB level.** The pre-7.13.2A `addFavorite` `findFirst + create` emulation had a window where two concurrent `addFavorite(user, listing, null)` calls could both pass the findFirst check and both insert, producing duplicate NULL-serviceType rows (Postgres default: NULLS DISTINCT means two NULLs don't conflict). Phase 7.13.2A installs a SECOND unique index over the same columns with `NULLS NOT DISTINCT` semantics, alongside the existing one. The new index catches the race; the app code now relies on the constraint via try/create/catch/findFirst (Plan B).
+
+**Branch**: `phase-7.13.2a-marketplace-favorite-new-unique-nullsnotdistinct` — 3 commits, single PR. Merge gated on Phase 7.13's + Phase 7.13.1's staging soaks both clean (work-ahead-then-hold pattern; PR queued).
+
+**This is 7.13.2A — half of Phase 7.13.2.** 7.13.2B (separate PR + soak after 7.13.2A) drops the original NULLS DISTINCT index via `DROP INDEX CONCURRENTLY` (verified via pg_constraint inspection that the original is a stand-alone INDEX, not a CONSTRAINT — so DROP INDEX is online + no ACCESS EXCLUSIVE lock needed) + renames the new one to canonical. Race is structurally fixed as of 7.13.2A; 7.13.2B is metadata cleanup only.
+
+| # | Title | What landed |
+|---|---|---|
+| **Commit 1** | `feat(database): add NULLS NOT DISTINCT unique on MarketplaceFavorite` | Single `CREATE UNIQUE INDEX CONCURRENTLY "MarketplaceFavorite_uniq_nullsnotdistinct" ON "MarketplaceFavorite" ("userId", "listingId", "serviceType") NULLS NOT DISTINCT;` migration. NO drop, NO rename. schema.prisma NOTE on MarketplaceFavorite extended to document both indexes between 7.13.2A and 7.13.2B + Phase reference. Prisma's drift detection treats NULLS-distinctness as transparent — schema declaration's `@@unique` stays in sync. |
+| **Commit 2** | `fix(marketplace): rely on DB constraint for addFavorite dedup (Plan B)` | Replaces `findFirst + create` at marketplace.service.ts:1066-1071 with try/create/catch/findFirst (Plan B). Gate 0.5 ruled out Plan A (`upsert`) because Prisma 7's `WhereUniqueInput` validator rejects `null` for nullable composite-key parts BEFORE emitting any SQL — exact error `Argument 'serviceType' must not be null. clientVersion: '7.8.0'`. Plan B works regardless of Prisma's emitted SQL; the DB constraint is the source of truth. Multi-paragraph TOCTOU comment removed. |
+| **Commit 3** | `test(marketplace): cover addFavorite race-proofing (Phase 7.13.2A)` | 4 new static-source assertions on phase-7-12-favorites-correctness.spec.ts (15→19 cases): try/create/catch pattern present, pre-7.13.2A `existing ?? create` regression guard, migration file shape, schema NOTE shape. Runtime 5-caller stress NOT shipped (apps/api jest has no DATABASE_URL/Nest+supertest — Phase 7.10.2 backlog item). Race-proof verified out-of-band via the migration's manual duplicate-NULL-INSERT test + pg_indexes `indnullsnotdistinct=t` check. |
+
+**Gate 0 (re-used from 7.13.1)**: Prisma 7.4+ doesn't wrap migrations in a transaction by default — already verified via [ARCHITECTURE.md](https://github.com/prisma/prisma-engines/blob/main/schema-engine/ARCHITECTURE.md#why-does-migrate-not-run-migrations-in-a-transaction-by-default) + [prisma#14456 maintainer confirmation](https://github.com/prisma/prisma/issues/14456#issuecomment-3889774509).
+
+**Gate 0.5 (this phase's binary upsert+NULL probe)**: spun up `prisma7132_probe` DB, manually applied NULLS NOT DISTINCT via `DROP INDEX` + `CREATE UNIQUE INDEX ... NULLS NOT DISTINCT` (also confirmed the original index is NOT a CONSTRAINT — useful for Phase 7.13.2B). Ran tsx probe with three binary checks. **check1 sequential same-id: FAIL** — Prisma rejected `serviceType: null` in WhereUniqueInput before SQL emit. Binary decision: **Plan B** (try/create/catch/findFirst). Probe DB dropped.
+
+**Verification (all green)**:
+- Migration replay on fresh `prisma7132a_verify` DB: 21/21 applied (was 20; will be 22/22 once 7.13.1 also merges per the merge-gate sequence)
+- BOTH indexes present + verified on `MarketplaceFavorite`:
+  - `MarketplaceFavorite_userId_listingId_serviceType_key` — uniq=t, valid=t, **nulls_not_distinct=f** (original, untouched)
+  - `MarketplaceFavorite_uniq_nullsnotdistinct` — uniq=t, valid=t, **nulls_not_distinct=t** (new)
+- Manual duplicate-NULL-INSERT against fresh DB: third insert errors with `duplicate key value violates unique constraint "MarketplaceFavorite_uniq_nullsnotdistinct"` — proves the new constraint catches NULL dupes as designed
+- apps/api jest: phase-7-12-favorites-correctness.spec.ts goes 15 → 19 cases, all green; total suite baseline 45 (unchanged suite count)
+- Workspace typecheck + lint + pnpm build: unchanged baseline
+
+**Operator pre-flight (PR body)**: single-number COUNT(*) NULL-dupe-groups query against dev/staging/prod before deploy — must return `dupe_groups | 0`. If non-zero, collapse via `ROW_NUMBER() OVER PARTITION BY ... HAVING rn > 1 DELETE` query (also in PR body) FIRST, then re-check.
+
+**Notable findings for future work**:
+- Pre-flight confirmed the original is a stand-alone INDEX (no `pg_constraint` row with `contype='u'` for the name), so 7.13.2B can use `DROP INDEX CONCURRENTLY` — fully online, no ACCESS EXCLUSIVE lock. Operator cross-env check (dev/staging/prod) still required before 7.13.2B's plan is written; documented in Phase 7.13.2A plan file.
+- Prisma 7 `upsert` is not usable for composite keys with nullable parts (runtime validator rejects `null`). Pattern is broader than this one model — flag for future Phase 7.x considerations whenever a similar nullable-composite emerges.
+
+---
+
 ### 2026-06-20 — Phase 7.13.1: Settlement(status, reviewEndsAt) composite index — first production use of CREATE INDEX CONCURRENTLY under Prisma 7
 
 **First production exercise of Prisma 7's non-transactional migration model.** Phase 7.13 (merged earlier today) landed the 6→7 upgrade itself; this PR is the simplest possible use of the new capability — a pure read-path optimization with no app-layer change.
