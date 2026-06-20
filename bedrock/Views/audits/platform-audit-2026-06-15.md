@@ -948,6 +948,44 @@ _(none — Phase 7.13 landed the Prisma 6→7 upgrade 2026-06-20, unblocking Pha
 
 ---
 
+### 2026-06-20 — Phase 7.13.1: Settlement(status, reviewEndsAt) composite index — first production use of CREATE INDEX CONCURRENTLY under Prisma 7
+
+**First production exercise of Prisma 7's non-transactional migration model.** Phase 7.13 (merged earlier today) landed the 6→7 upgrade itself; this PR is the simplest possible use of the new capability — a pure read-path optimization with no app-layer change.
+
+**Branch**: `phase-7.13.1-settlement-status-reviewendsat-index` — 2 commits, single PR. Audit dashboard unchanged at 30/31 (#23 still pending Phase 7.14). **Merge gated on Phase 7.13's 24h staging soak signal coming back clean** (work-ahead-then-hold per user direction; PR queued, merge waits).
+
+**The index**:
+```sql
+CREATE INDEX CONCURRENTLY "Settlement_status_reviewEndsAt_idx"
+  ON "Settlement"(status, "reviewEndsAt");
+```
+
+Targets the auto-approve worker sweep at `packages/shared/src/settlement-auto-approve-core.ts` which runs every 15 minutes with `WHERE status IN ('PENDING','UNDER_REVIEW') AND reviewEndsAt <= now()`. Single-column `Settlement_status_idx` (kept in place) forced the planner to index-scan by status then row-filter `reviewEndsAt`; the composite enables a single index-range-scan combining both predicates.
+
+**Gate 0 (resolved from upstream docs)**: Prisma 7.4+ does NOT wrap migrations in a transaction by default — verified against [`prisma-engines/blob/main/schema-engine/ARCHITECTURE.md`](https://github.com/prisma/prisma-engines/blob/main/schema-engine/ARCHITECTURE.md#why-does-migrate-not-run-migrations-in-a-transaction-by-default) ("If we do not wrap in a transaction by default, users have the option to add a BEGIN; and a COMMIT; to the migrations they want wrapped in a transaction") + maintainer confirmation in [prisma#14456 (2026-02-12)](https://github.com/prisma/prisma/issues/14456#issuecomment-3889774509) ("This has been fixed in Prisma 7.4.0"). **No directive comment needed at the top of the migration file.**
+
+**Gate 0.5 (empirical confirmation on installed prisma@7.8.0)**: throwaway probe migration with single `CREATE INDEX CONCURRENTLY` deployed cleanly against `prisma7131_tx_probe` DB; probe index showed `indisvalid = t`. Confirms the documented behavior holds on the actual installed patch release; eliminates the last assumption before shipping production schema migration. Probe migration + DB both cleaned up after verification.
+
+**Verification (all green)**:
+- Migration replay on fresh `prisma7131_verify` DB: 21/21 applied (was 20)
+- `indisvalid = t` on `Settlement_status_reviewEndsAt_idx` (Postgres considers it usable)
+- `pg_indexes.indexdef` matches design verbatim: `CREATE INDEX "Settlement_status_reviewEndsAt_idx" ON public."Settlement" USING btree (status, "reviewEndsAt")`
+- ANALYZE Settlement + EXPLAIN ANALYZE on dev DB: planner chose **Seq Scan at 60 rows** (correct cost-based decision at trivial volume; the composite engages at prod scale where Settlement is >>10k rows — `Settlement_status_idx` was already chosen identically in pre-7.13.1 plans). Plan node:
+  ```
+  Seq Scan on "Settlement"  (cost=0.00..3.05 rows=1 width=64) (actual time=0.012..0.012 rows=0 loops=1)
+    Filter: ((status = ANY ('{PENDING,UNDER_REVIEW}'::"SettlementStatus"[])) AND ("reviewEndsAt" <= now()))
+    Rows Removed by Filter: 60
+  ```
+- Workspace typecheck + lint + apps/api jest (45/634) + pnpm build (11/11) all unchanged baseline — index is transparent to consumers
+
+**Schema NOTE comment extension**: `schema.prisma`'s Settlement model NOTE now documents both raw-SQL-only indexes (the existing `Settlement_orderId_active_key` partial unique + the new `Settlement_status_reviewEndsAt_idx` composite). Pattern matches the existing precedent.
+
+**Operator follow-up after prod deploy**: trigger ANALYZE Settlement on prod (auto-runs on PG anyway) + EXPLAIN ANALYZE the actual sweep query — paste plan node into this entry. Once Settlement crosses ~10k rows, the planner is expected to switch from Seq Scan to Index Scan using `Settlement_status_reviewEndsAt_idx`. Pre-prod row count and post-deploy plan node both belong in the closure follow-up.
+
+**Single-column `Settlement_status_idx` fate**: now technically redundant (composite's leading column covers WHERE status = X queries) but left in place this PR for safety. Drop in a future cleanup if EXPLAIN ANALYZE on prod confirms nothing exclusively uses it.
+
+---
+
 ### 2026-06-20 — Phase 7.13: Prisma 6.19.3 → 7.8.0 with driver-adapter migration (unblocks 7.13.1 / 7.13.2 / 7.14)
 
 **Foundational dep upgrade.** Audit line 890 had named this work the "most valuable uncompleted roadmap item": Prisma 6's transaction wrapper rejects `CREATE INDEX CONCURRENTLY` ([prisma#14456](https://github.com/prisma/prisma/issues/14456), fixed in 7.4). The upgrade gates three queued items — Phase 7.3.1 Settlement composite index, Phase 7.12.1 favorites partial unique, and #23 fulfillment claim race. Now unblocked.

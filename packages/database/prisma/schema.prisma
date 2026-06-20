@@ -713,9 +713,13 @@ model Settlement {
   transactions   Transaction[]
   listingService ListingService?      @relation(fields: [listingServiceId], references: [id])
 
-  // NOTE: a partial unique index "Settlement_orderId_active_key" on (orderId)
-  // WHERE status != 'CANCELLED' exists via raw SQL migration — Prisma cannot
-  // express partial indexes. Do not remove it when regenerating migrations.
+  // NOTE: two indexes live in raw SQL migrations because Prisma can't
+  // express them in @@index:
+  //   - Settlement_orderId_active_key — partial UNIQUE on (orderId)
+  //     WHERE status != 'CANCELLED' (Phase 6.x)
+  //   - Settlement_status_reviewEndsAt_idx — composite on
+  //     (status, reviewEndsAt) via CREATE INDEX CONCURRENTLY (Phase 7.13.1)
+  // Do not remove either when regenerating migrations.
   @@index([orderId])
   @@index([publisherId, status])
   @@index([status])
