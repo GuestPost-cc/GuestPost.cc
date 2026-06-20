@@ -913,6 +913,53 @@ _(none — Phase 7.13 landed the Prisma 6→7 upgrade 2026-06-20, unblocking Pha
 
 ---
 
+### 2026-06-20 — Phase 7.13.2B: closes the Phase 7.13.2 umbrella (DROP original + RENAME new to canonical)
+
+**Metadata-only cleanup of Phase 7.13.2A's intermediate two-indexes state.** Two single-statement migrations (Gate 0.5B-required split — see "Plan deviation" below):
+- **part-1** (`DROP INDEX CONCURRENTLY IF EXISTS "MarketplaceFavorite_userId_listingId_serviceType_key"`) — removes the original NULLS-DISTINCT index, fully online with no ACCESS EXCLUSIVE lock (Gate 0 confirmed the original is a stand-alone INDEX, not a CONSTRAINT)
+- **part-2** (`ALTER INDEX "MarketplaceFavorite_uniq_nullsnotdistinct" RENAME TO "MarketplaceFavorite_userId_listingId_serviceType_key"`) — metadata-only rename of the 7.13.2A NULLS-NOT-DISTINCT index to the canonical Prisma name
+
+After 7.13.2B the live DB has ONE unique index over `(userId, listingId, serviceType)` named canonically with NULLS NOT DISTINCT semantics — clean steady state. **Phase 7.13.2 umbrella CLOSED.**
+
+**Branch**: `phase-7.13.2b-marketplace-favorite-drop-old-unique-and-rename-new` — 3 commits, single PR. Merge gated on Phase 7.13.2A's 24h staging soak signal coming back clean.
+
+**Plan deviation: split into two migrations instead of one.** The approved plan called for a single migration with DROP + RENAME in the same file. Gate 0.5B (empirical probe against installed `prisma@7.8.0`) surfaced that the migrate runner wraps MULTI-statement migration files in a transaction, which causes `DROP INDEX CONCURRENTLY` to error with:
+
+```
+ERROR: DROP INDEX CONCURRENTLY cannot run inside a transaction block
+```
+
+A SINGLE-statement migration file is NOT wrapped (verified by Phase 7.13.1 + 7.13.2A which both shipped single-statement `CREATE INDEX CONCURRENTLY` successfully). The plan's fallback rule pre-anticipated this exact outcome: "If Gate 0.5B fails — STOP and split the 7.13.2B migration into TWO sequential migrations." Executed accordingly.
+
+**Pattern-broadening finding for future Phase 7.x**: any migration that combines `* CONCURRENTLY` with another statement must be split into separate single-statement files. The architecture.md says "migrations are not transaction-wrapped by default" but **multi-statement files are an exception** — the runner appears to batch them in a transaction even though single-statement files are not. Worth flagging in any future plan involving CONCURRENTLY DDL.
+
+| # | Title | What landed |
+|---|---|---|
+| **Commit 1** | `feat(database): drop original MarketplaceFavorite unique + rename new to canonical` | Two single-statement migrations (split per Gate 0.5B) — part-1 DROP, part-2 RENAME. schema.prisma NOTE on MarketplaceFavorite reduced from the 7.13.2A "two indexes coexisting" wording to single-canonical-index post-7.13.2B steady-state wording. |
+| **Commit 2** | `test(marketplace): update 7.13.2A spec assertions for post-7.13.2B canonical name` | 2 existing schema-NOTE assertions updated to expect canonical name (was temporary `_uniq_nullsnotdistinct` name). 1 new assertion verifies both 7.13.2B migration files exist + part-1 timestamp precedes part-2 (so DROP runs before RENAME). 19→20 cases. |
+| **Commit 3** | `docs(bedrock): close Phase 7.13.2 umbrella` | This entry. backlog: 7.13.2B + 7.13.2 umbrella both DONE. risks: two-indexes temporary row CLOSED. |
+
+**Gate 0 (operator pre-flight on dev confirmed; staging + prod required before deploy)**: `pg_constraint` on dev DB shows NO `contype='u'` row for `MarketplaceFavorite_userId_listingId_serviceType_key` — confirming it's a stand-alone INDEX, not a CONSTRAINT. So `DROP INDEX CONCURRENTLY` is the right operator path (fully online; no ACCESS EXCLUSIVE lock). Operator MUST re-run the same query on staging + prod before applying — if any env has a CONSTRAINT row, swap DROP INDEX for `ALTER TABLE ... DROP CONSTRAINT` (brief ACCESS EXCLUSIVE; schedule outside peak hours).
+
+**Verification on fresh DB**:
+- 24/24 migrations apply cleanly (22 base + part-1 + part-2 = 24)
+- Steady-state catalog: ONE unique on (userId, listingId, serviceType), name = canonical `MarketplaceFavorite_userId_listingId_serviceType_key`, **indnullsnotdistinct = t** (preserved through rename), indisvalid = t. NO `_uniq_nullsnotdistinct` row.
+- Manual duplicate (userId, listingId, NULL) INSERT: second INSERT errors with `duplicate key value violates unique constraint "MarketplaceFavorite_userId_listingId_serviceType_key"` — proves NULLS NOT DISTINCT semantics survived the rename end-to-end.
+- apps/api jest: 19 → 20 cases on the favorites spec, all green. Suite baseline 45 unchanged.
+- Workspace typecheck + lint + pnpm build: unchanged baseline.
+
+**Revert strategy** (note: NOT a DB rollback): 7.13.2B's DROP is destructive. The cleanest revert is to leave the post-7.13.2B DB state in place + revert only the docs/tests, since race-proofing is preserved under the canonical name and the renamed index is functionally identical to "what 7.13.2A wanted to achieve eventually." Reverting the merge commit on main restores schema.prisma NOTE to the 7.13.2A-era extended wording + restores spec assertions to old-name references; no DB action needed.
+
+**Closure summary for the Phase 7.13.2 umbrella**:
+- 7.13.2A added the NULLS NOT DISTINCT companion index alongside the original
+- 7.13.2B dropped the original + renamed the new one to the canonical Prisma name
+- Phase 7.12.1 TOCTOU race is structurally fixed at the DB level
+- addFavorite uses Plan B (try/create/catch/findFirst) — the constraint catch path
+- One unique index over `(userId, listingId, serviceType)` with NULLS NOT DISTINCT semantics, named canonically
+- Audit dashboard unchanged at 30/31 (#23 still pending Phase 7.14)
+
+---
+
 ### 2026-06-20 — Phase 7.13.2A: MarketplaceFavorite gains NULLS NOT DISTINCT companion unique (closes Phase 7.12.1 TOCTOU race; 7.13.2B drops original next)
 
 **Closes the Phase 7.12.1 TOCTOU race at the DB level.** The pre-7.13.2A `addFavorite` `findFirst + create` emulation had a window where two concurrent `addFavorite(user, listing, null)` calls could both pass the findFirst check and both insert, producing duplicate NULL-serviceType rows (Postgres default: NULLS DISTINCT means two NULLs don't conflict). Phase 7.13.2A installs a SECOND unique index over the same columns with `NULLS NOT DISTINCT` semantics, alongside the existing one. The new index catches the race; the app code now relies on the constraint via try/create/catch/findFirst (Plan B).
