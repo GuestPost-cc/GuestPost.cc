@@ -1619,18 +1619,15 @@ model MarketplaceFavorite {
   user    User               @relation(fields: [userId], references: [id])
   listing MarketplaceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
-  // NOTE: between Phase 7.13.2A (2026-06-20) and Phase 7.13.2B, this table
-  // carries TWO unique indexes over the same columns:
-  //   - MarketplaceFavorite_userId_listingId_serviceType_key — NULLS DISTINCT
-  //     (Postgres default; Prisma-generated for the @@unique below)
-  //   - MarketplaceFavorite_uniq_nullsnotdistinct — NULLS NOT DISTINCT
-  //     (raw SQL migration, catches NULL-serviceType duplicate-create race)
-  // The NULLS NOT DISTINCT variant is what addFavorite relies on for race-
-  // proofing (Plan B try/create/catch in marketplace.service.ts). Phase
-  // 7.13.2B drops the original via DROP INDEX CONCURRENTLY (verified the
-  // original is an index, not a constraint) and renames the new one to
-  // canonical. Until then, both fire on insert — strictly stricter is fine.
-  // Prisma's drift detection treats NULLS-distinctness as transparent.
+  // NOTE: the @@unique below is realised as
+  // `MarketplaceFavorite_userId_listingId_serviceType_key` with NULLS NOT
+  // DISTINCT semantics (raw SQL — Prisma's @@unique syntax doesn't expose
+  // NULL distinctness, but pg drift detection treats it as transparent).
+  // The NULLS NOT DISTINCT modifier closes the Phase 7.12.1 TOCTOU race
+  // on (userId, listingId, NULL) addFavorite calls — see Phase 7.13.2A/B
+  // for the migration history (7.13.2A added the NULLS NOT DISTINCT index
+  // alongside the original; 7.13.2B dropped the original + renamed the
+  // new one to the canonical Prisma name).
   @@unique([userId, listingId, serviceType])
   @@index([userId])
   @@index([listingId])
