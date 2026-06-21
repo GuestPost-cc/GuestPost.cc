@@ -913,6 +913,55 @@ _(none — Phase 7.13 landed the Prisma 6→7 upgrade 2026-06-20, unblocking Pha
 
 ---
 
+### 2026-06-21 — Phase 7.10.2: Nest+supertest integration test harness ships (greenfield)
+
+**First real integration tests in the codebase.** Pre-7.10.2, all 47 apps/api suites were unit/static-source (Prisma mocked at the spec level; no NestFactory.create anywhere). The harness opens up real-DB, real-Nest integration coverage for future race + DB-shape work.
+
+**NOT a re-opening of the audit dashboard** — those are at 31/31 (100%) and stay closed. This is post-audit infrastructure that was named as a deferred follow-up across multiple Phase 7.x specs.
+
+**Scope reduced this PR vs the original plan**: harness + Spec 1 only (claim race). Spec 2 (GET /operations/fulfillment-queue happy-path) + TestAuthGuard + supertest api-client deferred to Phase 7.10.2.1 fast-follow. Reasoning: Spec 2 adds auth-forgery complexity that was making the first-PR config-tuning loop expensive; ship the foundation + the highest-value spec now, polish the HTTP-layer machinery in a follow-up.
+
+**3 pre-flight gates all passed empirically** (run via throwaway `_spike_*.spec.ts` files; deleted before commit 1):
+| Gate | Question | Outcome |
+|---|---|---|
+| 0.25 | Does `Test.createTestingModule({ imports: [AppModule] }).compile()` succeed? | ✅ 1999ms total (1938ms import + 53ms compile) |
+| 0.5 | Do 8 parallel `CREATE DATABASE ... TEMPLATE guestpost_test_template` clones succeed? | ✅ all 8 in 1139ms wall time |
+| 0.75 | Does mutating `process.env.DATABASE_URL` reach PrismaService (not cached)? | ✅ DB-A: 1 row, DB-B: 0 rows; clean isolation |
+
+**Design decisions baked in**:
+- **DB isolation**: TEMPLATE-clone from `guestpost_test_template` (NOT dev's `guestpost`). 51 `$transaction` callbacks across 28 services rule out transaction-rollback isolation; template-clone is the only viable strategy. ~150ms per test.
+- **Jest runner**: projects feature. `pnpm test` runs unit only (~5s, unchanged baseline). `pnpm test:integration` runs the new project. `pnpm test:all` runs both. Side benefit: ts-jest `isolatedModules: true` (required under projects to avoid full-program type-check failures on transitively-mocked deps) gave the unit project a ~10x speedup (53s → 5.4s on the full 47-suite run).
+- **Auth strategy**: deferred. Spec 1 calls services directly via `app.get(Service)`, bypassing HTTP. Spec 2 + TestAuthGuard ships in Phase 7.10.2.1.
+- **forceExit**: root-level (jest's projects array doesn't honor per-project forceExit). Unit project needs it (grandfathered from Phase 7.8 PR #5 — pre-existing leaks); integration project inherits as a side effect. If integration leak-detection becomes more valuable, split into separate jest configs as a future PR.
+
+**Template DB management**: `guestpost_test_template` created via `prisma migrate deploy` against an empty DB; clone-source only, never receives app writes. Decouples integration tests from dev workflow (a dev can `prisma migrate dev` against their `guestpost` without affecting any test run). Operator must refresh when new migrations land on main (docs to be added in Phase 7.10.2.1).
+
+**Spec 1 — Phase 7.14 #23 claim race (closed)**: 5 concurrent `service.claim(orderId, userId)` via `Promise.allSettled` against a real DB. Confirms exactly 1 succeeds + 4 reject with `ConflictException("Order is already assigned")` + `activeCount=1` post-settlement. The Phase 7.14 partial-unique index + Plan B per-caller try/catch holds end-to-end under real concurrency. First-run timing: 146ms seed + 106ms claims + 92ms teardown = 2844ms total test, 3383ms jest invocation. Within all budgets.
+
+**Verification**:
+- `pnpm test` → 47 suites / 652 tests pass (unit baseline unchanged)
+- `pnpm test:integration` → 1 suite / 1 test pass (new)
+- `pnpm test:all` → 48 suites / 653 tests pass
+- Typecheck + lint + build: clean baseline holds
+
+**Commits**:
+| # | Title | Scope |
+|---|---|---|
+| 1 | `feat(api): jest projects shape + integration scaffolding` | supertest deps + projects config + scripts + empty integration dir |
+| 2 | `feat(api): test-db + createTestApp helpers` | `createTestDatabase` (TEMPLATE clone) + `createTestApp` (boot AppModule, deferred DATABASE_URL mutation) |
+| 3 | `feat(api): minimum-viable factory library` | makeOrganization / makeUser / makeWebsite / makeOrder |
+| 4 | `test(orders): integration spec for Phase 7.14 #23 claim race` | The proof-of-life integration spec |
+| 5 | `docs(bedrock): close Phase 7.10.2 (harness ships)` | This entry + backlog flips |
+
+**Follow-up backlog items added**:
+- Phase 7.10.2.1 — Spec 2 (queue GET happy-path) + TestAuthGuard + supertest api-client
+- Phase 7.10.2.2 — split AppModule into per-feature TestModules once integration suite hits 20+ specs (AppModule boot becomes the dominant runtime cost at scale)
+- Phase 7.10.2.x — convert Phase 7.12 favorites manual-smoke race to integration spec
+
+**Mission ceiling — NOT in scope**: converting existing 47 static-source suites to integration specs (incremental migration as needed); real Better Auth round-trip (Phase 7.10.2.1); external-service mocking layer (Stripe/Wise/BullMQ workers); CI matrix changes (uses existing postgres + redis services); performance benchmarking SLOs.
+
+---
+
 ### 2026-06-21 — Phase 7.13.1.1 cleanup: drop redundant Settlement_status_idx
 
 **Sibling cleanup from Phase 7.13.1.** The composite `Settlement_status_reviewEndsAt_idx` added by 7.13.1 makes the single-column `Settlement_status_idx` (Prisma-generated from `@@index([status])`) redundant — PostgreSQL's B-tree planner uses the composite's leading column for WHERE status = X queries.
