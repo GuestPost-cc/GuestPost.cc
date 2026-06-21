@@ -720,9 +720,14 @@ model Settlement {
   //   - Settlement_status_reviewEndsAt_idx — composite on
   //     (status, reviewEndsAt) via CREATE INDEX CONCURRENTLY (Phase 7.13.1)
   // Do not remove either when regenerating migrations.
+  //
+  // Phase 7.13.1.1 dropped the redundant single-column @@index([status]) —
+  // the composite Settlement_status_reviewEndsAt_idx covers WHERE status = X
+  // via its leading column, so a separate single-column status index was dead
+  // weight. publisherId+status filters still use Settlement_publisherId_status_idx;
+  // orderId+status filters still use the partial unique above.
   @@index([orderId])
   @@index([publisherId, status])
-  @@index([status])
   @@index([serviceType])
   @@index([fulfillmentChannel])
   @@index([listingServiceId])

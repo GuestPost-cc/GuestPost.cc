@@ -913,6 +913,50 @@ _(none — Phase 7.13 landed the Prisma 6→7 upgrade 2026-06-20, unblocking Pha
 
 ---
 
+### 2026-06-21 — Phase 7.13.1.1 cleanup: drop redundant Settlement_status_idx
+
+**Sibling cleanup from Phase 7.13.1.** The composite `Settlement_status_reviewEndsAt_idx` added by 7.13.1 makes the single-column `Settlement_status_idx` (Prisma-generated from `@@index([status])`) redundant — PostgreSQL's B-tree planner uses the composite's leading column for WHERE status = X queries.
+
+**NOT a re-opening of the audit dashboard** — those are at 31/31 (100%) and stay closed. This is post-audit cleanup of the named Phase 7.13.1 follow-up risk.
+
+**Migration**: single-statement `DROP INDEX CONCURRENTLY IF EXISTS "Settlement_status_idx"`. Online drop, no write blocking. Matches the CONCURRENT-ops convention from all Phase 7.13.x migrations.
+
+**Schema change**: removed `@@index([status])` from Settlement model; added NOTE comment explaining the drop. Keeps `prisma migrate diff` clean post-deploy.
+
+**Other Settlement.status-involving queries unaffected**:
+- `publisherId + status` → uses `Settlement_publisherId_status_idx`
+- `orderId + status != CANCELLED` → uses `Settlement_orderId_active_key` (partial unique)
+- `status alone` → uses composite leading column (post-drop)
+
+**Gate 0 (operator REQUIRED on staging + prod before applying)**:
+
+```sql
+EXPLAIN (ANALYZE, BUFFERS) SELECT id, status FROM "Settlement" WHERE status = 'PENDING';
+```
+
+| Outcome | Action |
+|---|---|
+| Bitmap Heap Scan / Index Scan on `Settlement_status_reviewEndsAt_idx` | Composite covers the query. **Safe to apply.** Expected case. |
+| Index Scan on `Settlement_status_idx` exclusively | STOP — some query pattern depends on the single-column index for a reason that wasn't anticipated. Investigate before approving the drop in that env. |
+| Seq Scan (small env) | Inconclusive — re-run with `SET enable_seqscan = OFF` to force index usage and see which the planner picks. If composite, safe to apply. |
+
+**Why dev EXPLAIN can't prove redundancy**: dev's Settlement table is 60 rows; PG planner correctly picks Seq Scan < index lookup at that scale. Confirmed via `BEGIN; DROP INDEX "Settlement_status_idx"; EXPLAIN ...; ROLLBACK;` — both shapes return Seq Scan on dev. The proof is operator-side at prod scale.
+
+**Commits**:
+| # | Title | Scope |
+|---|---|---|
+| 1 | `feat(database): drop redundant Settlement_status_idx (Phase 7.13.1 sibling cleanup)` | Single migration + `@@index([status])` removal from schema.prisma + extended NOTE. 2 files / +53 −1. |
+| 2 | `docs(bedrock): close Phase 7.13.1.1 cleanup follow-up` | This audit entry + risks.md closure of the "single-column redundant" row. |
+
+**Verification**:
+- Two-path migration replay: PATH A (fresh DB, schema sans `@@index([status])`) gives 8 Settlement indexes (was 9); PATH B (clone of dev DB) actually fires the drop (`status_idx_exists_BEFORE = t → AFTER = f`)
+- typecheck + lint + jest + build: clean baseline holds
+- apps/api jest baseline unchanged (no spec assertions touch the index by name)
+
+**Revert strategy**: the DROP is destructive (index gone from the DB). Reverting the merge commit on main restores the `@@index([status])` line in schema.prisma + restores the migration file in code — but the live DB stays without the index until a new CREATE INDEX migration is applied. Worst case post-revert: queries that WERE using the composite leading column continue to do so (slightly less compact than the dedicated single-column would be); the planner DOES NOT silently regress. Safe asymmetric revert. If a true rollback to pre-7.13.1.1 DB state is required, write a new migration with `CREATE INDEX CONCURRENTLY IF NOT EXISTS "Settlement_status_idx" ON "Settlement"(status)`.
+
+---
+
 ### 2026-06-21 — Phase 7.13.x cleanup: createPrismaClient() helper + drop orphan Escrow table/enum
 
 **Closes the two named Phase 7.13 backlog follow-ups.** NOT a re-opening of the audit dashboard (those are at 31/31 closed and stay closed) — this is post-audit cleanup that finishes the Phase 7.13 work in two small pieces.

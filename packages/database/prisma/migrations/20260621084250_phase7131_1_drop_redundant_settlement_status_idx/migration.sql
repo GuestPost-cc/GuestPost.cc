@@ -1,0 +1,47 @@
+-- Phase 7.13.1.1 — drop redundant Settlement_status_idx (sibling cleanup from Phase 7.13.1).
+--
+-- Phase 7.13.1 added Settlement_status_reviewEndsAt_idx (composite on status + reviewEndsAt)
+-- to optimize the auto-approve sweep's WHERE status IN (...) AND reviewEndsAt <= NOW pattern.
+-- The single-column Settlement_status_idx (Prisma-generated from @@index([status])) became
+-- theoretically redundant: PostgreSQL's B-tree planner can use the composite's leading
+-- column for WHERE status = X queries, so queries that filter on status alone can be served
+-- by the composite without the single-column index.
+--
+-- Other Settlement.status-involving queries are unaffected:
+--   - publisherId + status filters → Settlement_publisherId_status_idx
+--   - orderId + status != CANCELLED → Settlement_orderId_active_key (partial unique)
+--   - status alone → composite leading column (post-drop)
+--
+-- Pre-flight (operator REQUIRED before applying on staging + prod):
+-- Run on production-scale data + confirm the planner picks the composite's leading
+-- column (NOT the single-column index that's about to be dropped):
+--
+--   EXPLAIN (ANALYZE, BUFFERS) SELECT id, status FROM "Settlement" WHERE status = 'PENDING';
+--
+-- Expected: Bitmap Heap Scan or Index Scan on Settlement_status_reviewEndsAt_idx (the
+-- composite's leading column). If the planner is using Settlement_status_idx exclusively
+-- (and not the composite), STOP — there's a query pattern that needs the single-column
+-- index for some reason; investigate before approving the drop in that env.
+--
+-- Dev EXPLAIN (60 rows) returns Seq Scan in BOTH cases (with + without the single-column
+-- index) — small-dataset planner picks Seq < index lookup. The proof is operator-side at
+-- prod scale; dev cannot confirm.
+--
+-- CONCURRENTLY: online drop, no write blocking. Matches the convention from Phase 7.13.1
+-- + 7.13.2A + 7.13.2B + 7.14 + 7.13.x (all CONCURRENT ops). Single-statement migration
+-- file (per the 7.13.2B finding — multi-statement files break CONCURRENTLY ops under
+-- prisma@7.8.0's implicit-tx wrap).
+--
+-- IF EXISTS: cross-env safe — if some env never had the single-column index (e.g. an env
+-- bootstrapped after this migration), the DROP is a no-op there.
+--
+-- Recovery if the CONCURRENTLY drop fails mid-flight: PostgreSQL leaves indisvalid=false
+-- on the in-progress drop. Clean up via:
+--   DROP INDEX CONCURRENTLY IF EXISTS "Settlement_status_idx";
+-- (idempotent — the IF EXISTS makes the re-run safe).
+--
+-- This migration pairs with the sibling schema.prisma edit removing
+-- `@@index([status])` from the Settlement model — keeps prisma migrate diff clean
+-- post-deploy.
+
+DROP INDEX CONCURRENTLY IF EXISTS "Settlement_status_idx";
