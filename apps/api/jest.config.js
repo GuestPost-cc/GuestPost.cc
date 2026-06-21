@@ -29,6 +29,12 @@ module.exports = {
     "^better-auth/api$": "<rootDir>/__mocks__/better-auth",
   },
   testPathIgnorePatterns: ["/node_modules/"],
+  // Phase 7.13.x — set a test-env DATABASE_URL default BEFORE any spec
+  // imports run. The createPrismaAdapter() helper throws at instantiation
+  // time when DATABASE_URL is unset (intentional runtime guard); without
+  // this default, any spec that transitively imports the @guestpost/database
+  // singleton (e.g. via @guestpost/auth) would fail at import time.
+  setupFiles: ["<rootDir>/../jest.setup.js"],
   // CI hang protection — without this, jest waits indefinitely for
   // open handles to close (Redis sockets, BullMQ connections, etc).
   // Locally the worker-process auto-timeout eventually force-exits

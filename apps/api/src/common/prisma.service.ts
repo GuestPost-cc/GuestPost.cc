@@ -1,13 +1,11 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common"
-import { PrismaClient } from "@guestpost/database"
-import { PrismaPg } from "@prisma/adapter-pg"
+import { PrismaClient, createPrismaAdapter } from "@guestpost/database"
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
     super({
-      adapter: new PrismaPg({
-        connectionString: process.env.DATABASE_URL,
+      adapter: createPrismaAdapter({
         // Burst capacity for concurrent money operations (payment capture,
         // settlement release, payout). The default ~num_cpus*2+1 starves the
         // pool under bursts of interactive transactions.

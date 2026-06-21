@@ -913,6 +913,49 @@ _(none — Phase 7.13 landed the Prisma 6→7 upgrade 2026-06-20, unblocking Pha
 
 ---
 
+### 2026-06-21 — Phase 7.13.x cleanup: createPrismaClient() helper + drop orphan Escrow table/enum
+
+**Closes the two named Phase 7.13 backlog follow-ups.** NOT a re-opening of the audit dashboard (those are at 31/31 closed and stay closed) — this is post-audit cleanup that finishes the Phase 7.13 work in two small pieces.
+
+**Bundled single PR** (user choice; both items are Phase 7.13 cleanup, low risk, small scope). 3 commits, single PR.
+
+**Item 1 — `createPrismaClient()` + `createPrismaAdapter()` helpers**: dual-helper design (the NestJS site requires it because `PrismaService extends PrismaClient` can't substitute the full helper inside `super(...)`). Both helpers exported from `@guestpost/database`. Both production sites (`packages/database/src/index.ts` singleton + `apps/api/src/common/prisma.service.ts` NestJS service) adopt the appropriate helper. Per-site behavior preserved: singleton keeps default pool + HMR re-use; NestJS service keeps `max: 25 / idleTimeoutMillis: 20_000` + `transactionOptions: { maxWait: 10_000, timeout: 20_000 }` + `OnModuleInit/Destroy`. The helper centralizes `process.env.DATABASE_URL` reading + `new PrismaPg(...)` wiring + adds a `if (!DATABASE_URL) throw "DATABASE_URL is required"` runtime guard (converts what would be a confusing first-query failure into a clear startup-time error). Worker is unchanged (imports the global singleton).
+
+**Item 2 — Drop orphan Escrow table + EscrowStatus enum**: recon-expanded scope. The original backlog item said "drop the orphan EscrowStatus enum"; recon for the plan revealed the enum has a live column dependent (`Escrow.status`) AND the `Escrow` table itself is also orphan (0 rows on dev; no schema.prisma model; no current-migrations reference; no app-code reference). `migrations_archive/` grep returned ZERO matches (case-insensitive) — the original creating migration was either deleted entirely before archival or created via a one-off `prisma migrate dev` run that never made it into version control. Single-statement DROP TABLE + DROP TYPE migration; both `IF EXISTS` for cross-env safety (envs that never had the orphans treat it as a no-op).
+
+**Gate 0 — operator cross-env Escrow presence + rowcount check** (REQUIRED on dev + staging + prod):
+```sql
+-- (1) Confirm what this env has
+SELECT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'Escrow' AND relkind = 'r') AS escrow_table_exists,
+       EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EscrowStatus' AND typtype = 'e') AS escrow_status_enum_exists;
+-- (2) [if table present] COUNT must be 0 — STOP if non-zero
+SELECT COUNT(*) FROM "Escrow";
+-- (3) [if enum present] ONLY Escrow.status should reference the enum — STOP if anything else
+SELECT c.relname, a.attname FROM pg_attribute a JOIN pg_class c ON a.attrelid = c.oid JOIN pg_type t ON a.atttypid = t.oid WHERE t.typname = 'EscrowStatus' AND NOT a.attisdropped AND c.relkind = 'r';
+```
+
+**Two-path migration replay verified locally**:
+- PATH A (fresh DB, orphans never existed): 26/26 migrations apply; Escrow + EscrowStatus absent before AND after (IF EXISTS no-op)
+- PATH B (clone of dev DB via `CREATE DATABASE ... TEMPLATE guestpost`): orphans present BEFORE → migration applies → orphans absent AFTER. Actually fires.
+
+**Commits**:
+| # | Title | Scope |
+|---|---|---|
+| 1 | `refactor(database): introduce createPrismaClient() helper + adopt at both sites` | helper + 2 adoption edits + 7-case unit + static-source spec |
+| 2 | `feat(database): drop orphan Escrow table + EscrowStatus enum (pg_dump drift cleanup)` | single migration with DROP TABLE IF EXISTS + DROP TYPE IF EXISTS |
+| 3 | `docs(bedrock): close Phase 7.13.x cleanup follow-ups (helper + Escrow orphan)` | backlog flips + this audit entry |
+
+**Verification**:
+- apps/api jest: 46 → 47 suites (+7 new cases for the helper spec)
+- Two-path migration replay: PATH A (fresh) + PATH B (drift-repro) both pass
+- typecheck + lint + build: clean baseline holds
+
+**Audit dashboard status unchanged**: 31/31 closed (100%) from Phase 7.14. This entry records post-audit cleanup that resolves named Phase 7.13 follow-ups, not a re-opening of finding tracking.
+
+**Mission ceiling — NOT in scope** (deferred): broader `migrations_archive/` review (other potential pre-Phase-2 drift), worker PrismaClient instantiation site (worker still uses global singleton; adopt helper IF one appears), drop redundant `Settlement_status_idx` (gated on prod EXPLAIN ANALYZE), fresh platform audit, Phase 7.10.2 Nest+supertest harness.
+
+---
+
 ### 2026-06-21 — Phase 7.14: closes #23 FulfillmentAssignment claim race — **audit dashboard 30/31 → 31/31 (100%)**
 
 **Final closure of the 2026-06-15 audit batch.** The last open finding (#23 "Claim race lets two Ops both succeed") is now structurally fixed at the DB level. Audit dashboard flips to **31/31 closed (100%)** — every finding from the 2026-06-15 batch is addressed.
