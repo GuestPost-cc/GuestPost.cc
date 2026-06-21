@@ -790,6 +790,15 @@ model FulfillmentAssignment {
 
   order Order @relation(fields: [orderId], references: [id])
 
+  // NOTE: Phase 7.14 adds a partial unique index
+  // `FulfillmentAssignment_orderId_active_unique` over (orderId) WHERE status IN
+  // ('ASSIGNED', 'IN_PROGRESS') via raw SQL — Prisma's @@unique syntax doesn't
+  // express partial predicates. Closes #23 (audit 2026-06-15): the prior
+  // findFirst-pre-check-then-upsert pattern in claim() let two concurrent Ops
+  // both succeed; the partial unique makes the race structurally impossible
+  // (the second-to-commit hits P2002, mapped to ConflictException). Prisma's
+  // drift detection ignores raw-SQL indexes, so the @@index declarations
+  // below stay accurate.
   @@index([orderId])
   @@index([assignedToUserId, status])
   @@index([status])

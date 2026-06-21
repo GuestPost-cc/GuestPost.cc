@@ -805,14 +805,14 @@ Living section. Each entry documents *what* was fixed, *how*, *what changed in t
 | ⚠️ Partially closed | **0** | 0% |
 | ⛔ Still open | **1** | 3% |
 
-> Phase 7.12 reconciliation note: previous dashboard reads of "25/31 → 27/31 → 31/32" carried catch-all-row aggregation drift. Recomputed by enumerating each finding individually from the §2 list (Phase 0b in the Phase 7.12 plan). Post-Phase-7.12 truth: **30 closed, 1 open (#23)**. Only #23 remains, gated on Prisma 6 → 7.4+ upgrade for `CREATE INDEX CONCURRENTLY`.
+> Phase 7.12 reconciliation note: previous dashboard reads of "25/31 → 27/31 → 31/32" carried catch-all-row aggregation drift. Recomputed by enumerating each finding individually from the §2 list (Phase 0b in the Phase 7.12 plan). Post-Phase-7.12 truth: 30 closed, 1 open (#23). Phase 7.14 (2026-06-21) closed #23 via partial unique index on `FulfillmentAssignment(orderId) WHERE status IN (ASSIGNED, IN_PROGRESS)` + Plan B P2002 catch on all 3 upsertAssignment callers. **Final: 31/31 closed (100%).** The 2026-06-15 audit batch is fully closed.
 
 **By severity:**
 
 | Severity | Total | Closed | Partial | Open |
 |---|---|---|---|---|
 | Critical (production-blocker) | 11 | **11** (#1, #2, #3, #4, #5, #6, #7, #8, #9, #10, #11) | — | **0** |
-| High | 14 | **13** (#12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22, #24, V-1, R-3+R-4 — counting R-3+R-4 as one combined row) | — | 1 (#23) |
+| High | 14 | **14** (#12, #13, #14, #15, #16, #17, #18, #19, #20, #21, #22, #23, #24, V-1, R-3+R-4 — counting R-3+R-4 as one combined row) | — | **0** |
 | Medium | 5 | **5** (#25, #26, #27 — Phase 7.8; #28, #29, #30 — Phase 7.9) | — | **0** |
 
 Phase 7.8 also closed audit §5.8's `hasAuthCredentials()` sub-finding (bundled with #26 as documented in the recommended fix). The auth/queue trust boundary has zero open security findings; remaining 2 Medium items (#28 status-color, #29 unused shared components — both frontend) plus #30 (hooks-rule violation in publisher listings) are queued for Phase 7.9.
@@ -845,7 +845,7 @@ Phase 7.8 also closed audit §5.8's `hasAuthCredentials()` sub-finding (bundled 
 | #17 | No endpoint to create service-scoped favorite (WAITLIST notify-me) | High | ✅ FIXED | 7.12 | `addFavorite(userId, listingId, serviceType?)` + `CreateFavoriteDto.serviceType` + new `DELETE /favorites/:listingId/services/:serviceType` route with `ParseEnumPipe`. Validates non-null serviceType against PAUSED services to avoid dead-write favorites. Reachable WAITLIST fan-out (already existed at marketplace.service.ts:728-749) finally has an entry point. |
 | #18 | Auto-`FulfillmentAssignment.assignedByUserId` = customer's userId | High | ✅ FIXED | 7.12 | `assignedByUserId: snapshot.managedByUserId` (self-assignment). The `auto: true` metadata flag on the OrderEvent still disambiguates from manual claims. |
 | #20 | Favorites page shows $0 (response missing `services`) | High | ✅ FIXED | 7.12 | `getFavorites` includes services (filtered to non-PAUSED, ordered by price asc) with the fields the frontend needs to compute priceFrom. |
-| #23 | Claim race lets two Ops both succeed | High | ⛔ open | — | Needs partial unique index migration which Prisma 6 can't run `CREATE INDEX CONCURRENTLY`. Gated on Prisma 6 → 7.4+ upgrade. |
+| #23 | Claim race lets two Ops both succeed | High | ✅ FIXED | 7.14 | Partial unique index `FulfillmentAssignment_orderId_active_unique` on `(orderId) WHERE status IN ('ASSIGNED','IN_PROGRESS')` via `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` (single-statement, online build). App-layer: removed findFirst pre-check from `claim()`; all 3 `upsertAssignment` callers (claim/assign/reassign) wrap the call in `try/catch(P2002)` with caller-appropriate `ConflictException` messages (claim: "Order is already assigned"; assign+reassign: "Order assignment changed concurrently — refresh and try again"). The DELIVERED+CANCELLED terminal statuses are excluded from the partial predicate so legitimate cancel-then-create reassignment paths still work. |
 | #24 | Platform website + auto-listing defaults wrong | High | ✅ FIXED | 7.12 | `verificationStatus: WebsiteVerificationStatus.VERIFIED` on platform website (matches schema comment at schema.prisma:466-467); auto-listing `status: ListingStatus.DRAFT` (no more zero-service APPROVED listings going live). |
 
 **Bonus improvements landed beyond the audit's scope** (these strengthen posture but weren't in the original 30 findings):
@@ -910,6 +910,78 @@ _(none — Phase 7.13 landed the Prisma 6→7 upgrade 2026-06-20, unblocking Pha
 - **After Phase 7.9 lands** — append new §11 entry; update scorecard's "Mobile UX" + "Frontend reliability" rows; mark Phase 7.6.1 closed.
 
 **Production-blocker status**: **11 of 11 Criticals closed (100%)**. No production-blocker finding from the 2026-06-15 audit remains open. All remaining work is High/Medium polish, security hardening, or accessibility — none gate production.
+
+---
+
+### 2026-06-21 — Phase 7.14: closes #23 FulfillmentAssignment claim race — **audit dashboard 30/31 → 31/31 (100%)**
+
+**Final closure of the 2026-06-15 audit batch.** The last open finding (#23 "Claim race lets two Ops both succeed") is now structurally fixed at the DB level. Audit dashboard flips to **31/31 closed (100%)** — every finding from the 2026-06-15 batch is addressed.
+
+**Race shape**: `apps/api/src/modules/orders/services/order-fulfillment-assignment.service.ts:claim()` did a `findFirst` pre-check OUTSIDE its transaction, then called `upsertAssignment` which did `updateMany({CANCELLED}) → create({ASSIGNED})` inside a tx. Two concurrent claims both passed the pre-check, both entered the tx, both cancelled each other's would-be row and both created fresh rows — final state had ONE row but BOTH Ops got a successful Promise back. The "loser" thought they owned work that the "winner" actually cancelled.
+
+**Fix**: Partial unique index over `(orderId) WHERE status IN ('ASSIGNED', 'IN_PROGRESS')` makes the race structurally impossible at the DB level — the second-to-commit hits P2002. App-layer per-caller `try/catch(P2002) → ConflictException` translates the constraint violation into the same user-facing error the (race-leaky) pre-check used to return, now with caller-appropriate messages for each of the 3 `upsertAssignment` callers.
+
+**Branch**: `phase-7.14-fulfillment-assignment-claim-race` — 4 commits, single PR. Merge gated on Phase 7.13.2B's 24h staging soak signal coming back clean + operator Gate 0 dupe sweep returning 0 rows on dev + staging + prod.
+
+**Gate 0.25 — full `upsertAssignment` caller enumeration** (REQUIRED before coding):
+
+| # | Caller | Action | Catch placement | User-facing message |
+|---|---|---|---|---|
+| 1 | `claim(orderId, userId)` (L75-83) | self-pickup | inside `claim()` | `"Order is already assigned"` |
+| 2 | `assign(orderId, toUserId, byUserId)` (L86-89) | admin assigns to user | inside `assign()` | `"Order assignment changed concurrently — refresh and try again"` |
+| 3 | `reassign(orderId, toUserId, byUserId)` (L92-95) | admin transfer | inside `reassign()` | `"Order assignment changed concurrently — refresh and try again"` |
+| 4 | `orders.service.ts:283-297` auto-assign | direct create (NOT via helper) | none | n/a — Order.id is fresh; theoretical P2002 only |
+
+Mixed semantics across the 3 helper callers (claim's "self-pickup" intent vs assign/reassign's "admin override changed concurrently") meant the plan's decision matrix selected per-caller catches with caller-specific messages, NOT a single catch in the helper. Helper rethrows P2002 untouched.
+
+**Gate 0.5 outcome (CONCURRENTLY + WHERE partial unique probe on prisma@7.8.0)**:
+- Migration applies cleanly via `prisma migrate deploy`; catalog confirms `indisunique=t`, `indisvalid=t`, predicate preserved as `WHERE (status = ANY (ARRAY['ASSIGNED'::"FulfillmentAssignmentStatus", 'IN_PROGRESS'::"FulfillmentAssignmentStatus"]))` (PG auto-cast enum)
+- Full predicate coverage proven on probe table: (a) ASSIGNED+ASSIGNED blocked, (b) ASSIGNED+IN_PROGRESS cross-state blocked, (c) IN_PROGRESS+IN_PROGRESS blocked, (d) terminal statuses release the predicate (post-CANCELLED fresh ASSIGNED succeeds), DELIVERED row on same orderId does NOT trigger
+- Initial attempt to drive the semantic checks via `psql -c "stmt1; stmt2; ..."` was misleading — psql -c wraps multi-statement input in an implicit tx, so an error rolls back earlier statements. Re-ran with `docker exec -i ... <<EOF` stdin heredoc form so each statement auto-commits independently. **Documented for future probe scripting.**
+
+| # | Commit | Title | Scope |
+|---|---|---|---|
+| 1 | `590d956` | `feat(database): partial unique on FulfillmentAssignment(orderId) for active claims` | Migration + schema NOTE. Single-statement `CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS` (single-statement requirement per Phase 7.13.2B finding). |
+| 2 | `837c9ff` | `fix(orders): remove findFirst pre-check; map P2002 to ConflictException per caller` | Per-caller try/catch on all 3 `upsertAssignment` callers + removed race-leaky findFirst from `claim()`. |
+| 3 | `24cdaa5` | `test(orders): static-source assertions for Phase 7.14 claim-race fix` | 6 new assertions: 3 per-caller try/catch shape checks + 1 regression guard (no findFirst in claim) + 1 migration shape + 1 schema NOTE shape. |
+| 4 | _(this entry)_ | `docs(bedrock): close Phase 7.14 + audit #23 (dashboard 30/31 → 31/31)` | Audit §2 #23 row flipped to FIXED + dashboard flipped to 31/31 + backlog marks 7.14 DONE + risks closes claim-race row. |
+
+**Gate 0 — operator pre-flight dupe sweep** (REQUIRED on dev + staging + prod):
+
+```sql
+SELECT
+  "orderId",
+  COUNT(*)                                  AS active_count,
+  ARRAY_AGG(id ORDER BY "assignedAt" DESC)  AS assignment_ids_newest_first,
+  ARRAY_AGG(status)                         AS statuses,
+  ARRAY_AGG("assignedToUserId")             AS assigned_to
+FROM "FulfillmentAssignment"
+WHERE status IN ('ASSIGNED', 'IN_PROGRESS')
+GROUP BY "orderId"
+HAVING COUNT(*) > 1
+ORDER BY active_count DESC, "orderId";
+```
+
+Non-zero results require operator to manually collapse dupes (cancel-all-but-newest per orderId) before the CREATE INDEX can succeed — otherwise the build errors at constraint validation time. Document outcomes per env in PR comments before merging.
+
+**Verification on fresh DB**:
+- 25/25 migrations apply cleanly (24 pre-7.14 baseline + 1 new = 25); APPLIED == EXPECTED drift check passes
+- Steady-state catalog: 5 indexes on FulfillmentAssignment — 3 existing non-unique + pkey + new `_orderId_active_unique` (uniq=t, valid=t, partial predicate intact with enum cast)
+- apps/api jest: 45 suites / 645 tests (was 639; +6 new Phase 7.14 spec cases). All green.
+- Typecheck + lint + pnpm build: clean baseline holds.
+
+**Manual smoke — empirical 5-caller race** (replaces theory with proof; documented in PR body): Use `Promise.allSettled` to fire 5 concurrent `claim(sameOrderId, differentUserIds)` calls against a freshly-created PLATFORM order. Expected: **1 fulfilled + 4 rejected** with `ConflictException("Order is already assigned")`, **activeCount = 1** after settlement. Confirms the constraint catches the race end-to-end against the real service code, not just the SQL.
+
+**Revert strategy**: The DROP is destructive (the constraint goes away), but the partial unique is strictly safer than the prior pre-check. Revert the merge commit; the schema.prisma NOTE + spec + claim() pre-check restore via revert. The live DB STILL has the partial unique index — fine, since it won't reject any legitimate claim that the old code would have allowed. Worst case the restored code doesn't catch P2002 → 500 instead of 409, still safer than the pre-revert race. If a true rollback to pre-7.14 DB state is required, separately apply `DROP INDEX CONCURRENTLY IF EXISTS "FulfillmentAssignment_orderId_active_unique";`.
+
+**Closure summary for the 2026-06-15 audit batch**:
+- **31/31 findings closed (100%)** — every High/Critical/Medium finding addressed
+- 11/11 Criticals closed (Phase 7.6 closed the last one, #9 Mobile UX)
+- 14/14 Highs closed (Phase 7.14 closed the last one, #23)
+- 5/5 Mediums closed (Phase 7.8 + 7.9)
+- The full unblocked-by-Prisma-7 sequence (7.13 → 7.13.1 → 7.13.2A → 7.13.2B → 7.14) is COMPLETE
+- Pattern-broadening finding from 7.13.2B carried forward: single-statement migrations only when combining `* CONCURRENTLY` with any other DDL. Applied here (single CREATE INDEX statement; no companion DDL).
+- Post-audit work continues on the standard backlog queue (Phase 7.13.x `createPrismaClient()` helper, `EscrowStatus` orphan cleanup, future audit batches)
 
 ---
 
