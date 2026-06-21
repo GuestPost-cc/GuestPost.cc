@@ -1,6 +1,8 @@
 # Current Focus
 
-**Status (2026-06-22): 2026-06-15 audit batch CLOSED at 31/31 (100%).** All Critical, High, and Medium findings closed. Phases 7.13 → 7.14 sequence shipped the full Prisma 6→7 upgrade + 3 deferred-by-Prisma-6 fixes (Settlement composite, favorites NULLS NOT DISTINCT umbrella, fulfillment claim race). Phase 7.13.x cleanup + Phase 7.13.1.1 sibling closed the named follow-ups. Phase 7.10.2 shipped the codebase's first real-DB integration test harness. Per-phase details live in `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log.
+**Status (2026-06-22): 2026-06-15 audit batch CLOSED at 31/31 (100%); 2026-06-22 audit KICKED OFF at 37/37 open.** All prior-audit findings closed via Phases 7.13 → 7.14. The new 2026-06-22 audit (`bedrock/Views/audits/platform-audit-2026-06-22.md`) surfaces 7 Critical + 12 High + 18 Medium new findings across 8 parallel domain audits (money, marketplace+orders, security, workers, frontend, delta-lens, infrastructure+deployment, database). Closure flow mirrors the 6.6→7.14 pattern: each finding becomes its own Phase 8.X planning + execution cycle. Per-phase details live in `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 Remediation Log (empty until first Phase 8.X lands).
+
+**Audit scorecard movement (2026-06-15 → 2026-06-22)**: 12 dimensions improved (5 up by ≥ 2 grades — biggest lifts: RBAC granularity C→A, Worker observability D→A−, Reporting D→A−, Frontend mobile D→A−, Frontend reliability C+→A−); 2 unchanged; 1 (State machine integrity) slipped a notch on 2 newly-surfaced settlement race windows.
 
 ## Completed since last NOW update (2026-06-16 → 2026-06-22)
 
@@ -50,7 +52,8 @@ Phases 7.8 → 7.10.2 shipped across multiple sessions. Major batch on 2026-06-2
 
 **Named follow-up backlog items** (next session work):
 
-- **Phase 7.10.2.1** — Spec 2 (queue GET happy-path) + TestAuthGuard (X-Test-User-Id header) + supertest api-client. HTTP-layer integration capability deferred from PR #18 for shipping velocity. ALSO ships the CI integration step (`prisma migrate deploy` to template DB before `pnpm test:integration`).
+- **Phase 8.X bundle** — close 2026-06-22 audit findings one phase per finding (same pattern as Phase 6.6 → 7.14 closed the prior batch). Suggested ordering: start with the 7 Criticals (settlement race windows #1+#2, payout webhook dedup #3, settlement-auto-approve audit log #4, lazy-queueServiceRef race #5, CI template-DB step #6 = Phase 7.10.2.1 already named, adapter-pg pool sizing #7). High items cluster naturally into batches by domain (database hardening, infra/CI cleanup, delta-edge guards).
+- **Phase 7.10.2.1** — Spec 2 (queue GET happy-path) + TestAuthGuard (X-Test-User-Id header) + supertest api-client. HTTP-layer integration capability deferred from PR #18 for shipping velocity. ALSO ships the CI integration step (`prisma migrate deploy` to template DB before `pnpm test:integration`). **This phase closes 2026-06-22 audit Critical #6.**
 - **Phase 7.10.2.x** — Convert Phase 7.12 favorites manual-smoke race to integration spec. Fast-follow now that the harness exists; same 5-caller shape as PR #18's Spec 1.
 - **Phase 7.10.2.2** — Split AppModule into per-feature TestModules once integration suite hits 20+ specs. Deferred until the suite actually justifies the rework (currently 1 spec; ~2s/spec boot cost is fine at small scale).
 - **Phase 7.10.1** — Admin "manually mark customer verified" action. Speculative; defer until real support burden surfaces.

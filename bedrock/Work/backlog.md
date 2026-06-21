@@ -1,14 +1,39 @@
 ---
 note_type: backlog
 project: guestpost-platform
-updated: 2026-06-20
+updated: 2026-06-22
 ---
 
 # Backlog
 
-Forward roadmap after the Phases 6.6 → 7.7 audit batch. Canonical source for per-finding status is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11.
+Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 (the 2026-06-15 batch's §11 closed at 31/31 on 2026-06-21).
 
-**Critical-finding status: 11/11 closed** (Phase 7.6 closed the last one, #9 Mobile UX). All remaining items are High / Medium / strategic.
+**2026-06-22 audit dashboard: 0/37 closed** (7 Critical / 12 High / 18 Medium open). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX).
+
+## Phase 8.X — Close 2026-06-22 audit findings (new batch, mirrors 6.6→7.14 pattern)
+
+Suggested ordering by criticality + dependency. Each finding number maps to `bedrock/Views/audits/platform-audit-2026-06-22.md` §2.
+
+**Critical (7):**
+
+- [ ] **Phase 8.1 — Settlement returnToReview race** (#1). Add version-guard to `settlements.service.ts:450`; increment version on every transition.
+- [ ] **Phase 8.2 — releaseFundsInternal Order.status version guard** (#2). Fetch fresh order with version before `settlements.service.ts:584`; updateMany with version + conflict check.
+- [ ] **Phase 8.3 — Payout webhook idempotency dedupKey** (#3). Add `dedupKey: 'payout-webhook:${provider}:${providerExecutionId}'` to queue.add() call; worker rejects jobs without one.
+- [ ] **Phase 8.4 — Settlement auto-approve audit log per sweep** (#4). Add `prisma.auditLog.create()` per approved settlement in `settlement-auto-approve.processor.ts`.
+- [ ] **Phase 8.5 — Lazy queueServiceRef race fix** (#5). Move `queueServiceRef = app.get(QueueService)` before Better Auth handler mount OR switch to `OnModuleInit` injection pattern.
+- [x] **Phase 7.10.2.1 — CI integration template-DB step + Spec 2** (#6). Already named in NOW.md. Closes Critical #6.
+- [ ] **Phase 8.6 — Adapter-pg pool sizing** (#7). Document per-replica formula; parameterize `max` via `PRISMA_POOL_MAX` env var; add 80% utilization alert. (Production-blocker only at multi-replica scale-up.)
+
+**High (12):** see `bedrock/Views/audits/platform-audit-2026-06-22.md` §2 findings #8 through #19. Likely bundles:
+- **Phase 8.7 — Database hardening bundle** (#11 enum-drift static specs, #12 CASCADE→SetNull, #13 JSON validation + payout key-rotation runbook).
+- **Phase 8.8 — Infra/CI cleanup bundle** (#15 mailpit + worker healthchecks, #16 .env.example DATABASE_URL flag, #17 workflow consolidation, #19 JWT_SECRET hard check).
+- **Phase 8.9 — Operational resilience bundle** (#8 Redis client timeouts, #9 DNS-rebinding pool-reuse guard).
+- **Phase 8.10 — Worker observability gaps** (#14 body-cap structured log, #18 reconciliation dedup metric).
+- **Phase 8.11 — Revenue raw-SQL refactor** (#10) — small standalone or absorb into a Phase 7.1.x.
+
+**Medium (18):** see `bedrock/Views/audits/platform-audit-2026-06-22.md` §2 findings #20 through #37. Cluster opportunistically; many are 1-commit fixes (status-presentation adoption, env-var docs, console→logger).
+
+## Older items (carried over)
 
 **2026-06-16 roadmap pivot** (post-Phase-7.7): future work is bundled into Phase 7.8 (Security Hardening) and Phase 7.9 (Frontend Quality & Accessibility) per the project-direction prompt. Phase 7.6.1 is approved but deferred into 7.9.
 
