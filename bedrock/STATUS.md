@@ -8,7 +8,7 @@ local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
 last_backfill_import: 
-2026-06-17
+2026-06-22
 last_compaction: 2026-06-11
 last_validation: 2026-06-11
 last_validation_result: valid
@@ -33,7 +33,7 @@ last_system_refresh: 2026-06-11T12:30:00Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
-- Last project sync: `2026-06-16T21:42:10Z`
+- Last project sync: `2026-06-21T18:26:09Z`
 - Last phase landed: `7.7.y — restored 3 pre-existing failing test specs (Phase 6.x fixture drift); apps/api jest now 33 suites / 478 tests, no skips` on 2026-06-16
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)
