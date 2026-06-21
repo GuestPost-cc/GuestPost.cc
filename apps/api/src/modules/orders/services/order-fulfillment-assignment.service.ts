@@ -72,25 +72,55 @@ export class OrderFulfillmentAssignmentService {
     })
   }
 
-  // Operations user claims an unassigned order for themselves.
+  // Operations user claims an unassigned order for themselves. Phase 7.14
+  // replaced the prior findFirst pre-check with a partial unique index on
+  // (orderId) WHERE status IN ('ASSIGNED','IN_PROGRESS') — the constraint
+  // is the only authoritative answer to "is this order already claimed?",
+  // since the pre-check was outside the tx and two concurrent claims could
+  // both pass it. P2002 from upsertAssignment's create step maps to the
+  // same user-facing message the pre-check used to return.
   async claim(orderId: string, userId: string) {
     const order = await this.assertPlatformOrder(orderId)
-    const existing = await this.prisma.fulfillmentAssignment.findFirst({
-      where: { orderId, status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
-    })
-    if (existing) throw new ConflictException("Order is already assigned")
-    return this.upsertAssignment(orderId, userId, userId, order.organizationId, "ORDER_DELIVERY_ASSIGNED")
+    try {
+      return await this.upsertAssignment(orderId, userId, userId, order.organizationId, "ORDER_DELIVERY_ASSIGNED")
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        throw new ConflictException("Order is already assigned")
+      }
+      throw e
+    }
   }
 
-  // Assign to another Operations user.
+  // Assign to another Operations user. P2002 here means a concurrent claim
+  // / assign / reassign committed first — admin intent was "transfer to X"
+  // but the order's assignment state changed mid-flight. Different message
+  // from claim() because the user (admin) wasn't trying to "take" an
+  // unowned order; they were trying to redirect ownership.
   async assign(orderId: string, assignedToUserId: string, assignedByUserId: string) {
     const order = await this.assertPlatformOrder(orderId)
-    return this.upsertAssignment(orderId, assignedToUserId, assignedByUserId, order.organizationId, "ORDER_DELIVERY_ASSIGNED")
+    try {
+      return await this.upsertAssignment(orderId, assignedToUserId, assignedByUserId, order.organizationId, "ORDER_DELIVERY_ASSIGNED")
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        throw new ConflictException("Order assignment changed concurrently — refresh and try again")
+      }
+      throw e
+    }
   }
 
-  // Reassign (cancels prior, creates new).
+  // Reassign (cancels prior, creates new). Same concurrent-change semantic
+  // as assign(); the cancel-then-create in upsertAssignment runs in a single
+  // tx, so P2002 only fires when another tx committed an active row between
+  // this tx's cancel and its create — i.e. a true concurrent collision.
   async reassign(orderId: string, assignedToUserId: string, assignedByUserId: string) {
     const order = await this.assertPlatformOrder(orderId)
-    return this.upsertAssignment(orderId, assignedToUserId, assignedByUserId, order.organizationId, "ORDER_DELIVERY_REASSIGNED")
+    try {
+      return await this.upsertAssignment(orderId, assignedToUserId, assignedByUserId, order.organizationId, "ORDER_DELIVERY_REASSIGNED")
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        throw new ConflictException("Order assignment changed concurrently — refresh and try again")
+      }
+      throw e
+    }
   }
 }
