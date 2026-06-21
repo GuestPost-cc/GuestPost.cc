@@ -1,0 +1,43 @@
+-- Phase 7.13.x cleanup — drop orphan Escrow table + EscrowStatus enum.
+--
+-- Both objects exist in dev's live DB but are absent from:
+--   - packages/database/prisma/schema.prisma
+--   - packages/database/prisma/migrations/ (current, post-archive)
+--   - packages/database/prisma/migrations_archive/ (case-insensitive grep returned ZERO matches —
+--     the original creating migration must have been deleted entirely before archival, or
+--     created via a one-off `prisma migrate dev` run that never made it into version control)
+--   - apps/**/*.ts and packages/**/*.ts (no reads, writes, or type references; the WORD
+--     "escrowed" appears only in reconciliation-core.ts comments, which mean a different thing)
+--
+-- Phase 7.13 Phase 0 v2's pg_dump diff vs fresh-DB snapshot surfaced 151 lines of drift
+-- driven by these two orphans. This migration closes that drift so future `prisma migrate
+-- diff` runs return clean.
+--
+-- The original backlog item called for "drop the orphan EscrowStatus enum." Recon for
+-- this plan surfaced the larger scope: the enum has a live column dependent (Escrow.status
+-- in the Escrow table), and the Escrow table itself is also orphan (0 rows on dev; no
+-- code, schema, or current-migration references). So this migration drops BOTH.
+--
+-- Pre-flight (Gate 0): operator MUST run on dev + staging + prod BEFORE applying:
+--   (a) Confirm presence per env: pg_class for Escrow + pg_type for EscrowStatus
+--   (b) [if table present] Confirm Escrow row count is 0 — if >0, STOP and investigate
+--       FK to Order before approving the drop in that env
+--   (c) [if enum present] Confirm ONLY Escrow.status references the enum — if anything
+--       else does, the cleanup scope is wider than this plan anticipated; STOP and replan
+-- See PR body for the full Gate 0 query + decision matrix.
+--
+-- IF EXISTS on both DROPs makes the migration:
+--   - Safe to run on envs where the orphan never existed (no-op)
+--   - Safe to retry after a partial failure
+--   - Cross-env safe — same migration file applies cleanly whether the env had the drift or not
+--
+-- Order matters: DROP TABLE first (removes the `status` column dependent on EscrowStatus),
+-- then DROP TYPE (now no dependents → succeeds even without CASCADE).
+--
+-- These are non-CONCURRENT DDL operations. Both can live in the same migration file —
+-- the 7.13.2B split-rule (multi-statement files break CONCURRENTLY ops) does NOT apply
+-- here because neither operation uses CONCURRENTLY. Plain DROP TABLE / DROP TYPE happily
+-- run inside the implicit tx that prisma@7.8.0 wraps multi-statement files in.
+
+DROP TABLE IF EXISTS "Escrow";
+DROP TYPE IF EXISTS "EscrowStatus";
