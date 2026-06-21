@@ -1,0 +1,52 @@
+-- Phase 7.14 — close #23 FulfillmentAssignment claim race.
+-- Partial unique index over orderId, scoped to actively-claimed statuses.
+--
+-- The race (Phase 7.12 audit #23): order-fulfillment-assignment.service.ts:claim()
+-- did a findFirst pre-check OUTSIDE its transaction, then called upsertAssignment
+-- which did updateMany({CANCELLED}) → create({ASSIGNED}) inside a tx. Two concurrent
+-- claims both passed the pre-check, both entered the tx, both cancelled each other's
+-- would-be row and both created fresh rows — final state had ONE row but BOTH Ops
+-- got a successful Promise back. The "loser" thought they owned work that the
+-- "winner" actually cancelled.
+--
+-- The partial unique below makes the race structurally impossible at the DB level:
+-- between any two concurrent claims, the second-to-commit hits P2002, which the
+-- app layer maps to ConflictException — same user-facing error the (race-leaky)
+-- pre-check used to return. ASSIGNED + IN_PROGRESS are the "actively claimed"
+-- statuses per the FulfillmentAssignmentStatus enum; DELIVERED + CANCELLED are
+-- terminal and excluded from the unique predicate (so a CANCELLED row from a
+-- prior reassignment doesn't block a fresh claim on the same order).
+--
+-- The `upsertAssignment` helper at lines 50-73 stays as-is — its cancel-then-create
+-- pattern remains safe under the new constraint because both statements run in the
+-- same tx: the cancel flips old rows OUT of the partial-unique predicate before
+-- the create flips a new row IN. Concurrent claims still fail at the create step
+-- exactly as designed.
+--
+-- CONCURRENTLY: online build, no write blocking. Verified on the pinned
+-- prisma@7.8.0 via Phases 7.13.1, 7.13.2A, and 7.13.2B — the migrate runner
+-- does NOT wrap single-statement migration files in a transaction, so this
+-- file (one statement) runs outside any tx. No directive header needed.
+-- (Multi-statement files are an exception; that's why this PR keeps the
+-- migration to a single statement — same rule that drove 7.13.2B's split.)
+--
+-- Pre-flight (Gate 0): operator MUST sweep existing dupes on dev + staging + prod
+-- before this migration applies. Query in PR body. Non-zero results require manual
+-- collapse (cancel-all-but-newest per orderId) before the CREATE INDEX can succeed.
+--
+-- Recovery if the CONCURRENTLY build fails mid-flight: Postgres leaves
+-- indisvalid=false; planner ignores. Clean up via:
+--   DROP INDEX CONCURRENTLY IF EXISTS "FulfillmentAssignment_orderId_active_unique";
+-- Then re-run after addressing the failure cause (typically: pre-flight wasn't
+-- actually clean, or new dupes raced in between sweep and migration).
+--
+-- IF NOT EXISTS: PG 12+ supports this on CONCURRENTLY; dev runs PG 17.10.
+-- Mirrors the IF EXISTS idiom used in Phase 7.13.2B's DROP migration. Extra
+-- operator-retry safety beyond Prisma's migration tracking — if an operator
+-- has built the index out-of-band (e.g. as part of pre-flight troubleshooting)
+-- before this migration runs, the CREATE here is idempotent rather than
+-- erroring with "relation already exists."
+
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "FulfillmentAssignment_orderId_active_unique"
+  ON "FulfillmentAssignment"("orderId")
+  WHERE status IN ('ASSIGNED', 'IN_PROGRESS');
