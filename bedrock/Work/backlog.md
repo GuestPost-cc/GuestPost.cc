@@ -8,7 +8,7 @@ updated: 2026-06-22
 
 Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 (the 2026-06-15 batch's §11 closed at 31/31 on 2026-06-21).
 
-**2026-06-22 audit dashboard: 1/41 closed** (7 Critical + 15 High + 18 Medium open). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX). **Phase 8.7 closed #38** (payout worker `handleExecute` no-op stub — see §12 of the audit doc; PR pending).
+**2026-06-22 audit dashboard: 3/41 closed** (6 Critical + 14 High + 18 Medium open). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX). **Closed**: #38 (Phase 8.7 — PR #19 merged), #4 (Phase 8.4 — invalid finding; verified already-fixed; spec coverage added), #41 (Phase 8.9 — onError callback + factory; PR pending). See §12 of the audit doc.
 
 ## Phase 8.X — Close 2026-06-22 audit findings (new batch, mirrors 6.6→7.14 pattern)
 
@@ -19,7 +19,7 @@ Suggested ordering by criticality + dependency. Each finding number maps to `bed
 - [ ] **Phase 8.1 — Settlement returnToReview race** (#1). Add version-guard to `settlements.service.ts:450`; increment version on every transition.
 - [ ] **Phase 8.2 — releaseFundsInternal Order.status version guard** (#2). Fetch fresh order with version before `settlements.service.ts:584`; updateMany with version + conflict check.
 - [ ] **Phase 8.3 — Payout webhook idempotency dedupKey** (#3). Add `dedupKey: 'payout-webhook:${provider}:${providerExecutionId}'` to queue.add() call; worker rejects jobs without one.
-- [ ] **Phase 8.4 — Settlement auto-approve audit log per sweep** (#4). Add `prisma.auditLog.create()` per approved settlement in `settlement-auto-approve.processor.ts`.
+- [x] **Phase 8.4 — Settlement auto-approve audit log per sweep** (#4). ✅ DONE 2026-06-22 (commit `4185cf1` on branch `phase-8.4-8.9-settlement-auto-approve-hardening`; PR pending). **Invalid finding** — recon verified the core at `packages/shared/src/settlement-auto-approve-core.ts:136-149` has written the audit log row since Phase 7.3; the audit reviewed the processor file in isolation and missed the delegation. No production code changed; tightened the existing Phase 7.3 spec at `apps/api/src/__tests__/phase-7-3-auto-approve-worker.spec.ts:104-122` with payload-shape assertions so a future change cannot silently drop the row's load-bearing fields.
 - [ ] **Phase 8.5 — Lazy queueServiceRef race fix** (#5). Move `queueServiceRef = app.get(QueueService)` before Better Auth handler mount OR switch to `OnModuleInit` injection pattern.
 - [x] **Phase 7.10.2.1 — CI integration template-DB step + Spec 2** (#6). Already named in NOW.md. Closes Critical #6.
 - [ ] **Phase 8.6 — Adapter-pg pool sizing** (#7). Document per-replica formula; parameterize `max` via `PRISMA_POOL_MAX` env var; add 80% utilization alert. (Production-blocker only at multi-replica scale-up.)
@@ -27,7 +27,7 @@ Suggested ordering by criticality + dependency. Each finding number maps to `bed
 
 **High (15):** see `bedrock/Views/audits/platform-audit-2026-06-22.md` §2 findings #8 through #19, plus follow-up #39, #40, #41. Likely bundles:
 - **Phase 8.8 — Payout-flow hardening bundle** (#39 Stripe reversal Idempotency-Key, #40 cancelExecution two-phase pattern). Companion to 8.7 — together they harden the cancel path end-to-end.
-- **Phase 8.9 — Settlement auto-approve catch fix** (#41). Tiny scope — bind error to variable + Sentry.captureException + structured logger emit + keep skipped++ + test injecting an error. Can ride with 8.4 (audit log per sweep) since they touch the same processor.
+- [x] **Phase 8.9 — Settlement auto-approve catch fix** (#41). ✅ DONE 2026-06-22 (commits `6208320` + `fd5d8d7` + `e3476bf` on branch `phase-8.4-8.9-settlement-auto-approve-hardening`; PR pending). Added `onError?: (err, settlementId) => void` to `RunSettlementAutoApproveOptions` + new `makeAutoApproveOnError(hooks, jobName, sweepRunId)` factory in `@guestpost/shared`. Processor passes injected hooks so `packages/shared` stays Sentry-free (preserves the established shared-core convention). Sentry call uses `fingerprint: ['settlement-auto-approve', settlementId]` for issue-grouping under burst failures. Defensive inner try/catch around `opts.onError` so a buggy handler can't kill the sweep. 9 new tests (2 in Phase 7.3 spec + 7 in new Phase 8.9 spec — 4 factory contract + 3 adoption guard).
 - **Phase 8.10 — Database hardening bundle** (#11 enum-drift static specs, #12 CASCADE→SetNull, #13 JSON validation + payout key-rotation runbook).
 - **Phase 8.11 — Infra/CI cleanup bundle** (#15 mailpit + worker healthchecks, #16 .env.example DATABASE_URL flag, #17 workflow consolidation, #19 JWT_SECRET hard check).
 - **Phase 8.12 — Operational resilience bundle** (#8 Redis client timeouts, #9 DNS-rebinding pool-reuse guard).
