@@ -8,7 +8,7 @@ updated: 2026-06-22
 
 Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 (the 2026-06-15 batch's §11 closed at 31/31 on 2026-06-21).
 
-**2026-06-22 audit dashboard: 3/41 closed** (6 Critical + 14 High + 18 Medium open). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX). **Closed**: #38 (Phase 8.7 — PR #19 merged), #4 (Phase 8.4 — invalid finding; verified already-fixed; spec coverage added), #41 (Phase 8.9 — onError callback + factory; PR pending). See §12 of the audit doc.
+**2026-06-22 audit dashboard: 5/41 closed** (4 Critical + 14 High + 18 Medium open). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX). **Closed**: #38 (Phase 8.7 — PR #19 merged), #4 (Phase 8.4 — invalid finding; PR #20 merged), #41 (Phase 8.9 — onError callback + factory; PR #20 merged), #1 (Phase 8.1 — returnToReview version-guard; PR pending), #2 (Phase 8.2 — releaseFundsInternal Order.version guard; PR pending). See §12 of the audit doc.
 
 ## Phase 8.X — Close 2026-06-22 audit findings (new batch, mirrors 6.6→7.14 pattern)
 
@@ -16,8 +16,8 @@ Suggested ordering by criticality + dependency. Each finding number maps to `bed
 
 **Critical (7):**
 
-- [ ] **Phase 8.1 — Settlement returnToReview race** (#1). Add version-guard to `settlements.service.ts:450`; increment version on every transition.
-- [ ] **Phase 8.2 — releaseFundsInternal Order.status version guard** (#2). Fetch fresh order with version before `settlements.service.ts:584`; updateMany with version + conflict check.
+- [x] **Phase 8.1 — Settlement returnToReview race** (#1). ✅ DONE 2026-06-22 (commit `35d0d31` on branch `phase-8.1-8.2-settlement-race-windows`; PR pending). Changed `tx.settlement.update` → `tx.settlement.updateMany` with `where: { id, status: "CUSTOMER_APPROVED", version: settlement.version }` + `data: { ..., version: { increment: 1 } }` + `ConflictException` on `count === 0` + `findUniqueOrThrow` refetch. Matches the 6 sibling-site convention.
+- [x] **Phase 8.2 — releaseFundsInternal Order.status version guard** (#2). ✅ DONE 2026-06-22 (commit `a21de33` on branch `phase-8.1-8.2-settlement-race-windows`; PR pending). Extended `tx.order.findUnique` `select` with `version` (+ all 4 other downstream-consumed fields enumerated by recon); changed `tx.order.update` → `tx.order.updateMany` with version guard + `ConflictException`. Status-only predicate intentionally omitted (callers pass orders in varying legitimate pre-states). Defensive `NotFoundException` added for null-order. 6 new tests in `phase-8-1-8-2-settlement-race-windows.spec.ts`.
 - [ ] **Phase 8.3 — Payout webhook idempotency dedupKey** (#3). Add `dedupKey: 'payout-webhook:${provider}:${providerExecutionId}'` to queue.add() call; worker rejects jobs without one.
 - [x] **Phase 8.4 — Settlement auto-approve audit log per sweep** (#4). ✅ DONE 2026-06-22 (commit `4185cf1` on branch `phase-8.4-8.9-settlement-auto-approve-hardening`; PR pending). **Invalid finding** — recon verified the core at `packages/shared/src/settlement-auto-approve-core.ts:136-149` has written the audit log row since Phase 7.3; the audit reviewed the processor file in isolation and missed the delegation. No production code changed; tightened the existing Phase 7.3 spec at `apps/api/src/__tests__/phase-7-3-auto-approve-worker.spec.ts:104-122` with payload-shape assertions so a future change cannot silently drop the row's load-bearing fields.
 - [ ] **Phase 8.5 — Lazy queueServiceRef race fix** (#5). Move `queueServiceRef = app.get(QueueService)` before Better Auth handler mount OR switch to `OnModuleInit` injection pattern.
