@@ -16,6 +16,10 @@ describe("PayoutWebhookController — signature verification", () => {
   let controller: PayoutWebhookController
   let queueMock: any
 
+  // Default test payload — Wise-shape (data.id), used by both providers via
+  // normalizeProviderWebhook's envelope-or-inner tolerance. The Stripe-specific
+  // "queues a correctly signed Stripe webhook" test overrides with the real
+  // Stripe envelope shape so the Phase 8.3 jobId dedup path is exercised.
   const payload = JSON.stringify({ data: { id: "transfer-1", status: "COMPLETED" }, event: "transfer.state-change" })
   const rawBody = Buffer.from(payload, "utf8")
 
@@ -69,12 +73,25 @@ describe("PayoutWebhookController — signature verification", () => {
     ).rejects.toThrow(UnauthorizedException)
   })
 
-  it("queues a correctly signed Stripe webhook", async () => {
+  it("queues a correctly signed Stripe webhook with deterministic jobId (Phase 8.3 / audit #3)", async () => {
     process.env.STRIPE_PAYOUT_WEBHOOK_SECRET = "whsec_test"
-    const sig = stripeSig("whsec_test", payload)
-    const result = await controller.handleWebhook("stripe_connect", { "stripe-signature": sig }, { rawBody } as any)
+    // Use the real Stripe envelope shape so normalizeProviderWebhook extracts
+    // data.object.id = "tr_phase83" → jobId = "payout-webhook:stripe_connect:tr_phase83".
+    const stripePayload = JSON.stringify({
+      id: "evt_phase83",
+      type: "transfer.updated",
+      data: { object: { id: "tr_phase83", status: "paid" } },
+    })
+    const stripeRaw = Buffer.from(stripePayload, "utf8")
+    const sig = stripeSig("whsec_test", stripePayload)
+    const result = await controller.handleWebhook("stripe_connect", { "stripe-signature": sig }, { rawBody: stripeRaw } as any)
     expect(result).toEqual({ received: true, jobId: "job-1" })
-    expect(queueMock.addJob).toHaveBeenCalledWith("payout", "payout-webhook", expect.objectContaining({ verified: true, provider: "stripe_connect" }))
+    expect(queueMock.addJob).toHaveBeenCalledWith(
+      "payout",
+      "payout-webhook",
+      expect.objectContaining({ verified: true, provider: "stripe_connect" }),
+      { jobId: "payout-webhook:stripe_connect:tr_phase83" },
+    )
   })
 
   it("rejects Wise webhook when no public key is configured (fail closed)", async () => {
@@ -99,7 +116,14 @@ describe("PayoutWebhookController — signature verification", () => {
 
     const result = await controller.handleWebhook("wise", { "x-signature-sha256": signature }, { rawBody } as any)
     expect(result).toEqual({ received: true, jobId: "job-1" })
-    expect(queueMock.addJob).toHaveBeenCalledWith("payout", "payout-webhook", expect.objectContaining({ verified: true, provider: "wise" }))
+    // Phase 8.3 (audit #3) — normalizer pulls data.id as the providerExecutionId
+    // for Wise via inner.resource.id ?? inner.id fallback → deterministic jobId.
+    expect(queueMock.addJob).toHaveBeenCalledWith(
+      "payout",
+      "payout-webhook",
+      expect.objectContaining({ verified: true, provider: "wise" }),
+      { jobId: "payout-webhook:wise:transfer-1" },
+    )
   })
 })
 

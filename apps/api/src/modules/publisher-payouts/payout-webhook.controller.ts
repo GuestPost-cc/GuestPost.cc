@@ -3,7 +3,7 @@ import type { RawBodyRequest } from "@nestjs/common"
 import type { Request } from "express"
 import { createHmac, createVerify, timingSafeEqual } from "crypto"
 import { QueueService } from "../queues/queue.service"
-import { QUEUES } from "@guestpost/shared"
+import { QUEUES, normalizeProviderWebhook } from "@guestpost/shared"
 import { Public } from "../../common/decorators/public.decorator"
 
 const STRIPE_TIMESTAMP_TOLERANCE_SECONDS = 300
@@ -49,13 +49,47 @@ export class PayoutWebhookController {
       throw new BadRequestException("Invalid JSON body")
     }
 
-    const job = await this.queue.addJob(QUEUES.PAYOUT, "payout-webhook", {
-      provider,
-      event: body.type ?? body.event ?? "unknown",
-      data: body.data ?? body,
-      verified: true,
-      receivedAt: new Date().toISOString(),
-    })
+    const eventType = body.type ?? body.event ?? "unknown"
+    const data = body.data ?? body
+
+    // Phase 8.3 (audit #3) — BullMQ-native dedup. Replay protection: two
+    // identical webhook payloads (provider retry, ops re-trigger, network
+    // duplicate) produce the same jobId and the second enqueue becomes a
+    // no-op for the dedup window bounded by the PAYOUT queue's
+    // removeOnComplete policy (`{ count: 100, age: 86400 }` → ~24h / 100
+    // jobs whichever first). We reuse normalizeProviderWebhook from
+    // @guestpost/shared rather than duplicating payload-shape extraction —
+    // single source of truth means future provider-shape changes update
+    // both the worker's status path AND our dedup keying together.
+    const normalized = normalizeProviderWebhook(provider, data)
+    const providerExecutionId = normalized.providerExecutionId
+
+    if (!providerExecutionId && (provider === "stripe_connect" || provider === "wise")) {
+      // Drift visibility: signature already passed, payload is genuine, but
+      // we couldn't pull a transfer id. Probably a non-transfer event type
+      // (account.updated, payout.created without object.id, etc.). Log so
+      // drift is investigable; fall through with auto-id (current behavior).
+      this.logger.warn(
+        `unable to derive payout webhook dedup key (provider=${provider} eventType=${eventType})`,
+      )
+    }
+
+    const jobIdOverride = providerExecutionId
+      ? { jobId: `payout-webhook:${provider}:${providerExecutionId}` }
+      : undefined
+
+    const job = await this.queue.addJob(
+      QUEUES.PAYOUT,
+      "payout-webhook",
+      {
+        provider,
+        event: eventType,
+        data,
+        verified: true,
+        receivedAt: new Date().toISOString(),
+      },
+      jobIdOverride,
+    )
 
     this.logger.log(`Verified webhook from ${provider} queued as job ${job.id}`)
     return { received: true, jobId: job.id }
