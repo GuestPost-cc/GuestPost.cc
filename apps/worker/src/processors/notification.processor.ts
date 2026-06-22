@@ -3,8 +3,8 @@ import {
   getDedupHitsTotal,
   incrementDedupHits,
   isUniqueViolation,
-  verifyJobPayload,
 } from "@guestpost/shared"
+import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { prisma } from "@guestpost/database"
 import { connection } from "../redis"
 import { createObservableWorker } from "../lib/queue-observability"

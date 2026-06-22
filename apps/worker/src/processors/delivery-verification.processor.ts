@@ -1,5 +1,6 @@
 import { connection } from "../redis"
-import { QUEUES, verifyJobPayload } from "@guestpost/shared"
+import { QUEUES } from "@guestpost/shared"
+import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { isRepeatableJob } from "../repeatable-job-registry"
 import { createObservableWorker } from "../lib/queue-observability"
 // Node-only deep imports keep cheerio + aws-sdk + undici/dns out of the

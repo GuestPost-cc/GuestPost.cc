@@ -1,5 +1,6 @@
 import { connection } from "../redis"
-import { QUEUES, verifyJobPayload, recomputePublisherTrustCore } from "@guestpost/shared"
+import { QUEUES, recomputePublisherTrustCore } from "@guestpost/shared"
+import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"

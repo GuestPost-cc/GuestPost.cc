@@ -1,7 +1,8 @@
 export * from "./types"
 export * from "./constants"
 export * from "./queues"
-export * from "./job-signing"
+// NOT re-exported: job-signing uses Node crypto (HMAC) — server-only.
+// Consumer deep-import via `@guestpost/shared/dist/job-signing`.
 export * from "./payout-status"
 export * from "./payout-webhook"
 export * from "./reconciliation-core"
