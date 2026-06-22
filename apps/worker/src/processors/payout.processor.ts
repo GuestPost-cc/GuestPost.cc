@@ -1,5 +1,6 @@
 import { connection } from "../redis"
-import { QUEUES, verifyJobPayload, checkProviderTransferStatus, normalizeProviderWebhook } from "@guestpost/shared"
+import { QUEUES, checkProviderTransferStatus, normalizeProviderWebhook } from "@guestpost/shared"
+import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { isRepeatableJob } from "../repeatable-job-registry"
 import { prisma } from "@guestpost/database"
 import { createObservableWorker } from "../lib/queue-observability"

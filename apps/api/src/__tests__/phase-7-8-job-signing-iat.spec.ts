@@ -4,11 +4,7 @@
  * Imports from source (not dist) so the test reflects in-flight edits
  * without needing a rebuild of @guestpost/shared.
  */
-import {
-  signJobPayload,
-  verifyJobPayload,
-  SIGNED_PAYLOAD_VERSION,
-} from "@guestpost/shared"
+import { signJobPayload, verifyJobPayload, SIGNED_PAYLOAD_VERSION } from "@guestpost/shared/dist/job-signing"
 
 const ORIGINAL_SECRET = process.env.QUEUE_SIGNING_SECRET
 beforeAll(() => {

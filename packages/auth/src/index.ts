@@ -3,14 +3,14 @@ import { prismaAdapter } from "better-auth/adapters/prisma"
 import { bearer } from "better-auth/plugins/bearer"
 import { prisma } from "@guestpost/database"
 import { toNodeHandler } from "better-auth/node"
-import { emailRateLimitPlugin, type EmailRateLimitOptions } from "./plugins/email-rate-limit"
-import { renderVerificationEmail } from "./email-templates/verification"
+import { emailRateLimitPlugin, type EmailRateLimitOptions } from "./plugins/email-rate-limit.js"
+import { renderVerificationEmail } from "./email-templates/verification.js"
 
 export { toNodeHandler }
-export { emailRateLimitPlugin } from "./plugins/email-rate-limit"
+export { emailRateLimitPlugin } from "./plugins/email-rate-limit.js"
 export type { EmailRateLimitOptions }
-export { renderVerificationEmail } from "./email-templates/verification"
-export type { VerificationEmailContext } from "./email-templates/verification"
+export { renderVerificationEmail } from "./email-templates/verification.js"
+export type { VerificationEmailContext } from "./email-templates/verification.js"
 
 // Fail closed: silently trusting localhost origins in production would relax
 // origin checking on a money platform. Same pattern as QUEUE_SIGNING_SECRET.

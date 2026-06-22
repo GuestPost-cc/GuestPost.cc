@@ -1,6 +1,7 @@
 import { Queue } from "bullmq"
 import { connection } from "./redis"
-import { QUEUES, QUEUE_JOBS, signJobPayload, trustRecomputeJobOptions } from "@guestpost/shared"
+import { QUEUES, QUEUE_JOBS, trustRecomputeJobOptions } from "@guestpost/shared"
+import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 
 const logger = createLogger("worker.trust-enqueue")

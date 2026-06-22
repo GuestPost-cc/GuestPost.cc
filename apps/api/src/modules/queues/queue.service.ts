@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common"
 import { Queue, QueueOptions, JobsOptions } from "bullmq"
-import { QUEUES, QUEUE_JOBS, signJobPayload, trustRecomputeJobOptions } from "@guestpost/shared"
+import { QUEUES, QUEUE_JOBS, trustRecomputeJobOptions } from "@guestpost/shared"
+import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 // Deep import: request-context uses node:async_hooks and is not in the
 // shared barrel.
 import { getRequestId } from "@guestpost/shared/dist/observability/request-context"

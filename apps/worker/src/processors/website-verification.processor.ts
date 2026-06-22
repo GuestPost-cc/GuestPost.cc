@@ -1,5 +1,6 @@
 import { connection } from "../redis"
-import { QUEUES, verifyJobPayload, runWebsiteVerify, runWebsiteReverifySweep } from "@guestpost/shared"
+import { QUEUES, runWebsiteVerify, runWebsiteReverifySweep } from "@guestpost/shared"
+import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createObservableWorker } from "../lib/queue-observability"
 // Node-only DNS lookup — deep import keeps node `dns` out of the shared index
 // (which the browser apps bundle).

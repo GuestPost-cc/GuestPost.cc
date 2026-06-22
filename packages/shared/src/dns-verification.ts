@@ -2,13 +2,18 @@
 // framework deps and (deliberately) no node `dns` import so this module is safe
 // to bundle into browser apps. The actual TXT lookup lives in ./dns-lookup
 // (node-only) and is NOT re-exported from the package index.
-import { randomBytes } from "crypto"
-
 export const VERIFICATION_TXT_PREFIX = "guestpost-verification"
 
 // 32 bytes entropy, URL-safe base64url, no padding.
+// Uses Web Crypto API (globalThis.crypto.getRandomValues) instead of
+// node:crypto so this module stays browser-bundle-safe.
 export function generateVerificationToken(): string {
-  return randomBytes(32).toString("base64url")
+  const bytes = new Uint8Array(32)
+  globalThis.crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "")
 }
 
 export function verificationTxtValue(token: string): string {

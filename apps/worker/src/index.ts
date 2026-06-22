@@ -26,7 +26,8 @@ import { createSettlementAutoApproveWorker } from "./processors/settlement-auto-
 import { connection } from "./redis"
 import { prisma } from "@guestpost/database"
 import { Queue } from "bullmq"
-import { QUEUES, signJobPayload } from "@guestpost/shared"
+import { QUEUES } from "@guestpost/shared"
+import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { startHealthServer, type HealthServerHandle } from "./lib/health-server"
 
