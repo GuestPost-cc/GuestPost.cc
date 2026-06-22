@@ -447,10 +447,22 @@ export class SettlementsService {
     }
 
     return this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.settlement.update({
-        where: { id },
-        data: { status: "UNDER_REVIEW" },
+      // Phase 8.1 (audit #1) — version-guarded transition. The pre-tx status
+      // check at line 445 reads a stale snapshot; a concurrent adminApprove
+      // racing this would have silently corrupted the status (e.g. flipped a
+      // RELEASED settlement back to UNDER_REVIEW). Now we move the status
+      // predicate into the where clause + add the version guard, matching the
+      // 6 sibling sites in this file (customerApprove, adminApprove, etc.).
+      const transitioned = await tx.settlement.updateMany({
+        where: { id, status: "CUSTOMER_APPROVED", version: settlement.version },
+        data: { status: "UNDER_REVIEW", version: { increment: 1 } },
       })
+      if (transitioned.count === 0) {
+        throw new ConflictException(
+          "Settlement was modified by another request (likely admin-approved or released). Refresh and retry.",
+        )
+      }
+      const updated = await tx.settlement.findUniqueOrThrow({ where: { id } })
 
       // Remove stale customer approval so the customer can approve again
       // (unique [settlementId, type] would otherwise block re-approval forever).
