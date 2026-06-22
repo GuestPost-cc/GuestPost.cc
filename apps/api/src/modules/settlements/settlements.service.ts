@@ -447,10 +447,22 @@ export class SettlementsService {
     }
 
     return this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.settlement.update({
-        where: { id },
-        data: { status: "UNDER_REVIEW" },
+      // Phase 8.1 (audit #1) — version-guarded transition. The pre-tx status
+      // check at line 445 reads a stale snapshot; a concurrent adminApprove
+      // racing this would have silently corrupted the status (e.g. flipped a
+      // RELEASED settlement back to UNDER_REVIEW). Now we move the status
+      // predicate into the where clause + add the version guard, matching the
+      // 6 sibling sites in this file (customerApprove, adminApprove, etc.).
+      const transitioned = await tx.settlement.updateMany({
+        where: { id, status: "CUSTOMER_APPROVED", version: settlement.version },
+        data: { status: "UNDER_REVIEW", version: { increment: 1 } },
       })
+      if (transitioned.count === 0) {
+        throw new ConflictException(
+          "Settlement was modified by another request (likely admin-approved or released). Refresh and retry.",
+        )
+      }
+      const updated = await tx.settlement.findUniqueOrThrow({ where: { id } })
 
       // Remove stale customer approval so the customer can approve again
       // (unique [settlementId, type] would otherwise block re-approval forever).
@@ -498,9 +510,20 @@ export class SettlementsService {
     // Separation of duties: for platform inventory the fulfiller may not also
     // release the settlement. Look up the order's ownership + active delivery
     // submitter and block self-release.
+    // Phase 8.2 (audit #2) — version is needed for the guarded Order.status
+    // updateMany at the end of this method. Field list enumerated by recon:
+    // every `order.<field>` access in releaseFundsInternal (activeDeliveryVersionId,
+    // fulfillmentChannel, organizationId, website.ownershipType) plus version.
     const order = await tx.order.findUnique({
       where: { id: settlement.orderId },
-      include: { website: { select: { ownershipType: true } } },
+      select: {
+        id: true,
+        version: true,
+        activeDeliveryVersionId: true,
+        fulfillmentChannel: true,
+        organizationId: true,
+        website: { select: { ownershipType: true } },
+      },
     })
     if (order) {
       const active = order.activeDeliveryVersionId
@@ -581,10 +604,25 @@ export class SettlementsService {
 
     // Settlement released = order fully closed. COMPLETED is the terminal state;
     // post-release clawback still works (COMPLETED is refundable).
-    await tx.order.update({
-      where: { id: settlement.orderId },
-      data: { status: "COMPLETED" },
+    //
+    // Phase 8.2 (audit #2) — version-guarded so a concurrent order mutation
+    // (customer dispute, force-cancel) doesn't get silently overwritten. We
+    // intentionally do NOT add a status predicate: releaseFundsInternal is
+    // called from adminApprove + forceApprove with order in varying legitimate
+    // pre-states (APPROVED / IN_PROGRESS / etc.); version-only is the safer
+    // guard. If a status invariant is later proven, tighten the predicate.
+    // `order` may be null (the pre-existing null-check on line 517 covers
+    // the SoD branch); if null at this point we still need to handle it.
+    if (!order) throw new NotFoundException("Order not found for settlement release")
+    const orderUpdated = await tx.order.updateMany({
+      where: { id: settlement.orderId, version: order.version },
+      data: { status: "COMPLETED", version: { increment: 1 } },
     })
+    if (orderUpdated.count === 0) {
+      throw new ConflictException(
+        "Order state changed during settlement release. Refresh and retry.",
+      )
+    }
 
     // Event-driven trust recompute (proven completion + payout released).
     await this.queue.enqueueTrustRecompute(settlement.publisherId, "SETTLEMENT_RELEASED", `settlement ${settlementId} released`)
