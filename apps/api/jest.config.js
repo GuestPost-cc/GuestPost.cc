@@ -23,7 +23,10 @@
 // matching how jest actually runs them. The full-program type-check is the
 // job of `pnpm typecheck` (turbo-driven, runs tsc --noEmit), not jest.
 const sharedTransform = { "^.+\\.ts$": ["ts-jest", { isolatedModules: true }] }
+const stripJsExtension = "^(\\.{1,2}/.*)\\.js$"
+const stripJsMapping = { [stripJsExtension]: "$1" }
 const baseModuleNameMapperFromSrc = {
+  ...stripJsMapping,
   "^@guestpost/database$": "<rootDir>/../../../packages/database/src",
   "^@guestpost/shared/dist/dns-lookup$": "<rootDir>/../../../packages/shared/src/dns-lookup",
   "^@guestpost/shared/dist/delivery-verification-core$": "<rootDir>/../../../packages/shared/src/delivery-verification-core",
@@ -69,6 +72,7 @@ module.exports = {
       transform: sharedTransform,
       testEnvironment: "node",
       moduleNameMapper: {
+        ...stripJsMapping,
         "^@guestpost/database$": "<rootDir>/../../../../../packages/database/src",
         "^@guestpost/shared/dist/dns-lookup$": "<rootDir>/../../../../../packages/shared/src/dns-lookup",
         "^@guestpost/shared/dist/delivery-verification-core$": "<rootDir>/../../../../../packages/shared/src/delivery-verification-core",
