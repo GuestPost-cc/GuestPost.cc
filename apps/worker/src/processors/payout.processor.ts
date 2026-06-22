@@ -79,23 +79,6 @@ async function failExecution(execution: any, source: string, errorMessage: strin
   })
 }
 
-async function handleExecute(job: any) {
-  const { withdrawalId, providerName } = job.data
-  if (!withdrawalId || !providerName) {
-    throw new Error("Missing withdrawalId or providerName in job data")
-  }
-  logger.info("processing withdrawal", { withdrawalId, providerName })
-  const withdrawal = await prisma.withdrawal.findUnique({
-    where: { id: withdrawalId },
-  })
-  if (!withdrawal) throw new Error(`Withdrawal ${withdrawalId} not found`)
-  if (withdrawal.status !== "APPROVED" && withdrawal.status !== "PROCESSING") {
-    logger.warn("withdrawal not eligible — skipping", { withdrawalId, status: withdrawal.status })
-    return { skipped: true, reason: `Status is ${withdrawal.status}` }
-  }
-  return { withdrawalId, providerName, queued: true }
-}
-
 async function handleCheckStatus(job: any) {
   const limit = job.data.limit ?? 50
   const pendingExecutions = await prisma.payoutExecution.findMany({
@@ -198,15 +181,15 @@ export function createPayoutWorker() {
     QUEUES.PAYOUT,
     async (job) => {
       // Phase 7.8 #27 — payout-check-status (repeatable) bypasses
-      // freshness; ad-hoc payout-execute jobs get a 72h window to
-      // accommodate Wise-outage retry storms across long weekends.
+      // freshness; non-repeatable jobs (currently only payout-webhook)
+      // get a 72h window to accommodate provider-outage retry storms
+      // across long weekends.
       const maxAgeMs = isRepeatableJob(job.name) ? 0 : 72 * 60 * 60 * 1000
       if (!verifyJobPayload(job.data, { maxAgeMs })) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
       switch (job.name) {
-        case "payout-execute": return handleExecute(job)
         case "payout-check-status": return handleCheckStatus(job)
         case "payout-webhook": return handleWebhook(job)
         default:

@@ -719,10 +719,10 @@ README mentioned VPS attempt + abandonment. Current deploy story unclear — lap
 
 ## §12. Remediation Log
 
-This section is intentionally empty and populates phase-by-phase as 2026-06-22 findings close.
+Findings close phase-by-phase here.
 
 | Finding | Status | Closed by | Date | Notes |
 |---|---|---|---|---|
-| (none yet) | | | | |
+| #38 — Payout worker `handleExecute` no-op stub | ✅ Closed | Phase 8.7 (PR pending) | 2026-06-22 | Recon (95% confidence) confirmed dead code: 0 enqueuers, 0 tests, 0 runbook refs, 0 registry entries, stub from day one. Deleted handler + switch arm + `QUEUE_JOBS.PAYOUT.EXECUTE` constant. Shipped 7-case regression guard at `apps/api/src/__tests__/phase-8-7-payout-execute-dead-code.spec.ts` (negative + positive assertions on the surviving 2-arm shape). Cleaned a stale freshness-window comment that still referenced the dead handler. Verification: typecheck + lint + jest (48 suites / 659 tests) + build all green; pre-flight greps clean. Worker now accepts exactly `payout-check-status` (repeatable) + `payout-webhook`. |
 
 ---

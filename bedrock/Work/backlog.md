@@ -8,7 +8,7 @@ updated: 2026-06-22
 
 Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 (the 2026-06-15 batch's §11 closed at 31/31 on 2026-06-21).
 
-**2026-06-22 audit dashboard: 0/41 closed** (8 Critical / 15 High / 18 Medium open — 37 from initial 8-agent synthesis + 4 from follow-up payout-flow probe). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX).
+**2026-06-22 audit dashboard: 1/41 closed** (7 Critical + 15 High + 18 Medium open). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX). **Phase 8.7 closed #38** (payout worker `handleExecute` no-op stub — see §12 of the audit doc; PR pending).
 
 ## Phase 8.X — Close 2026-06-22 audit findings (new batch, mirrors 6.6→7.14 pattern)
 
@@ -23,7 +23,7 @@ Suggested ordering by criticality + dependency. Each finding number maps to `bed
 - [ ] **Phase 8.5 — Lazy queueServiceRef race fix** (#5). Move `queueServiceRef = app.get(QueueService)` before Better Auth handler mount OR switch to `OnModuleInit` injection pattern.
 - [x] **Phase 7.10.2.1 — CI integration template-DB step + Spec 2** (#6). Already named in NOW.md. Closes Critical #6.
 - [ ] **Phase 8.6 — Adapter-pg pool sizing** (#7). Document per-replica formula; parameterize `max` via `PRISMA_POOL_MAX` env var; add 80% utilization alert. (Production-blocker only at multi-replica scale-up.)
-- [ ] **Phase 8.7 — Payout worker handleExecute disambiguation** (#38). FIRST decide: dead code or broken path? Audit `grep -rn 'payout-execute' apps/ packages/` for enqueue sites. If no enqueuer → delete handler + switch arm + add worker-boot grep guard. If enqueuer exists → port `executeWithdrawal` logic into the handler (createTransfer + PayoutExecution row + audit log mirroring API path). Add an integration spec asserting the handler is not a no-op stub.
+- [x] **Phase 8.7 — Payout worker handleExecute disambiguation** (#38). ✅ DONE 2026-06-22 (commits a2f9f73 + b75cf7a + 58b4d0e on branch `phase-8.7-delete-payout-execute-dead-code`; PR pending). Recon (95% confidence) confirmed dead code: 0 enqueuers, 0 tests, 0 runbook refs, 0 registry entries, stub from day one (commit 145bd89). DELETED handler + switch arm + `QUEUE_JOBS.PAYOUT.EXECUTE` constant + stale freshness-window comment reference. Shipped 7-case regression guard at `apps/api/src/__tests__/phase-8-7-payout-execute-dead-code.spec.ts` (negative + positive assertions). apps/api jest: 48 suites / 659 tests all pass.
 
 **High (15):** see `bedrock/Views/audits/platform-audit-2026-06-22.md` §2 findings #8 through #19, plus follow-up #39, #40, #41. Likely bundles:
 - **Phase 8.8 — Payout-flow hardening bundle** (#39 Stripe reversal Idempotency-Key, #40 cancelExecution two-phase pattern). Companion to 8.7 — together they harden the cancel path end-to-end.
