@@ -181,8 +181,9 @@ export function createPayoutWorker() {
     QUEUES.PAYOUT,
     async (job) => {
       // Phase 7.8 #27 — payout-check-status (repeatable) bypasses
-      // freshness; ad-hoc payout-execute jobs get a 72h window to
-      // accommodate Wise-outage retry storms across long weekends.
+      // freshness; non-repeatable jobs (currently only payout-webhook)
+      // get a 72h window to accommodate provider-outage retry storms
+      // across long weekends.
       const maxAgeMs = isRepeatableJob(job.name) ? 0 : 72 * 60 * 60 * 1000
       if (!verifyJobPayload(job.data, { maxAgeMs })) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
