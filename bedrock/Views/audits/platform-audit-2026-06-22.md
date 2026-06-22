@@ -15,7 +15,7 @@ A to Z review of the platform after 14 phases of hardening landed since the 2026
 
 ### Overall posture (one-paragraph verdict)
 
-The platform is **substantially harder than 2026-06-15**: every Critical and High from the prior audit is closed, the production-readiness scorecard moves up across nearly every dimension, and the integration test harness (Phase 7.10.2) finally provides the missing real-DB regression layer. The four largest deltas — Phase 7.7 observability spine, Phase 7.8 security hardening, Phase 7.13 Prisma 7 + adapter-pg, Phase 7.10.2 integration harness — landed cleanly with no rework. Today's audit surfaces **5 net-new Critical findings** (2 settlement-race windows in Money, 2 worker-side gaps in payout-webhook idempotency + settlement-auto-approve audit logging, 1 startup-window race on the email verification queue ref) plus **1 already-tracked Critical** (CI missing the integration-test template-DB step — already on the Phase 7.10.2.1 backlog) plus **1 architectural Critical** (Prisma adapter-pg pool sized for single-replica only — production-blocker if/when the platform scales horizontally). High findings cluster in three groups: new database-shaped maintenance hazards (enum-drift on partial uniques, CASCADE deletes on actor-attribution tables), new infrastructure & deployment gaps (no dedicated Dockerfile healthcheck on worker, .env.example does not flag DATABASE_URL as required, CI workflows drifted on postgres version), and new operational-resilience gaps (Redis client has no timeout / unguarded retries, undici Agent's DNS-rebinding guard does not cover pool-reused connections). None of these require emergency response — the platform is still laptop-only per `bedrock/Memory/infrastructure.md` — but the scale-up to multi-replica production cannot happen until the pool sizing and CI integration gates close.
+The platform is **substantially harder than 2026-06-15**: every Critical and High from the prior audit is closed, the production-readiness scorecard moves up across nearly every dimension, and the integration test harness (Phase 7.10.2) finally provides the missing real-DB regression layer. The four largest deltas — Phase 7.7 observability spine, Phase 7.8 security hardening, Phase 7.13 Prisma 7 + adapter-pg, Phase 7.10.2 integration harness — landed cleanly with no rework. Today's audit surfaces **6 net-new Critical findings** (2 settlement-race windows in Money, 2 worker-side gaps in payout-webhook idempotency + settlement-auto-approve audit logging, 1 startup-window race on the email verification queue ref, plus a follow-up probe surfaced a Critical no-op stub in `payout.processor.ts:handleExecute`) plus **1 already-tracked Critical** (CI missing the integration-test template-DB step — already on the Phase 7.10.2.1 backlog) plus **1 architectural Critical** (Prisma adapter-pg pool sized for single-replica only — production-blocker if/when the platform scales horizontally). High findings cluster in four groups: new database-shaped maintenance hazards (enum-drift on partial uniques, CASCADE deletes on actor-attribution tables), new infrastructure & deployment gaps (no dedicated Dockerfile healthcheck on worker, .env.example does not flag DATABASE_URL as required, CI workflows drifted on postgres version), new operational-resilience gaps (Redis client has no timeout / unguarded retries, undici Agent's DNS-rebinding guard does not cover pool-reused connections), and three additional payout-flow findings from the follow-up probe (missing Stripe reversal Idempotency-Key, cancelExecution calls provider before DB commit, settlement-auto-approve catch-all swallows all errors). None of these require emergency response — the platform is still laptop-only per `bedrock/Memory/infrastructure.md` — but the scale-up to multi-replica production cannot happen until the pool sizing, CI integration gate, and the payout-worker `handleExecute` ambiguity close.
 
 ### Production-readiness scorecard (15 dimensions)
 
@@ -27,7 +27,7 @@ The platform is **substantially harder than 2026-06-15**: every Critical and Hig
 | Auth + global guards | B+ | A− | ↑ | Phase 7.8 email-rate-limit + AuthGuard email-verification gate + job-signing iat. Phase 7.10 verification flow. CSRF still SameSite=Lax-only (acceptable in current threat model). |
 | RBAC granularity | C | A | ↑↑↑ | Phase 6.6/6.7 StaffRolesGuard fail-closed + every handler declares @StaffRoles explicitly + coverage test prevents regressions. |
 | Multi-tenant isolation | A− | A− | — | Unchanged. |
-| Worker idempotency | B | B+ | ↑ | Phase 7.4 notification dedup + Phase 7.8 job-signing iat. Surfaced: payout webhook lacks dedupKey (replay risk if a manually-replayed webhook from ops tooling, see §2 Critical #3). |
+| Worker idempotency | B | B− | ↓ | Phase 7.4 notification dedup + Phase 7.8 job-signing iat improved the baseline. Follow-up probe pulled the grade down: §2 Critical #3 (payout webhook lacks dedupKey), §2 Critical #38 (payout `handleExecute` is a no-op stub), §2 High #39 (Stripe reversal missing Idempotency-Key), §2 High #40 (cancelExecution provider-before-DB-commit), §2 High #41 (auto-approve catch-all swallows errors). Payout flow needs a focused hardening pass before scale-up. |
 | Worker observability | D | A− | ↑↑↑ | Phase 7.7 Sentry + structured logger + /metrics/queues + worker entrypoint. Surfaced: settlement-auto-approve writes no audit log (see §2 Critical #4). |
 | Job signing + queue security | A− | A | ↑ | Phase 7.8 added iat + v to signing payload; verifyJobPayload enforces freshness window (24h default, 0 for repeatable crons) + 60s clock skew. |
 | SSRF + outbound calls | B | A− | ↑↑ | Phase 7.11 safe-fetch (undici Agent + DNS resolution in connection callback + IP validation + 5MB body cap). Edge gap: pool-reused connections do not re-resolve (see §2 High #9). |
@@ -45,7 +45,7 @@ The platform is **substantially harder than 2026-06-15**: every Critical and Hig
 
 | Metric | 2026-06-15 | 2026-06-22 | Δ |
 |---|---|---|---|
-| Numbered findings | 31 (open) | 31 closed + 37 new | +37 net new |
+| Numbered findings | 31 (open) | 31 closed + 41 new | +41 net new |
 | Prior-audit closure rate | — | 31/31 (100%) | — |
 | Prisma migrations | ~50 (baseline) | +10 | +10 |
 | BullMQ processors | 8 | 9 | +1 (`settlement-auto-approve.processor.ts`) |
@@ -152,7 +152,7 @@ build stack
 
 ## §2. Top N Cross-Domain Findings (synthesized + ranked)
 
-37 findings total: 7 Critical, 12 High, 18 Medium. Count not predetermined.
+41 findings total: 8 Critical, 15 High, 18 Medium. Count not predetermined. (Findings #1-#37 from the original 8-agent synthesis pass; findings #38-#41 added in a follow-up payout-flow probe at the end of §2 — kept numerically separate to avoid renumbering cross-references in §3-§11.)
 
 ### Critical (production-blockers / financial integrity / data-exposure)
 
@@ -387,6 +387,50 @@ build stack
 - Impact: If a developer adds a repeatable job in `worker/index.ts` without updating the registry, the new job gets full freshness validation, potentially rejecting valid signed payloads. Spec catches but spec must be run.
 - Fix: Codegen the registry from a single source-of-truth definition. OR add a worker-boot assertion that the registry covers every registered repeatable.
 
+### Late additions — payout-flow follow-up probe (post-synthesis review)
+
+These four findings were added after the initial 8-agent synthesis pass via a targeted manual probe of the payout flow. Numbered #38-#41 to preserve cross-references in §3-§11; severity tier is annotated inline.
+
+**#38. Payout worker `handleExecute` is a no-op stub — silently drops `payout-execute` jobs** *[money, workers]*
+- **Location**: `apps/worker/src/processors/payout.processor.ts:82-97`
+- **Severity**: Critical
+- **Confidence**: high
+- **Impact**: `handleExecute` fetches the withdrawal, validates status, logs, and returns `{ withdrawalId, providerName, queued: true }`. **It never calls any provider adapter, never creates a PayoutExecution row, never sets a providerExecutionId.** The status-poll cron only acts on rows with `providerExecutionId: { not: null }` (line 102), so a withdrawal "processed" through the worker path stays in APPROVED status forever — no money moves, no failure surfaces, the publisher waits indefinitely. The misleading `queued: true` return makes monitoring believe the job succeeded.
+- **Reproduction**: Enqueue a `payout-execute` job (or trigger any caller that does so). Observe: BullMQ marks the job completed; no Stripe/Wise transfer initiated; no PayoutExecution row created; withdrawal stays in APPROVED. The synchronous `POST /admin/payouts/.../execute` path (`payout-execution.service.ts:executeWithdrawal`) is the only code path that actually moves money — but that path doesn't enqueue a worker job, so the worker handler is either dead code or a broken alternative path.
+- **Affected actors**: PUBLISHER (never paid), FINANCE (lifetimePaid not updated), OPERATIONS (silent failure invisible in dashboards), SUPER_ADMIN
+- **Business impact**: money loss (publisher not paid; depending on caller surface, withdrawal balance reconciles incorrectly); operational outage (silent failure with success-shaped telemetry — the worst observability state)
+- **Fix**: Two options: (a) **delete** `handleExecute` + the `case "payout-execute": return handleExecute(job)` switch arm if no caller enqueues `payout-execute` jobs (audit `grep -rn 'payout-execute' apps/ packages/`); OR (b) **implement** the missing logic — call `adapter.createTransfer()` + create PayoutExecution row + transition withdrawal status + audit log (mirroring `payout-execution.service.ts:84-137`). Either way, also add a worker-boot grep guard asserting no job name maps to a `return { queued: true }` stub.
+
+**#39. Stripe Connect `cancelTransfer` reversal POST is missing `Idempotency-Key` header** *[security, workers]*
+- **Location**: `apps/api/src/modules/publisher-payouts/providers/stripe-connect-payout.adapter.ts:108-114`
+- **Severity**: High
+- **Confidence**: high
+- **Impact**: `createTransfer` (line 43) correctly sets `Idempotency-Key`. The reversal call (`POST /v1/transfers/{id}/reversals`) does NOT set the header. On any retry — BullMQ retry, network timeout + replay, manual ops replay — Stripe will create a NEW reversal record each call. Reversals reverse money. Each duplicate reversal pulls funds back from the publisher's connected account.
+- **Reproduction**: `cancelExecution` for a COMPLETED payout → first reversal succeeds (returns 200) → response packet dropped / connection times out → retry hits Stripe again → second reversal succeeds → publisher account is double-debited.
+- **Affected actors**: PUBLISHER (over-debited on retry), FINANCE (reconciliation drift)
+- **Business impact**: money loss (double-reversal pulls extra funds); regulatory dispute (publisher complaint about unauthorized debit)
+- **Fix**: Build a deterministic key and set the header. Suggested key shape: `payout-reversal-${providerExecutionId}` (one reversal allowed per execution; subsequent calls with same key get the existing reversal back, not a new one). Pass an explicit `idempotencyKey: string` parameter through the `cancelTransfer` interface so callers (PayoutExecutionService.cancelExecution) can supply per-attempt keys when intentional re-reversal is needed.
+
+**#40. `cancelExecution` calls provider before DB transaction — race window where money moves but DB doesn't update** *[money]*
+- **Location**: `apps/api/src/modules/publisher-payouts/payout-execution.service.ts:282-309`
+- **Severity**: High
+- **Confidence**: high
+- **Impact**: `cancelExecution` calls `adapter.cancelTransfer(execution.providerExecutionId)` at line 285, then opens a `$transaction` at line 288. If the provider call succeeds but the transaction's `updateMany` returns count=0 (concurrent state change — e.g., webhook flipped status to COMPLETED between the initial fetch and the tx open), the code throws `ConflictException("Execution state changed before cancel could complete")`. Net state: **provider says CANCELLED, DB says PROCESSING (or COMPLETED)**. Reconciliation drift requires manual ops intervention. Contrast with `executeWithdrawal` which uses the safe Tx1-commit → provider call → Tx2-commit pattern.
+- **Reproduction**: Webhook arrives + transitions execution to COMPLETED. Operator clicks Cancel in admin UI moments later. Provider `cancelTransfer` succeeds (Stripe accepts reversal). DB tx opens — `updateMany WHERE status: execution.status` (PROCESSING per the originally-fetched row) returns count=0 because status is now COMPLETED. Exception thrown. Stripe reversal is real; DB has no record.
+- **Affected actors**: PUBLISHER (drift between Stripe and platform views), FINANCE (manual reconciliation cost), OPERATIONS
+- **Business impact**: data inconsistency between provider and platform; money state ambiguous; manual reconciliation effort; potential double-handling if operator re-issues a payout assuming the cancel never happened
+- **Fix**: Restructure to mirror `executeWithdrawal`: (a) Tx1 — refetch under SELECT FOR UPDATE, version-guarded updateMany to a `CANCELLING` intermediate state, audit "CANCEL_REQUESTED"; (b) provider call; (c) Tx2 — finalize to CANCELLED + audit "CANCEL_COMPLETED" OR roll back to original state + audit "CANCEL_FAILED" with safeMessage. Together with #39 (idempotency key on reversal), retry of the provider call from Tx2's catch path becomes safe.
+
+**#41. Settlement auto-approve `catch {}` swallows ALL per-row errors as "skipped"** *[workers, observability]*
+- **Location**: `packages/shared/src/settlement-auto-approve-core.ts:159-164`
+- **Severity**: High
+- **Confidence**: high
+- **Impact**: The `try { ... } catch { skipped++ }` block catches every error type without binding it to a variable, without logging it, without rethrowing it. The comment claims "per-row errors propagate via Sentry from the queue-observability wrapper" — but this is incorrect: if the catch block doesn't rethrow, the outer wrapper sees a normal return, and no exception reaches Sentry. **Every per-row failure** — a TypeError from a stale snapshot, a Prisma constraint violation, a memory error, a logic bug, a database deadlock — is silently counted as "skipped" indistinguishably from the legitimate "version-guard race lost" case (line 157). Sweep returns success with elevated `skipped`. Money-moving sweep failures hide in plain sight.
+- **Reproduction**: Introduce a Prisma schema change that breaks the SettlementApproval upsert (e.g., add a required column without backfilling). Run the sweep. Result: `{ scanned: N, approved: 0, skipped: N, durationMs: ... }` — looks like a quiet day. Sentry: empty. Ops dashboard: green. Reality: settlement state machine is wedged platform-wide.
+- **Affected actors**: PUBLISHERS (settlements stuck), FINANCE (revenue recognition delays), OPERATIONS (no signal), SUPER_ADMIN
+- **Business impact**: silent platform-wide breakage of settlement state machine; reputational risk; potential SLA breach if customer-facing
+- **Fix**: Change the catch to `} catch (err: any) {`. Either (a) `Sentry.captureException(err, { tags: { sweep: 'settlement-auto-approve', settlementId: settlement.id } })` + `logger.error(...)` + `skipped++` + continue; OR (b) re-throw and let the queue-observability wrapper handle Sentry (NOT current behavior despite the comment) — but then a single bad row breaks the whole sweep. The first option preserves sweep robustness while restoring observability. Add a test that injects an error and asserts Sentry.captureException was called.
+
 ---
 
 ## §3. Money Flow Deep Dive (refresh)
@@ -407,7 +451,13 @@ The 2026-06-15 money flow framing (§3.1 domain model, §3.2 happy path, §3.3 r
 
 **Surfaced this audit**: §2 Critical #1 (`returnToReview` race) and #2 (`releaseFundsInternal` Order.status unguarded update). Both are net-new findings — the 2026-06-15 audit's #11–#15 covered other settlement race patterns but missed these two specific update sites. They were below the threshold of the prior audit's spot-checks because they are admin-facing endpoints with assumed low concurrency, but the audit rubric counts "potential" race wins regardless of frequency.
 
-§3.5 idempotency table (per money endpoint) carries forward. Add row: **payout webhook handler** — `Mechanism: version-guard on Execution row` — `Verdict: ⚠️ replay-prone (no job-level dedupKey)`. See §2 Critical #3.
+**Follow-up payout-flow probe** (§2 Late additions #38-#41): four additional findings touch the money flow directly. **#38** (Critical) — `payout.processor.ts:handleExecute` is a no-op stub returning `{ queued: true }` without calling any provider; either dead code or a broken worker path. **#39** (High) — Stripe Connect `cancelTransfer` reversal POST is missing the `Idempotency-Key` header, allowing double-debit of publisher accounts on retry. **#40** (High) — `PayoutExecutionService.cancelExecution` calls the provider before the DB transaction, creating a window where Stripe says CANCELLED but our DB does not. **#41** (High) — settlement-auto-approve sweep catches every per-row error as "skipped" without rethrowing or capturing to Sentry; silent platform-wide breakage shape.
+
+§3.5 idempotency table (per money endpoint) carries forward. Add rows:
+- **payout webhook handler** — `Mechanism: version-guard on Execution row` — `Verdict: ⚠️ replay-prone (no job-level dedupKey)`. See §2 Critical #3.
+- **payout worker `handleExecute`** — `Mechanism: NONE (no-op stub)` — `Verdict: ❌ does not actually execute`. See §2 Critical #38.
+- **Stripe reversal in `cancelTransfer`** — `Mechanism: NONE (no Idempotency-Key header)` — `Verdict: ❌ double-reverses on retry`. See §2 High #39.
+- **`cancelExecution` orchestration** — `Mechanism: provider-call-before-tx (no two-phase pattern)` — `Verdict: ⚠️ provider/DB drift window`. See §2 High #40.
 
 ---
 
@@ -453,7 +503,7 @@ The 2026-06-15 framing of §6.1 queue inventory, §6.2 cron schedules, §6.3 job
 
 **Delivery-verification** (Phase 7.11): safe-fetch + readBodyWithCap (5MB). Defense-in-depth pre-flight check at processor + internal check at safe-fetch. New finding: body-cap silent failure (§2 High #14).
 
-**Payout processor**: still best-in-class for version-guarded idempotency on intra-row transitions. New finding: webhook lacks job-level dedupKey (§2 Critical #3) — the version guard catches concurrent transitions, but not replay.
+**Payout processor**: best-in-class for version-guarded idempotency on intra-row transitions when those transitions actually run. But **two new Critical/High findings reframe the verdict**: (a) §2 Critical #38 — `handleExecute` is a no-op stub (`return { queued: true }` with no provider call), so the worker's "payout-execute" job name is either dead code or a silent-fail path that never moves money. (b) §2 Critical #3 — `handleWebhook` lacks job-level dedupKey; the version guard catches concurrent transitions but not replay. Plus follow-up payout-flow findings #39 (Stripe reversal missing Idempotency-Key) and #40 (`cancelExecution` provider-before-DB-commit race) on the API side.
 
 **Notifications**: Phase 7.4 dedupKey partial unique + `notification-dedup-keys.ts`. All writers route through helpers with P2002 swallow. Grade: dedup catches retry duplicates.
 
@@ -562,6 +612,7 @@ Phase 7.7 shipped the observability spine end-to-end:
 
 - §2 Critical #4 — settlement-auto-approve processor writes no audit row per sweep. Compliance gap.
 - §2 High #18 — reconciliation dedup hitcount logged as cumulative, not per-sweep. Limits operational tuning.
+- §2 High #41 — settlement-auto-approve sweep catches every per-row error as "skipped" without rethrowing or capturing to Sentry. The comment promises Sentry propagation that the code does not deliver. Silent-failure path for the entire settlement state machine.
 - §2 Medium #34 — worker unhandledRejection uses `console.error`, bypasses the structured logger spine.
 - §2 Medium #31 — structured logger has no context-size cap or stack-trace truncation. Ingestion cost risk.
 

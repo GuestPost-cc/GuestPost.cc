@@ -8,7 +8,7 @@ updated: 2026-06-22
 
 Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 (the 2026-06-15 batch's §11 closed at 31/31 on 2026-06-21).
 
-**2026-06-22 audit dashboard: 0/37 closed** (7 Critical / 12 High / 18 Medium open). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX).
+**2026-06-22 audit dashboard: 0/41 closed** (8 Critical / 15 High / 18 Medium open — 37 from initial 8-agent synthesis + 4 from follow-up payout-flow probe). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX).
 
 ## Phase 8.X — Close 2026-06-22 audit findings (new batch, mirrors 6.6→7.14 pattern)
 
@@ -23,13 +23,16 @@ Suggested ordering by criticality + dependency. Each finding number maps to `bed
 - [ ] **Phase 8.5 — Lazy queueServiceRef race fix** (#5). Move `queueServiceRef = app.get(QueueService)` before Better Auth handler mount OR switch to `OnModuleInit` injection pattern.
 - [x] **Phase 7.10.2.1 — CI integration template-DB step + Spec 2** (#6). Already named in NOW.md. Closes Critical #6.
 - [ ] **Phase 8.6 — Adapter-pg pool sizing** (#7). Document per-replica formula; parameterize `max` via `PRISMA_POOL_MAX` env var; add 80% utilization alert. (Production-blocker only at multi-replica scale-up.)
+- [ ] **Phase 8.7 — Payout worker handleExecute disambiguation** (#38). FIRST decide: dead code or broken path? Audit `grep -rn 'payout-execute' apps/ packages/` for enqueue sites. If no enqueuer → delete handler + switch arm + add worker-boot grep guard. If enqueuer exists → port `executeWithdrawal` logic into the handler (createTransfer + PayoutExecution row + audit log mirroring API path). Add an integration spec asserting the handler is not a no-op stub.
 
-**High (12):** see `bedrock/Views/audits/platform-audit-2026-06-22.md` §2 findings #8 through #19. Likely bundles:
-- **Phase 8.7 — Database hardening bundle** (#11 enum-drift static specs, #12 CASCADE→SetNull, #13 JSON validation + payout key-rotation runbook).
-- **Phase 8.8 — Infra/CI cleanup bundle** (#15 mailpit + worker healthchecks, #16 .env.example DATABASE_URL flag, #17 workflow consolidation, #19 JWT_SECRET hard check).
-- **Phase 8.9 — Operational resilience bundle** (#8 Redis client timeouts, #9 DNS-rebinding pool-reuse guard).
-- **Phase 8.10 — Worker observability gaps** (#14 body-cap structured log, #18 reconciliation dedup metric).
-- **Phase 8.11 — Revenue raw-SQL refactor** (#10) — small standalone or absorb into a Phase 7.1.x.
+**High (15):** see `bedrock/Views/audits/platform-audit-2026-06-22.md` §2 findings #8 through #19, plus follow-up #39, #40, #41. Likely bundles:
+- **Phase 8.8 — Payout-flow hardening bundle** (#39 Stripe reversal Idempotency-Key, #40 cancelExecution two-phase pattern). Companion to 8.7 — together they harden the cancel path end-to-end.
+- **Phase 8.9 — Settlement auto-approve catch fix** (#41). Tiny scope — bind error to variable + Sentry.captureException + structured logger emit + keep skipped++ + test injecting an error. Can ride with 8.4 (audit log per sweep) since they touch the same processor.
+- **Phase 8.10 — Database hardening bundle** (#11 enum-drift static specs, #12 CASCADE→SetNull, #13 JSON validation + payout key-rotation runbook).
+- **Phase 8.11 — Infra/CI cleanup bundle** (#15 mailpit + worker healthchecks, #16 .env.example DATABASE_URL flag, #17 workflow consolidation, #19 JWT_SECRET hard check).
+- **Phase 8.12 — Operational resilience bundle** (#8 Redis client timeouts, #9 DNS-rebinding pool-reuse guard).
+- **Phase 8.13 — Worker observability gaps** (#14 body-cap structured log, #18 reconciliation dedup metric).
+- **Phase 8.14 — Revenue raw-SQL refactor** (#10) — small standalone or absorb into a Phase 7.1.x.
 
 **Medium (18):** see `bedrock/Views/audits/platform-audit-2026-06-22.md` §2 findings #20 through #37. Cluster opportunistically; many are 1-commit fixes (status-presentation adoption, env-var docs, console→logger).
 
