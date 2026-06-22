@@ -101,6 +101,24 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
     expect(tx.settlementApproval.upsert).toHaveBeenCalledTimes(2)
     expect(tx.orderEvent.create).toHaveBeenCalledTimes(2)
     expect(tx.auditLog.create).toHaveBeenCalledTimes(2)
+    // Phase 8.4 (audit #4): the 2026-06-22 audit incorrectly reported that
+    // the auto-approve processor wrote NO audit log per sweep. Recon showed
+    // the core (this file's runSettlementAutoApprove) has written the row
+    // since Phase 7.3 — the audit reviewed the processor in isolation and
+    // missed the delegation. These payload-shape assertions lock in the
+    // already-correct behavior so a future change cannot silently drop the
+    // row's load-bearing fields without tripping CI.
+    expect(tx.auditLog.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        action: "SETTLEMENT_AUTO_APPROVED",
+        entityType: "Settlement",
+        entityId: expect.any(String),
+        userId: null,
+        metadata: expect.objectContaining({
+          orderId: expect.any(String),
+        }),
+      }),
+    })
   })
 
   it("skips settlements with an active dispute (no transaction opened)", async () => {
@@ -152,6 +170,48 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
     expect(r.scanned).toBe(2)
     expect(r.approved).toBe(1) // s2 succeeded
     expect(r.skipped).toBe(1) // s1 failed but didn't kill the sweep
+  })
+
+  it("Phase 8.9 (audit #41): per-row error invokes onError callback before incrementing skipped", async () => {
+    const prisma = makePrismaMock()
+    prisma.settlement.findMany.mockResolvedValue([
+      makeSettlement({ id: "s1" }),
+      makeSettlement({ id: "s2" }),
+    ])
+    const tx = makeTxMock()
+    const dbError = new Error("simulated DB error")
+    prisma.$transaction
+      .mockImplementationOnce(async () => { throw dbError })
+      .mockImplementationOnce(async (fn: any) => fn(tx))
+    const onError = jest.fn()
+
+    const r = await runSettlementAutoApprove(prisma as any, { onError })
+
+    expect(r.approved).toBe(1) // s2 succeeded
+    expect(r.skipped).toBe(1)  // s1 failed; sweep continued
+    expect(onError).toHaveBeenCalledTimes(1)
+    expect(onError).toHaveBeenCalledWith(dbError, "s1")
+  })
+
+  it("Phase 8.9 (audit #41): an onError handler that throws does NOT kill the sweep", async () => {
+    const prisma = makePrismaMock()
+    prisma.settlement.findMany.mockResolvedValue([
+      makeSettlement({ id: "s1" }),
+      makeSettlement({ id: "s2" }),
+    ])
+    const tx = makeTxMock()
+    prisma.$transaction
+      .mockImplementationOnce(async () => { throw new Error("row error") })
+      .mockImplementationOnce(async (fn: any) => fn(tx))
+    // Handler that itself throws — the defensive try/catch in the core must
+    // swallow this so the next iteration still runs.
+    const onError = jest.fn(() => { throw new Error("handler bug") })
+
+    const r = await runSettlementAutoApprove(prisma as any, { onError })
+
+    expect(r.approved).toBe(1) // s2 succeeded despite onError throwing
+    expect(r.skipped).toBe(1)
+    expect(onError).toHaveBeenCalledTimes(1)
   })
 
   it("batchSize honored in findMany take", async () => {

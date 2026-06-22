@@ -20,6 +20,7 @@ import * as Sentry from "@sentry/node"
 import {
   QUEUES,
   countStaleReviewSettlements,
+  makeAutoApproveOnError,
   runSettlementAutoApprove,
   verifyJobPayload,
 } from "@guestpost/shared"
@@ -57,7 +58,24 @@ export function createSettlementAutoApproveWorker() {
       const slowMs = Math.max(Number(process.env.SETTLEMENT_AUTO_APPROVE_SLOW_MS) || SLOW_SWEEP_DEFAULT_MS, 1000)
 
       runsTotal++
-      const result = await runSettlementAutoApprove(prisma, { batchSize })
+      // Phase 8.9 (audit #41): per-row failures used to be silently swallowed
+      // by a parameterless catch in the core. Inject an onError hook that
+      // emits a structured log line + Sentry capture per failed row, with a
+      // fingerprint keyed on settlementId so a DB outage producing N row
+      // failures shows as one Sentry issue with N occurrences. Sweep
+      // robustness preserved — the core wraps onError so a handler bug can't
+      // kill the sweep.
+      const onError = makeAutoApproveOnError(
+        {
+          logError: (msg, ctx) => logger.error(msg, ctx),
+          // CaptureContext is a fiddly union in @sentry/node; our hook shape
+          // is structurally compatible. Cast at the adapter boundary only.
+          captureException: (err, opts) => Sentry.captureException(err, opts as any),
+        },
+        job.name,
+        job.id,
+      )
+      const result = await runSettlementAutoApprove(prisma, { batchSize, onError })
       const stale = await countStaleReviewSettlements(prisma)
 
       logger.info("sweep complete", {

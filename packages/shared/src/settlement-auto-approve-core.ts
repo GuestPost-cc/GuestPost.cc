@@ -31,6 +31,63 @@ export interface RunSettlementAutoApproveOptions {
    * and the function uses `new Date()`.
    */
   now?: Date
+  /**
+   * Phase 8.9 (audit #41) — invoked once per per-row failure with the bound
+   * error + the settlement id. The sweep ALWAYS continues regardless of
+   * whether this handler is supplied or what it does (the handler itself is
+   * wrapped in a defensive try/catch so a misbehaving callback can't kill
+   * the sweep). Production callers use this to capture to Sentry + structured
+   * logger. Without it, errors are still counted as `skipped` but become
+   * invisible to ops — the parameterless `catch` shape we replaced.
+   */
+  onError?: (err: unknown, settlementId: string) => void
+}
+
+/**
+ * Phase 8.9 (audit #41) — observability hooks injected into the onError
+ * handler returned by `makeAutoApproveOnError`. Decoupled from any specific
+ * observability backend so the shared core stays Sentry-free (matches the
+ * convention established by `website-verification-core.ts` et al — shared
+ * cores are pure functions; infra coupling stays in the worker).
+ */
+export interface AutoApproveObservabilityHooks {
+  logError: (msg: string, ctx: Record<string, unknown>) => void
+  captureException: (err: unknown, opts: {
+    tags: Record<string, string>
+    contexts: Record<string, unknown>
+    fingerprint: string[]
+  }) => void
+}
+
+/**
+ * Build the `onError` handler the worker passes to `runSettlementAutoApprove`.
+ * The injected `hooks` shape decouples this from `@sentry/node` and from the
+ * worker's structured-logger module so packages/shared has no new dependency.
+ *
+ * The fingerprint `["settlement-auto-approve", settlementId]` groups Sentry
+ * events by settlementId regardless of stack-trace shape — load-bearing once
+ * batchSize scales above ~100 events per sweep (otherwise a DB outage that
+ * trips every row in a sweep would produce N distinct Sentry issues instead
+ * of one issue with N occurrences).
+ */
+export function makeAutoApproveOnError(
+  hooks: AutoApproveObservabilityHooks,
+  jobName: string,
+  sweepRunId: string | undefined,
+) {
+  return (err: unknown, settlementId: string) => {
+    const message = err instanceof Error ? err.message : String(err)
+    hooks.logError("per-settlement transaction failed in auto-approve sweep", {
+      settlementId,
+      err: message,
+      sweepRunId,
+    })
+    hooks.captureException(err, {
+      tags: { queue: "settlement", job: jobName, sweepRunId: sweepRunId ?? "unknown" },
+      contexts: { settlement_auto_approve: { settlementId } },
+      fingerprint: ["settlement-auto-approve", settlementId],
+    })
+  }
 }
 
 export interface SettlementAutoApproveResult {
@@ -156,10 +213,23 @@ export async function runSettlementAutoApprove(
       } else {
         skipped++ // version-guard race lost
       }
-    } catch {
-      // Per-row failures (DB error, etc.) are counted as skipped so the
-      // sweep can continue. The caller logs sweep-level counters; per-row
-      // errors propagate via Sentry from the queue-observability wrapper.
+    } catch (err) {
+      // Per-row failures (DB error, TypeError, anything) are counted as
+      // skipped so the sweep can continue — that's the deliberate robustness
+      // shape for a money-touching cron. Phase 8.9 (audit #41) fixed the
+      // legacy parameterless catch that hid these failures: the comment used
+      // to claim "errors propagate via Sentry from the queue-observability
+      // wrapper" but that wrapper only captures from BullMQ's failed event,
+      // which never fires here because we return normally. The onError hook
+      // lets the caller (worker processor) capture to Sentry + structured
+      // logger without coupling this shared core to those infra modules.
+      // We wrap onError itself so a misbehaving handler can't kill the sweep.
+      try {
+        opts.onError?.(err, settlement.id)
+      } catch {
+        // Handler threw — best we can do is keep going. Caller should never
+        // throw from onError, but defensive in case of a future bug.
+      }
       skipped++
     }
   }
