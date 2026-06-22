@@ -55,7 +55,6 @@ export const QUEUE_JOBS = {
     RECOMPUTE: "publisher-trust-recompute",
   },
   [QUEUES.PAYOUT]: {
-    EXECUTE: "payout-execute",
     CHECK_STATUS: "payout-check-status",
     WEBHOOK: "payout-webhook",
   },
