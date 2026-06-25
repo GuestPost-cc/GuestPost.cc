@@ -103,7 +103,7 @@ export class WisePayoutAdapter implements PayoutProviderAdapter {
     }
   }
 
-  async cancelTransfer(providerExecutionId: string): Promise<CancelTransferResult> {
+  async cancelTransfer(providerExecutionId: string, _idempotencyKey: string): Promise<CancelTransferResult> {
     const apiKey = process.env.WISE_API_KEY
     if (!apiKey) {
       this.assertNotProductionMock("cancelTransfer")

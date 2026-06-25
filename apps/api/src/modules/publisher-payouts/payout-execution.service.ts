@@ -282,7 +282,7 @@ export class PayoutExecutionService {
     const adapter = this.providerService.getAdapter(execution.provider.name)
 
     if (execution.providerExecutionId) {
-      await adapter.cancelTransfer(execution.providerExecutionId)
+      await adapter.cancelTransfer(execution.providerExecutionId, `payout-cancel-${executionId}`)
     }
 
     await this.prisma.$transaction(async (tx: any) => {

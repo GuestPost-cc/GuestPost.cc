@@ -28,7 +28,7 @@ export class ManualPayoutAdapter implements PayoutProviderAdapter {
     }
   }
 
-  async cancelTransfer(providerExecutionId: string): Promise<CancelTransferResult> {
+  async cancelTransfer(providerExecutionId: string, _idempotencyKey: string): Promise<CancelTransferResult> {
     return {
       success: true,
       providerExecutionId,

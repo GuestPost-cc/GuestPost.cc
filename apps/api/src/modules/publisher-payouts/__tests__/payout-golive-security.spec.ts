@@ -194,8 +194,23 @@ describe("Provider adapters — idempotency and production safety", () => {
     await expect(stripe.createTransfer(params as any)).rejects.toThrow(/production/)
     await expect(wise.checkTransferStatus("t-1")).rejects.toThrow(/production/)
     await expect(stripe.checkTransferStatus("t-1")).rejects.toThrow(/production/)
-    await expect(wise.cancelTransfer("t-1")).rejects.toThrow(/production/)
-    await expect(stripe.cancelTransfer("t-1")).rejects.toThrow(/production/)
+    await expect(wise.cancelTransfer("t-1", "test-key")).rejects.toThrow(/production/)
+    await expect(stripe.cancelTransfer("t-1", "test-key")).rejects.toThrow(/production/)
+  })
+
+  it("Stripe adapter sends the Idempotency-Key header on cancelTransfer", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test"
+    const fetchMock = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "re_1" }),
+    })
+    global.fetch = fetchMock as any
+
+    const adapter = new StripeConnectPayoutAdapter()
+    await adapter.cancelTransfer("tr_1", "payout-cancel-exec-1")
+
+    const [, options] = fetchMock.mock.calls[0]
+    expect(options.headers["Idempotency-Key"]).toBe("payout-cancel-exec-1")
   })
 })
 

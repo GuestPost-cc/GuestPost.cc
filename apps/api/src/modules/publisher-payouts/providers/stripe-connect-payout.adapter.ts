@@ -96,7 +96,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
     }
   }
 
-  async cancelTransfer(providerExecutionId: string): Promise<CancelTransferResult> {
+  async cancelTransfer(providerExecutionId: string, idempotencyKey: string): Promise<CancelTransferResult> {
     const apiKey = process.env.STRIPE_SECRET_KEY
     if (!apiKey) {
       this.assertNotProductionMock("cancelTransfer")
@@ -110,6 +110,7 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/x-www-form-urlencoded",
+          "Idempotency-Key": idempotencyKey,
         },
       })
       const data = await response.json() as any

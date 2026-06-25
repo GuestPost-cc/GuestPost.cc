@@ -37,5 +37,5 @@ export interface PayoutProviderAdapter {
 
   checkTransferStatus(providerExecutionId: string): Promise<CheckStatusResult>
 
-  cancelTransfer(providerExecutionId: string): Promise<CancelTransferResult>
+  cancelTransfer(providerExecutionId: string, idempotencyKey: string): Promise<CancelTransferResult>
 }
