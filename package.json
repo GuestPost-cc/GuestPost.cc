@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "prepare": "husky",
     "dev": "turbo dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
@@ -32,7 +33,8 @@
     "seed:users": "pnpm tsx scripts/seed.ts",
     "test:integration": "pnpm tsx scripts/integration-test.ts",
     "test:concurrency": "pnpm tsx scripts/concurrency-test.ts",
-    "test:load": "pnpm tsx scripts/load-test.ts"
+    "test:load": "pnpm tsx scripts/load-test.ts",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
@@ -48,6 +50,8 @@
     "dependency-cruiser": "^17.4.3",
     "eslint": "^9.0.0",
     "eslint-plugin-react-hooks": "^5.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.8",
     "tsx": "^4.22.4",
     "turbo": "^2.9.16",
     "typescript-eslint": "^8.0.0"
