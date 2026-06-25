@@ -1,0 +1,26 @@
+# Each owner line below is a fallback — if no more specific pattern matches,
+# the default team(s) are requested for review.
+
+# Default — project maintainers.
+* @guestpost/maintainers
+
+# API and backend.
+apps/api/ @guestpost/backend
+packages/database/ @guestpost/backend
+packages/auth/ @guestpost/backend
+packages/shared/ @guestpost/backend
+
+# Frontend apps.
+apps/portal/ @guestpost/frontend
+apps/publisher/ @guestpost/frontend
+apps/admin/ @guestpost/frontend
+apps/website/ @guestpost/frontend
+packages/ui/ @guestpost/frontend
+packages/api-client/ @guestpost/frontend
+
+# Infrastructure and CI.
+.github/workflows/ @guestpost/infra
+infrastructure/ @guestpost/infra
+
+# E2E tests.
+e2e/ @guestpost/qa
