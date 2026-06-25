@@ -1,0 +1,41 @@
+# Normalise line endings — all text files checked out as LF on all platforms.
+* text=auto eol=lf
+
+# Binary files — never touch line endings.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.svg -text
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.ttf binary
+*.otf binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.gz binary
+*.mp4 binary
+*.webm binary
+*.avif binary
+
+# Lockfile — treat as generated, never diff by default.
+pnpm-lock.yaml linguist-generated
+
+# Prisma-generated client.
+packages/database/src/prisma/** linguist-generated
+
+# Next.js build output.
+.next/** linguist-generated
+
+# Turbo cache.
+.turbo/** linguist-generated
+
+# Compiled JavaScript alongside TypeScript sources (build cruft).
+apps/*/src/**/*.js linguist-generated
+packages/*/src/**/*.js linguist-generated
+apps/*/src/**/*.js.map linguist-generated
+packages/*/src/**/*.js.map linguist-generated
