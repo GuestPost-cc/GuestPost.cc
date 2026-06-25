@@ -5,8 +5,8 @@
 // its own <html>/<body>; cannot rely on @guestpost/ui or any layout being loaded.
 // Styles inlined defensively.
 
-import { useEffect } from "react"
 import * as Sentry from "@sentry/nextjs"
+import { useEffect } from "react"
 
 export default function GlobalError({
   error,
@@ -39,7 +39,13 @@ export default function GlobalError({
           margin: 0,
         }}
       >
-        <h1 style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "0.75rem" }}>
+        <h1
+          style={{
+            fontSize: "1.5rem",
+            fontWeight: 600,
+            marginBottom: "0.75rem",
+          }}
+        >
           Something went wrong
         </h1>
         <p style={{ marginBottom: "1.5rem", color: "#555", maxWidth: "32rem" }}>

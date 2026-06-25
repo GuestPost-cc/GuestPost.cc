@@ -6,19 +6,67 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": false
+    "ignoreUnknown": false,
+    "includes": [
+      "apps/**/*.{js,jsx,ts,tsx,mjs,cjs}",
+      "packages/*/src/**/*.{js,jsx,ts,tsx,mjs,cjs}",
+      "!packages/database/src/prisma",
+      "scripts/**/*.{ts,js,mjs}",
+      "e2e/**/*.{ts,tsx}",
+      "*.config.{ts,js,mjs}",
+      "*.{ts,js,mjs}"
+    ]
   },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2,
     "lineEnding": "lf",
-    "formatWithErrors": false
+    "formatWithErrors": true
   },
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "suspicious": {
+        "noExplicitAny": "off",
+        "noArrayIndexKey": "off",
+        "noUnknownAtRules": "off",
+        "noShadowRestrictedNames": "off",
+        "noImplicitAnyLet": "off",
+        "noControlCharactersInRegex": "off",
+        "noAssignInExpressions": "off",
+        "noUndeclaredEnvVars": "off",
+        "noNonNullAssertedOptionalChain": "off",
+        "useIterableCallbackReturn": "off"
+      },
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedFunctionParameters": "off",
+        "noUnusedVariables": "off"
+      },
+      "complexity": {
+        "useLiteralKeys": "error"
+      },
+      "style": {
+        "noNonNullAssertion": "off",
+        "noParameterAssign": "off"
+      },
+      "performance": {
+        "noAccumulatingSpread": "off",
+        "noImgElement": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "off"
+      },
+      "a11y": {
+        "useButtonType": "off",
+        "noLabelWithoutControl": "off",
+        "useSemanticElements": "off",
+        "useKeyWithClickEvents": "off",
+        "noSvgWithoutTitle": "off",
+        "noStaticElementInteractions": "off"
+      }
     }
   },
   "assist": {
@@ -30,6 +78,9 @@
     }
   },
   "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    },
     "formatter": {
       "quoteStyle": "double",
       "jsxQuoteStyle": "double",

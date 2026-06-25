@@ -16,18 +16,18 @@
 // (failed events → Sentry.captureException with attemptsMade tag). Filter
 // Sentry by attemptsMade >= 3 for final-failure events.
 
-import * as Sentry from "@sentry/node"
+import { prisma } from "@guestpost/database"
 import {
-  QUEUES,
   countStaleReviewSettlements,
   makeAutoApproveOnError,
+  QUEUES,
   runSettlementAutoApprove,
 } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
-import { prisma } from "@guestpost/database"
-import { connection } from "../redis"
-import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import * as Sentry from "@sentry/node"
+import { createObservableWorker } from "../lib/queue-observability"
+import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.settlement-auto-approve")
@@ -44,7 +44,11 @@ export function createSettlementAutoApproveWorker() {
     async (job) => {
       // Phase 7.8 #27 — settlement-auto-approve (repeatable) bypasses
       // freshness; payload is signed once at boot and reused per cron tick.
-      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
+      if (
+        !verifyJobPayload(job.data, {
+          maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined,
+        })
+      ) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
@@ -54,8 +58,14 @@ export function createSettlementAutoApproveWorker() {
         return
       }
 
-      const batchSize = clampBatchSize((job.data as { batchSize?: number }).batchSize)
-      const slowMs = Math.max(Number(process.env.SETTLEMENT_AUTO_APPROVE_SLOW_MS) || SLOW_SWEEP_DEFAULT_MS, 1000)
+      const batchSize = clampBatchSize(
+        (job.data as { batchSize?: number }).batchSize,
+      )
+      const slowMs = Math.max(
+        Number(process.env.SETTLEMENT_AUTO_APPROVE_SLOW_MS) ||
+          SLOW_SWEEP_DEFAULT_MS,
+        1000,
+      )
 
       runsTotal++
       // Phase 8.9 (audit #41): per-row failures used to be silently swallowed
@@ -70,12 +80,16 @@ export function createSettlementAutoApproveWorker() {
           logError: (msg, ctx) => logger.error(msg, ctx),
           // CaptureContext is a fiddly union in @sentry/node; our hook shape
           // is structurally compatible. Cast at the adapter boundary only.
-          captureException: (err, opts) => Sentry.captureException(err, opts as any),
+          captureException: (err, opts) =>
+            Sentry.captureException(err, opts as any),
         },
         job.name,
         job.id,
       )
-      const result = await runSettlementAutoApprove(prisma, { batchSize, onError })
+      const result = await runSettlementAutoApprove(prisma, {
+        batchSize,
+        onError,
+      })
       const stale = await countStaleReviewSettlements(prisma)
 
       logger.info("sweep complete", {

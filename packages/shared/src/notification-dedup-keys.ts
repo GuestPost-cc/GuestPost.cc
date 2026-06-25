@@ -44,7 +44,9 @@ function reconDrift(args: {
   staffUserId: string
   dateBucket: string
 }): string {
-  return check(`recon:${args.driftType}:${args.entityId}:${args.staffUserId}:${args.dateBucket}`)
+  return check(
+    `recon:${args.driftType}:${args.entityId}:${args.staffUserId}:${args.dateBucket}`,
+  )
 }
 
 /**
@@ -84,7 +86,11 @@ function chargeback(disputeId: string, userId: string): string {
  * A subsequent re-approval after a reject IS a separate dedup event because
  * the status string differs.
  */
-function listingStatus(listingId: string, publisherUserId: string, status: string): string {
+function listingStatus(
+  listingId: string,
+  publisherUserId: string,
+  status: string,
+): string {
   return check(`listing-status:${listingId}:${publisherUserId}:${status}`)
 }
 
@@ -101,7 +107,11 @@ function supportMessage(ticketMessageId: string, userId: string): string {
  * Publisher tier promotion / demotion. One per actual tier change (not per
  * recompute that landed on the same tier).
  */
-function trustTierChange(publisherId: string, oldTier: string, newTier: string): string {
+function trustTierChange(
+  publisherId: string,
+  oldTier: string,
+  newTier: string,
+): string {
   return check(`trust-tier:${publisherId}:${oldTier}-${newTier}`)
 }
 

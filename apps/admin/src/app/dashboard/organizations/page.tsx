@@ -1,14 +1,28 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api, adminFetch } from "../../../lib/api"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
 import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -16,53 +30,34 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogDescription,
-} from "@guestpost/ui"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import {
-  Building,
-  Search,
-  Plus,
-  MoreHorizontal,
-  AlertCircle,
-  Users,
-  Calendar,
-  Pencil,
-  Trash2,
-} from "lucide-react"
-import { format } from "date-fns"
-import { toast } from "sonner"
-import { z } from "zod"
-import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  type ColumnDef,
   createColumnHelper,
-  useReactTable,
+  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  flexRender,
-  type ColumnDef,
+  useReactTable,
 } from "@tanstack/react-table"
+import { format } from "date-fns"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@guestpost/ui"
+  AlertCircle,
+  Building,
+  Calendar,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Users,
+} from "lucide-react"
+import { useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
+import { adminFetch, api } from "../../../lib/api"
 
 interface Organization {
   id: string
@@ -79,9 +74,12 @@ interface Organization {
 
 const createOrgSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters"),
-  slug: z.string().min(2, "Slug must be at least 2 characters").regex(/^[a-z0-9-]+$/, {
-    message: "Slug must be lowercase letters, numbers, and hyphens only",
-  }),
+  slug: z
+    .string()
+    .min(2, "Slug must be at least 2 characters")
+    .regex(/^[a-z0-9-]+$/, {
+      message: "Slug must be lowercase letters, numbers, and hyphens only",
+    }),
   plan: z.string().optional(),
 })
 
@@ -110,15 +108,18 @@ function CreateOrgDialog({
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof createOrgSchema>) => {
       const token = (await import("../../../lib/api")).getToken()
-      const res = await fetch(`${(await import("../../../lib/api")).getApiUrl()}/admin/organizations`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const res = await fetch(
+        `${(await import("../../../lib/api")).getApiUrl()}/admin/organizations`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(data),
+          credentials: "include",
         },
-        body: JSON.stringify(data),
-        credentials: "include",
-      })
+      )
       if (!res.ok) throw new Error(await res.text())
       return res.json()
     },
@@ -140,12 +141,17 @@ function CreateOrgDialog({
             Create a new organization on the platform.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit((d) => createMutation.mutate(d))} className="space-y-4">
+        <form
+          onSubmit={handleSubmit((d) => createMutation.mutate(d))}
+          className="space-y-4"
+        >
           <div>
             <Label htmlFor="name">Name</Label>
             <Input id="name" {...register("name")} className="mt-1" />
             {errors.name && (
-              <p className="mt-1 text-xs text-destructive">{errors.name.message}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {errors.name.message}
+              </p>
             )}
           </div>
           <div>
@@ -157,7 +163,9 @@ function CreateOrgDialog({
               placeholder={name?.toLowerCase().replace(/\s+/g, "-") ?? "my-org"}
             />
             {errors.slug && (
-              <p className="mt-1 text-xs text-destructive">{errors.slug.message}</p>
+              <p className="mt-1 text-xs text-destructive">
+                {errors.slug.message}
+              </p>
             )}
           </div>
           <div>
@@ -250,7 +258,11 @@ function OrgRowActions({ org }: { org: Organization }) {
           <div className="space-y-3">
             <div>
               <Label>Name</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} className="mt-1" />
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="mt-1"
+              />
             </div>
             <div>
               <Label>Plan</Label>
@@ -275,20 +287,27 @@ function OrgRowActions({ org }: { org: Organization }) {
               onClick={async () => {
                 setEditSaving(true)
                 try {
-                  const { getToken, getApiUrl } = await import("../../../lib/api")
+                  const { getToken, getApiUrl } = await import(
+                    "../../../lib/api"
+                  )
                   const token = getToken()
-                  const res = await fetch(`${getApiUrl()}/admin/organizations/${org.id}`, {
-                    method: "PATCH",
-                    headers: {
-                      "Content-Type": "application/json",
-                      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                  const res = await fetch(
+                    `${getApiUrl()}/admin/organizations/${org.id}`,
+                    {
+                      method: "PATCH",
+                      headers: {
+                        "Content-Type": "application/json",
+                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                      },
+                      body: JSON.stringify({ name: editName, plan: editPlan }),
+                      credentials: "include",
                     },
-                    body: JSON.stringify({ name: editName, plan: editPlan }),
-                    credentials: "include",
-                  })
+                  )
                   if (!res.ok) throw new Error(await res.text())
                   toast.success("Organization updated")
-                  queryClient.invalidateQueries({ queryKey: ["admin", "organizations"] })
+                  queryClient.invalidateQueries({
+                    queryKey: ["admin", "organizations"],
+                  })
                   setDialogOpen(false)
                 } catch {
                   toast.error("Failed to update organization")
@@ -314,7 +333,12 @@ export default function OrganizationsPage() {
   const [planFilter, setPlanFilter] = useState<string>("all")
   const [createOpen, setCreateOpen] = useState(false)
 
-  const { data: orgs = [], isLoading, error, refetch } = useQuery({
+  const {
+    data: orgs = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["admin", "organizations"],
     queryFn: () => api.admin.listOrganizations(),
     retry: 1,
@@ -331,7 +355,9 @@ export default function OrganizationsPage() {
             </div>
             <div>
               <div className="font-medium">{info.getValue()}</div>
-              <div className="text-xs text-muted-foreground">/{info.row.original.slug}</div>
+              <div className="text-xs text-muted-foreground">
+                /{info.row.original.slug}
+              </div>
             </div>
           </div>
         ),
@@ -346,8 +372,8 @@ export default function OrganizationsPage() {
                 plan === "ENTERPRISE"
                   ? "default"
                   : plan === "PRO"
-                  ? "secondary"
-                  : "outline"
+                    ? "secondary"
+                    : "outline"
               }
               className="capitalize"
             >
@@ -369,12 +395,16 @@ export default function OrganizationsPage() {
       columnHelper.accessor((row) => row._count.campaigns, {
         id: "campaigns",
         header: "Campaigns",
-        cell: (info) => <span className="text-muted-foreground">{info.getValue()}</span>,
+        cell: (info) => (
+          <span className="text-muted-foreground">{info.getValue()}</span>
+        ),
       }),
       columnHelper.accessor((row) => row._count.orders, {
         id: "orders",
         header: "Orders",
-        cell: (info) => <span className="text-muted-foreground">{info.getValue()}</span>,
+        cell: (info) => (
+          <span className="text-muted-foreground">{info.getValue()}</span>
+        ),
       }),
       columnHelper.accessor("createdAt", {
         header: "Created",
@@ -479,7 +509,10 @@ export default function OrganizationsPage() {
                       <TableHead key={h.id}>
                         {h.isPlaceholder
                           ? null
-                          : flexRender(h.column.columnDef.header, h.getContext())}
+                          : flexRender(
+                              h.column.columnDef.header,
+                              h.getContext(),
+                            )}
                       </TableHead>
                     ))}
                   </TableRow>
@@ -490,7 +523,7 @@ export default function OrganizationsPage() {
                   <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
-                        {typeof cell.column.columnDef.cell === 'function' 
+                        {typeof cell.column.columnDef.cell === "function"
                           ? cell.column.columnDef.cell(cell.getContext())
                           : null}
                       </TableCell>
@@ -514,7 +547,8 @@ export default function OrganizationsPage() {
             Previous
           </Button>
           <span className="text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            {table.getPageCount()}
           </span>
           <Button
             variant="outline"

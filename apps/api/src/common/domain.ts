@@ -11,7 +11,7 @@ export function normalizeDomain(url: string): string {
     throw new BadRequestException(`Invalid website URL: ${url}`)
   }
   const host = parsed.hostname.toLowerCase().replace(/^www\./, "")
-  if (!host || !host.includes(".")) {
+  if (!host?.includes(".")) {
     throw new BadRequestException(`Invalid website domain: ${url}`)
   }
   return host

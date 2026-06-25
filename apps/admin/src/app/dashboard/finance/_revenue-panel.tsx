@@ -10,21 +10,19 @@
 // other tabs in this file still use bare keys like ["settlements"]
 // (audit §7.3 drift); this tab sets the corrected pattern for a future sweep.
 
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
 import {
+  Button,
   Card,
   CardContent,
-  Button,
   Input,
-  Label,
-  Skeleton,
   KpiCard,
+  Label,
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -32,7 +30,9 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
+import { useQuery } from "@tanstack/react-query"
 import { AlertCircle, AlertTriangle, Download, RefreshCw } from "lucide-react"
+import { useState } from "react"
 import { api } from "../../../lib/api"
 
 type GroupBy = "channel" | "month" | "serviceType" | "listing"
@@ -54,7 +54,9 @@ function fmtCount(n: number): string {
   return n.toLocaleString("en-US")
 }
 
-function trendOf(deltaPct: number | undefined): { value: number; isPositive: boolean } | undefined {
+function trendOf(
+  deltaPct: number | undefined,
+): { value: number; isPositive: boolean } | undefined {
   if (deltaPct === undefined || deltaPct === null) return undefined
   if (!Number.isFinite(deltaPct)) return undefined
   return { value: Math.round(deltaPct * 10) / 10, isPositive: deltaPct >= 0 }
@@ -96,15 +98,28 @@ export function RevenuePanel() {
           <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] items-end">
             <div className="space-y-1">
               <Label htmlFor="rev-from">From</Label>
-              <Input id="rev-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+              <Input
+                id="rev-from"
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label htmlFor="rev-to">To</Label>
-              <Input id="rev-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+              <Input
+                id="rev-to"
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+              />
             </div>
             <div className="space-y-1">
               <Label htmlFor="rev-groupby">Group by</Label>
-              <Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
+              <Select
+                value={groupBy}
+                onValueChange={(v) => setGroupBy(v as GroupBy)}
+              >
                 <SelectTrigger id="rev-groupby">
                   <SelectValue />
                 </SelectTrigger>
@@ -117,13 +132,21 @@ export function RevenuePanel() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={() => q.refetch()} disabled={q.isFetching}>
-              <RefreshCw className={`mr-2 h-3 w-3 ${q.isFetching ? "animate-spin" : ""}`} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => q.refetch()}
+              disabled={q.isFetching}
+            >
+              <RefreshCw
+                className={`mr-2 h-3 w-3 ${q.isFetching ? "animate-spin" : ""}`}
+              />
               Refresh
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            Timezone: UTC · Reversed (refunded) rows are excluded from totals but counted separately.
+            Timezone: UTC · Reversed (refunded) rows are excluded from totals
+            but counted separately.
           </p>
         </CardContent>
       </Card>
@@ -133,11 +156,14 @@ export function RevenuePanel() {
         <div className="flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
           <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
           <div>
-            <p className="font-medium text-amber-900">Non-USD orders detected in this range</p>
+            <p className="font-medium text-amber-900">
+              Non-USD orders detected in this range
+            </p>
             <p className="text-amber-800">
-              {fmtCount(data.meta.currencyMismatch.rowCount)} order(s) in {" "}
-              {data.meta.currencyMismatch.distinctCurrencies.join(", ")}. Revenue totals below are shown in USD only —
-              verify before reporting externally.
+              {fmtCount(data.meta.currencyMismatch.rowCount)} order(s) in{" "}
+              {data.meta.currencyMismatch.distinctCurrencies.join(", ")}.
+              Revenue totals below are shown in USD only — verify before
+              reporting externally.
             </p>
           </div>
         </div>
@@ -169,7 +195,9 @@ export function RevenuePanel() {
       {/* Grouped table */}
       <Card>
         <div className="flex items-center justify-between border-b px-4 py-2">
-          <h3 className="text-sm font-medium">By {GROUP_BY_LABELS[groupBy].toLowerCase()}</h3>
+          <h3 className="text-sm font-medium">
+            By {GROUP_BY_LABELS[groupBy].toLowerCase()}
+          </h3>
           <Button
             variant="outline"
             size="sm"
@@ -190,7 +218,8 @@ export function RevenuePanel() {
           <div className="flex flex-col items-center justify-center py-16 gap-3">
             <AlertCircle className="h-10 w-10 text-destructive" />
             <p className="text-muted-foreground">
-              {(q.error as Error | undefined)?.message ?? "Failed to load revenue"}
+              {(q.error as Error | undefined)?.message ??
+                "Failed to load revenue"}
             </p>
             <Button variant="outline" size="sm" onClick={() => q.refetch()}>
               <RefreshCw className="mr-2 h-3 w-3" /> Retry
@@ -198,7 +227,9 @@ export function RevenuePanel() {
           </div>
         )}
         {!q.isLoading && !q.isError && data && data.buckets.length === 0 && (
-          <div className="py-16 text-center text-muted-foreground">No revenue in this range.</div>
+          <div className="py-16 text-center text-muted-foreground">
+            No revenue in this range.
+          </div>
         )}
         {!q.isLoading && !q.isError && data && data.buckets.length > 0 && (
           <Table>
@@ -229,10 +260,18 @@ export function RevenuePanel() {
                       <span>{b.bucket}</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtUsd(b.grossAmount)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtUsd(b.platformFee)}</TableCell>
-                  <TableCell className="text-right tabular-nums font-medium">{fmtUsd(b.netRevenue)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtCount(b.rowCount)}</TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtUsd(b.grossAmount)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtUsd(b.platformFee)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums font-medium">
+                    {fmtUsd(b.netRevenue)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtCount(b.rowCount)}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums text-muted-foreground">
                     {fmtCount(b.reversedCount)}
                   </TableCell>

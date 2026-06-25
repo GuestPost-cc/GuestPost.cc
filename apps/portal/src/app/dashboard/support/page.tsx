@@ -1,62 +1,57 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Textarea } from "@guestpost/ui"
-import { Badge, getTicketStatusPresentation } from "@guestpost/ui"
 import type { TicketStatus } from "@guestpost/database"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@guestpost/ui"
-import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@guestpost/ui"
-import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorState,
+  getTicketStatusPresentation,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  Textarea,
 } from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { formatDistanceToNow } from "date-fns"
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@guestpost/ui"
-import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Eye,
   HeadphonesIcon,
   Plus,
-  MoreHorizontal,
-  MessageSquare,
-  Clock,
-  CheckCircle,
-  AlertCircle,
   Search,
-  Eye,
-  Send,
 } from "lucide-react"
-import { format, formatDistanceToNow } from "date-fns"
-import { toast } from "sonner"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
 import Link from "next/link"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
+import { api } from "../../../lib/api"
 
 const createTicketSchema = z.object({
   subject: z.string().min(1, "Subject is required").max(200),
-  message: z.string().min(10, "Message must be at least 10 characters").max(5000),
+  message: z
+    .string()
+    .min(10, "Message must be at least 10 characters")
+    .max(5000),
   priority: z.string().optional(),
 })
 
@@ -81,19 +76,19 @@ interface Ticket {
 // (see getTicketStatusPresentation). This local map only keeps the page-
 // specific icon choice. Per the table's header: icons stay local.
 const ticketIcon: Record<TicketStatus, React.ElementType> = {
-  OPEN:                AlertCircle,
-  IN_PROGRESS:         Clock,
+  OPEN: AlertCircle,
+  IN_PROGRESS: Clock,
   WAITING_ON_CUSTOMER: Clock,
-  RESOLVED:            CheckCircle,
-  CLOSED:              CheckCircle,
+  RESOLVED: CheckCircle,
+  CLOSED: CheckCircle,
 }
 const VARIANT_CIRCLE_BG: Record<string, string> = {
-  default:     "bg-primary/10 text-primary",
-  success:     "bg-emerald-100 text-emerald-700",
-  warning:     "bg-amber-100 text-amber-700",
+  default: "bg-primary/10 text-primary",
+  success: "bg-emerald-100 text-emerald-700",
+  warning: "bg-amber-100 text-amber-700",
   destructive: "bg-red-100 text-red-700",
-  info:        "bg-blue-100 text-blue-700",
-  pending:     "bg-gray-100 text-gray-700",
+  info: "bg-blue-100 text-blue-700",
+  pending: "bg-gray-100 text-gray-700",
 }
 
 function TicketsTableSkeleton() {
@@ -122,13 +117,23 @@ function CreateTicketDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const queryClient = useQueryClient()
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset, watch, setValue } = useForm<CreateTicketForm>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+    watch,
+    setValue,
+  } = useForm<CreateTicketForm>({
     resolver: zodResolver(createTicketSchema),
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: { subject: string; message: string; priority?: string }) => 
-      api.support.createTicket(data),
+    mutationFn: (data: {
+      subject: string
+      message: string
+      priority?: string
+    }) => api.support.createTicket(data),
     onSuccess: () => {
       toast.success("Support ticket created successfully")
       queryClient.invalidateQueries({ queryKey: ["tickets"] })
@@ -166,7 +171,9 @@ function CreateTicketDialog({
               placeholder="Brief description of your issue"
             />
             {errors.subject && (
-              <p className="text-sm text-destructive">{errors.subject.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.subject.message}
+              </p>
             )}
           </div>
 
@@ -179,7 +186,9 @@ function CreateTicketDialog({
               placeholder="Describe your issue in detail..."
             />
             {errors.message && (
-              <p className="text-sm text-destructive">{errors.message.message}</p>
+              <p className="text-sm text-destructive">
+                {errors.message.message}
+              </p>
             )}
           </div>
 
@@ -202,7 +211,11 @@ function CreateTicketDialog({
           </div>
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting}>
@@ -216,18 +229,28 @@ function CreateTicketDialog({
 }
 
 export default function SupportPage() {
-  const queryClient = useQueryClient()
+  const _queryClient = useQueryClient()
   const [showCreateTicket, setShowCreateTicket] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
 
-  const { data: ticketsData, isLoading, error, refetch } = useQuery<Ticket[]>({
+  const {
+    data: ticketsData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<Ticket[]>({
     queryKey: ["tickets"],
     queryFn: () => api.support.listTickets() as Promise<Ticket[]>,
   })
 
   const filteredTickets = (ticketsData ?? []).filter((ticket: Ticket) => {
-    if (statusFilter && statusFilter !== "all" && ticket.status !== statusFilter) return false
+    if (
+      statusFilter &&
+      statusFilter !== "all" &&
+      ticket.status !== statusFilter
+    )
+      return false
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       return (
@@ -238,11 +261,18 @@ export default function SupportPage() {
     return true
   })
 
-  const openTickets = (ticketsData ?? []).filter((t: Ticket) => 
-    ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER"].includes(t.status)
+  const openTickets = (ticketsData ?? []).filter((t: Ticket) =>
+    ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER"].includes(t.status),
   ).length
 
-  if (error) return <ErrorState title="Failed to load support tickets" description={(error as Error).message} onRetry={() => refetch()} />
+  if (error)
+    return (
+      <ErrorState
+        title="Failed to load support tickets"
+        description={(error as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
 
   if (isLoading) {
     return (
@@ -254,13 +284,29 @@ export default function SupportPage() {
           </div>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
-          <Card><CardContent className="pt-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
-          <Card><CardContent className="pt-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
-          <Card><CardContent className="pt-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-16 w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-16 w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-16 w-full" />
+            </CardContent>
+          </Card>
         </div>
         <Card>
-          <CardHeader><Skeleton className="h-6 w-32" /></CardHeader>
-          <CardContent><TicketsTableSkeleton /></CardContent>
+          <CardHeader>
+            <Skeleton className="h-6 w-32" />
+          </CardHeader>
+          <CardContent>
+            <TicketsTableSkeleton />
+          </CardContent>
         </Card>
       </div>
     )
@@ -282,7 +328,9 @@ export default function SupportPage() {
       <div className="grid gap-6 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Tickets</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Tickets
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{ticketsData?.length ?? 0}</div>
@@ -290,7 +338,9 @@ export default function SupportPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Open Tickets</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Open Tickets
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{openTickets}</div>
@@ -298,11 +348,18 @@ export default function SupportPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Resolved</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Resolved
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {(ticketsData ?? []).filter((t: Ticket) => t.status === "RESOLVED" || t.status === "CLOSED").length}
+              {
+                (ticketsData ?? []).filter(
+                  (t: Ticket) =>
+                    t.status === "RESOLVED" || t.status === "CLOSED",
+                ).length
+              }
             </div>
           </CardContent>
         </Card>
@@ -314,7 +371,8 @@ export default function SupportPage() {
             <div>
               <CardTitle>Your Tickets</CardTitle>
               <CardDescription>
-                {filteredTickets.length} ticket{filteredTickets.length !== 1 ? "s" : ""}
+                {filteredTickets.length} ticket
+                {filteredTickets.length !== 1 ? "s" : ""}
               </CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -354,7 +412,10 @@ export default function SupportPage() {
                   : "Create a ticket to get support"}
               </p>
               {!searchQuery && !statusFilter && (
-                <Button className="mt-4" onClick={() => setShowCreateTicket(true)}>
+                <Button
+                  className="mt-4"
+                  onClick={() => setShowCreateTicket(true)}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   New Ticket
                 </Button>
@@ -363,8 +424,11 @@ export default function SupportPage() {
           ) : (
             <div className="space-y-2">
               {filteredTickets.map((ticket: Ticket) => {
-                const p = getTicketStatusPresentation(ticket.status as TicketStatus)
-                const StatusIcon = ticketIcon[ticket.status as TicketStatus] || AlertCircle
+                const p = getTicketStatusPresentation(
+                  ticket.status as TicketStatus,
+                )
+                const StatusIcon =
+                  ticketIcon[ticket.status as TicketStatus] || AlertCircle
 
                 return (
                   <div
@@ -372,7 +436,9 @@ export default function SupportPage() {
                     className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-full ${VARIANT_CIRCLE_BG[p.variant]}`}>
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-full ${VARIANT_CIRCLE_BG[p.variant]}`}
+                      >
                         <StatusIcon className="h-5 w-5" />
                       </div>
                       <div>
@@ -381,9 +447,13 @@ export default function SupportPage() {
                           <span className="text-sm text-muted-foreground">
                             #{ticket.id.slice(0, 8)}
                           </span>
-                          <span className="text-sm text-muted-foreground">•</span>
                           <span className="text-sm text-muted-foreground">
-                            {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
+                            •
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            {formatDistanceToNow(new Date(ticket.createdAt), {
+                              addSuffix: true,
+                            })}
                           </span>
                         </div>
                       </div>
@@ -415,25 +485,34 @@ export default function SupportPage() {
           <div className="rounded-lg border p-4">
             <h4 className="font-medium">How long does a guest post take?</h4>
             <p className="mt-1 text-sm text-muted-foreground">
-              Guest posts typically take 5-14 days from order to publication, depending on the publisher&apos;s schedule and content requirements.
+              Guest posts typically take 5-14 days from order to publication,
+              depending on the publisher&apos;s schedule and content
+              requirements.
             </p>
           </div>
           <div className="rounded-lg border p-4">
             <h4 className="font-medium">What is your revision policy?</h4>
             <p className="mt-1 text-sm text-muted-foreground">
-              We offer up to 2 rounds of revisions per order. Additional revisions may incur extra charges depending on the scope of changes.
+              We offer up to 2 rounds of revisions per order. Additional
+              revisions may incur extra charges depending on the scope of
+              changes.
             </p>
           </div>
           <div className="rounded-lg border p-4">
             <h4 className="font-medium">How do I track my order?</h4>
             <p className="mt-1 text-sm text-muted-foreground">
-              You can track all your orders in the Orders section of your dashboard. You&apos;ll also receive email updates at each status change.
+              You can track all your orders in the Orders section of your
+              dashboard. You&apos;ll also receive email updates at each status
+              change.
             </p>
           </div>
         </CardContent>
       </Card>
 
-      <CreateTicketDialog open={showCreateTicket} onOpenChange={setShowCreateTicket} />
+      <CreateTicketDialog
+        open={showCreateTicket}
+        onOpenChange={setShowCreateTicket}
+      />
     </div>
   )
 }

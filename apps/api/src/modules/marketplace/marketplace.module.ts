@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common"
+import { QueueModule } from "../queues/queue.module"
 import { MarketplaceController } from "./marketplace.controller"
 import { MarketplaceService } from "./marketplace.service"
-import { QueueModule } from "../queues/queue.module"
 
 @Module({
   imports: [QueueModule],

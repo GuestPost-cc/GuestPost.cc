@@ -1,22 +1,30 @@
-import { Controller, Get, Post, Delete, Body, Param, UseGuards } from "@nestjs/common"
-import { IdentityService } from "./identity.service"
-import { ActiveContextService } from "../active-context/active-context.service"
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from "@nestjs/common"
+import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
-import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
-import { CreateOrganizationDto } from "./dto/create-organization.dto"
-import { InviteMemberDto } from "./dto/invite-member.dto"
-import { CreateTeamDto } from "./dto/create-team.dto"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
+import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import type { PrismaService } from "../../common/prisma.service"
+import type { ActiveContextService } from "../active-context/active-context.service"
+import type { AuditService } from "../audit/audit.service"
+import type { CreateOrganizationDto } from "./dto/create-organization.dto"
+import type { CreateTeamDto } from "./dto/create-team.dto"
+import type { InviteMemberDto } from "./dto/invite-member.dto"
+import type { IdentityService } from "./identity.service"
 
 @Controller("identity")
 export class IdentityController {
   constructor(
     private readonly identity: IdentityService,
-    private readonly prisma: PrismaService,
+    readonly _prisma: PrismaService,
     private readonly activeContext: ActiveContextService,
     private readonly audit: AuditService,
   ) {}
@@ -50,12 +58,18 @@ export class IdentityController {
   }
 
   @Post("invites/:membershipId/accept")
-  acceptInvite(@Param("membershipId") membershipId: string, @CurrentUser() user: any) {
+  acceptInvite(
+    @Param("membershipId") membershipId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.identity.respondToInvite(user.id, membershipId, true)
   }
 
   @Post("invites/:membershipId/decline")
-  declineInvite(@Param("membershipId") membershipId: string, @CurrentUser() user: any) {
+  declineInvite(
+    @Param("membershipId") membershipId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.identity.respondToInvite(user.id, membershipId, false)
   }
 
@@ -72,7 +86,10 @@ export class IdentityController {
     @CurrentUser() user: any,
   ) {
     const prevOrgId = user.organizationId
-    const ctx = await this.activeContext.setActiveOrganization(user.id, organizationId)
+    const ctx = await this.activeContext.setActiveOrganization(
+      user.id,
+      organizationId,
+    )
 
     await this.audit.log({
       action: "ORGANIZATION_SWITCHED",
@@ -94,7 +111,10 @@ export class IdentityController {
     @CurrentUser() user: any,
   ) {
     const prevPubId = user.publisherId
-    const ctx = await this.activeContext.setActivePublisher(user.id, publisherId)
+    const ctx = await this.activeContext.setActivePublisher(
+      user.id,
+      publisherId,
+    )
 
     await this.audit.log({
       action: "PUBLISHER_SWITCHED",
@@ -126,7 +146,10 @@ export class IdentityController {
   // money controls are unchanged: NEW tier hold, listing moderation, dual
   // settlement approval.
   @Post("become-publisher")
-  becomePublisher(@Body("publisherName") publisherName: string | undefined, @CurrentUser() user: any) {
+  becomePublisher(
+    @Body("publisherName") publisherName: string | undefined,
+    @CurrentUser() user: any,
+  ) {
     return this.identity.becomePublisher(user.id, publisherName)
   }
 

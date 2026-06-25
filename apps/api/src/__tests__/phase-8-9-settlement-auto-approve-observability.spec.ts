@@ -22,7 +22,10 @@
 
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { makeAutoApproveOnError, type AutoApproveObservabilityHooks } from "@guestpost/shared"
+import {
+  type AutoApproveObservabilityHooks,
+  makeAutoApproveOnError,
+} from "@guestpost/shared"
 
 describe("Phase 8.9 — settlement-auto-approve onError observability (audit #41)", () => {
   function mkHooks() {
@@ -34,7 +37,11 @@ describe("Phase 8.9 — settlement-auto-approve onError observability (audit #41
 
   it("logError is called once with settlementId + err message + sweepRunId", () => {
     const { hooks, logError } = mkHooks()
-    const handler = makeAutoApproveOnError(hooks, "settlement-auto-approve", "job-123")
+    const handler = makeAutoApproveOnError(
+      hooks,
+      "settlement-auto-approve",
+      "job-123",
+    )
     handler(new Error("simulated db error"), "settlement-456")
 
     expect(logError).toHaveBeenCalledTimes(1)
@@ -50,7 +57,11 @@ describe("Phase 8.9 — settlement-auto-approve onError observability (audit #41
 
   it("captureException is called once with settlementId in contexts + fingerprint for dedup", () => {
     const { hooks, captureException } = mkHooks()
-    const handler = makeAutoApproveOnError(hooks, "settlement-auto-approve", "job-123")
+    const handler = makeAutoApproveOnError(
+      hooks,
+      "settlement-auto-approve",
+      "job-123",
+    )
     const err = new Error("simulated db error")
     handler(err, "settlement-456")
 
@@ -63,7 +74,9 @@ describe("Phase 8.9 — settlement-auto-approve onError observability (audit #41
           job: "settlement-auto-approve",
           sweepRunId: "job-123",
         }),
-        contexts: { settlement_auto_approve: { settlementId: "settlement-456" } },
+        contexts: {
+          settlement_auto_approve: { settlementId: "settlement-456" },
+        },
         fingerprint: ["settlement-auto-approve", "settlement-456"],
       }),
     )
@@ -71,7 +84,11 @@ describe("Phase 8.9 — settlement-auto-approve onError observability (audit #41
 
   it("non-Error throws are stringified safely (no crash on string/null/object)", () => {
     const { hooks, logError } = mkHooks()
-    const handler = makeAutoApproveOnError(hooks, "settlement-auto-approve", "job-x")
+    const handler = makeAutoApproveOnError(
+      hooks,
+      "settlement-auto-approve",
+      "job-x",
+    )
     handler("string error", "s1")
     expect(logError).toHaveBeenCalledWith(
       expect.any(String),
@@ -81,7 +98,11 @@ describe("Phase 8.9 — settlement-auto-approve onError observability (audit #41
 
   it("sweepRunId undefined defaults to 'unknown' in tags (Sentry tag values must be strings)", () => {
     const { hooks, captureException } = mkHooks()
-    const handler = makeAutoApproveOnError(hooks, "settlement-auto-approve", undefined)
+    const handler = makeAutoApproveOnError(
+      hooks,
+      "settlement-auto-approve",
+      undefined,
+    )
     handler(new Error("x"), "s2")
     expect(captureException).toHaveBeenCalledWith(
       expect.any(Error),

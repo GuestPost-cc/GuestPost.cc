@@ -19,8 +19,6 @@
 //   - non-ASCII (Unicode → ambiguous in log lines)
 //   - anything over 128 chars
 
-import { Injectable, NestMiddleware } from "@nestjs/common"
-import { Request, Response, NextFunction } from "express"
 // Deep import: request-context uses node:async_hooks and must not be in the
 // shared package's browser-safe barrel.
 import {
@@ -28,6 +26,8 @@ import {
   isValidRequestId,
   runWithRequestId,
 } from "@guestpost/shared/dist/observability/request-context"
+import { Injectable, type NestMiddleware } from "@nestjs/common"
+import type { NextFunction, Request, Response } from "express"
 
 const HEADER_NAME = "x-request-id"
 
@@ -37,7 +37,9 @@ export class RequestIdMiddleware implements NestMiddleware {
     const incoming = req.headers[HEADER_NAME]
     const candidate = Array.isArray(incoming) ? incoming[0] : incoming
 
-    const requestId = isValidRequestId(candidate) ? candidate : generateRequestId()
+    const requestId = isValidRequestId(candidate)
+      ? candidate
+      : generateRequestId()
 
     // Echo in response header so the client can include it in error reports / toasts.
     res.setHeader("X-Request-ID", requestId)

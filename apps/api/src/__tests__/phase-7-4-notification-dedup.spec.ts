@@ -36,7 +36,9 @@ describe("Phase 7.4 — notificationDedupKey builders", () => {
       "recon:summary:wallet=3,pub=0,stuckOrd=0,stuckPay=0:staff-1:2026-06-16",
     )
     // Same args → same key (idempotent across hourly cron runs)
-    expect(notificationDedupKey.reconDrift(args)).toBe(notificationDedupKey.reconDrift(args))
+    expect(notificationDedupKey.reconDrift(args)).toBe(
+      notificationDedupKey.reconDrift(args),
+    )
   })
 
   it("reconDrift produces a DIFFERENT key when drift composition changes", () => {
@@ -72,40 +74,61 @@ describe("Phase 7.4 — notificationDedupKey builders", () => {
   })
 
   it("deliveryFailed / deliveryManual / deliveryAccepted shape", () => {
-    expect(notificationDedupKey.deliveryFailed("v-1", "u-1")).toBe("delivery-failed:v-1:u-1")
-    expect(notificationDedupKey.deliveryManual("v-1", "u-1")).toBe("delivery-manual:v-1:u-1")
-    expect(notificationDedupKey.deliveryAccepted("v-1", "u-1")).toBe("delivery-accept:v-1:u-1")
+    expect(notificationDedupKey.deliveryFailed("v-1", "u-1")).toBe(
+      "delivery-failed:v-1:u-1",
+    )
+    expect(notificationDedupKey.deliveryManual("v-1", "u-1")).toBe(
+      "delivery-manual:v-1:u-1",
+    )
+    expect(notificationDedupKey.deliveryAccepted("v-1", "u-1")).toBe(
+      "delivery-accept:v-1:u-1",
+    )
   })
 
   it("chargeback / listingStatus / supportMessage / trustTierChange shape", () => {
-    expect(notificationDedupKey.chargeback("dispute-1", "u-1")).toBe("chargeback:dispute-1:u-1")
+    expect(notificationDedupKey.chargeback("dispute-1", "u-1")).toBe(
+      "chargeback:dispute-1:u-1",
+    )
     expect(notificationDedupKey.listingStatus("l-1", "pub-1", "APPROVED")).toBe(
       "listing-status:l-1:pub-1:APPROVED",
     )
-    expect(notificationDedupKey.supportMessage("msg-1", "u-1")).toBe("support-msg:msg-1:u-1")
-    expect(notificationDedupKey.trustTierChange("pub-1", "NEW", "TRUSTED")).toBe(
-      "trust-tier:pub-1:NEW-TRUSTED",
+    expect(notificationDedupKey.supportMessage("msg-1", "u-1")).toBe(
+      "support-msg:msg-1:u-1",
     )
+    expect(
+      notificationDedupKey.trustTierChange("pub-1", "NEW", "TRUSTED"),
+    ).toBe("trust-tier:pub-1:NEW-TRUSTED")
   })
 
   it("throws on overlong input (≤256 char DB column would silently truncate otherwise)", () => {
     const huge = "x".repeat(300)
-    expect(() => notificationDedupKey.deliveryFailed(huge, "u-1")).toThrow(/length .* exceeds/)
-    expect(() => notificationDedupKey.supportMessage(huge, "u-1")).toThrow(/length .* exceeds/)
+    expect(() => notificationDedupKey.deliveryFailed(huge, "u-1")).toThrow(
+      /length .* exceeds/,
+    )
+    expect(() => notificationDedupKey.supportMessage(huge, "u-1")).toThrow(
+      /length .* exceeds/,
+    )
   })
 
   it("utcDateBucket returns YYYY-MM-DD UTC", () => {
     const d = new Date("2026-06-16T23:59:59Z")
     expect(notificationDedupKey.utcDateBucket(d)).toBe("2026-06-16")
     // After UTC midnight
-    expect(notificationDedupKey.utcDateBucket(new Date("2026-06-17T00:00:00Z"))).toBe("2026-06-17")
+    expect(
+      notificationDedupKey.utcDateBucket(new Date("2026-06-17T00:00:00Z")),
+    ).toBe("2026-06-17")
   })
 })
 
 describe("Phase 7.4 — isUniqueViolation (Prisma P2002 detection)", () => {
   it("returns true for objects with code === 'P2002'", () => {
     expect(isUniqueViolation({ code: "P2002" })).toBe(true)
-    expect(isUniqueViolation({ code: "P2002", meta: { target: ["userId", "dedupKey"] } })).toBe(true)
+    expect(
+      isUniqueViolation({
+        code: "P2002",
+        meta: { target: ["userId", "dedupKey"] },
+      }),
+    ).toBe(true)
   })
 
   it("returns false for any other shape", () => {
@@ -157,7 +180,9 @@ describe("Phase 7.4 — migration + schema regression guards", () => {
       "utf8",
     )
     expect(sql).toMatch(/ADD COLUMN "dedupKey" VARCHAR\(256\)/)
-    expect(sql).toMatch(/CREATE UNIQUE INDEX "Notification_userId_dedupKey_key"/)
+    expect(sql).toMatch(
+      /CREATE UNIQUE INDEX "Notification_userId_dedupKey_key"/,
+    )
     // The WHERE clause is what makes it a partial unique — NULL rows coexist
     expect(sql).toMatch(/WHERE "dedupKey" IS NOT NULL/)
   })
@@ -178,7 +203,9 @@ describe("Phase 7.4 — writer integration (Prisma mock)", () => {
   // Simulates the worker's notification.processor.ts P2002-swallow shape.
   // Verifies: 3 identical creates → 1 row; 3 distinct → 3 rows; 2 NULL → 2 rows.
 
-  type CreateCall = { data: { userId: string; dedupKey: string | null; [k: string]: unknown } }
+  type CreateCall = {
+    data: { userId: string; dedupKey: string | null; [k: string]: unknown }
+  }
 
   function makePrismaMock() {
     const rows: CreateCall["data"][] = []
@@ -189,7 +216,9 @@ describe("Phase 7.4 — writer integration (Prisma mock)", () => {
           const dup =
             args.data.dedupKey !== null &&
             rows.some(
-              (r) => r.userId === args.data.userId && r.dedupKey === args.data.dedupKey,
+              (r) =>
+                r.userId === args.data.userId &&
+                r.dedupKey === args.data.dedupKey,
             )
           if (dup) {
             throw { code: "P2002" }
@@ -201,7 +230,10 @@ describe("Phase 7.4 — writer integration (Prisma mock)", () => {
     }
   }
 
-  async function safeCreate(prisma: ReturnType<typeof makePrismaMock>, data: CreateCall["data"]) {
+  async function safeCreate(
+    prisma: ReturnType<typeof makePrismaMock>,
+    data: CreateCall["data"],
+  ) {
     try {
       await prisma.notification.create({ data })
       return "created" as const
@@ -255,7 +287,13 @@ describe("Phase 7.4 — writer integration (Prisma mock)", () => {
 
   it("2 creates with NULL dedupKey → 2 rows (legacy compatibility — partial unique exempts NULL)", async () => {
     const prisma = makePrismaMock()
-    const base = { userId: "u-1", organizationId: null, type: "X", message: "", dedupKey: null as string | null }
+    const base = {
+      userId: "u-1",
+      organizationId: null,
+      type: "X",
+      message: "",
+      dedupKey: null as string | null,
+    }
     expect(await safeCreate(prisma, base)).toBe("created")
     expect(await safeCreate(prisma, base)).toBe("created")
     expect(prisma.rows).toHaveLength(2)

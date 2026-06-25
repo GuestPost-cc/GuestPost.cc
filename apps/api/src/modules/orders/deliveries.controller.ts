@@ -1,12 +1,20 @@
-import { Controller, Get, Post, Body, Param, UseGuards, BadRequestException } from "@nestjs/common"
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  UseGuards,
+} from "@nestjs/common"
+import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
-import { OrderDeliveryService } from "./services/order-delivery.service"
-import { DeliveryInterventionService } from "./services/delivery-intervention.service"
-import { OrderFulfillmentAssignmentService } from "./services/order-fulfillment-assignment.service"
-import { OrderOperationsService } from "./services/order-operations.service"
-import { PrismaService } from "../../common/prisma.service"
+import type { PrismaService } from "../../common/prisma.service"
+import type { DeliveryInterventionService } from "./services/delivery-intervention.service"
+import type { OrderDeliveryService } from "./services/order-delivery.service"
+import type { OrderFulfillmentAssignmentService } from "./services/order-fulfillment-assignment.service"
+import type { OrderOperationsService } from "./services/order-operations.service"
 
 // Staff-facing delivery operations: read (versions/evidence/snapshots/audit),
 // platform fulfillment assignment, intervention, and dispute evidence package.
@@ -56,7 +64,9 @@ export class DeliveriesController {
 
   @Get("disputes/:disputeId/evidence")
   async disputeEvidence(@Param("disputeId") disputeId: string) {
-    const dispute = await this.prisma.orderDispute.findUnique({ where: { id: disputeId } })
+    const dispute = await this.prisma.orderDispute.findUnique({
+      where: { id: disputeId },
+    })
     if (!dispute) throw new BadRequestException("Dispute not found")
     return this.intervention.disputeEvidencePackage(dispute.orderId)
   }
@@ -76,13 +86,21 @@ export class DeliveriesController {
 
   @Post("orders/:id/assign")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  assign(@Param("id") id: string, @Body("assignedToUserId") to: string, @CurrentUser() user: any) {
+  assign(
+    @Param("id") id: string,
+    @Body("assignedToUserId") to: string,
+    @CurrentUser() user: any,
+  ) {
     return this.assignment.assign(id, to, user.id)
   }
 
   @Post("orders/:id/reassign")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  reassign(@Param("id") id: string, @Body("assignedToUserId") to: string, @CurrentUser() user: any) {
+  reassign(
+    @Param("id") id: string,
+    @Body("assignedToUserId") to: string,
+    @CurrentUser() user: any,
+  ) {
     return this.assignment.reassign(id, to, user.id)
   }
 
@@ -91,7 +109,12 @@ export class DeliveriesController {
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   submitPlatformDelivery(
     @Param("id") id: string,
-    @Body() body: { publishedUrl: string; articleTitle?: string; notes?: string; screenshotUrl?: string },
+    @Body() body: {
+      publishedUrl: string
+      articleTitle?: string
+      notes?: string
+      screenshotUrl?: string
+    },
     @CurrentUser() user: any,
   ) {
     return this.operations.markPublished(id, user.id, body.publishedUrl, {
@@ -109,12 +132,20 @@ export class DeliveriesController {
   }
 
   @Post("deliveries/:id/manual-approve")
-  manualApprove(@Param("id") id: string, @Body("reason") reason: string, @CurrentUser() user: any) {
+  manualApprove(
+    @Param("id") id: string,
+    @Body("reason") reason: string,
+    @CurrentUser() user: any,
+  ) {
     return this.intervention.manualApprove(id, user.id, this.role(user), reason)
   }
 
   @Post("deliveries/:id/manual-reject")
-  manualReject(@Param("id") id: string, @Body("reason") reason: string, @CurrentUser() user: any) {
+  manualReject(
+    @Param("id") id: string,
+    @Body("reason") reason: string,
+    @CurrentUser() user: any,
+  ) {
     return this.intervention.manualReject(id, user.id, this.role(user), reason)
   }
 
@@ -124,6 +155,12 @@ export class DeliveriesController {
     @Body() body: { targetStatus: "VERIFIED" | "FAILED"; reason: string },
     @CurrentUser() user: any,
   ) {
-    return this.intervention.override(id, user.id, this.role(user), body.targetStatus, body.reason)
+    return this.intervention.override(
+      id,
+      user.id,
+      this.role(user),
+      body.targetStatus,
+      body.reason,
+    )
   }
 }

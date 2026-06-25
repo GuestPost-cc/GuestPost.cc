@@ -1,7 +1,24 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalDependencies": ["**/.env.*local"],
-  "globalEnv": ["NODE_ENV", "CI"],
+  "globalEnv": [
+    "NODE_ENV",
+    "CI",
+    "SEED_API_URL",
+    "SEED_DOMAIN",
+    "DATABASE_URL",
+    "REDIS_URL",
+    "JWT_SECRET",
+    "QUEUE_SIGNING_SECRET",
+    "BETTER_AUTH_URL",
+    "CORS_ORIGIN",
+    "SENTRY_AUTH_TOKEN",
+    "SENTRY_ORG",
+    "SENTRY_PROJECT",
+    "SENTRY_DSN",
+    "SENTRY_ENVIRONMENT",
+    "SENTRY_RELEASE"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

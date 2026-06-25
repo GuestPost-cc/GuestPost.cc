@@ -56,7 +56,10 @@ export const wordCountSchema = z
 // Sanitized free-text field for any "topic" / "context" prompt. The brief is
 // rendered server-side as JSON, so we don't need HTML stripping — just a
 // length cap and trim.
-export function makeText(name: string, opts: { min?: number; max?: number; required?: boolean } = {}) {
+export function makeText(
+  name: string,
+  opts: { min?: number; max?: number; required?: boolean } = {},
+) {
   const { min = 1, max = 1000, required = true } = opts
   const base = z
     .string()

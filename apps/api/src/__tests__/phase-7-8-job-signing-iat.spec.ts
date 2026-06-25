@@ -4,7 +4,11 @@
  * Imports from source (not dist) so the test reflects in-flight edits
  * without needing a rebuild of @guestpost/shared.
  */
-import { signJobPayload, verifyJobPayload, SIGNED_PAYLOAD_VERSION } from "@guestpost/shared/dist/job-signing"
+import {
+  SIGNED_PAYLOAD_VERSION,
+  signJobPayload,
+  verifyJobPayload,
+} from "@guestpost/shared/dist/job-signing"
 
 const ORIGINAL_SECRET = process.env.QUEUE_SIGNING_SECRET
 beforeAll(() => {
@@ -98,18 +102,24 @@ describe("Phase 7.8 #27 — job-signing iat + replay protection", () => {
     // Simulate a pre-Phase-7.8 payload by re-implementing the legacy
     // sign-without-iat path. We can't reach the new signJobPayload to
     // produce such a payload, so build it manually with the same HMAC.
-    function signLegacy(data: Record<string, unknown>): Record<string, unknown> & { signature: string } {
+    function signLegacy(
+      data: Record<string, unknown>,
+    ): Record<string, unknown> & { signature: string } {
       // Re-use canonicalize via a stable JSON.stringify with sorted keys.
-      const { createHmac } = require("crypto") as typeof import("crypto")
-      const sorted = Object.keys(data).sort().reduce(
-        (acc, k) => ({ ...acc, [k]: data[k] }),
-        {} as Record<string, unknown>,
-      )
+      const { createHmac } = require("node:crypto") as typeof import("crypto")
+      const sorted = Object.keys(data)
+        .sort()
+        .reduce(
+          (acc, k) => ({ ...acc, [k]: data[k] }),
+          {} as Record<string, unknown>,
+        )
       const canon = JSON.stringify(sorted)
       // Match canonicalize() format exactly: sorted keys, no undefined.
       // For flat {foo: "bar"} the canonical form is `{"foo":"bar"}` so
       // JSON.stringify of sorted suffices.
-      const sig = createHmac("sha256", process.env.QUEUE_SIGNING_SECRET!).update(canon).digest("hex")
+      const sig = createHmac("sha256", process.env.QUEUE_SIGNING_SECRET!)
+        .update(canon)
+        .digest("hex")
       return { ...data, signature: sig }
     }
 
@@ -126,7 +136,9 @@ describe("Phase 7.8 #27 — job-signing iat + replay protection", () => {
   describe("verifyJobPayload — repeatable bypass (maxAgeMs: 0)", () => {
     it("accepts an arbitrarily old payload when freshness is disabled", () => {
       const realNow = Date.now()
-      jest.spyOn(Date, "now").mockReturnValue(realNow - 365 * 24 * 60 * 60 * 1000) // 1 year ago
+      jest
+        .spyOn(Date, "now")
+        .mockReturnValue(realNow - 365 * 24 * 60 * 60 * 1000) // 1 year ago
       const ancient = signJobPayload({ foo: "bar" })
       ;(Date.now as jest.Mock).mockRestore()
       expect(verifyJobPayload(ancient, { maxAgeMs: 0 })).toBe(true)

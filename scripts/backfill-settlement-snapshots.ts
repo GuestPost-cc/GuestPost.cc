@@ -5,8 +5,9 @@
 // Safe to re-run any time. Run after the Phase 6 additive migration lands.
 // Run: pnpm tsx scripts/backfill-settlement-snapshots.ts [--dry-run]
 
+import { resolve } from "node:path"
 import { config } from "dotenv"
-import { resolve } from "path"
+
 config({ path: resolve(__dirname, "../.env.development") })
 
 import { prisma } from "@guestpost/database"
@@ -30,9 +31,12 @@ async function backfillSettlements() {
     },
   })
 
-  console.log(`Settlement: ${rows.length} rows missing snapshot${DRY_RUN ? " [DRY RUN]" : ""}`)
+  console.log(
+    `Settlement: ${rows.length} rows missing snapshot${DRY_RUN ? " [DRY RUN]" : ""}`,
+  )
 
-  let updated = 0, skipped = 0
+  let updated = 0,
+    skipped = 0
   for (const r of rows) {
     const lsId = r.order?.listingServiceId ?? null
     const channel = r.order?.fulfillmentChannel ?? null
@@ -45,7 +49,8 @@ async function backfillSettlements() {
     let unitPrice: any = null
     if (lsId) {
       const ls = await prisma.listingService.findUnique({
-        where: { id: lsId }, select: { price: true },
+        where: { id: lsId },
+        select: { price: true },
       })
       unitPrice = ls?.price ?? null
     }
@@ -89,9 +94,12 @@ async function backfillPlatformRevenue() {
     },
   })
 
-  console.log(`PlatformRevenue: ${rows.length} rows missing snapshot${DRY_RUN ? " [DRY RUN]" : ""}`)
+  console.log(
+    `PlatformRevenue: ${rows.length} rows missing snapshot${DRY_RUN ? " [DRY RUN]" : ""}`,
+  )
 
-  let updated = 0, skipped = 0
+  let updated = 0,
+    skipped = 0
   for (const r of rows) {
     const lsId = r.order?.listingServiceId ?? null
     const channel = r.order?.fulfillmentChannel ?? null
@@ -101,7 +109,8 @@ async function backfillPlatformRevenue() {
     let unitPrice: any = null
     if (lsId) {
       const ls = await prisma.listingService.findUnique({
-        where: { id: lsId }, select: { price: true },
+        where: { id: lsId },
+        select: { price: true },
       })
       unitPrice = ls?.price ?? null
     }
@@ -134,5 +143,8 @@ async function main() {
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1) })
+  .catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
   .finally(() => prisma.$disconnect())

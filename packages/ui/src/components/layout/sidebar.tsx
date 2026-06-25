@@ -1,31 +1,31 @@
-"use client";
+"use client"
 
-import * as React from "react";
-import { cn } from "../../lib/utils";
-import { Button } from "../button";
+import {
+  BarChart3,
+  ChevronLeft,
+  ChevronRight,
+  CreditCard,
+  LayoutDashboard,
+  Megaphone,
+  Moon,
+  Settings,
+  ShoppingCart,
+  Sun,
+} from "lucide-react"
+import * as React from "react"
+import { cn } from "../../lib/utils"
+import { Button } from "../button"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "../tooltip";
-import {
-  LayoutDashboard,
-  ShoppingCart,
-  Megaphone,
-  BarChart3,
-  CreditCard,
-  Settings,
-  ChevronLeft,
-  ChevronRight,
-  Moon,
-  Sun,
-} from "lucide-react";
+} from "../tooltip"
 
 interface SidebarProps {
-  collapsed?: boolean;
-  onCollapsedChange?: (collapsed: boolean) => void;
-  className?: string;
+  collapsed?: boolean
+  onCollapsedChange?: (collapsed: boolean) => void
+  className?: string
 }
 
 const navItems = [
@@ -35,22 +35,22 @@ const navItems = [
   { icon: BarChart3, label: "Reports", href: "#" },
   { icon: CreditCard, label: "Billing", href: "#" },
   { icon: Settings, label: "Settings", href: "#" },
-];
+]
 
 function Sidebar({
   collapsed = false,
   onCollapsedChange,
   className,
 }: SidebarProps) {
-  const [isDark, setIsDark] = React.useState(false);
+  const [isDark, setIsDark] = React.useState(false)
 
   React.useEffect(() => {
     if (isDark) {
-      document.documentElement.classList.add("dark");
+      document.documentElement.classList.add("dark")
     } else {
-      document.documentElement.classList.remove("dark");
+      document.documentElement.classList.remove("dark")
     }
-  }, [isDark]);
+  }, [isDark])
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -79,7 +79,7 @@ function Sidebar({
 
         <nav className="flex-1 space-y-1 p-3">
           {navItems.map((item) => {
-            const Icon = item.icon;
+            const Icon = item.icon
             return (
               <Tooltip key={item.label}>
                 <TooltipTrigger asChild>
@@ -98,7 +98,7 @@ function Sidebar({
                   <TooltipContent side="right">{item.label}</TooltipContent>
                 )}
               </Tooltip>
-            );
+            )
           })}
         </nav>
 
@@ -139,7 +139,7 @@ function Sidebar({
         </Button>
       </aside>
     </TooltipProvider>
-  );
+  )
 }
 
-export { Sidebar };
+export { Sidebar }

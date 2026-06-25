@@ -14,8 +14,8 @@
  * route through the helper (the helper-adoption test is the regression guard
  * against silent reversion to the inline form).
  */
-import { readFileSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 const ORIGINAL_DATABASE_URL = process.env.DATABASE_URL
 
@@ -29,7 +29,8 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
     it("THROWS 'DATABASE_URL is required' when env var is missing (runtime guard regression)", () => {
       jest.isolateModules(() => {
         delete process.env.DATABASE_URL
-        const { createPrismaAdapter } = require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
+        const { createPrismaAdapter } =
+          require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
         expect(() => createPrismaAdapter()).toThrow("DATABASE_URL is required")
       })
     })
@@ -37,7 +38,8 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
     it("returns a defined adapter value when DATABASE_URL is set", () => {
       jest.isolateModules(() => {
         process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test"
-        const { createPrismaAdapter } = require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
+        const { createPrismaAdapter } =
+          require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
         const adapter = createPrismaAdapter()
         // Not asserting instanceof PrismaPg (brittle); just that the helper returns the contract value.
         expect(adapter).toBeDefined()
@@ -48,7 +50,8 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
       jest.isolateModules(() => {
         // Import with env set — module load succeeds.
         process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test"
-        const { createPrismaAdapter } = require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
+        const { createPrismaAdapter } =
+          require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
         // After import, unset env. Call should THROW — proves call-time read, not load-time read.
         delete process.env.DATABASE_URL
         expect(() => createPrismaAdapter()).toThrow("DATABASE_URL is required")
@@ -60,7 +63,8 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
     it("returns a defined PrismaClient when DATABASE_URL is set", () => {
       jest.isolateModules(() => {
         process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test"
-        const { createPrismaClient } = require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
+        const { createPrismaClient } =
+          require("../../../../packages/database/src/create-prisma-client") as typeof import("@guestpost/database")
         const client = createPrismaClient()
         expect(client).toBeDefined()
         // Cleanup — prevent test from holding the client open
@@ -73,11 +77,25 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
   describe("static-source: both production callsites adopt the helpers", () => {
     it("packages/database/src/index.ts uses createPrismaClient (singleton site adopted)", () => {
       const src = readFileSync(
-        join(__dirname, "..", "..", "..", "..", "packages", "database", "src", "index.ts"),
+        join(
+          __dirname,
+          "..",
+          "..",
+          "..",
+          "..",
+          "packages",
+          "database",
+          "src",
+          "index.ts",
+        ),
         "utf-8",
       )
-      expect(src).toMatch(/import\s*\{[^}]*createPrismaClient[^}]*\}\s*from\s*["']\.\/create-prisma-client["']/)
-      expect(src).toMatch(/globalForPrisma\.prisma\s*\?\?\s*createPrismaClient\(\)/)
+      expect(src).toMatch(
+        /import\s*\{[^}]*createPrismaClient[^}]*\}\s*from\s*["']\.\/create-prisma-client["']/,
+      )
+      expect(src).toMatch(
+        /globalForPrisma\.prisma\s*\?\?\s*createPrismaClient\(\)/,
+      )
     })
 
     it("apps/api/src/common/prisma.service.ts uses createPrismaAdapter inside super(...) (NestJS site adopted)", () => {
@@ -85,13 +103,27 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
         join(__dirname, "..", "common", "prisma.service.ts"),
         "utf-8",
       )
-      expect(src).toMatch(/import\s*\{[^}]*createPrismaAdapter[^}]*\}\s*from\s*["']@guestpost\/database["']/)
-      expect(src).toMatch(/super\(\s*\{[\s\S]*?adapter:\s*createPrismaAdapter\(/)
+      expect(src).toMatch(
+        /import\s*\{[^}]*createPrismaAdapter[^}]*\}\s*from\s*["']@guestpost\/database["']/,
+      )
+      expect(src).toMatch(
+        /super\(\s*\{[\s\S]*?adapter:\s*createPrismaAdapter\(/,
+      )
     })
 
     it("NEITHER site contains the legacy inline `new PrismaPg({ connectionString:` form (regression guard)", () => {
       const singletonSrc = readFileSync(
-        join(__dirname, "..", "..", "..", "..", "packages", "database", "src", "index.ts"),
+        join(
+          __dirname,
+          "..",
+          "..",
+          "..",
+          "..",
+          "packages",
+          "database",
+          "src",
+          "index.ts",
+        ),
         "utf-8",
       )
       const serviceSrc = readFileSync(
@@ -100,8 +132,12 @@ describe("Phase 7.13.x — createPrismaClient / createPrismaAdapter helpers", ()
       )
       // The inline form is the pre-7.13.x shape both sites had. After adoption,
       // ONLY create-prisma-client.ts contains it.
-      expect(singletonSrc).not.toMatch(/new\s+PrismaPg\s*\(\s*\{\s*connectionString:/)
-      expect(serviceSrc).not.toMatch(/new\s+PrismaPg\s*\(\s*\{\s*connectionString:/)
+      expect(singletonSrc).not.toMatch(
+        /new\s+PrismaPg\s*\(\s*\{\s*connectionString:/,
+      )
+      expect(serviceSrc).not.toMatch(
+        /new\s+PrismaPg\s*\(\s*\{\s*connectionString:/,
+      )
     })
   })
 })

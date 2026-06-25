@@ -42,7 +42,11 @@ function makePrismaMock(): PrismaMocks {
   }
 }
 
-function makeSettlement(opts: { id: string; orderId?: string; version?: number }) {
+function makeSettlement(opts: {
+  id: string
+  orderId?: string
+  version?: number
+}) {
   return {
     id: opts.id,
     version: opts.version ?? 1,
@@ -181,14 +185,16 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
     const tx = makeTxMock()
     const dbError = new Error("simulated DB error")
     prisma.$transaction
-      .mockImplementationOnce(async () => { throw dbError })
+      .mockImplementationOnce(async () => {
+        throw dbError
+      })
       .mockImplementationOnce(async (fn: any) => fn(tx))
     const onError = jest.fn()
 
     const r = await runSettlementAutoApprove(prisma as any, { onError })
 
     expect(r.approved).toBe(1) // s2 succeeded
-    expect(r.skipped).toBe(1)  // s1 failed; sweep continued
+    expect(r.skipped).toBe(1) // s1 failed; sweep continued
     expect(onError).toHaveBeenCalledTimes(1)
     expect(onError).toHaveBeenCalledWith(dbError, "s1")
   })
@@ -201,11 +207,15 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
     ])
     const tx = makeTxMock()
     prisma.$transaction
-      .mockImplementationOnce(async () => { throw new Error("row error") })
+      .mockImplementationOnce(async () => {
+        throw new Error("row error")
+      })
       .mockImplementationOnce(async (fn: any) => fn(tx))
     // Handler that itself throws — the defensive try/catch in the core must
     // swallow this so the next iteration still runs.
-    const onError = jest.fn(() => { throw new Error("handler bug") })
+    const onError = jest.fn(() => {
+      throw new Error("handler bug")
+    })
 
     const r = await runSettlementAutoApprove(prisma as any, { onError })
 
@@ -217,7 +227,9 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
   it("batchSize honored in findMany take", async () => {
     const prisma = makePrismaMock()
     await runSettlementAutoApprove(prisma as any, { batchSize: 42 })
-    const callArgs = prisma.settlement.findMany.mock.calls[0]![0] as { take: number }
+    const callArgs = prisma.settlement.findMany.mock.calls[0]?.[0] as {
+      take: number
+    }
     expect(callArgs.take).toBe(42)
   })
 
@@ -225,7 +237,9 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
     const prisma = makePrismaMock()
     const frozenNow = new Date("2026-01-15T12:00:00Z")
     await runSettlementAutoApprove(prisma as any, { now: frozenNow })
-    const callArgs = prisma.settlement.findMany.mock.calls[0]![0] as { where: { reviewEndsAt: { lte: Date } } }
+    const callArgs = prisma.settlement.findMany.mock.calls[0]?.[0] as {
+      where: { reviewEndsAt: { lte: Date } }
+    }
     expect(callArgs.where.reviewEndsAt.lte).toEqual(frozenNow)
   })
 })
@@ -237,11 +251,13 @@ describe("Phase 7.3 — countStaleReviewSettlements", () => {
     const frozenNow = new Date("2026-06-15T12:00:00Z")
     await countStaleReviewSettlements(prisma as any, { now: frozenNow })
 
-    const callArgs = prisma.settlement.count.mock.calls[0]![0] as {
+    const callArgs = prisma.settlement.count.mock.calls[0]?.[0] as {
       where: { status: { in: string[] }; reviewEndsAt: { lt: Date } }
     }
     expect(callArgs.where.status.in).toEqual(["PENDING", "UNDER_REVIEW"])
-    const expectedThreshold = new Date(frozenNow.getTime() - 24 * 60 * 60 * 1000)
+    const expectedThreshold = new Date(
+      frozenNow.getTime() - 24 * 60 * 60 * 1000,
+    )
     expect(callArgs.where.reviewEndsAt.lt).toEqual(expectedThreshold)
   })
 
@@ -256,11 +272,16 @@ describe("Phase 7.3 — countStaleReviewSettlements", () => {
     const prisma = makePrismaMock()
     prisma.settlement.count.mockResolvedValue(0)
     const frozenNow = new Date("2026-06-15T12:00:00Z")
-    await countStaleReviewSettlements(prisma as any, { now: frozenNow, staleThresholdHours: 1 })
-    const callArgs = prisma.settlement.count.mock.calls[0]![0] as {
+    await countStaleReviewSettlements(prisma as any, {
+      now: frozenNow,
+      staleThresholdHours: 1,
+    })
+    const callArgs = prisma.settlement.count.mock.calls[0]?.[0] as {
       where: { reviewEndsAt: { lt: Date } }
     }
-    expect(callArgs.where.reviewEndsAt.lt).toEqual(new Date(frozenNow.getTime() - 60 * 60 * 1000))
+    expect(callArgs.where.reviewEndsAt.lt).toEqual(
+      new Date(frozenNow.getTime() - 60 * 60 * 1000),
+    )
   })
 })
 
@@ -276,29 +297,43 @@ describe("Phase 7.3 — file-deletion + module-wiring regression guards", () => 
   const repoRoot = path.resolve(__dirname, "..", "..", "..", "..")
 
   it("apps/api/src/modules/settlements/settlement-auto-approve.service.ts is DELETED", () => {
-    const filePath = path.join(repoRoot, "apps/api/src/modules/settlements/settlement-auto-approve.service.ts")
+    const filePath = path.join(
+      repoRoot,
+      "apps/api/src/modules/settlements/settlement-auto-approve.service.ts",
+    )
     expect(fs.existsSync(filePath)).toBe(false)
   })
 
   it("settlements.module.ts no longer imports or registers SettlementAutoApproveService", () => {
     const src = fs.readFileSync(
-      path.join(repoRoot, "apps/api/src/modules/settlements/settlements.module.ts"),
+      path.join(
+        repoRoot,
+        "apps/api/src/modules/settlements/settlements.module.ts",
+      ),
       "utf8",
     )
     // Catch actual code references; a comment mentioning the deleted class
     // name as historical context is fine.
     expect(src).not.toMatch(/^\s*import .*SettlementAutoApproveService/m)
     expect(src).not.toMatch(/providers:\s*\[[^\]]*SettlementAutoApproveService/)
-    expect(src).not.toMatch(/from\s+["']\.\/settlement-auto-approve\.service["']/)
+    expect(src).not.toMatch(
+      /from\s+["']\.\/settlement-auto-approve\.service["']/,
+    )
   })
 
   it("apps/worker/src/processors/settlement-auto-approve.processor.ts EXISTS", () => {
-    const filePath = path.join(repoRoot, "apps/worker/src/processors/settlement-auto-approve.processor.ts")
+    const filePath = path.join(
+      repoRoot,
+      "apps/worker/src/processors/settlement-auto-approve.processor.ts",
+    )
     expect(fs.existsSync(filePath)).toBe(true)
   })
 
   it("apps/worker/src/index.ts registers the sweep + adds the worker", () => {
-    const src = fs.readFileSync(path.join(repoRoot, "apps/worker/src/index.ts"), "utf8")
+    const src = fs.readFileSync(
+      path.join(repoRoot, "apps/worker/src/index.ts"),
+      "utf8",
+    )
     expect(src).toMatch(/createSettlementAutoApproveWorker/)
     expect(src).toMatch(/registerSettlementAutoApproveSweep/)
     expect(src).toMatch(/jobId:\s*"settlement-auto-approve"/)

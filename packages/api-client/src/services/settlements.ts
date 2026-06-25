@@ -1,5 +1,5 @@
 import type { SettlementStatus } from "@guestpost/shared"
-import { HttpClient } from "../client"
+import type { HttpClient } from "../client"
 
 export interface SettlementResponse {
   id: string

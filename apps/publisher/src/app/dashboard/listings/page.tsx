@@ -1,38 +1,38 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
 import {
+  Badge,
   Button,
   Card,
   CardContent,
-  Badge,
-  Skeleton,
-  Input,
-  Label,
-  Textarea,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
 } from "@guestpost/ui"
-import { Plus, Store, AlertCircle, RefreshCw } from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { AlertCircle, Plus, RefreshCw, Store } from "lucide-react"
+import { useState } from "react"
 import { toast } from "sonner"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 const LISTING_TYPES = [
   "GUEST_POST",
@@ -45,7 +45,10 @@ const LISTING_TYPES = [
   "SEO_CONTENT",
 ] as const
 
-const STATUS_VARIANTS: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+const STATUS_VARIANTS: Record<
+  string,
+  "default" | "secondary" | "destructive" | "outline"
+> = {
   APPROVED: "default",
   PENDING_REVIEW: "secondary",
   DRAFT: "outline",
@@ -74,7 +77,11 @@ export default function PublisherListingsPage() {
   const publisherId = (user as any)?.publisherId as string | undefined
   const queryClient = useQueryClient()
   const [showCreate, setShowCreate] = useState(false)
-  const [servicesForListing, setServicesForListing] = useState<{ id: string; title: string; services: ServiceRow[] } | null>(null)
+  const [servicesForListing, setServicesForListing] = useState<{
+    id: string
+    title: string
+    services: ServiceRow[]
+  } | null>(null)
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -97,7 +104,8 @@ export default function PublisherListingsPage() {
 
   const websitesQ = useQuery({
     queryKey: ["publisher-websites", publisherId],
-    queryFn: async () => (await api.publishers.getWebsites(publisherId!)) as any[],
+    queryFn: async () =>
+      (await api.publishers.getWebsites(publisherId!)) as any[],
     enabled: !!publisherId && showCreate,
   })
 
@@ -117,9 +125,16 @@ export default function PublisherListingsPage() {
       toast.success("Listing submitted for review")
       queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
       setShowCreate(false)
-      setForm({ title: "", description: "", type: "GUEST_POST", price: "", websiteId: "" })
+      setForm({
+        title: "",
+        description: "",
+        type: "GUEST_POST",
+        price: "",
+        websiteId: "",
+      })
     },
-    onError: (err: Error) => toast.error(err.message || "Failed to create listing"),
+    onError: (err: Error) =>
+      toast.error(err.message || "Failed to create listing"),
   })
 
   // Service-management mutations (per-row endpoints). All three invalidate
@@ -154,15 +169,25 @@ export default function PublisherListingsPage() {
       api.marketplace.addListingService(vars.listingId, vars.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
-      setNewService({ serviceType: "GUEST_POST", price: "", turnaroundDays: "7", revisionRounds: "2" })
+      setNewService({
+        serviceType: "GUEST_POST",
+        price: "",
+        turnaroundDays: "7",
+        revisionRounds: "2",
+      })
       toast.success("Service added")
     },
     onError: (e: Error) => toast.error(e.message || "Failed to add service"),
   })
   const updateServiceMut = useMutation({
     mutationFn: (vars: UpdateServiceVars) =>
-      api.marketplace.updateListingService(vars.listingId, vars.serviceId, vars.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["publisher-listings"] }),
+      api.marketplace.updateListingService(
+        vars.listingId,
+        vars.serviceId,
+        vars.data,
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["publisher-listings"] }),
     onError: (e: Error) => toast.error(e.message || "Update failed"),
   })
   const pauseServiceMut = useMutation({
@@ -192,10 +217,22 @@ export default function PublisherListingsPage() {
       onError: (e: any) => toast.error(e?.message || `${label} failed`),
     }
   }
-  const submitMut  = useMutation({ mutationFn: (id: string) => api.marketplace.submitListing(id),  ...lifecycleOpts("Submitted for review") })
-  const pauseMut   = useMutation({ mutationFn: (id: string) => api.marketplace.pauseListing(id),   ...lifecycleOpts("Listing paused") })
-  const unpauseMut = useMutation({ mutationFn: (id: string) => api.marketplace.unpauseListing(id), ...lifecycleOpts("Listing unpaused") })
-  const archiveMut = useMutation({ mutationFn: (id: string) => api.marketplace.archiveListing(id), ...lifecycleOpts("Listing archived") })
+  const submitMut = useMutation({
+    mutationFn: (id: string) => api.marketplace.submitListing(id),
+    ...lifecycleOpts("Submitted for review"),
+  })
+  const pauseMut = useMutation({
+    mutationFn: (id: string) => api.marketplace.pauseListing(id),
+    ...lifecycleOpts("Listing paused"),
+  })
+  const unpauseMut = useMutation({
+    mutationFn: (id: string) => api.marketplace.unpauseListing(id),
+    ...lifecycleOpts("Listing unpaused"),
+  })
+  const archiveMut = useMutation({
+    mutationFn: (id: string) => api.marketplace.archiveListing(id),
+    ...lifecycleOpts("Listing archived"),
+  })
 
   const listings = (listingsQ.data ?? []) as any[]
   const canSubmit =
@@ -208,8 +245,13 @@ export default function PublisherListingsPage() {
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-semibold mb-2">Failed to load listings</h2>
-        <p className="text-muted-foreground mb-4">{(listingsQ.error as Error).message}</p>
-        <Button onClick={() => listingsQ.refetch()}><RefreshCw className="mr-2 h-4 w-4" />Retry</Button>
+        <p className="text-muted-foreground mb-4">
+          {(listingsQ.error as Error).message}
+        </p>
+        <Button onClick={() => listingsQ.refetch()}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Retry
+        </Button>
       </div>
     )
   }
@@ -218,9 +260,12 @@ export default function PublisherListingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Marketplace Listings</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Marketplace Listings
+          </h1>
           <p className="text-muted-foreground">
-            Your inventory on the marketplace. New listings are reviewed by staff before going live.
+            Your inventory on the marketplace. New listings are reviewed by
+            staff before going live.
           </p>
         </div>
         <Button onClick={() => setShowCreate(true)}>
@@ -233,13 +278,17 @@ export default function PublisherListingsPage() {
         <CardContent className="p-0">
           {listingsQ.isLoading ? (
             <div className="p-4 space-y-3">
-              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
           ) : listings.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Store className="h-12 w-12 text-muted-foreground/50" />
               <h3 className="mt-4 text-lg font-medium">No listings yet</h3>
-              <p className="text-sm text-muted-foreground">Create your first listing to start receiving orders</p>
+              <p className="text-sm text-muted-foreground">
+                Create your first listing to start receiving orders
+              </p>
             </div>
           ) : (
             <Table>
@@ -253,7 +302,8 @@ export default function PublisherListingsPage() {
               </TableHeader>
               <TableBody>
                 {listings.map((l: any) => {
-                  const services: ServiceRow[] = (l.services as ServiceRow[] | undefined) ?? []
+                  const services: ServiceRow[] =
+                    (l.services as ServiceRow[] | undefined) ?? []
                   // Phase 6: lifecyclePhase comes from the server (computed
                   // from status + ownerType + website verification + service
                   // count). The phase decides which lifecycle CTAs render —
@@ -262,44 +312,85 @@ export default function PublisherListingsPage() {
                   const phase: string = l.lifecyclePhase ?? l.status
                   return (
                     <TableRow key={l.id}>
-                      <TableCell className="font-medium max-w-[320px] truncate">{l.title}</TableCell>
+                      <TableCell className="font-medium max-w-[320px] truncate">
+                        {l.title}
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-xs">
-                        {services.length === 0
-                          ? <span className="italic">No services yet</span>
-                          : services.map(s => `${s.serviceType.replace(/_/g, " ")} · $${Number(s.price).toFixed(0)} · ${s.turnaroundDays}d`).join(" • ")}
+                        {services.length === 0 ? (
+                          <span className="italic">No services yet</span>
+                        ) : (
+                          services
+                            .map(
+                              (s) =>
+                                `${s.serviceType.replace(/_/g, " ")} · $${Number(s.price).toFixed(0)} · ${s.turnaroundDays}d`,
+                            )
+                            .join(" • ")
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANTS[l.status] ?? "secondary"}>
+                        <Badge
+                          variant={STATUS_VARIANTS[l.status] ?? "secondary"}
+                        >
                           {phase.replace(/_/g, " ")}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right space-x-1">
                         {phase === "READY_FOR_REVIEW" && (
-                          <Button size="sm" onClick={() => submitMut.mutate(l.id)} disabled={submitMut.isPending}>
+                          <Button
+                            size="sm"
+                            onClick={() => submitMut.mutate(l.id)}
+                            disabled={submitMut.isPending}
+                          >
                             Submit for review
                           </Button>
                         )}
                         {phase === "PUBLISHED" && (
-                          <Button size="sm" variant="outline" onClick={() => pauseMut.mutate(l.id)} disabled={pauseMut.isPending}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => pauseMut.mutate(l.id)}
+                            disabled={pauseMut.isPending}
+                          >
                             Pause
                           </Button>
                         )}
                         {phase === "PAUSED" && (
-                          <Button size="sm" variant="outline" onClick={() => unpauseMut.mutate(l.id)} disabled={unpauseMut.isPending}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => unpauseMut.mutate(l.id)}
+                            disabled={unpauseMut.isPending}
+                          >
                             Unpause
                           </Button>
                         )}
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setServicesForListing({ id: l.id, title: l.title, services })}
+                          onClick={() =>
+                            setServicesForListing({
+                              id: l.id,
+                              title: l.title,
+                              services,
+                            })
+                          }
                         >
                           Services
                         </Button>
                         {phase !== "ARCHIVED" && (
-                          <Button size="sm" variant="ghost" onClick={() => {
-                            if (confirm("Archive this listing? Existing orders are untouched.")) archiveMut.mutate(l.id)
-                          }} disabled={archiveMut.isPending}>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              if (
+                                confirm(
+                                  "Archive this listing? Existing orders are untouched.",
+                                )
+                              )
+                                archiveMut.mutate(l.id)
+                            }}
+                            disabled={archiveMut.isPending}
+                          >
                             Archive
                           </Button>
                         )}
@@ -318,7 +409,8 @@ export default function PublisherListingsPage() {
           <DialogHeader>
             <DialogTitle>New Listing</DialogTitle>
             <DialogDescription>
-              Submitted listings are reviewed by our team before they appear in the marketplace.
+              Submitted listings are reviewed by our team before they appear in
+              the marketplace.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -337,7 +429,9 @@ export default function PublisherListingsPage() {
               <Textarea
                 id="l-desc"
                 value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
                 placeholder="What the buyer gets, niche, link policy..."
                 rows={3}
                 maxLength={1000}
@@ -346,11 +440,18 @@ export default function PublisherListingsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Type</Label>
-                <Select value={form.type} onValueChange={(v) => setForm({ ...form, type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={form.type}
+                  onValueChange={(v) => setForm({ ...form, type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {LISTING_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+                      <SelectItem key={t} value={t}>
+                        {t.replace(/_/g, " ")}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -370,24 +471,39 @@ export default function PublisherListingsPage() {
             </div>
             <div className="space-y-2">
               <Label>Website</Label>
-              <Select value={form.websiteId} onValueChange={(v) => setForm({ ...form, websiteId: v })}>
+              <Select
+                value={form.websiteId}
+                onValueChange={(v) => setForm({ ...form, websiteId: v })}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder={websitesQ.isLoading ? "Loading..." : "Select website"} />
+                  <SelectValue
+                    placeholder={
+                      websitesQ.isLoading ? "Loading..." : "Select website"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {(websitesQ.data ?? []).map((w: any) => (
-                    <SelectItem key={w.id} value={w.id}>{w.url}</SelectItem>
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.url}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Orders for this listing will be fulfilled on the selected website.
+                Orders for this listing will be fulfilled on the selected
+                website.
               </p>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={() => createMutation.mutate()} disabled={!canSubmit || createMutation.isPending}>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createMutation.mutate()}
+              disabled={!canSubmit || createMutation.isPending}
+            >
               {createMutation.isPending ? "Submitting..." : "Submit for Review"}
             </Button>
           </DialogFooter>
@@ -400,12 +516,18 @@ export default function PublisherListingsPage() {
         orders that snapshot this serviceId never orphan. Price/TAT edits go
         through a version-guarded PATCH; concurrent edits get a 409.
       */}
-      <Dialog open={!!servicesForListing} onOpenChange={(v) => { if (!v) setServicesForListing(null) }}>
+      <Dialog
+        open={!!servicesForListing}
+        onOpenChange={(v) => {
+          if (!v) setServicesForListing(null)
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Services on “{servicesForListing?.title}”</DialogTitle>
             <DialogDescription>
-              Each row is a separately purchasable offering. Buyers pick one at checkout — your edits here never affect in-flight orders.
+              Each row is a separately purchasable offering. Buyers pick one at
+              checkout — your edits here never affect in-flight orders.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -422,26 +544,43 @@ export default function PublisherListingsPage() {
               <TableBody>
                 {servicesForListing?.services.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-muted-foreground py-6"
+                    >
                       No services configured yet. Add the first one below.
                     </TableCell>
                   </TableRow>
                 )}
-                {servicesForListing?.services.map(s => (
+                {servicesForListing?.services.map((s) => (
                   <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.serviceType.replace(/_/g, " ")}</TableCell>
-                    <TableCell className="font-mono text-sm">${Number(s.price).toFixed(2)}</TableCell>
+                    <TableCell className="font-medium">
+                      {s.serviceType.replace(/_/g, " ")}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      ${Number(s.price).toFixed(2)}
+                    </TableCell>
                     <TableCell>{s.turnaroundDays}d</TableCell>
                     <TableCell>
                       <Select
                         value={s.availability}
-                        onValueChange={(v) => updateServiceMut.mutate({
-                          listingId: servicesForListing!.id,
-                          serviceId: s.id,
-                          data: { version: s.version, availability: v as "AVAILABLE" | "PAUSED" | "WAITLIST" },
-                        })}
+                        onValueChange={(v) =>
+                          updateServiceMut.mutate({
+                            listingId: servicesForListing?.id,
+                            serviceId: s.id,
+                            data: {
+                              version: s.version,
+                              availability: v as
+                                | "AVAILABLE"
+                                | "PAUSED"
+                                | "WAITLIST",
+                            },
+                          })
+                        }
                       >
-                        <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 w-[110px]">
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="AVAILABLE">Available</SelectItem>
                           <SelectItem value="PAUSED">Paused</SelectItem>
@@ -453,7 +592,12 @@ export default function PublisherListingsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => pauseServiceMut.mutate({ listingId: servicesForListing!.id, serviceId: s.id })}
+                        onClick={() =>
+                          pauseServiceMut.mutate({
+                            listingId: servicesForListing?.id,
+                            serviceId: s.id,
+                          })
+                        }
                         disabled={s.availability === "PAUSED"}
                       >
                         Pause
@@ -466,21 +610,66 @@ export default function PublisherListingsPage() {
             <div className="border-t pt-4 space-y-3">
               <div className="text-sm font-medium">Add a service</div>
               <div className="grid grid-cols-4 gap-3">
-                <Select value={newService.serviceType} onValueChange={(v) => setNewService({ ...newService, serviceType: v })}>
-                  <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
+                <Select
+                  value={newService.serviceType}
+                  onValueChange={(v) =>
+                    setNewService({ ...newService, serviceType: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Service" />
+                  </SelectTrigger>
                   <SelectContent>
                     {LISTING_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+                      <SelectItem key={t} value={t}>
+                        {t.replace(/_/g, " ")}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Input type="number" min={1} step="0.01" placeholder="Price" value={newService.price} onChange={(e) => setNewService({ ...newService, price: e.target.value })} />
-                <Input type="number" min={1} placeholder="TAT (days)" value={newService.turnaroundDays} onChange={(e) => setNewService({ ...newService, turnaroundDays: e.target.value })} />
-                <Input type="number" min={0} placeholder="Revisions" value={newService.revisionRounds} onChange={(e) => setNewService({ ...newService, revisionRounds: e.target.value })} />
+                <Input
+                  type="number"
+                  min={1}
+                  step="0.01"
+                  placeholder="Price"
+                  value={newService.price}
+                  onChange={(e) =>
+                    setNewService({ ...newService, price: e.target.value })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="TAT (days)"
+                  value={newService.turnaroundDays}
+                  onChange={(e) =>
+                    setNewService({
+                      ...newService,
+                      turnaroundDays: e.target.value,
+                    })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Revisions"
+                  value={newService.revisionRounds}
+                  onChange={(e) =>
+                    setNewService({
+                      ...newService,
+                      revisionRounds: e.target.value,
+                    })
+                  }
+                />
               </div>
               <Button
                 size="sm"
-                disabled={!servicesForListing || !newService.price || Number(newService.price) <= 0 || addServiceMut.isPending}
+                disabled={
+                  !servicesForListing ||
+                  !newService.price ||
+                  Number(newService.price) <= 0 ||
+                  addServiceMut.isPending
+                }
                 onClick={() => {
                   if (!servicesForListing) return
                   addServiceMut.mutate({
@@ -499,7 +688,12 @@ export default function PublisherListingsPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setServicesForListing(null)}>Done</Button>
+            <Button
+              variant="outline"
+              onClick={() => setServicesForListing(null)}
+            >
+              Done
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

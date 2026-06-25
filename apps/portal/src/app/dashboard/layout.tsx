@@ -1,29 +1,12 @@
 "use client"
 
-import Link from "next/link"
-import { useRouter, usePathname } from "next/navigation"
-import { useEffect } from "react"
-import { cn, Drawer, DrawerContent, DrawerTitle } from "@guestpost/ui"
-import { useAuth } from "../../lib/auth"
 import {
-  LayoutDashboard,
-  Megaphone,
-  ShoppingCart,
-  CreditCard,
-  HeadphonesIcon,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  Store,
-  Heart,
-  Bookmark,
-  Building2,
-} from "lucide-react"
-import { useState } from "react"
-import { Button } from "@guestpost/ui"
-import { Avatar, AvatarFallback } from "@guestpost/ui"
-import {
+  Avatar,
+  AvatarFallback,
+  cn,
+  Drawer,
+  DrawerContent,
+  DrawerTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -31,10 +14,30 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@guestpost/ui"
-import { Notifications } from "../../components/notifications"
+import {
+  BarChart3,
+  Bookmark,
+  Building2,
+  CreditCard,
+  HeadphonesIcon,
+  Heart,
+  LayoutDashboard,
+  LogOut,
+  Megaphone,
+  Menu,
+  Settings,
+  ShoppingCart,
+  Store,
+  X,
+} from "lucide-react"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { CreateOrgGate } from "../../components/create-org-gate"
-import { OrgSwitcher } from "../../components/org-switcher"
 import { EmailVerificationBannerContainer } from "../../components/email-verification-banner-container"
+import { Notifications } from "../../components/notifications"
+import { OrgSwitcher } from "../../components/org-switcher"
+import { useAuth } from "../../lib/auth"
 
 // ownerOnly items hit OWNER-gated backend routes (wallet deposit/checkout/
 // withdraw, org member/team management) — hiding them from MEMBER avoids
@@ -45,15 +48,32 @@ const navItems = [
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
   { href: "/dashboard/marketplace", label: "Marketplace", icon: Store },
   { href: "/dashboard/marketplace/favorites", label: "Favorites", icon: Heart },
-  { href: "/dashboard/marketplace/saved-lists", label: "Saved Lists", icon: Bookmark },
-  { href: "/dashboard/reports", label: "Reports", icon: LayoutDashboard },
-  { href: "/dashboard/billing", label: "Billing", icon: CreditCard, ownerOnly: true },
-  { href: "/dashboard/settings/organization", label: "Organization", icon: Building2 },
+  {
+    href: "/dashboard/marketplace/saved-lists",
+    label: "Saved Lists",
+    icon: Bookmark,
+  },
+  { href: "/dashboard/reports", label: "Reports", icon: BarChart3 },
+  {
+    href: "/dashboard/billing",
+    label: "Billing",
+    icon: CreditCard,
+    ownerOnly: true,
+  },
+  {
+    href: "/dashboard/settings/organization",
+    label: "Organization",
+    icon: Building2,
+  },
   { href: "/dashboard/support", label: "Support", icon: HeadphonesIcon },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const { user, loading, signOut, refresh } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -65,16 +85,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Phase 7.9 — pathname-auto-close added to the portal layout. Admin +
   // publisher already had this from Phase 7.6; portal was missing it.
-  useEffect(() => { setMobileOpen(false) }, [pathname])
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [])
 
-  if (loading) return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="text-sm text-muted-foreground">Loading...</p>
+  if (loading)
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
       </div>
-    </div>
-  )
+    )
   if (!user) return null
 
   // No organization yet: every money action would 403 — onboard first
@@ -86,14 +109,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const u = user
 
   const userInitials = u.name
-    ? u.name.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)
-    : u.email?.[0]?.toUpperCase() ?? "U"
+    ? u.name
+        .split(" ")
+        .map((n: string) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : (u.email?.[0]?.toUpperCase() ?? "U")
 
   function SidebarContents({ inDrawer = false }: { inDrawer?: boolean }) {
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b px-6 py-5">
-          <Link href="/dashboard" className="flex items-center gap-2 text-lg font-bold tracking-tight">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 text-lg font-bold tracking-tight"
+          >
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <span className="text-sm font-bold">GP</span>
             </div>
@@ -111,10 +142,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-          {navItems
-            .filter((item) => !item.ownerOnly || u.customerRole === "OWNER")
-            .map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + "/")
+          {(() => {
+            const visible = navItems.filter(
+              (item) => !item.ownerOnly || u.customerRole === "OWNER",
+            )
+            const bestMatch = visible.reduce<(typeof navItems)[number] | null>(
+              (best, item) => {
+                const match =
+                  pathname === item.href || pathname.startsWith(`${item.href}/`)
+                if (!match) return best
+                if (!best) return item
+                return item.href.length > best.href.length ? item : best
+              },
+              null,
+            )
+            return visible.map((item) => {
+              const isActive = bestMatch === item
               const Icon = item.icon
               return (
                 <Link
@@ -131,7 +174,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   {item.label}
                 </Link>
               )
-            })}
+            })
+          })()}
         </nav>
 
         <div className="border-t p-4 space-y-2">
@@ -139,7 +183,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <div className="min-w-0 flex-1">
               <OrgSwitcher />
             </div>
-            <Notifications />
+            {!inDrawer && <Notifications />}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -151,7 +195,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </Avatar>
                 <div className="flex-1 text-left">
                   <p className="font-medium">{u.name ?? "User"}</p>
-                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {u.email}
+                  </p>
                 </div>
               </button>
             </DropdownMenuTrigger>
@@ -162,7 +208,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <Link href="/dashboard/settings">Settings</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={signOut} className="text-destructive cursor-pointer">
+              <DropdownMenuItem
+                onClick={signOut}
+                className="text-destructive cursor-pointer"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign out
               </DropdownMenuItem>
@@ -199,14 +248,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Menu className="h-5 w-5" />
           </button>
           <span className="font-semibold">GuestPost</span>
-          <div className="ml-auto"><Notifications /></div>
+          <div className="ml-auto">
+            <Notifications />
+          </div>
         </header>
 
         {/* Phase 7.10 — Banner short-circuits to null for verified/non-CUSTOMER users. */}
         <EmailVerificationBannerContainer />
-        <main className="flex-1 p-6 lg:p-8">
-          {children}
-        </main>
+        <main className="flex-1 p-6 lg:p-8">{children}</main>
       </div>
     </div>
   )

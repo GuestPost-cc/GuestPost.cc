@@ -1,12 +1,30 @@
 "use client"
 
-import Link from "next/link"
-import { useRouter, usePathname } from "next/navigation"
-import { useEffect, useMemo, useState } from "react"
 import { cn, Drawer, DrawerContent, DrawerTitle } from "@guestpost/ui"
-import { LayoutDashboard, Users, Building, ShoppingCart, Landmark, Settings, LogOut, Store, Newspaper, HeadphonesIcon, ScrollText, ClipboardList, Scale, ShieldCheck, AlertTriangle, Menu, X } from "lucide-react"
-import { useAuth } from "../../lib/auth"
+import {
+  AlertTriangle,
+  Building,
+  ClipboardList,
+  HeadphonesIcon,
+  Landmark,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Newspaper,
+  Scale,
+  ScrollText,
+  Settings,
+  ShieldCheck,
+  ShoppingCart,
+  Store,
+  Users,
+  X,
+} from "lucide-react"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { Notifications } from "../../components/notifications"
+import { useAuth } from "../../lib/auth"
 
 // Per-item role allowlist mirroring the backend @StaffRoles guards: finance
 // surfaces (settlements/withdrawals/payouts/reconciliation) are FINANCE +
@@ -14,21 +32,66 @@ import { Notifications } from "../../components/notifications"
 // pages the API authorizes them to use.
 type StaffRole = "SUPER_ADMIN" | "OPERATIONS" | "FINANCE"
 
-const navItems: Array<{ href: string; label: string; icon: any; roles?: StaffRole[] }> = [
+const navItems: Array<{
+  href: string
+  label: string
+  icon: any
+  roles?: StaffRole[]
+}> = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
   { href: "/dashboard/users", label: "Users", icon: Users },
   { href: "/dashboard/publishers", label: "Publishers", icon: Newspaper },
   { href: "/dashboard/organizations", label: "Organizations", icon: Building },
   { href: "/dashboard/orders", label: "Orders", icon: ShoppingCart },
-  { href: "/dashboard/disputes", label: "Disputes", icon: AlertTriangle, roles: ["SUPER_ADMIN", "OPERATIONS", "FINANCE"] },
-  { href: "/dashboard/marketplace", label: "Marketplace", icon: Store, roles: ["SUPER_ADMIN", "OPERATIONS"] },
-  { href: "/dashboard/websites", label: "Platform Websites", icon: Store, roles: ["SUPER_ADMIN", "OPERATIONS"] },
-  { href: "/dashboard/fulfillment", label: "Fulfillment", icon: ClipboardList, roles: ["SUPER_ADMIN", "OPERATIONS"] },
-  { href: "/dashboard/verification", label: "Verification", icon: ShieldCheck, roles: ["SUPER_ADMIN", "OPERATIONS"] },
-  { href: "/dashboard/finance", label: "Finance", icon: Landmark, roles: ["SUPER_ADMIN", "FINANCE"] },
-  { href: "/dashboard/finance/settlement-review", label: "Settlement Review", icon: Scale, roles: ["SUPER_ADMIN", "FINANCE"] },
+  {
+    href: "/dashboard/disputes",
+    label: "Disputes",
+    icon: AlertTriangle,
+    roles: ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
+  },
+  {
+    href: "/dashboard/marketplace",
+    label: "Marketplace",
+    icon: Store,
+    roles: ["SUPER_ADMIN", "OPERATIONS"],
+  },
+  {
+    href: "/dashboard/websites",
+    label: "Platform Websites",
+    icon: Store,
+    roles: ["SUPER_ADMIN", "OPERATIONS"],
+  },
+  {
+    href: "/dashboard/fulfillment",
+    label: "Fulfillment",
+    icon: ClipboardList,
+    roles: ["SUPER_ADMIN", "OPERATIONS"],
+  },
+  {
+    href: "/dashboard/verification",
+    label: "Verification",
+    icon: ShieldCheck,
+    roles: ["SUPER_ADMIN", "OPERATIONS"],
+  },
+  {
+    href: "/dashboard/finance",
+    label: "Finance",
+    icon: Landmark,
+    roles: ["SUPER_ADMIN", "FINANCE"],
+  },
+  {
+    href: "/dashboard/finance/settlement-review",
+    label: "Settlement Review",
+    icon: Scale,
+    roles: ["SUPER_ADMIN", "FINANCE"],
+  },
   { href: "/dashboard/support", label: "Support", icon: HeadphonesIcon },
-  { href: "/dashboard/audit-logs", label: "Audit Logs", icon: ScrollText, roles: ["SUPER_ADMIN"] },
+  {
+    href: "/dashboard/audit-logs",
+    label: "Audit Logs",
+    icon: ScrollText,
+    roles: ["SUPER_ADMIN"],
+  },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
@@ -38,7 +101,11 @@ const ROLE_LABELS: Record<StaffRole, string> = {
   FINANCE: "Finance",
 }
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const { user, loading, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -51,9 +118,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   // Pathname-auto-close — drawer closes when the user navigates inside it.
   // Lives at the layout level (not in the Drawer component) so
   // @guestpost/ui stays framework-agnostic.
-  useEffect(() => { setMobileOpen(false) }, [pathname])
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [])
 
-  if (loading) return <div className="flex min-h-screen items-center justify-center">Loading...</div>
+  if (loading)
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Loading...
+      </div>
+    )
   if (!user) return null
   // Local non-null alias so the nested SidebarContents closure has a
   // narrowed type without each ref needing a `!` non-null assertion.
@@ -81,7 +155,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
         <nav className="flex flex-1 flex-col gap-2 overflow-y-auto">
           {navItems
-            .filter(item => !item.roles || (u.staffRole && item.roles.includes(u.staffRole as StaffRole)))
+            .filter(
+              (item) =>
+                !item.roles ||
+                (u.staffRole && item.roles.includes(u.staffRole as StaffRole)),
+            )
             .map((item) => {
               const Icon = item.icon
               return (
@@ -107,7 +185,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary uppercase tracking-wider">
               {ROLE_LABELS[u.staffRole as StaffRole] ?? "Staff"}
             </span>
-            <span className="ml-auto"><Notifications /></span>
+            <span className="ml-auto">
+              <Notifications />
+            </span>
           </div>
           <button
             type="button"

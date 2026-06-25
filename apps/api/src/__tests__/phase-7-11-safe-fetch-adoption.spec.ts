@@ -11,33 +11,44 @@
  * guard and Phase 7.9's shared-component-adoption guard. Catches a
  * future processor that copy-pastes the old vulnerable pattern.
  */
-import { readdirSync, readFileSync, statSync } from "fs"
-import { join } from "path"
+import { readdirSync, readFileSync, statSync } from "node:fs"
+import { join } from "node:path"
 
 // apps/api/src/__tests__ → repo root → apps/worker/src/processors
-const PROCESSORS_DIR = join(__dirname, "..", "..", "..", "..", "apps", "worker", "src", "processors")
+const PROCESSORS_DIR = join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "..",
+  "apps",
+  "worker",
+  "src",
+  "processors",
+)
 
 // Each forbidden pattern is described as { name, regex, why }. The
 // regex must use the multiline flag so line-by-line reporting is
 // straightforward. `why` is shown in the failure message so a future
 // reader knows what the rule protects.
-const FORBIDDEN_PATTERNS: Array<{ name: string; regex: RegExp; why: string }> = [
-  {
-    name: "local isSafePublicUrl declaration",
-    regex: /^\s*(function|const)\s+isSafePublicUrl\b/gm,
-    why: "Phase 7.11 lifted isSafePublicUrl to @guestpost/shared. Use `import { isSafePublicUrl } from \"@guestpost/shared\"`. The dispatcher-based safeFetch enforces DNS-rebinding protection that a local copy would miss (#14).",
-  },
-  {
-    name: "local PRIVATE_IP_PATTERNS declaration",
-    regex: /^\s*const\s+PRIVATE_IP_PATTERNS\s*=\s*\[/gm,
-    why: "Phase 7.11 lifted PRIVATE_IP_PATTERNS to @guestpost/shared. Use `import { PRIVATE_IP_PATTERNS } from \"@guestpost/shared\"`. The shared module includes IPv4-mapped IPv6 patterns (e.g. ::ffff:127.0.0.1) that a local copy would miss.",
-  },
-  {
-    name: "uncapped response body read",
-    regex: /\bawait\s+(?:res|response|resp|r)\.text\(\)/gm,
-    why: "Phase 7.11 (#13) requires response bodies to be read with a size cap. Use `await readBodyWithCap(res, MAX_HTML_BYTES)`. A 1GB malicious response at concurrency 4 OOMs the worker pod.",
-  },
-]
+const FORBIDDEN_PATTERNS: Array<{ name: string; regex: RegExp; why: string }> =
+  [
+    {
+      name: "local isSafePublicUrl declaration",
+      regex: /^\s*(function|const)\s+isSafePublicUrl\b/gm,
+      why: 'Phase 7.11 lifted isSafePublicUrl to @guestpost/shared. Use `import { isSafePublicUrl } from "@guestpost/shared"`. The dispatcher-based safeFetch enforces DNS-rebinding protection that a local copy would miss (#14).',
+    },
+    {
+      name: "local PRIVATE_IP_PATTERNS declaration",
+      regex: /^\s*const\s+PRIVATE_IP_PATTERNS\s*=\s*\[/gm,
+      why: 'Phase 7.11 lifted PRIVATE_IP_PATTERNS to @guestpost/shared. Use `import { PRIVATE_IP_PATTERNS } from "@guestpost/shared"`. The shared module includes IPv4-mapped IPv6 patterns (e.g. ::ffff:127.0.0.1) that a local copy would miss.',
+    },
+    {
+      name: "uncapped response body read",
+      regex: /\bawait\s+(?:res|response|resp|r)\.text\(\)/gm,
+      why: "Phase 7.11 (#13) requires response bodies to be read with a size cap. Use `await readBodyWithCap(res, MAX_HTML_BYTES)`. A 1GB malicious response at concurrency 4 OOMs the worker pod.",
+    },
+  ]
 
 function listProcessorFiles(): string[] {
   const out: string[] = []
@@ -91,10 +102,12 @@ describe("Phase 7.11 — safeFetch adoption regression guard", () => {
     for (const h of hits) {
       const key = h.rule
       if (!grouped.has(key)) grouped.set(key, [])
-      grouped.get(key)!.push(h)
+      grouped.get(key)?.push(h)
     }
 
-    const lines: string[] = ["Phase 7.11 forbidden patterns found in apps/worker/src/processors:"]
+    const lines: string[] = [
+      "Phase 7.11 forbidden patterns found in apps/worker/src/processors:",
+    ]
     for (const [rule, group] of grouped) {
       lines.push("")
       lines.push(`  Rule: ${rule}`)

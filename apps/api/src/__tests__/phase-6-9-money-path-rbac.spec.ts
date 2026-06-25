@@ -18,9 +18,9 @@
 // helper is "underused at 2 of ~30 callsites") — the next PR that adds a
 // money-audit call without the helper fails CI.
 
-import { ForbiddenException } from "@nestjs/common"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
+import { ForbiddenException } from "@nestjs/common"
 import { assertOwnerOrCreator } from "../modules/orders/services/owner-or-creator"
 
 // ─── (A) assertOwnerOrCreator ─────────────────────────────────────────────
@@ -100,17 +100,26 @@ describe("confirmDelivery — Phase 6.9 race guard (audit #22)", () => {
     // `where: { id: orderId, version: order.version }`. The new form adds
     // `status: "VERIFIED"` — without it, a parallel customer-accept could
     // commit a DELIVERED transition through the same code path.
-    const confirmBlock = src.match(/async confirmDelivery[\s\S]*?return updated/)
+    const confirmBlock = src.match(
+      /async confirmDelivery[\s\S]*?return updated/,
+    )
     expect(confirmBlock).toBeTruthy()
-    const block = confirmBlock![0]
+    const block = confirmBlock?.[0]
     // Match the updateMany call's where clause.
-    expect(block).toMatch(/updateMany\(\{[\s\S]*?where:\s*\{[\s\S]*?status:\s*"VERIFIED"[\s\S]*?\}/)
+    expect(block).toMatch(
+      /updateMany\(\{[\s\S]*?where:\s*\{[\s\S]*?status:\s*"VERIFIED"[\s\S]*?\}/,
+    )
   })
 })
 
 // ─── (C) orderEventMetadata coverage ──────────────────────────────────────
 
-const MONEY_ENTITY_TYPES = ["Order", "Settlement", "PlatformRevenue", "OrderDeliveryVersion"]
+const MONEY_ENTITY_TYPES = [
+  "Order",
+  "Settlement",
+  "PlatformRevenue",
+  "OrderDeliveryVersion",
+]
 
 // Files in the money-audit perimeter that we hold to the standard. Any new
 // audit.log({entityType: "Order"|"Settlement"|…}) in these files must spread
@@ -221,10 +230,14 @@ describe("orderEventMetadata coverage (audit #4)", () => {
     expect(filesFound.size).toBeGreaterThanOrEqual(8)
     // Cross-check: refund.service.ts is where this pattern started — it
     // MUST be present, else the sweep regressed the original good citizen.
-    expect(filesFound.has("modules/orders/services/refund.service.ts")).toBe(true)
+    expect(filesFound.has("modules/orders/services/refund.service.ts")).toBe(
+      true,
+    )
     // settlements.service.ts is where SETTLEMENT_CREATED lives — also
     // must remain covered.
-    expect(filesFound.has("modules/settlements/settlements.service.ts")).toBe(true)
+    expect(filesFound.has("modules/settlements/settlements.service.ts")).toBe(
+      true,
+    )
     // Silence the unused-var lint on filesAudited.
     expect(filesAudited.size).toBe(MONEY_AUDIT_FILES.length)
   })
@@ -269,22 +282,24 @@ describe("Phase 6.9 — money-path OWNER||creator gate coverage", () => {
     },
   ]
 
-  it.each(gateFiles)(
-    "$method in $path enforces OWNER||creator (via assertOwnerOrCreator or inline isCreator/isOwner)",
-    ({ path, method }) => {
-      const src = readFileSync(join(__dirname, "..", path), "utf8")
-      // Pull the method body (next ~80 lines should be plenty).
-      const methodIdx = src.indexOf(`async ${method}(`)
-      expect(methodIdx).toBeGreaterThanOrEqual(0)
-      const body = src.slice(methodIdx, methodIdx + 4000)
-      const hasHelper = /assertOwnerOrCreator\(/.test(body)
-      const hasInlineGate =
-        /isCreator\s*=\s*[^=]*customerId\s*===?/.test(body) &&
-        /isOwner/.test(body) &&
-        /ForbiddenException/.test(body)
-      expect(hasHelper || hasInlineGate).toBe(true)
-    },
-  )
+  it.each(
+    gateFiles,
+  )("$method in $path enforces OWNER||creator (via assertOwnerOrCreator or inline isCreator/isOwner)", ({
+    path,
+    method,
+  }) => {
+    const src = readFileSync(join(__dirname, "..", path), "utf8")
+    // Pull the method body (next ~80 lines should be plenty).
+    const methodIdx = src.indexOf(`async ${method}(`)
+    expect(methodIdx).toBeGreaterThanOrEqual(0)
+    const body = src.slice(methodIdx, methodIdx + 4000)
+    const hasHelper = /assertOwnerOrCreator\(/.test(body)
+    const hasInlineGate =
+      /isCreator\s*=\s*[^=]*customerId\s*===?/.test(body) &&
+      /isOwner/.test(body) &&
+      /ForbiddenException/.test(body)
+    expect(hasHelper || hasInlineGate).toBe(true)
+  })
 
   it("orders.controller.ts threads customerRole into submitPayment + acceptDelivery", () => {
     const src = readFileSync(
@@ -292,9 +307,13 @@ describe("Phase 6.9 — money-path OWNER||creator gate coverage", () => {
       "utf8",
     )
     // submitPayment must pass user.customerRole as the 4th arg.
-    expect(src).toMatch(/payment\.submitPayment\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.customerRole\s*\)/)
+    expect(src).toMatch(
+      /payment\.submitPayment\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.customerRole\s*\)/,
+    )
     // acceptDelivery must pass user.customerRole as the 4th arg.
-    expect(src).toMatch(/delivery\.customerAcceptDelivery\(\s*id\s*,\s*user\.organizationId\s*,\s*user\.id\s*,\s*user\.customerRole\s*\)/)
+    expect(src).toMatch(
+      /delivery\.customerAcceptDelivery\(\s*id\s*,\s*user\.organizationId\s*,\s*user\.id\s*,\s*user\.customerRole\s*\)/,
+    )
   })
 
   it("settlements.controller.ts threads customerRole into customerApprove", () => {
@@ -302,6 +321,8 @@ describe("Phase 6.9 — money-path OWNER||creator gate coverage", () => {
       join(__dirname, "../modules/settlements/settlements.controller.ts"),
       "utf8",
     )
-    expect(src).toMatch(/customerApprove\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.role\s*,\s*user\.customerRole\s*\)/)
+    expect(src).toMatch(
+      /customerApprove\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.role\s*,\s*user\.customerRole\s*\)/,
+    )
   })
 })

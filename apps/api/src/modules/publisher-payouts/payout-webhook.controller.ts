@@ -1,10 +1,20 @@
-import { Controller, Post, Param, Headers, Logger, UnauthorizedException, BadRequestException, Req, ServiceUnavailableException } from "@nestjs/common"
+import { createHmac, createVerify, timingSafeEqual } from "node:crypto"
+import { normalizeProviderWebhook, QUEUES } from "@guestpost/shared"
 import type { RawBodyRequest } from "@nestjs/common"
+import {
+  BadRequestException,
+  Controller,
+  Headers,
+  Logger,
+  Param,
+  Post,
+  Req,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common"
 import type { Request } from "express"
-import { createHmac, createVerify, timingSafeEqual } from "crypto"
-import { QueueService } from "../queues/queue.service"
-import { QUEUES, normalizeProviderWebhook } from "@guestpost/shared"
 import { Public } from "../../common/decorators/public.decorator"
+import type { QueueService } from "../queues/queue.service"
 
 const STRIPE_TIMESTAMP_TOLERANCE_SECONDS = 300
 
@@ -64,7 +74,10 @@ export class PayoutWebhookController {
     const normalized = normalizeProviderWebhook(provider, data)
     const providerExecutionId = normalized.providerExecutionId
 
-    if (!providerExecutionId && (provider === "stripe_connect" || provider === "wise")) {
+    if (
+      !providerExecutionId &&
+      (provider === "stripe_connect" || provider === "wise")
+    ) {
       // Drift visibility: signature already passed, payload is genuine, but
       // we couldn't pull a transfer id. Probably a non-transfer event type
       // (account.updated, payout.created without object.id, etc.). Log so
@@ -98,10 +111,16 @@ export class PayoutWebhookController {
   // Stripe signs `${timestamp}.${rawBody}` with HMAC-SHA256 using the
   // endpoint's webhook secret; header format `t=...,v1=...`.
   private verifyStripeSignature(rawBody: Buffer, signatureHeader?: string) {
-    const secret = process.env.STRIPE_PAYOUT_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET
+    const secret =
+      process.env.STRIPE_PAYOUT_WEBHOOK_SECRET ??
+      process.env.STRIPE_WEBHOOK_SECRET
     if (!secret) {
-      this.logger.error("STRIPE_PAYOUT_WEBHOOK_SECRET not configured — rejecting webhook (fail closed)")
-      throw new ServiceUnavailableException("Webhook verification not configured")
+      this.logger.error(
+        "STRIPE_PAYOUT_WEBHOOK_SECRET not configured — rejecting webhook (fail closed)",
+      )
+      throw new ServiceUnavailableException(
+        "Webhook verification not configured",
+      )
     }
     if (!signatureHeader) {
       throw new UnauthorizedException("Missing stripe-signature header")
@@ -122,8 +141,13 @@ export class PayoutWebhookController {
     }
 
     const ageSeconds = Math.abs(Date.now() / 1000 - Number(timestamp))
-    if (!Number.isFinite(ageSeconds) || ageSeconds > STRIPE_TIMESTAMP_TOLERANCE_SECONDS) {
-      throw new UnauthorizedException("Stripe webhook timestamp outside tolerance")
+    if (
+      !Number.isFinite(ageSeconds) ||
+      ageSeconds > STRIPE_TIMESTAMP_TOLERANCE_SECONDS
+    ) {
+      throw new UnauthorizedException(
+        "Stripe webhook timestamp outside tolerance",
+      )
     }
 
     const expected = createHmac("sha256", secret)
@@ -132,7 +156,10 @@ export class PayoutWebhookController {
     const expectedBuf = Buffer.from(expected, "utf8")
     const valid = candidates.some((c) => {
       const candidateBuf = Buffer.from(c, "utf8")
-      return candidateBuf.length === expectedBuf.length && timingSafeEqual(candidateBuf, expectedBuf)
+      return (
+        candidateBuf.length === expectedBuf.length &&
+        timingSafeEqual(candidateBuf, expectedBuf)
+      )
     })
     if (!valid) {
       throw new UnauthorizedException("Invalid Stripe webhook signature")
@@ -144,8 +171,12 @@ export class PayoutWebhookController {
   private verifyWiseSignature(rawBody: Buffer, signatureHeader?: string) {
     const publicKey = process.env.WISE_WEBHOOK_PUBLIC_KEY
     if (!publicKey) {
-      this.logger.error("WISE_WEBHOOK_PUBLIC_KEY not configured — rejecting webhook (fail closed)")
-      throw new ServiceUnavailableException("Webhook verification not configured")
+      this.logger.error(
+        "WISE_WEBHOOK_PUBLIC_KEY not configured — rejecting webhook (fail closed)",
+      )
+      throw new ServiceUnavailableException(
+        "Webhook verification not configured",
+      )
     }
     if (!signatureHeader) {
       throw new UnauthorizedException("Missing x-signature-sha256 header")
@@ -155,7 +186,11 @@ export class PayoutWebhookController {
     try {
       const verifier = createVerify("RSA-SHA256")
       verifier.update(rawBody)
-      valid = verifier.verify(publicKey.replace(/\\n/g, "\n"), signatureHeader, "base64")
+      valid = verifier.verify(
+        publicKey.replace(/\\n/g, "\n"),
+        signatureHeader,
+        "base64",
+      )
     } catch {
       throw new UnauthorizedException("Invalid Wise webhook signature")
     }

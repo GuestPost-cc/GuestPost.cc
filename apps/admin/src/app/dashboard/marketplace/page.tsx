@@ -1,16 +1,31 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
-import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Badge, StatusBadge, getListingStatusPresentation } from "@guestpost/ui"
 import type { ListingStatus } from "@guestpost/database"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@guestpost/ui"
 import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  ErrorState,
+  getListingStatusPresentation,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  StatusBadge,
   Table,
   TableBody,
   TableCell,
@@ -18,38 +33,23 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { format } from "date-fns"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@guestpost/ui"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import {
-  Store,
-  Star,
-  Eye,
   CheckCircle,
-  XCircle,
   MoreVertical,
+  Search,
+  ShieldCheck,
+  Star,
+  Store,
   ToggleLeft,
   ToggleRight,
-  Flag,
-  Search,
-  Filter,
-  AlertTriangle,
-  ShieldCheck,
+  XCircle,
 } from "lucide-react"
-import { format } from "date-fns"
+import { useState } from "react"
 import { toast } from "sonner"
-import { flexRender } from "@tanstack/react-table"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 // Listing-service row (Phase 2). Mirrors the API response; staff view shows
 // ALL availability values (not just AVAILABLE) so reviewers can spot paused
@@ -104,7 +104,15 @@ const verifyBadge: Record<string, string> = {
 // `verifyBadge` above maps the WebsiteVerificationStatus enum (a different
 // enum, not in scope for the Phase 7.9 sweep — kept inline for now).
 
-const LISTING_TYPES = ["GUEST_POST", "NICHE_EDIT", "EDITORIAL_LINK", "SPONSORED_CONTENT", "DIGITAL_PR", "BLOG_ARTICLE", "SEO_CONTENT"] as const
+const LISTING_TYPES = [
+  "GUEST_POST",
+  "NICHE_EDIT",
+  "EDITORIAL_LINK",
+  "SPONSORED_CONTENT",
+  "DIGITAL_PR",
+  "BLOG_ARTICLE",
+  "SEO_CONTENT",
+] as const
 
 export default function AdminMarketplacePage() {
   const { user } = useAuth()
@@ -114,9 +122,16 @@ export default function AdminMarketplacePage() {
   const [typeFilter, setTypeFilter] = useState("all")
   const [page, setPage] = useState(1)
   // Moderation + platform-listing creation are SUPER_ADMIN/OPERATIONS
-  const canManage = user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
+  const canManage =
+    user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
   const [showCreate, setShowCreate] = useState(false)
-  const [pform, setPform] = useState({ title: "", description: "", type: "GUEST_POST", price: "", websiteId: "" })
+  const [pform, setPform] = useState({
+    title: "",
+    description: "",
+    type: "GUEST_POST",
+    price: "",
+    websiteId: "",
+  })
 
   const platformWebsitesQ = useQuery({
     queryKey: ["admin", "platform-websites"],
@@ -136,15 +151,31 @@ export default function AdminMarketplacePage() {
       }),
     onSuccess: () => {
       toast.success("Platform listing created")
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-marketplace-listings"],
+      })
       setShowCreate(false)
-      setPform({ title: "", description: "", type: "GUEST_POST", price: "", websiteId: "" })
+      setPform({
+        title: "",
+        description: "",
+        type: "GUEST_POST",
+        price: "",
+        websiteId: "",
+      })
     },
-    onError: (e: Error) => toast.error(e.message || "Failed to create platform listing"),
+    onError: (e: Error) =>
+      toast.error(e.message || "Failed to create platform listing"),
   })
-  const canSubmitPlatform = pform.title.trim().length >= 3 && pform.description.trim().length >= 1 && Number(pform.price) > 0
+  const canSubmitPlatform =
+    pform.title.trim().length >= 3 &&
+    pform.description.trim().length >= 1 &&
+    Number(pform.price) > 0
 
-  const { data, isLoading, error: listingsError } = useQuery({
+  const {
+    data,
+    isLoading,
+    error: listingsError,
+  } = useQuery({
     queryKey: ["admin-marketplace-listings", page, statusFilter, typeFilter],
     queryFn: async () => {
       const params: any = { page, limit: 20 }
@@ -167,18 +198,32 @@ export default function AdminMarketplacePage() {
   const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
 
   const updateStatus = useMutation({
-    mutationFn: ({ id, status, force }: { id: string; status: string; force?: boolean }) =>
-      api.admin.updateListingStatus(id, status, force),
+    mutationFn: ({
+      id,
+      status,
+      force,
+    }: {
+      id: string
+      status: string
+      force?: boolean
+    }) => api.admin.updateListingStatus(id, status, force),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-marketplace-listings"],
+      })
       toast.success("Listing status updated")
     },
     onError: (err: any) => {
       // API blocks approval of listings whose website isn't VERIFIED.
       const body = err?.response?.body || err?.body || err
       const code = body?.code || body?.message?.code
-      if (code === "WEBSITE_NOT_VERIFIED" || String(err?.message).includes("WEBSITE_NOT_VERIFIED")) {
-        toast.error("Domain not verified — publisher must verify ownership before this listing can be approved.")
+      if (
+        code === "WEBSITE_NOT_VERIFIED" ||
+        String(err?.message).includes("WEBSITE_NOT_VERIFIED")
+      ) {
+        toast.error(
+          "Domain not verified — publisher must verify ownership before this listing can be approved.",
+        )
       } else {
         toast.error(err?.message || "Failed to update status")
       }
@@ -189,7 +234,9 @@ export default function AdminMarketplacePage() {
     mutationFn: ({ id, featured }: { id: string; featured: boolean }) =>
       api.admin.toggleListingFeatured(id, featured),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-marketplace-listings"],
+      })
       toast.success("Featured status updated")
     },
     onError: () => toast.error("Failed to update featured status"),
@@ -199,7 +246,9 @@ export default function AdminMarketplacePage() {
     mutationFn: ({ id, verified }: { id: string; verified: boolean }) =>
       api.admin.toggleListingVerified(id, verified),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-marketplace-listings"],
+      })
       toast.success("Verified status updated")
     },
     onError: () => toast.error("Failed to update verified status"),
@@ -208,7 +257,9 @@ export default function AdminMarketplacePage() {
   const deleteListing = useMutation({
     mutationFn: (id: string) => api.admin.deleteListing(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-marketplace-listings"],
+      })
       toast.success("Listing deleted")
     },
     onError: () => toast.error("Failed to delete listing"),
@@ -228,37 +279,75 @@ export default function AdminMarketplacePage() {
       availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
     }
   }
-  const [servicesForListing, setServicesForListing] = useState<{ id: string; title: string; services: ListingServiceRow[] } | null>(null)
-  const [newAdminService, setNewAdminService] = useState({ serviceType: "GUEST_POST", price: "", turnaroundDays: "7", revisionRounds: "2" })
+  const [servicesForListing, setServicesForListing] = useState<{
+    id: string
+    title: string
+    services: ListingServiceRow[]
+  } | null>(null)
+  const [newAdminService, setNewAdminService] = useState({
+    serviceType: "GUEST_POST",
+    price: "",
+    turnaroundDays: "7",
+    revisionRounds: "2",
+  })
 
   const addAdminServiceMut = useMutation({
-    mutationFn: (vars: { listingId: string; data: { serviceType: string; price: number; turnaroundDays: number; revisionRounds?: number } }) =>
-      api.marketplace.addPlatformListingService(vars.listingId, vars.data),
+    mutationFn: (vars: {
+      listingId: string
+      data: {
+        serviceType: string
+        price: number
+        turnaroundDays: number
+        revisionRounds?: number
+      }
+    }) => api.marketplace.addPlatformListingService(vars.listingId, vars.data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
-      setNewAdminService({ serviceType: "GUEST_POST", price: "", turnaroundDays: "7", revisionRounds: "2" })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-marketplace-listings"],
+      })
+      setNewAdminService({
+        serviceType: "GUEST_POST",
+        price: "",
+        turnaroundDays: "7",
+        revisionRounds: "2",
+      })
       toast.success("Service added")
     },
     onError: (e: Error) => toast.error(e.message || "Failed to add service"),
   })
   const updateAdminServiceMut = useMutation({
     mutationFn: (vars: AdminService) =>
-      api.marketplace.updatePlatformListingService(vars.listingId, vars.serviceId, vars.data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] }),
+      api.marketplace.updatePlatformListingService(
+        vars.listingId,
+        vars.serviceId,
+        vars.data,
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ["admin-marketplace-listings"],
+      }),
     onError: (e: Error) => toast.error(e.message || "Update failed"),
   })
   const pauseAdminServiceMut = useMutation({
     mutationFn: (vars: { listingId: string; serviceId: string }) =>
-      api.marketplace.pausePlatformListingService(vars.listingId, vars.serviceId),
+      api.marketplace.pausePlatformListingService(
+        vars.listingId,
+        vars.serviceId,
+      ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-marketplace-listings"],
+      })
       toast.success("Service paused")
     },
     onError: (e: Error) => toast.error(e.message || "Pause failed"),
   })
 
   function formatPrice(price: number, currency: string = "USD") {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(price)
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    }).format(price)
   }
 
   // Phase 7.9 #30 — early returns moved AFTER all hook calls (was before
@@ -269,10 +358,18 @@ export default function AdminMarketplacePage() {
     return (
       <ErrorState
         title="Failed to load marketplace"
-        description={queryError instanceof Error ? queryError.message : "An unexpected error occurred"}
+        description={
+          queryError instanceof Error
+            ? queryError.message
+            : "An unexpected error occurred"
+        }
         onRetry={() => {
-          queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
-          queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
+          queryClient.invalidateQueries({
+            queryKey: ["admin-marketplace-listings"],
+          })
+          queryClient.invalidateQueries({
+            queryKey: ["admin-marketplace-stats"],
+          })
         }}
       />
     )
@@ -285,8 +382,12 @@ export default function AdminMarketplacePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Marketplace Management</h1>
-          <p className="text-muted-foreground">Publisher and platform-owned listings</p>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Marketplace Management
+          </h1>
+          <p className="text-muted-foreground">
+            Publisher and platform-owned listings
+          </p>
         </div>
         {canManage && (
           <Button onClick={() => setShowCreate(true)}>
@@ -302,52 +403,110 @@ export default function AdminMarketplacePage() {
             <DialogTitle>New Platform Listing</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Platform-owned listing fulfilled by your team (no publisher). Attach an optional platform website.
+            Platform-owned listing fulfilled by your team (no publisher). Attach
+            an optional platform website.
           </p>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Title</label>
-              <Input value={pform.title} onChange={(e) => setPform({ ...pform, title: e.target.value })} maxLength={200} placeholder="e.g. Premium editorial placement" />
+              <Input
+                value={pform.title}
+                onChange={(e) => setPform({ ...pform, title: e.target.value })}
+                maxLength={200}
+                placeholder="e.g. Premium editorial placement"
+              />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium">Description</label>
-              <Input value={pform.description} onChange={(e) => setPform({ ...pform, description: e.target.value })} maxLength={1000} placeholder="What the buyer gets" />
+              <Input
+                value={pform.description}
+                onChange={(e) =>
+                  setPform({ ...pform, description: e.target.value })
+                }
+                maxLength={1000}
+                placeholder="What the buyer gets"
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Type</label>
-                <Select value={pform.type} onValueChange={(v) => setPform({ ...pform, type: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Select
+                  value={pform.type}
+                  onValueChange={(v) => setPform({ ...pform, type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {LISTING_TYPES.map((t) => <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>)}
+                    {LISTING_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">Price (USD)</label>
-                <Input type="number" min={1} step="0.01" value={pform.price} onChange={(e) => setPform({ ...pform, price: e.target.value })} placeholder="500" />
+                <Input
+                  type="number"
+                  min={1}
+                  step="0.01"
+                  value={pform.price}
+                  onChange={(e) =>
+                    setPform({ ...pform, price: e.target.value })
+                  }
+                  placeholder="500"
+                />
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium">Platform website (optional)</label>
-              <Select value={pform.websiteId || "none"} onValueChange={(v) => setPform({ ...pform, websiteId: v === "none" ? "" : v })}>
+              <label className="text-sm font-medium">
+                Platform website (optional)
+              </label>
+              <Select
+                value={pform.websiteId || "none"}
+                onValueChange={(v) =>
+                  setPform({ ...pform, websiteId: v === "none" ? "" : v })
+                }
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder={platformWebsitesQ.isLoading ? "Loading..." : "No website (service listing)"} />
+                  <SelectValue
+                    placeholder={
+                      platformWebsitesQ.isLoading
+                        ? "Loading..."
+                        : "No website (service listing)"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">No website (service listing)</SelectItem>
+                  <SelectItem value="none">
+                    No website (service listing)
+                  </SelectItem>
                   {(platformWebsitesQ.data ?? []).map((w) => (
-                    <SelectItem key={w.id} value={w.id}>{w.name ?? w.url}</SelectItem>
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.name ?? w.url}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">Only platform-owned websites are selectable. Create them under Websites.</p>
+              <p className="text-xs text-muted-foreground">
+                Only platform-owned websites are selectable. Create them under
+                Websites.
+              </p>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setShowCreate(false)}>Cancel</Button>
-            <Button onClick={() => createPlatformMutation.mutate()} disabled={!canSubmitPlatform || createPlatformMutation.isPending}>
-              {createPlatformMutation.isPending ? "Creating..." : "Create Listing"}
+            <Button variant="outline" onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createPlatformMutation.mutate()}
+              disabled={!canSubmitPlatform || createPlatformMutation.isPending}
+            >
+              {createPlatformMutation.isPending
+                ? "Creating..."
+                : "Create Listing"}
             </Button>
           </div>
         </DialogContent>
@@ -356,11 +515,15 @@ export default function AdminMarketplacePage() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Listings</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Total Listings
+            </CardTitle>
             <Store className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalListings || 0}</div>
+            <div className="text-2xl font-bold">
+              {stats?.totalListings || 0}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -369,7 +532,9 @@ export default function AdminMarketplacePage() {
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats?.activeListings || 0}</div>
+            <div className="text-2xl font-bold">
+              {stats?.activeListings || 0}
+            </div>
           </CardContent>
         </Card>
         <Card>
@@ -405,7 +570,13 @@ export default function AdminMarketplacePage() {
           />
         </div>
         <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1) }}>
+          <Select
+            value={statusFilter}
+            onValueChange={(v) => {
+              setStatusFilter(v)
+              setPage(1)
+            }}
+          >
             <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
@@ -419,7 +590,13 @@ export default function AdminMarketplacePage() {
               <SelectItem value="ARCHIVED">Archived</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1) }}>
+          <Select
+            value={typeFilter}
+            onValueChange={(v) => {
+              setTypeFilter(v)
+              setPage(1)
+            }}
+          >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Type" />
             </SelectTrigger>
@@ -428,7 +605,9 @@ export default function AdminMarketplacePage() {
               <SelectItem value="GUEST_POST">Guest Post</SelectItem>
               <SelectItem value="NICHE_EDIT">Niche Edit</SelectItem>
               <SelectItem value="EDITORIAL_LINK">Editorial Link</SelectItem>
-              <SelectItem value="PUBLISHER_WEBSITE">Publisher Website</SelectItem>
+              <SelectItem value="PUBLISHER_WEBSITE">
+                Publisher Website
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -463,7 +642,10 @@ export default function AdminMarketplacePage() {
               ))
             ) : listings.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                <TableCell
+                  colSpan={10}
+                  className="text-center py-8 text-muted-foreground"
+                >
                   No listings found
                 </TableCell>
               </TableRow>
@@ -473,32 +655,56 @@ export default function AdminMarketplacePage() {
                   <TableCell>
                     <div>
                       <div className="font-medium">{listing.title}</div>
-                      <div className="text-sm text-muted-foreground">{listing.slug}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {listing.slug}
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell>
                     {/* Phase 7: prefer the first AVAILABLE service. */}
-                    <Badge variant="outline">{(((listing as any).serviceTypes?.[0]) ?? listing.type ?? "").replace(/_/g, " ")}</Badge>
+                    <Badge variant="outline">
+                      {(
+                        (listing as any).serviceTypes?.[0] ??
+                        listing.type ??
+                        ""
+                      ).replace(/_/g, " ")}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     {(() => {
-                      const p = getListingStatusPresentation(listing.status as ListingStatus)
-                      return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+                      const p = getListingStatusPresentation(
+                        listing.status as ListingStatus,
+                      )
+                      return (
+                        <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+                      )
                     })()}
                   </TableCell>
                   <TableCell>
                     {listing.websiteVerificationStatus ? (
                       <Badge
-                        className={verifyBadge[listing.websiteVerificationStatus] || "bg-gray-100"}
+                        className={
+                          verifyBadge[listing.websiteVerificationStatus] ||
+                          "bg-gray-100"
+                        }
                         title={listing.websiteDomain ?? undefined}
                       >
-                        {listing.websiteVerificationStatus.replace("_VERIFICATION", "").replace("_", " ")}
+                        {listing.websiteVerificationStatus
+                          .replace("_VERIFICATION", "")
+                          .replace("_", " ")}
                       </Badge>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Platform</span>
+                      <span className="text-xs text-muted-foreground">
+                        Platform
+                      </span>
                     )}
                   </TableCell>
-                  <TableCell>{formatPrice((listing as any).priceFrom ?? listing.price ?? 0, listing.currency)}</TableCell>
+                  <TableCell>
+                    {formatPrice(
+                      (listing as any).priceFrom ?? listing.price ?? 0,
+                      listing.currency,
+                    )}
+                  </TableCell>
                   <TableCell>{listing.domainRating || "-"}</TableCell>
                   <TableCell>
                     {listing.featured ? (
@@ -506,7 +712,12 @@ export default function AdminMarketplacePage() {
                     ) : (
                       <ToggleLeft
                         className="h-5 w-5 text-muted-foreground cursor-pointer"
-                        onClick={() => toggleFeatured.mutate({ id: listing.id, featured: true })}
+                        onClick={() =>
+                          toggleFeatured.mutate({
+                            id: listing.id,
+                            featured: true,
+                          })
+                        }
                       />
                     )}
                   </TableCell>
@@ -517,7 +728,9 @@ export default function AdminMarketplacePage() {
                       <XCircle className="h-5 w-5 text-muted-foreground" />
                     )}
                   </TableCell>
-                  <TableCell>{format(new Date(listing.createdAt), "MMM d, yyyy")}</TableCell>
+                  <TableCell>
+                    {format(new Date(listing.createdAt), "MMM d, yyyy")}
+                  </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -534,7 +747,9 @@ export default function AdminMarketplacePage() {
                             })
                           }
                         >
-                          {listing.featured ? "Remove Featured" : "Mark Featured"}
+                          {listing.featured
+                            ? "Remove Featured"
+                            : "Mark Featured"}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() =>
@@ -544,7 +759,9 @@ export default function AdminMarketplacePage() {
                             })
                           }
                         >
-                          {listing.verified ? "Remove Verified" : "Mark Verified"}
+                          {listing.verified
+                            ? "Remove Verified"
+                            : "Mark Verified"}
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           {/* In-app preview of the public page (staff cannot
@@ -557,11 +774,13 @@ export default function AdminMarketplacePage() {
                             server enforces staff-only for PUBLISHER-owned
                             (admin can edit any listing's services from here). */}
                         <DropdownMenuItem
-                          onClick={() => setServicesForListing({
-                            id: listing.id,
-                            title: listing.title,
-                            services: listing.services ?? [],
-                          })}
+                          onClick={() =>
+                            setServicesForListing({
+                              id: listing.id,
+                              title: listing.title,
+                              services: listing.services ?? [],
+                            })
+                          }
                         >
                           Manage Services ({listing.services?.length ?? 0})
                         </DropdownMenuItem>
@@ -574,7 +793,10 @@ export default function AdminMarketplacePage() {
                               if (blocked) {
                                 return (
                                   <>
-                                    <DropdownMenuItem disabled className="text-muted-foreground">
+                                    <DropdownMenuItem
+                                      disabled
+                                      className="text-muted-foreground"
+                                    >
                                       Approve (domain not verified)
                                     </DropdownMenuItem>
                                     {isSuperAdmin && (
@@ -586,7 +808,11 @@ export default function AdminMarketplacePage() {
                                               "Emergency override: approve this listing even though the domain is NOT verified? This is audited.",
                                             )
                                           ) {
-                                            updateStatus.mutate({ id: listing.id, status: "APPROVED", force: true })
+                                            updateStatus.mutate({
+                                              id: listing.id,
+                                              status: "APPROVED",
+                                              force: true,
+                                            })
                                           }
                                         }}
                                       >
@@ -598,7 +824,12 @@ export default function AdminMarketplacePage() {
                               }
                               return (
                                 <DropdownMenuItem
-                                  onClick={() => updateStatus.mutate({ id: listing.id, status: "APPROVED" })}
+                                  onClick={() =>
+                                    updateStatus.mutate({
+                                      id: listing.id,
+                                      status: "APPROVED",
+                                    })
+                                  }
                                 >
                                   Approve
                                 </DropdownMenuItem>
@@ -670,13 +901,19 @@ export default function AdminMarketplacePage() {
         endpoints. Pause is soft (PAUSED), preserving historical orders'
         listingServiceId references.
       */}
-      <Dialog open={!!servicesForListing} onOpenChange={(v) => { if (!v) setServicesForListing(null) }}>
+      <Dialog
+        open={!!servicesForListing}
+        onOpenChange={(v) => {
+          if (!v) setServicesForListing(null)
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Services on “{servicesForListing?.title}”</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Per-service prices, turnarounds, and availability. Pausing a service keeps it linked to historical orders.
+            Per-service prices, turnarounds, and availability. Pausing a service
+            keeps it linked to historical orders.
           </p>
           <div className="space-y-4">
             <Table>
@@ -692,24 +929,43 @@ export default function AdminMarketplacePage() {
               <TableBody>
                 {servicesForListing?.services.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">No services configured yet.</TableCell>
+                    <TableCell
+                      colSpan={5}
+                      className="text-center text-muted-foreground py-6"
+                    >
+                      No services configured yet.
+                    </TableCell>
                   </TableRow>
                 )}
-                {servicesForListing?.services.map(s => (
+                {servicesForListing?.services.map((s) => (
                   <TableRow key={s.id}>
-                    <TableCell className="font-medium">{s.serviceType.replace(/_/g, " ")}</TableCell>
-                    <TableCell className="font-mono text-sm">{formatPrice(Number(s.price), s.currency)}</TableCell>
+                    <TableCell className="font-medium">
+                      {s.serviceType.replace(/_/g, " ")}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm">
+                      {formatPrice(Number(s.price), s.currency)}
+                    </TableCell>
                     <TableCell>{s.turnaroundDays}d</TableCell>
                     <TableCell>
                       <Select
                         value={s.availability}
-                        onValueChange={(v) => updateAdminServiceMut.mutate({
-                          listingId: servicesForListing!.id,
-                          serviceId: s.id,
-                          data: { version: s.version, availability: v as "AVAILABLE" | "PAUSED" | "WAITLIST" },
-                        })}
+                        onValueChange={(v) =>
+                          updateAdminServiceMut.mutate({
+                            listingId: servicesForListing?.id,
+                            serviceId: s.id,
+                            data: {
+                              version: s.version,
+                              availability: v as
+                                | "AVAILABLE"
+                                | "PAUSED"
+                                | "WAITLIST",
+                            },
+                          })
+                        }
                       >
-                        <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+                        <SelectTrigger className="h-8 w-[110px]">
+                          <SelectValue />
+                        </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="AVAILABLE">Available</SelectItem>
                           <SelectItem value="PAUSED">Paused</SelectItem>
@@ -721,7 +977,12 @@ export default function AdminMarketplacePage() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => pauseAdminServiceMut.mutate({ listingId: servicesForListing!.id, serviceId: s.id })}
+                        onClick={() =>
+                          pauseAdminServiceMut.mutate({
+                            listingId: servicesForListing?.id,
+                            serviceId: s.id,
+                          })
+                        }
                         disabled={s.availability === "PAUSED"}
                       >
                         Pause
@@ -734,30 +995,94 @@ export default function AdminMarketplacePage() {
             <div className="border-t pt-4 space-y-3">
               <div className="text-sm font-medium">Add a service</div>
               <div className="grid grid-cols-4 gap-3">
-                <Select value={newAdminService.serviceType} onValueChange={(v) => setNewAdminService({ ...newAdminService, serviceType: v })}>
-                  <SelectTrigger><SelectValue placeholder="Service" /></SelectTrigger>
+                <Select
+                  value={newAdminService.serviceType}
+                  onValueChange={(v) =>
+                    setNewAdminService({ ...newAdminService, serviceType: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Service" />
+                  </SelectTrigger>
                   <SelectContent>
-                    {(["GUEST_POST","NICHE_EDIT","EDITORIAL_LINK","OUTREACH_LINK","LOCAL_CITATION","FOUNDATION_LINK","BLOG_ARTICLE","SEO_CONTENT"] as const).map(t => (
-                      <SelectItem key={t} value={t}>{t.replace(/_/g, " ")}</SelectItem>
+                    {(
+                      [
+                        "GUEST_POST",
+                        "NICHE_EDIT",
+                        "EDITORIAL_LINK",
+                        "OUTREACH_LINK",
+                        "LOCAL_CITATION",
+                        "FOUNDATION_LINK",
+                        "BLOG_ARTICLE",
+                        "SEO_CONTENT",
+                      ] as const
+                    ).map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t.replace(/_/g, " ")}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Input type="number" min={1} step="0.01" placeholder="Price" value={newAdminService.price} onChange={(e) => setNewAdminService({ ...newAdminService, price: e.target.value })} />
-                <Input type="number" min={1} placeholder="TAT (days)" value={newAdminService.turnaroundDays} onChange={(e) => setNewAdminService({ ...newAdminService, turnaroundDays: e.target.value })} />
-                <Input type="number" min={0} placeholder="Revisions" value={newAdminService.revisionRounds} onChange={(e) => setNewAdminService({ ...newAdminService, revisionRounds: e.target.value })} />
+                <Input
+                  type="number"
+                  min={1}
+                  step="0.01"
+                  placeholder="Price"
+                  value={newAdminService.price}
+                  onChange={(e) =>
+                    setNewAdminService({
+                      ...newAdminService,
+                      price: e.target.value,
+                    })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="TAT (days)"
+                  value={newAdminService.turnaroundDays}
+                  onChange={(e) =>
+                    setNewAdminService({
+                      ...newAdminService,
+                      turnaroundDays: e.target.value,
+                    })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Revisions"
+                  value={newAdminService.revisionRounds}
+                  onChange={(e) =>
+                    setNewAdminService({
+                      ...newAdminService,
+                      revisionRounds: e.target.value,
+                    })
+                  }
+                />
               </div>
               <Button
                 size="sm"
-                disabled={!servicesForListing || !newAdminService.price || Number(newAdminService.price) <= 0 || addAdminServiceMut.isPending}
-                onClick={() => servicesForListing && addAdminServiceMut.mutate({
-                  listingId: servicesForListing.id,
-                  data: {
-                    serviceType: newAdminService.serviceType,
-                    price: Number(newAdminService.price),
-                    turnaroundDays: Number(newAdminService.turnaroundDays) || 7,
-                    revisionRounds: Number(newAdminService.revisionRounds) || 2,
-                  },
-                })}
+                disabled={
+                  !servicesForListing ||
+                  !newAdminService.price ||
+                  Number(newAdminService.price) <= 0 ||
+                  addAdminServiceMut.isPending
+                }
+                onClick={() =>
+                  servicesForListing &&
+                  addAdminServiceMut.mutate({
+                    listingId: servicesForListing.id,
+                    data: {
+                      serviceType: newAdminService.serviceType,
+                      price: Number(newAdminService.price),
+                      turnaroundDays:
+                        Number(newAdminService.turnaroundDays) || 7,
+                      revisionRounds:
+                        Number(newAdminService.revisionRounds) || 2,
+                    },
+                  })
+                }
               >
                 {addAdminServiceMut.isPending ? "Adding..." : "Add service"}
               </Button>

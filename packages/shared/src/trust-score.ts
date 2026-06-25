@@ -32,13 +32,18 @@ export function computeTrustScore(input: TrustScoreInputs): TrustScore {
 
   // Hard gates: unverified/revoked domains are inherently low trust.
   if (input.verificationStatus === "REVOKED") return { score: 0, band: "Low" }
-  if (input.verificationStatus !== "VERIFIED") return { score: clamp(20 - input.consecutiveFailures * 5, 0, 40), band: "Low" }
+  if (input.verificationStatus !== "VERIFIED")
+    return {
+      score: clamp(20 - input.consecutiveFailures * 5, 0, 40),
+      band: "Low",
+    }
 
   let score = 50 // verified baseline
 
   // Verification age — older proven ownership is more trustworthy (cap +20 at 1y)
   if (input.verifiedAt) {
-    const ageDays = (now.getTime() - new Date(input.verifiedAt).getTime()) / 86_400_000
+    const ageDays =
+      (now.getTime() - new Date(input.verifiedAt).getTime()) / 86_400_000
     score += clamp(Math.floor(ageDays / 18), 0, 20)
   }
 
@@ -60,11 +65,14 @@ export function computeTrustScore(input: TrustScoreInputs): TrustScore {
   score -= input.chargebackCount * 10 // chargebacks are severe
 
   const final = clamp(Math.round(score), 0, 100)
-  const band: TrustScore["band"] = final >= 70 ? "High" : final >= 40 ? "Medium" : "Low"
+  const band: TrustScore["band"] =
+    final >= 70 ? "High" : final >= 40 ? "Medium" : "Low"
   return { score: final, band }
 }
 
-export function trustBand(score: number | null | undefined): "Low" | "Medium" | "High" | "Unknown" {
+export function trustBand(
+  score: number | null | undefined,
+): "Low" | "Medium" | "High" | "Unknown" {
   if (score == null) return "Unknown"
   return score >= 70 ? "High" : score >= 40 ? "Medium" : "Low"
 }
@@ -74,14 +82,14 @@ export function trustBand(score: number | null | undefined): "Low" | "Medium" | 
 // only. Drives the publisher tier (NEW / TRUSTED / VERIFIED) shown in the
 // marketplace and used by moderation.
 export interface PublisherTrustInputs {
-  avgRating: number | null       // 1..5 from order reviews
+  avgRating: number | null // 1..5 from order reviews
   reviewCount: number
   completedOrders: number
   totalOrders: number
   disputeCount: number
   refundCount: number
-  linkRemovals: number           // LINK_REMOVED fraud flags across their orders
-  websiteRevocations: number     // REVOKED websites (lost domain verification)
+  linkRemovals: number // LINK_REMOVED fraud flags across their orders
+  websiteRevocations: number // REVOKED websites (lost domain verification)
 }
 
 export interface PublisherTrust {
@@ -90,7 +98,9 @@ export interface PublisherTrust {
   tier: "NEW" | "TRUSTED" | "VERIFIED"
 }
 
-export function computePublisherTrust(input: PublisherTrustInputs): PublisherTrust {
+export function computePublisherTrust(
+  input: PublisherTrustInputs,
+): PublisherTrust {
   // New publishers with no track record start neutral-low (must earn trust).
   if (input.totalOrders === 0 && input.reviewCount === 0) {
     return { score: 30, band: "Low", tier: "NEW" }
@@ -118,13 +128,14 @@ export function computePublisherTrust(input: PublisherTrustInputs): PublisherTru
   score -= input.websiteRevocations * 8
 
   const final = clamp(Math.round(score), 0, 100)
-  const band: PublisherTrust["band"] = final >= 70 ? "High" : final >= 40 ? "Medium" : "Low"
+  const band: PublisherTrust["band"] =
+    final >= 70 ? "High" : final >= 40 ? "Medium" : "Low"
   // Tier ladder — VERIFIED requires sustained high trust + real volume.
   const tier: PublisherTrust["tier"] =
     final >= 80 && input.completedOrders >= 5 && input.linkRemovals === 0
       ? "VERIFIED"
       : final >= 55
-      ? "TRUSTED"
-      : "NEW"
+        ? "TRUSTED"
+        : "NEW"
   return { score: final, band, tier }
 }

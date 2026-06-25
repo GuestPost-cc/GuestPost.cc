@@ -1,16 +1,24 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
-import * as Sentry from "@sentry/nextjs"
 import { setBusinessContext } from "@guestpost/shared"
-import { api, setToken, clearToken, getToken } from "./api"
+import * as Sentry from "@sentry/nextjs"
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react"
+import { clearToken, getToken, setToken } from "./api"
 
 const getBaseUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL
   if (envUrl) return envUrl
   if (typeof window !== "undefined") {
     const host = window.location.hostname
-    if (host !== "localhost" && host !== "127.0.0.1") return `http://${host}:4000`
+    if (host !== "localhost" && host !== "127.0.0.1")
+      return `http://${host}:4000`
   }
   return "http://localhost:4000"
 }
@@ -64,7 +72,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
-  useEffect(() => { refresh().finally(() => setLoading(false)) }, [refresh])
+  useEffect(() => {
+    refresh().finally(() => setLoading(false))
+  }, [refresh])
 
   // Phase 7.0 — tag Sentry scope with publisher identity for forensics.
   useEffect(() => {
@@ -101,13 +111,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.token) setToken(data.token)
 
       const meRes = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
-        headers: data.token ? { Authorization: `Bearer ${data.token}` } : undefined,
+        headers: data.token
+          ? { Authorization: `Bearer ${data.token}` }
+          : undefined,
         credentials: "include",
       })
       const me = await meRes.json()
       if (me.userType !== "PUBLISHER") {
         clearToken()
-        throw new Error("This portal is for publishers only. Please sign in at the correct portal.")
+        throw new Error(
+          "This portal is for publishers only. Please sign in at the correct portal.",
+        )
       }
       setUser(me)
     } finally {
@@ -134,19 +148,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Accounts register as CUSTOMER by default — convert this fresh account
       // into a publisher (backend refuses staff/existing-membership accounts;
       // new publishers start at NEW tier with the full withdrawal hold).
-      const convertRes = await fetch(`${getBaseUrl()}/api/v1/identity/become-publisher`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(data.token ? { Authorization: `Bearer ${data.token}` } : {}),
+      const convertRes = await fetch(
+        `${getBaseUrl()}/api/v1/identity/become-publisher`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(data.token ? { Authorization: `Bearer ${data.token}` } : {}),
+          },
+          credentials: "include",
+          body: JSON.stringify({ publisherName: name }),
         },
-        credentials: "include",
-        body: JSON.stringify({ publisherName: name }),
-      })
+      )
       if (!convertRes.ok) {
         const err = await convertRes.json().catch(() => ({}))
         clearToken()
-        throw new Error(err.message ?? "Could not set up your publisher account")
+        throw new Error(
+          err.message ?? "Could not set up your publisher account",
+        )
       }
 
       await refresh()

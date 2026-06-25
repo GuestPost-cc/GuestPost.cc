@@ -1,50 +1,44 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
-import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@guestpost/ui"
-import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorState,
+  Input,
+  Label,
+  Skeleton,
 } from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { formatDistanceToNow } from "date-fns"
 import {
-  Wallet,
-  ArrowUpCircle,
   ArrowDownCircle,
-  CreditCard,
-  Plus,
-  Search,
-  FileText,
-  Download,
+  ArrowUpCircle,
   Clock,
-  CheckCircle,
-  XCircle,
+  CreditCard,
+  Download,
+  FileText,
+  Plus,
   RefreshCw,
+  Search,
+  Wallet,
 } from "lucide-react"
-import { format, formatDistanceToNow } from "date-fns"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
 import { toast } from "sonner"
+import { z } from "zod"
+import { api } from "../../../lib/api"
 
 interface WalletData {
   id: string
@@ -138,28 +132,44 @@ export default function BillingPage() {
     resolver: zodResolver(
       z.object({
         amount: z.coerce.number().positive("Amount must be positive"),
-      })
+      }),
     ),
     defaultValues: { amount: 0 },
   })
 
-  const { data: walletData, isLoading: walletLoading, error: walletError, refetch: refetchWallet } = useQuery<WalletData>({
+  const {
+    data: walletData,
+    isLoading: walletLoading,
+    error: walletError,
+    refetch: refetchWallet,
+  } = useQuery<WalletData>({
     queryKey: ["wallet"],
     queryFn: () => api.billing.getWallet(),
   })
 
-  const { data: transactionsData, isLoading: transactionsLoading, error: transactionsError, refetch: refetchTransactions } = useQuery<Transaction[]>({
+  const {
+    data: transactionsData,
+    isLoading: transactionsLoading,
+    error: transactionsError,
+    refetch: refetchTransactions,
+  } = useQuery<Transaction[]>({
     queryKey: ["transactions"],
     queryFn: () => api.billing.listTransactions() as Promise<Transaction[]>,
   })
 
-  const { data: ordersData, error: ordersError, refetch: refetchOrders } = useQuery({
+  const {
+    data: ordersData,
+    error: ordersError,
+    refetch: refetchOrders,
+  } = useQuery({
     queryKey: ["orders"],
     queryFn: () => api.orders.list() as Promise<any[]>,
   })
 
   const reservedBalance = (ordersData ?? [])
-    .filter((o: any) => !["COMPLETED", "CANCELLED", "REFUNDED"].includes(o.status))
+    .filter(
+      (o: any) => !["COMPLETED", "CANCELLED", "REFUNDED"].includes(o.status),
+    )
     .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
 
   // Auto-open the deposit dialog (prefilled) when checkout redirects here for a
@@ -198,28 +208,43 @@ export default function BillingPage() {
     },
   })
 
-  const filteredTransactions = (transactionsData ?? []).filter((tx: Transaction) => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      tx.id.toLowerCase().includes(query) ||
-      tx.type.toLowerCase().includes(query) ||
-      tx.description?.toLowerCase().includes(query)
-    )
-  })
+  const filteredTransactions = (transactionsData ?? []).filter(
+    (tx: Transaction) => {
+      if (!searchQuery) return true
+      const query = searchQuery.toLowerCase()
+      return (
+        tx.id.toLowerCase().includes(query) ||
+        tx.type.toLowerCase().includes(query) ||
+        tx.description?.toLowerCase().includes(query)
+      )
+    },
+  )
 
   const totalDeposits = (transactionsData ?? [])
     .filter((tx: Transaction) => tx.type === "DEPOSIT")
     .reduce((sum: number, tx: Transaction) => sum + Number(tx.amount), 0)
 
-  const totalSpent = (transactionsData ?? [])
+  const _totalSpent = (transactionsData ?? [])
     .filter((tx: Transaction) => tx.type === "PURCHASE")
-    .reduce((sum: number, tx: Transaction) => sum + Math.abs(Number(tx.amount)), 0)
+    .reduce(
+      (sum: number, tx: Transaction) => sum + Math.abs(Number(tx.amount)),
+      0,
+    )
 
   const billingError = walletError || transactionsError || ordersError
 
   if (billingError) {
-    return <ErrorState title="Failed to load billing" description={(billingError as Error).message} onRetry={() => { refetchWallet(); refetchTransactions(); refetchOrders(); }} />
+    return (
+      <ErrorState
+        title="Failed to load billing"
+        description={(billingError as Error).message}
+        onRetry={() => {
+          refetchWallet()
+          refetchTransactions()
+          refetchOrders()
+        }}
+      />
+    )
   }
 
   if (walletLoading) {
@@ -227,7 +252,9 @@ export default function BillingPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-          <p className="text-muted-foreground">Manage your wallet and payments</p>
+          <p className="text-muted-foreground">
+            Manage your wallet and payments
+          </p>
         </div>
         <WalletSkeleton />
         <Card>
@@ -247,7 +274,9 @@ export default function BillingPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-          <p className="text-muted-foreground">Manage your wallet and payments</p>
+          <p className="text-muted-foreground">
+            Manage your wallet and payments
+          </p>
         </div>
         <Button onClick={() => setShowDepositDialog(true)}>
           <Plus className="mr-2 h-4 w-4" />
@@ -343,7 +372,8 @@ export default function BillingPage() {
             <div className="space-y-2">
               {filteredTransactions.map((tx: Transaction) => {
                 const Icon = transactionIcons[tx.type] || RefreshCw
-                const colorClass = transactionColors[tx.type] || "text-muted-foreground"
+                const colorClass =
+                  transactionColors[tx.type] || "text-muted-foreground"
                 const isNegative = Number(tx.amount) < 0
 
                 return (
@@ -352,7 +382,9 @@ export default function BillingPage() {
                     className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50 transition-colors"
                   >
                     <div className="flex items-center gap-4">
-                      <div className={`flex h-10 w-10 items-center justify-center rounded-full bg-muted ${colorClass}`}>
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-muted ${colorClass}`}
+                      >
                         <Icon className="h-5 w-5" />
                       </div>
                       <div>
@@ -361,13 +393,18 @@ export default function BillingPage() {
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {tx.description || tx.id.slice(0, 8)} •{" "}
-                          {formatDistanceToNow(new Date(tx.createdAt), { addSuffix: true })}
+                          {formatDistanceToNow(new Date(tx.createdAt), {
+                            addSuffix: true,
+                          })}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className={`font-mono font-medium ${isNegative ? "text-red-500" : "text-emerald-500"}`}>
-                        {isNegative ? "-" : "+"}${Math.abs(Number(tx.amount)).toFixed(2)}
+                      <span
+                        className={`font-mono font-medium ${isNegative ? "text-red-500" : "text-emerald-500"}`}
+                      >
+                        {isNegative ? "-" : "+"}$
+                        {Math.abs(Number(tx.amount)).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -385,7 +422,11 @@ export default function BillingPage() {
               <CardTitle>Invoices</CardTitle>
               <CardDescription>Your billing invoices</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => toast.info("No invoices to download yet")}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => toast.info("No invoices to download yet")}
+            >
               <Download className="mr-2 h-4 w-4" />
               Download All
             </Button>
@@ -403,18 +444,25 @@ export default function BillingPage() {
 
       <Dialog open={showDepositDialog} onOpenChange={setShowDepositDialog}>
         <DialogContent className="sm:max-w-[400px]">
-          <form onSubmit={handleSubmit((data) => depositMutation.mutate(data.amount))}>
+          <form
+            onSubmit={handleSubmit((data) =>
+              depositMutation.mutate(data.amount),
+            )}
+          >
             <DialogHeader>
               <DialogTitle>Deposit Funds</DialogTitle>
               <DialogDescription>
-                Add funds to your wallet. This will redirect to our secure payment provider.
+                Add funds to your wallet. This will redirect to our secure
+                payment provider.
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="amount">Amount (USD)</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    $
+                  </span>
                   <Input
                     id="amount"
                     type="number"
@@ -426,7 +474,9 @@ export default function BillingPage() {
                   />
                 </div>
                 {errors.amount?.message && (
-                  <p className="text-sm text-destructive">{errors.amount.message}</p>
+                  <p className="text-sm text-destructive">
+                    {errors.amount.message}
+                  </p>
                 )}
               </div>
 
@@ -437,7 +487,9 @@ export default function BillingPage() {
                     variant={watch("amount") === amount ? "default" : "outline"}
                     size="sm"
                     type="button"
-                    onClick={() => setValue("amount", amount, { shouldValidate: true })}
+                    onClick={() =>
+                      setValue("amount", amount, { shouldValidate: true })
+                    }
                   >
                     ${amount}
                   </Button>
@@ -447,16 +499,23 @@ export default function BillingPage() {
               <div className="rounded-lg bg-muted p-4 text-sm">
                 <p className="font-medium">Secure payment powered by Stripe</p>
                 <p className="mt-1 text-muted-foreground">
-                  Your payment information is encrypted and never stored on our servers.
+                  Your payment information is encrypted and never stored on our
+                  servers.
                 </p>
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowDepositDialog(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowDepositDialog(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={depositMutation.isPending}>
-                {depositMutation.isPending ? "Processing..." : "Continue to Payment"}
+                {depositMutation.isPending
+                  ? "Processing..."
+                  : "Continue to Payment"}
               </Button>
             </DialogFooter>
           </form>

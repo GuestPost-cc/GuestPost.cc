@@ -6,10 +6,7 @@
 // phase (introduce MJML/react-email at that point, not now).
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
 }
 
 function escapeAttr(s: string): string {
@@ -26,7 +23,10 @@ export interface VerificationEmailContext {
   url: string
 }
 
-export function renderVerificationEmail({ name, url }: VerificationEmailContext): string {
+export function renderVerificationEmail({
+  name,
+  url,
+}: VerificationEmailContext): string {
   const greeting = name ? `Hi ${escapeHtml(name)}` : "Hi"
   return `<!DOCTYPE html><html><body style="font-family: sans-serif; max-width: 600px; margin: 40px auto; line-height: 1.5;">
     <h2>Verify your email</h2>

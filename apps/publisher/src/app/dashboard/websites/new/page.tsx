@@ -1,20 +1,25 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { useForm } from "react-hook-form"
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+} from "@guestpost/ui"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { ArrowLeft, Globe } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
 import { z } from "zod"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
-import { toast } from "sonner"
-import { ArrowLeft, Globe } from "lucide-react"
-import Link from "next/link"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@guestpost/ui"
 
 const websiteSchema = z.object({
   url: z.string().url("Must be a valid URL").min(1, "URL is required"),
@@ -131,7 +136,8 @@ export default function NewWebsitePage() {
             Website Details
           </CardTitle>
           <CardDescription>
-            Provide information about the website you want to add to your inventory
+            Provide information about the website you want to add to your
+            inventory
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -242,7 +248,9 @@ export default function NewWebsitePage() {
                   {...register("price")}
                 />
                 {errors.price && (
-                  <p className="text-xs text-destructive">{errors.price.message}</p>
+                  <p className="text-xs text-destructive">
+                    {errors.price.message}
+                  </p>
                 )}
               </div>
 

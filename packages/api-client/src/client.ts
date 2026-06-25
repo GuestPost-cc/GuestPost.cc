@@ -52,9 +52,15 @@ function generateRequestId(): string {
 
 let _token: string | null = null
 
-export function setToken(token: string) { _token = token }
-export function clearToken() { _token = null }
-export function getToken() { return _token }
+export function setToken(token: string) {
+  _token = token
+}
+export function clearToken() {
+  _token = null
+}
+export function getToken() {
+  return _token
+}
 
 export class HttpClient {
   private config: ApiClientConfig
@@ -63,8 +69,13 @@ export class HttpClient {
     this.config = config
   }
 
-  private buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>): string {
-    const url = new URL(path.startsWith("http") ? path : `${this.config.baseUrl}${path}`)
+  private buildUrl(
+    path: string,
+    params?: Record<string, string | number | boolean | undefined>,
+  ): string {
+    const url = new URL(
+      path.startsWith("http") ? path : `${this.config.baseUrl}${path}`,
+    )
     if (params) {
       for (const [key, value] of Object.entries(params)) {
         if (value !== undefined) url.searchParams.set(key, String(value))
@@ -73,10 +84,16 @@ export class HttpClient {
     return url.toString()
   }
 
-  private async request<T = unknown>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
+  private async request<T = unknown>(
+    method: string,
+    path: string,
+    opts: RequestOptions = {},
+  ): Promise<T> {
     const { params, body, json, ...rest } = opts
-    const headers: Record<string, string> = { "Content-Type": "application/json" }
-    if (_token) headers["Authorization"] = `Bearer ${_token}`
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    }
+    if (_token) headers.Authorization = `Bearer ${_token}`
     // Phase 7.0 — every request carries an X-Request-ID. The API echoes it in
     // the response (or replaces with its own if malformed). On failure we
     // attach it to the ApiError so toasts/error reports can surface it.
@@ -111,12 +128,23 @@ export class HttpClient {
       // For every other 401, fire onAuthError. The handler is responsible
       // for idempotency + same-page debounce + URL sanitization — see
       // ./auth-redirect.ts buildAuthErrorHandler.
-      if (res.status === 401 && this.config.onAuthError && !isAuthEndpointPath(path)) {
+      if (
+        res.status === 401 &&
+        this.config.onAuthError &&
+        !isAuthEndpointPath(path)
+      ) {
         this.config.onAuthError()
       }
       let err: { message?: string; code?: string } = {}
-      try { err = await res.json() } catch { }
-      throw new ApiError(res.status, err.code ?? "UNKNOWN", err.message ?? res.statusText, responseRequestId)
+      try {
+        err = await res.json()
+      } catch {}
+      throw new ApiError(
+        res.status,
+        err.code ?? "UNKNOWN",
+        err.message ?? res.statusText,
+        responseRequestId,
+      )
     }
     if (res.status === 204) return undefined as T
     return res.json()

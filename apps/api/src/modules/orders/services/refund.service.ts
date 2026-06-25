@@ -1,17 +1,32 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../../common/prisma.service"
-import { AuditService } from "../../audit/audit.service"
-import { QueueService } from "../../queues/queue.service"
-import { Decimal } from "@prisma/client/runtime/client"
 import { orderEventMetadata } from "@guestpost/shared"
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import { Decimal } from "@prisma/client/runtime/client"
+import type { PrismaService } from "../../../common/prisma.service"
+import type { AuditService } from "../../audit/audit.service"
+import type { QueueService } from "../../queues/queue.service"
 
 const REFUNDABLE_STATUSES = [
-  "PAID", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED",
-  "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW",
-  "APPROVED", "PUBLISHED", "VERIFIED", "DELIVERED",
+  "PAID",
+  "SUBMITTED",
+  "ACCEPTED",
+  "CONTENT_REQUESTED",
+  "CONTENT_CREATION",
+  "CONTENT_READY",
+  "CUSTOMER_REVIEW",
+  "APPROVED",
+  "PUBLISHED",
+  "VERIFIED",
+  "DELIVERED",
   // SETTLED kept for legacy rows; COMPLETED is the terminal state and must stay
   // refundable so post-release publisher clawback still works.
-  "SETTLED", "COMPLETED", "DISPUTED",
+  "SETTLED",
+  "COMPLETED",
+  "DISPUTED",
 ]
 
 /**
@@ -29,22 +44,32 @@ export class RefundService {
     private readonly queue: QueueService,
   ) {}
 
-  async refundOrder(orderId: string, reason: string, userId: string, idempotencyKey?: string) {
+  async refundOrder(
+    orderId: string,
+    reason: string,
+    userId: string,
+    idempotencyKey?: string,
+  ) {
     if (idempotencyKey) {
       const existing = await this.prisma.transaction.findFirst({
         where: { reference: idempotencyKey },
       })
-      if (existing) return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
+      if (existing)
+        return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
     }
 
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { website: { select: { ownershipType: true, publisherId: true } } },
+      include: {
+        website: { select: { ownershipType: true, publisherId: true } },
+      },
     })
     if (!order) throw new NotFoundException("Order not found")
 
     if (!REFUNDABLE_STATUSES.includes(order.status)) {
-      throw new BadRequestException(`Order cannot be refunded in ${order.status} status`)
+      throw new BadRequestException(
+        `Order cannot be refunded in ${order.status} status`,
+      )
     }
     if (order.paymentStatus !== "PAID") {
       throw new BadRequestException("Only paid orders can be refunded")
@@ -56,16 +81,20 @@ export class RefundService {
         const existing = await tx.transaction.findFirst({
           where: { reference: idempotencyKey },
         })
-        if (existing) return tx.order.findUniqueOrThrow({ where: { id: orderId } })
+        if (existing)
+          return tx.order.findUniqueOrThrow({ where: { id: orderId } })
       }
       const existingRefund = await tx.transaction.findFirst({
         where: { orderId, type: "REFUND" },
       })
-      if (existingRefund) throw new BadRequestException("Order already refunded")
+      if (existingRefund)
+        throw new BadRequestException("Order already refunded")
 
       // Channel snapshot is authoritative — but legacy orders predate the
       // snapshot, so fall back to website.ownershipType for them.
-      const channel = order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+      const channel =
+        order.fulfillmentChannel ??
+        (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
       const isPlatformOrder = channel === "PLATFORM"
       let cancelledSettlementId: string | null = null
 
@@ -83,11 +112,16 @@ export class RefundService {
         })
         if (activeSettlement && activeSettlement.status !== "RELEASED") {
           const cancelled = await tx.settlement.updateMany({
-            where: { id: activeSettlement.id, version: activeSettlement.version },
+            where: {
+              id: activeSettlement.id,
+              version: activeSettlement.version,
+            },
             data: { status: "CANCELLED", version: { increment: 1 } },
           })
           if (cancelled.count === 0) {
-            throw new ConflictException("Settlement was modified by another request. Retry.")
+            throw new ConflictException(
+              "Settlement was modified by another request. Retry.",
+            )
           }
         }
 
@@ -107,7 +141,10 @@ export class RefundService {
             const newDebt = owed.minus(clawedNow)
 
             const updated = await tx.publisherBalance.updateMany({
-              where: { publisherId: activeSettlement.publisherId, version: balance.version },
+              where: {
+                publisherId: activeSettlement.publisherId,
+                version: balance.version,
+              },
               data: {
                 withdrawableBalance: { decrement: clawedNow },
                 debtBalance: { increment: newDebt },
@@ -116,7 +153,9 @@ export class RefundService {
               },
             })
             if (updated.count === 0) {
-              throw new ConflictException("Publisher balance was modified by another request")
+              throw new ConflictException(
+                "Publisher balance was modified by another request",
+              )
             }
 
             if (clawedNow.greaterThan(0)) {
@@ -128,8 +167,11 @@ export class RefundService {
                   publisherId: activeSettlement.publisherId,
                   settlementId: activeSettlement.id,
                   reference: `clawback-${orderId}`,
-                  description: `Clawback of ${clawedNow.toFixed(2)} for refunded order ${orderId}` +
-                    (newDebt.greaterThan(0) ? ` (${newDebt.toFixed(2)} recorded as debt)` : ""),
+                  description:
+                    `Clawback of ${clawedNow.toFixed(2)} for refunded order ${orderId}` +
+                    (newDebt.greaterThan(0)
+                      ? ` (${newDebt.toFixed(2)} recorded as debt)`
+                      : ""),
                 },
               })
             }
@@ -167,18 +209,28 @@ export class RefundService {
           },
         })
         if (refunded.count === 0) {
-          throw new ConflictException("Wallet was modified by another request. Retry.")
+          throw new ConflictException(
+            "Wallet was modified by another request. Retry.",
+          )
         }
       }
 
       const refundedOrder = await tx.order.updateMany({
         where: { id: orderId, version: order.version },
-        data: { status: "REFUNDED", paymentStatus: "REFUNDED", version: { increment: 1 } },
+        data: {
+          status: "REFUNDED",
+          paymentStatus: "REFUNDED",
+          version: { increment: 1 },
+        },
       })
       if (refundedOrder.count === 0) {
-        throw new ConflictException("Order was modified by another request. Retry.")
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
       }
-      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      const updated = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+      })
 
       await tx.transaction.create({
         data: {
@@ -197,31 +249,42 @@ export class RefundService {
           eventType: "REFUND_ISSUED",
           actorId: userId,
           message: `Order refunded: ${reason}`,
-          metadata: { reason, refundedBy: userId, settlementCancelled: cancelledSettlementId },
+          metadata: {
+            reason,
+            refundedBy: userId,
+            settlementCancelled: cancelledSettlementId,
+          },
         },
       })
 
-      await this.audit.log({
-        action: "ORDER_REFUNDED",
-        entityType: "Order",
-        entityId: orderId,
-        // Phase 6 standardized metadata — orderEventMetadata supplies the
-        // snapshot trio so historical refund replays don't have to chase
-        // a possibly-edited live listing.
-        metadata: {
-          fromStatus: order.status,
-          reason,
-          ...orderEventMetadata(order),
+      await this.audit.log(
+        {
+          action: "ORDER_REFUNDED",
+          entityType: "Order",
+          entityId: orderId,
+          // Phase 6 standardized metadata — orderEventMetadata supplies the
+          // snapshot trio so historical refund replays don't have to chase
+          // a possibly-edited live listing.
+          metadata: {
+            fromStatus: order.status,
+            reason,
+            ...orderEventMetadata(order),
+          },
+          userId,
+          organizationId: order.organizationId,
         },
-        userId,
-        organizationId: order.organizationId,
-      }, tx)
+        tx,
+      )
 
       return updated
     })
 
     // Event-driven trust recompute (refund reflects badly on the publisher).
-    await this.queue.enqueueTrustRecompute(order.website?.publisherId, "REFUND_ISSUED", `order ${orderId} refunded`)
+    await this.queue.enqueueTrustRecompute(
+      order.website?.publisherId,
+      "REFUND_ISSUED",
+      `order ${orderId} refunded`,
+    )
 
     return result
   }

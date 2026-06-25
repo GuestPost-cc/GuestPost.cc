@@ -1,9 +1,9 @@
 "use client"
 
-import { Suspense, useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@guestpost/ui"
 import { sanitizeReturnTo } from "@guestpost/api-client"
+import { Button } from "@guestpost/ui"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useEffect, useState } from "react"
 import { useAuth } from "../lib/auth"
 
 // Phase 7.1 sibling fix — Next 15 strict mode requires useSearchParams() to be
@@ -27,7 +27,9 @@ function LoginPageInner() {
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   // Phase 6.8 — sessionStorage-stashed reason from the 401-redirect handler.
-  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<string | null>(null)
+  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<
+    string | null
+  >(null)
 
   // Phase 6.8 — sanitize returnTo once + reuse for both the auto-redirect
   // (already-signed-in user lands on this page with returnTo) and post-submit.
@@ -50,7 +52,9 @@ function LoginPageInner() {
         setSessionExpiredBanner(reason)
         sessionStorage.removeItem("guestpost:auth-redirect-reason")
       }
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {

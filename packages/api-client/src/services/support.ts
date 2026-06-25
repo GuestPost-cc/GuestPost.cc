@@ -1,5 +1,5 @@
 import type { TicketStatus } from "@guestpost/shared"
-import { HttpClient } from "../client"
+import type { HttpClient } from "../client"
 
 // Phase 6.6: visibility scope for a ticket reply.
 //   PUBLIC   — customer-visible message (default).
@@ -12,7 +12,12 @@ export type TicketMessageVisibility = "PUBLIC" | "INTERNAL"
 // the role badge off this; reports key audit filters off this. Never
 // derived dynamically — a role change later does NOT mutate historical
 // messages.
-export type TicketParticipantRole = "CUSTOMER" | "PUBLISHER" | "OPS" | "ADMIN" | "FINANCE"
+export type TicketParticipantRole =
+  | "CUSTOMER"
+  | "PUBLISHER"
+  | "OPS"
+  | "ADMIN"
+  | "FINANCE"
 
 // Phase 6.6.1: how to classify this row in the thread render.
 //   MESSAGE       — human reply.
@@ -41,7 +46,12 @@ export interface TicketMessageDto {
   messageType: TicketMessageType
   actorSnapshot: TicketMessageActorSnapshot | null
   createdAt: string
-  user: { id: string; name: string | null; email?: string; userType?: string } | null
+  user: {
+    id: string
+    name: string | null
+    email?: string
+    userType?: string
+  } | null
 }
 
 export interface TicketListItem {
@@ -53,7 +63,13 @@ export interface TicketListItem {
   fulfillmentChannel?: "PUBLISHER" | "PLATFORM" | null
   assignedTo?: { id: string; name: string | null } | null
   assignedPublisher?: { id: string; name: string | null } | null
-  order?: { id: string; title: string | null; status: string; type: string; fulfillmentChannel: string | null } | null
+  order?: {
+    id: string
+    title: string | null
+    status: string
+    type: string
+    fulfillmentChannel: string | null
+  } | null
 }
 
 export interface TicketDetail extends TicketListItem {
@@ -69,24 +85,45 @@ export class SupportService {
   // Backend stores the body as `description` — the previous `message`/`priority`
   // keys were silently dropped, so tickets were created with no detail. Map
   // explicitly and allow linking an order.
-  createTicket(data: { subject: string; message: string; priority?: string; orderId?: string }) {
-    return this.client.post<{ id: string; status: string }>("/support/tickets", {
-      json: { subject: data.subject, description: data.message, orderId: data.orderId },
-    })
+  createTicket(data: {
+    subject: string
+    message: string
+    priority?: string
+    orderId?: string
+  }) {
+    return this.client.post<{ id: string; status: string }>(
+      "/support/tickets",
+      {
+        json: {
+          subject: data.subject,
+          description: data.message,
+          orderId: data.orderId,
+        },
+      },
+    )
   }
 
   // Phase 6.5: actor-aware. Customer sees their org; publisher sees their
   // assigned tickets; staff sees the slice per role (see SupportService).
   // Optional status filter.
   listTickets(params?: { status?: string }) {
-    return this.client.get<TicketListItem[]>(
-      "/support/tickets", { params: params as Record<string, any> },
-    )
+    return this.client.get<TicketListItem[]>("/support/tickets", {
+      params: params as Record<string, any>,
+    })
   }
 
   // Phase 6.5 admin-only reassignment.
-  reassignTicket(ticketId: string, body: { assignedToUserId?: string | null; assignedPublisherId?: string | null; reason?: string }) {
-    return this.client.patch(`/support/tickets/${ticketId}/reassign`, { json: body })
+  reassignTicket(
+    ticketId: string,
+    body: {
+      assignedToUserId?: string | null
+      assignedPublisherId?: string | null
+      reason?: string
+    },
+  ) {
+    return this.client.patch(`/support/tickets/${ticketId}/reassign`, {
+      json: body,
+    })
   }
 
   getTicket(id: string) {
@@ -96,11 +133,18 @@ export class SupportService {
   // Phase 6.6: optional visibility on replies. Customer/publisher clients
   // should not pass INTERNAL — the server enforces this and returns 403 if
   // they try. Default visibility is PUBLIC.
-  addMessage(ticketId: string, data: { content: string; visibility?: TicketMessageVisibility }) {
-    return this.client.post(`/support/tickets/${ticketId}/messages`, { json: data })
+  addMessage(
+    ticketId: string,
+    data: { content: string; visibility?: TicketMessageVisibility },
+  ) {
+    return this.client.post(`/support/tickets/${ticketId}/messages`, {
+      json: data,
+    })
   }
 
   updateTicketStatus(ticketId: string, status: TicketStatus) {
-    return this.client.patch(`/support/tickets/${ticketId}/status`, { json: { status } })
+    return this.client.patch(`/support/tickets/${ticketId}/status`, {
+      json: { status },
+    })
   }
 }

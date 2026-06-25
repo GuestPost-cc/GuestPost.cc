@@ -1,14 +1,23 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from "@nestjs/common"
-import { SupportService } from "./support.service"
-import { AddTicketMessageDto } from "./dto/add-ticket-message.dto"
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common"
+import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
-import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import { ActorType } from "../../common/decorators/actor-type.decorator"
-import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
-import { CreateTicketDto } from "./dto/create-ticket.dto"
+import type { AddTicketMessageDto } from "./dto/add-ticket-message.dto"
+import type { CreateTicketDto } from "./dto/create-ticket.dto"
+import type { SupportService } from "./support.service"
 
 // The support API is now multi-actor: CUSTOMER, PUBLISHER, and STAFF all
 // read/write the same Ticket rows, but each sees a different slice based on
@@ -53,10 +62,7 @@ export class SupportController {
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER", "MEMBER")
-  createTicket(
-    @Body() body: CreateTicketDto,
-    @CurrentUser() user: any,
-  ) {
+  createTicket(@Body() body: CreateTicketDto, @CurrentUser() user: any) {
     return this.support.createTicket({
       subject: body.subject,
       description: body.description,
@@ -103,9 +109,16 @@ export class SupportController {
   @StaffRoles("SUPER_ADMIN")
   reassign(
     @Param("id") ticketId: string,
-    @Body() body: { assignedToUserId?: string | null; assignedPublisherId?: string | null; reason?: string },
+    @Body() body: {
+      assignedToUserId?: string | null
+      assignedPublisherId?: string | null
+      reason?: string
+    },
     @CurrentUser() user: any,
   ) {
-    return this.support.reassignTicket(ticketId, body, { userId: user.id, staffRole: user.staffRole })
+    return this.support.reassignTicket(ticketId, body, {
+      userId: user.id,
+      staffRole: user.staffRole,
+    })
   }
 }

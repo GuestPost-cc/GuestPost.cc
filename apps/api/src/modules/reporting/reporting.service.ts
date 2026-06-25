@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { QueueService } from "../queues/queue.service"
 import { QUEUES } from "@guestpost/shared"
+import { Injectable, NotFoundException } from "@nestjs/common"
+import type { PrismaService } from "../../common/prisma.service"
+import type { QueueService } from "../queues/queue.service"
 
 @Injectable()
 export class ReportingService {
@@ -35,7 +35,8 @@ export class ReportingService {
       // historical revenue — that's the entire point of Phase 6's channel snapshot.
       ownershipType:
         (order as { fulfillmentChannel?: string | null }).fulfillmentChannel ??
-        (order.website as { ownershipType?: string | null } | null)?.ownershipType ??
+        (order.website as { ownershipType?: string | null } | null)
+          ?.ownershipType ??
         "PUBLISHER",
     }
   }
@@ -59,25 +60,47 @@ export class ReportingService {
     // `fulfillmentChannel` first; the live `website.ownershipType` is only a
     // legacy-row fallback. Otherwise a site reassigned mid-flight re-attributes
     // historical campaign revenue — the exact bug Phase 6's snapshot prevents.
-    const resolveChannel = (o: { fulfillmentChannel?: string | null; website?: { ownershipType?: string | null } | null }): string =>
+    const resolveChannel = (o: {
+      fulfillmentChannel?: string | null
+      website?: { ownershipType?: string | null } | null
+    }): string =>
       o.fulfillmentChannel ?? o.website?.ownershipType ?? "PUBLISHER"
 
     const orders = campaign.orders as any[]
-    const platformOrders = orders.filter((o: any) => resolveChannel(o) === "PLATFORM")
-    const publisherOrders = orders.filter((o: any) => resolveChannel(o) !== "PLATFORM")
+    const platformOrders = orders.filter(
+      (o: any) => resolveChannel(o) === "PLATFORM",
+    )
+    const publisherOrders = orders.filter(
+      (o: any) => resolveChannel(o) !== "PLATFORM",
+    )
 
     return {
       ...campaign,
-      totalSpend: orders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0),
-      publishedCount: orders.filter((o: any) => ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status)).length,
+      totalSpend: orders.reduce(
+        (sum: number, o: any) => sum + (Number(o.amount) || 0),
+        0,
+      ),
+      publishedCount: orders.filter((o: any) =>
+        ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status),
+      ).length,
       platformOrderCount: platformOrders.length,
       publisherOrderCount: publisherOrders.length,
-      platformSpend: platformOrders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0),
-      publisherSpend: publisherOrders.reduce((sum: number, o: any) => sum + (Number(o.amount) || 0), 0),
+      platformSpend: platformOrders.reduce(
+        (sum: number, o: any) => sum + (Number(o.amount) || 0),
+        0,
+      ),
+      publisherSpend: publisherOrders.reduce(
+        (sum: number, o: any) => sum + (Number(o.amount) || 0),
+        0,
+      ),
     }
   }
 
-  async generateOrderReport(orderId: string, organizationId: string, format: "pdf" | "csv" = "pdf") {
+  async generateOrderReport(
+    orderId: string,
+    organizationId: string,
+    format: "pdf" | "csv" = "pdf",
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
     })

@@ -1,9 +1,9 @@
-import { connection } from "../redis"
+import { prisma } from "@guestpost/database"
 import { QUEUES } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
-import { prisma } from "@guestpost/database"
-import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { createObservableWorker } from "../lib/queue-observability"
+import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.report")
@@ -13,7 +13,11 @@ export function createReportWorker() {
     QUEUES.REPORT,
     async (job) => {
       // Phase 7.8 #27 — repeatable cron jobs bypass freshness.
-      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
+      if (
+        !verifyJobPayload(job.data, {
+          maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined,
+        })
+      ) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
@@ -37,7 +41,8 @@ export function createReportWorker() {
           let unitPrice: any = null
           if (order.listingServiceId) {
             const ls = await prisma.listingService.findUnique({
-              where: { id: order.listingServiceId }, select: { price: true },
+              where: { id: order.listingServiceId },
+              select: { price: true },
             })
             unitPrice = ls?.price ?? null
           }

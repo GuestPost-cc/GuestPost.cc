@@ -1,54 +1,73 @@
 "use client"
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { useQuery, useMutation } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
-import { toast } from "sonner"
 import {
-  Wallet,
-  Plus,
-  Clock,
-  CheckCircle,
-  XCircle,
-  ArrowUpRight,
-  RefreshCw,
-  CreditCard,
-  Building2,
-} from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@guestpost/ui"
-import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogDescription,
+  ErrorState,
+  Input,
+  Label,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import {
+  ArrowUpRight,
+  Building2,
+  CheckCircle,
+  Clock,
+  CreditCard,
+  Plus,
+  RefreshCw,
+  Wallet,
+  XCircle,
+} from "lucide-react"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 // Full WithdrawalStatus enum — FAILED (provider hard-failure) and REVERSED
 // (funds returned after failure) were missing and crashed the table
-type WithdrawalStatus = "PENDING" | "APPROVED" | "PROCESSING" | "COMPLETED" | "REJECTED" | "FAILED" | "REVERSED"
+type WithdrawalStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "REJECTED"
+  | "FAILED"
+  | "REVERSED"
 
 const statusConfig: Record<
   WithdrawalStatus,
-  { label: string; icon: React.ElementType; variant: "default" | "secondary" | "success" | "destructive" | "warning" | "outline" }
+  {
+    label: string
+    icon: React.ElementType
+    variant:
+      | "default"
+      | "secondary"
+      | "success"
+      | "destructive"
+      | "warning"
+      | "outline"
+  }
 > = {
   PENDING: { label: "Pending", icon: Clock, variant: "warning" },
   APPROVED: { label: "Approved", icon: CheckCircle, variant: "secondary" },
@@ -56,11 +75,19 @@ const statusConfig: Record<
   PROCESSING: { label: "Processing", icon: Clock, variant: "secondary" },
   REJECTED: { label: "Rejected", icon: XCircle, variant: "destructive" },
   FAILED: { label: "Failed", icon: XCircle, variant: "destructive" },
-  REVERSED: { label: "Reversed — funds returned", icon: CheckCircle, variant: "outline" },
+  REVERSED: {
+    label: "Reversed — funds returned",
+    icon: CheckCircle,
+    variant: "outline",
+  },
 }
 
 // Unknown statuses must never crash the table
-const fallbackStatus = { label: "Unknown", icon: Clock, variant: "outline" as const }
+const fallbackStatus = {
+  label: "Unknown",
+  icon: Clock,
+  variant: "outline" as const,
+}
 
 export default function WithdrawalsPage() {
   const { user } = useAuth()
@@ -82,13 +109,23 @@ export default function WithdrawalsPage() {
     resolver: zodResolver(requestSchema),
   })
 
-  const { data: balance, isLoading, refetch, error } = useQuery({
+  const {
+    data: balance,
+    isLoading,
+    refetch,
+    error,
+  } = useQuery({
     queryKey: ["publisher-balance", user?.publisherId],
     queryFn: () => api.publisherPayouts.getBalance(),
     enabled: !!user?.publisherId,
   })
 
-  const { data: withdrawalsRaw, isLoading: withdrawalsLoading, error: withdrawalsError, refetch: refetchWithdrawals } = useQuery({
+  const {
+    data: withdrawalsRaw,
+    isLoading: withdrawalsLoading,
+    error: withdrawalsError,
+    refetch: refetchWithdrawals,
+  } = useQuery({
     queryKey: ["publisher-withdrawals"],
     queryFn: () => api.publisherPayouts.listWithdrawals(),
   })
@@ -99,12 +136,16 @@ export default function WithdrawalsPage() {
     queryFn: () => api.publisherPayouts.listPayoutMethods(),
   })
   const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
-  const defaultMethod = payoutMethods?.find((m) => m.isDefault) ?? payoutMethods?.[0]
+  const defaultMethod =
+    payoutMethods?.find((m) => m.isDefault) ?? payoutMethods?.[0]
   const activeMethodId = selectedMethodId ?? defaultMethod?.id
 
   const requestMutation = useMutation({
-    mutationFn: (data: { amount: number; payoutMethodId?: string; method?: string }) =>
-      api.publisherPayouts.requestWithdrawal(data),
+    mutationFn: (data: {
+      amount: number
+      payoutMethodId?: string
+      method?: string
+    }) => api.publisherPayouts.requestWithdrawal(data),
     onSuccess: () => {
       toast.success("Withdrawal requested successfully")
       setShowRequestDialog(false)
@@ -167,7 +208,9 @@ export default function WithdrawalsPage() {
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">Available to Withdraw</p>
+              <p className="text-sm text-muted-foreground">
+                Available to Withdraw
+              </p>
               <Wallet className="h-5 w-5 text-emerald-500" />
             </div>
             <p className="mt-2 text-3xl font-bold tracking-tight">
@@ -202,7 +245,7 @@ export default function WithdrawalsPage() {
                 .filter(
                   (w) =>
                     w.status === "COMPLETED" &&
-                    new Date(w.createdAt).getMonth() === new Date().getMonth()
+                    new Date(w.createdAt).getMonth() === new Date().getMonth(),
                 )
                 .reduce((sum, w) => sum + w.amount, 0)
                 .toFixed(2)}
@@ -243,7 +286,8 @@ export default function WithdrawalsPage() {
               </TableHeader>
               <TableBody>
                 {withdrawals.map((withdrawal) => {
-                  const config = statusConfig[withdrawal.status] ?? fallbackStatus
+                  const config =
+                    statusConfig[withdrawal.status] ?? fallbackStatus
                   const Icon = config.icon
                   return (
                     <TableRow key={withdrawal.id}>
@@ -264,7 +308,9 @@ export default function WithdrawalsPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {withdrawal.availableAt
-                          ? new Date(withdrawal.availableAt).toLocaleDateString()
+                          ? new Date(
+                              withdrawal.availableAt,
+                            ).toLocaleDateString()
                           : "—"}
                       </TableCell>
                     </TableRow>
@@ -299,7 +345,11 @@ export default function WithdrawalsPage() {
                 placeholder="0.00"
                 {...register("amount")}
               />
-              {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
+              {errors.amount && (
+                <p className="text-sm text-destructive">
+                  {errors.amount.message}
+                </p>
+              )}
               <div className="flex gap-2 pt-2">
                 {[100, 250, 500].map((val) => (
                   <Button
@@ -328,7 +378,10 @@ export default function WithdrawalsPage() {
               {!payoutMethods || payoutMethods.length === 0 ? (
                 <p className="text-sm text-muted-foreground">
                   No payout method on file — add one under{" "}
-                  <a href="/dashboard/payout-methods" className="underline text-foreground">
+                  <a
+                    href="/dashboard/payout-methods"
+                    className="underline text-foreground"
+                  >
                     Payout Methods
                   </a>{" "}
                   first.
@@ -341,17 +394,31 @@ export default function WithdrawalsPage() {
                       type="button"
                       onClick={() => setSelectedMethodId(m.id)}
                       className={`flex w-full items-center justify-between rounded-md border p-3 text-left text-sm transition-colors ${
-                        activeMethodId === m.id ? "border-primary bg-primary/5" : "hover:bg-muted/50"
+                        activeMethodId === m.id
+                          ? "border-primary bg-primary/5"
+                          : "hover:bg-muted/50"
                       }`}
                     >
                       <span className="flex items-center gap-2">
-                        {m.type === "bank_transfer" ? <Building2 className="h-4 w-4" /> : <CreditCard className="h-4 w-4" />}
+                        {m.type === "bank_transfer" ? (
+                          <Building2 className="h-4 w-4" />
+                        ) : (
+                          <CreditCard className="h-4 w-4" />
+                        )}
                         <span className="font-medium">{m.label}</span>
-                        {m.isDefault && <Badge variant="outline">Default</Badge>}
+                        {m.isDefault && (
+                          <Badge variant="outline">Default</Badge>
+                        )}
                       </span>
                       <span className="text-muted-foreground">
-                        {String(m.displayDetails?.bankName ?? m.displayDetails?.maskedEmail ?? m.type)}
-                        {m.displayDetails?.last4 ? ` ••••${m.displayDetails.last4}` : ""}
+                        {String(
+                          m.displayDetails?.bankName ??
+                            m.displayDetails?.maskedEmail ??
+                            m.type,
+                        )}
+                        {m.displayDetails?.last4
+                          ? ` ••••${m.displayDetails.last4}`
+                          : ""}
                       </span>
                     </button>
                   ))}
@@ -370,7 +437,9 @@ export default function WithdrawalsPage() {
               onClick={handleFormSubmit(handleRequest)}
               disabled={requestMutation.isPending}
             >
-              {requestMutation.isPending ? "Processing..." : "Request Withdrawal"}
+              {requestMutation.isPending
+                ? "Processing..."
+                : "Request Withdrawal"}
             </Button>
           </DialogFooter>
         </DialogContent>

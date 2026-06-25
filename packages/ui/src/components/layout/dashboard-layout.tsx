@@ -1,6 +1,6 @@
 "use client"
 
-import * as React from "react"
+import type * as React from "react"
 import { cn } from "../../lib/utils"
 import { AppShell } from "./app-shell"
 
@@ -15,7 +15,12 @@ interface DashboardLayoutProps {
   onSignOut?: () => void
 }
 
-function DashboardLayout({ children, className, user, onSignOut }: DashboardLayoutProps) {
+function DashboardLayout({
+  children,
+  className,
+  user,
+  onSignOut,
+}: DashboardLayoutProps) {
   return (
     <AppShell user={user} onSignOut={onSignOut}>
       <div className={cn("mx-auto max-w-7xl", className)}>{children}</div>

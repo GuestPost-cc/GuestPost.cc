@@ -12,20 +12,22 @@
 // the Next.js apps can't bundle). See packages/shared/src/index.ts.
 import {
   isSafePublicUrl,
-  validateResolvedAddress,
+  PRIVATE_IP_PATTERNS,
   readBodyWithCap,
   SafeFetchError,
-  PRIVATE_IP_PATTERNS,
+  validateResolvedAddress,
 } from "@guestpost/shared/dist/safe-fetch"
 
 describe("Phase 7.11 — isSafePublicUrl (pre-flight URL check)", () => {
   describe("protocol enforcement", () => {
-    it.each(["file:///etc/passwd", "ftp://example.com/", "javascript:alert(1)", "data:text/html,<h1>x</h1>"])(
-      "rejects non-http(s) protocol: %s",
-      (url) => {
-        expect(isSafePublicUrl(url)).toBe(false)
-      },
-    )
+    it.each([
+      "file:///etc/passwd",
+      "ftp://example.com/",
+      "javascript:alert(1)",
+      "data:text/html,<h1>x</h1>",
+    ])("rejects non-http(s) protocol: %s", (url) => {
+      expect(isSafePublicUrl(url)).toBe(false)
+    })
 
     it("accepts http://", () => {
       expect(isSafePublicUrl("http://example.com/")).toBe(true)
@@ -55,7 +57,7 @@ describe("Phase 7.11 — isSafePublicUrl (pre-flight URL check)", () => {
       "http://192.168.1.1/",
       "http://172.16.0.1/",
       "http://172.31.255.255/",
-      "http://169.254.169.254/",  // AWS metadata
+      "http://169.254.169.254/", // AWS metadata
       "http://0.0.0.0/",
     ])("rejects %s", (url) => {
       expect(isSafePublicUrl(url)).toBe(false)
@@ -99,12 +101,18 @@ describe("Phase 7.11 — isSafePublicUrl (pre-flight URL check)", () => {
 
 describe("Phase 7.11 — validateResolvedAddress (pure DNS-rebinding validator)", () => {
   describe("accepts public addresses", () => {
-    it.each(["1.1.1.1", "8.8.8.8", "142.250.190.46"])("returns null for public IPv4: %s", (addr) => {
+    it.each([
+      "1.1.1.1",
+      "8.8.8.8",
+      "142.250.190.46",
+    ])("returns null for public IPv4: %s", (addr) => {
       expect(validateResolvedAddress("example.com", addr)).toBeNull()
     })
 
     it("returns null for public IPv6", () => {
-      expect(validateResolvedAddress("example.com", "2001:4860:4860::8888")).toBeNull()
+      expect(
+        validateResolvedAddress("example.com", "2001:4860:4860::8888"),
+      ).toBeNull()
     })
   })
 
@@ -120,32 +128,35 @@ describe("Phase 7.11 — validateResolvedAddress (pure DNS-rebinding validator)"
     ])("returns SafeFetchError(DNS_REBINDING) for %s (%s)", (addr) => {
       const err = validateResolvedAddress("evil.example.com", addr)
       expect(err).not.toBeNull()
-      expect(err!.code).toBe("DNS_REBINDING")
-      expect(err!.message).toContain(addr)
-      expect(err!.message).toContain("evil.example.com")
+      expect(err?.code).toBe("DNS_REBINDING")
+      expect(err?.message).toContain(addr)
+      expect(err?.message).toContain("evil.example.com")
     })
   })
 
   describe("rejects private IPv6", () => {
-    it.each(["::1", "fe80::1", "fc00::1", "fd12:3456:789a::1"])(
-      "returns error for %s",
-      (addr) => {
-        const err = validateResolvedAddress("evil.example.com", addr)
-        expect(err).not.toBeNull()
-        expect(err!.code).toBe("DNS_REBINDING")
-      },
-    )
+    it.each([
+      "::1",
+      "fe80::1",
+      "fc00::1",
+      "fd12:3456:789a::1",
+    ])("returns error for %s", (addr) => {
+      const err = validateResolvedAddress("evil.example.com", addr)
+      expect(err).not.toBeNull()
+      expect(err?.code).toBe("DNS_REBINDING")
+    })
   })
 
   describe("rejects IPv4-mapped IPv6 (the bonus catch)", () => {
-    it.each(["::ffff:127.0.0.1", "::ffff:10.0.0.1", "::ffff:169.254.169.254"])(
-      "returns error for %s",
-      (addr) => {
-        const err = validateResolvedAddress("evil.example.com", addr)
-        expect(err).not.toBeNull()
-        expect(err!.code).toBe("DNS_REBINDING")
-      },
-    )
+    it.each([
+      "::ffff:127.0.0.1",
+      "::ffff:10.0.0.1",
+      "::ffff:169.254.169.254",
+    ])("returns error for %s", (addr) => {
+      const err = validateResolvedAddress("evil.example.com", addr)
+      expect(err).not.toBeNull()
+      expect(err?.code).toBe("DNS_REBINDING")
+    })
   })
 
   describe("defensive: empty address", () => {
@@ -234,13 +245,17 @@ describe("Phase 7.11 — readBodyWithCap (response body size limit)", () => {
 
 describe("Phase 7.11 — PRIVATE_IP_PATTERNS sanity (regression guard)", () => {
   it("includes IPv4-mapped IPv6 patterns (the bonus catch from this phase)", () => {
-    const ipv4Mapped = PRIVATE_IP_PATTERNS.filter((p) => p.source.includes("ffff"))
+    const ipv4Mapped = PRIVATE_IP_PATTERNS.filter((p) =>
+      p.source.includes("ffff"),
+    )
     expect(ipv4Mapped.length).toBeGreaterThanOrEqual(5)
   })
 
   it("rejects every IPv4 private range via the same patterns isSafePublicUrl uses", () => {
     expect(PRIVATE_IP_PATTERNS.some((p) => p.test("127.0.0.1"))).toBe(true)
     expect(PRIVATE_IP_PATTERNS.some((p) => p.test("10.0.0.1"))).toBe(true)
-    expect(PRIVATE_IP_PATTERNS.some((p) => p.test("169.254.169.254"))).toBe(true)
+    expect(PRIVATE_IP_PATTERNS.some((p) => p.test("169.254.169.254"))).toBe(
+      true,
+    )
   })
 })

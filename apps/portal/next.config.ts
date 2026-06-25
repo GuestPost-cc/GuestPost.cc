@@ -1,8 +1,12 @@
-import type { NextConfig } from "next"
 import { withSentryConfig } from "@sentry/nextjs"
+import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@guestpost/ui", "@guestpost/shared", "@guestpost/api-client"],
+  transpilePackages: [
+    "@guestpost/ui",
+    "@guestpost/shared",
+    "@guestpost/api-client",
+  ],
 }
 
 // Phase 7.0 — Sentry plugin. Safe to call unconditionally; without SENTRY_DSN

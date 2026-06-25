@@ -5,9 +5,9 @@
 // (no-op without DSN), renders branded fallback, offers a Reset button that
 // re-mounts the segment.
 
-import { useEffect } from "react"
-import * as Sentry from "@sentry/nextjs"
 import { ErrorState } from "@guestpost/ui"
+import * as Sentry from "@sentry/nextjs"
+import { useEffect } from "react"
 
 export default function Error({
   error,

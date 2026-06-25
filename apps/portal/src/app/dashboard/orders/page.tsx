@@ -1,17 +1,35 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { sortOrdersByPriority, isActiveOrder } from "@guestpost/shared"
-import { api } from "../../../lib/api"
-import { Button } from "@guestpost/ui"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Badge, StatusBadge, getOrderStatusPresentation } from "@guestpost/ui"
 import type { OrderStatus } from "@guestpost/database"
-import { Skeleton } from "@guestpost/ui"
+import { isActiveOrder, sortOrdersByPriority } from "@guestpost/shared"
 import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  getOrderStatusPresentation,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  StatusBadge,
   Table,
   TableBody,
   TableCell,
@@ -19,60 +37,40 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@guestpost/ui"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@guestpost/ui"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@guestpost/ui"
-import {
-  useReactTable,
+  type ColumnDef,
+  type ColumnFiltersState,
+  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  flexRender,
-  type ColumnDef,
   type SortingState,
-  type ColumnFiltersState,
+  useReactTable,
 } from "@tanstack/react-table"
+import { format } from "date-fns"
 import {
-  FileText,
-  MoreHorizontal,
-  Plus,
-  Search,
   ArrowUpDown,
-  Eye,
-  Edit,
-  XCircle,
-  RefreshCw,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Edit,
+  Eye,
+  FileText,
+  MoreHorizontal,
+  Plus,
+  Search,
+  XCircle,
 } from "lucide-react"
-import { format } from "date-fns"
 import Link from "next/link"
-import { toast } from "sonner"
+import { useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
+import { toast } from "sonner"
 import { z } from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { api } from "../../../lib/api"
 
 const ORDER_STATUSES = [
   "DRAFT",
@@ -98,7 +96,6 @@ const SERVICE_TYPES = [
   "BLOG_ARTICLE",
   "SEO_CONTENT",
 ] as const
-
 
 const createOrderSchema = z.object({
   campaignId: z.string().min(1, "Campaign is required"),
@@ -156,11 +153,12 @@ export default function OrdersPage() {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [_selectedOrder, _setSelectedOrder] = useState<Order | null>(null)
   const [showCancelDialog, setShowCancelDialog] = useState<Order | null>(null)
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) => api.orders.updateStatus(id, "CANCELLED") as Promise<any>,
+    mutationFn: (id: string) =>
+      api.orders.updateStatus(id, "CANCELLED") as Promise<any>,
     onSuccess: () => {
       toast.success("Order cancelled successfully")
       queryClient.invalidateQueries({ queryKey: ["orders"] })
@@ -181,7 +179,12 @@ export default function OrdersPage() {
     queryFn: () => api.campaigns.listCampaigns(),
   })
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<CreateOrderForm>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm<CreateOrderForm>({
     resolver: zodResolver(createOrderSchema),
   })
 
@@ -200,164 +203,172 @@ export default function OrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["orders"] })
       setShowCreateOrder(false)
       reset()
-    } catch (error) {
+    } catch (_error) {
       toast.error("Failed to create order")
     }
   }
 
-  const columns = useMemo<ColumnDef<Order>[]>(() => [
-    {
-      accessorKey: "id",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Order ID
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <Link 
-          href={`/dashboard/orders/${row.original.id}`}
-          className="font-mono text-xs hover:text-primary"
-        >
-          #{row.original.id.slice(0, 8)}
-        </Link>
-      ),
-    },
-    {
-      accessorKey: "website",
-      header: "Website",
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {row.original.items?.[0]?.website?.url 
-            ? new URL(row.original.items[0].website.url).hostname 
-            : "—"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "campaign",
-      header: "Campaign",
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {row.original.campaign?.name || "—"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "serviceType",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Service
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <span className="text-sm capitalize">
-          {row.original.items?.[0]?.serviceType?.replace(/_/g, " ").toLowerCase() ?? "—"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "status",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Status
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => {
-        const p = getOrderStatusPresentation(row.original.status as OrderStatus)
-        return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+  const columns = useMemo<ColumnDef<Order>[]>(
+    () => [
+      {
+        accessorKey: "id",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Order ID
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <Link
+            href={`/dashboard/orders/${row.original.id}`}
+            className="font-mono text-xs hover:text-primary"
+          >
+            #{row.original.id.slice(0, 8)}
+          </Link>
+        ),
       },
-    },
-    {
-      accessorKey: "totalAmount",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="justify-end"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Price
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <span className="text-right font-mono text-sm">
-          {row.original.totalAmount ? `$${row.original.totalAmount.toFixed(2)}` : "—"}
-        </span>
-      ),
-    },
-    {
-      accessorKey: "createdAt",
-      header: ({ column }) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Created
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      ),
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">
-          {format(new Date(row.original.createdAt), "PP")}
-        </span>
-      ),
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem asChild>
-              <Link href={`/dashboard/orders/${row.original.id}`}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </Link>
-            </DropdownMenuItem>
-            {row.original.status !== "COMPLETED" && row.original.status !== "CANCELLED" && (
-              <>
-                <DropdownMenuItem asChild>
-                  <Link href={`/dashboard/orders/${row.original.id}`}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Request Revision
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  className="text-destructive"
-                  onClick={() => setShowCancelDialog(row.original)}
-                >
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Cancel Order
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      ),
-    },
-  ], [])
+      {
+        accessorKey: "website",
+        header: "Website",
+        cell: ({ row }) => (
+          <span className="text-sm">
+            {row.original.items?.[0]?.website?.url
+              ? new URL(row.original.items[0].website.url).hostname
+              : "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "campaign",
+        header: "Campaign",
+        cell: ({ row }) => (
+          <span className="text-sm">{row.original.campaign?.name || "—"}</span>
+        ),
+      },
+      {
+        accessorKey: "serviceType",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Service
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <span className="text-sm capitalize">
+            {row.original.items?.[0]?.serviceType
+              ?.replace(/_/g, " ")
+              .toLowerCase() ?? "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "status",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Status
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const p = getOrderStatusPresentation(
+            row.original.status as OrderStatus,
+          )
+          return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+        },
+      },
+      {
+        accessorKey: "totalAmount",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-end"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Price
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <span className="text-right font-mono text-sm">
+            {row.original.totalAmount
+              ? `$${row.original.totalAmount.toFixed(2)}`
+              : "—"}
+          </span>
+        ),
+      },
+      {
+        accessorKey: "createdAt",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+          >
+            Created
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">
+            {format(new Date(row.original.createdAt), "PP")}
+          </span>
+        ),
+      },
+      {
+        id: "actions",
+        cell: ({ row }) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem asChild>
+                <Link href={`/dashboard/orders/${row.original.id}`}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  View Details
+                </Link>
+              </DropdownMenuItem>
+              {row.original.status !== "COMPLETED" &&
+                row.original.status !== "CANCELLED" && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href={`/dashboard/orders/${row.original.id}`}>
+                        <Edit className="mr-2 h-4 w-4" />
+                        Request Revision
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => setShowCancelDialog(row.original)}
+                    >
+                      <XCircle className="mr-2 h-4 w-4" />
+                      Cancel Order
+                    </DropdownMenuItem>
+                  </>
+                )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ),
+      },
+    ],
+    [],
+  )
 
   const filteredData = useMemo(() => {
     if (!ordersData) return []
@@ -369,10 +380,11 @@ export default function OrdersPage() {
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      data = data.filter((order: Order) => 
-        order.id.toLowerCase().includes(query) ||
-        order.items?.[0]?.serviceType?.toLowerCase().includes(query) ||
-        order.items?.[0]?.website?.url?.toLowerCase().includes(query)
+      data = data.filter(
+        (order: Order) =>
+          order.id.toLowerCase().includes(query) ||
+          order.items?.[0]?.serviceType?.toLowerCase().includes(query) ||
+          order.items?.[0]?.website?.url?.toLowerCase().includes(query),
       )
     }
 
@@ -382,7 +394,8 @@ export default function OrdersPage() {
   }, [ordersData, statusFilter, searchQuery])
 
   const activeCount = useMemo(
-    () => (ordersData ?? []).filter((o: Order) => isActiveOrder(o.status)).length,
+    () =>
+      (ordersData ?? []).filter((o: Order) => isActiveOrder(o.status)).length,
     [ordersData],
   )
 
@@ -409,7 +422,9 @@ export default function OrdersPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-            <p className="text-muted-foreground">Manage your guest post orders</p>
+            <p className="text-muted-foreground">
+              Manage your guest post orders
+            </p>
           </div>
         </div>
         <Card>
@@ -447,7 +462,8 @@ export default function OrdersPage() {
             <div>
               <CardTitle>All Orders</CardTitle>
               <CardDescription>
-                {filteredData.length} order{filteredData.length !== 1 ? "s" : ""} found
+                {filteredData.length} order
+                {filteredData.length !== 1 ? "s" : ""} found
               </CardDescription>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -487,7 +503,10 @@ export default function OrdersPage() {
                   : "Create your first order to get started"}
               </p>
               {!searchQuery && !statusFilter && (
-                <Button className="mt-4" onClick={() => setShowCreateOrder(true)}>
+                <Button
+                  className="mt-4"
+                  onClick={() => setShowCreateOrder(true)}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   New Order
                 </Button>
@@ -504,7 +523,10 @@ export default function OrdersPage() {
                           <TableHead key={header.id}>
                             {header.isPlaceholder
                               ? null
-                              : flexRender(header.column.columnDef.header, header.getContext())}
+                              : flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext(),
+                                )}
                           </TableHead>
                         ))}
                       </TableRow>
@@ -515,7 +537,10 @@ export default function OrdersPage() {
                       <TableRow key={row.id}>
                         {row.getVisibleCells().map((cell) => (
                           <TableCell key={cell.id}>
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            {flexRender(
+                              cell.column.columnDef.cell,
+                              cell.getContext(),
+                            )}
                           </TableCell>
                         ))}
                       </TableRow>
@@ -526,8 +551,8 @@ export default function OrdersPage() {
 
               <div className="flex items-center justify-between py-4">
                 <div className="text-sm text-muted-foreground">
-                  Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
-                  {" "}({filteredData.length} total)
+                  Page {table.getState().pagination.pageIndex + 1} of{" "}
+                  {table.getPageCount()} ({filteredData.length} total)
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -581,10 +606,12 @@ export default function OrdersPage() {
             <div className="grid gap-4 py-4">
               <div className="grid gap-2">
                 <Label htmlFor="campaignId">Campaign *</Label>
-                <Select onValueChange={(value) => {
-                  const event = { target: { value } }
-                  register("campaignId").onChange(event)
-                }}>
+                <Select
+                  onValueChange={(value) => {
+                    const event = { target: { value } }
+                    register("campaignId").onChange(event)
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select campaign" />
                   </SelectTrigger>
@@ -597,15 +624,19 @@ export default function OrdersPage() {
                   </SelectContent>
                 </Select>
                 {errors.campaignId && (
-                  <p className="text-sm text-destructive">{errors.campaignId.message}</p>
+                  <p className="text-sm text-destructive">
+                    {errors.campaignId.message}
+                  </p>
                 )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="serviceType">Service Type *</Label>
-                <Select onValueChange={(value) => {
-                  const event = { target: { value } }
-                  register("serviceType").onChange(event)
-                }}>
+                <Select
+                  onValueChange={(value) => {
+                    const event = { target: { value } }
+                    register("serviceType").onChange(event)
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select service type" />
                   </SelectTrigger>
@@ -618,30 +649,44 @@ export default function OrdersPage() {
                   </SelectContent>
                 </Select>
                 {errors.serviceType && (
-                  <p className="text-sm text-destructive">{errors.serviceType.message}</p>
+                  <p className="text-sm text-destructive">
+                    {errors.serviceType.message}
+                  </p>
                 )}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="topic">Topic</Label>
-                <Input id="topic" {...register("topic")} placeholder="e.g., Best SEO practices" />
+                <Input
+                  id="topic"
+                  {...register("topic")}
+                  placeholder="e.g., Best SEO practices"
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="instructions">Instructions</Label>
-                <Input id="instructions" {...register("instructions")} placeholder="Any specific requirements" />
+                <Input
+                  id="instructions"
+                  {...register("instructions")}
+                  placeholder="Any specific requirements"
+                />
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="budget">Budget (USD)</Label>
-                <Input 
-                  id="budget" 
-                  type="number" 
+                <Input
+                  id="budget"
+                  type="number"
                   step="0.01"
-                  {...register("budget", { valueAsNumber: true })} 
+                  {...register("budget", { valueAsNumber: true })}
                   placeholder="0.00"
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowCreateOrder(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreateOrder(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
@@ -652,12 +697,17 @@ export default function OrdersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!showCancelDialog} onOpenChange={(open) => !open && setShowCancelDialog(null)}>
+      <Dialog
+        open={!!showCancelDialog}
+        onOpenChange={(open) => !open && setShowCancelDialog(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cancel Order</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel order #{showCancelDialog?.id.slice(0, 8)}? This action cannot be undone. Any reserved funds will be released back to your wallet.
+              Are you sure you want to cancel order #
+              {showCancelDialog?.id.slice(0, 8)}? This action cannot be undone.
+              Any reserved funds will be released back to your wallet.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
@@ -667,7 +717,9 @@ export default function OrdersPage() {
             <Button
               variant="destructive"
               disabled={cancelMutation.isPending}
-              onClick={() => showCancelDialog && cancelMutation.mutate(showCancelDialog.id)}
+              onClick={() =>
+                showCancelDialog && cancelMutation.mutate(showCancelDialog.id)
+              }
             >
               {cancelMutation.isPending ? "Cancelling..." : "Cancel Order"}
             </Button>

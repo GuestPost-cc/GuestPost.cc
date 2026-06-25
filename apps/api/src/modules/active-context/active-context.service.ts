@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
+import type { PrismaService } from "../../common/prisma.service"
 
 @Injectable()
 export class ActiveContextService {
@@ -45,8 +49,10 @@ export class ActiveContextService {
     const membership = await this.prisma.membership.findUnique({
       where: { userId_organizationId: { userId, organizationId } },
     })
-    if (!membership || membership.status !== "ACTIVE") {
-      throw new ForbiddenException("You are not an active member of this organization")
+    if (membership?.status !== "ACTIVE") {
+      throw new ForbiddenException(
+        "You are not an active member of this organization",
+      )
     }
 
     const ctx = await this.prisma.activeContext.upsert({
@@ -62,7 +68,8 @@ export class ActiveContextService {
     const membership = await this.prisma.publisherMembership.findFirst({
       where: { userId, publisherId },
     })
-    if (!membership) throw new ForbiddenException("User does not belong to this publisher")
+    if (!membership)
+      throw new ForbiddenException("User does not belong to this publisher")
 
     const ctx = await this.prisma.activeContext.upsert({
       where: { userId },
@@ -73,7 +80,11 @@ export class ActiveContextService {
     return ctx
   }
 
-  async resolveRoles(userId: string, organizationId: string | null, publisherId: string | null) {
+  async resolveRoles(
+    userId: string,
+    organizationId: string | null,
+    publisherId: string | null,
+  ) {
     let customerRole: string | null = null
     let publisherRole: string | null = null
     let staffRole: string | null = null
@@ -92,7 +103,9 @@ export class ActiveContextService {
       publisherRole = pubMembership?.role ?? null
     }
 
-    const staffMembership = await this.prisma.staffMembership.findUnique({ where: { userId } })
+    const staffMembership = await this.prisma.staffMembership.findUnique({
+      where: { userId },
+    })
     staffRole = staffMembership?.role ?? null
 
     return { customerRole, memberRole: customerRole, publisherRole, staffRole }
@@ -101,7 +114,9 @@ export class ActiveContextService {
   async listOrganizations(userId: string) {
     return this.prisma.membership.findMany({
       where: { userId },
-      include: { organization: { select: { id: true, name: true, slug: true } } },
+      include: {
+        organization: { select: { id: true, name: true, slug: true } },
+      },
     })
   }
 

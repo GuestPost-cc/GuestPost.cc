@@ -1,6 +1,6 @@
-import { BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
-import { OrderPaymentService } from "../order-payment.service"
+import { BadRequestException, ConflictException } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import { OrderPaymentService } from "../order-payment.service"
 
 describe("OrderPaymentService", () => {
   let service: OrderPaymentService
@@ -37,7 +37,12 @@ describe("OrderPaymentService", () => {
   }
 
   const mockItems = [
-    { id: "item-1", websiteId: "site-1", price: new Decimal(500), status: "PENDING_PAYMENT" },
+    {
+      id: "item-1",
+      websiteId: "site-1",
+      price: new Decimal(500),
+      status: "PENDING_PAYMENT",
+    },
   ]
 
   beforeEach(() => {
@@ -68,7 +73,11 @@ describe("OrderPaymentService", () => {
       $transaction: jest.fn(),
     }
 
-    service = new OrderPaymentService(prismaMock as any, auditMock as any, billingMock as any)
+    service = new OrderPaymentService(
+      prismaMock as any,
+      auditMock as any,
+      billingMock as any,
+    )
   })
 
   describe("submitPayment", () => {
@@ -82,8 +91,7 @@ describe("OrderPaymentService", () => {
           availability: "AVAILABLE",
         })
         prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        prismaMock.order.updateMany
-          .mockResolvedValue({ count: 1 }) // captured
+        prismaMock.order.updateMany.mockResolvedValue({ count: 1 }) // captured
         prismaMock.order.findUnique.mockResolvedValue({
           ...mockOrder,
           paymentStatus: "PAID",
@@ -98,14 +106,25 @@ describe("OrderPaymentService", () => {
       // reserve/pay now run inside the order transaction (5th arg = tx) so the
       // debit is atomic with the version-guarded order claim
       expect(billingMock.reserve).toHaveBeenCalledWith(
-        "wallet-1", 500, "order-1", { id: "user-1", organizationId: "org-1" }, expect.anything(),
+        "wallet-1",
+        500,
+        "order-1",
+        { id: "user-1", organizationId: "org-1" },
+        expect.anything(),
       )
       expect(billingMock.payFromReserved).toHaveBeenCalledWith(
-        "wallet-1", 500, "order-1", { id: "user-1", organizationId: "org-1" }, expect.anything(),
+        "wallet-1",
+        500,
+        "order-1",
+        { id: "user-1", organizationId: "org-1" },
+        expect.anything(),
       )
       expect(prismaMock.order.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ paymentStatus: "PAID", status: "PAID" }),
+          data: expect.objectContaining({
+            paymentStatus: "PAID",
+            status: "PAID",
+          }),
         }),
       )
       expect(prismaMock.order.update).toHaveBeenCalledWith(
@@ -120,24 +139,30 @@ describe("OrderPaymentService", () => {
 
     it("rejects non-DRAFT orders", async () => {
       prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.order.findFirst.mockResolvedValue({ ...mockOrder, status: "SUBMITTED" })
+        prismaMock.order.findFirst.mockResolvedValue({
+          ...mockOrder,
+          status: "SUBMITTED",
+        })
         return cb(prismaMock)
       })
 
-      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.submitPayment("order-1", "user-1", "org-1"),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("rejects orders with zero amount", async () => {
       prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.order.findFirst.mockResolvedValue({ ...mockOrder, amount: new Decimal(0) })
+        prismaMock.order.findFirst.mockResolvedValue({
+          ...mockOrder,
+          amount: new Decimal(0),
+        })
         return cb(prismaMock)
       })
 
-      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.submitPayment("order-1", "user-1", "org-1"),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("rejects insufficient balance", async () => {
@@ -150,9 +175,9 @@ describe("OrderPaymentService", () => {
         return cb(prismaMock)
       })
 
-      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.submitPayment("order-1", "user-1", "org-1"),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("rejects when listing is no longer available", async () => {
@@ -164,9 +189,9 @@ describe("OrderPaymentService", () => {
         return cb(prismaMock)
       })
 
-      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.submitPayment("order-1", "user-1", "org-1"),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("throws ConflictException on order version mismatch", async () => {
@@ -183,9 +208,9 @@ describe("OrderPaymentService", () => {
         return cb(prismaMock)
       })
 
-      await expect(service.submitPayment("order-1", "user-1", "org-1")).rejects.toThrow(
-        ConflictException,
-      )
+      await expect(
+        service.submitPayment("order-1", "user-1", "org-1"),
+      ).rejects.toThrow(ConflictException)
     })
   })
 })

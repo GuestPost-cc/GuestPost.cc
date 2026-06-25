@@ -1,6 +1,6 @@
 "use client"
 
-import * as React from "react"
+import type * as React from "react"
 import { Button } from "./button"
 
 export interface EmailVerificationBannerProps {
@@ -49,11 +49,17 @@ export function EmailVerificationBanner({
         {message ?? (
           <>
             <strong>Please verify your email.</strong> We sent a link to{" "}
-            <code className="font-mono">{email}</code>. Some actions are restricted until you confirm.
+            <code className="font-mono">{email}</code>. Some actions are
+            restricted until you confirm.
           </>
         )}
       </div>
-      <Button size="sm" variant="outline" onClick={onResend} disabled={disabled}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={onResend}
+        disabled={disabled}
+      >
         {label}
       </Button>
     </div>

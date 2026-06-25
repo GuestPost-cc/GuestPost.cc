@@ -21,7 +21,10 @@ const MIGRATION_PATH = path.join(
   repoRoot,
   "packages/database/prisma/migrations/20260616130000_phase77_audit_request_id_column/migration.sql",
 )
-const SCHEMA_PATH = path.join(repoRoot, "packages/database/prisma/schema.prisma")
+const SCHEMA_PATH = path.join(
+  repoRoot,
+  "packages/database/prisma/schema.prisma",
+)
 
 describe("Phase 7.7 A1 — migration regression guards", () => {
   it("migration file exists at the expected path", () => {
@@ -77,13 +80,15 @@ describe("Phase 7.7 A1 — schema.prisma reflects DB state", () => {
   it("AuditLog model declares requestId String? @db.VarChar(128)", () => {
     const auditLogBlock = schema.match(/model AuditLog \{[\s\S]+?\n\}/)
     expect(auditLogBlock).not.toBeNull()
-    expect(auditLogBlock![0]).toMatch(/requestId\s+String\?\s+@db\.VarChar\(128\)/)
+    expect(auditLogBlock?.[0]).toMatch(
+      /requestId\s+String\?\s+@db\.VarChar\(128\)/,
+    )
   })
 
-  it("AuditLog model declares @@index([requestId], map: \"AuditLog_requestId_idx\")", () => {
+  it('AuditLog model declares @@index([requestId], map: "AuditLog_requestId_idx")', () => {
     const auditLogBlock = schema.match(/model AuditLog \{[\s\S]+?\n\}/)
     expect(auditLogBlock).not.toBeNull()
-    expect(auditLogBlock![0]).toMatch(
+    expect(auditLogBlock?.[0]).toMatch(
       /@@index\(\[requestId\],\s*map:\s*"AuditLog_requestId_idx"\)/,
     )
   })
@@ -114,7 +119,11 @@ describe("Phase 7.7 A1 — AuditService.log dual-write contract", () => {
     }
     const service = new AuditService(fakePrisma)
 
-    await service.log({ action: "TEST_ACTION", entityType: "Test", entityId: "abc" })
+    await service.log({
+      action: "TEST_ACTION",
+      entityType: "Test",
+      entityId: "abc",
+    })
 
     expect(captured).toHaveLength(1)
     expect(captured[0].data.requestId).toBe(FAKE_REQUEST_ID)
@@ -187,7 +196,10 @@ describe("Phase 7.7 A1 — AuditService.log dual-write contract", () => {
     }
     const service = new AuditService(fakePrisma)
 
-    await service.log({ action: "FINANCIAL_ACTION", entityType: "Settlement" }, fakeTx)
+    await service.log(
+      { action: "FINANCIAL_ACTION", entityType: "Settlement" },
+      fakeTx,
+    )
 
     expect(prismaCaptured).toHaveLength(0)
     expect(txCaptured).toHaveLength(1)

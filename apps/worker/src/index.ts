@@ -1,35 +1,41 @@
 import { config } from "dotenv"
+
 // Dev env file loads ONLY under explicit NODE_ENV=development — unset NODE_ENV
 // (staging, CI) fails closed instead of silently using dev secrets
 if (process.env.NODE_ENV === "development") {
-  config({ path: require("path").resolve(__dirname, "../../../.env.development") })
+  config({
+    path: require("node:path").resolve(__dirname, "../../../.env.development"),
+  })
 }
+
+import { initSentry } from "@guestpost/shared"
 // Sentry must initialize BEFORE any other module so its auto-instrumentation
 // can wrap http / pg / undici. Phase 7.0.
 import * as Sentry from "@sentry/node"
-import { initSentry } from "@guestpost/shared"
+
 initSentry(Sentry, { runtime: "worker" })
 
 import { validateEnv } from "./lib/env"
+
 validateEnv()
 
-import { createEmailWorker } from "./processors/email.processor"
-import { createReportWorker } from "./processors/report.processor"
-import { createNotificationWorker } from "./processors/notification.processor"
-import { createVerificationWorker } from "./processors/verification.processor"
-import { createPayoutWorker } from "./processors/payout.processor"
-import { createReconciliationWorker } from "./processors/reconciliation.processor"
-import { createWebsiteVerificationWorker } from "./processors/website-verification.processor"
-import { createDeliveryVerificationWorker } from "./processors/delivery-verification.processor"
-import { createPublisherTrustWorker } from "./processors/publisher-trust.processor"
-import { createSettlementAutoApproveWorker } from "./processors/settlement-auto-approve.processor"
-import { connection } from "./redis"
 import { prisma } from "@guestpost/database"
-import { Queue } from "bullmq"
 import { QUEUES } from "@guestpost/shared"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
-import { startHealthServer, type HealthServerHandle } from "./lib/health-server"
+import { Queue } from "bullmq"
+import { type HealthServerHandle, startHealthServer } from "./lib/health-server"
+import { createDeliveryVerificationWorker } from "./processors/delivery-verification.processor"
+import { createEmailWorker } from "./processors/email.processor"
+import { createNotificationWorker } from "./processors/notification.processor"
+import { createPayoutWorker } from "./processors/payout.processor"
+import { createPublisherTrustWorker } from "./processors/publisher-trust.processor"
+import { createReconciliationWorker } from "./processors/reconciliation.processor"
+import { createReportWorker } from "./processors/report.processor"
+import { createSettlementAutoApproveWorker } from "./processors/settlement-auto-approve.processor"
+import { createVerificationWorker } from "./processors/verification.processor"
+import { createWebsiteVerificationWorker } from "./processors/website-verification.processor"
+import { connection } from "./redis"
 
 const logger = createLogger("worker.bootstrap")
 
@@ -47,16 +53,12 @@ const logger = createLogger("worker.bootstrap")
 // poll catches transfers whose webhook was lost or never configured.
 async function registerPayoutStatusPoll() {
   const queue = new Queue(QUEUES.PAYOUT, { connection })
-  await queue.add(
-    "payout-check-status",
-    signJobPayload({ limit: 50 }),
-    {
-      repeat: { every: 10 * 60 * 1000 },
-      jobId: "payout-check-status-poll",
-      removeOnComplete: { count: 10 },
-      removeOnFail: { count: 10 },
-    },
-  )
+  await queue.add("payout-check-status", signJobPayload({ limit: 50 }), {
+    repeat: { every: 10 * 60 * 1000 },
+    jobId: "payout-check-status-poll",
+    removeOnComplete: { count: 10 },
+    removeOnFail: { count: 10 },
+  })
   await queue.close()
   logger.info("registered payout status poll", { intervalMs: 10 * 60 * 1000 })
 }
@@ -64,59 +66,68 @@ async function registerPayoutStatusPoll() {
 // Scheduled drift sweep — alerting must not depend on a human remembering to
 // call GET /admin/reconciliation. Interval configurable for ops tuning.
 async function registerReconciliationSweep() {
-  const everyMs = Math.max(Number(process.env.RECONCILIATION_SWEEP_MINUTES ?? 60), 5) * 60 * 1000
+  const everyMs =
+    Math.max(Number(process.env.RECONCILIATION_SWEEP_MINUTES ?? 60), 5) *
+    60 *
+    1000
   const queue = new Queue(QUEUES.RECONCILIATION, { connection })
-  await queue.add(
-    "reconciliation-run",
-    signJobPayload({}),
-    {
-      repeat: { every: everyMs },
-      jobId: "reconciliation-sweep",
-      removeOnComplete: { count: 24 },
-      removeOnFail: { count: 24 },
-    },
-  )
+  await queue.add("reconciliation-run", signJobPayload({}), {
+    repeat: { every: everyMs },
+    jobId: "reconciliation-sweep",
+    removeOnComplete: { count: 24 },
+    removeOnFail: { count: 24 },
+  })
   await queue.close()
-  logger.info("registered reconciliation sweep", { intervalMs: everyMs, intervalMin: everyMs / 60000 })
+  logger.info("registered reconciliation sweep", {
+    intervalMs: everyMs,
+    intervalMin: everyMs / 60000,
+  })
 }
 
 // Domain re-verification sweep — every VERIFIED site is re-checked every 30d
 // and REVOKED if its TXT record vanished. Trust must decay, not persist forever.
 async function registerWebsiteReverifySweep() {
-  const everyMs = Math.max(Number(process.env.WEBSITE_REVERIFY_DAYS ?? 30), 1) * 24 * 60 * 60 * 1000
+  const everyMs =
+    Math.max(Number(process.env.WEBSITE_REVERIFY_DAYS ?? 30), 1) *
+    24 *
+    60 *
+    60 *
+    1000
   const queue = new Queue(QUEUES.WEBSITE_VERIFICATION, { connection })
-  await queue.add(
-    "website-reverify-sweep",
-    signJobPayload({}),
-    {
-      repeat: { every: everyMs },
-      jobId: "website-reverify-sweep",
-      removeOnComplete: { count: 12 },
-      removeOnFail: { count: 12 },
-    },
-  )
+  await queue.add("website-reverify-sweep", signJobPayload({}), {
+    repeat: { every: everyMs },
+    jobId: "website-reverify-sweep",
+    removeOnComplete: { count: 12 },
+    removeOnFail: { count: 12 },
+  })
   await queue.close()
-  logger.info("registered website re-verify sweep", { intervalMs: everyMs, intervalDays: everyMs / 86400000 })
+  logger.info("registered website re-verify sweep", {
+    intervalMs: everyMs,
+    intervalDays: everyMs / 86400000,
+  })
 }
 
 // Settlement-hold link monitoring — re-check the live link for every order
 // whose payout is still on hold. If removed, raises a fraud flag that blocks
 // release. Default every 6h.
 async function registerSettlementHoldLinkSweep() {
-  const everyMs = Math.max(Number(process.env.SETTLEMENT_LINK_SWEEP_HOURS ?? 6), 1) * 60 * 60 * 1000
+  const everyMs =
+    Math.max(Number(process.env.SETTLEMENT_LINK_SWEEP_HOURS ?? 6), 1) *
+    60 *
+    60 *
+    1000
   const queue = new Queue(QUEUES.DELIVERY_VERIFICATION, { connection })
-  await queue.add(
-    "settlement-hold-sweep",
-    signJobPayload({}),
-    {
-      repeat: { every: everyMs },
-      jobId: "settlement-hold-sweep",
-      removeOnComplete: { count: 24 },
-      removeOnFail: { count: 24 },
-    },
-  )
+  await queue.add("settlement-hold-sweep", signJobPayload({}), {
+    repeat: { every: everyMs },
+    jobId: "settlement-hold-sweep",
+    removeOnComplete: { count: 24 },
+    removeOnFail: { count: 24 },
+  })
   await queue.close()
-  logger.info("registered settlement-hold link sweep", { intervalMs: everyMs, intervalHours: everyMs / 3600000 })
+  logger.info("registered settlement-hold link sweep", {
+    intervalMs: everyMs,
+    intervalHours: everyMs / 3600000,
+  })
 }
 
 // Phase 7.3 — settlement review window auto-approval. Replaces the per-API-pod
@@ -127,9 +138,12 @@ async function registerSettlementHoldLinkSweep() {
 // for tuning during backlog recovery.
 async function registerSettlementAutoApproveSweep() {
   if (process.env.SETTLEMENT_AUTO_APPROVE_DISABLED === "true") {
-    logger.info("settlement auto-approve disabled — skipping cron registration", {
-      env: "SETTLEMENT_AUTO_APPROVE_DISABLED",
-    })
+    logger.info(
+      "settlement auto-approve disabled — skipping cron registration",
+      {
+        env: "SETTLEMENT_AUTO_APPROVE_DISABLED",
+      },
+    )
     return
   }
   const everyMs = Math.max(
@@ -141,16 +155,12 @@ async function registerSettlementAutoApproveSweep() {
     10_000,
   )
   const queue = new Queue(QUEUES.SETTLEMENT, { connection })
-  await queue.add(
-    "settlement-auto-approve",
-    signJobPayload({ batchSize }),
-    {
-      repeat: { every: everyMs },
-      jobId: "settlement-auto-approve",
-      removeOnComplete: { count: 24 },
-      removeOnFail: { count: 24 },
-    },
-  )
+  await queue.add("settlement-auto-approve", signJobPayload({ batchSize }), {
+    repeat: { every: everyMs },
+    jobId: "settlement-auto-approve",
+    removeOnComplete: { count: 24 },
+    removeOnFail: { count: 24 },
+  })
   await queue.close()
   logger.info("registered settlement auto-approve sweep", {
     intervalMs: everyMs,
@@ -163,13 +173,17 @@ async function checkConnections() {
   try {
     await connection.ping()
   } catch (err) {
-    logger.error("FATAL: Redis connection failed", { err: err instanceof Error ? err.message : String(err) })
+    logger.error("FATAL: Redis connection failed", {
+      err: err instanceof Error ? err.message : String(err),
+    })
     process.exit(1)
   }
   try {
     await prisma.$queryRaw`SELECT 1`
   } catch (err) {
-    logger.error("FATAL: Database connection failed", { err: err instanceof Error ? err.message : String(err) })
+    logger.error("FATAL: Database connection failed", {
+      err: err instanceof Error ? err.message : String(err),
+    })
     process.exit(1)
   }
   logger.info("Redis + database connections verified")
@@ -189,10 +203,18 @@ let healthServer: HealthServerHandle | undefined
 // has potentially-corrupted in-memory state. Continuing to process the next
 // job risks committing inconsistent state. A pod restart loses one in-flight
 // job (BullMQ retries it); continuing in a bad state loses N future ones.
-const SHOULD_EXIT_ON_UNHANDLED_REJECTION = process.env.UNHANDLED_REJECTION_EXIT !== "false"
+const SHOULD_EXIT_ON_UNHANDLED_REJECTION =
+  process.env.UNHANDLED_REJECTION_EXIT !== "false"
 
-async function flushAndExit(code: number, reason: string, err: unknown): Promise<never> {
-  logger.error("FATAL: process exit", { reason, err: err instanceof Error ? err.message : String(err) })
+async function flushAndExit(
+  code: number,
+  reason: string,
+  err: unknown,
+): Promise<never> {
+  logger.error("FATAL: process exit", {
+    reason,
+    err: err instanceof Error ? err.message : String(err),
+  })
   Sentry.captureException(err)
   try {
     await Sentry.flush(2000)
@@ -207,9 +229,12 @@ process.on("unhandledRejection", (reason: unknown) => {
     void flushAndExit(1, "unhandledRejection", reason)
     return
   }
-  logger.error("unhandledRejection (continuing — UNHANDLED_REJECTION_EXIT=false)", {
-    reason: reason instanceof Error ? reason.message : String(reason),
-  })
+  logger.error(
+    "unhandledRejection (continuing — UNHANDLED_REJECTION_EXIT=false)",
+    {
+      reason: reason instanceof Error ? reason.message : String(reason),
+    },
+  )
   Sentry.captureException(reason)
 })
 
@@ -238,43 +263,65 @@ async function bootstrap() {
   logger.info("workers started", { count: workers.length })
   await Promise.all([
     registerPayoutStatusPoll().catch((err) =>
-      logger.error("failed to register payout status poll", { err: err instanceof Error ? err.message : String(err) }),
+      logger.error("failed to register payout status poll", {
+        err: err instanceof Error ? err.message : String(err),
+      }),
     ),
     registerReconciliationSweep().catch((err) =>
-      logger.error("failed to register reconciliation sweep", { err: err instanceof Error ? err.message : String(err) }),
+      logger.error("failed to register reconciliation sweep", {
+        err: err instanceof Error ? err.message : String(err),
+      }),
     ),
     registerWebsiteReverifySweep().catch((err) =>
-      logger.error("failed to register website re-verify sweep", { err: err instanceof Error ? err.message : String(err) }),
+      logger.error("failed to register website re-verify sweep", {
+        err: err instanceof Error ? err.message : String(err),
+      }),
     ),
     registerSettlementHoldLinkSweep().catch((err) =>
-      logger.error("failed to register settlement-hold link sweep", { err: err instanceof Error ? err.message : String(err) }),
+      logger.error("failed to register settlement-hold link sweep", {
+        err: err instanceof Error ? err.message : String(err),
+      }),
     ),
     registerSettlementAutoApproveSweep().catch((err) =>
-      logger.error("failed to register settlement auto-approve sweep", { err: err instanceof Error ? err.message : String(err) }),
+      logger.error("failed to register settlement auto-approve sweep", {
+        err: err instanceof Error ? err.message : String(err),
+      }),
     ),
   ])
 }
 
 bootstrap().catch((err) => {
-  logger.error("FATAL: bootstrap failed", { err: err instanceof Error ? err.message : String(err) })
+  logger.error("FATAL: bootstrap failed", {
+    err: err instanceof Error ? err.message : String(err),
+  })
   Sentry.captureException(err)
   void Sentry.flush(2000).finally(() => process.exit(1))
 })
 
 async function shutdown(signal: string): Promise<void> {
   logger.info("signal received — draining workers", { signal })
-  await Promise.all(workers.map((w) => w.close().catch((err) =>
-    logger.error("worker close error", { err: err instanceof Error ? err.message : String(err) })
-  )))
+  await Promise.all(
+    workers.map((w) =>
+      w.close().catch((err) =>
+        logger.error("worker close error", {
+          err: err instanceof Error ? err.message : String(err),
+        }),
+      ),
+    ),
+  )
   if (healthServer) {
     await healthServer.close().catch((err) =>
-      logger.error("health server close error", { err: err instanceof Error ? err.message : String(err) })
+      logger.error("health server close error", {
+        err: err instanceof Error ? err.message : String(err),
+      }),
     )
   }
   try {
     await prisma.$disconnect()
   } catch (err) {
-    logger.error("prisma $disconnect error", { err: err instanceof Error ? err.message : String(err) })
+    logger.error("prisma $disconnect error", {
+      err: err instanceof Error ? err.message : String(err),
+    })
   }
   try {
     await Sentry.flush(2000)

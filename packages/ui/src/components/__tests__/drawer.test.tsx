@@ -10,14 +10,10 @@
  * Radix's overlay scroll-lock behavior. Verified manually at narrow
  * viewport in commit 4's smoke checklist instead.
  */
-import { describe, it, expect } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
-import {
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-  DrawerTrigger,
-} from "../drawer"
+
+import { fireEvent, render, screen } from "@testing-library/react"
+import { describe, expect, it } from "vitest"
+import { Drawer, DrawerContent, DrawerTitle, DrawerTrigger } from "../drawer"
 
 function Harness({
   open,
@@ -105,7 +101,9 @@ describe("Drawer", () => {
       // what matters is focus is not OUTSIDE the drawer.
       const dialog = screen.getByRole("dialog")
       const active = document.activeElement
-      expect(active === first || active === dialog || dialog.contains(active)).toBe(true)
+      expect(
+        active === first || active === dialog || dialog.contains(active),
+      ).toBe(true)
     })
   })
 })

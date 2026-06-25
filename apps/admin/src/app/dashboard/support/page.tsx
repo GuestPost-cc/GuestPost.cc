@@ -1,17 +1,20 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
-import { useQuery } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
-import { Card, CardContent } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Badge, StatusBadge, getTicketStatusPresentation, FulfillmentChannelBadge } from "@guestpost/ui"
 import type { TicketStatus } from "@guestpost/database"
-import { Skeleton } from "@guestpost/ui"
 import {
+  Button,
+  Card,
+  CardContent,
+  FulfillmentChannelBadge,
+  getTicketStatusPresentation,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  StatusBadge,
   Table,
   TableBody,
   TableCell,
@@ -19,21 +22,19 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@guestpost/ui"
-import {
-  Search,
-  RefreshCw,
-  AlertCircle,
-  HeadphonesIcon,
-  ArrowRight,
-} from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
 import { formatDistanceToNow } from "date-fns"
+import {
+  AlertCircle,
+  ArrowRight,
+  HeadphonesIcon,
+  RefreshCw,
+  Search,
+} from "lucide-react"
+import Link from "next/link"
+import { useState } from "react"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 // Phase 7.9 #28 — ticket status presentation comes from
 // getTicketStatusPresentation in @guestpost/ui. Local STATUS_COLORS deleted.
@@ -53,12 +54,23 @@ export default function AdminSupportPage() {
   const [page, setPage] = useState(1)
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ["admin", "tickets", search, statusFilter, channelFilter, assigneeFilter, page],
+    queryKey: [
+      "admin",
+      "tickets",
+      search,
+      statusFilter,
+      channelFilter,
+      assigneeFilter,
+      page,
+    ],
     queryFn: () =>
       api.admin.listTickets({
         search: search || undefined,
         status: statusFilter === "all" ? undefined : statusFilter,
-        channel: channelFilter === "all" ? undefined : (channelFilter as "PLATFORM" | "PUBLISHER"),
+        channel:
+          channelFilter === "all"
+            ? undefined
+            : (channelFilter as "PLATFORM" | "PUBLISHER"),
         assignedToUserId:
           assigneeFilter === "all"
             ? undefined
@@ -129,7 +141,9 @@ export default function AdminSupportPage() {
             <SelectItem value="all">All status</SelectItem>
             <SelectItem value="OPEN">Open</SelectItem>
             <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-            <SelectItem value="WAITING_ON_CUSTOMER">Waiting on Customer</SelectItem>
+            <SelectItem value="WAITING_ON_CUSTOMER">
+              Waiting on Customer
+            </SelectItem>
             <SelectItem value="RESOLVED">Resolved</SelectItem>
             <SelectItem value="CLOSED">Closed</SelectItem>
           </SelectContent>
@@ -163,7 +177,9 @@ export default function AdminSupportPage() {
           <SelectContent>
             <SelectItem value="all">All assignees</SelectItem>
             <SelectItem value="UNASSIGNED">Unassigned platform pool</SelectItem>
-            {user?.id && <SelectItem value={user.id}>Assigned to me</SelectItem>}
+            {user?.id && (
+              <SelectItem value={user.id}>Assigned to me</SelectItem>
+            )}
           </SelectContent>
         </Select>
       </div>
@@ -181,7 +197,9 @@ export default function AdminSupportPage() {
               <HeadphonesIcon className="h-12 w-12 text-muted-foreground/50" />
               <h3 className="mt-4 text-lg font-medium">No tickets found</h3>
               <p className="text-sm text-muted-foreground">
-                {search ? "Try a different search" : "No support tickets match these filters"}
+                {search
+                  ? "Try a different search"
+                  : "No support tickets match these filters"}
               </p>
             </div>
           ) : (
@@ -202,9 +220,13 @@ export default function AdminSupportPage() {
                 <TableBody>
                   {tickets.map((t) => (
                     <TableRow key={t.id}>
-                      <TableCell className="font-medium max-w-[280px] truncate">{t.subject}</TableCell>
+                      <TableCell className="font-medium max-w-[280px] truncate">
+                        {t.subject}
+                      </TableCell>
                       <TableCell>
-                        <FulfillmentChannelBadge channel={t.fulfillmentChannel as any} />
+                        <FulfillmentChannelBadge
+                          channel={t.fulfillmentChannel as any}
+                        />
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {t.customer.name || t.customer.email}
@@ -218,13 +240,23 @@ export default function AdminSupportPage() {
                       </TableCell>
                       <TableCell>
                         {(() => {
-                          const p = getTicketStatusPresentation(t.status as TicketStatus)
-                          return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+                          const p = getTicketStatusPresentation(
+                            t.status as TicketStatus,
+                          )
+                          return (
+                            <StatusBadge variant={p.variant}>
+                              {p.label}
+                            </StatusBadge>
+                          )
                         })()}
                       </TableCell>
-                      <TableCell className="text-center">{t.messageCount}</TableCell>
+                      <TableCell className="text-center">
+                        {t.messageCount}
+                      </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
-                        {formatDistanceToNow(new Date(t.updatedAt), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(t.updatedAt), {
+                          addSuffix: true,
+                        })}
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" asChild>
@@ -253,7 +285,8 @@ export default function AdminSupportPage() {
             Previous
           </Button>
           <span className="text-sm text-muted-foreground">
-            Page {pagination.page} of {pagination.totalPages} ({pagination.total} total)
+            Page {pagination.page} of {pagination.totalPages} (
+            {pagination.total} total)
           </span>
           <Button
             variant="outline"

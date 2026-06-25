@@ -1,63 +1,58 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { sortOrdersByPriority } from "@guestpost/shared"
-import { api } from "../../../lib/api"
-import { Card, CardContent } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
+import { ORDER_STATUS_LABELS, sortOrdersByPriority } from "@guestpost/shared"
 import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
 } from "@guestpost/ui"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@guestpost/ui"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@guestpost/ui"
-import { Skeleton, Textarea } from "@guestpost/ui"
-import {
-  ShoppingCart,
-  Search,
-  XCircle,
-  AlertCircle,
-  DollarSign,
-  Eye,
-  Ban,
-  ClipboardList,
-  Scale,
-} from "lucide-react"
-import Link from "next/link"
-import { format } from "date-fns"
-import { toast } from "sonner"
-import { useAuth } from "../../../lib/auth"
-import { ORDER_STATUS_LABELS } from "@guestpost/shared"
-import {
+  type ColumnDef,
   createColumnHelper,
-  useReactTable,
+  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
-  flexRender,
-  type ColumnDef,
+  useReactTable,
 } from "@tanstack/react-table"
-import { adminFetch } from "../../../lib/api"
+import { format } from "date-fns"
+import {
+  AlertCircle,
+  Ban,
+  ClipboardList,
+  DollarSign,
+  Eye,
+  Scale,
+  Search,
+  ShoppingCart,
+} from "lucide-react"
+import Link from "next/link"
+import { useMemo, useState } from "react"
+import { toast } from "sonner"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 interface Order {
   id: string
@@ -101,81 +96,189 @@ const statusVariant = (status: string) => {
 // status manually; they monitor and intervene (force-cancel / refund), review
 // deliveries in Fulfillment, and work Disputes there.
 const TERMINAL = ["COMPLETED", "CANCELLED", "REFUNDED"]
-const CANCELLABLE = ["DRAFT", "PENDING_PAYMENT", "PAID", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW", "APPROVED"]
-const REFUNDABLE = ["PAID", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW", "APPROVED", "PUBLISHED", "VERIFIED", "DELIVERED", "SETTLED", "DISPUTED"]
+const CANCELLABLE = [
+  "DRAFT",
+  "PENDING_PAYMENT",
+  "PAID",
+  "SUBMITTED",
+  "ACCEPTED",
+  "CONTENT_REQUESTED",
+  "CONTENT_CREATION",
+  "CONTENT_READY",
+  "CUSTOMER_REVIEW",
+  "APPROVED",
+]
+const REFUNDABLE = [
+  "PAID",
+  "SUBMITTED",
+  "ACCEPTED",
+  "CONTENT_REQUESTED",
+  "CONTENT_CREATION",
+  "CONTENT_READY",
+  "CUSTOMER_REVIEW",
+  "APPROVED",
+  "PUBLISHED",
+  "VERIFIED",
+  "DELIVERED",
+  "SETTLED",
+  "DISPUTED",
+]
 
 function OrderActions({ order }: { order: Order }) {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
-  const canRefund = user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "FINANCE"
+  const canRefund =
+    user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "FINANCE"
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [action, setAction] = useState<null | "cancel" | "refund">(null)
   const [reason, setReason] = useState("")
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey: ["admin", "orders"] })
+  const refresh = () =>
+    queryClient.invalidateQueries({ queryKey: ["admin", "orders"] })
 
   const intervene = useMutation({
-    mutationFn: ({ kind, reason }: { kind: "cancel" | "refund"; reason: string }) =>
-      kind === "cancel" ? api.admin.forceCancelOrder(order.id, reason) : api.admin.refundOrder(order.id, reason),
+    mutationFn: ({
+      kind,
+      reason,
+    }: {
+      kind: "cancel" | "refund"
+      reason: string
+    }) =>
+      kind === "cancel"
+        ? api.admin.forceCancelOrder(order.id, reason)
+        : api.admin.refundOrder(order.id, reason),
     onSuccess: (_d, vars) => {
-      toast.success(vars.kind === "cancel" ? "Order force-cancelled" : "Order refunded")
-      setAction(null); setReason(""); refresh()
+      toast.success(
+        vars.kind === "cancel" ? "Order force-cancelled" : "Order refunded",
+      )
+      setAction(null)
+      setReason("")
+      refresh()
     },
     onError: (e: any) => toast.error(e?.message || "Action failed"),
   })
 
   const showCancel = isSuperAdmin && CANCELLABLE.includes(order.status)
-  const showRefund = canRefund && REFUNDABLE.includes(order.status) && !TERMINAL.includes(order.status)
+  const showRefund =
+    canRefund &&
+    REFUNDABLE.includes(order.status) &&
+    !TERMINAL.includes(order.status)
 
   return (
     <>
       <div className="flex items-center gap-1">
-        <Button size="sm" variant="ghost" title="View" onClick={() => { setSelectedOrder(order); setDetailOpen(true) }}>
+        <Button
+          size="sm"
+          variant="ghost"
+          title="View"
+          onClick={() => {
+            setSelectedOrder(order)
+            setDetailOpen(true)
+          }}
+        >
           <Eye className="h-3.5 w-3.5" />
         </Button>
         {order.status === "DISPUTED" && (
           <Button size="sm" variant="ghost" title="Work dispute" asChild>
-            <Link href="/dashboard/disputes"><Scale className="h-3.5 w-3.5 text-orange-600" /></Link>
+            <Link href="/dashboard/disputes">
+              <Scale className="h-3.5 w-3.5 text-orange-600" />
+            </Link>
           </Button>
         )}
         {["PUBLISHED", "VERIFIED"].includes(order.status) && (
-          <Button size="sm" variant="ghost" title="Review delivery in Fulfillment" asChild>
-            <Link href="/dashboard/fulfillment"><ClipboardList className="h-3.5 w-3.5" /></Link>
+          <Button
+            size="sm"
+            variant="ghost"
+            title="Review delivery in Fulfillment"
+            asChild
+          >
+            <Link href="/dashboard/fulfillment">
+              <ClipboardList className="h-3.5 w-3.5" />
+            </Link>
           </Button>
         )}
         {showCancel && (
-          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" title="Force cancel" onClick={() => { setAction("cancel"); setReason("") }}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
+            title="Force cancel"
+            onClick={() => {
+              setAction("cancel")
+              setReason("")
+            }}
+          >
             <Ban className="h-3.5 w-3.5" />
           </Button>
         )}
         {showRefund && (
-          <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" title="Refund" onClick={() => { setAction("refund"); setReason("") }}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="text-destructive hover:text-destructive"
+            title="Refund"
+            onClick={() => {
+              setAction("refund")
+              setReason("")
+            }}
+          >
             <DollarSign className="h-3.5 w-3.5" />
           </Button>
         )}
       </div>
 
-      <Dialog open={!!action} onOpenChange={(o) => { if (!o) { setAction(null); setReason("") } }}>
+      <Dialog
+        open={!!action}
+        onOpenChange={(o) => {
+          if (!o) {
+            setAction(null)
+            setReason("")
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{action === "cancel" ? "Force-cancel order" : "Refund order"}</DialogTitle>
+            <DialogTitle>
+              {action === "cancel" ? "Force-cancel order" : "Refund order"}
+            </DialogTitle>
             <DialogDescription>
               {action === "cancel"
                 ? "Cancels the order and refunds any captured payment. Use only for stuck or erroneous orders."
                 : "Refunds the customer. If a settlement was already released, the publisher is clawed back."}
             </DialogDescription>
           </DialogHeader>
-          <Textarea placeholder="Reason (recorded in the audit trail)..." value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={1000} />
+          <Textarea
+            placeholder="Reason (recorded in the audit trail)..."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            maxLength={1000}
+          />
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setAction(null); setReason("") }}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAction(null)
+                setReason("")
+              }}
+            >
+              Cancel
+            </Button>
             <Button
               variant="destructive"
               disabled={intervene.isPending || reason.trim().length < 3}
-              onClick={() => action && intervene.mutate({ kind: action, reason: reason.trim() })}
+              onClick={() =>
+                action &&
+                intervene.mutate({ kind: action, reason: reason.trim() })
+              }
             >
-              {intervene.isPending ? "Working..." : action === "cancel" ? "Force Cancel" : "Refund"}
+              {intervene.isPending
+                ? "Working..."
+                : action === "cancel"
+                  ? "Force Cancel"
+                  : "Refund"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -185,7 +288,10 @@ function OrderActions({ order }: { order: Order }) {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Order Details</DialogTitle>
-            <DialogDescription>Read-only — the order lifecycle is automated; intervene via Fulfillment, Disputes, or the actions here.</DialogDescription>
+            <DialogDescription>
+              Read-only — the order lifecycle is automated; intervene via
+              Fulfillment, Disputes, or the actions here.
+            </DialogDescription>
           </DialogHeader>
           {selectedOrder && (
             <div className="space-y-4">
@@ -197,7 +303,9 @@ function OrderActions({ order }: { order: Order }) {
                 <div>
                   <p className="text-muted-foreground">Service Type</p>
                   <p className="capitalize">
-                    {(selectedOrder.type ?? "").replace(/_/g, " ").toLowerCase() || "—"}
+                    {(selectedOrder.type ?? "")
+                      .replace(/_/g, " ")
+                      .toLowerCase() || "—"}
                   </p>
                 </div>
                 <div>
@@ -216,7 +324,11 @@ function OrderActions({ order }: { order: Order }) {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Customer</p>
-                  <p>{selectedOrder.customer?.name ?? selectedOrder.customer?.email ?? "—"}</p>
+                  <p>
+                    {selectedOrder.customer?.name ??
+                      selectedOrder.customer?.email ??
+                      "—"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Created</p>
@@ -254,7 +366,12 @@ export default function OrdersPage() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
-  const { data: orders = [], isLoading, error, refetch } = useQuery({
+  const {
+    data: orders = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["admin", "orders"],
     queryFn: () => api.admin.listOrders() as Promise<Order[]>,
     retry: 1,
@@ -265,7 +382,9 @@ export default function OrdersPage() {
       columnHelper.accessor("id", {
         header: "ID",
         cell: (info) => (
-          <span className="font-mono text-xs">{info.getValue().slice(0, 8)}</span>
+          <span className="font-mono text-xs">
+            {info.getValue().slice(0, 8)}
+          </span>
         ),
       }),
       columnHelper.accessor("customer", {
@@ -273,7 +392,9 @@ export default function OrdersPage() {
         cell: (info) => (
           <div>
             <div className="font-medium">{info.getValue()?.name ?? "—"}</div>
-            <div className="text-xs text-muted-foreground">{info.getValue()?.email ?? "—"}</div>
+            <div className="text-xs text-muted-foreground">
+              {info.getValue()?.email ?? "—"}
+            </div>
           </div>
         ),
       }),
@@ -309,7 +430,9 @@ export default function OrdersPage() {
         header: "Amount",
         cell: (info) => (
           <span className="font-medium">
-            {info.getValue() ? `${info.row.original.currency} ${Number(info.getValue()).toFixed(2)}` : "—"}
+            {info.getValue()
+              ? `${info.row.original.currency} ${Number(info.getValue()).toFixed(2)}`
+              : "—"}
           </span>
         ),
       }),
@@ -418,7 +541,10 @@ export default function OrdersPage() {
                       <TableHead key={h.id}>
                         {h.isPlaceholder
                           ? null
-                          : flexRender(h.column.columnDef.header, h.getContext())}
+                          : flexRender(
+                              h.column.columnDef.header,
+                              h.getContext(),
+                            )}
                       </TableHead>
                     ))}
                   </TableRow>
@@ -429,7 +555,7 @@ export default function OrdersPage() {
                   <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
-                        {typeof cell.column.columnDef.cell === 'function' 
+                        {typeof cell.column.columnDef.cell === "function"
                           ? cell.column.columnDef.cell(cell.getContext())
                           : null}
                       </TableCell>
@@ -453,7 +579,8 @@ export default function OrdersPage() {
             Previous
           </Button>
           <span className="text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount()}
+            Page {table.getState().pagination.pageIndex + 1} of{" "}
+            {table.getPageCount()}
           </span>
           <Button
             variant="outline"

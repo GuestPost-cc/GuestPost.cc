@@ -1,24 +1,42 @@
 "use client"
 
+import { cn } from "@guestpost/ui"
+import { Building2, Group, Users } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { cn } from "@guestpost/ui"
-import { Building2, Users, Group } from "lucide-react"
 
 const subNav = [
-  { href: "/dashboard/settings/organization", label: "Overview", icon: Building2 },
-  { href: "/dashboard/settings/organization/members", label: "Members", icon: Users },
-  { href: "/dashboard/settings/organization/teams", label: "Teams", icon: Group },
+  {
+    href: "/dashboard/settings/organization",
+    label: "Overview",
+    icon: Building2,
+  },
+  {
+    href: "/dashboard/settings/organization/members",
+    label: "Members",
+    icon: Users,
+  },
+  {
+    href: "/dashboard/settings/organization/teams",
+    label: "Teams",
+    icon: Group,
+  },
 ]
 
-export default function OrgSettingsLayout({ children }: { children: React.ReactNode }) {
+export default function OrgSettingsLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const pathname = usePathname()
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Organization</h1>
-        <p className="text-muted-foreground">Manage your organization, members, and teams</p>
+        <p className="text-muted-foreground">
+          Manage your organization, members, and teams
+        </p>
       </div>
 
       <nav className="flex gap-1 border-b">

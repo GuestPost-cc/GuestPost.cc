@@ -1,6 +1,6 @@
 "use client"
 
-import * as React from "react"
+import type * as React from "react"
 
 interface PermissionGateProps {
   requiredPermission: string
@@ -9,7 +9,12 @@ interface PermissionGateProps {
   fallback?: React.ReactNode
 }
 
-function PermissionGate({ requiredPermission, userPermissions = [], children, fallback = null }: PermissionGateProps) {
+function PermissionGate({
+  requiredPermission,
+  userPermissions = [],
+  children,
+  fallback = null,
+}: PermissionGateProps) {
   const hasPermission = userPermissions.includes(requiredPermission)
 
   if (!hasPermission) {

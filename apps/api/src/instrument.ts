@@ -13,7 +13,7 @@
 // Either way, exactly one self-test line is emitted so deployment verification
 // can grep for it.
 
-import * as Sentry from "@sentry/node"
 import { initSentry } from "@guestpost/shared"
+import * as Sentry from "@sentry/node"
 
 initSentry(Sentry, { runtime: "api" })

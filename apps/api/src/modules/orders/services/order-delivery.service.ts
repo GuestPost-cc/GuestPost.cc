@@ -1,12 +1,33 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../../common/prisma.service"
-import { AuditService } from "../../audit/audit.service"
-import { QueueService } from "../../queues/queue.service"
-import { QUEUES, normalizeUrl, orderEventMetadata, notificationDedupKey, isUniqueViolation } from "@guestpost/shared"
+import {
+  isUniqueViolation,
+  normalizeUrl,
+  notificationDedupKey,
+  orderEventMetadata,
+  QUEUES,
+} from "@guestpost/shared"
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import type { PrismaService } from "../../../common/prisma.service"
+import type { AuditService } from "../../audit/audit.service"
+import type { QueueService } from "../../queues/queue.service"
 import { assertOwnerOrCreator } from "./owner-or-creator"
 
 // Rejected placeholder "deliveries" — a human typing "done" is not a delivery.
-const PLACEHOLDER_VALUES = new Set(["done", "n/a", "na", "none", "-", "tbd", "pending", "complete", "completed"])
+const PLACEHOLDER_VALUES = new Set([
+  "done",
+  "n/a",
+  "na",
+  "none",
+  "-",
+  "tbd",
+  "pending",
+  "complete",
+  "completed",
+])
 
 @Injectable()
 export class OrderDeliveryService {
@@ -17,7 +38,10 @@ export class OrderDeliveryService {
   ) {}
 
   // Validate + normalize a published URL. Throws on empty/placeholder/invalid.
-  private validatePublishedUrl(raw: string | undefined | null): { publishedUrl: string; normalizedUrl: string } {
+  private validatePublishedUrl(raw: string | undefined | null): {
+    publishedUrl: string
+    normalizedUrl: string
+  } {
     const trimmed = (raw ?? "").trim()
     if (!trimmed) throw new BadRequestException("Published URL is required")
     if (PLACEHOLDER_VALUES.has(trimmed.toLowerCase())) {
@@ -39,11 +63,24 @@ export class OrderDeliveryService {
   // Used by both publisher fulfillment and platform Operations — identical path.
   // `expectStatuses` guards the order state the caller transitioned from.
   async submitDelivery(
-    order: { id: string; version: number; status: string; organizationId: string; websiteId: string | null },
+    order: {
+      id: string
+      version: number
+      status: string
+      organizationId: string
+      websiteId: string | null
+    },
     actorUserId: string,
-    dto: { publishedUrl: string; articleTitle?: string; notes?: string; screenshotUrl?: string },
+    dto: {
+      publishedUrl: string
+      articleTitle?: string
+      notes?: string
+      screenshotUrl?: string
+    },
   ) {
-    const { publishedUrl, normalizedUrl } = this.validatePublishedUrl(dto.publishedUrl)
+    const { publishedUrl, normalizedUrl } = this.validatePublishedUrl(
+      dto.publishedUrl,
+    )
 
     return this.prisma.$transaction(async (tx: any) => {
       // Next version number for this order (immutable history)
@@ -88,7 +125,10 @@ export class OrderDeliveryService {
           version: { increment: 1 },
         },
       })
-      if (upd.count === 0) throw new ConflictException("Order was modified by another request. Retry.")
+      if (upd.count === 0)
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
 
       await tx.orderEvent.create({
         data: {
@@ -96,7 +136,11 @@ export class OrderDeliveryService {
           eventType: "PUBLICATION_MARKED",
           actorId: actorUserId,
           message: `Delivery v${nextVersion} submitted: ${publishedUrl}`,
-          metadata: { publishedUrl, version: nextVersion, deliveryVersionId: version.id },
+          metadata: {
+            publishedUrl,
+            version: nextVersion,
+            deliveryVersionId: version.id,
+          },
         },
       })
 
@@ -141,7 +185,10 @@ export class OrderDeliveryService {
     return this.prisma.orderDeliveryVersion.findMany({
       where: { orderId },
       orderBy: { version: "desc" },
-      include: { evidence: { orderBy: { createdAt: "desc" }, take: 1 }, snapshots: true },
+      include: {
+        evidence: { orderBy: { createdAt: "desc" }, take: 1 },
+        snapshots: true,
+      },
     })
   }
 
@@ -168,7 +215,13 @@ export class OrderDeliveryService {
       verificationStatus: version.verificationStatus,
       interventionStatus: version.interventionStatus,
       submittedAt: version.submittedAt,
-      deliveredBy: (order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")) === "PLATFORM" ? "Platform" : "Publisher",
+      deliveredBy:
+        (order.fulfillmentChannel ??
+          (order.website?.ownershipType === "PLATFORM"
+            ? "PLATFORM"
+            : "PUBLISHER")) === "PLATFORM"
+          ? "Platform"
+          : "Publisher",
       verifiedAt: order.verifiedAt,
       pageTitle: ev?.pageTitle ?? null,
       results: ev
@@ -189,7 +242,12 @@ export class OrderDeliveryService {
   // FAILED or needs MANUAL_REVIEW. A VERIFIED delivery uses Confirm Delivery
   // instead; a still-running check must be waited out. Accepting completes the
   // order (DELIVERED) so settlement can proceed.
-  async customerAcceptDelivery(orderId: string, organizationId: string, userId: string, actorRole?: string | null) {
+  async customerAcceptDelivery(
+    orderId: string,
+    organizationId: string,
+    userId: string,
+    actorRole?: string | null,
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
       include: { website: { select: { publisherId: true } } },
@@ -204,42 +262,72 @@ export class OrderDeliveryService {
       actorRole,
       action: "accept delivery",
     })
-    if (!order.activeDeliveryVersionId) throw new BadRequestException("There is no delivery to accept yet")
+    if (!order.activeDeliveryVersionId)
+      throw new BadRequestException("There is no delivery to accept yet")
 
-    const v = await this.prisma.orderDeliveryVersion.findUnique({ where: { id: order.activeDeliveryVersionId } })
+    const v = await this.prisma.orderDeliveryVersion.findUnique({
+      where: { id: order.activeDeliveryVersionId },
+    })
     if (!v) throw new BadRequestException("Active delivery not found")
 
     // System-check priority: manual accept is the fallback path only.
     if (v.verificationStatus === "VERIFIED") {
-      throw new BadRequestException("This delivery passed automated verification — use Confirm Delivery.")
+      throw new BadRequestException(
+        "This delivery passed automated verification — use Confirm Delivery.",
+      )
     }
     if (!["FAILED", "MANUAL_REVIEW"].includes(v.verificationStatus)) {
-      throw new BadRequestException("Automated verification is still running — please wait for it to finish.")
+      throw new BadRequestException(
+        "Automated verification is still running — please wait for it to finish.",
+      )
     }
     if (order.status !== "PUBLISHED") {
-      throw new BadRequestException("Order is not awaiting delivery confirmation")
+      throw new BadRequestException(
+        "Order is not awaiting delivery confirmation",
+      )
     }
 
     return this.prisma.$transaction(async (tx: any) => {
       const upd = await tx.orderDeliveryVersion.updateMany({
         where: { id: v.id, verificationVersion: v.verificationVersion },
-        data: { interventionStatus: "APPROVED", verificationFailureReason: null, verificationVersion: v.verificationVersion + 1 },
+        data: {
+          interventionStatus: "APPROVED",
+          verificationFailureReason: null,
+          verificationVersion: v.verificationVersion + 1,
+        },
       })
-      if (upd.count === 0) throw new ConflictException("Delivery was modified by another request. Retry.")
+      if (upd.count === 0)
+        throw new ConflictException(
+          "Delivery was modified by another request. Retry.",
+        )
 
       const ordUpd = await tx.order.updateMany({
         where: { id: order.id, version: order.version, status: "PUBLISHED" },
-        data: { status: "DELIVERED", deliveredAt: new Date(), verifiedAt: new Date(), verifiedBy: userId, verifyMethod: "customer_manual", version: { increment: 1 } },
+        data: {
+          status: "DELIVERED",
+          deliveredAt: new Date(),
+          verifiedAt: new Date(),
+          verifiedBy: userId,
+          verifyMethod: "customer_manual",
+          version: { increment: 1 },
+        },
       })
-      if (ordUpd.count === 0) throw new ConflictException("Order was modified by another request. Retry.")
+      if (ordUpd.count === 0)
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
 
       await tx.orderEvent.create({
         data: {
           orderId,
           eventType: "DELIVERY_CONFIRMED",
           actorId: userId,
-          message: "Customer manually accepted the delivery after the automated check could not verify it",
-          metadata: { priorVerification: v.verificationStatus, deliveryVersionId: v.id },
+          message:
+            "Customer manually accepted the delivery after the automated check could not verify it",
+          metadata: {
+            priorVerification: v.verificationStatus,
+            deliveryVersionId: v.id,
+          },
         },
       })
       await this.audit.log(
@@ -265,12 +353,24 @@ export class OrderDeliveryService {
       // a worker retry of this customer-accept flow produces ONE notification
       // per publisher owner, not three.
       if (order.website?.publisherId) {
-        const owners = await tx.publisherMembership.findMany({ where: { publisherId: order.website.publisherId, role: "PUBLISHER_OWNER" }, select: { userId: true } })
+        const owners = await tx.publisherMembership.findMany({
+          where: {
+            publisherId: order.website.publisherId,
+            role: "PUBLISHER_OWNER",
+          },
+          select: { userId: true },
+        })
         for (const o of owners) {
           const dedupKey = notificationDedupKey.deliveryAccepted(v.id, o.userId)
           try {
             await tx.notification.create({
-              data: { userId: o.userId, organizationId, type: "ORDER_DELIVERY_CUSTOMER_ACCEPTED", message: `Customer manually accepted delivery for order ${orderId}.`, dedupKey },
+              data: {
+                userId: o.userId,
+                organizationId,
+                type: "ORDER_DELIVERY_CUSTOMER_ACCEPTED",
+                message: `Customer manually accepted delivery for order ${orderId}.`,
+                dedupKey,
+              },
             })
           } catch (err) {
             if (!isUniqueViolation(err)) {
@@ -287,7 +387,11 @@ export class OrderDeliveryService {
   async getDelivery(id: string) {
     const v = await this.prisma.orderDeliveryVersion.findUnique({
       where: { id },
-      include: { evidence: { orderBy: { createdAt: "desc" } }, snapshots: true, fraudFlags: true },
+      include: {
+        evidence: { orderBy: { createdAt: "desc" } },
+        snapshots: true,
+        fraudFlags: true,
+      },
     })
     if (!v) throw new NotFoundException("Delivery version not found")
     return v

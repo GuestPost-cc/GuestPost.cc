@@ -1,10 +1,18 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards } from "@nestjs/common"
-import { PublisherPayoutsService } from "./publisher-payouts.service"
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import type { PublisherPayoutsService } from "./publisher-payouts.service"
 
 @Controller("publisher-payouts")
 export class PublisherPayoutsController {
@@ -21,10 +29,22 @@ export class PublisherPayoutsController {
   @MemberRoles("PUBLISHER_OWNER")
   @Post("withdrawals")
   requestWithdrawal(
-    @Body() body: { amount: number; method: string; idempotencyKey?: string; payoutMethodId?: string },
+    @Body() body: {
+      amount: number
+      method: string
+      idempotencyKey?: string
+      payoutMethodId?: string
+    },
     @CurrentUser() user: any,
   ) {
-    return this.payouts.requestWithdrawal(user.publisherId, body.amount, body.method, user.id, body.idempotencyKey, body.payoutMethodId)
+    return this.payouts.requestWithdrawal(
+      user.publisherId,
+      body.amount,
+      body.method,
+      user.id,
+      body.idempotencyKey,
+      body.payoutMethodId,
+    )
   }
 
   @UseGuards(MemberRolesGuard)
@@ -38,7 +58,12 @@ export class PublisherPayoutsController {
   @MemberRoles("PUBLISHER_OWNER")
   @Post("payout-methods")
   createPayoutMethod(
-    @Body() body: { type: string; label: string; details: Record<string, unknown>; isDefault?: boolean },
+    @Body() body: {
+      type: string
+      label: string
+      details: Record<string, unknown>
+      isDefault?: boolean
+    },
     @CurrentUser() user: any,
   ) {
     return this.payouts.createPayoutMethod(user.publisherId, user.id, body)

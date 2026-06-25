@@ -1,9 +1,9 @@
-import { connection } from "../redis"
+import { prisma } from "@guestpost/database"
 import { QUEUES, recomputePublisherTrustCore } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
-import { prisma } from "@guestpost/database"
-import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { createObservableWorker } from "../lib/queue-observability"
+import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.publisher-trust")
@@ -18,18 +18,33 @@ export function createPublisherTrustWorker() {
     async (job) => {
       // Phase 7.8 #27 — repeatable cron jobs bypass freshness (none today
       // in this queue, but the helper future-proofs new repeatables).
-      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
+      if (
+        !verifyJobPayload(job.data, {
+          maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined,
+        })
+      ) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
-      const { publisherId, sourceEvent, reason } = job.data as { publisherId: string; sourceEvent: string; reason?: string }
-      const res = await recomputePublisherTrustCore(prisma, publisherId, { sourceEvent, reason })
+      const { publisherId, sourceEvent, reason } = job.data as {
+        publisherId: string
+        sourceEvent: string
+        reason?: string
+      }
+      const res = await recomputePublisherTrustCore(prisma, publisherId, {
+        sourceEvent,
+        reason,
+      })
       return res ?? { skipped: "publisher_not_found" }
     },
     { connection, concurrency: 4 },
   )
 
-  worker.on("completed", (job) => logger.info("job completed", { jobId: job.id }))
-  worker.on("failed", (job, err) => logger.error("job failed", { jobId: job?.id, err: err?.message }))
+  worker.on("completed", (job) =>
+    logger.info("job completed", { jobId: job.id }),
+  )
+  worker.on("failed", (job, err) =>
+    logger.error("job failed", { jobId: job?.id, err: err?.message }),
+  )
   return worker
 }

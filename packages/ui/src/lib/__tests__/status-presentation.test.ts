@@ -6,19 +6,19 @@
  * an entry fails `tsc`, not the spec. This file covers what types
  * can't: the runtime shape of each entry's values.
  */
-import { describe, it, expect } from "vitest"
+import { describe, expect, it } from "vitest"
 import {
-  ORDER_STATUS_PRESENTATION,
-  TICKET_STATUS_PRESENTATION,
-  DISPUTE_STATUS_PRESENTATION,
-  LISTING_STATUS_PRESENTATION,
   CAMPAIGN_STATUS_PRESENTATION,
-  getOrderStatusPresentation,
-  getTicketStatusPresentation,
+  DISPUTE_STATUS_PRESENTATION,
+  getCampaignStatusPresentation,
   getDisputeStatusPresentation,
   getListingStatusPresentation,
-  getCampaignStatusPresentation,
+  getOrderStatusPresentation,
+  getTicketStatusPresentation,
+  LISTING_STATUS_PRESENTATION,
+  ORDER_STATUS_PRESENTATION,
   type StatusVariant,
+  TICKET_STATUS_PRESENTATION,
 } from "../status-presentation"
 
 const VALID_VARIANTS: StatusVariant[] = [
@@ -44,7 +44,7 @@ describe("status-presentation runtime shape", () => {
   for (const [family, table] of Object.entries(ALL_TABLES)) {
     describe(`${family} family`, () => {
       it("every entry has a valid StatusVariant", () => {
-        for (const [status, p] of Object.entries(table)) {
+        for (const [_status, p] of Object.entries(table)) {
           expect(VALID_VARIANTS).toContain(p.variant)
         }
       })
@@ -57,7 +57,7 @@ describe("status-presentation runtime shape", () => {
         }
       })
       it("every entry has a 6-digit hex chartColor", () => {
-        for (const [status, p] of Object.entries(table)) {
+        for (const [_status, p] of Object.entries(table)) {
           expect(p.chartColor).toMatch(HEX_RE)
         }
       })

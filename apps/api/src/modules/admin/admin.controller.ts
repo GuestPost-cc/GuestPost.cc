@@ -1,31 +1,44 @@
-import { Controller, Get, Param, Patch, Post, Put, Delete, Body, Query, UseGuards, BadRequestException, Req, Res, Headers, Header } from "@nestjs/common"
-import { AdminService } from "./admin.service"
-import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
-import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
-import { Permissions } from "../../common/decorators/permissions.decorator"
-import { PermissionsGuard } from "../../common/guards/permissions.guard"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
-import { DecryptPayoutMethodDto } from "../publisher-payouts/dto/decrypt-payout-method.dto"
-import { SettlementsService } from "../settlements/settlements.service"
-import { PublisherPayoutsService } from "../publisher-payouts/publisher-payouts.service"
-import { PayoutExecutionService } from "../publisher-payouts/payout-execution.service"
-import { OrdersService } from "../orders/orders.service"
-import { OrderDisputeService } from "../orders/services/order-dispute.service"
-import { OrderOperationsService } from "../orders/services/order-operations.service"
-import { OrderReviewService } from "../orders/services/order-review.service"
-import { SettlementReasonDto } from "../settlements/dto/settlement-reason.dto"
-import { CreatePlatformWebsiteDto, UpdatePlatformWebsiteDto } from "./dto/create-platform-website.dto"
-import { ReconciliationService } from "./reconciliation.service"
-import { RevenueService } from "./finance/revenue.service"
-import { buildRevenueCsvFilename, streamRevenueCsv } from "./finance/csv-stream"
-import { GetRevenueQueryDto } from "./dto/get-revenue-query.dto"
-import type { Response } from "express"
-import { WebsiteVerificationService } from "./website-verification.service"
-import { MarketplaceService } from "../marketplace/marketplace.service"
-import { CreateListingDto, ListingServiceInput, UpdateListingServiceInput } from "../marketplace/dto/marketplace.dto"
-import { SupportService, type SupportActor } from "../support/support.service"
-import { AddTicketMessageDto } from "../support/dto/add-ticket-message.dto"
 import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Header,
+  Headers,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+  UseGuards,
+} from "@nestjs/common"
+import type { Response } from "express"
+import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { Permissions } from "../../common/decorators/permissions.decorator"
+import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
+import { PermissionsGuard } from "../../common/guards/permissions.guard"
+import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import type {
+  CreateListingDto,
+  ListingServiceInput,
+  UpdateListingServiceInput,
+} from "../marketplace/dto/marketplace.dto"
+import type { MarketplaceService } from "../marketplace/marketplace.service"
+import type { OrdersService } from "../orders/orders.service"
+import type { OrderDisputeService } from "../orders/services/order-dispute.service"
+import type { OrderOperationsService } from "../orders/services/order-operations.service"
+import type { OrderReviewService } from "../orders/services/order-review.service"
+import type { DecryptPayoutMethodDto } from "../publisher-payouts/dto/decrypt-payout-method.dto"
+import type { PayoutExecutionService } from "../publisher-payouts/payout-execution.service"
+import type { PublisherPayoutsService } from "../publisher-payouts/publisher-payouts.service"
+import type { SettlementReasonDto } from "../settlements/dto/settlement-reason.dto"
+import type { SettlementsService } from "../settlements/settlements.service"
+import type { AddTicketMessageDto } from "../support/dto/add-ticket-message.dto"
+import type { SupportActor, SupportService } from "../support/support.service"
+import type { AdminService } from "./admin.service"
+import type {
   BulkRetryVerificationDto,
   ExecuteWithdrawalDto,
   ManualVerifyDto,
@@ -44,6 +57,15 @@ import {
   UpdateSupportTicketStatusDto,
   UpdateUserRoleDto,
 } from "./dto/admin-action-bodies.dto"
+import type {
+  CreatePlatformWebsiteDto,
+  UpdatePlatformWebsiteDto,
+} from "./dto/create-platform-website.dto"
+import type { GetRevenueQueryDto } from "./dto/get-revenue-query.dto"
+import { buildRevenueCsvFilename, streamRevenueCsv } from "./finance/csv-stream"
+import type { RevenueService } from "./finance/revenue.service"
+import type { ReconciliationService } from "./reconciliation.service"
+import type { WebsiteVerificationService } from "./website-verification.service"
 
 // Build the staff actor from the authenticated user. The matrix lives in
 // SupportService — this just hands it the role context. customerRole +
@@ -59,7 +81,8 @@ function staffActor(user: any): SupportActor {
   }
 }
 
-const clamp = (v: number, min: number, max: number) => Math.min(Math.max(v, min), max)
+const clamp = (v: number, min: number, max: number) =>
+  Math.min(Math.max(v, min), max)
 const parsePagination = (take?: string, skip?: string) => ({
   take: clamp(take ? parseInt(take, 10) || 50 : 50, 1, 100),
   skip: Math.max(0, skip ? parseInt(skip, 10) || 0 : 0),
@@ -108,7 +131,7 @@ export class AdminController {
     private readonly admin: AdminService,
     private readonly settlements: SettlementsService,
     private readonly payouts: PublisherPayoutsService,
-    private readonly orders: OrdersService,
+    readonly _orders: OrdersService,
     private readonly dispute: OrderDisputeService,
     private readonly ops: OrderOperationsService,
     private readonly reconciliation: ReconciliationService,
@@ -143,12 +166,21 @@ export class AdminController {
     @Query("from") from?: string,
     @Query("to") to?: string,
   ) {
-    return this.websiteVerification.reviewCenter({ publisherId, domain, status, from, to })
+    return this.websiteVerification.reviewCenter({
+      publisherId,
+      domain,
+      status,
+      from,
+      to,
+    })
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Post("websites/verification/bulk-retry")
-  bulkRetryVerification(@Body() body: BulkRetryVerificationDto, @CurrentUser() user: any) {
+  bulkRetryVerification(
+    @Body() body: BulkRetryVerificationDto,
+    @CurrentUser() user: any,
+  ) {
     return this.websiteVerification.bulkRetry(body.websiteIds, user.id)
   }
 
@@ -178,14 +210,21 @@ export class AdminController {
         groupBy: query.groupBy,
       })
       if (query.format === "csv") {
-        const filename = buildRevenueCsvFilename({ from: query.from, to: query.to, groupBy: query.groupBy })
+        const filename = buildRevenueCsvFilename({
+          from: query.from,
+          to: query.to,
+          groupBy: query.groupBy,
+        })
         streamRevenueCsv(res, data, filename)
         return
       }
       res.json(data)
     } catch (err) {
       // Date-range validation lives in the service; surface as 400 not 500.
-      if (err instanceof Error && /Invalid date|must be on or after/.test(err.message)) {
+      if (
+        err instanceof Error &&
+        /Invalid date|must be on or after/.test(err.message)
+      ) {
         throw new BadRequestException(err.message)
       }
       throw err
@@ -211,14 +250,22 @@ export class AdminController {
 
   @Patch("users/:id/role")
   @StaffRoles("SUPER_ADMIN")
-  updateUserRole(@Param("id") id: string, @Body() body: UpdateUserRoleDto, @CurrentUser() user?: any) {
+  updateUserRole(
+    @Param("id") id: string,
+    @Body() body: UpdateUserRoleDto,
+    @CurrentUser() user?: any,
+  ) {
     const role = body.role
     return this.admin.updateUserRole(id, role, user)
   }
 
   @Patch("users/:id/staff-role")
   @StaffRoles("SUPER_ADMIN")
-  updateStaffRole(@Param("id") id: string, @Body() body: UpdateStaffRoleDto, @CurrentUser() user?: any) {
+  updateStaffRole(
+    @Param("id") id: string,
+    @Body() body: UpdateStaffRoleDto,
+    @CurrentUser() user?: any,
+  ) {
     const role = body.role
     return this.admin.updateStaffRole(id, role, user)
   }
@@ -247,22 +294,38 @@ export class AdminController {
 
   @Post("orders/:id/manual-verify")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  manualVerify(@Param("id") id: string, @Body() body: ManualVerifyDto, @CurrentUser() user: any) {
+  manualVerify(
+    @Param("id") id: string,
+    @Body() body: ManualVerifyDto,
+    @CurrentUser() user: any,
+  ) {
     const method = body.method
     return this.admin.manualVerify(id, method, user.id)
   }
 
   @Post("orders/:id/refund")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  refundOrder(@Param("id") id: string, @Body() body: ReasonRequiredDto, @CurrentUser() user: any) {
+  refundOrder(
+    @Param("id") id: string,
+    @Body() body: ReasonRequiredDto,
+    @CurrentUser() user: any,
+  ) {
     const reason = body.reason
     return this.admin.refundOrder(id, reason, user.id)
   }
 
   @Get("disputes")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
-  listDisputes(@Query("status") status?: string, @Query("page") page?: string, @Query("limit") limit?: string) {
-    return this.dispute.listDisputes({ status, page: page ? parseInt(page, 10) : 1, limit: limit ? parseInt(limit, 10) : 50 })
+  listDisputes(
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.dispute.listDisputes({
+      status,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 50,
+    })
   }
 
   @Post("disputes/:id/review")
@@ -278,12 +341,22 @@ export class AdminController {
     @Body() body: ResolveDisputeDto,
     @CurrentUser() user: any,
   ) {
-    return this.dispute.resolveDispute(id, user.id, user.role, body.resolution, body.action)
+    return this.dispute.resolveDispute(
+      id,
+      user.id,
+      user.role,
+      body.resolution,
+      body.action,
+    )
   }
 
   @Post("orders/:id/force-cancel")
   @StaffRoles("SUPER_ADMIN")
-  forceCancelOrder(@Param("id") id: string, @Body() body: ReasonRequiredDto, @CurrentUser() user: any) {
+  forceCancelOrder(
+    @Param("id") id: string,
+    @Body() body: ReasonRequiredDto,
+    @CurrentUser() user: any,
+  ) {
     const reason = body.reason
     return this.admin.forceCancelOrder(id, reason, user.id)
   }
@@ -309,7 +382,11 @@ export class AdminController {
 
   @Post("orders/:id/submit-content")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  submitPlatformContent(@Param("id") id: string, @Body() body: SubmitPlatformContentDto, @CurrentUser() user: any) {
+  submitPlatformContent(
+    @Param("id") id: string,
+    @Body() body: SubmitPlatformContentDto,
+    @CurrentUser() user: any,
+  ) {
     const content = body.content
     return this.ops.submitContent(id, user.id, content)
   }
@@ -328,17 +405,18 @@ export class AdminController {
 
   @Post("orders/:id/mark-published")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  markPlatformPublished(@Param("id") id: string, @Body() body: MarkPlatformPublishedDto, @CurrentUser() user: any) {
+  markPlatformPublished(
+    @Param("id") id: string,
+    @Body() body: MarkPlatformPublishedDto,
+    @CurrentUser() user: any,
+  ) {
     const url = body.url
     return this.ops.markPublished(id, user.id, url)
   }
 
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   @Get("settlements")
-  listSettlements(
-    @Query("take") take?: string,
-    @Query("skip") skip?: string,
-  ) {
+  listSettlements(@Query("take") take?: string, @Query("skip") skip?: string) {
     const { take: t, skip: s } = parsePagination(take, skip)
     return this.settlements.listSettlements(undefined, t, s)
   }
@@ -351,7 +429,10 @@ export class AdminController {
 
   @Post("settlements/orders/:orderId")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  createSettlement(@Param("orderId") orderId: string, @CurrentUser() user: any) {
+  createSettlement(
+    @Param("orderId") orderId: string,
+    @CurrentUser() user: any,
+  ) {
     // Staff have no organization context — service resolves org from the order
     return this.settlements.createSettlement(orderId, null, user.id)
   }
@@ -370,16 +451,17 @@ export class AdminController {
 
   @Post("settlements/:id/cancel")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  cancelSettlement(@Param("id") id: string, @Body() body: SettlementReasonDto, @CurrentUser() user: any) {
+  cancelSettlement(
+    @Param("id") id: string,
+    @Body() body: SettlementReasonDto,
+    @CurrentUser() user: any,
+  ) {
     return this.settlements.cancelSettlement(id, user.id, body.reason)
   }
 
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   @Get("withdrawals")
-  listWithdrawals(
-    @Query("take") take?: string,
-    @Query("skip") skip?: string,
-  ) {
+  listWithdrawals(@Query("take") take?: string, @Query("skip") skip?: string) {
     const { take: t, skip: s } = parsePagination(take, skip)
     return this.payouts.listWithdrawals(undefined, t, s)
   }
@@ -414,7 +496,9 @@ export class AdminController {
   ) {
     const reason = (body?.reason ?? "").trim()
     if (reason.length < 10) {
-      throw new BadRequestException("A reason of at least 10 characters is required to reverse a withdrawal")
+      throw new BadRequestException(
+        "A reason of at least 10 characters is required to reverse a withdrawal",
+      )
     }
     return this.payouts.reverseFailedWithdrawal(id, user.id, reason)
   }
@@ -426,7 +510,11 @@ export class AdminController {
     @Body() body: ExecuteWithdrawalDto,
     @CurrentUser() user: any,
   ) {
-    return this.payoutExecution.executeWithdrawal(id, body.providerName, user.id)
+    return this.payoutExecution.executeWithdrawal(
+      id,
+      body.providerName,
+      user.id,
+    )
   }
 
   @Get("withdrawals/:id/executions")
@@ -461,7 +549,13 @@ export class AdminController {
     @Headers("user-agent") userAgent?: string,
   ) {
     const ip = forwardedFor ?? "unknown"
-    return this.payouts.decryptPayoutMethod(id, user.id, body.reason, ip, userAgent ?? "unknown")
+    return this.payouts.decryptPayoutMethod(
+      id,
+      user.id,
+      body.reason,
+      ip,
+      userAgent ?? "unknown",
+    )
   }
 
   // ── Audit log browsing — staff-action forensics is SUPER_ADMIN-only ────
@@ -514,7 +608,11 @@ export class AdminController {
   // a money-risk lever, so it is finance-controlled, not operations.
   @Patch("publishers/:id/tier")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  updatePublisherTier(@Param("id") id: string, @Body() body: UpdatePublisherTierDto, @CurrentUser() user: any) {
+  updatePublisherTier(
+    @Param("id") id: string,
+    @Body() body: UpdatePublisherTierDto,
+    @CurrentUser() user: any,
+  ) {
     const tier = body.tier
     return this.admin.updatePublisherTier(id, tier, user)
   }
@@ -538,7 +636,8 @@ export class AdminController {
     @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
-    const normalizedChannel = channel === "PLATFORM" || channel === "PUBLISHER" ? channel : undefined
+    const normalizedChannel =
+      channel === "PLATFORM" || channel === "PUBLISHER" ? channel : undefined
     return this.support.listTicketsDetailed(staffActor(user), {
       status,
       search,
@@ -611,7 +710,10 @@ export class AdminController {
   // Service rejects publisher-owned websites so ownership can't be spoofed.
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Post("marketplace/listings")
-  createPlatformListing(@Body() body: CreateListingDto & { websiteId?: string }, @CurrentUser() user: any) {
+  createPlatformListing(
+    @Body() body: CreateListingDto & { websiteId?: string },
+    @CurrentUser() user: any,
+  ) {
     return this.marketplace.createPlatformListing(user.id, body)
   }
 
@@ -674,13 +776,21 @@ export class AdminController {
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Patch("marketplace/listings/:id/featured")
-  toggleListingFeatured(@Param("id") id: string, @Body() body: ToggleListingFeaturedDto, @CurrentUser() user: any) {
+  toggleListingFeatured(
+    @Param("id") id: string,
+    @Body() body: ToggleListingFeaturedDto,
+    @CurrentUser() user: any,
+  ) {
     return this.admin.toggleListingFeatured(id, body.featured, user)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Patch("marketplace/listings/:id/verified")
-  toggleListingVerified(@Param("id") id: string, @Body() body: ToggleListingVerifiedDto, @CurrentUser() user: any) {
+  toggleListingVerified(
+    @Param("id") id: string,
+    @Body() body: ToggleListingVerifiedDto,
+    @CurrentUser() user: any,
+  ) {
     return this.admin.toggleListingVerified(id, body.verified, user)
   }
 
@@ -694,13 +804,20 @@ export class AdminController {
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Post("websites")
-  createWebsite(@Body() body: CreatePlatformWebsiteDto, @CurrentUser() user: any) {
+  createWebsite(
+    @Body() body: CreatePlatformWebsiteDto,
+    @CurrentUser() user: any,
+  ) {
     return this.admin.createPlatformWebsite(body, user)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Put("websites/:id")
-  updateWebsite(@Param("id") id: string, @Body() body: UpdatePlatformWebsiteDto, @CurrentUser() user: any) {
+  updateWebsite(
+    @Param("id") id: string,
+    @Body() body: UpdatePlatformWebsiteDto,
+    @CurrentUser() user: any,
+  ) {
     return this.admin.updatePlatformWebsite(id, body, user)
   }
 
@@ -724,7 +841,10 @@ export class AdminController {
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   @Get("websites")
-  listWebsites(@Query("ownershipType") ownershipType?: string, @Query() pagination?: any) {
+  listWebsites(
+    @Query("ownershipType") ownershipType?: string,
+    @Query() pagination?: any,
+  ) {
     const p = parsePagination(pagination?.take, pagination?.skip)
     return this.admin.listWebsites(ownershipType, p.take, p.skip)
   }
@@ -737,7 +857,11 @@ export class AdminController {
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Patch("websites/:id/pause")
-  pauseWebsite(@Param("id") id: string, @Body() body: PauseWebsiteDto, @CurrentUser() user: any) {
+  pauseWebsite(
+    @Param("id") id: string,
+    @Body() body: PauseWebsiteDto,
+    @CurrentUser() user: any,
+  ) {
     const paused = body.paused
     return this.admin.pauseWebsite(id, paused, user)
   }

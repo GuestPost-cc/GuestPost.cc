@@ -1,14 +1,22 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button, downloadCsv } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
-import { Skeleton, ErrorState } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
 import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  downloadCsv,
+  ErrorState,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -16,23 +24,19 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
+import { useQuery } from "@tanstack/react-query"
+import { endOfMonth, format, startOfMonth, subDays } from "date-fns"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@guestpost/ui"
-import {
-  FileText,
-  Download,
   Calendar,
-  Search,
+  Download,
   ExternalLink,
   FileSpreadsheet,
+  FileText,
+  Search,
 } from "lucide-react"
-import { format, subDays, startOfMonth, endOfMonth } from "date-fns"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import { api } from "../../../lib/api"
 
 interface ReportOrder {
   id: string
@@ -120,7 +124,12 @@ export default function ReportsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
 
-  const { data: ordersData, isLoading, error, refetch } = useQuery<ReportOrder[]>({
+  const {
+    data: ordersData,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<ReportOrder[]>({
     queryKey: ["orders"],
     queryFn: () => api.orders.list() as Promise<ReportOrder[]>,
   })
@@ -139,39 +148,62 @@ export default function ReportsPage() {
     }
 
     if (statusFilter && statusFilter !== "all") {
-      orders = orders.filter((order: ReportOrder) => order.status === statusFilter)
+      orders = orders.filter(
+        (order: ReportOrder) => order.status === statusFilter,
+      )
     }
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      orders = orders.filter((order: ReportOrder) =>
-        order.id.toLowerCase().includes(query) ||
-        order.items?.[0]?.topic?.toLowerCase().includes(query) ||
-        order.items?.[0]?.website?.url?.toLowerCase().includes(query)
+      orders = orders.filter(
+        (order: ReportOrder) =>
+          order.id.toLowerCase().includes(query) ||
+          order.items?.[0]?.topic?.toLowerCase().includes(query) ||
+          order.items?.[0]?.website?.url?.toLowerCase().includes(query),
       )
     }
 
     return orders
   }, [ordersData, dateRange, statusFilter, searchQuery])
 
-  const publishedOrders = filteredOrders.filter((o: ReportOrder) => 
-    ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status)
+  const publishedOrders = filteredOrders.filter((o: ReportOrder) =>
+    ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status),
   )
 
   const stats = useMemo(() => {
     const orders = filteredOrders
     return {
       totalOrders: orders.length,
-      published: orders.filter((o: ReportOrder) => ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status)).length,
-      totalSpend: orders.reduce((sum: number, o: ReportOrder) => sum + (Number(o.amount || o.totalAmount || 0)), 0),
-      avgOrderValue: orders.length > 0 
-        ? orders.reduce((sum: number, o: ReportOrder) => sum + (Number(o.amount || o.totalAmount || 0)), 0) / orders.length 
-        : 0,
+      published: orders.filter((o: ReportOrder) =>
+        ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status),
+      ).length,
+      totalSpend: orders.reduce(
+        (sum: number, o: ReportOrder) =>
+          sum + Number(o.amount || o.totalAmount || 0),
+        0,
+      ),
+      avgOrderValue:
+        orders.length > 0
+          ? orders.reduce(
+              (sum: number, o: ReportOrder) =>
+                sum + Number(o.amount || o.totalAmount || 0),
+              0,
+            ) / orders.length
+          : 0,
     }
   }, [filteredOrders])
 
   const exportToCSV = () => {
-    const headers = ["Order ID", "Published URL", "Target URL", "Anchor Text", "Service", "Status", "Publish Date", "Price"]
+    const headers = [
+      "Order ID",
+      "Published URL",
+      "Target URL",
+      "Anchor Text",
+      "Service",
+      "Status",
+      "Publish Date",
+      "Price",
+    ]
     const rows = publishedOrders.map((order: ReportOrder) => {
       const item = order.items?.[0]
       const publishedUrl = getFirstPublishedUrl(order)
@@ -184,24 +216,32 @@ export default function ReportsPage() {
         item?.serviceType?.replace(/_/g, " ") || "",
         order.status,
         publishedDate ? format(new Date(publishedDate), "yyyy-MM-dd") : "",
-        (Number(order.amount || order.totalAmount || 0)).toFixed(2),
+        Number(order.amount || order.totalAmount || 0).toFixed(2),
       ]
     })
 
     // downloadCsv neutralizes formula injection — anchor text and target
     // URLs are user-supplied and must never round-trip as spreadsheet formulas
-    downloadCsv(`guestpost-report-${format(new Date(), "yyyy-MM-dd")}.csv`, headers, rows)
+    downloadCsv(
+      `guestpost-report-${format(new Date(), "yyyy-MM-dd")}.csv`,
+      headers,
+      rows,
+    )
     toast.success("Report exported to CSV")
   }
 
   const exportToPDF = () => {
     const win = window.open("", "_blank")
-    if (!win) { toast.error("Pop-up blocked"); return }
-    const rows = publishedOrders.map((order: ReportOrder) => {
-      const item = order.items?.[0]
-      const publishedUrl = getFirstPublishedUrl(order)
-      const publishedDate = getFirstPublishedDate(order)
-      return `<tr>
+    if (!win) {
+      toast.error("Pop-up blocked")
+      return
+    }
+    const rows = publishedOrders
+      .map((order: ReportOrder) => {
+        const item = order.items?.[0]
+        const publishedUrl = getFirstPublishedUrl(order)
+        const publishedDate = getFirstPublishedDate(order)
+        return `<tr>
         <td>${publishedUrl || "—"}</td>
         <td>${item?.targetUrl || item?.topic || "—"}</td>
         <td>${item?.anchorText || "—"}</td>
@@ -209,14 +249,26 @@ export default function ReportsPage() {
         <td>${publishedDate ? format(new Date(publishedDate), "PP") : "—"}</td>
         <td style="text-align:right">$${(Number(order.amount || order.totalAmount || 0)).toFixed(2)}</td>
       </tr>`
-    }).join("")
-    win.document.write(`<!DOCTYPE html><html><head><title>GuestPost Report</title><style>body{font-family:system-ui,sans-serif;padding:2rem}h1{font-size:1.5rem;margin-bottom:0.5rem}p{margin-bottom:2rem;color:#666}table{width:100%;border-collapse:collapse}th{background:#f5f5f5;text-align:left;padding:8px;font-size:0.875rem;border:1px solid #ddd}td{padding:8px;border:1px solid #ddd;font-size:0.875rem}@media print{body{padding:0.5in}}</style></head><body><h1>GuestPost Order Report</h1><p>Generated ${format(new Date(), "PPpp")} — ${publishedOrders.length} orders</p><table><thead><tr><th>Published URL</th><th>Target URL</th><th>Anchor Text</th><th>Status</th><th>Publish Date</th><th style="text-align:right">Price</th></tr></thead><tbody>${rows}</tbody></table><script>window.print()</script></body></html>`)
+      })
+      .join("")
+    win.document.write(
+      `<!DOCTYPE html><html><head><title>GuestPost Report</title><style>body{font-family:system-ui,sans-serif;padding:2rem}h1{font-size:1.5rem;margin-bottom:0.5rem}p{margin-bottom:2rem;color:#666}table{width:100%;border-collapse:collapse}th{background:#f5f5f5;text-align:left;padding:8px;font-size:0.875rem;border:1px solid #ddd}td{padding:8px;border:1px solid #ddd;font-size:0.875rem}@media print{body{padding:0.5in}}</style></head><body><h1>GuestPost Order Report</h1><p>Generated ${format(new Date(), "PPpp")} — ${publishedOrders.length} orders</p><table><thead><tr><th>Published URL</th><th>Target URL</th><th>Anchor Text</th><th>Status</th><th>Publish Date</th><th style="text-align:right">Price</th></tr></thead><tbody>${rows}</tbody></table><script>window.print()</script></body></html>`,
+    )
     win.document.close()
     toast.success("Report opened for PDF export")
   }
 
   const exportToXLSX = () => {
-    const headers = ["Order ID", "Published URL", "Target URL", "Anchor Text", "Service", "Status", "Publish Date", "Price"]
+    const headers = [
+      "Order ID",
+      "Published URL",
+      "Target URL",
+      "Anchor Text",
+      "Service",
+      "Status",
+      "Publish Date",
+      "Price",
+    ]
     const rows = publishedOrders.map((order: ReportOrder) => {
       const item = order.items?.[0]
       const publishedUrl = getFirstPublishedUrl(order)
@@ -229,7 +281,7 @@ export default function ReportsPage() {
         item?.serviceType?.replace(/_/g, " ") || "",
         order.status,
         publishedDate ? format(new Date(publishedDate), "yyyy-MM-dd") : "",
-        (Number(order.amount || order.totalAmount || 0)).toFixed(2),
+        Number(order.amount || order.totalAmount || 0).toFixed(2),
       ]
     })
     const xls = [
@@ -237,15 +289,18 @@ export default function ReportsPage() {
       '<?mso-application progid="Excel.Sheet"?>',
       '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">',
       '<Worksheet ss:Name="Report">',
-      '<Table>',
-      ...headers.map(h => `<Column ss:AutoFitWidth="1"/>`),
-      '<Row>',
-      ...headers.map(h => `<Cell><Data ss:Type="String">${h}</Data></Cell>`),
-      '</Row>',
-      ...rows.map(row => `<Row>${row.map(cell => `<Cell><Data ss:Type="String">${String(cell).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</Data></Cell>`).join("")}</Row>`),
-      '</Table>',
-      '</Worksheet>',
-      '</Workbook>',
+      "<Table>",
+      ...headers.map((_h) => `<Column ss:AutoFitWidth="1"/>`),
+      "<Row>",
+      ...headers.map((h) => `<Cell><Data ss:Type="String">${h}</Data></Cell>`),
+      "</Row>",
+      ...rows.map(
+        (row) =>
+          `<Row>${row.map((cell) => `<Cell><Data ss:Type="String">${String(cell).replace(/&/g, "&amp;").replace(/</g, "&lt;")}</Data></Cell>`).join("")}</Row>`,
+      ),
+      "</Table>",
+      "</Worksheet>",
+      "</Workbook>",
     ].join("\n")
     const blob = new Blob([xls], { type: "application/vnd.ms-excel" })
     const url = URL.createObjectURL(blob)
@@ -266,7 +321,14 @@ export default function ReportsPage() {
     }
   }
 
-  if (error) return <ErrorState title="Failed to load reports" description={(error as Error).message} onRetry={() => refetch()} />
+  if (error)
+    return (
+      <ErrorState
+        title="Failed to load reports"
+        description={(error as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
 
   if (isLoading) {
     return (
@@ -274,7 +336,9 @@ export default function ReportsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-            <p className="text-muted-foreground">View and export your order reports</p>
+            <p className="text-muted-foreground">
+              View and export your order reports
+            </p>
           </div>
         </div>
         <Card>
@@ -294,7 +358,9 @@ export default function ReportsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-          <p className="text-muted-foreground">View and export your order reports</p>
+          <p className="text-muted-foreground">
+            View and export your order reports
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={exportToCSV}>
@@ -315,7 +381,9 @@ export default function ReportsPage() {
       <div className="grid gap-6 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Orders
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalOrders}</div>
@@ -324,7 +392,9 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Published</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Published
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.published}</div>
@@ -333,19 +403,27 @@ export default function ReportsPage() {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Spend</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Spend
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">${stats.totalSpend.toFixed(2)}</div>
+            <div className="text-2xl font-bold font-mono">
+              ${stats.totalSpend.toFixed(2)}
+            </div>
             <p className="text-xs text-muted-foreground">in selected period</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Avg Order Value</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Avg Order Value
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">${stats.avgOrderValue.toFixed(2)}</div>
+            <div className="text-2xl font-bold font-mono">
+              ${stats.avgOrderValue.toFixed(2)}
+            </div>
             <p className="text-xs text-muted-foreground">per order</p>
           </CardContent>
         </Card>
@@ -456,13 +534,21 @@ export default function ReportsPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm">{item?.anchorText || "—"}</span>
+                          <span className="text-sm">
+                            {item?.anchorText || "—"}
+                          </span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm">{item?.website?.url ? new URL(item.website.url).hostname : "—"}</span>
+                          <span className="text-sm">
+                            {item?.website?.url
+                              ? new URL(item.website.url).hostname
+                              : "—"}
+                          </span>
                         </TableCell>
                         <TableCell>
-                          {publishedDate ? format(new Date(publishedDate), "PP") : format(new Date(order.createdAt), "PP")}
+                          {publishedDate
+                            ? format(new Date(publishedDate), "PP")
+                            : format(new Date(order.createdAt), "PP")}
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="capitalize">
@@ -470,10 +556,17 @@ export default function ReportsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          ${(Number(order.amount || order.totalAmount || 0)).toFixed(2)}
+                          $
+                          {Number(
+                            order.amount || order.totalAmount || 0,
+                          ).toFixed(2)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="sm" onClick={() => exportReport(order.id)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => exportReport(order.id)}
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
                         </TableCell>

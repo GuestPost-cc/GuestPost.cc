@@ -12,7 +12,10 @@ export interface SettlementEligibility {
 // states do not block.
 const ACTIVE_REVISION_STATUSES = ["REQUESTED", "IN_PROGRESS"]
 
-export async function evaluateSettlementEligibility(prisma: any, orderId: string): Promise<SettlementEligibility> {
+export async function evaluateSettlementEligibility(
+  prisma: any,
+  orderId: string,
+): Promise<SettlementEligibility> {
   const reasons: string[] = []
 
   const order = await prisma.order.findUnique({ where: { id: orderId } })
@@ -27,21 +30,28 @@ export async function evaluateSettlementEligibility(prisma: any, orderId: string
   if (!order.activeDeliveryVersionId) {
     reasons.push("No active delivery version")
   } else {
-    const active = await prisma.orderDeliveryVersion.findUnique({ where: { id: order.activeDeliveryVersionId } })
+    const active = await prisma.orderDeliveryVersion.findUnique({
+      where: { id: order.activeDeliveryVersionId },
+    })
     if (!active) {
       reasons.push("Active delivery version missing")
     } else {
       const verified = active.verificationStatus === "VERIFIED"
       const manuallyApproved =
-        active.interventionStatus === "APPROVED" || active.interventionStatus === "OVERRIDDEN"
+        active.interventionStatus === "APPROVED" ||
+        active.interventionStatus === "OVERRIDDEN"
       if (!verified && !manuallyApproved) {
-        reasons.push(`Active delivery is ${active.verificationStatus} and not manually approved`)
+        reasons.push(
+          `Active delivery is ${active.verificationStatus} and not manually approved`,
+        )
       }
     }
   }
 
   // No open dispute
-  const dispute = await prisma.orderDispute.findUnique({ where: { orderId } }).catch(() => null)
+  const dispute = await prisma.orderDispute
+    .findUnique({ where: { orderId } })
+    .catch(() => null)
   if (dispute && dispute.status === "OPEN") {
     reasons.push("Order has an open dispute")
   }
@@ -72,7 +82,10 @@ export function checkSeparationOfDuties(params: {
   releasedByUserId: string
 }): string | null {
   if (params.ownershipType !== "PLATFORM") return null
-  if (params.fulfilledByUserId && params.fulfilledByUserId === params.releasedByUserId) {
+  if (
+    params.fulfilledByUserId &&
+    params.fulfilledByUserId === params.releasedByUserId
+  ) {
     return "Separation of duties: the user who fulfilled this platform order cannot release its settlement"
   }
   return null

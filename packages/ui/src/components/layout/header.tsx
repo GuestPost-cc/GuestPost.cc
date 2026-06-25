@@ -1,10 +1,9 @@
 "use client"
 
-import * as React from "react"
+import { Bell, LogOut, Search, Settings, User } from "lucide-react"
 import { cn } from "../../lib/utils"
-import { Button } from "../button"
-import { Input } from "../input"
 import { Avatar, AvatarFallback, AvatarImage } from "../avatar"
+import { Button } from "../button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../dropdown-menu"
-import { Bell, Search, LogOut, User, Settings } from "lucide-react"
+import { Input } from "../input"
 
 interface HeaderProps {
   className?: string
@@ -30,7 +29,7 @@ function Header({ className, user, onSignOut }: HeaderProps) {
     <header
       className={cn(
         "flex h-16 items-center justify-between border-b bg-card px-6",
-        className
+        className,
       )}
     >
       <div className="flex flex-1 items-center">
@@ -55,9 +54,7 @@ function Header({ className, user, onSignOut }: HeaderProps) {
             <Button variant="ghost" className="relative h-9 w-9 rounded-full">
               <Avatar className="h-9 w-9">
                 <AvatarImage src={user?.avatar} alt={user?.name || "User"} />
-                <AvatarFallback>
-                  {user?.name?.charAt(0) || "U"}
-                </AvatarFallback>
+                <AvatarFallback>{user?.name?.charAt(0) || "U"}</AvatarFallback>
               </Avatar>
             </Button>
           </DropdownMenuTrigger>
@@ -65,7 +62,9 @@ function Header({ className, user, onSignOut }: HeaderProps) {
             <DropdownMenuLabel>
               <div className="flex flex-col space-y-1">
                 <p className="text-sm font-medium">{user?.name || "User"}</p>
-                <p className="text-xs text-muted-foreground">{user?.email || "user@example.com"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {user?.email || "user@example.com"}
+                </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />

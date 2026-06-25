@@ -17,13 +17,14 @@
 // the reintroduction PR — not an accidental side effect of "the test was
 // failing so I removed it."
 
+import { execSync } from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { execSync } from "node:child_process"
 import { QUEUE_JOBS, QUEUES } from "@guestpost/shared"
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..", "..")
-const SELF_FILENAME = "apps/api/src/__tests__/phase-8-7-payout-execute-dead-code.spec.ts"
+const SELF_FILENAME =
+  "apps/api/src/__tests__/phase-8-7-payout-execute-dead-code.spec.ts"
 
 function readRepoFile(relPath: string): string {
   return fs.readFileSync(path.join(repoRoot, relPath), "utf8")
@@ -50,7 +51,9 @@ describe("Phase 8.7 — payout-execute dead-code regression guard (audit #38)", 
 
   it("no production code uses the literal 'payout-execute' (only this spec self-references)", () => {
     const hits = gitGrep('"payout-execute"', ["apps/", "packages/", "scripts/"])
-    const offenders = hits.filter((line) => !line.startsWith(`${SELF_FILENAME}:`))
+    const offenders = hits.filter(
+      (line) => !line.startsWith(`${SELF_FILENAME}:`),
+    )
     if (offenders.length > 0) {
       throw new Error(
         `Phase 8.7 regression — found '"payout-execute"' outside this spec:\n${offenders.join("\n")}\n` +
@@ -66,7 +69,7 @@ describe("Phase 8.7 — payout-execute dead-code regression guard (audit #38)", 
     expect(src).not.toMatch(/\bhandleExecute\s*\(/)
   })
 
-  it("packages/shared/src/queues.ts no longer defines EXECUTE: \"payout-execute\"", () => {
+  it('packages/shared/src/queues.ts no longer defines EXECUTE: "payout-execute"', () => {
     const src = readRepoFile("packages/shared/src/queues.ts")
     expect(src).not.toMatch(/EXECUTE:\s*"payout-execute"/)
   })

@@ -1,5 +1,13 @@
-import { IsString, IsUrl, IsOptional, IsNumber, Min, Max, MinLength, MaxLength } from "class-validator"
 import { Type } from "class-transformer"
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Max,
+  MaxLength,
+  Min,
+} from "class-validator"
 
 export class CreateWebsiteDto {
   @IsString()

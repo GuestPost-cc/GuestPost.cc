@@ -25,8 +25,12 @@ describe("Phase 7.7 B — structured logger JSON mode", () => {
   beforeEach(() => {
     process.env.NODE_ENV = "production"
     process.env.LOG_FORMAT = "json"
-    writeStdout = jest.spyOn(process.stdout, "write").mockImplementation(() => true)
-    writeStderr = jest.spyOn(process.stderr, "write").mockImplementation(() => true)
+    writeStdout = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true)
+    writeStderr = jest
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true)
   })
 
   afterEach(() => {
@@ -82,7 +86,9 @@ describe("Phase 7.7 B — structured logger JSON mode", () => {
     const line = (writeStdout.mock.calls[0][0] as string).trim()
     const record = JSON.parse(line)
 
-    expect(record).toEqual(expect.objectContaining({ runs_total: 42, scanned: 17 }))
+    expect(record).toEqual(
+      expect.objectContaining({ runs_total: 42, scanned: 17 }),
+    )
   })
 
   it("child() merges baseCtx into every emit", async () => {
@@ -204,7 +210,9 @@ describe("Phase 7.7 B — pretty mode (NODE_ENV !== production && LOG_FORMAT !==
   beforeEach(() => {
     delete process.env.LOG_FORMAT
     delete process.env.NODE_ENV // pretty: !production
-    writeStdout = jest.spyOn(process.stdout, "write").mockImplementation(() => true)
+    writeStdout = jest
+      .spyOn(process.stdout, "write")
+      .mockImplementation(() => true)
   })
 
   afterEach(() => {

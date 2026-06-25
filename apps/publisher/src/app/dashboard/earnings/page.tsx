@@ -1,46 +1,47 @@
 "use client"
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { useQuery, useMutation } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
-import { toast } from "sonner"
 import {
-  DollarSign,
-  Clock,
-  CheckCircle,
-  Wallet,
-  TrendingUp,
-  ArrowUpRight,
-  RefreshCw,
-  Download,
-  Filter,
-} from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
-import { Button, downloadCsv } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@guestpost/ui"
-import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
-  DialogDescription,
+  downloadCsv,
+  ErrorState,
+  Input,
+  Label,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import {
+  CheckCircle,
+  Clock,
+  DollarSign,
+  Download,
+  RefreshCw,
+  TrendingUp,
+  Wallet,
+} from "lucide-react"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 type TabValue = "pending" | "approved" | "withdrawable" | "paid"
 
@@ -96,13 +97,22 @@ export default function EarningsPage() {
     resolver: zodResolver(withdrawSchema),
   })
 
-  const { data: balance, isLoading, refetch, error } = useQuery({
+  const {
+    data: balance,
+    isLoading,
+    refetch,
+    error,
+  } = useQuery({
     queryKey: ["publisher-balance", user?.publisherId],
     queryFn: () => api.publisherPayouts.getBalance(),
     enabled: !!user?.publisherId,
   })
 
-  const { data: transactions = [], isLoading: txnLoading, error: txnError } = useQuery({
+  const {
+    data: transactions = [],
+    isLoading: txnLoading,
+    error: txnError,
+  } = useQuery({
     queryKey: ["publisher-transactions"],
     queryFn: async () => {
       const withdrawals = await api.publisherPayouts.listWithdrawals()
@@ -237,7 +247,11 @@ export default function EarningsPage() {
         <CardHeader className="pb-0">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Transaction History</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => handleExport(transactions)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleExport(transactions)}
+            >
               <Download className="mr-2 h-4 w-4" />
               Export
             </Button>
@@ -306,8 +320,8 @@ export default function EarningsPage() {
                           txn.status === "PAID"
                             ? "success"
                             : txn.status === "APPROVED"
-                            ? "info"
-                            : "warning"
+                              ? "info"
+                              : "warning"
                         }
                       >
                         {txn.status}
@@ -316,10 +330,13 @@ export default function EarningsPage() {
                     <TableCell className="text-right font-medium">
                       <span
                         className={
-                          txn.type === "PAYOUT" ? "text-destructive" : "text-emerald-600"
+                          txn.type === "PAYOUT"
+                            ? "text-destructive"
+                            : "text-emerald-600"
                         }
                       >
-                        {txn.type === "PAYOUT" ? "-" : "+"}${txn.amount.toFixed(2)}
+                        {txn.type === "PAYOUT" ? "-" : "+"}$
+                        {txn.amount.toFixed(2)}
                       </span>
                     </TableCell>
                   </TableRow>
@@ -335,7 +352,8 @@ export default function EarningsPage() {
           <DialogHeader>
             <DialogTitle>Request Withdrawal</DialogTitle>
             <DialogDescription>
-              Enter the amount you want to withdraw. Your withdrawable balance is{" "}
+              Enter the amount you want to withdraw. Your withdrawable balance
+              is{" "}
               <span className="font-medium text-foreground">
                 ${withdrawableAmount.toFixed(2)}
               </span>
@@ -353,7 +371,11 @@ export default function EarningsPage() {
                 placeholder="0.00"
                 {...register("amount")}
               />
-              {errors.amount && <p className="text-sm text-destructive">{errors.amount.message}</p>}
+              {errors.amount && (
+                <p className="text-sm text-destructive">
+                  {errors.amount.message}
+                </p>
+              )}
             </div>
             <div className="flex gap-2">
               {[50, 100, 250, 500].map((amount) => (
@@ -389,7 +411,9 @@ export default function EarningsPage() {
               onClick={handleFormSubmit(handleWithdraw)}
               disabled={withdrawMutation.isPending}
             >
-              {withdrawMutation.isPending ? "Processing..." : "Request Withdrawal"}
+              {withdrawMutation.isPending
+                ? "Processing..."
+                : "Request Withdrawal"}
             </Button>
           </DialogFooter>
         </DialogContent>

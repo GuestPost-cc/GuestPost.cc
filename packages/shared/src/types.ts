@@ -7,9 +7,19 @@ export type PublisherRole = "PUBLISHER_OWNER" | "PUBLISHER_MEMBER"
 export type StaffRole = "SUPER_ADMIN" | "OPERATIONS" | "FINANCE"
 
 // Deprecated: kept for migration compatibility
-export type UserRole = "OWNER" | "MANAGER" | "SEO_SPECIALIST" | "CLIENT_VIEWER" | "PUBLISHER" | "ADMIN"
+export type UserRole =
+  | "OWNER"
+  | "MANAGER"
+  | "SEO_SPECIALIST"
+  | "CLIENT_VIEWER"
+  | "PUBLISHER"
+  | "ADMIN"
 // Deprecated: kept for migration compatibility
-export type MemberRole = "OWNER" | "MANAGER" | "SEO_SPECIALIST" | "CLIENT_VIEWER"
+export type MemberRole =
+  | "OWNER"
+  | "MANAGER"
+  | "SEO_SPECIALIST"
+  | "CLIENT_VIEWER"
 
 export type OrderStatus =
   | "DRAFT"
@@ -43,11 +53,26 @@ export type ServiceType =
 
 export type PaymentStatus = "PENDING" | "PAID" | "REFUNDED" | "FAILED"
 
-export type TicketStatus = "OPEN" | "IN_PROGRESS" | "WAITING_ON_CUSTOMER" | "RESOLVED" | "CLOSED"
+export type TicketStatus =
+  | "OPEN"
+  | "IN_PROGRESS"
+  | "WAITING_ON_CUSTOMER"
+  | "RESOLVED"
+  | "CLOSED"
 
 export type CampaignStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED"
-export type ContentOrderStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED"
-export type RevisionStatus = "REQUESTED" | "PENDING" | "APPROVED" | "REJECTED" | "CHANGES_REQUESTED" | "DRAFT"
+export type ContentOrderStatus =
+  | "PENDING"
+  | "IN_PROGRESS"
+  | "COMPLETED"
+  | "CANCELLED"
+export type RevisionStatus =
+  | "REQUESTED"
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "CHANGES_REQUESTED"
+  | "DRAFT"
 export type WebsiteOwnershipType = "PUBLISHER" | "PLATFORM"
 
 export type OrderEventType =
@@ -75,11 +100,27 @@ export type OrderEventType =
   | "SETTLED"
   | "REFUNDED"
 
-export type SettlementStatus = "PENDING" | "UNDER_REVIEW" | "CUSTOMER_APPROVED" | "ADMIN_APPROVED" | "RELEASED" | "CANCELLED"
+export type SettlementStatus =
+  | "PENDING"
+  | "UNDER_REVIEW"
+  | "CUSTOMER_APPROVED"
+  | "ADMIN_APPROVED"
+  | "RELEASED"
+  | "CANCELLED"
 
-export type DisputeStatus = "OPEN" | "UNDER_REVIEW" | "RESOLVED_REFUNDED" | "RESOLVED_REJECTED" | "RESOLVED_RESTORED"
+export type DisputeStatus =
+  | "OPEN"
+  | "UNDER_REVIEW"
+  | "RESOLVED_REFUNDED"
+  | "RESOLVED_REJECTED"
+  | "RESOLVED_RESTORED"
 
-export type WithdrawalStatus = "PENDING" | "APPROVED" | "PROCESSING" | "COMPLETED" | "REJECTED"
+export type WithdrawalStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "REJECTED"
 
 export type PublisherTier = "NEW" | "TRUSTED" | "VERIFIED"
 

@@ -1,10 +1,10 @@
-import { Controller, Get, Post, Param, Query, UseGuards } from "@nestjs/common"
-import { ReportingService } from "./reporting.service"
+import { Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common"
+import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
-import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import type { ReportingService } from "./reporting.service"
 
 @Controller("reports")
 @UseGuards(ActorTypeGuard, MemberRolesGuard)
@@ -25,7 +25,11 @@ export class ReportingController {
 
   @Post("orders/:id/generate")
   generateOrderReport(@Param("id") orderId: string, @CurrentUser() user: any) {
-    return this.reporting.generateOrderReport(orderId, user.organizationId, "pdf")
+    return this.reporting.generateOrderReport(
+      orderId,
+      user.organizationId,
+      "pdf",
+    )
   }
 
   @Get()

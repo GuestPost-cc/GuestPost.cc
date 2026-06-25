@@ -1,16 +1,16 @@
+import { prisma } from "@guestpost/database"
 import {
-  QUEUES,
   getDedupHitsTotal,
   incrementDedupHits,
   isUniqueViolation,
   notificationDedupKey,
+  QUEUES,
   runReconciliation,
 } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
-import { prisma } from "@guestpost/database"
-import { connection } from "../redis"
-import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { createObservableWorker } from "../lib/queue-observability"
+import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.reconciliation")
@@ -51,7 +51,9 @@ async function handleReconciliationRun() {
     problems.publisherDrift && `${problems.publisherDrift} publisher drift`,
     problems.stuckOrders && `${problems.stuckOrders} stuck orders`,
     problems.stuckPayouts && `${problems.stuckPayouts} stuck/duplicate payouts`,
-  ].filter(Boolean).join(", ")
+  ]
+    .filter(Boolean)
+    .join(", ")
 
   // Phase 7.4 (audit #12) — drift-keyed notification dedup.
   // Same drift COMPOSITION across hourly cron runs → same key per staff per
@@ -70,7 +72,9 @@ async function handleReconciliationRun() {
   ].join(",")
   const dateBucket = notificationDedupKey.utcDateBucket()
 
-  const staff = await prisma.staffMembership.findMany({ select: { userId: true } })
+  const staff = await prisma.staffMembership.findMany({
+    select: { userId: true },
+  })
   for (const s of staff) {
     const dedupKey = notificationDedupKey.reconDrift({
       driftType: "summary",
@@ -91,10 +95,17 @@ async function handleReconciliationRun() {
     } catch (err) {
       if (isUniqueViolation(err)) {
         const total = incrementDedupHits()
-        logger.info("notification deduped (P2002)", { dedupKey, userId: s.userId, dedup_hits_total: total })
+        logger.info("notification deduped (P2002)", {
+          dedupKey,
+          userId: s.userId,
+          dedup_hits_total: total,
+        })
         continue
       }
-      logger.error("failed to notify staff", { userId: s.userId, err: err instanceof Error ? err.message : String(err) })
+      logger.error("failed to notify staff", {
+        userId: s.userId,
+        err: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
@@ -106,7 +117,11 @@ export function createReconciliationWorker() {
     QUEUES.RECONCILIATION,
     async (job) => {
       // Phase 7.8 #27 — reconciliation-run (repeatable) bypasses freshness.
-      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
+      if (
+        !verifyJobPayload(job.data, {
+          maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined,
+        })
+      ) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
@@ -120,7 +135,11 @@ export function createReconciliationWorker() {
     { connection, concurrency: 1 },
   )
 
-  worker.on("completed", (job) => logger.info("job completed", { jobId: job.id }))
-  worker.on("failed", (job, err) => logger.error("job failed", { jobId: job?.id, err: err?.message }))
+  worker.on("completed", (job) =>
+    logger.info("job completed", { jobId: job.id }),
+  )
+  worker.on("failed", (job, err) =>
+    logger.error("job failed", { jobId: job?.id, err: err?.message }),
+  )
   return worker
 }

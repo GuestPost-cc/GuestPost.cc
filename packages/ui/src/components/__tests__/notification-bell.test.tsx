@@ -1,14 +1,31 @@
-import { describe, it, expect, vi } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { NotificationBell, type NotificationBellItem } from "../notification-bell"
+import { describe, expect, it, vi } from "vitest"
+import {
+  NotificationBell,
+  type NotificationBellItem,
+} from "../notification-bell"
 
 const items: NotificationBellItem[] = [
-  { id: "n1", type: "SETTLEMENT_RELEASED", message: "Settlement of 200 released", read: false, createdAt: new Date().toISOString() },
-  { id: "n2", type: "WITHDRAWAL_APPROVED", message: "Withdrawal approved", read: true, createdAt: new Date(Date.now() - 3600_000).toISOString() },
+  {
+    id: "n1",
+    type: "SETTLEMENT_RELEASED",
+    message: "Settlement of 200 released",
+    read: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: "n2",
+    type: "WITHDRAWAL_APPROVED",
+    message: "Withdrawal approved",
+    read: true,
+    createdAt: new Date(Date.now() - 3600_000).toISOString(),
+  },
 ]
 
-function renderBell(overrides: Partial<Parameters<typeof NotificationBell>[0]> = {}) {
+function renderBell(
+  overrides: Partial<Parameters<typeof NotificationBell>[0]> = {},
+) {
   const onMarkRead = vi.fn()
   const onMarkAllRead = vi.fn()
   render(
@@ -26,7 +43,9 @@ function renderBell(overrides: Partial<Parameters<typeof NotificationBell>[0]> =
 describe("NotificationBell", () => {
   it("shows the unread badge and an accessible label", () => {
     renderBell()
-    expect(screen.getByRole("button", { name: /notifications \(3 unread\)/i })).toBeInTheDocument()
+    expect(
+      screen.getByRole("button", { name: /notifications \(3 unread\)/i }),
+    ).toBeInTheDocument()
     expect(screen.getByText("3")).toBeInTheDocument()
   })
 
@@ -55,7 +74,9 @@ describe("NotificationBell", () => {
     const user = userEvent.setup()
     const { onMarkAllRead } = renderBell()
     await user.click(screen.getByRole("button", { name: /notifications/i }))
-    await user.click(await screen.findByRole("button", { name: /mark all read/i }))
+    await user.click(
+      await screen.findByRole("button", { name: /mark all read/i }),
+    )
     expect(onMarkAllRead).toHaveBeenCalledOnce()
   })
 

@@ -18,12 +18,12 @@
 //      nothing alerts. The console log is emitted unconditionally so even
 //      DSN-less dev runs surface the failure.
 
-import { Worker, type Processor, type WorkerOptions, type Job } from "bullmq"
-import * as Sentry from "@sentry/node"
 // Deep import: request-context uses node:async_hooks and is not in the
 // shared barrel.
 import { runWithRequestId } from "@guestpost/shared/dist/observability/request-context"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import * as Sentry from "@sentry/node"
+import { type Job, type Processor, Worker, type WorkerOptions } from "bullmq"
 
 const logger = createLogger("worker.queue-observability")
 
@@ -52,7 +52,10 @@ export function createObservableWorker<TData = any, TResult = any>(
   processor: Processor<TData, TResult, string>,
   opts: WorkerOptions,
 ): Worker<TData, TResult, string> {
-  const wrappedProcessor: Processor<TData, TResult, string> = async (job, token) => {
+  const wrappedProcessor: Processor<TData, TResult, string> = async (
+    job,
+    token,
+  ) => {
     const requestId = extractRequestId(job)
     const run = async (): Promise<TResult> => {
       // Sentry scope tags are inherited by any captureException fired from
@@ -70,14 +73,19 @@ export function createObservableWorker<TData = any, TResult = any>(
     return run()
   }
 
-  const worker = new Worker<TData, TResult, string>(queueName, wrappedProcessor, opts)
+  const worker = new Worker<TData, TResult, string>(
+    queueName,
+    wrappedProcessor,
+    opts,
+  )
 
   worker.on("failed", (job, err) => {
     const requestId = extractRequestId(job)
     Sentry.withScope((scope) => {
       scope.setTag("queue", queueName)
       if (job?.id) scope.setTag("jobId", String(job.id))
-      if (job?.attemptsMade != null) scope.setTag("attemptsMade", String(job.attemptsMade))
+      if (job?.attemptsMade != null)
+        scope.setTag("attemptsMade", String(job.attemptsMade))
       if (requestId) scope.setTag("requestId", requestId)
       Sentry.captureException(err)
     })
@@ -98,7 +106,10 @@ export function createObservableWorker<TData = any, TResult = any>(
       scope.setTag("source", "worker-error")
       Sentry.captureException(err)
     })
-    logger.error("worker error (Redis/connection-level)", { queue: queueName, err: err.message })
+    logger.error("worker error (Redis/connection-level)", {
+      queue: queueName,
+      err: err.message,
+    })
   })
 
   // 'stalled' jobs are recovered automatically by BullMQ on the next sweep,
@@ -106,7 +117,11 @@ export function createObservableWorker<TData = any, TResult = any>(
   // logging even if not capturing as an exception.
   worker.on("stalled", (jobId) => {
     stalledHitsTotal++
-    logger.warn("job stalled", { queue: queueName, jobId, stalled_hits_total: stalledHitsTotal })
+    logger.warn("job stalled", {
+      queue: queueName,
+      jobId,
+      stalled_hits_total: stalledHitsTotal,
+    })
   })
 
   return worker

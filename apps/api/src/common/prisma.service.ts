@@ -1,8 +1,15 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from "@nestjs/common"
-import { PrismaClient, createPrismaAdapter } from "@guestpost/database"
+import { createPrismaAdapter, PrismaClient } from "@guestpost/database"
+import {
+  Injectable,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from "@nestjs/common"
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService
+  extends PrismaClient
+  implements OnModuleInit, OnModuleDestroy
+{
   constructor() {
     super({
       adapter: createPrismaAdapter({

@@ -1,21 +1,26 @@
+import { prisma } from "@guestpost/database"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
-import { bearer } from "better-auth/plugins/bearer"
-import { prisma } from "@guestpost/database"
 import { toNodeHandler } from "better-auth/node"
-import { emailRateLimitPlugin, type EmailRateLimitOptions } from "./plugins/email-rate-limit.js"
+import { bearer } from "better-auth/plugins/bearer"
 import { renderVerificationEmail } from "./email-templates/verification.js"
+import {
+  type EmailRateLimitOptions,
+  emailRateLimitPlugin,
+} from "./plugins/email-rate-limit.js"
 
-export { toNodeHandler }
+export type { VerificationEmailContext } from "./email-templates/verification.js"
+export { renderVerificationEmail } from "./email-templates/verification.js"
 export { emailRateLimitPlugin } from "./plugins/email-rate-limit.js"
 export type { EmailRateLimitOptions }
-export { renderVerificationEmail } from "./email-templates/verification.js"
-export type { VerificationEmailContext } from "./email-templates/verification.js"
+export { toNodeHandler }
 
 // Fail closed: silently trusting localhost origins in production would relax
 // origin checking on a money platform. Same pattern as QUEUE_SIGNING_SECRET.
 if (process.env.NODE_ENV === "production" && !process.env.TRUSTED_ORIGINS) {
-  throw new Error("TRUSTED_ORIGINS is required in production (comma-separated list of app origins)")
+  throw new Error(
+    "TRUSTED_ORIGINS is required in production (comma-separated list of app origins)",
+  )
 }
 
 export interface SendEmailArgs {
@@ -77,32 +82,43 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
     // supplied `sendEmail`. Without it, signup completes silently with
     // `emailVerified: false` (the pre-7.10 broken state) and Better
     // Auth's `/send-verification-email` route returns NOT_ENABLED.
-    emailVerification: opts.sendEmail ? {
-      sendVerificationEmail: async ({ user, url }: { user: { email: string; name?: string | null }; url: string; token?: string }) => {
-        await opts.sendEmail!({
-          to: user.email,
-          subject: "Verify your email — GuestPost.cc",
-          html: renderVerificationEmail({ name: user.name ?? null, url }),
-          jobName: "send-verification-email",
-        })
-      },
-      // Auto-send on signup (otherwise email/password signups silently
-      // skip verification and the AuthGuard #25 gate becomes a one-way
-      // trapdoor — Phase 7.10's whole motivating bug).
-      sendOnSignUp: true,
-      // After the user clicks the link, sign them in and redirect to the
-      // app — smoother UX than landing on a "verified, now sign in" page.
-      autoSignInAfterVerification: true,
-      // 24h is generous enough for users who let the email sit overnight
-      // without being a security risk (single-use tokens).
-      expiresIn: 60 * 60 * 24,
-      // Phase 0a verified: this purpose-built callback fires on the
-      // verification transition. Replaces the noisier
-      // `databaseHooks.user.update.after` approach considered earlier.
-      afterEmailVerification: opts.onEmailVerified
-        ? async (user: { id: string }) => { opts.onEmailVerified!(user.id) }
-        : undefined,
-    } : undefined,
+    emailVerification: opts.sendEmail
+      ? {
+          sendVerificationEmail: async ({
+            user,
+            url,
+          }: {
+            user: { email: string; name?: string | null }
+            url: string
+            token?: string
+          }) => {
+            await opts.sendEmail?.({
+              to: user.email,
+              subject: "Verify your email — GuestPost.cc",
+              html: renderVerificationEmail({ name: user.name ?? null, url }),
+              jobName: "send-verification-email",
+            })
+          },
+          // Auto-send on signup (otherwise email/password signups silently
+          // skip verification and the AuthGuard #25 gate becomes a one-way
+          // trapdoor — Phase 7.10's whole motivating bug).
+          sendOnSignUp: true,
+          // After the user clicks the link, sign them in and redirect to the
+          // app — smoother UX than landing on a "verified, now sign in" page.
+          autoSignInAfterVerification: true,
+          // 24h is generous enough for users who let the email sit overnight
+          // without being a security risk (single-use tokens).
+          expiresIn: 60 * 60 * 24,
+          // Phase 0a verified: this purpose-built callback fires on the
+          // verification transition. Replaces the noisier
+          // `databaseHooks.user.update.after` approach considered earlier.
+          afterEmailVerification: opts.onEmailVerified
+            ? async (user: { id: string }) => {
+                opts.onEmailVerified?.(user.id)
+              }
+            : undefined,
+        }
+      : undefined,
     socialProviders: {
       google: {
         clientId: process.env.GOOGLE_CLIENT_ID ?? "",
@@ -112,25 +128,37 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
     magicLink: {
       enabled: true,
     },
-    trustedOrigins: process.env.NODE_ENV === "production"
-      ? process.env.TRUSTED_ORIGINS!.split(",").map((o) => o.trim())
-      : ((req: any) => {
-          const origin = req?.headers?.get?.("origin") || req?.headers?.origin
-          return origin ? [origin, "http://localhost:3000", "http://localhost:3001", "http://localhost:3002", "http://localhost:3003", "http://localhost:4000"] : [
-            "http://localhost:3000",
-            "http://localhost:3001",
-            "http://localhost:3002",
-            "http://localhost:3003",
-            "http://localhost:4000",
-          ]
-        }) as any,
+    trustedOrigins:
+      process.env.NODE_ENV === "production"
+        ? process.env.TRUSTED_ORIGINS?.split(",").map((o) => o.trim())
+        : (((req: any) => {
+            const origin = req?.headers?.get?.("origin") || req?.headers?.origin
+            return origin
+              ? [
+                  origin,
+                  "http://localhost:3000",
+                  "http://localhost:3001",
+                  "http://localhost:3002",
+                  "http://localhost:3003",
+                  "http://localhost:4000",
+                ]
+              : [
+                  "http://localhost:3000",
+                  "http://localhost:3001",
+                  "http://localhost:3002",
+                  "http://localhost:3003",
+                  "http://localhost:4000",
+                ]
+          }) as any),
     advanced: {
       cookiePrefix: "guestpost",
       useSecureCookies: process.env.NODE_ENV === "production",
     },
     plugins: [
       bearer(),
-      ...(opts.emailRateLimit ? [emailRateLimitPlugin(opts.emailRateLimit)] : []),
+      ...(opts.emailRateLimit
+        ? [emailRateLimitPlugin(opts.emailRateLimit)]
+        : []),
     ],
   }
 }

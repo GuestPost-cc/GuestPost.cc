@@ -1,20 +1,29 @@
-import { Controller, Get, Post, Delete, Body, Param, Query, UseGuards } from "@nestjs/common"
-import { OrdersService } from "./orders.service"
-import { OrderPaymentService } from "./services/order-payment.service"
-import { OrderFulfillmentService } from "./services/order-fulfillment.service"
-import { OrderReviewService } from "./services/order-review.service"
-import { OrderDisputeService } from "./services/order-dispute.service"
-import { OrderDeliveryService } from "./services/order-delivery.service"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
-import { CreateOrderDto } from "./dto/create-order.dto"
-import { AddOrderItemDto } from "./dto/add-order-item.dto"
-import { MemberRoles } from "../../common/decorators/member-roles.decorator"
-import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common"
 import { ActorType } from "../../common/decorators/actor-type.decorator"
-import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { RequireOrderOwnership } from "../../common/decorators/order-ownership.decorator"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { OrderOwnershipGuard } from "../../common/guards/order-ownership.guard"
 import { AuthGuard } from "../auth/auth.guard"
+import type { AddOrderItemDto } from "./dto/add-order-item.dto"
+import type { CreateOrderDto } from "./dto/create-order.dto"
+import type { OrdersService } from "./orders.service"
+import type { OrderDeliveryService } from "./services/order-delivery.service"
+import type { OrderDisputeService } from "./services/order-dispute.service"
+import type { OrderFulfillmentService } from "./services/order-fulfillment.service"
+import type { OrderPaymentService } from "./services/order-payment.service"
+import type { OrderReviewService } from "./services/order-review.service"
 
 @Controller("orders")
 @UseGuards(AuthGuard, ActorTypeGuard)
@@ -35,7 +44,10 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   create(@Body() body: CreateOrderDto, @CurrentUser() user: any) {
-    return this.orders.createOrder({ ...body, customerId: user.id, organizationId: user.organizationId }, user.id)
+    return this.orders.createOrder(
+      { ...body, customerId: user.id, organizationId: user.organizationId },
+      user.id,
+    )
   }
 
   @ActorType("CUSTOMER", "PUBLISHER")
@@ -48,7 +60,8 @@ export class OrdersController {
   ) {
     const t = Math.min(Math.max(parseInt(take ?? "50", 10) || 50, 1), 100)
     const s = Math.max(0, parseInt(skip ?? "0", 10) || 0)
-    if (user.userType === "PUBLISHER") return this.orders.listPublisherOrders(user.publisherId, t, s)
+    if (user.userType === "PUBLISHER")
+      return this.orders.listPublisherOrders(user.publisherId, t, s)
     return this.orders.listOrders(user.organizationId, campaignId, t, s)
   }
 
@@ -58,14 +71,20 @@ export class OrdersController {
   get(@Param("id") id: string, @CurrentUser() user: any) {
     // Publishers have no organizationId — the ownership guard above is their
     // access check (order.website.publisherId === user.publisherId)
-    return this.orders.getOrder(id, user.userType === "PUBLISHER" ? null : user.organizationId)
+    return this.orders.getOrder(
+      id,
+      user.userType === "PUBLISHER" ? null : user.organizationId,
+    )
   }
 
   @Get(":id/events")
   @UseGuards(OrderOwnershipGuard)
   @RequireOrderOwnership()
   async getEvents(@Param("id") id: string, @CurrentUser() user: any) {
-    const order = await this.orders.getOrder(id, user.userType === "PUBLISHER" ? null : user.organizationId)
+    const order = await this.orders.getOrder(
+      id,
+      user.userType === "PUBLISHER" ? null : user.organizationId,
+    )
     return order.events
   }
 
@@ -74,7 +93,11 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  addItem(@Param("id") id: string, @Body() body: AddOrderItemDto, @CurrentUser() user: any) {
+  addItem(
+    @Param("id") id: string,
+    @Body() body: AddOrderItemDto,
+    @CurrentUser() user: any,
+  ) {
     return this.orders.addOrderItem(id, user.organizationId, body, user.id)
   }
 
@@ -83,7 +106,11 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  removeItem(@Param("id") id: string, @Param("itemId") itemId: string, @CurrentUser() user: any) {
+  removeItem(
+    @Param("id") id: string,
+    @Param("itemId") itemId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.orders.removeOrderItem(id, itemId, user.organizationId)
   }
 
@@ -102,7 +129,12 @@ export class OrdersController {
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
   submitPayment(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.payment.submitPayment(id, user.id, user.organizationId, user.customerRole)
+    return this.payment.submitPayment(
+      id,
+      user.id,
+      user.organizationId,
+      user.customerRole,
+    )
   }
 
   @Post(":id/cancel")
@@ -132,7 +164,11 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  requestRevision(@Param("id") id: string, @Body("notes") notes: string, @CurrentUser() user: any) {
+  requestRevision(
+    @Param("id") id: string,
+    @Body("notes") notes: string,
+    @CurrentUser() user: any,
+  ) {
     return this.review.requestRevision(id, user.organizationId, user.id, notes)
   }
 
@@ -154,8 +190,18 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  submitReview(@Param("id") id: string, @Body() body: { rating: number; comment?: string }, @CurrentUser() user: any) {
-    return this.review.submitReview(id, user.organizationId, user.id, Number(body.rating), body.comment)
+  submitReview(
+    @Param("id") id: string,
+    @Body() body: { rating: number; comment?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.review.submitReview(
+      id,
+      user.organizationId,
+      user.id,
+      Number(body.rating),
+      body.comment,
+    )
   }
 
   @Get(":id/review")
@@ -174,7 +220,12 @@ export class OrdersController {
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
   acceptDelivery(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.delivery.customerAcceptDelivery(id, user.organizationId, user.id, user.customerRole)
+    return this.delivery.customerAcceptDelivery(
+      id,
+      user.organizationId,
+      user.id,
+      user.customerRole,
+    )
   }
 
   // Customer-facing delivery proof (verification checklist, no internal evidence)
@@ -191,7 +242,11 @@ export class OrdersController {
   @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  openDispute(@Param("id") id: string, @Body("reason") reason: string, @CurrentUser() user: any) {
+  openDispute(
+    @Param("id") id: string,
+    @Body("reason") reason: string,
+    @CurrentUser() user: any,
+  ) {
     return this.dispute.openDispute(id, user.organizationId, user.id, reason)
   }
 
@@ -211,8 +266,17 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  submitContent(@Param("id") id: string, @Body("content") content: string, @CurrentUser() user: any) {
-    return this.fulfillment.submitContent(id, user.publisherId, user.id, content)
+  submitContent(
+    @Param("id") id: string,
+    @Body("content") content: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.fulfillment.submitContent(
+      id,
+      user.publisherId,
+      user.id,
+      content,
+    )
   }
 
   @Post(":id/mark-content-ready")
@@ -238,7 +302,11 @@ export class OrdersController {
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
-  markPublished(@Param("id") id: string, @Body("url") url: string, @CurrentUser() user: any) {
+  markPublished(
+    @Param("id") id: string,
+    @Body("url") url: string,
+    @CurrentUser() user: any,
+  ) {
     return this.fulfillment.markPublished(id, user.publisherId, user.id, url)
   }
 }

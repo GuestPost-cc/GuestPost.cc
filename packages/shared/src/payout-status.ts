@@ -30,13 +30,18 @@ export const STRIPE_STATUS_MAP: Record<string, ProviderTransferStatus> = {
   failed: "FAILED",
 }
 
-export async function checkWiseTransferStatus(providerExecutionId: string): Promise<ProviderStatusResult | null> {
+export async function checkWiseTransferStatus(
+  providerExecutionId: string,
+): Promise<ProviderStatusResult | null> {
   const apiKey = process.env.WISE_API_KEY
   if (!apiKey) return null
 
-  const response = await fetch(`https://api.transferwise.com/v1/transfers/${providerExecutionId}`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  })
+  const response = await fetch(
+    `https://api.transferwise.com/v1/transfers/${providerExecutionId}`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    },
+  )
   if (!response.ok) {
     throw new Error(`Wise status check failed: ${response.status}`)
   }
@@ -44,17 +49,25 @@ export async function checkWiseTransferStatus(providerExecutionId: string): Prom
   return {
     status: WISE_STATUS_MAP[data.status as string] ?? "PROCESSING",
     fee: Number(data.fee?.amount ?? 0),
-    metadata: { wiseStatus: data.status, estimatedDelivery: data.estimatedDelivery },
+    metadata: {
+      wiseStatus: data.status,
+      estimatedDelivery: data.estimatedDelivery,
+    },
   }
 }
 
-export async function checkStripeTransferStatus(providerExecutionId: string): Promise<ProviderStatusResult | null> {
+export async function checkStripeTransferStatus(
+  providerExecutionId: string,
+): Promise<ProviderStatusResult | null> {
   const apiKey = process.env.STRIPE_SECRET_KEY
   if (!apiKey) return null
 
-  const response = await fetch(`https://api.stripe.com/v1/transfers/${providerExecutionId}`, {
-    headers: { Authorization: `Bearer ${apiKey}` },
-  })
+  const response = await fetch(
+    `https://api.stripe.com/v1/transfers/${providerExecutionId}`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    },
+  )
   if (!response.ok) {
     throw new Error(`Stripe status check failed: ${response.status}`)
   }

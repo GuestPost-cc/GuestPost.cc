@@ -35,7 +35,11 @@ interface RequestLike {
 }
 
 export function requiresEmailVerification(req: RequestLike): boolean {
-  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
+  if (
+    req.method === "GET" ||
+    req.method === "HEAD" ||
+    req.method === "OPTIONS"
+  ) {
     return false
   }
   return !EXEMPT_POST_PATHS.some((re) => re.test(req.path))

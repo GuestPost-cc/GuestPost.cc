@@ -12,15 +12,27 @@ describe("IdentityService.becomePublisher", () => {
   let prisma: any
   let audit: any
 
-  const freshUser = { id: "u1", email: "new@pub.test", name: "New Pub", userType: "CUSTOMER" }
+  const freshUser = {
+    id: "u1",
+    email: "new@pub.test",
+    name: "New Pub",
+    userType: "CUSTOMER",
+  }
 
   beforeEach(() => {
     prisma = {
       user: { findUnique: jest.fn(), update: jest.fn().mockResolvedValue({}) },
       membership: { count: jest.fn().mockResolvedValue(0) },
-      publisherMembership: { count: jest.fn().mockResolvedValue(0), create: jest.fn().mockResolvedValue({}) },
+      publisherMembership: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({}),
+      },
       organization: { create: jest.fn().mockResolvedValue({ id: "org-1" }) },
-      publisher: { create: jest.fn().mockResolvedValue({ id: "pub-1", name: "New Pub", tier: "NEW" }) },
+      publisher: {
+        create: jest
+          .fn()
+          .mockResolvedValue({ id: "pub-1", name: "New Pub", tier: "NEW" }),
+      },
       $transaction: jest.fn().mockImplementation(async (cb: any) => cb(prisma)),
     }
     audit = { log: jest.fn().mockResolvedValue(undefined) }
@@ -51,22 +63,31 @@ describe("IdentityService.becomePublisher", () => {
   })
 
   it("refuses staff accounts", async () => {
-    prisma.user.findUnique.mockResolvedValue({ ...freshUser, userType: "STAFF" })
-    await expect(service.becomePublisher("u1")).rejects.toThrow(ForbiddenException)
+    prisma.user.findUnique.mockResolvedValue({
+      ...freshUser,
+      userType: "STAFF",
+    })
+    await expect(service.becomePublisher("u1")).rejects.toThrow(
+      ForbiddenException,
+    )
     expect(prisma.publisher.create).not.toHaveBeenCalled()
   })
 
   it("refuses accounts that are already publishers", async () => {
     prisma.user.findUnique.mockResolvedValue(freshUser)
     prisma.publisherMembership.count.mockResolvedValue(1)
-    await expect(service.becomePublisher("u1")).rejects.toThrow(BadRequestException)
+    await expect(service.becomePublisher("u1")).rejects.toThrow(
+      BadRequestException,
+    )
     expect(prisma.publisher.create).not.toHaveBeenCalled()
   })
 
   it("refuses accounts with customer-organization memberships (no silent re-typing)", async () => {
     prisma.user.findUnique.mockResolvedValue(freshUser)
     prisma.membership.count.mockResolvedValue(2)
-    await expect(service.becomePublisher("u1")).rejects.toThrow(/customer organization/)
+    await expect(service.becomePublisher("u1")).rejects.toThrow(
+      /customer organization/,
+    )
     expect(prisma.user.update).not.toHaveBeenCalled()
   })
 })

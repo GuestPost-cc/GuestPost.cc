@@ -1,4 +1,4 @@
-import { HttpClient } from "../client"
+import type { HttpClient } from "../client"
 
 export interface ApiKeyResponse {
   id: string

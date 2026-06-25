@@ -1,14 +1,12 @@
 "use client"
 
+import { Button, EmptyState, ErrorState, Skeleton } from "@guestpost/ui"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { ExternalLink, Heart, Star } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
-import { Button } from "@guestpost/ui"
-import { Skeleton, ErrorState } from "@guestpost/ui"
-import { EmptyState } from "@guestpost/ui"
-import { Heart, Star, ExternalLink } from "lucide-react"
 
 interface FavoriteListing {
   id: string
@@ -38,22 +36,38 @@ export default function FavoritesPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
 
-  const { data: favorites = [], isLoading, error, refetch } = useQuery<FavoriteListing[]>({
+  const {
+    data: favorites = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<FavoriteListing[]>({
     queryKey: ["favorites"],
     queryFn: () => api.marketplace.getFavorites(),
     enabled: !!user?.id,
   })
 
   const { mutate: removeFavorite } = useMutation({
-    mutationFn: (listingId: string) => api.marketplace.removeFavorite(listingId),
+    mutationFn: (listingId: string) =>
+      api.marketplace.removeFavorite(listingId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites"] }),
   })
 
   function formatPrice(price: number, currency: string = "USD") {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(price)
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    }).format(price)
   }
 
-  if (error) return <ErrorState title="Failed to load favorites" description={(error as Error).message} onRetry={() => refetch()} />
+  if (error)
+    return (
+      <ErrorState
+        title="Failed to load favorites"
+        description={(error as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
 
   if (isLoading) {
     return (
@@ -102,33 +116,57 @@ export default function FavoritesPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">My Favorites</h1>
-        <p className="text-muted-foreground">{favorites.length} saved listing{favorites.length !== 1 ? "s" : ""}</p>
+        <p className="text-muted-foreground">
+          {favorites.length} saved listing{favorites.length !== 1 ? "s" : ""}
+        </p>
       </div>
 
       <div className="space-y-4">
         {favorites.map((fav) => (
-          <div key={fav.id} className="border rounded-lg p-4 flex gap-4 hover:shadow-md transition-shadow">
-            <Link href={`/dashboard/marketplace/${fav.listing.slug}`} className="flex-shrink-0">
+          <div
+            key={fav.id}
+            className="border rounded-lg p-4 flex gap-4 hover:shadow-md transition-shadow"
+          >
+            <Link
+              href={`/dashboard/marketplace/${fav.listing.slug}`}
+              className="flex-shrink-0"
+            >
               <div className="w-32 h-24 bg-muted rounded-lg overflow-hidden">
                 {fav.listing.image ? (
-                  <img src={fav.listing.image} alt={fav.listing.title} className="w-full h-full object-cover" />
+                  <img
+                    src={fav.listing.image}
+                    alt={fav.listing.title}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-primary/5">
-                    <span className="text-2xl font-bold text-primary/20">{fav.listing.title[0]}</span>
+                    <span className="text-2xl font-bold text-primary/20">
+                      {fav.listing.title[0]}
+                    </span>
                   </div>
                 )}
               </div>
             </Link>
             <div className="flex-1 min-w-0">
               <Link href={`/dashboard/marketplace/${fav.listing.slug}`}>
-                <h3 className="font-semibold hover:text-primary transition-colors">{fav.listing.title}</h3>
+                <h3 className="font-semibold hover:text-primary transition-colors">
+                  {fav.listing.title}
+                </h3>
               </Link>
               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                {fav.listing.category && <span>{fav.listing.category.name}</span>}
+                {fav.listing.category && (
+                  <span>{fav.listing.category.name}</span>
+                )}
                 <span>•</span>
                 {/* Phase 7: read service type from the first AVAILABLE
                     service, fall back to deprecated listing.type. */}
-                <span>{(((fav.listing as any).serviceTypes?.[0]) ?? fav.listing.type ?? "").replace(/_/g, " ")}</span>
+                <span>
+                  {(
+                    (fav.listing as any).serviceTypes?.[0] ??
+                    fav.listing.type ??
+                    ""
+                  ).replace(/_/g, " ")}
+                </span>
                 {fav.listing.domainRating && (
                   <>
                     <span>•</span>
@@ -141,7 +179,9 @@ export default function FavoritesPage() {
                   <div className="flex items-center gap-1 text-sm">
                     <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
                     <span>{fav.listing.avgRating.toFixed(1)}</span>
-                    <span className="text-muted-foreground">({fav.listing.reviewCount})</span>
+                    <span className="text-muted-foreground">
+                      ({fav.listing.reviewCount})
+                    </span>
                   </div>
                 )}
                 {fav.listing.traffic && (
@@ -154,9 +194,18 @@ export default function FavoritesPage() {
             <div className="flex flex-col items-end justify-between">
               {/* Phase 7: prefer priceFrom (min AVAILABLE service price)
                   with a graceful fallback to the deprecated flat price. */}
-              <span className="font-bold text-lg">{formatPrice(((fav.listing as any).priceFrom ?? fav.listing.price ?? 0), fav.listing.currency)}</span>
+              <span className="font-bold text-lg">
+                {formatPrice(
+                  (fav.listing as any).priceFrom ?? fav.listing.price ?? 0,
+                  fav.listing.currency,
+                )}
+              </span>
               <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => removeFavorite(fav.listing.id)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeFavorite(fav.listing.id)}
+                >
                   Remove
                 </Button>
                 <Button size="sm" asChild>

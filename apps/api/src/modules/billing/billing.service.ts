@@ -1,9 +1,16 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Logger, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
 import { isUniqueViolation } from "@guestpost/shared"
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import Stripe from "stripe"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
 
 // Thrown inside an interactive transaction to force a ROLLBACK when a
 // concurrent duplicate is detected via P2002. Returning normally from the
@@ -26,23 +33,33 @@ export class BillingService {
   ) {
     const stripeKey = process.env.STRIPE_SECRET_KEY
     if (stripeKey && stripeKey.trim() !== "") {
-      this.stripe = new Stripe(stripeKey, { apiVersion: "2025-01-27.acacia" as any })
+      this.stripe = new Stripe(stripeKey, {
+        apiVersion: "2025-01-27.acacia" as any,
+      })
       this.logger.log("Stripe initialized")
     } else {
-      this.logger.warn("Stripe secret key not found — set STRIPE_SECRET_KEY in .env.development")
+      this.logger.warn(
+        "Stripe secret key not found — set STRIPE_SECRET_KEY in .env.development",
+      )
     }
   }
 
-  private assertWalletOwned(wallet: { organizationId: string | null; userId: string | null }, user: { id: string; organizationId?: string | null }) {
-    const owned = (
-      (wallet.organizationId && wallet.organizationId === user.organizationId) ||
+  private assertWalletOwned(
+    wallet: { organizationId: string | null; userId: string | null },
+    user: { id: string; organizationId?: string | null },
+  ) {
+    const owned =
+      (wallet.organizationId &&
+        wallet.organizationId === user.organizationId) ||
       (!wallet.organizationId && wallet.userId === user.id)
-    )
-    if (!owned) throw new ForbiddenException("Wallet does not belong to this account")
+    if (!owned)
+      throw new ForbiddenException("Wallet does not belong to this account")
   }
 
   async createCheckoutSession(walletId: string, amount: number, user: any) {
-    const wallet = await this.prisma.wallet.findUnique({ where: { id: walletId } })
+    const wallet = await this.prisma.wallet.findUnique({
+      where: { id: walletId },
+    })
     if (!wallet) throw new NotFoundException("Wallet not found")
 
     this.assertWalletOwned(wallet, user)
@@ -75,19 +92,29 @@ export class BillingService {
       })
       return { url: session.url }
     } else {
-      throw new BadRequestException("Payment service not configured — set STRIPE_SECRET_KEY in .env.development")
+      throw new BadRequestException(
+        "Payment service not configured — set STRIPE_SECRET_KEY in .env.development",
+      )
     }
   }
 
   async handleWebhook(signature: string, payload: Buffer) {
     if (!this.stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
-      this.logger.error("Stripe webhook received without STRIPE_WEBHOOK_SECRET set")
-      throw new BadRequestException("Webhook not configured — set STRIPE_WEBHOOK_SECRET in .env.development (run `stripe listen --forward-to localhost:4000/api/v1/billing/webhook/stripe`)")
+      this.logger.error(
+        "Stripe webhook received without STRIPE_WEBHOOK_SECRET set",
+      )
+      throw new BadRequestException(
+        "Webhook not configured — set STRIPE_WEBHOOK_SECRET in .env.development (run `stripe listen --forward-to localhost:4000/api/v1/billing/webhook/stripe`)",
+      )
     }
 
     let event: any
     try {
-      event = this.stripe.webhooks.constructEvent(payload, signature, process.env.STRIPE_WEBHOOK_SECRET)
+      event = this.stripe.webhooks.constructEvent(
+        payload,
+        signature,
+        process.env.STRIPE_WEBHOOK_SECRET,
+      )
     } catch (err: any) {
       throw new BadRequestException(`Webhook Error: ${err.message}`)
     }
@@ -125,7 +152,11 @@ export class BillingService {
         })
       : null
 
-    let holdResult: { held: string; shortfall: string; walletId: string } | null = null
+    let holdResult: {
+      held: string
+      shortfall: string
+      walletId: string
+    } | null = null
 
     if (depositTx?.walletId && disputedAmount.greaterThan(0)) {
       try {
@@ -135,9 +166,12 @@ export class BillingService {
           const existingHold = await tx.transaction.findFirst({
             where: { reference: `chargeback-hold-${dispute.id}` },
           })
-          if (existingHold) throw new DuplicateEventError(`chargeback-hold-${dispute.id}`)
+          if (existingHold)
+            throw new DuplicateEventError(`chargeback-hold-${dispute.id}`)
 
-          const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: depositTx.walletId } })
+          const wallet = await tx.wallet.findUniqueOrThrow({
+            where: { id: depositTx.walletId },
+          })
           const available = new Decimal(wallet.availableBalance)
           // Hold what is still there — the org may have spent part of the
           // deposit already. The shortfall is recorded for finance.
@@ -154,7 +188,9 @@ export class BillingService {
               },
             })
             if (updated.count === 0) {
-              throw new ConflictException("Wallet was modified by another request. Retry.")
+              throw new ConflictException(
+                "Wallet was modified by another request. Retry.",
+              )
             }
           }
 
@@ -167,16 +203,25 @@ export class BillingService {
               type: "RESERVATION",
               reference: `chargeback-hold-${dispute.id}`,
               providerRef: paymentIntent,
-              description: `Chargeback hold of ${held.toFixed(2)} for dispute ${dispute.id}` +
-                (shortfall.greaterThan(0) ? ` (${shortfall.toFixed(2)} already spent — uncovered exposure)` : ""),
+              description:
+                `Chargeback hold of ${held.toFixed(2)} for dispute ${dispute.id}` +
+                (shortfall.greaterThan(0)
+                  ? ` (${shortfall.toFixed(2)} already spent — uncovered exposure)`
+                  : ""),
             },
           })
 
-          return { held: held.toFixed(2), shortfall: shortfall.toFixed(2), walletId: wallet.id }
+          return {
+            held: held.toFixed(2),
+            shortfall: shortfall.toFixed(2),
+            walletId: wallet.id,
+          }
         })
       } catch (err: any) {
         if (err instanceof DuplicateEventError || err?.code === "P2002") {
-          this.logger.warn(`Chargeback hold for dispute ${dispute.id} already placed — duplicate webhook ignored`)
+          this.logger.warn(
+            `Chargeback hold for dispute ${dispute.id} already placed — duplicate webhook ignored`,
+          )
           return
         }
         throw err
@@ -184,7 +229,9 @@ export class BillingService {
     }
 
     await this.audit.log({
-      action: holdResult ? "STRIPE_CHARGEBACK_HOLD_PLACED" : "STRIPE_CHARGEBACK_UNLINKED",
+      action: holdResult
+        ? "STRIPE_CHARGEBACK_HOLD_PLACED"
+        : "STRIPE_CHARGEBACK_UNLINKED",
       entityType: "StripeDispute",
       entityId: dispute.id,
       metadata: {
@@ -227,7 +274,10 @@ export class BillingService {
         action: "STRIPE_CHARGEBACK_CLOSED_UNLINKED",
         entityType: "StripeDispute",
         entityId: dispute.id,
-        metadata: { status: dispute.status, paymentIntent: dispute.payment_intent ?? null },
+        metadata: {
+          status: dispute.status,
+          paymentIntent: dispute.payment_intent ?? null,
+        },
         userId: null,
         organizationId: null,
       })
@@ -251,7 +301,11 @@ export class BillingService {
         action: "STRIPE_CHARGEBACK_CLOSED_UNRECOGNIZED",
         entityType: "StripeDispute",
         entityId: dispute.id,
-        metadata: { status: dispute.status, walletId: hold.walletId, heldAmount: held.toFixed(2) },
+        metadata: {
+          status: dispute.status,
+          walletId: hold.walletId,
+          heldAmount: held.toFixed(2),
+        },
         userId: null,
         organizationId: null,
       })
@@ -262,15 +316,21 @@ export class BillingService {
       )
       return
     }
-    const reference = won ? `chargeback-release-${dispute.id}` : `chargeback-lost-${dispute.id}`
+    const reference = won
+      ? `chargeback-release-${dispute.id}`
+      : `chargeback-lost-${dispute.id}`
 
     try {
       await this.prisma.$transaction(async (tx: any) => {
-        const existing = await tx.transaction.findFirst({ where: { reference } })
+        const existing = await tx.transaction.findFirst({
+          where: { reference },
+        })
         if (existing) throw new DuplicateEventError(reference)
 
         if (held.greaterThan(0)) {
-          const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: hold.walletId } })
+          const wallet = await tx.wallet.findUniqueOrThrow({
+            where: { id: hold.walletId },
+          })
           const updated = await tx.wallet.updateMany({
             where: { id: wallet.id, version: wallet.version },
             data: won
@@ -285,7 +345,9 @@ export class BillingService {
                 },
           })
           if (updated.count === 0) {
-            throw new ConflictException("Wallet was modified by another request. Retry.")
+            throw new ConflictException(
+              "Wallet was modified by another request. Retry.",
+            )
           }
         }
 
@@ -305,17 +367,25 @@ export class BillingService {
       })
     } catch (err: any) {
       if (err instanceof DuplicateEventError || err?.code === "P2002") {
-        this.logger.warn(`Chargeback close for dispute ${dispute.id} already processed — duplicate webhook ignored`)
+        this.logger.warn(
+          `Chargeback close for dispute ${dispute.id} already processed — duplicate webhook ignored`,
+        )
         return
       }
       throw err
     }
 
     await this.audit.log({
-      action: won ? "STRIPE_CHARGEBACK_WON_RELEASED" : "STRIPE_CHARGEBACK_LOST_DEBITED",
+      action: won
+        ? "STRIPE_CHARGEBACK_WON_RELEASED"
+        : "STRIPE_CHARGEBACK_LOST_DEBITED",
       entityType: "StripeDispute",
       entityId: dispute.id,
-      metadata: { walletId: hold.walletId, amount: held.toFixed(2), disputeStatus: dispute.status },
+      metadata: {
+        walletId: hold.walletId,
+        amount: held.toFixed(2),
+        disputeStatus: dispute.status,
+      },
       userId: null,
       organizationId: null,
     })
@@ -333,13 +403,25 @@ export class BillingService {
   // idempotency. Callers that have a stable identifier for the event (chargeback
   // dispute id, etc.) supply the prefix; per-staff suffix is added automatically.
   // Callers without a stable identifier omit it — legacy NULL dedup applies.
-  private async notifyStaff(type: string, message: string, dedupKeyPrefix?: string) {
-    const staff = await this.prisma.staffMembership.findMany({ select: { userId: true } })
+  private async notifyStaff(
+    type: string,
+    message: string,
+    dedupKeyPrefix?: string,
+  ) {
+    const staff = await this.prisma.staffMembership.findMany({
+      select: { userId: true },
+    })
     for (const s of staff) {
       const dedupKey = dedupKeyPrefix ? `${dedupKeyPrefix}:${s.userId}` : null
       try {
         await this.prisma.notification.create({
-          data: { userId: s.userId, organizationId: null, type, message, dedupKey },
+          data: {
+            userId: s.userId,
+            organizationId: null,
+            type,
+            message,
+            dedupKey,
+          },
         })
       } catch (err) {
         if (isUniqueViolation(err)) {
@@ -360,7 +442,9 @@ export class BillingService {
     // $11 and mint money on every non-whole-dollar deposit.
     const amountCents = session.amount_total ?? 0
     if (!Number.isInteger(amountCents) || amountCents <= 0) {
-      this.logger.warn(`Invalid amount_total ${amountCents} in webhook session ${session.id}`)
+      this.logger.warn(
+        `Invalid amount_total ${amountCents} in webhook session ${session.id}`,
+      )
       return
     }
     const amount = new Decimal(amountCents).div(100)
@@ -376,7 +460,9 @@ export class BillingService {
         })
         if (existingTx) throw new DuplicateEventError(session.id)
 
-        const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+        const wallet = await tx.wallet.findUniqueOrThrow({
+          where: { id: walletId },
+        })
         const updated = await tx.wallet.updateMany({
           where: { id: walletId, version: wallet.version },
           data: {
@@ -385,7 +471,9 @@ export class BillingService {
           },
         })
         if (updated.count === 0) {
-          throw new ConflictException("Wallet was modified by another request. Retry.")
+          throw new ConflictException(
+            "Wallet was modified by another request. Retry.",
+          )
         }
 
         // P2002 here MUST propagate and roll the transaction back — catching
@@ -406,7 +494,9 @@ export class BillingService {
       })
     } catch (err: any) {
       if (err instanceof DuplicateEventError || err?.code === "P2002") {
-        this.logger.warn(`Duplicate webhook: session ${session.id} already processed — rolled back`)
+        this.logger.warn(
+          `Duplicate webhook: session ${session.id} already processed — rolled back`,
+        )
         return
       }
       throw err
@@ -416,42 +506,70 @@ export class BillingService {
       action: "WALLET_DEPOSIT",
       entityType: "Wallet",
       entityId: walletId,
-      metadata: { amount: amount.toNumber(), reference: session.id, method: "stripe" },
+      metadata: {
+        amount: amount.toNumber(),
+        reference: session.id,
+        method: "stripe",
+      },
       userId: session.metadata?.userId || null,
       organizationId: orgId,
     })
   }
 
   async getWallet(organizationId: string | null, userId: string) {
-    const include = { transactions: { orderBy: { createdAt: "desc" as const }, take: 50 } }
+    const include = {
+      transactions: { orderBy: { createdAt: "desc" as const }, take: 50 },
+    }
 
     if (organizationId) {
       // @@unique([organizationId]) makes upsert race-safe
       return this.prisma.wallet.upsert({
         where: { organizationId },
-        create: { availableBalance: 0, reservedBalance: 0, currency: "USD", organizationId, userId },
+        create: {
+          availableBalance: 0,
+          reservedBalance: 0,
+          currency: "USD",
+          organizationId,
+          userId,
+        },
         update: {},
         include,
       })
     }
 
     // userId has no unique constraint — fall back to find/create with conflict retry
-    let wallet = await this.prisma.wallet.findFirst({ where: { userId }, include })
+    let wallet = await this.prisma.wallet.findFirst({
+      where: { userId },
+      include,
+    })
     if (!wallet) {
       try {
         wallet = await this.prisma.wallet.create({
-          data: { availableBalance: 0, reservedBalance: 0, currency: "USD", userId },
+          data: {
+            availableBalance: 0,
+            reservedBalance: 0,
+            currency: "USD",
+            userId,
+          },
           include,
         })
       } catch (err) {
-        wallet = await this.prisma.wallet.findFirst({ where: { userId }, include })
+        wallet = await this.prisma.wallet.findFirst({
+          where: { userId },
+          include,
+        })
         if (!wallet) throw err
       }
     }
     return wallet
   }
 
-  async deposit(walletId: string, amount: number, user: any, reference?: string) {
+  async deposit(
+    walletId: string,
+    amount: number,
+    user: any,
+    reference?: string,
+  ) {
     const result = await this.prisma.$transaction(async (tx: any) => {
       if (reference) {
         const existing = await tx.transaction.findFirst({
@@ -459,10 +577,14 @@ export class BillingService {
         })
         if (existing) {
           this.logger.warn(`Duplicate deposit detected: ${reference}`)
-          throw new BadRequestException("Deposit with this reference already exists")
+          throw new BadRequestException(
+            "Deposit with this reference already exists",
+          )
         }
       }
-      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const wallet = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
       this.assertWalletOwned(wallet, user)
 
       const updated = await tx.wallet.updateMany({
@@ -473,10 +595,14 @@ export class BillingService {
         },
       })
       if (updated.count === 0) {
-        throw new ConflictException("Wallet was modified by another request. Retry.")
+        throw new ConflictException(
+          "Wallet was modified by another request. Retry.",
+        )
       }
 
-      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const fresh = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
 
       await tx.transaction.create({
         data: {
@@ -502,7 +628,12 @@ export class BillingService {
     return result
   }
 
-  async withdraw(walletId: string, amount: number, user: any, idempotencyKey?: string) {
+  async withdraw(
+    walletId: string,
+    amount: number,
+    user: any,
+    idempotencyKey?: string,
+  ) {
     const result = await this.prisma.$transaction(async (tx: any) => {
       if (idempotencyKey) {
         const existing = await tx.transaction.findFirst({
@@ -510,10 +641,14 @@ export class BillingService {
         })
         if (existing) {
           this.logger.warn(`Duplicate withdrawal detected: ${idempotencyKey}`)
-          throw new BadRequestException("Withdrawal with this idempotency key already exists")
+          throw new BadRequestException(
+            "Withdrawal with this idempotency key already exists",
+          )
         }
       }
-      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const wallet = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
       this.assertWalletOwned(wallet, user)
 
       const available = new Decimal(wallet.availableBalance)
@@ -529,10 +664,14 @@ export class BillingService {
         },
       })
       if (updated.count === 0) {
-        throw new ConflictException("Wallet was modified by another request. Retry.")
+        throw new ConflictException(
+          "Wallet was modified by another request. Retry.",
+        )
       }
 
-      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const fresh = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
 
       await tx.transaction.create({
         data: {
@@ -575,14 +714,24 @@ export class BillingService {
   // back atomically with the caller's state change. Passing a separate
   // transaction here would let a debit survive a rolled-back order capture —
   // the double-charge bug under concurrent submit-payment.
-  async reserve(walletId: string, amount: number, orderId: string, user: any, existingTx?: any) {
+  async reserve(
+    walletId: string,
+    amount: number,
+    orderId: string,
+    user: any,
+    existingTx?: any,
+  ) {
     const run = async (tx: any) => {
-      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const wallet = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
       this.assertWalletOwned(wallet, user)
 
       const available = new Decimal(wallet.availableBalance)
       if (available.lessThan(amount)) {
-        throw new BadRequestException("Insufficient available balance to reserve")
+        throw new BadRequestException(
+          "Insufficient available balance to reserve",
+        )
       }
 
       const updated = await tx.wallet.updateMany({
@@ -594,10 +743,14 @@ export class BillingService {
         },
       })
       if (updated.count === 0) {
-        throw new ConflictException("Wallet was modified by another request. Retry.")
+        throw new ConflictException(
+          "Wallet was modified by another request. Retry.",
+        )
       }
 
-      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const fresh = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
 
       await tx.transaction.create({
         data: {
@@ -614,9 +767,17 @@ export class BillingService {
     return existingTx ? run(existingTx) : this.prisma.$transaction(run)
   }
 
-  async payFromReserved(walletId: string, amount: number, orderId: string, user: any, existingTx?: any) {
+  async payFromReserved(
+    walletId: string,
+    amount: number,
+    orderId: string,
+    user: any,
+    existingTx?: any,
+  ) {
     const run = async (tx: any) => {
-      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const wallet = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
       this.assertWalletOwned(wallet, user)
 
       const reserved = new Decimal(wallet.reservedBalance)
@@ -632,10 +793,14 @@ export class BillingService {
         },
       })
       if (updated.count === 0) {
-        throw new ConflictException("Wallet was modified by another request. Retry.")
+        throw new ConflictException(
+          "Wallet was modified by another request. Retry.",
+        )
       }
 
-      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const fresh = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
 
       await tx.transaction.create({
         data: {
@@ -654,7 +819,9 @@ export class BillingService {
 
   async refund(walletId: string, amount: number, orderId: string, user: any) {
     const result = await this.prisma.$transaction(async (tx: any) => {
-      const wallet = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const wallet = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
       this.assertWalletOwned(wallet, user)
 
       // Idempotency check using unique reference — database-level @@unique prevents race
@@ -680,7 +847,9 @@ export class BillingService {
         throw new ConflictException("Concurrent wallet modification")
       }
 
-      const fresh = await tx.wallet.findUniqueOrThrow({ where: { id: walletId } })
+      const fresh = await tx.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
 
       await tx.transaction.create({
         data: {

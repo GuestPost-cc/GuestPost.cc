@@ -1,5 +1,10 @@
-import type { OrderStatus, SettlementStatus, WithdrawalStatus, TicketStatus } from "@guestpost/shared"
-import { HttpClient, type RequestOptions } from "../client"
+import type {
+  OrderStatus,
+  SettlementStatus,
+  TicketStatus,
+  WithdrawalStatus,
+} from "@guestpost/shared"
+import type { HttpClient, RequestOptions } from "../client"
 
 export interface PaginatedResponse<T> {
   items: T[]
@@ -69,18 +74,22 @@ export class AdminService {
   }
 
   updateStaffRole(userId: string, role: string) {
-    return this.client.patch(`/admin/users/${userId}/staff-role`, { json: { role } })
+    return this.client.patch(`/admin/users/${userId}/staff-role`, {
+      json: { role },
+    })
   }
 
   listOrganizations() {
-    return this.client.get<Array<{
-      id: string
-      name: string
-      slug: string
-      plan: string | null
-      createdAt: string
-      _count: { memberships: number; campaigns: number; orders: number }
-    }>>("/admin/organizations")
+    return this.client.get<
+      Array<{
+        id: string
+        name: string
+        slug: string
+        plan: string | null
+        createdAt: string
+        _count: { memberships: number; campaigns: number; orders: number }
+      }>
+    >("/admin/organizations")
   }
 
   listOrders() {
@@ -93,16 +102,23 @@ export class AdminService {
   // Order interventions — verification/advancement is automated; staff only
   // force-cancel (SUPER_ADMIN) or refund (SUPER_ADMIN/FINANCE), reason required.
   forceCancelOrder(id: string, reason: string) {
-    return this.client.post<any>(`/admin/orders/${id}/force-cancel`, { json: { reason } })
+    return this.client.post<any>(`/admin/orders/${id}/force-cancel`, {
+      json: { reason },
+    })
   }
   refundOrder(id: string, reason: string) {
-    return this.client.post<any>(`/admin/orders/${id}/refund`, { json: { reason } })
+    return this.client.post<any>(`/admin/orders/${id}/refund`, {
+      json: { reason },
+    })
   }
 
   listSettlements(take?: number, skip?: number) {
-    return this.client.get<PaginatedResponse<AdminSettlementResponse>>("/admin/settlements", {
-      params: { take, skip },
-    } as RequestOptions)
+    return this.client.get<PaginatedResponse<AdminSettlementResponse>>(
+      "/admin/settlements",
+      {
+        params: { take, skip },
+      } as RequestOptions,
+    )
   }
 
   approveSettlement(id: string) {
@@ -110,9 +126,12 @@ export class AdminService {
   }
 
   listWithdrawals(take?: number, skip?: number) {
-    return this.client.get<PaginatedResponse<AdminWithdrawalResponse>>("/admin/withdrawals", {
-      params: { take, skip },
-    } as RequestOptions)
+    return this.client.get<PaginatedResponse<AdminWithdrawalResponse>>(
+      "/admin/withdrawals",
+      {
+        params: { take, skip },
+      } as RequestOptions,
+    )
   }
 
   approveWithdrawal(id: string) {
@@ -138,23 +157,26 @@ export class AdminService {
   }
 
   executePayout(withdrawalId: string, providerName: string) {
-    return this.client.post<{ executionId: string; status: string; providerExecutionId: string | null }>(
-      `/admin/withdrawals/${withdrawalId}/execute`,
-      { json: { providerName } },
-    )
+    return this.client.post<{
+      executionId: string
+      status: string
+      providerExecutionId: string | null
+    }>(`/admin/withdrawals/${withdrawalId}/execute`, { json: { providerName } })
   }
 
   getWithdrawalExecutions(withdrawalId: string) {
-    return this.client.get<Array<{
-      id: string
-      status: string
-      amount: number
-      fee: number
-      errorMessage: string | null
-      providerExecutionId: string | null
-      createdAt: string
-      provider: { id: string; name: string; displayName: string }
-    }>>(`/admin/withdrawals/${withdrawalId}/executions`)
+    return this.client.get<
+      Array<{
+        id: string
+        status: string
+        amount: number
+        fee: number
+        errorMessage: string | null
+        providerExecutionId: string | null
+        createdAt: string
+        provider: { id: string; name: string; displayName: string }
+      }>
+    >(`/admin/withdrawals/${withdrawalId}/executions`)
   }
 
   retryPayoutExecution(executionId: string) {
@@ -177,10 +199,11 @@ export class AdminService {
   }
 
   decryptPayoutMethod(payoutMethodId: string, reason: string) {
-    return this.client.post<{ details: Record<string, unknown>; methodId: string; publisherId: string }>(
-      `/admin/payout-methods/${payoutMethodId}/decrypt`,
-      { json: { reason } },
-    )
+    return this.client.post<{
+      details: Record<string, unknown>
+      methodId: string
+      publisherId: string
+    }>(`/admin/payout-methods/${payoutMethodId}/decrypt`, { json: { reason } })
   }
 
   getMarketplaceStats() {
@@ -217,26 +240,34 @@ export class AdminService {
         publisher?: { name: string }
         createdAt: string
       }>
-      pagination: { page: number; limit: number; total: number; totalPages: number }
-    }>("/admin/marketplace/listings", { params: params as Record<string, string | number | undefined> })
+      pagination: {
+        page: number
+        limit: number
+        total: number
+        totalPages: number
+      }
+    }>("/admin/marketplace/listings", {
+      params: params as Record<string, string | number | undefined>,
+    })
   }
 
   // Platform-owned websites (for attaching platform listings + ownership
   // management). Phase 6.5: response carries managedByUserId + managedBy
   // for the ownership picker.
   async listPlatformWebsites() {
-    const res = await this.client.get<{ websites: Array<{
-      id: string
-      url: string
-      name: string | null
-      domain?: string | null
-      ownershipType: "PLATFORM" | "PUBLISHER"
-      managedByUserId?: string | null
-      managedBy?: { id: string; name: string | null } | null
-    }> }>(
-      "/admin/websites",
-      { params: { ownershipType: "PLATFORM" } as Record<string, string> },
-    )
+    const res = await this.client.get<{
+      websites: Array<{
+        id: string
+        url: string
+        name: string | null
+        domain?: string | null
+        ownershipType: "PLATFORM" | "PUBLISHER"
+        managedByUserId?: string | null
+        managedBy?: { id: string; name: string | null } | null
+      }>
+    }>("/admin/websites", {
+      params: { ownershipType: "PLATFORM" } as Record<string, string>,
+    })
     return res.websites ?? []
   }
 
@@ -245,11 +276,18 @@ export class AdminService {
   // Phase 2: accepts an optional services[] for the multi-service shape;
   // legacy clients pass type+price and the API shims a single service row.
   // Phase 6.5: site-ownership reassignment + OPS staff picker.
-  assignWebsite(websiteId: string, data: { managedByUserId: string | null; reason?: string }) {
-    return this.client.patch(`/admin/websites/${websiteId}/assign`, { json: data })
+  assignWebsite(
+    websiteId: string,
+    data: { managedByUserId: string | null; reason?: string },
+  ) {
+    return this.client.patch(`/admin/websites/${websiteId}/assign`, {
+      json: data,
+    })
   }
   listOpsStaff() {
-    return this.client.get<Array<{ id: string; name: string | null; email: string }>>("/admin/users/ops")
+    return this.client.get<
+      Array<{ id: string; name: string | null; email: string }>
+    >("/admin/users/ops")
   }
 
   createPlatformListing(data: {
@@ -270,19 +308,31 @@ export class AdminService {
       availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
     }>
   }) {
-    return this.client.post<{ id: string; slug: string; status: string }>("/admin/marketplace/listings", { json: data })
+    return this.client.post<{ id: string; slug: string; status: string }>(
+      "/admin/marketplace/listings",
+      { json: data },
+    )
   }
 
   updateListingStatus(listingId: string, status: string, force?: boolean) {
-    return this.client.patch(`/admin/marketplace/listings/${listingId}/status`, { json: { status, force } })
+    return this.client.patch(
+      `/admin/marketplace/listings/${listingId}/status`,
+      { json: { status, force } },
+    )
   }
 
   toggleListingFeatured(listingId: string, featured: boolean) {
-    return this.client.patch(`/admin/marketplace/listings/${listingId}/featured`, { json: { featured } })
+    return this.client.patch(
+      `/admin/marketplace/listings/${listingId}/featured`,
+      { json: { featured } },
+    )
   }
 
   toggleListingVerified(listingId: string, verified: boolean) {
-    return this.client.patch(`/admin/marketplace/listings/${listingId}/verified`, { json: { verified } })
+    return this.client.patch(
+      `/admin/marketplace/listings/${listingId}/verified`,
+      { json: { verified } },
+    )
   }
 
   deleteListing(listingId: string) {
@@ -299,15 +349,29 @@ export class AdminService {
   }
 
   // -- Website verification governance + review center --
-  verificationReviewCenter(filters: { publisherId?: string; domain?: string; status?: string; from?: string; to?: string } = {}) {
-    const q = new URLSearchParams(Object.entries(filters).filter(([, v]) => v) as [string, string][]).toString()
-    return this.client.get<any>(`/admin/websites/verification${q ? `?${q}` : ""}`)
+  verificationReviewCenter(
+    filters: {
+      publisherId?: string
+      domain?: string
+      status?: string
+      from?: string
+      to?: string
+    } = {},
+  ) {
+    const q = new URLSearchParams(
+      Object.entries(filters).filter(([, v]) => v) as [string, string][],
+    ).toString()
+    return this.client.get<any>(
+      `/admin/websites/verification${q ? `?${q}` : ""}`,
+    )
   }
   forceApprovedReport() {
     return this.client.get<any>("/admin/websites/force-approved")
   }
   bulkRetryVerification(websiteIds: string[]) {
-    return this.client.post<any>("/admin/websites/verification/bulk-retry", { json: { websiteIds } })
+    return this.client.post<any>("/admin/websites/verification/bulk-retry", {
+      json: { websiteIds },
+    })
   }
   recomputeTrust(websiteId: string) {
     return this.client.post<any>(`/admin/websites/${websiteId}/recompute-trust`)
@@ -321,12 +385,19 @@ export class AdminService {
     return this.client.post(`/orders/${orderId}/claim`)
   }
   assignOrder(orderId: string, assignedToUserId: string) {
-    return this.client.post(`/orders/${orderId}/assign`, { json: { assignedToUserId } })
+    return this.client.post(`/orders/${orderId}/assign`, {
+      json: { assignedToUserId },
+    })
   }
   reassignOrder(orderId: string, assignedToUserId: string) {
-    return this.client.post(`/orders/${orderId}/reassign`, { json: { assignedToUserId } })
+    return this.client.post(`/orders/${orderId}/reassign`, {
+      json: { assignedToUserId },
+    })
   }
-  submitPlatformDelivery(orderId: string, data: { publishedUrl: string; articleTitle?: string; notes?: string }) {
+  submitPlatformDelivery(
+    orderId: string,
+    data: { publishedUrl: string; articleTitle?: string; notes?: string },
+  ) {
     return this.client.post(`/orders/${orderId}/deliveries`, { json: data })
   }
   listDeliveries(orderId: string) {
@@ -358,24 +429,43 @@ export class AdminService {
   reviewDispute(disputeId: string) {
     return this.client.post<any>(`/admin/disputes/${disputeId}/review`)
   }
-  resolveDispute(disputeId: string, action: "RESTORE" | "REFUND" | "REJECT", resolution: string) {
-    return this.client.post<any>(`/admin/disputes/${disputeId}/resolve`, { json: { action, resolution } })
+  resolveDispute(
+    disputeId: string,
+    action: "RESTORE" | "REFUND" | "REJECT",
+    resolution: string,
+  ) {
+    return this.client.post<any>(`/admin/disputes/${disputeId}/resolve`, {
+      json: { action, resolution },
+    })
   }
   reverifyDelivery(deliveryId: string) {
     return this.client.post(`/deliveries/${deliveryId}/reverify`)
   }
   manualApproveDelivery(deliveryId: string, reason: string) {
-    return this.client.post(`/deliveries/${deliveryId}/manual-approve`, { json: { reason } })
+    return this.client.post(`/deliveries/${deliveryId}/manual-approve`, {
+      json: { reason },
+    })
   }
   manualRejectDelivery(deliveryId: string, reason: string) {
-    return this.client.post(`/deliveries/${deliveryId}/manual-reject`, { json: { reason } })
+    return this.client.post(`/deliveries/${deliveryId}/manual-reject`, {
+      json: { reason },
+    })
   }
-  overrideDelivery(deliveryId: string, targetStatus: "VERIFIED" | "FAILED", reason: string) {
-    return this.client.post(`/deliveries/${deliveryId}/override`, { json: { targetStatus, reason } })
+  overrideDelivery(
+    deliveryId: string,
+    targetStatus: "VERIFIED" | "FAILED",
+    reason: string,
+  ) {
+    return this.client.post(`/deliveries/${deliveryId}/override`, {
+      json: { targetStatus, reason },
+    })
   }
 
   moderateReview(reviewId: string, status: "APPROVED" | "REJECTED") {
-    return this.client.patch(`/admin/marketplace/reviews/${reviewId}/moderate`, { json: { status } })
+    return this.client.patch(
+      `/admin/marketplace/reviews/${reviewId}/moderate`,
+      { json: { status } },
+    )
   }
 
   // -- Publishers --
@@ -406,14 +496,23 @@ export class AdminService {
       page: number
       limit: number
       totalPages: number
-    }>("/admin/publishers", { params: params as Record<string, string | number | undefined> })
+    }>("/admin/publishers", {
+      params: params as Record<string, string | number | undefined>,
+    })
   }
 
-  updatePublisherTier(publisherId: string, tier: "NEW" | "TRUSTED" | "VERIFIED") {
-    return this.client.patch(`/admin/publishers/${publisherId}/tier`, { json: { tier } })
+  updatePublisherTier(
+    publisherId: string,
+    tier: "NEW" | "TRUSTED" | "VERIFIED",
+  ) {
+    return this.client.patch(`/admin/publishers/${publisherId}/tier`, {
+      json: { tier },
+    })
   }
   recomputePublisherTrust(publisherId: string) {
-    return this.client.post<{ score: number; band: string; tier: string }>(`/admin/publishers/${publisherId}/recompute-trust`)
+    return this.client.post<{ score: number; band: string; tier: string }>(
+      `/admin/publishers/${publisherId}/recompute-trust`,
+    )
   }
 
   // -- Support --
@@ -438,7 +537,13 @@ export class AdminService {
         assignedPublisher: { id: string; name: string | null } | null
         customer: { id: string; name: string | null; email: string }
         organization: { id: string; name: string } | null
-        order: { id: string; title: string | null; status: string; type: string; fulfillmentChannel: string | null } | null
+        order: {
+          id: string
+          title: string | null
+          status: string
+          type: string
+          fulfillmentChannel: string | null
+        } | null
         messageCount: number
         createdAt: string
         updatedAt: string
@@ -447,7 +552,9 @@ export class AdminService {
       page: number
       limit: number
       totalPages: number
-    }>("/admin/support/tickets", { params: params as Record<string, string | number | undefined> })
+    }>("/admin/support/tickets", {
+      params: params as Record<string, string | number | undefined>,
+    })
   }
 
   getTicketDetail(id: string) {
@@ -461,7 +568,13 @@ export class AdminService {
       assignedPublisher: { id: string; name: string | null } | null
       user: { id: string; name: string | null; email: string; userType: string }
       organization: { id: string; name: string } | null
-      order: { id: string; title: string | null; status: string; type: string; fulfillmentChannel: string | null } | null
+      order: {
+        id: string
+        title: string | null
+        status: string
+        type: string
+        fulfillmentChannel: string | null
+      } | null
       messages: Array<{
         id: string
         content: string
@@ -478,7 +591,12 @@ export class AdminService {
           publisherRole: "PUBLISHER_OWNER" | "PUBLISHER_MEMBER" | null
         } | null
         createdAt: string
-        user: { id: string; name: string | null; email: string; userType: string } | null
+        user: {
+          id: string
+          name: string | null
+          email: string
+          userType: string
+        } | null
       }>
       createdAt: string
       updatedAt: string
@@ -486,7 +604,9 @@ export class AdminService {
   }
 
   updateTicketStatus(ticketId: string, status: TicketStatus) {
-    return this.client.patch(`/admin/support/tickets/${ticketId}/status`, { json: { status } })
+    return this.client.patch(`/admin/support/tickets/${ticketId}/status`, {
+      json: { status },
+    })
   }
 
   // Phase 6.6: visibility is optional; defaults to PUBLIC. Staff frontends
@@ -496,14 +616,22 @@ export class AdminService {
     ticketId: string,
     data: { content: string; visibility?: "PUBLIC" | "INTERNAL" },
   ) {
-    return this.client.post(`/admin/support/tickets/${ticketId}/messages`, { json: data })
+    return this.client.post(`/admin/support/tickets/${ticketId}/messages`, {
+      json: data,
+    })
   }
 
   reassignTicket(
     ticketId: string,
-    body: { assignedToUserId?: string | null; assignedPublisherId?: string | null; reason?: string },
+    body: {
+      assignedToUserId?: string | null
+      assignedPublisherId?: string | null
+      reason?: string
+    },
   ) {
-    return this.client.patch(`/support/tickets/${ticketId}/reassign`, { json: body })
+    return this.client.patch(`/support/tickets/${ticketId}/reassign`, {
+      json: body,
+    })
   }
 
   // -- Audit Logs --
@@ -511,7 +639,17 @@ export class AdminService {
   // backend rejects fuzzy operators. The returned `requestId` field carries
   // the indexed column value (Phase 7.7 A1) with fallback to legacy
   // metadata.requestId for pre-backfill rows.
-  listAuditLogs(params?: { actorId?: string; action?: string; entity?: string; entityId?: string; requestId?: string; startDate?: string; endDate?: string; page?: number; limit?: number }) {
+  listAuditLogs(params?: {
+    actorId?: string
+    action?: string
+    entity?: string
+    entityId?: string
+    requestId?: string
+    startDate?: string
+    endDate?: string
+    page?: number
+    limit?: number
+  }) {
     return this.client.get<{
       items: Array<{
         id: string
@@ -529,7 +667,9 @@ export class AdminService {
       page: number
       limit: number
       totalPages: number
-    }>("/admin/audit-logs", { params: params as Record<string, string | number | undefined> })
+    }>("/admin/audit-logs", {
+      params: params as Record<string, string | number | undefined>,
+    })
   }
 
   // ── Phase 7.1 — PlatformRevenue dashboard (GET /admin/finance/revenue) ──
@@ -560,9 +700,16 @@ export class AdminService {
    * `/api/v1/admin/finance/revenue?format=csv&...` directly via a link so the
    * browser streams it without ever materializing the full body in JS.
    */
-  exportRevenueCsv(params: { from?: string; to?: string; groupBy: "channel" | "month" | "serviceType" | "listing" }) {
+  exportRevenueCsv(params: {
+    from?: string
+    to?: string
+    groupBy: "channel" | "month" | "serviceType" | "listing"
+  }) {
     return this.client.get<string>("/admin/finance/revenue", {
-      params: { ...params, format: "csv" } as Record<string, string | number | undefined>,
+      params: { ...params, format: "csv" } as Record<
+        string,
+        string | number | undefined
+      >,
     })
   }
 }

@@ -1,14 +1,18 @@
 "use client"
 
-import { use } from "react"
-import { useQuery } from "@tanstack/react-query"
-import { api } from "../../../../lib/api"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Badge, StatusBadge, getCampaignStatusPresentation } from "@guestpost/ui"
 import type { CampaignStatus } from "@guestpost/database"
-import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  ErrorState,
+  getCampaignStatusPresentation,
+  Skeleton,
+  StatusBadge,
   Table,
   TableBody,
   TableCell,
@@ -16,16 +20,12 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
-import {
-  ArrowLeft,
-  Plus,
-  Eye,
-  FileText,
-  Megaphone,
-  AlertCircle,
-} from "lucide-react"
+import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
+import { AlertCircle, ArrowLeft, Eye, FileText, Plus } from "lucide-react"
 import Link from "next/link"
+import { use } from "react"
+import { api } from "../../../../lib/api"
 
 interface Campaign {
   id: string
@@ -49,7 +49,6 @@ interface Order {
   createdAt: string
 }
 
-
 function CampaignDetailSkeleton() {
   return (
     <div className="space-y-6">
@@ -59,23 +58,45 @@ function CampaignDetailSkeleton() {
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <Card><CardContent className="pt-6"><Skeleton className="h-64 w-full" /></CardContent></Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
         </div>
-        <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
+        <Card>
+          <CardContent className="pt-6">
+            <Skeleton className="h-48 w-full" />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
 }
 
-export default function CampaignDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function CampaignDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
   const resolvedParams = use(params)
 
-  const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useQuery({
+  const {
+    data: campaignsData,
+    isLoading: campaignsLoading,
+    error: campaignsError,
+    refetch: refetchCampaigns,
+  } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns(),
   })
 
-  const { data: ordersData, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+    error: ordersError,
+    refetch: refetchOrders,
+  } = useQuery({
     queryKey: ["orders"],
     queryFn: () => api.orders.list(),
   })
@@ -83,20 +104,39 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   const campaignDetailError = campaignsError || ordersError
 
   if (campaignDetailError) {
-    return <ErrorState title="Failed to load campaign" description={(campaignDetailError as Error).message} onRetry={() => { refetchCampaigns(); refetchOrders(); }} />
+    return (
+      <ErrorState
+        title="Failed to load campaign"
+        description={(campaignDetailError as Error).message}
+        onRetry={() => {
+          refetchCampaigns()
+          refetchOrders()
+        }}
+      />
+    )
   }
 
   const isLoading = campaignsLoading || ordersLoading
 
-  const campaign = campaignsData?.find((c: Campaign) => c.id === resolvedParams.id)
-  const campaignOrders = ordersData?.filter((o: Order) => {
-    const order = o as any
-    return order.campaignId === resolvedParams.id
-  }) ?? []
+  const campaign = campaignsData?.find(
+    (c: Campaign) => c.id === resolvedParams.id,
+  )
+  const campaignOrders =
+    ordersData?.filter((o: Order) => {
+      const order = o as any
+      return order.campaignId === resolvedParams.id
+    }) ?? []
 
-  const activeOrders = campaignOrders.filter((o: Order) => !["COMPLETED", "CANCELLED"].includes(o.status)).length
-  const completedOrders = campaignOrders.filter((o: Order) => o.status === "COMPLETED").length
-  const totalSpend = campaignOrders.reduce((sum: number, o: Order) => sum + (o.totalAmount || 0), 0)
+  const activeOrders = campaignOrders.filter(
+    (o: Order) => !["COMPLETED", "CANCELLED"].includes(o.status),
+  ).length
+  const completedOrders = campaignOrders.filter(
+    (o: Order) => o.status === "COMPLETED",
+  ).length
+  const totalSpend = campaignOrders.reduce(
+    (sum: number, o: Order) => sum + (o.totalAmount || 0),
+    0,
+  )
 
   if (isLoading) {
     return (
@@ -118,7 +158,8 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         <AlertCircle className="h-12 w-12 text-destructive" />
         <h2 className="mt-4 text-xl font-semibold">Campaign Not Found</h2>
         <p className="mt-2 text-muted-foreground">
-          The campaign you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+          The campaign you&apos;re looking for doesn&apos;t exist or you
+          don&apos;t have access to it.
         </p>
         <Button className="mt-4" asChild>
           <Link href="/dashboard/campaigns">View All Campaigns</Link>
@@ -138,9 +179,13 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight">{campaign.name}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                {campaign.name}
+              </h1>
               {(() => {
-                const p = getCampaignStatusPresentation(campaign.status as CampaignStatus)
+                const p = getCampaignStatusPresentation(
+                  campaign.status as CampaignStatus,
+                )
                 return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
               })()}
             </div>
@@ -161,7 +206,9 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       <div className="grid gap-6 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Orders</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Orders
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{campaignOrders.length}</div>
@@ -169,7 +216,9 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Orders</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Active Orders
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activeOrders}</div>
@@ -177,7 +226,9 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Completed
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{completedOrders}</div>
@@ -185,10 +236,14 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Spend</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Total Spend
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">${totalSpend.toFixed(2)}</div>
+            <div className="text-2xl font-bold font-mono">
+              ${totalSpend.toFixed(2)}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -198,7 +253,9 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Campaign Orders</CardTitle>
-              <CardDescription>Orders associated with this campaign</CardDescription>
+              <CardDescription>
+                Orders associated with this campaign
+              </CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -233,7 +290,10 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                 {campaignOrders.map((order: Order) => (
                   <TableRow key={order.id}>
                     <TableCell className="font-mono text-xs">
-                      <Link href={`/dashboard/orders/${order.id}`} className="hover:text-primary">
+                      <Link
+                        href={`/dashboard/orders/${order.id}`}
+                        className="hover:text-primary"
+                      >
                         #{order.id.slice(0, 8)}
                       </Link>
                     </TableCell>
@@ -246,7 +306,9 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {order.totalAmount ? `$${order.totalAmount.toFixed(2)}` : "—"}
+                      {order.totalAmount
+                        ? `$${order.totalAmount.toFixed(2)}`
+                        : "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {format(new Date(order.createdAt), "PP")}

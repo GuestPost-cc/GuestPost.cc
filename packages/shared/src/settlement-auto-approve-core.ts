@@ -52,11 +52,14 @@ export interface RunSettlementAutoApproveOptions {
  */
 export interface AutoApproveObservabilityHooks {
   logError: (msg: string, ctx: Record<string, unknown>) => void
-  captureException: (err: unknown, opts: {
-    tags: Record<string, string>
-    contexts: Record<string, unknown>
-    fingerprint: string[]
-  }) => void
+  captureException: (
+    err: unknown,
+    opts: {
+      tags: Record<string, string>
+      contexts: Record<string, unknown>
+      fingerprint: string[]
+    },
+  ) => void
 }
 
 /**
@@ -83,7 +86,11 @@ export function makeAutoApproveOnError(
       sweepRunId,
     })
     hooks.captureException(err, {
-      tags: { queue: "settlement", job: jobName, sweepRunId: sweepRunId ?? "unknown" },
+      tags: {
+        queue: "settlement",
+        job: jobName,
+        sweepRunId: sweepRunId ?? "unknown",
+      },
       contexts: { settlement_auto_approve: { settlementId } },
       fingerprint: ["settlement-auto-approve", settlementId],
     })
@@ -149,7 +156,10 @@ export async function runSettlementAutoApprove(
     // Settlement gating: an active dispute blocks auto-approval (the customer
     // is actively contesting; the review window is paused for resolution).
     const activeDispute = await prisma.orderDispute.findFirst({
-      where: { orderId: settlement.orderId, status: { in: ["OPEN", "UNDER_REVIEW"] } },
+      where: {
+        orderId: settlement.orderId,
+        status: { in: ["OPEN", "UNDER_REVIEW"] },
+      },
     })
     if (activeDispute) {
       skipped++
@@ -170,7 +180,12 @@ export async function runSettlementAutoApprove(
         if (updated.count === 0) return false
 
         await tx.settlementApproval.upsert({
-          where: { settlementId_type: { settlementId: settlement.id, type: "CUSTOMER" } },
+          where: {
+            settlementId_type: {
+              settlementId: settlement.id,
+              type: "CUSTOMER",
+            },
+          },
           create: {
             settlementId: settlement.id,
             type: "CUSTOMER",

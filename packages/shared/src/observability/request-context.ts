@@ -60,7 +60,9 @@ export function getRequestId(): string | null {
 export function requireRequestId(): string {
   const id = getRequestId()
   if (!id) {
-    throw new Error("[request-context] requireRequestId() called outside any runWithRequestId() frame")
+    throw new Error(
+      "[request-context] requireRequestId() called outside any runWithRequestId() frame",
+    )
   }
   return id
 }

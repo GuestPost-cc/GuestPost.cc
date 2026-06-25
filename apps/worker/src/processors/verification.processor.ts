@@ -1,12 +1,17 @@
-import { connection } from "../redis"
+import { prisma } from "@guestpost/database"
 import { QUEUES } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
-import { prisma } from "@guestpost/database"
-import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 // Node-only deep import — undici + dns must stay out of the shared
 // package's public index so the Next.js apps can bundle @guestpost/shared.
-import { safeFetch, readBodyWithCap, isSafePublicUrl, SafeFetchError } from "@guestpost/shared/dist/safe-fetch"
+import {
+  isSafePublicUrl,
+  readBodyWithCap,
+  SafeFetchError,
+  safeFetch,
+} from "@guestpost/shared/dist/safe-fetch"
+import { createObservableWorker } from "../lib/queue-observability"
+import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.verification")
@@ -16,15 +21,22 @@ const MAX_HTML_BYTES = 5 * 1024 * 1024
 
 function hostMatchesWebsite(targetUrl: string, websiteUrl: string): boolean {
   try {
-    const targetHost = new URL(targetUrl).hostname.toLowerCase().replace(/^www\./, "")
-    const siteHost = new URL(websiteUrl).hostname.toLowerCase().replace(/^www\./, "")
+    const targetHost = new URL(targetUrl).hostname
+      .toLowerCase()
+      .replace(/^www\./, "")
+    const siteHost = new URL(websiteUrl).hostname
+      .toLowerCase()
+      .replace(/^www\./, "")
     return targetHost === siteHost || targetHost.endsWith(`.${siteHost}`)
   } catch {
     return false
   }
 }
 
-async function verifyLinkOnPage(targetUrl: string, anchorText?: string): Promise<string | null> {
+async function verifyLinkOnPage(
+  targetUrl: string,
+  anchorText?: string,
+): Promise<string | null> {
   let response: Response
   try {
     // Phase 7.11 (#14): safeFetch resolves DNS inside the dispatcher
@@ -43,7 +55,10 @@ async function verifyLinkOnPage(targetUrl: string, anchorText?: string): Promise
     return null
   }
   if (!response.ok) {
-    logger.warn("HTTP non-OK fetching target", { status: response.status, targetUrl })
+    logger.warn("HTTP non-OK fetching target", {
+      status: response.status,
+      targetUrl,
+    })
     return null
   }
   // Phase 7.11 (#13): capped read — 5MB ceiling prevents OOM on a
@@ -54,7 +69,10 @@ async function verifyLinkOnPage(targetUrl: string, anchorText?: string): Promise
     html = await readBodyWithCap(response, MAX_HTML_BYTES)
   } catch (err: any) {
     if (err instanceof SafeFetchError && err.code === "BODY_TOO_LARGE") {
-      logger.warn("response body cap exceeded", { url: targetUrl, maxBytes: MAX_HTML_BYTES })
+      logger.warn("response body cap exceeded", {
+        url: targetUrl,
+        maxBytes: MAX_HTML_BYTES,
+      })
     }
     return null
   }
@@ -83,7 +101,11 @@ export function createVerificationWorker() {
           // otherwise enqueue arbitrary URL fetches (SSRF).
           // Phase 7.8 #27 — repeatable cron jobs bypass freshness (none today
           // in this queue, but the helper future-proofs new repeatables).
-          if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
+          if (
+            !verifyJobPayload(job.data, {
+              maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined,
+            })
+          ) {
             logger.error("job signature invalid — rejecting", { jobId: job.id })
             throw new Error("Invalid job signature")
           }
@@ -93,8 +115,15 @@ export function createVerificationWorker() {
           }
 
           if (!isSafePublicUrl(targetUrl)) {
-            logger.error("unsafe target URL rejected (SSRF guard)", { orderId, targetUrl })
-            return { verified: false, orderId, reason: "Target URL is not a safe public URL" }
+            logger.error("unsafe target URL rejected (SSRF guard)", {
+              orderId,
+              targetUrl,
+            })
+            return {
+              verified: false,
+              orderId,
+              reason: "Target URL is not a safe public URL",
+            }
           }
 
           const order = await prisma.order.findUnique({
@@ -103,22 +132,48 @@ export function createVerificationWorker() {
           })
           if (!order) throw new Error(`Order ${orderId} not found`)
 
-          if (order.website?.url && !hostMatchesWebsite(targetUrl, order.website.url)) {
-            logger.warn("target URL host does not match order website", { orderId, targetUrl, websiteUrl: order.website.url })
-            return { verified: false, orderId, reason: "Published URL does not match the order's website domain" }
+          if (
+            order.website?.url &&
+            !hostMatchesWebsite(targetUrl, order.website.url)
+          ) {
+            logger.warn("target URL host does not match order website", {
+              orderId,
+              targetUrl,
+              websiteUrl: order.website.url,
+            })
+            return {
+              verified: false,
+              orderId,
+              reason: "Published URL does not match the order's website domain",
+            }
           }
           if (order.status !== "PUBLISHED") {
-            logger.warn("order not PUBLISHED — skipping", { orderId, status: order.status })
-            return { verified: false, orderId, reason: `Status is ${order.status}, expected PUBLISHED` }
+            logger.warn("order not PUBLISHED — skipping", {
+              orderId,
+              status: order.status,
+            })
+            return {
+              verified: false,
+              orderId,
+              reason: `Status is ${order.status}, expected PUBLISHED`,
+            }
           }
 
           const orgId = organizationId || order.organizationId
           if (orgId && order.organizationId !== orgId) {
-            logger.warn("organization mismatch", { orderId, expectedOrg: orgId, actualOrg: order.organizationId })
+            logger.warn("organization mismatch", {
+              orderId,
+              expectedOrg: orgId,
+              actualOrg: order.organizationId,
+            })
             return { verified: false, orderId, reason: "Organization mismatch" }
           }
 
-          logger.info("verifying link", { orderId, targetUrl, anchorText: anchorText ?? null })
+          logger.info("verifying link", {
+            orderId,
+            targetUrl,
+            anchorText: anchorText ?? null,
+          })
           const evidence = await verifyLinkOnPage(targetUrl, anchorText)
 
           if (evidence) {
@@ -148,7 +203,11 @@ export function createVerificationWorker() {
               },
             })
 
-            logger.info("link verified", { orderId, targetUrl, anchorText: anchorText ?? null })
+            logger.info("link verified", {
+              orderId,
+              targetUrl,
+              anchorText: anchorText ?? null,
+            })
           } else {
             await prisma.orderEvent.create({
               data: {
@@ -163,7 +222,11 @@ export function createVerificationWorker() {
                 },
               },
             })
-            logger.warn("link NOT found", { orderId, targetUrl, anchorText: anchorText ?? null })
+            logger.warn("link NOT found", {
+              orderId,
+              targetUrl,
+              anchorText: anchorText ?? null,
+            })
           }
 
           return { verified: !!evidence, orderId, evidence }

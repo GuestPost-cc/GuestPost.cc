@@ -3,7 +3,12 @@
 // shared so customer portal, publisher, and admin lists rank identically.
 
 // Fully closed — money settled or order ended. These sink to the bottom.
-export const TERMINAL_ORDER_STATUSES = ["SETTLED", "COMPLETED", "CANCELLED", "REFUNDED"]
+export const TERMINAL_ORDER_STATUSES = [
+  "SETTLED",
+  "COMPLETED",
+  "CANCELLED",
+  "REFUNDED",
+]
 
 // Needs a human now — surfaced at the very top regardless of recency.
 export const ATTENTION_ORDER_STATUSES = ["DISPUTED", "PENDING_PAYMENT"]
@@ -24,10 +29,13 @@ export function isActiveOrder(status: string): boolean {
 
 // Comparator: tier asc, then most-recently-touched first. Pass the field that
 // best reflects "last activity" (updatedAt, else createdAt).
-export function compareOrdersByPriority<T extends { status: string; updatedAt?: string | Date | null; createdAt?: string | Date | null }>(
-  a: T,
-  b: T,
-): number {
+export function compareOrdersByPriority<
+  T extends {
+    status: string
+    updatedAt?: string | Date | null
+    createdAt?: string | Date | null
+  },
+>(a: T, b: T): number {
   const ta = orderPriorityTier(a.status)
   const tb = orderPriorityTier(b.status)
   if (ta !== tb) return ta - tb
@@ -37,6 +45,12 @@ export function compareOrdersByPriority<T extends { status: string; updatedAt?: 
 }
 
 // Sort a copy — never mutate the query cache array in place.
-export function sortOrdersByPriority<T extends { status: string; updatedAt?: string | Date | null; createdAt?: string | Date | null }>(orders: T[]): T[] {
+export function sortOrdersByPriority<
+  T extends {
+    status: string
+    updatedAt?: string | Date | null
+    createdAt?: string | Date | null
+  },
+>(orders: T[]): T[] {
   return [...orders].sort(compareOrdersByPriority)
 }

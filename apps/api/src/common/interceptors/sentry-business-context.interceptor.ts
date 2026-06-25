@@ -14,13 +14,18 @@
 // Also tags requestId from the AsyncLocalStorage frame established by
 // RequestIdMiddleware.
 
-import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from "@nestjs/common"
-import * as Sentry from "@sentry/node"
-import { Observable } from "rxjs"
-import { setBusinessContext, type BusinessContext } from "@guestpost/shared"
+import { type BusinessContext, setBusinessContext } from "@guestpost/shared"
 // Deep import: request-context uses node:async_hooks and is not in the
 // shared barrel.
 import { getRequestId } from "@guestpost/shared/dist/observability/request-context"
+import {
+  type CallHandler,
+  type ExecutionContext,
+  Injectable,
+  type NestInterceptor,
+} from "@nestjs/common"
+import * as Sentry from "@sentry/node"
+import type { Observable } from "rxjs"
 
 interface ReqWithUser {
   user?: {

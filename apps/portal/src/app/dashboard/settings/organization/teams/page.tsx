@@ -1,23 +1,45 @@
 "use client"
 
+import {
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  EmptyState,
+  ErrorState,
+  Input,
+  Label,
+  LoadingState,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  AlertTriangle,
+  CalendarDays,
+  Group,
+  Loader2,
+  Plus,
+  Trash2,
+} from "lucide-react"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
 import { z } from "zod"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../../../lib/api"
 import { useAuth } from "../../../../../lib/auth"
-import {
-  Card, CardContent, CardHeader, CardTitle,
-  Button, Input, Label,
-  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-  DialogFooter, DialogClose,
-  Table, TableHeader, TableBody, TableHead, TableRow, TableCell,
-  Skeleton,
-} from "@guestpost/ui"
-import { ErrorState, EmptyState, LoadingState } from "@guestpost/ui"
-import { toast } from "sonner"
-import { Group, Plus, Trash2, Loader2, AlertTriangle, CalendarDays } from "lucide-react"
 
 export default function OrgTeamsPage() {
   const { user } = useAuth()
@@ -26,9 +48,17 @@ export default function OrgTeamsPage() {
   const isOwner = user?.customerRole === "OWNER"
 
   const [createOpen, setCreateOpen] = useState(false)
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string
+    name: string
+  } | null>(null)
 
-  const { data: teams, isLoading, error, refetch } = useQuery({
+  const {
+    data: teams,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["org-teams", orgId],
     queryFn: () => api.identity.listTeams(orgId!),
     enabled: !!orgId,
@@ -55,7 +85,13 @@ export default function OrgTeamsPage() {
   })
 
   if (!orgId) {
-    return <EmptyState icon={Group} title="No organization" description="You are not part of an organization." />
+    return (
+      <EmptyState
+        icon={Group}
+        title="No organization"
+        description="You are not part of an organization."
+      />
+    )
   }
 
   return (
@@ -63,7 +99,9 @@ export default function OrgTeamsPage() {
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-muted-foreground">
-            {teams ? `${teams.length} team${teams.length !== 1 ? "s" : ""}` : ""}
+            {teams
+              ? `${teams.length} team${teams.length !== 1 ? "s" : ""}`
+              : ""}
           </p>
         </div>
         {isOwner && (
@@ -93,7 +131,11 @@ export default function OrgTeamsPage() {
           icon={Group}
           title="No teams yet"
           description="Teams help you organize your members into groups."
-          action={isOwner ? { label: "Create Team", onClick: () => setCreateOpen(true) } : undefined}
+          action={
+            isOwner
+              ? { label: "Create Team", onClick: () => setCreateOpen(true) }
+              : undefined
+          }
         />
       ) : (
         <Card>
@@ -102,7 +144,9 @@ export default function OrgTeamsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Team Name</TableHead>
-                  <TableHead className="hidden sm:table-cell">Created</TableHead>
+                  <TableHead className="hidden sm:table-cell">
+                    Created
+                  </TableHead>
                   {isOwner && <TableHead className="w-20"></TableHead>}
                 </TableRow>
               </TableHeader>
@@ -122,7 +166,9 @@ export default function OrgTeamsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => setDeleteTarget({ id: team.id, name: team.name })}
+                          onClick={() =>
+                            setDeleteTarget({ id: team.id, name: team.name })
+                          }
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -136,19 +182,26 @@ export default function OrgTeamsPage() {
         </Card>
       )}
 
-      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null) }}>
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Team</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete <strong>{deleteTarget?.name}</strong>?
-              This action cannot be undone.
+              Are you sure you want to delete{" "}
+              <strong>{deleteTarget?.name}</strong>? This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-4 text-sm">
             <AlertTriangle className="h-5 w-5 text-destructive shrink-0" />
             <p className="text-muted-foreground">
-              The team will be permanently removed. Any members assigned to this team will be unlinked.
+              The team will be permanently removed. Any members assigned to this
+              team will be unlinked.
             </p>
           </div>
           <DialogFooter>
@@ -157,10 +210,14 @@ export default function OrgTeamsPage() {
             </DialogClose>
             <Button
               variant="destructive"
-              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              onClick={() =>
+                deleteTarget && deleteMutation.mutate(deleteTarget.id)
+              }
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {deleteMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Delete Team
             </Button>
           </DialogFooter>
@@ -185,7 +242,7 @@ function CreateTeamForm({
     resolver: zodResolver(
       z.object({
         name: z.string().min(1, "Name is required"),
-      })
+      }),
     ),
     defaultValues: { name: "" },
   })
@@ -194,7 +251,9 @@ function CreateTeamForm({
     <form onSubmit={handleSubmit((data) => onSubmit(data.name.trim()))}>
       <DialogHeader className="mb-4">
         <DialogTitle>Create Team</DialogTitle>
-        <DialogDescription>Add a new team to organize your members.</DialogDescription>
+        <DialogDescription>
+          Add a new team to organize your members.
+        </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
         <div className="space-y-2">
@@ -212,7 +271,9 @@ function CreateTeamForm({
       </div>
       <DialogFooter className="mt-6">
         <DialogClose asChild>
-          <Button type="button" variant="outline">Cancel</Button>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
         </DialogClose>
         <Button type="submit" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

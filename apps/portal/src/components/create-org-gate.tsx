@@ -1,10 +1,19 @@
 "use client"
 
-import { useState } from "react"
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+} from "@guestpost/ui"
 import { useMutation } from "@tanstack/react-query"
-import { api } from "../lib/api"
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from "@guestpost/ui"
 import { Building2 } from "lucide-react"
+import { useState } from "react"
+import { api } from "../lib/api"
 
 // A freshly registered customer has no organization, and every money action
 // (deposit, checkout, orders) requires the OWNER role on one. This gate
@@ -14,7 +23,12 @@ export function CreateOrgGate({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState("")
 
   const slugify = (s: string) =>
-    s.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48)
+    s
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48)
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -35,7 +49,8 @@ export function CreateOrgGate({ onCreated }: { onCreated: () => void }) {
           </div>
           <CardTitle>Create your organization</CardTitle>
           <CardDescription>
-            Campaigns, orders, and your wallet all live under an organization. You&apos;ll be its owner.
+            Campaigns, orders, and your wallet all live under an organization.
+            You&apos;ll be its owner.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -61,10 +76,15 @@ export function CreateOrgGate({ onCreated }: { onCreated: () => void }) {
             </div>
             {createMutation.isError && (
               <p className="text-sm text-destructive">
-                {(createMutation.error as Error).message || "Could not create organization"}
+                {(createMutation.error as Error).message ||
+                  "Could not create organization"}
               </p>
             )}
-            <Button type="submit" className="w-full" disabled={createMutation.isPending || name.trim().length < 2}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={createMutation.isPending || name.trim().length < 2}
+            >
               {createMutation.isPending ? "Creating..." : "Create organization"}
             </Button>
           </form>

@@ -1,25 +1,35 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, ParseEnumPipe } from "@nestjs/common"
 import { ServiceType } from "@guestpost/database"
-import { MarketplaceService } from "./marketplace.service"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
-import { Public } from "../../common/decorators/public.decorator"
-import { ActorType } from "../../common/decorators/actor-type.decorator"
-import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
-import { MemberRoles } from "../../common/decorators/member-roles.decorator"
-import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import {
-  SearchListingsDto,
-  CreateListingDto,
-  UpdateListingDto,
-  CreateReviewDto,
-  CreateFavoriteDto,
-  CreateSavedListDto,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseEnumPipe,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from "@nestjs/common"
+import { ActorType } from "../../common/decorators/actor-type.decorator"
+import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { MemberRoles } from "../../common/decorators/member-roles.decorator"
+import { Public } from "../../common/decorators/public.decorator"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import type {
   AddToSavedListDto,
-  GetListingFiltersDto,
+  CreateFavoriteDto,
+  CreateListingDto,
+  CreateReviewDto,
+  CreateSavedListDto,
   GetRecommendationsDto,
   ListingServiceInput,
+  SearchListingsDto,
+  UpdateListingDto,
   UpdateListingServiceInput,
 } from "./dto/marketplace.dto"
+import type { MarketplaceService } from "./marketplace.service"
 
 @Controller("marketplace")
 export class MarketplaceController {
@@ -100,7 +110,10 @@ export class MarketplaceController {
   }
 
   @Get("recommendations")
-  async getRecommendations(@Query() query: GetRecommendationsDto, @CurrentUser() user: any) {
+  async getRecommendations(
+    @Query() query: GetRecommendationsDto,
+    @CurrentUser() user: any,
+  ) {
     return this.marketplaceService.getRecommendations(user.id, query)
   }
 
@@ -125,14 +138,21 @@ export class MarketplaceController {
     // When undefined, the service defaults to null (whole-listing favorite,
     // legacy behavior). When set, creates a service-scoped WAITLIST
     // notify-me favorite.
-    return this.marketplaceService.addFavorite(user.id, body.listingId, body.serviceType ?? null)
+    return this.marketplaceService.addFavorite(
+      user.id,
+      body.listingId,
+      body.serviceType ?? null,
+    )
   }
 
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER", "MEMBER")
   @Delete("favorites/:listingId")
-  async removeFavorite(@Param("listingId") listingId: string, @CurrentUser() user: any) {
+  async removeFavorite(
+    @Param("listingId") listingId: string,
+    @CurrentUser() user: any,
+  ) {
     await this.marketplaceService.removeFavorite(user.id, listingId)
     return { success: true }
   }
@@ -148,10 +168,15 @@ export class MarketplaceController {
     // with a clean 400 before the handler runs — without it, a malformed
     // serviceType like `FAKETYPE` would reach Prisma and fail at the SQL
     // layer with an uglier error.
-    @Param("serviceType", new ParseEnumPipe(ServiceType)) serviceType: ServiceType,
+    @Param("serviceType", new ParseEnumPipe(ServiceType))
+    serviceType: ServiceType,
     @CurrentUser() user: any,
   ) {
-    await this.marketplaceService.removeFavoriteService(user.id, listingId, serviceType)
+    await this.marketplaceService.removeFavoriteService(
+      user.id,
+      listingId,
+      serviceType,
+    )
     return { success: true }
   }
 
@@ -167,7 +192,10 @@ export class MarketplaceController {
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER", "MEMBER")
   @Post("saved-lists")
-  async createSavedList(@Body() body: CreateSavedListDto, @CurrentUser() user: any) {
+  async createSavedList(
+    @Body() body: CreateSavedListDto,
+    @CurrentUser() user: any,
+  ) {
     return this.marketplaceService.createSavedList(user.id, body)
   }
 
@@ -176,9 +204,9 @@ export class MarketplaceController {
   @MemberRoles("OWNER", "MEMBER")
   @Post("saved-lists/:listId/items")
   async addToSavedList(
-    @Param("listId") listId: string, 
+    @Param("listId") listId: string,
     @Body() body: AddToSavedListDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: any,
   ) {
     return this.marketplaceService.addToSavedList(user.id, listId, body)
   }
@@ -188,11 +216,15 @@ export class MarketplaceController {
   @MemberRoles("OWNER", "MEMBER")
   @Delete("saved-lists/:listId/items/:listingId")
   async removeFromSavedList(
-    @Param("listId") listId: string, 
+    @Param("listId") listId: string,
     @Param("listingId") listingId: string,
-    @CurrentUser() user: any
+    @CurrentUser() user: any,
   ) {
-    await this.marketplaceService.removeFromSavedList(user.id, listId, listingId)
+    await this.marketplaceService.removeFromSavedList(
+      user.id,
+      listId,
+      listingId,
+    )
     return { success: true }
   }
 
@@ -206,8 +238,8 @@ export class MarketplaceController {
 
   @Get("publisher/:publisherId/listings")
   async getPublisherListings(
-    @Param("publisherId") publisherId: string, 
-    @CurrentUser() user?: any
+    @Param("publisherId") publisherId: string,
+    @CurrentUser() user?: any,
   ) {
     return this.marketplaceService.getPublisherListings(publisherId, user?.id)
   }
@@ -220,8 +252,15 @@ export class MarketplaceController {
   @ActorType("PUBLISHER")
   @MemberRoles("PUBLISHER_OWNER")
   @Post("listings")
-  async createListing(@Body() body: CreateListingDto, @CurrentUser() user: any) {
-    return this.marketplaceService.createListing(user.id, user.publisherId, body)
+  async createListing(
+    @Body() body: CreateListingDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplaceService.createListing(
+      user.id,
+      user.publisherId,
+      body,
+    )
   }
 
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
@@ -229,11 +268,16 @@ export class MarketplaceController {
   @MemberRoles("PUBLISHER_OWNER")
   @Put("listings/:id")
   async updateListing(
-    @Param("id") id: string, 
+    @Param("id") id: string,
     @Body() body: UpdateListingDto,
-    @CurrentUser() user: any
+    @CurrentUser() user: any,
   ) {
-    return this.marketplaceService.updateListing(user.id, user.publisherId, id, body)
+    return this.marketplaceService.updateListing(
+      user.id,
+      user.publisherId,
+      id,
+      body,
+    )
   }
 
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
@@ -255,7 +299,11 @@ export class MarketplaceController {
   @MemberRoles("PUBLISHER_OWNER")
   @Post("listings/:id/submit")
   async submitListing(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.marketplaceService.submitListingForReview(user.id, user.publisherId, id)
+    return this.marketplaceService.submitListingForReview(
+      user.id,
+      user.publisherId,
+      id,
+    )
   }
 
   @UseGuards(ActorTypeGuard, MemberRolesGuard)

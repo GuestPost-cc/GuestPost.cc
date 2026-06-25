@@ -20,8 +20,13 @@
  *   Total:    ≤3.5s per test
  */
 import { ConflictException } from "@nestjs/common"
+import {
+  makeOrder,
+  makeOrganization,
+  makeUser,
+  makeWebsite,
+} from "../factories"
 import { createTestApp } from "../helpers/create-test-app"
-import { makeOrganization, makeUser, makeWebsite, makeOrder } from "../factories"
 
 describe("[INTEGRATION] Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
   it("5 concurrent claim() calls on the same order: exactly 1 succeeds, 4 reject with ConflictException", async () => {
@@ -57,36 +62,45 @@ describe("[INTEGRATION] Phase 7.14 #23 — FulfillmentAssignment claim race", ()
       // Use a late require to avoid eager-importing the service at module-load
       // time (which would compete with createTestApp's deferred-import dance).
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { OrderFulfillmentAssignmentService } = require(
-        "../../../modules/orders/services/order-fulfillment-assignment.service",
-      )
+      const {
+        OrderFulfillmentAssignmentService,
+      } = require("../../../modules/orders/services/order-fulfillment-assignment.service")
       const service = app.get(OrderFulfillmentAssignmentService) as any
 
       console.time("[claim-race] concurrent-claims")
-      const results = await Promise.allSettled(opUsers.map(u => service.claim(order.id, u.id)))
+      const results = await Promise.allSettled(
+        opUsers.map((u) => service.claim(order.id, u.id)),
+      )
       console.timeEnd("[claim-race] concurrent-claims")
 
       // ── 4. Assertions — exactly 1 fulfilled + 4 rejected with ConflictException ──
-      const fulfilled = results.filter(r => r.status === "fulfilled")
-      const rejected = results.filter(r => r.status === "rejected") as PromiseRejectedResult[]
+      const fulfilled = results.filter((r) => r.status === "fulfilled")
+      const rejected = results.filter(
+        (r) => r.status === "rejected",
+      ) as PromiseRejectedResult[]
 
       console.log(
         `[claim-race] results: ${fulfilled.length} fulfilled, ${rejected.length} rejected`,
       )
       if (rejected.length > 0) {
-        console.log(`[claim-race] first rejection: ${rejected[0].reason?.message}`)
+        console.log(
+          `[claim-race] first rejection: ${rejected[0].reason?.message}`,
+        )
       }
 
       expect(fulfilled).toHaveLength(1)
       expect(rejected).toHaveLength(4)
-      rejected.forEach((r, i) => {
+      rejected.forEach((r, _i) => {
         expect(r.reason).toBeInstanceOf(ConflictException)
         expect(r.reason.message).toBe("Order is already assigned")
       })
 
       // ── 5. Steady-state check: exactly 1 ASSIGNED row for this orderId ──
       const activeCount = await prisma.fulfillmentAssignment.count({
-        where: { orderId: order.id, status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
+        where: {
+          orderId: order.id,
+          status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+        },
       })
       expect(activeCount).toBe(1)
       console.log(`[claim-race] activeCount: ${activeCount} (expect 1)`)

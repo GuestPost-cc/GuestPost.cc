@@ -1,7 +1,13 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException, NotFoundException } from "@nestjs/common"
-import { Reflector } from "@nestjs/core"
+import {
+  type CanActivate,
+  type ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import type { Reflector } from "@nestjs/core"
 import { ORDER_OWNERSHIP_KEY } from "../decorators/order-ownership.decorator"
-import { PrismaService } from "../prisma.service"
+import type { PrismaService } from "../prisma.service"
 
 @Injectable()
 export class OrderOwnershipGuard implements CanActivate {
@@ -11,10 +17,10 @@ export class OrderOwnershipGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const required = this.reflector.getAllAndOverride<boolean>(ORDER_OWNERSHIP_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ])
+    const required = this.reflector.getAllAndOverride<boolean>(
+      ORDER_OWNERSHIP_KEY,
+      [context.getHandler(), context.getClass()],
+    )
     if (!required) return true
 
     const request = context.switchToHttp().getRequest()
@@ -25,7 +31,12 @@ export class OrderOwnershipGuard implements CanActivate {
 
     // Phase 6.5: also pull fulfillmentChannel so we can refuse access when
     // a publisher's website later gets reassigned out from under them.
-    const orderSelect = { id: true, organizationId: true, fulfillmentChannel: true, website: { select: { publisherId: true, ownershipType: true } } }
+    const orderSelect = {
+      id: true,
+      organizationId: true,
+      fulfillmentChannel: true,
+      website: { select: { publisherId: true, ownershipType: true } },
+    }
 
     // Routes like /settlements/:id pass a settlement ID — resolve it to its order
     let order = await this.prisma.order.findUnique({
@@ -46,22 +57,29 @@ export class OrderOwnershipGuard implements CanActivate {
 
     if (user.userType === "CUSTOMER") {
       if (order.organizationId !== user.organizationId) {
-        throw new ForbiddenException("Order does not belong to your organization")
+        throw new ForbiddenException(
+          "Order does not belong to your organization",
+        )
       }
       return true
     }
 
     if (user.userType === "PUBLISHER") {
       if (order.website?.publisherId !== user.publisherId) {
-        throw new ForbiddenException("Order is not assigned to your publisher account")
+        throw new ForbiddenException(
+          "Order is not assigned to your publisher account",
+        )
       }
       // Channel consistency: a publisher should never operate on an order
       // whose snapshotted channel is PLATFORM (would mean a stale view of a
       // recently-reassigned website). Restrictive-only — never grants access.
-      const channel = order.fulfillmentChannel
-        ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+      const channel =
+        order.fulfillmentChannel ??
+        (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
       if (channel === "PLATFORM") {
-        throw new ForbiddenException("Order has been reassigned to platform fulfilment")
+        throw new ForbiddenException(
+          "Order has been reassigned to platform fulfilment",
+        )
       }
       return true
     }

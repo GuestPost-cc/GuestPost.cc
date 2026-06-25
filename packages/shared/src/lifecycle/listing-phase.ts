@@ -27,14 +27,14 @@ export type WebsiteVerificationStatus =
 
 export type ListingLifecyclePhase =
   // Publisher path
-  | "AWAITING_VERIFICATION"   // DRAFT, website still unverified
-  | "AWAITING_SERVICES"        // DRAFT, no AVAILABLE service yet
-  | "READY_FOR_REVIEW"         // DRAFT + verified + ≥1 AVAILABLE → publisher can submit
-  | "IN_REVIEW"                // PENDING_REVIEW
+  | "AWAITING_VERIFICATION" // DRAFT, website still unverified
+  | "AWAITING_SERVICES" // DRAFT, no AVAILABLE service yet
+  | "READY_FOR_REVIEW" // DRAFT + verified + ≥1 AVAILABLE → publisher can submit
+  | "IN_REVIEW" // PENDING_REVIEW
   // Platform path: no admin review step
-  | "READY_TO_PUBLISH"         // DRAFT + ≥1 AVAILABLE → admin can publish
+  | "READY_TO_PUBLISH" // DRAFT + ≥1 AVAILABLE → admin can publish
   // Shared terminal/active states
-  | "PUBLISHED"                // APPROVED
+  | "PUBLISHED" // APPROVED
   | "PAUSED"
   | "REJECTED"
   | "ARCHIVED"
@@ -52,12 +52,19 @@ export interface ListingPhaseInput {
 // Pure function. Order of conditions matters — terminal states first so a
 // PAUSED/REJECTED/ARCHIVED listing never reports "AWAITING_*" even if its
 // underlying website was later revoked.
-export function computeListingPhase(input: ListingPhaseInput): ListingLifecyclePhase {
-  const { status, ownerType, websiteVerificationStatus, availableServiceCount } = input
+export function computeListingPhase(
+  input: ListingPhaseInput,
+): ListingLifecyclePhase {
+  const {
+    status,
+    ownerType,
+    websiteVerificationStatus,
+    availableServiceCount,
+  } = input
 
   if (status === "ARCHIVED") return "ARCHIVED"
   if (status === "REJECTED") return "REJECTED"
-  if (status === "PAUSED")   return "PAUSED"
+  if (status === "PAUSED") return "PAUSED"
   if (status === "APPROVED") return "PUBLISHED"
   if (status === "PENDING_REVIEW") return "IN_REVIEW"
 
@@ -68,7 +75,7 @@ export function computeListingPhase(input: ListingPhaseInput): ListingLifecycleP
 
   // PUBLISHER path
   if (websiteVerificationStatus !== "VERIFIED") return "AWAITING_VERIFICATION"
-  if (availableServiceCount === 0)              return "AWAITING_SERVICES"
+  if (availableServiceCount === 0) return "AWAITING_SERVICES"
   return "READY_FOR_REVIEW"
 }
 

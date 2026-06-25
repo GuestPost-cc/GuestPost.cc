@@ -12,20 +12,35 @@
  * F-6: chargebacks place a spend-blocking hold; closed disputes release or
  *      debit it idempotently.
  */
+
+import { normalizeProviderWebhook } from "@guestpost/shared"
 import { BadRequestException, ConflictException } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
-import { normalizeProviderWebhook } from "@guestpost/shared"
-import { BillingService } from "../billing.service"
 import { OrdersService } from "../../orders/orders.service"
-import { SettlementsService } from "../../settlements/settlements.service"
 import { PublisherPayoutsService } from "../../publisher-payouts/publisher-payouts.service"
+import { SettlementsService } from "../../settlements/settlements.service"
+import { BillingService } from "../billing.service"
 
 function makePrismaMock() {
   const tables = [
-    "wallet", "transaction", "order", "orderItem", "orderEvent", "settlement",
-    "settlementApproval", "publisherBalance", "withdrawal", "payoutExecution",
-    "publisher", "publisherMembership", "staffMembership", "notification",
-    "orderDispute", "auditLog", "marketplaceListing", "service",
+    "wallet",
+    "transaction",
+    "order",
+    "orderItem",
+    "orderEvent",
+    "settlement",
+    "settlementApproval",
+    "publisherBalance",
+    "withdrawal",
+    "payoutExecution",
+    "publisher",
+    "publisherMembership",
+    "staffMembership",
+    "notification",
+    "orderDispute",
+    "auditLog",
+    "marketplaceListing",
+    "service",
     // Phase 6 — production orders.service.ts calls tx.listingService.findUnique
     // on the snapshot path; F-3 needs this model to be on the mock.
     "listingService",
@@ -63,7 +78,9 @@ function makePrismaMock() {
 }
 
 const auditMock = () => ({ log: jest.fn().mockResolvedValue(undefined) })
-const queueMock = () => ({ addJob: jest.fn().mockResolvedValue({ id: "job-1" }) })
+const queueMock = () => ({
+  addJob: jest.fn().mockResolvedValue({ id: "job-1" }),
+})
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe("F-1: deposit webhook double-credit race", () => {
@@ -81,19 +98,28 @@ describe("F-1: deposit webhook double-credit race", () => {
     id: "cs_test_123",
     amount_total: 25050, // $250.50
     payment_intent: "pi_test_456",
-    metadata: { walletId: "wallet-1", organizationId: "org-1", userId: "user-1" },
+    metadata: {
+      walletId: "wallet-1",
+      organizationId: "org-1",
+      userId: "user-1",
+    },
   }
 
   it("commits exactly one wallet increment with the ledger row (happy path)", async () => {
     prisma.transaction.findFirst.mockResolvedValue(null)
-    prisma.wallet.findUniqueOrThrow.mockResolvedValue({ id: "wallet-1", version: 3 })
+    prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      id: "wallet-1",
+      version: 3,
+    })
 
     await (service as any).processSuccessfulPayment(session)
 
     expect(prisma.__committed).toBe(true)
-    expect(prisma.wallet.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "wallet-1", version: 3 },
-    }))
+    expect(prisma.wallet.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "wallet-1", version: 3 },
+      }),
+    )
     // Ledger row carries the payment_intent linkage for chargeback lookup (F-6)
     expect(prisma.transaction.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -106,11 +132,18 @@ describe("F-1: deposit webhook double-credit race", () => {
 
   it("ROLLS BACK the wallet increment when the ledger insert hits P2002 (duplicate race)", async () => {
     prisma.transaction.findFirst.mockResolvedValue(null) // fast path passes — race window
-    prisma.wallet.findUniqueOrThrow.mockResolvedValue({ id: "wallet-1", version: 3 })
-    prisma.transaction.create.mockRejectedValue(Object.assign(new Error("unique"), { code: "P2002" }))
+    prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      id: "wallet-1",
+      version: 3,
+    })
+    prisma.transaction.create.mockRejectedValue(
+      Object.assign(new Error("unique"), { code: "P2002" }),
+    )
 
     // Service swallows the duplicate (webhook returns 200 so Stripe stops retrying)…
-    await expect((service as any).processSuccessfulPayment(session)).resolves.toBeUndefined()
+    await expect(
+      (service as any).processSuccessfulPayment(session),
+    ).resolves.toBeUndefined()
 
     // …but the transaction itself must have ABORTED: the previous behavior
     // caught P2002 inside the callback and returned, committing the wallet
@@ -119,9 +152,14 @@ describe("F-1: deposit webhook double-credit race", () => {
   })
 
   it("rolls back when the fast-path dedupe finds an existing ledger row", async () => {
-    prisma.transaction.findFirst.mockResolvedValue({ id: "t-1", reference: "cs_test_123" })
+    prisma.transaction.findFirst.mockResolvedValue({
+      id: "t-1",
+      reference: "cs_test_123",
+    })
 
-    await expect((service as any).processSuccessfulPayment(session)).resolves.toBeUndefined()
+    await expect(
+      (service as any).processSuccessfulPayment(session),
+    ).resolves.toBeUndefined()
     expect(prisma.__committed).toBe(false)
     expect(prisma.wallet.updateMany).not.toHaveBeenCalled()
   })
@@ -152,51 +190,90 @@ describe("F-6: chargeback hold workflow", () => {
   it("places a hold (available -> reserved) linked via payment_intent", async () => {
     // outer lookup: deposit row; in-tx lookup: no existing hold
     prisma.transaction.findFirst
-      .mockResolvedValueOnce({ id: "t-dep", walletId: "wallet-1", amount: new Decimal(1000), reference: "cs_1" })
+      .mockResolvedValueOnce({
+        id: "t-dep",
+        walletId: "wallet-1",
+        amount: new Decimal(1000),
+        reference: "cs_1",
+      })
       .mockResolvedValueOnce(null)
     prisma.wallet.findUniqueOrThrow.mockResolvedValue({
-      id: "wallet-1", version: 2, availableBalance: new Decimal(1000), reservedBalance: new Decimal(0),
+      id: "wallet-1",
+      version: 2,
+      availableBalance: new Decimal(1000),
+      reservedBalance: new Decimal(0),
     })
 
     await (service as any).handleChargeback(dispute)
 
     expect(prisma.__committed).toBe(true)
-    expect(prisma.wallet.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "wallet-1", version: 2 },
-      data: expect.objectContaining({
-        availableBalance: { decrement: expect.anything() },
-        reservedBalance: { increment: expect.anything() },
+    expect(prisma.wallet.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "wallet-1", version: 2 },
+        data: expect.objectContaining({
+          availableBalance: { decrement: expect.anything() },
+          reservedBalance: { increment: expect.anything() },
+        }),
       }),
-    }))
+    )
     expect(prisma.transaction.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ type: "RESERVATION", reference: "chargeback-hold-dp_1" }),
+      data: expect.objectContaining({
+        type: "RESERVATION",
+        reference: "chargeback-hold-dp_1",
+      }),
     })
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({
-      action: "STRIPE_CHARGEBACK_HOLD_PLACED",
-      metadata: expect.objectContaining({ heldAmount: "600.00", uncoveredExposure: "0.00" }),
-    }))
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "STRIPE_CHARGEBACK_HOLD_PLACED",
+        metadata: expect.objectContaining({
+          heldAmount: "600.00",
+          uncoveredExposure: "0.00",
+        }),
+      }),
+    )
   })
 
   it("holds only what remains and records the uncovered exposure", async () => {
     prisma.transaction.findFirst
-      .mockResolvedValueOnce({ id: "t-dep", walletId: "wallet-1", amount: new Decimal(1000), reference: "cs_1" })
+      .mockResolvedValueOnce({
+        id: "t-dep",
+        walletId: "wallet-1",
+        amount: new Decimal(1000),
+        reference: "cs_1",
+      })
       .mockResolvedValueOnce(null)
     prisma.wallet.findUniqueOrThrow.mockResolvedValue({
-      id: "wallet-1", version: 2, availableBalance: new Decimal(100), reservedBalance: new Decimal(0),
+      id: "wallet-1",
+      version: 2,
+      availableBalance: new Decimal(100),
+      reservedBalance: new Decimal(0),
     })
 
     await (service as any).handleChargeback(dispute)
 
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({
-      action: "STRIPE_CHARGEBACK_HOLD_PLACED",
-      metadata: expect.objectContaining({ heldAmount: "100.00", uncoveredExposure: "500.00" }),
-    }))
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "STRIPE_CHARGEBACK_HOLD_PLACED",
+        metadata: expect.objectContaining({
+          heldAmount: "100.00",
+          uncoveredExposure: "500.00",
+        }),
+      }),
+    )
   })
 
   it("ignores a duplicate dispute webhook without touching the wallet", async () => {
     prisma.transaction.findFirst
-      .mockResolvedValueOnce({ id: "t-dep", walletId: "wallet-1", amount: new Decimal(1000), reference: "cs_1" })
-      .mockResolvedValueOnce({ id: "t-hold", reference: "chargeback-hold-dp_1" }) // hold already exists
+      .mockResolvedValueOnce({
+        id: "t-dep",
+        walletId: "wallet-1",
+        amount: new Decimal(1000),
+        reference: "cs_1",
+      })
+      .mockResolvedValueOnce({
+        id: "t-hold",
+        reference: "chargeback-hold-dp_1",
+      }) // hold already exists
 
     await (service as any).handleChargeback(dispute)
 
@@ -211,81 +288,144 @@ describe("F-6: chargeback hold workflow", () => {
     await (service as any).handleChargeback(dispute)
 
     expect(prisma.wallet.updateMany).not.toHaveBeenCalled()
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({
-      action: "STRIPE_CHARGEBACK_UNLINKED",
-    }))
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "STRIPE_CHARGEBACK_UNLINKED",
+      }),
+    )
   })
 
   it("dispute WON releases the hold back to available", async () => {
     prisma.transaction.findFirst
-      .mockResolvedValueOnce({ id: "t-hold", walletId: "wallet-1", amount: new Decimal(-600) })
+      .mockResolvedValueOnce({
+        id: "t-hold",
+        walletId: "wallet-1",
+        amount: new Decimal(-600),
+      })
       .mockResolvedValueOnce(null) // no release row yet
-    prisma.wallet.findUniqueOrThrow.mockResolvedValue({ id: "wallet-1", version: 5 })
+    prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      id: "wallet-1",
+      version: 5,
+    })
 
     await (service as any).handleChargebackClosed({ id: "dp_1", status: "won" })
 
-    expect(prisma.wallet.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
-        reservedBalance: { decrement: expect.anything() },
-        availableBalance: { increment: expect.anything() },
+    expect(prisma.wallet.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          reservedBalance: { decrement: expect.anything() },
+          availableBalance: { increment: expect.anything() },
+        }),
       }),
-    }))
+    )
     expect(prisma.transaction.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ type: "RESERVATION", reference: "chargeback-release-dp_1" }),
+      data: expect.objectContaining({
+        type: "RESERVATION",
+        reference: "chargeback-release-dp_1",
+      }),
     })
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "STRIPE_CHARGEBACK_WON_RELEASED" }))
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "STRIPE_CHARGEBACK_WON_RELEASED" }),
+    )
   })
 
   it("dispute LOST debits the hold permanently with a CHARGEBACK ledger row", async () => {
     prisma.transaction.findFirst
-      .mockResolvedValueOnce({ id: "t-hold", walletId: "wallet-1", amount: new Decimal(-600) })
+      .mockResolvedValueOnce({
+        id: "t-hold",
+        walletId: "wallet-1",
+        amount: new Decimal(-600),
+      })
       .mockResolvedValueOnce(null)
-    prisma.wallet.findUniqueOrThrow.mockResolvedValue({ id: "wallet-1", version: 5 })
+    prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      id: "wallet-1",
+      version: 5,
+    })
 
-    await (service as any).handleChargebackClosed({ id: "dp_1", status: "lost" })
+    await (service as any).handleChargebackClosed({
+      id: "dp_1",
+      status: "lost",
+    })
 
     const updateData = prisma.wallet.updateMany.mock.calls[0][0].data
     expect(updateData.reservedBalance).toEqual({ decrement: expect.anything() })
     expect(updateData.availableBalance).toBeUndefined() // money does NOT come back
     expect(prisma.transaction.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ type: "CHARGEBACK", reference: "chargeback-lost-dp_1" }),
+      data: expect.objectContaining({
+        type: "CHARGEBACK",
+        reference: "chargeback-lost-dp_1",
+      }),
     })
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "STRIPE_CHARGEBACK_LOST_DEBITED" }))
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "STRIPE_CHARGEBACK_LOST_DEBITED" }),
+    )
   })
 
   it("dispute closed as warning_closed (inquiry dropped, no chargeback) RELEASES — never debits", async () => {
     prisma.transaction.findFirst
-      .mockResolvedValueOnce({ id: "t-hold", walletId: "wallet-1", amount: new Decimal(-600) })
+      .mockResolvedValueOnce({
+        id: "t-hold",
+        walletId: "wallet-1",
+        amount: new Decimal(-600),
+      })
       .mockResolvedValueOnce(null)
-    prisma.wallet.findUniqueOrThrow.mockResolvedValue({ id: "wallet-1", version: 5 })
+    prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      id: "wallet-1",
+      version: 5,
+    })
 
-    await (service as any).handleChargebackClosed({ id: "dp_1", status: "warning_closed" })
+    await (service as any).handleChargebackClosed({
+      id: "dp_1",
+      status: "warning_closed",
+    })
 
-    expect(prisma.wallet.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ availableBalance: { increment: expect.anything() } }),
-    }))
+    expect(prisma.wallet.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          availableBalance: { increment: expect.anything() },
+        }),
+      }),
+    )
     expect(prisma.transaction.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ type: "RESERVATION", reference: "chargeback-release-dp_1" }),
+      data: expect.objectContaining({
+        type: "RESERVATION",
+        reference: "chargeback-release-dp_1",
+      }),
     })
   })
 
   it("unrecognized dispute-closed status moves NO money — alerts for manual resolution", async () => {
-    prisma.transaction.findFirst
-      .mockResolvedValueOnce({ id: "t-hold", walletId: "wallet-1", amount: new Decimal(-600) })
+    prisma.transaction.findFirst.mockResolvedValueOnce({
+      id: "t-hold",
+      walletId: "wallet-1",
+      amount: new Decimal(-600),
+    })
 
-    await (service as any).handleChargebackClosed({ id: "dp_1", status: "under_review" })
+    await (service as any).handleChargebackClosed({
+      id: "dp_1",
+      status: "under_review",
+    })
 
     expect(prisma.wallet.updateMany).not.toHaveBeenCalled()
     expect(prisma.transaction.create).not.toHaveBeenCalled()
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({
-      action: "STRIPE_CHARGEBACK_CLOSED_UNRECOGNIZED",
-    }))
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "STRIPE_CHARGEBACK_CLOSED_UNRECOGNIZED",
+      }),
+    )
   })
 
   it("duplicate dispute-closed webhook is a no-op", async () => {
     prisma.transaction.findFirst
-      .mockResolvedValueOnce({ id: "t-hold", walletId: "wallet-1", amount: new Decimal(-600) })
-      .mockResolvedValueOnce({ id: "t-rel", reference: "chargeback-release-dp_1" }) // already released
+      .mockResolvedValueOnce({
+        id: "t-hold",
+        walletId: "wallet-1",
+        amount: new Decimal(-600),
+      })
+      .mockResolvedValueOnce({
+        id: "t-rel",
+        reference: "chargeback-release-dp_1",
+      }) // already released
 
     await (service as any).handleChargebackClosed({ id: "dp_1", status: "won" })
 
@@ -300,7 +440,12 @@ describe("F-2: payout webhook normalization (real provider shapes)", () => {
   it("maps a real Wise transfers#state-change envelope", () => {
     const wiseEnvelope = {
       data: {
-        resource: { id: 12345678, profile_id: 111, account_id: 222, type: "transfer" },
+        resource: {
+          id: 12345678,
+          profile_id: 111,
+          account_id: 222,
+          type: "transfer",
+        },
         current_state: "outgoing_payment_sent",
         previous_state: "processing",
         occurred_at: "2026-06-11T12:00:00Z",
@@ -317,14 +462,20 @@ describe("F-2: payout webhook normalization (real provider shapes)", () => {
   })
 
   it("maps the unwrapped inner Wise data the webhook controller enqueues", () => {
-    const inner = { resource: { id: 99, type: "transfer" }, current_state: "completed" }
+    const inner = {
+      resource: { id: 99, type: "transfer" },
+      current_state: "completed",
+    }
     const n = normalizeProviderWebhook("wise", inner)
     expect(n.providerExecutionId).toBe("99")
     expect(n.status).toBe("COMPLETED")
   })
 
   it("maps Wise cancelled to FAILED", () => {
-    const n = normalizeProviderWebhook("wise", { resource: { id: 7 }, current_state: "cancelled" })
+    const n = normalizeProviderWebhook("wise", {
+      resource: { id: 7 },
+      current_state: "cancelled",
+    })
     expect(n.status).toBe("FAILED")
   })
 
@@ -332,7 +483,14 @@ describe("F-2: payout webhook normalization (real provider shapes)", () => {
     const stripeEnvelope = {
       id: "evt_1",
       type: "transfer.updated",
-      data: { object: { id: "tr_123", object: "transfer", status: "paid", amount: 20000 } },
+      data: {
+        object: {
+          id: "tr_123",
+          object: "transfer",
+          status: "paid",
+          amount: 20000,
+        },
+      },
     }
     const n = normalizeProviderWebhook("stripe_connect", stripeEnvelope)
     expect(n.providerExecutionId).toBe("tr_123")
@@ -341,7 +499,11 @@ describe("F-2: payout webhook normalization (real provider shapes)", () => {
 
   it("maps Stripe payout failure with the failure message", () => {
     const n = normalizeProviderWebhook("stripe_connect", {
-      object: { id: "po_9", status: "failed", failure_message: "account closed" },
+      object: {
+        id: "po_9",
+        status: "failed",
+        failure_message: "account closed",
+      },
     })
     expect(n.providerExecutionId).toBe("po_9")
     expect(n.status).toBe("FAILED")
@@ -349,13 +511,19 @@ describe("F-2: payout webhook normalization (real provider shapes)", () => {
   })
 
   it("passes pre-normalized internal payloads through untouched", () => {
-    const n = normalizeProviderWebhook("wise", { providerExecutionId: "abc", status: "COMPLETED" })
+    const n = normalizeProviderWebhook("wise", {
+      providerExecutionId: "abc",
+      status: "COMPLETED",
+    })
     expect(n.providerExecutionId).toBe("abc")
     expect(n.status).toBe("COMPLETED")
   })
 
   it("yields no transition for unknown provider states", () => {
-    const n = normalizeProviderWebhook("wise", { resource: { id: 1 }, current_state: "bounced_back_weirdly" })
+    const n = normalizeProviderWebhook("wise", {
+      resource: { id: 1 },
+      current_state: "bounced_back_weirdly",
+    })
     expect(n.providerExecutionId).toBe("1")
     expect(n.status).toBeNull()
   })
@@ -368,7 +536,12 @@ describe("F-3: tenant-scoped order idempotency", () => {
 
   beforeEach(() => {
     prisma = makePrismaMock()
-    service = new OrdersService(prisma, auditMock() as any, queueMock() as any, {} as any)
+    service = new OrdersService(
+      prisma,
+      auditMock() as any,
+      queueMock() as any,
+      {} as any,
+    )
   })
 
   it("replays via the composite (organizationId, idempotencyKey) lookup — never key-only", async () => {
@@ -376,14 +549,22 @@ describe("F-3: tenant-scoped order idempotency", () => {
     prisma.order.findUnique.mockResolvedValue(existing)
 
     const result = await service.createOrder(
-      { type: "GUEST_POST", customerId: "u1", organizationId: "org-A", idempotencyKey: "key-1" } as any,
+      {
+        type: "GUEST_POST",
+        customerId: "u1",
+        organizationId: "org-A",
+        idempotencyKey: "key-1",
+      } as any,
       "u1",
     )
 
     expect(result).toBe(existing)
     expect(prisma.order.findUnique).toHaveBeenCalledWith({
       where: {
-        organizationId_idempotencyKey: { organizationId: "org-A", idempotencyKey: "key-1" },
+        organizationId_idempotencyKey: {
+          organizationId: "org-A",
+          idempotencyKey: "key-1",
+        },
       },
     })
     expect(prisma.order.create).not.toHaveBeenCalled()
@@ -415,7 +596,10 @@ describe("F-3: tenant-scoped order idempotency", () => {
         },
       },
     })
-    prisma.order.create.mockResolvedValue({ id: "order-B", organizationId: "org-B" })
+    prisma.order.create.mockResolvedValue({
+      id: "order-B",
+      organizationId: "org-B",
+    })
 
     const result = await service.createOrder(
       {
@@ -429,9 +613,14 @@ describe("F-3: tenant-scoped order idempotency", () => {
     )
 
     expect(result.id).toBe("order-B")
-    expect(prisma.order.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ organizationId: "org-B", idempotencyKey: "key-1" }),
-    }))
+    expect(prisma.order.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          organizationId: "org-B",
+          idempotencyKey: "key-1",
+        }),
+      }),
+    )
   })
 })
 
@@ -453,55 +642,95 @@ describe("F-4: FAILED withdrawal reversal", () => {
   beforeEach(() => {
     prisma = makePrismaMock()
     audit = auditMock()
-    service = new PublisherPayoutsService(prisma, audit as any, queueMock() as any, {} as any, {} as any)
+    service = new PublisherPayoutsService(
+      prisma,
+      audit as any,
+      queueMock() as any,
+      {} as any,
+      {} as any,
+    )
   })
 
   it("FAILED -> REVERSED restores the balance and writes the WITHDRAWAL_REVERSAL ledger row", async () => {
     prisma.withdrawal.findUnique.mockResolvedValue(failedWithdrawal)
     prisma.payoutExecution.findFirst.mockResolvedValue(null) // no money moved
     prisma.withdrawal.updateMany.mockResolvedValue({ count: 1 })
-    prisma.withdrawal.findUniqueOrThrow.mockResolvedValue({ ...failedWithdrawal, status: "REVERSED" })
-    prisma.publisherBalance.findUnique.mockResolvedValue({ publisherId: "pub-1", version: 7 })
+    prisma.withdrawal.findUniqueOrThrow.mockResolvedValue({
+      ...failedWithdrawal,
+      status: "REVERSED",
+    })
+    prisma.publisherBalance.findUnique.mockResolvedValue({
+      publisherId: "pub-1",
+      version: 7,
+    })
 
-    const result = await service.reverseFailedWithdrawal("wd-1", "admin-1", "provider rejected account")
+    const result = await service.reverseFailedWithdrawal(
+      "wd-1",
+      "admin-1",
+      "provider rejected account",
+    )
 
     expect(result.status).toBe("REVERSED")
-    expect(prisma.withdrawal.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "wd-1", status: "FAILED", version: 4 },
-    }))
-    expect(prisma.publisherBalance.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { publisherId: "pub-1", version: 7 },
-      data: expect.objectContaining({ withdrawableBalance: { increment: 200 } }),
-    }))
+    expect(prisma.withdrawal.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "wd-1", status: "FAILED", version: 4 },
+      }),
+    )
+    expect(prisma.publisherBalance.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { publisherId: "pub-1", version: 7 },
+        data: expect.objectContaining({
+          withdrawableBalance: { increment: 200 },
+        }),
+      }),
+    )
     expect(prisma.transaction.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ type: "WITHDRAWAL_REVERSAL", reference: "withdrawal-reverse-wd-1" }),
+      data: expect.objectContaining({
+        type: "WITHDRAWAL_REVERSAL",
+        reference: "withdrawal-reverse-wd-1",
+      }),
     })
-    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "WITHDRAWAL_REVERSED" }), prisma)
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "WITHDRAWAL_REVERSED" }),
+      prisma,
+    )
   })
 
   it("rejects a second reversal (status no longer FAILED)", async () => {
-    prisma.withdrawal.findUnique.mockResolvedValue({ ...failedWithdrawal, status: "REVERSED" })
+    prisma.withdrawal.findUnique.mockResolvedValue({
+      ...failedWithdrawal,
+      status: "REVERSED",
+    })
 
-    await expect(service.reverseFailedWithdrawal("wd-1", "admin-1", "double attempt here"))
-      .rejects.toThrow(BadRequestException)
+    await expect(
+      service.reverseFailedWithdrawal("wd-1", "admin-1", "double attempt here"),
+    ).rejects.toThrow(BadRequestException)
     expect(prisma.publisherBalance.updateMany).not.toHaveBeenCalled()
   })
 
   it("refuses while an execution is COMPLETED (money moved at the provider)", async () => {
     prisma.withdrawal.findUnique.mockResolvedValue(failedWithdrawal)
-    prisma.payoutExecution.findFirst.mockResolvedValue({ id: "exec-1", status: "COMPLETED" })
+    prisma.payoutExecution.findFirst.mockResolvedValue({
+      id: "exec-1",
+      status: "COMPLETED",
+    })
 
-    await expect(service.reverseFailedWithdrawal("wd-1", "admin-1", "should be refused"))
-      .rejects.toThrow(/COMPLETED/)
+    await expect(
+      service.reverseFailedWithdrawal("wd-1", "admin-1", "should be refused"),
+    ).rejects.toThrow(/COMPLETED/)
     expect(prisma.withdrawal.updateMany).not.toHaveBeenCalled()
   })
 
   it("refuses while an execution is still PROCESSING", async () => {
     prisma.withdrawal.findUnique.mockResolvedValue(failedWithdrawal)
-    prisma.payoutExecution.findFirst.mockResolvedValue({ id: "exec-2", status: "PROCESSING" })
+    prisma.payoutExecution.findFirst.mockResolvedValue({
+      id: "exec-2",
+      status: "PROCESSING",
+    })
 
-    await expect(service.reverseFailedWithdrawal("wd-1", "admin-1", "should be refused"))
-      .rejects.toThrow(/PROCESSING/)
+    await expect(
+      service.reverseFailedWithdrawal("wd-1", "admin-1", "should be refused"),
+    ).rejects.toThrow(/PROCESSING/)
   })
 
   it("loses the race cleanly when the withdrawal transitions concurrently", async () => {
@@ -509,8 +738,9 @@ describe("F-4: FAILED withdrawal reversal", () => {
     prisma.payoutExecution.findFirst.mockResolvedValue(null)
     prisma.withdrawal.updateMany.mockResolvedValue({ count: 0 }) // concurrent retry won
 
-    await expect(service.reverseFailedWithdrawal("wd-1", "admin-1", "race condition test"))
-      .rejects.toThrow(ConflictException)
+    await expect(
+      service.reverseFailedWithdrawal("wd-1", "admin-1", "race condition test"),
+    ).rejects.toThrow(ConflictException)
     expect(prisma.publisherBalance.updateMany).not.toHaveBeenCalled()
     expect(prisma.transaction.create).not.toHaveBeenCalled()
   })
@@ -533,21 +763,39 @@ describe("F-5: customerApprove cannot corrupt a RELEASED settlement", () => {
 
   beforeEach(() => {
     prisma = makePrismaMock()
-    service = new SettlementsService(prisma, auditMock() as any, queueMock() as any)
+    service = new SettlementsService(
+      prisma,
+      auditMock() as any,
+      queueMock() as any,
+    )
   })
 
   it("approves via a status+version-guarded conditional update", async () => {
     prisma.settlement.findUnique.mockResolvedValue(settlement)
     prisma.orderDispute.findFirst.mockResolvedValue(null)
     prisma.settlement.updateMany.mockResolvedValue({ count: 1 })
-    prisma.settlement.findUniqueOrThrow.mockResolvedValue({ ...settlement, status: "CUSTOMER_APPROVED" })
+    prisma.settlement.findUniqueOrThrow.mockResolvedValue({
+      ...settlement,
+      status: "CUSTOMER_APPROVED",
+    })
 
-    const result = await service.customerApprove("set-1", "u1", "org-1", "OWNER")
+    const result = await service.customerApprove(
+      "set-1",
+      "u1",
+      "org-1",
+      "OWNER",
+    )
 
     expect(result.status).toBe("CUSTOMER_APPROVED")
-    expect(prisma.settlement.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "set-1", status: { in: ["PENDING", "UNDER_REVIEW"] }, version: 2 },
-    }))
+    expect(prisma.settlement.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "set-1",
+          status: { in: ["PENDING", "UNDER_REVIEW"] },
+          version: 2,
+        },
+      }),
+    )
     // The unguarded settlement.update() path must be gone
     expect(prisma.settlement.update).not.toHaveBeenCalled()
   })
@@ -559,8 +807,9 @@ describe("F-5: customerApprove cannot corrupt a RELEASED settlement", () => {
     prisma.orderDispute.findFirst.mockResolvedValue(null)
     prisma.settlement.updateMany.mockResolvedValue({ count: 0 }) // guard catches it
 
-    await expect(service.customerApprove("set-1", "u1", "org-1", "OWNER"))
-      .rejects.toThrow(ConflictException)
+    await expect(
+      service.customerApprove("set-1", "u1", "org-1", "OWNER"),
+    ).rejects.toThrow(ConflictException)
     expect(prisma.settlementApproval.upsert).not.toHaveBeenCalled()
   })
 })

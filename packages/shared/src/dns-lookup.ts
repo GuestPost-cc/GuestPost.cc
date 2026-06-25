@@ -3,8 +3,12 @@
 // Kept OUT of the package index (./index.ts) on purpose: it imports node `dns`,
 // which has no browser fallback and breaks the Next.js client bundles. The
 // worker imports it directly via "@guestpost/shared/dist/dns-lookup".
-import { promises as dns } from "dns"
-import { verificationTxtValue, candidateHostnames, DnsCheckResult } from "./dns-verification"
+import { promises as dns } from "node:dns"
+import {
+  candidateHostnames,
+  type DnsCheckResult,
+  verificationTxtValue,
+} from "./dns-verification"
 
 // Resolves TXT records for the root + www variant and looks for the exact
 // expected value. TXT records can be split into multiple strings by the DNS
@@ -17,7 +21,8 @@ export async function checkDnsTxtToken(
 ): Promise<DnsCheckResult> {
   const expected = verificationTxtValue(token)
   const hosts = candidateHostnames(websiteUrl)
-  if (hosts.length === 0) return { found: false, matchedHost: null, reason: "Invalid website URL" }
+  if (hosts.length === 0)
+    return { found: false, matchedHost: null, reason: "Invalid website URL" }
 
   const timeoutMs = opts.timeoutMs ?? 8000
   let sawAnyRecord = false
@@ -42,9 +47,17 @@ export async function checkDnsTxtToken(
   }
 
   if (!sawAnyRecord) {
-    return { found: false, matchedHost: null, reason: `No TXT record found (${errors.join("; ") || "checked root + www"})` }
+    return {
+      found: false,
+      matchedHost: null,
+      reason: `No TXT record found (${errors.join("; ") || "checked root + www"})`,
+    }
   }
-  return { found: false, matchedHost: null, reason: "TXT records present but none match the verification token" }
+  return {
+    found: false,
+    matchedHost: null,
+    reason: "TXT records present but none match the verification token",
+  }
 }
 
 function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {

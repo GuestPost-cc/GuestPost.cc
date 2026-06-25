@@ -28,11 +28,16 @@ const stripJsMapping = { [stripJsExtension]: "$1" }
 const baseModuleNameMapperFromSrc = {
   ...stripJsMapping,
   "^@guestpost/database$": "<rootDir>/../../../packages/database/src",
-  "^@guestpost/shared/dist/dns-lookup$": "<rootDir>/../../../packages/shared/src/dns-lookup",
-  "^@guestpost/shared/dist/delivery-verification-core$": "<rootDir>/../../../packages/shared/src/delivery-verification-core",
-  "^@guestpost/shared/dist/object-storage$": "<rootDir>/../../../packages/shared/src/object-storage",
-  "^@guestpost/shared/dist/observability/request-context$": "<rootDir>/../../../packages/shared/src/observability/request-context",
-  "^@guestpost/shared/dist/observability/structured-logger$": "<rootDir>/../../../packages/shared/src/observability/structured-logger",
+  "^@guestpost/shared/dist/dns-lookup$":
+    "<rootDir>/../../../packages/shared/src/dns-lookup",
+  "^@guestpost/shared/dist/delivery-verification-core$":
+    "<rootDir>/../../../packages/shared/src/delivery-verification-core",
+  "^@guestpost/shared/dist/object-storage$":
+    "<rootDir>/../../../packages/shared/src/object-storage",
+  "^@guestpost/shared/dist/observability/request-context$":
+    "<rootDir>/../../../packages/shared/src/observability/request-context",
+  "^@guestpost/shared/dist/observability/structured-logger$":
+    "<rootDir>/../../../packages/shared/src/observability/structured-logger",
   "^@guestpost/shared$": "<rootDir>/../../../packages/shared/src",
   "^@guestpost/auth$": "<rootDir>/../../../packages/auth/src",
   "^better-auth$": "<rootDir>/__mocks__/better-auth",
@@ -73,16 +78,23 @@ module.exports = {
       testEnvironment: "node",
       moduleNameMapper: {
         ...stripJsMapping,
-        "^@guestpost/database$": "<rootDir>/../../../../../packages/database/src",
-        "^@guestpost/shared/dist/dns-lookup$": "<rootDir>/../../../../../packages/shared/src/dns-lookup",
-        "^@guestpost/shared/dist/delivery-verification-core$": "<rootDir>/../../../../../packages/shared/src/delivery-verification-core",
-        "^@guestpost/shared/dist/object-storage$": "<rootDir>/../../../../../packages/shared/src/object-storage",
-        "^@guestpost/shared/dist/observability/request-context$": "<rootDir>/../../../../../packages/shared/src/observability/request-context",
-        "^@guestpost/shared/dist/observability/structured-logger$": "<rootDir>/../../../../../packages/shared/src/observability/structured-logger",
+        "^@guestpost/database$":
+          "<rootDir>/../../../../../packages/database/src",
+        "^@guestpost/shared/dist/dns-lookup$":
+          "<rootDir>/../../../../../packages/shared/src/dns-lookup",
+        "^@guestpost/shared/dist/delivery-verification-core$":
+          "<rootDir>/../../../../../packages/shared/src/delivery-verification-core",
+        "^@guestpost/shared/dist/object-storage$":
+          "<rootDir>/../../../../../packages/shared/src/object-storage",
+        "^@guestpost/shared/dist/observability/request-context$":
+          "<rootDir>/../../../../../packages/shared/src/observability/request-context",
+        "^@guestpost/shared/dist/observability/structured-logger$":
+          "<rootDir>/../../../../../packages/shared/src/observability/structured-logger",
         "^@guestpost/shared$": "<rootDir>/../../../../../packages/shared/src",
         "^@guestpost/auth$": "<rootDir>/../../../../../packages/auth/src",
         "^better-auth$": "<rootDir>/../../__mocks__/better-auth",
-        "^better-auth/adapters/prisma$": "<rootDir>/../../__mocks__/better-auth",
+        "^better-auth/adapters/prisma$":
+          "<rootDir>/../../__mocks__/better-auth",
         "^better-auth/plugins/bearer$": "<rootDir>/../../__mocks__/better-auth",
         "^better-auth/node$": "<rootDir>/../../__mocks__/better-auth",
         "^better-auth/api$": "<rootDir>/../../__mocks__/better-auth",

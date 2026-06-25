@@ -7,7 +7,12 @@
 
 import { cn } from "../lib/utils"
 
-export type FulfillmentChannelValue = "PLATFORM" | "PUBLISHER" | string | null | undefined
+export type FulfillmentChannelValue =
+  | "PLATFORM"
+  | "PUBLISHER"
+  | string
+  | null
+  | undefined
 
 export interface FulfillmentChannelBadgeProps {
   channel: FulfillmentChannelValue
@@ -30,7 +35,10 @@ export function FulfillmentChannelBadge({
       )}
       title={variant.title}
     >
-      <span className={cn("mr-1 h-1.5 w-1.5 rounded-full", variant.dotClasses)} aria-hidden />
+      <span
+        className={cn("mr-1 h-1.5 w-1.5 rounded-full", variant.dotClasses)}
+        aria-hidden
+      />
       {variant.label || unknownLabel}
     </span>
   )
@@ -42,14 +50,16 @@ function resolveVariant(channel: FulfillmentChannelValue) {
       return {
         label: "Platform",
         title: "Fulfilled by GuestPost.cc operations",
-        classes: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
+        classes:
+          "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300",
         dotClasses: "bg-blue-500",
       }
     case "PUBLISHER":
       return {
         label: "Publisher",
         title: "Fulfilled by the publisher who owns the site",
-        classes: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+        classes:
+          "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
         dotClasses: "bg-emerald-500",
       }
     default:

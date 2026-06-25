@@ -20,14 +20,39 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
-const WORKER_INDEX_PATH = join(__dirname, "..", "..", "..", "..", "apps", "worker", "src", "index.ts")
-const REGISTRY_PATH = join(__dirname, "..", "..", "..", "..", "apps", "worker", "src", "repeatable-job-registry.ts")
+const WORKER_INDEX_PATH = join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "..",
+  "apps",
+  "worker",
+  "src",
+  "index.ts",
+)
+const REGISTRY_PATH = join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "..",
+  "apps",
+  "worker",
+  "src",
+  "repeatable-job-registry.ts",
+)
 
 function extractRegistryNames(): Set<string> {
   const src = readFileSync(REGISTRY_PATH, "utf8")
   // Match the set literal: new Set([...])
-  const setBlockMatch = src.match(/REPEATABLE_JOB_NAMES\s*=\s*new\s+Set\(\[\s*([\s\S]*?)\s*\]\)/)
-  if (!setBlockMatch) throw new Error("Could not locate REPEATABLE_JOB_NAMES set in registry file")
+  const setBlockMatch = src.match(
+    /REPEATABLE_JOB_NAMES\s*=\s*new\s+Set\(\[\s*([\s\S]*?)\s*\]\)/,
+  )
+  if (!setBlockMatch)
+    throw new Error(
+      "Could not locate REPEATABLE_JOB_NAMES set in registry file",
+    )
   const namesRaw = setBlockMatch[1]
   const names = [...namesRaw.matchAll(/["']([^"']+)["']/g)].map((m) => m[1])
   return new Set(names)
@@ -67,11 +92,18 @@ describe("Phase 7.8 #27 — repeatable-job-registry drift guard", () => {
     const registry = extractRegistryNames()
     const worker = extractWorkerRepeatables()
     // Stale registry entries: names in registry but not in worker.
-    const inRegistryMissingInWorker = [...registry].filter((n) => !worker.has(n))
+    const inRegistryMissingInWorker = [...registry].filter(
+      (n) => !worker.has(n),
+    )
     // Missing registry entries: repeatables in worker but not in registry.
-    const inWorkerMissingInRegistry = [...worker].filter((n) => !registry.has(n))
+    const inWorkerMissingInRegistry = [...worker].filter(
+      (n) => !registry.has(n),
+    )
 
-    if (inRegistryMissingInWorker.length > 0 || inWorkerMissingInRegistry.length > 0) {
+    if (
+      inRegistryMissingInWorker.length > 0 ||
+      inWorkerMissingInRegistry.length > 0
+    ) {
       const msg = [
         `Registry drift detected.`,
         `In REPEATABLE_JOB_NAMES but NOT in worker/index.ts: ${JSON.stringify(inRegistryMissingInWorker)}`,

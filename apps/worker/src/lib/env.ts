@@ -32,14 +32,18 @@ export function validateEnv(): void {
       if (!process.env[key]) missingProd.push(key)
     }
     if (missingProd.length > 0) {
-      logger.error("FATAL: missing production-required env vars", { missing: missingProd })
+      logger.error("FATAL: missing production-required env vars", {
+        missing: missingProd,
+      })
       process.exit(1)
     }
   }
 
   for (const key of OPTIONAL_WARN) {
     if (!process.env[key]) {
-      logger.warn("optional env var not set — feature will be disabled", { key })
+      logger.warn("optional env var not set — feature will be disabled", {
+        key,
+      })
     }
   }
 }

@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { QueueService } from "../queues/queue.service"
-import { AuditService } from "../audit/audit.service"
 import { QUEUES } from "@guestpost/shared"
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
+import type { QueueService } from "../queues/queue.service"
 
 // Phase 6.6: tickets are channel-aware. The participant matrix below is the
 // single source of truth — admin-route handlers delegate here so the matrix
@@ -87,9 +92,12 @@ export function resolveParticipantRole(actor: SupportActor): ParticipantRole {
   if (actor.kind === "CUSTOMER") return "CUSTOMER"
   if (actor.kind === "PUBLISHER") return "PUBLISHER"
   switch (actor.staffRole) {
-    case "SUPER_ADMIN": return "ADMIN"
-    case "OPERATIONS":  return "OPS"
-    case "FINANCE":     return "FINANCE"
+    case "SUPER_ADMIN":
+      return "ADMIN"
+    case "OPERATIONS":
+      return "OPS"
+    case "FINANCE":
+      return "FINANCE"
     default:
       // STAFF without a role should never reach a write path — guards refuse
       // earlier. Refuse here too rather than silently mislabel.
@@ -122,13 +130,20 @@ export class SupportService {
       const order = await this.prisma.order.findFirst({
         where: { id: data.orderId, organizationId: data.organizationId },
         include: {
-          website: { select: { publisherId: true, managedByUserId: true, ownershipType: true } },
+          website: {
+            select: {
+              publisherId: true,
+              managedByUserId: true,
+              ownershipType: true,
+            },
+          },
         },
       })
       if (!order) throw new NotFoundException("Order not found")
 
-      const channel = order.fulfillmentChannel
-        ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+      const channel =
+        order.fulfillmentChannel ??
+        (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
       fulfillmentChannel = channel
       if (channel === "PLATFORM") {
         assignedToUserId = order.website?.managedByUserId ?? null
@@ -188,7 +203,15 @@ export class SupportService {
       where,
       include: {
         user: { select: { id: true, name: true, email: true } },
-        order: { select: { id: true, title: true, status: true, type: true, fulfillmentChannel: true } },
+        order: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            type: true,
+            fulfillmentChannel: true,
+          },
+        },
         assignedTo: { select: { id: true, name: true } },
         assignedPublisher: { select: { id: true, name: true } },
       },
@@ -214,7 +237,8 @@ export class SupportService {
     const limit = Math.min(Math.max(params.limit ?? 50, 1), 100)
 
     const where: any = this.scopeWhere(actor, params.status)
-    if (params.search) where.subject = { contains: params.search, mode: "insensitive" }
+    if (params.search)
+      where.subject = { contains: params.search, mode: "insensitive" }
     if (params.channel) {
       // Merge with the role-scoped where — for an OPS actor this further
       // narrows their already-scoped slice, never widens it.
@@ -230,7 +254,9 @@ export class SupportService {
 
     // Staff can see INTERNAL message count; customers/publishers see only
     // their PUBLIC slice.
-    const messageCountWhere = this.isStaff(actor) ? undefined : { visibility: "PUBLIC" as const }
+    const messageCountWhere = this.isStaff(actor)
+      ? undefined
+      : { visibility: "PUBLIC" as const }
 
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.ticket.findMany({
@@ -240,8 +266,20 @@ export class SupportService {
           organization: { select: { id: true, name: true } },
           assignedTo: { select: { id: true, name: true } },
           assignedPublisher: { select: { id: true, name: true } },
-          order: { select: { id: true, title: true, status: true, type: true, fulfillmentChannel: true } },
-          _count: { select: { messages: messageCountWhere ? { where: messageCountWhere } : true } },
+          order: {
+            select: {
+              id: true,
+              title: true,
+              status: true,
+              type: true,
+              fulfillmentChannel: true,
+            },
+          },
+          _count: {
+            select: {
+              messages: messageCountWhere ? { where: messageCountWhere } : true,
+            },
+          },
         },
         orderBy: { updatedAt: "desc" },
         take: limit,
@@ -256,10 +294,16 @@ export class SupportService {
         subject: t.subject,
         status: t.status,
         fulfillmentChannel: t.fulfillmentChannel,
-        assignedTo: t.assignedTo ? { id: t.assignedTo.id, name: t.assignedTo.name } : null,
-        assignedPublisher: t.assignedPublisher ? { id: t.assignedPublisher.id, name: t.assignedPublisher.name } : null,
+        assignedTo: t.assignedTo
+          ? { id: t.assignedTo.id, name: t.assignedTo.name }
+          : null,
+        assignedPublisher: t.assignedPublisher
+          ? { id: t.assignedPublisher.id, name: t.assignedPublisher.name }
+          : null,
         customer: { id: t.user.id, name: t.user.name, email: t.user.email },
-        organization: t.organization ? { id: t.organization.id, name: t.organization.name } : null,
+        organization: t.organization
+          ? { id: t.organization.id, name: t.organization.name }
+          : null,
         order: t.order,
         messageCount: t._count.messages,
         createdAt: t.createdAt,
@@ -283,10 +327,22 @@ export class SupportService {
         organization: { select: { id: true, name: true } },
         messages: {
           where: this.isStaff(actor) ? undefined : { visibility: "PUBLIC" },
-          include: { user: { select: { id: true, name: true, email: true, userType: true } } },
+          include: {
+            user: {
+              select: { id: true, name: true, email: true, userType: true },
+            },
+          },
           orderBy: { createdAt: "asc" },
         },
-        order: { select: { id: true, title: true, status: true, type: true, fulfillmentChannel: true } },
+        order: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            type: true,
+            fulfillmentChannel: true,
+          },
+        },
         assignedTo: { select: { id: true, name: true } },
         assignedPublisher: { select: { id: true, name: true } },
       },
@@ -308,7 +364,9 @@ export class SupportService {
   ) {
     const visibility: Visibility = data.visibility ?? "PUBLIC"
 
-    const ticket = await this.prisma.ticket.findUnique({ where: { id: ticketId } })
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+    })
     if (!ticket) throw new NotFoundException("Ticket not found")
     await this.assertCanReply(actor, ticket, visibility)
 
@@ -320,7 +378,8 @@ export class SupportService {
     // MESSAGE. SYSTEM_EVENT is reserved for the future emitSystemEvent path
     // (status transitions, reassignments) — humans never write it.
     const participantRole = resolveParticipantRole(actor)
-    const messageType: MessageType = visibility === "INTERNAL" ? "INTERNAL_NOTE" : "MESSAGE"
+    const messageType: MessageType =
+      visibility === "INTERNAL" ? "INTERNAL_NOTE" : "MESSAGE"
     // Phase 6.6.2: uncollapsed role snapshot for forensic queries.
     const actorSnapshot = buildActorSnapshot(actor)
 
@@ -343,7 +402,10 @@ export class SupportService {
     })
 
     await this.audit.log({
-      action: visibility === "INTERNAL" ? "TICKET_INTERNAL_NOTE_ADDED" : "TICKET_MESSAGE_ADDED",
+      action:
+        visibility === "INTERNAL"
+          ? "TICKET_INTERNAL_NOTE_ADDED"
+          : "TICKET_MESSAGE_ADDED",
       entityType: "Ticket",
       entityId: ticketId,
       metadata: {
@@ -384,11 +446,21 @@ export class SupportService {
   // close someone else's thread. PUBLIC visibility is used for the gate
   // (status changes are inherently customer-visible).
   async updateStatus(ticketId: string, status: string, actor: SupportActor) {
-    const valid = ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER", "RESOLVED", "CLOSED"]
+    const valid = [
+      "OPEN",
+      "IN_PROGRESS",
+      "WAITING_ON_CUSTOMER",
+      "RESOLVED",
+      "CLOSED",
+    ]
     if (!valid.includes(status)) {
-      throw new BadRequestException(`Invalid status — must be one of ${valid.join(", ")}`)
+      throw new BadRequestException(
+        `Invalid status — must be one of ${valid.join(", ")}`,
+      )
     }
-    const ticket = await this.prisma.ticket.findUnique({ where: { id: ticketId } })
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+    })
     if (!ticket) throw new NotFoundException("Ticket not found")
     await this.assertCanReply(actor, ticket, "PUBLIC")
 
@@ -426,32 +498,45 @@ export class SupportService {
   // Visibility migration only — historical messages stay where they were.
   async reassignTicket(
     ticketId: string,
-    body: { assignedToUserId?: string | null; assignedPublisherId?: string | null; reason?: string },
+    body: {
+      assignedToUserId?: string | null
+      assignedPublisherId?: string | null
+      reason?: string
+    },
     staff: { userId: string; staffRole: StaffRole | null },
   ) {
     if (staff.staffRole !== "SUPER_ADMIN") {
       throw new ForbiddenException("Only SUPER_ADMIN can reassign tickets")
     }
-    const ticket = await this.prisma.ticket.findUnique({ where: { id: ticketId } })
+    const ticket = await this.prisma.ticket.findUnique({
+      where: { id: ticketId },
+    })
     if (!ticket) throw new NotFoundException("Ticket not found")
 
     if (body.assignedToUserId) {
       const target = await this.prisma.staffMembership.findUnique({
-        where: { userId: body.assignedToUserId }, select: { role: true },
+        where: { userId: body.assignedToUserId },
+        select: { role: true },
       })
-      if (!target || target.role !== "OPERATIONS") {
-        throw new BadRequestException({ code: "INVALID_OWNER", message: "assignedToUserId must be an OPERATIONS staff member" })
+      if (target?.role !== "OPERATIONS") {
+        throw new BadRequestException({
+          code: "INVALID_OWNER",
+          message: "assignedToUserId must be an OPERATIONS staff member",
+        })
       }
     }
     if (body.assignedPublisherId) {
-      const pub = await this.prisma.publisher.findUnique({ where: { id: body.assignedPublisherId }, select: { id: true } })
+      const pub = await this.prisma.publisher.findUnique({
+        where: { id: body.assignedPublisherId },
+        select: { id: true },
+      })
       if (!pub) throw new BadRequestException("Publisher not found")
     }
 
     await this.prisma.ticket.update({
       where: { id: ticketId },
       data: {
-        assignedToUserId:    body.assignedToUserId    ?? null,
+        assignedToUserId: body.assignedToUserId ?? null,
         assignedPublisherId: body.assignedPublisherId ?? null,
       },
     })
@@ -461,10 +546,10 @@ export class SupportService {
       entityType: "Ticket",
       entityId: ticketId,
       metadata: {
-        fromAssignedToUserId:    ticket.assignedToUserId,
-        toAssignedToUserId:      body.assignedToUserId ?? null,
+        fromAssignedToUserId: ticket.assignedToUserId,
+        toAssignedToUserId: body.assignedToUserId ?? null,
         fromAssignedPublisherId: ticket.assignedPublisherId,
-        toAssignedPublisherId:   body.assignedPublisherId ?? null,
+        toAssignedPublisherId: body.assignedPublisherId ?? null,
         reason: body.reason ?? null,
       },
       userId: staff.userId,
@@ -488,11 +573,13 @@ export class SupportService {
 
     switch (actor.kind) {
       case "CUSTOMER":
-        if (!actor.organizationId) throw new ForbiddenException("Missing organization context")
+        if (!actor.organizationId)
+          throw new ForbiddenException("Missing organization context")
         where.organizationId = actor.organizationId
         break
       case "PUBLISHER":
-        if (!actor.publisherId) throw new ForbiddenException("Missing publisher context")
+        if (!actor.publisherId)
+          throw new ForbiddenException("Missing publisher context")
         where.assignedPublisherId = actor.publisherId
         break
       case "STAFF":
@@ -523,8 +610,11 @@ export class SupportService {
       case "STAFF":
         if (actor.staffRole === "OPERATIONS") {
           const isOwn = ticket.assignedToUserId === actor.userId
-          const isUnassignedPlatform = ticket.assignedToUserId === null && ticket.fulfillmentChannel === "PLATFORM"
-          if (!isOwn && !isUnassignedPlatform) throw new NotFoundException("Ticket not found")
+          const isUnassignedPlatform =
+            ticket.assignedToUserId === null &&
+            ticket.fulfillmentChannel === "PLATFORM"
+          if (!isOwn && !isUnassignedPlatform)
+            throw new NotFoundException("Ticket not found")
         }
         // SUPER_ADMIN + FINANCE: all visible (read for audit/monitoring).
         return
@@ -533,12 +623,19 @@ export class SupportService {
 
   // ── The Phase 6.6 matrix, applied to a single ticket + intended visibility.
   // Splits cleanly along three axes: actor kind, channel, intended visibility.
-  private async assertCanReply(actor: SupportActor, ticket: any, visibility: Visibility) {
+  private async assertCanReply(
+    actor: SupportActor,
+    ticket: any,
+    visibility: Visibility,
+  ) {
     await this.assertVisible(actor, ticket)
 
     // Customers and publishers can never write INTERNAL — that's the whole
     // point of the visibility scope.
-    if (visibility === "INTERNAL" && (actor.kind === "CUSTOMER" || actor.kind === "PUBLISHER")) {
+    if (
+      visibility === "INTERNAL" &&
+      (actor.kind === "CUSTOMER" || actor.kind === "PUBLISHER")
+    ) {
       throw new ForbiddenException("Only staff can post internal notes")
     }
 
@@ -553,7 +650,10 @@ export class SupportService {
       return
     }
     if (actor.kind === "STAFF") {
-      const channel = ticket.fulfillmentChannel as "PUBLISHER" | "PLATFORM" | null
+      const channel = ticket.fulfillmentChannel as
+        | "PUBLISHER"
+        | "PLATFORM"
+        | null
       switch (actor.staffRole) {
         case "SUPER_ADMIN":
           // Universal participant — can write PUBLIC and INTERNAL anywhere.
@@ -571,7 +671,9 @@ export class SupportService {
           // Only on tickets they actually own. Unassigned-platform pool is
           // read-only until SUPER_ADMIN reassigns the ticket to them.
           if (ticket.assignedToUserId !== actor.userId) {
-            throw new ForbiddenException("Unassigned platform tickets are read-only until claimed")
+            throw new ForbiddenException(
+              "Unassigned platform tickets are read-only until claimed",
+            )
           }
           return
         default:
@@ -596,7 +698,9 @@ export class SupportService {
     const ticket = await this.prisma.ticket.findUnique({
       where: { id: ticketId },
       include: {
-        organization: { include: { memberships: { where: { status: "ACTIVE" } } } },
+        organization: {
+          include: { memberships: { where: { status: "ACTIVE" } } },
+        },
         assignedPublisher: { include: { publisherMemberships: true } },
       },
     })

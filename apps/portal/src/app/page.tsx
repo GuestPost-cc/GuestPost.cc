@@ -1,10 +1,9 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
-import { Button } from "@guestpost/ui"
 import { sanitizeReturnTo } from "@guestpost/api-client"
+import { Button } from "@guestpost/ui"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useEffect, useState } from "react"
 import { useAuth } from "../lib/auth"
 
 function LoginContent() {
@@ -20,7 +19,9 @@ function LoginContent() {
   // Phase 6.8 — surface "Your session expired" copy when the 401-redirect
   // handler bounced the user here. The handler stashes the reason in
   // sessionStorage so it survives the page reload.
-  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<string | null>(null)
+  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<
+    string | null
+  >(null)
 
   useEffect(() => {
     if (searchParams.get("signup") === "true") {
@@ -33,7 +34,9 @@ function LoginContent() {
         setSessionExpiredBanner(reason)
         sessionStorage.removeItem("guestpost:auth-redirect-reason")
       }
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
   }, [searchParams])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,7 +53,9 @@ function LoginContent() {
       // page that bounced them. The helper rejects cross-origin paths and
       // protocol handlers so an attacker can't craft a poisoned link.
       const safeReturnTo = sanitizeReturnTo(searchParams.get("returnTo"))
-      router.push(safeReturnTo && safeReturnTo !== "/" ? safeReturnTo : "/dashboard")
+      router.push(
+        safeReturnTo && safeReturnTo !== "/" ? safeReturnTo : "/dashboard",
+      )
     } catch (err: any) {
       setError(err.message ?? "Something went wrong")
     } finally {
@@ -66,7 +71,9 @@ function LoginContent() {
             {isSignUp ? "SEO Expert Sign Up" : "SEO Expert Sign In"}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {isSignUp ? "Create an account to manage your campaigns" : "Sign in to your GuestPost account"}
+            {isSignUp
+              ? "Create an account to manage your campaigns"
+              : "Sign in to your GuestPost account"}
           </p>
         </div>
 
@@ -109,28 +116,43 @@ function LoginContent() {
           />
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
+            {submitting
+              ? "Loading..."
+              : isSignUp
+                ? "Create Account"
+                : "Sign In"}
           </Button>
         </form>
 
         <div className="space-y-4">
           <p className="text-center text-sm text-muted-foreground">
             {isSignUp ? (
-              <>Already have an account?{" "}
-                <button onClick={() => setIsSignUp(false)} className="underline underline-offset-4 hover:text-primary">
+              <>
+                Already have an account?{" "}
+                <button
+                  onClick={() => setIsSignUp(false)}
+                  className="underline underline-offset-4 hover:text-primary"
+                >
                   Sign in
                 </button>
               </>
             ) : (
-              <>Don&apos;t have an account?{" "}
-                <button onClick={() => setIsSignUp(true)} className="underline underline-offset-4 hover:text-primary">
+              <>
+                Don&apos;t have an account?{" "}
+                <button
+                  onClick={() => setIsSignUp(true)}
+                  className="underline underline-offset-4 hover:text-primary"
+                >
                   Sign up
                 </button>
               </>
             )}
           </p>
           <p className="text-center text-sm text-muted-foreground">
-            <a href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"} className="underline underline-offset-4 hover:text-primary">
+            <a
+              href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"}
+              className="underline underline-offset-4 hover:text-primary"
+            >
               Back to homepage
             </a>
           </p>
@@ -142,7 +164,13 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   )

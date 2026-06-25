@@ -1,14 +1,26 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Headers, Req, RawBodyRequest, BadRequestException, ForbiddenException } from "@nestjs/common"
-import { BillingService } from "./billing.service"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
-import { DepositDto } from "./dto/deposit.dto"
-import { WithdrawDto } from "./dto/withdraw.dto"
-import { MemberRoles } from "../../common/decorators/member-roles.decorator"
-import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Headers,
+  Param,
+  Post,
+  type RawBodyRequest,
+  Req,
+  UseGuards,
+} from "@nestjs/common"
+import type { Request } from "express"
 import { ActorType } from "../../common/decorators/actor-type.decorator"
-import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { Public } from "../../common/decorators/public.decorator"
-import { Request } from "express"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
+import type { BillingService } from "./billing.service"
+import type { DepositDto } from "./dto/deposit.dto"
+import type { WithdrawDto } from "./dto/withdraw.dto"
 
 @Controller("billing")
 export class BillingController {
@@ -25,11 +37,17 @@ export class BillingController {
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER")
-  deposit(@Param("id") walletId: string, @Body() body: DepositDto, @CurrentUser() user: any) {
+  deposit(
+    @Param("id") walletId: string,
+    @Body() body: DepositDto,
+    @CurrentUser() user: any,
+  ) {
     // Direct balance manipulation — dev/test convenience only.
     // Production deposits must go through Stripe checkout + webhook.
     if (process.env.NODE_ENV === "production") {
-      throw new ForbiddenException("Direct deposits are disabled — use the checkout flow")
+      throw new ForbiddenException(
+        "Direct deposits are disabled — use the checkout flow",
+      )
     }
     return this.billing.deposit(walletId, body.amount, user, body.reference)
   }
@@ -38,13 +56,20 @@ export class BillingController {
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER")
-  createCheckoutSession(@Param("id") walletId: string, @Body() body: DepositDto, @CurrentUser() user: any) {
+  createCheckoutSession(
+    @Param("id") walletId: string,
+    @Body() body: DepositDto,
+    @CurrentUser() user: any,
+  ) {
     return this.billing.createCheckoutSession(walletId, body.amount, user)
   }
 
   @Public()
   @Post("webhook/stripe")
-  async stripeWebhook(@Headers("stripe-signature") signature: string, @Req() req: RawBodyRequest<Request>) {
+  async stripeWebhook(
+    @Headers("stripe-signature") signature: string,
+    @Req() req: RawBodyRequest<Request>,
+  ) {
     const payload = req.rawBody || Buffer.from(JSON.stringify(req.body))
     if (!signature) {
       throw new BadRequestException("Missing stripe-signature header")
@@ -61,8 +86,17 @@ export class BillingController {
   @UseGuards(ActorTypeGuard, MemberRolesGuard)
   @ActorType("CUSTOMER")
   @MemberRoles("OWNER")
-  withdraw(@Param("id") walletId: string, @Body() body: WithdrawDto, @CurrentUser() user: any) {
-    return this.billing.withdraw(walletId, body.amount, user, body.idempotencyKey)
+  withdraw(
+    @Param("id") walletId: string,
+    @Body() body: WithdrawDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.billing.withdraw(
+      walletId,
+      body.amount,
+      user,
+      body.idempotencyKey,
+    )
   }
 
   @Get("transactions")

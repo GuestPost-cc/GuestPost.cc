@@ -15,9 +15,9 @@
 // count to 0). When the map is empty except for the always-allowed
 // entries (logger module + main.ts boot fallback), the sweep is done.
 
+import { execSync } from "node:child_process"
 import * as fs from "node:fs"
 import * as path from "node:path"
-import { execSync } from "node:child_process"
 
 const repoRoot = path.resolve(__dirname, "..", "..", "..", "..")
 
@@ -72,7 +72,8 @@ function listProductionTsFiles(rootDirs: string[]): string[] {
 describe("Phase 7.7 B — console.* sweep regression guard", () => {
   it("no production file outside the allowlist uses console.*", () => {
     const files = listProductionTsFiles(["apps/api/src", "apps/worker/src"])
-    const offenders: Array<{ file: string; count: number; allowed: number }> = []
+    const offenders: Array<{ file: string; count: number; allowed: number }> =
+      []
     for (const relPath of files) {
       const count = countConsoleCalls(path.join(repoRoot, relPath))
       const allowed = CURRENTLY_ALLOWED_WITH_CONSOLE[relPath] ?? 0
@@ -97,8 +98,11 @@ describe("Phase 7.7 B — console.* sweep regression guard", () => {
     // If an allowlisted file's count drops BELOW its baseline (e.g. partial
     // sweep landed without updating the map), this test fails loudly so the
     // map can be tightened. Keeps the allowlist honest as Phase 7.7.x lands.
-    const drifted: Array<{ file: string; expected: number; actual: number }> = []
-    for (const [relPath, expected] of Object.entries(CURRENTLY_ALLOWED_WITH_CONSOLE)) {
+    const drifted: Array<{ file: string; expected: number; actual: number }> =
+      []
+    for (const [relPath, expected] of Object.entries(
+      CURRENTLY_ALLOWED_WITH_CONSOLE,
+    )) {
       const full = path.join(repoRoot, relPath)
       if (!fs.existsSync(full)) continue // file deleted is fine
       const actual = countConsoleCalls(full)
@@ -108,7 +112,10 @@ describe("Phase 7.7 B — console.* sweep regression guard", () => {
     }
     if (drifted.length > 0) {
       const detail = drifted
-        .map((d) => `  ${d.file}: ${d.actual} < declared ${d.expected} — sweep landed, tighten the allowlist`)
+        .map(
+          (d) =>
+            `  ${d.file}: ${d.actual} < declared ${d.expected} — sweep landed, tighten the allowlist`,
+        )
         .join("\n")
       throw new Error(
         `Phase 7.7 B allowlist drift — ${drifted.length} file(s) have fewer console.* calls than declared.\n` +

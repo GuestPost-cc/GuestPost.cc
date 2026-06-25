@@ -19,13 +19,18 @@ export function normalizeUrl(raw: string): string {
   u.hostname = u.hostname.toLowerCase()
 
   // Drop default ports
-  if ((u.protocol === "http:" && u.port === "80") || (u.protocol === "https:" && u.port === "443")) {
+  if (
+    (u.protocol === "http:" && u.port === "80") ||
+    (u.protocol === "https:" && u.port === "443")
+  ) {
     u.port = ""
   }
 
   // Sort query params for stable comparison
   if (u.searchParams && [...u.searchParams.keys()].length > 0) {
-    const sorted = [...u.searchParams.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    const sorted = [...u.searchParams.entries()].sort(([a], [b]) =>
+      a < b ? -1 : a > b ? 1 : 0,
+    )
     const next = new URLSearchParams()
     for (const [k, v] of sorted) next.append(k, v)
     u.search = next.toString()

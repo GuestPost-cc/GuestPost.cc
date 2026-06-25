@@ -1,4 +1,10 @@
-import { IsString, IsEmail, IsOptional, MinLength, MaxLength } from "class-validator"
+import {
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator"
 
 export class CreatePublisherDto {
   @IsString()

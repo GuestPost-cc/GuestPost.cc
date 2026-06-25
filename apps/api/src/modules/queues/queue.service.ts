@@ -1,10 +1,10 @@
-import { Injectable, Logger } from "@nestjs/common"
-import { Queue, QueueOptions, JobsOptions } from "bullmq"
-import { QUEUES, QUEUE_JOBS, trustRecomputeJobOptions } from "@guestpost/shared"
+import { QUEUE_JOBS, QUEUES, trustRecomputeJobOptions } from "@guestpost/shared"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 // Deep import: request-context uses node:async_hooks and is not in the
 // shared barrel.
 import { getRequestId } from "@guestpost/shared/dist/observability/request-context"
+import { Injectable, Logger } from "@nestjs/common"
+import { type JobsOptions, Queue, type QueueOptions } from "bullmq"
 import { getRedisClient } from "../../common/redis-client"
 
 const getConnection = getRedisClient
@@ -52,22 +52,35 @@ export class QueueService {
 
   private getQueue(name: string): Queue {
     if (!this.queues.has(name)) {
-      const config = QUEUE_CONFIGS[name] ?? { defaultJobOptions: DEFAULT_JOB_OPTIONS }
-      this.queues.set(name, new Queue(name, { ...config, connection: getConnection() as any }))
+      const config = QUEUE_CONFIGS[name] ?? {
+        defaultJobOptions: DEFAULT_JOB_OPTIONS,
+      }
+      this.queues.set(
+        name,
+        new Queue(name, { ...config, connection: getConnection() as any }),
+      )
       this.logger.log(`Queue initialized: ${name}`)
     }
     return this.queues.get(name)!
   }
 
-  async sendEmail(jobName: string, data: { to: string; subject: string; html?: string }) {
+  async sendEmail(
+    jobName: string,
+    data: { to: string; subject: string; html?: string },
+  ) {
     const job = await this.addJob(QUEUES.EMAIL, jobName, data)
     this.logger.log(`Email queued: ${jobName} -> ${data.to} (job ${job.id})`)
     return job
   }
 
-  async generateReport(jobName: string, data: { orderId: string; format?: string }) {
+  async generateReport(
+    jobName: string,
+    data: { orderId: string; format?: string },
+  ) {
     const job = await this.addJob(QUEUES.REPORT, jobName, data)
-    this.logger.log(`Report queued: ${jobName} for order ${data.orderId} (job ${job.id})`)
+    this.logger.log(
+      `Report queued: ${jobName} for order ${data.orderId} (job ${job.id})`,
+    )
     return job
   }
 
@@ -80,17 +93,30 @@ export class QueueService {
   // NULL rows so writes always succeed.
   async pushNotification(
     jobName: string,
-    data: { userId: string; organizationId: string | null; type: string; message: string },
+    data: {
+      userId: string
+      organizationId: string | null
+      type: string
+      message: string
+    },
     dedupKey?: string,
   ) {
     const payload = dedupKey ? { ...data, dedupKey } : data
     const job = await this.addJob(QUEUES.NOTIFICATION, jobName, payload)
-    this.logger.log(`Notification queued: ${jobName}${dedupKey ? ` dedupKey=${dedupKey}` : ""} (job ${job.id})`)
+    this.logger.log(
+      `Notification queued: ${jobName}${dedupKey ? ` dedupKey=${dedupKey}` : ""} (job ${job.id})`,
+    )
     return job
   }
 
-  async addJob<T = any>(queueName: string, jobName: string, data: T, overrides?: JobsOptions) {
-    const base = (QUEUE_CONFIGS[queueName]?.defaultJobOptions ?? DEFAULT_JOB_OPTIONS) as JobsOptions
+  async addJob<T = any>(
+    queueName: string,
+    jobName: string,
+    data: T,
+    overrides?: JobsOptions,
+  ) {
+    const base = (QUEUE_CONFIGS[queueName]?.defaultJobOptions ??
+      DEFAULT_JOB_OPTIONS) as JobsOptions
     // Per-call overrides (e.g. jobId for dedupe) merge over the queue defaults.
     const opts = { ...base, ...(overrides ?? {}) }
     // Every job is HMAC-signed — workers reject anything not enqueued by the
@@ -99,7 +125,7 @@ export class QueueService {
     // logs + Sentry events + audit writes share the originating request's ID.
     const requestId = getRequestId()
     const dataWithRequestId =
-      requestId && !((data as Record<string, unknown>).requestId)
+      requestId && !(data as Record<string, unknown>).requestId
         ? { ...(data as Record<string, unknown>), requestId }
         : (data as Record<string, unknown>)
     const payload = signJobPayload(dataWithRequestId)
@@ -111,7 +137,11 @@ export class QueueService {
   // Event-driven publisher trust recompute. jobId dedup + delay debounce so a
   // burst of trust-affecting events for one publisher collapses into a single
   // recompute. Never throws into the caller's transaction path.
-  async enqueueTrustRecompute(publisherId: string | null | undefined, sourceEvent: string, reason?: string) {
+  async enqueueTrustRecompute(
+    publisherId: string | null | undefined,
+    sourceEvent: string,
+    reason?: string,
+  ) {
     if (!publisherId) return
     try {
       await this.addJob(
@@ -121,7 +151,9 @@ export class QueueService {
         trustRecomputeJobOptions(publisherId),
       )
     } catch (err) {
-      this.logger.error(`Failed to enqueue trust recompute for ${publisherId}: ${err}`)
+      this.logger.error(
+        `Failed to enqueue trust recompute for ${publisherId}: ${err}`,
+      )
     }
   }
 }

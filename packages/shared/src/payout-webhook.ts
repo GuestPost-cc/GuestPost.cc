@@ -7,7 +7,11 @@
 // Status mapping reuses the SAME maps as the status poller (payout-status.ts)
 // so the two paths can never disagree about what a provider state means.
 
-import { WISE_STATUS_MAP, STRIPE_STATUS_MAP, type ProviderTransferStatus } from "./payout-status"
+import {
+  type ProviderTransferStatus,
+  STRIPE_STATUS_MAP,
+  WISE_STATUS_MAP,
+} from "./payout-status"
 
 export interface NormalizedPayoutWebhook {
   // Provider's transfer/payout id — matches PayoutExecution.providerExecutionId
@@ -30,7 +34,7 @@ function normalizeWise(body: any): NormalizedPayoutWebhook {
   const rawStatus: string | null = inner?.current_state ?? inner?.status ?? null
   return {
     providerExecutionId: resourceId != null ? String(resourceId) : null,
-    status: rawStatus ? WISE_STATUS_MAP[rawStatus] ?? null : null,
+    status: rawStatus ? (WISE_STATUS_MAP[rawStatus] ?? null) : null,
     rawStatus,
     error: null,
   }
@@ -45,7 +49,7 @@ function normalizeStripe(body: any): NormalizedPayoutWebhook {
   const rawStatus: string | null = object?.status ?? null
   return {
     providerExecutionId: object?.id != null ? String(object.id) : null,
-    status: rawStatus ? STRIPE_STATUS_MAP[rawStatus] ?? null : null,
+    status: rawStatus ? (STRIPE_STATUS_MAP[rawStatus] ?? null) : null,
     rawStatus,
     error: object?.failure_message ?? object?.failure_code ?? null,
   }
@@ -55,7 +59,11 @@ function normalizeStripe(body: any): NormalizedPayoutWebhook {
 function normalizeInternal(data: any): NormalizedPayoutWebhook | null {
   const id = data?.providerExecutionId
   const status = data?.status
-  if (id == null || (status !== "COMPLETED" && status !== "FAILED" && status !== "PROCESSING")) return null
+  if (
+    id == null ||
+    (status !== "COMPLETED" && status !== "FAILED" && status !== "PROCESSING")
+  )
+    return null
   return {
     providerExecutionId: String(id),
     status,
@@ -64,7 +72,10 @@ function normalizeInternal(data: any): NormalizedPayoutWebhook | null {
   }
 }
 
-export function normalizeProviderWebhook(provider: string, data: any): NormalizedPayoutWebhook {
+export function normalizeProviderWebhook(
+  provider: string,
+  data: any,
+): NormalizedPayoutWebhook {
   // Pre-normalized payloads pass through untouched regardless of provider
   const internal = normalizeInternal(data)
   if (internal) return internal
@@ -75,6 +86,11 @@ export function normalizeProviderWebhook(provider: string, data: any): Normalize
     case "stripe_connect":
       return normalizeStripe(data)
     default:
-      return { providerExecutionId: null, status: null, rawStatus: null, error: null }
+      return {
+        providerExecutionId: null,
+        status: null,
+        rawStatus: null,
+        error: null,
+      }
   }
 }

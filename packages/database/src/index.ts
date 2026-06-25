@@ -1,12 +1,17 @@
-import { PrismaClient } from "./prisma/client"
 import { createPrismaClient } from "./create-prisma-client"
+import { PrismaClient } from "./prisma/client"
 
-export { PrismaClient }
+export type {
+  CreatePrismaAdapterOptions,
+  CreatePrismaClientOptions,
+} from "./create-prisma-client"
+export { createPrismaAdapter, createPrismaClient } from "./create-prisma-client"
 export * from "./prisma/client"
-export { createPrismaClient, createPrismaAdapter } from "./create-prisma-client"
-export type { CreatePrismaClientOptions, CreatePrismaAdapterOptions } from "./create-prisma-client"
+export { PrismaClient }
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient | undefined }
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined
+}
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient()
 

@@ -1,5 +1,5 @@
+import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants"
 import { Reflector } from "@nestjs/core"
-import { PATH_METADATA, METHOD_METADATA } from "@nestjs/common/constants"
 import { STAFF_ROLES_KEY } from "../../../common/decorators/staff-roles.decorator"
 import { AdminController } from "../admin.controller"
 
@@ -19,9 +19,11 @@ import { AdminController } from "../admin.controller"
 // override. The class-level grant is gone (the controller relies on
 // per-handler declarations only) and this test guards the contract.
 
-const reflector = new Reflector()
+const _reflector = new Reflector()
 
-function getRouteHandlers(controllerClass: any): Array<{ name: string; httpMethod: string; path: string }> {
+function getRouteHandlers(
+  controllerClass: any,
+): Array<{ name: string; httpMethod: string; path: string }> {
   const prototype = controllerClass.prototype
   const methodNames = Object.getOwnPropertyNames(prototype).filter(
     (name) => name !== "constructor" && typeof prototype[name] === "function",
@@ -34,8 +36,23 @@ function getRouteHandlers(controllerClass: any): Array<{ name: string; httpMetho
     if (path !== undefined && method !== undefined) {
       // Nest maps RequestMethod enum integers to verbs. Stringify for the
       // failure message.
-      const verb = ["GET", "POST", "HEAD", "DELETE", "PUT", "PATCH", "OPTIONS", "ALL", "SEARCH"][method] ?? `?(${method})`
-      handlers.push({ name, httpMethod: verb, path: typeof path === "string" ? path : String(path) })
+      const verb =
+        [
+          "GET",
+          "POST",
+          "HEAD",
+          "DELETE",
+          "PUT",
+          "PATCH",
+          "OPTIONS",
+          "ALL",
+          "SEARCH",
+        ][method] ?? `?(${method})`
+      handlers.push({
+        name,
+        httpMethod: verb,
+        path: typeof path === "string" ? path : String(path),
+      })
     }
   }
   return handlers
@@ -64,7 +81,9 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       const roles = Reflect.getMetadata(STAFF_ROLES_KEY, prototype[h.name])
 
       if (!roles || !Array.isArray(roles) || roles.length === 0) {
-        violations.push(`  ${h.httpMethod} /admin/${h.path}  →  ${h.name}() is missing @StaffRoles(...)`)
+        violations.push(
+          `  ${h.httpMethod} /admin/${h.path}  →  ${h.name}() is missing @StaffRoles(...)`,
+        )
       }
     }
 
@@ -88,10 +107,14 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
 
     for (const h of handlers) {
       const prototype = AdminController.prototype as any
-      const roles = (Reflect.getMetadata(STAFF_ROLES_KEY, prototype[h.name]) as string[]) ?? []
+      const roles =
+        (Reflect.getMetadata(STAFF_ROLES_KEY, prototype[h.name]) as string[]) ??
+        []
       const bad = roles.filter((r) => !valid.has(r))
       if (bad.length > 0) {
-        violations.push(`  ${h.name}() declares unknown role(s): ${bad.join(", ")}`)
+        violations.push(
+          `  ${h.name}() declares unknown role(s): ${bad.join(", ")}`,
+        )
       }
     }
 
@@ -112,8 +135,12 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     for (const { method, expected } of expectations) {
       const handler = (AdminController.prototype as any)[method]
       if (!handler) continue // Method may have been renamed; coverage caught by the universal test above.
-      const roles = (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
-      expect([method, [...roles].sort()]).toEqual([method, [...expected].sort()])
+      const roles =
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      expect([method, [...roles].sort()]).toEqual([
+        method,
+        [...expected].sort(),
+      ])
     }
   })
 
@@ -136,7 +163,8 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     for (const method of moneyWrites) {
       const handler = (AdminController.prototype as any)[method]
       if (!handler) continue
-      const roles = (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      const roles =
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
       expect([method, roles.includes("FINANCE")]).toEqual([method, true])
     }
   })
@@ -166,7 +194,8 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     for (const method of opsWrites) {
       const handler = (AdminController.prototype as any)[method]
       if (!handler) continue
-      const roles = (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      const roles =
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
       expect([method, roles.includes("OPERATIONS")]).toEqual([method, true])
     }
   })
@@ -190,8 +219,13 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     for (const method of universalReads) {
       const handler = (AdminController.prototype as any)[method]
       if (!handler) continue
-      const roles = ((Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []).sort()
-      expect([method, roles]).toEqual([method, ["FINANCE", "OPERATIONS", "SUPER_ADMIN"]])
+      const roles = (
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      ).sort()
+      expect([method, roles]).toEqual([
+        method,
+        ["FINANCE", "OPERATIONS", "SUPER_ADMIN"],
+      ])
     }
   })
 })
@@ -201,51 +235,76 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
 // routes with empty/missing metadata. Importing the real class so a change
 // to the fail-open vs fail-closed behavior surfaces immediately.
 
-import { StaffRolesGuard } from "../../../common/guards/staff-roles.guard"
 import { ForbiddenException } from "@nestjs/common"
+import { StaffRolesGuard } from "../../../common/guards/staff-roles.guard"
 
 describe("StaffRolesGuard — fail-closed contract", () => {
-  function makeCtx(metadata: string[] | undefined, user: any) {
+  function makeCtx(_metadata: string[] | undefined, user: any) {
     return {
       getHandler: () => (() => {}) as any,
-      getClass:   () => (class {}) as any,
+      getClass: () => class {} as any,
       switchToHttp: () => ({ getRequest: () => ({ user }) }),
     } as any
   }
 
   it("refuses a route with no @StaffRoles metadata (fail-closed)", () => {
-    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(undefined) } as unknown as Reflector
+    const reflector = {
+      getAllAndOverride: jest.fn().mockReturnValue(undefined),
+    } as unknown as Reflector
     const guard = new StaffRolesGuard(reflector)
-    expect(() => guard.canActivate(makeCtx(undefined, { userType: "STAFF", staffRole: "SUPER_ADMIN" }))).toThrow(
-      ForbiddenException,
-    )
+    expect(() =>
+      guard.canActivate(
+        makeCtx(undefined, { userType: "STAFF", staffRole: "SUPER_ADMIN" }),
+      ),
+    ).toThrow(ForbiddenException)
   })
 
   it("refuses a route with empty @StaffRoles array (also fail-closed)", () => {
-    const reflector = { getAllAndOverride: jest.fn().mockReturnValue([]) } as unknown as Reflector
+    const reflector = {
+      getAllAndOverride: jest.fn().mockReturnValue([]),
+    } as unknown as Reflector
     const guard = new StaffRolesGuard(reflector)
-    expect(() => guard.canActivate(makeCtx([], { userType: "STAFF", staffRole: "SUPER_ADMIN" }))).toThrow(
-      ForbiddenException,
-    )
+    expect(() =>
+      guard.canActivate(
+        makeCtx([], { userType: "STAFF", staffRole: "SUPER_ADMIN" }),
+      ),
+    ).toThrow(ForbiddenException)
   })
 
   it("refuses a non-STAFF user even when role declared", () => {
-    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN"]) } as unknown as Reflector
+    const reflector = {
+      getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN"]),
+    } as unknown as Reflector
     const guard = new StaffRolesGuard(reflector)
-    expect(() => guard.canActivate(makeCtx(["SUPER_ADMIN"], { userType: "CUSTOMER" }))).toThrow(ForbiddenException)
+    expect(() =>
+      guard.canActivate(makeCtx(["SUPER_ADMIN"], { userType: "CUSTOMER" })),
+    ).toThrow(ForbiddenException)
   })
 
   it("refuses a STAFF user whose role is not in the allowlist", () => {
-    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN"]) } as unknown as Reflector
+    const reflector = {
+      getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN"]),
+    } as unknown as Reflector
     const guard = new StaffRolesGuard(reflector)
-    expect(() => guard.canActivate(makeCtx(["SUPER_ADMIN"], { userType: "STAFF", staffRole: "FINANCE" }))).toThrow(
-      ForbiddenException,
-    )
+    expect(() =>
+      guard.canActivate(
+        makeCtx(["SUPER_ADMIN"], { userType: "STAFF", staffRole: "FINANCE" }),
+      ),
+    ).toThrow(ForbiddenException)
   })
 
   it("allows a STAFF user whose role is in the allowlist", () => {
-    const reflector = { getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN", "FINANCE"]) } as unknown as Reflector
+    const reflector = {
+      getAllAndOverride: jest.fn().mockReturnValue(["SUPER_ADMIN", "FINANCE"]),
+    } as unknown as Reflector
     const guard = new StaffRolesGuard(reflector)
-    expect(guard.canActivate(makeCtx(["SUPER_ADMIN", "FINANCE"], { userType: "STAFF", staffRole: "FINANCE" }))).toBe(true)
+    expect(
+      guard.canActivate(
+        makeCtx(["SUPER_ADMIN", "FINANCE"], {
+          userType: "STAFF",
+          staffRole: "FINANCE",
+        }),
+      ),
+    ).toBe(true)
   })
 })

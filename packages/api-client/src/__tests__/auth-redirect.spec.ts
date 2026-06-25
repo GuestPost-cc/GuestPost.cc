@@ -7,10 +7,10 @@
 // DOM beyond a tiny window/sessionStorage mock.
 
 import {
-  sanitizeReturnTo,
-  isAuthEndpointPath,
-  buildAuthErrorHandler,
   __resetAuthRedirectGuard,
+  buildAuthErrorHandler,
+  isAuthEndpointPath,
+  sanitizeReturnTo,
 } from "../auth-redirect"
 
 // ─── sanitizeReturnTo ─────────────────────────────────────────────────────
@@ -136,7 +136,8 @@ describe("buildAuthErrorHandler — idempotency + same-page debounce + URL compo
 
   afterEach(() => {
     if (originalLocation) (globalThis as any).window.location = originalLocation
-    if (originalSessionStorage) (globalThis as any).window.sessionStorage = originalSessionStorage
+    if (originalSessionStorage)
+      (globalThis as any).window.sessionStorage = originalSessionStorage
     delete (globalThis as any).sessionStorage
   })
 
@@ -146,13 +147,21 @@ describe("buildAuthErrorHandler — idempotency + same-page debounce + URL compo
     expect(assignSpy).toHaveBeenCalledTimes(1)
     const target = assignSpy.mock.calls[0][0] as string
     expect(target).toMatch(/^\/\?returnTo=/)
-    expect(target).toContain(encodeURIComponent("/dashboard/orders/abc?tab=brief"))
+    expect(target).toContain(
+      encodeURIComponent("/dashboard/orders/abc?tab=brief"),
+    )
   })
 
   it("stashes the reason banner in sessionStorage", () => {
-    const handler = buildAuthErrorHandler({ signInPath: "/", reason: "Custom reason" })
+    const handler = buildAuthErrorHandler({
+      signInPath: "/",
+      reason: "Custom reason",
+    })
     handler()
-    expect(setItemSpy).toHaveBeenCalledWith("guestpost:auth-redirect-reason", "Custom reason")
+    expect(setItemSpy).toHaveBeenCalledWith(
+      "guestpost:auth-redirect-reason",
+      "Custom reason",
+    )
   })
 
   it("idempotency: multiple concurrent calls only fire ONE redirect", () => {
@@ -182,17 +191,27 @@ describe("buildAuthErrorHandler — idempotency + same-page debounce + URL compo
 
   it("runs the onBeforeRedirect cleanup hook before navigating", () => {
     const cleanup = jest.fn()
-    const handler = buildAuthErrorHandler({ signInPath: "/", onBeforeRedirect: cleanup })
+    const handler = buildAuthErrorHandler({
+      signInPath: "/",
+      onBeforeRedirect: cleanup,
+    })
     handler()
     expect(cleanup).toHaveBeenCalledTimes(1)
     expect(assignSpy).toHaveBeenCalledTimes(1)
     // Cleanup must run BEFORE assign (so query cache is gone before nav).
-    expect(cleanup.mock.invocationCallOrder[0]).toBeLessThan(assignSpy.mock.invocationCallOrder[0])
+    expect(cleanup.mock.invocationCallOrder[0]).toBeLessThan(
+      assignSpy.mock.invocationCallOrder[0],
+    )
   })
 
   it("swallows errors thrown by the cleanup hook (never blocks the redirect)", () => {
-    const cleanup = jest.fn(() => { throw new Error("clear() exploded") })
-    const handler = buildAuthErrorHandler({ signInPath: "/", onBeforeRedirect: cleanup })
+    const cleanup = jest.fn(() => {
+      throw new Error("clear() exploded")
+    })
+    const handler = buildAuthErrorHandler({
+      signInPath: "/",
+      onBeforeRedirect: cleanup,
+    })
     expect(() => handler()).not.toThrow()
     expect(assignSpy).toHaveBeenCalledTimes(1)
   })

@@ -1,16 +1,24 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react"
-import * as Sentry from "@sentry/nextjs"
 import { setBusinessContext } from "@guestpost/shared"
-import { api, setToken, clearToken, getToken } from "./api"
+import * as Sentry from "@sentry/nextjs"
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react"
+import { clearToken, getToken, setToken } from "./api"
 
 const getBaseUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL
   if (envUrl) return envUrl
   if (typeof window !== "undefined") {
     const host = window.location.hostname
-    if (host !== "localhost" && host !== "127.0.0.1") return `http://${host}:4000`
+    if (host !== "localhost" && host !== "127.0.0.1")
+      return `http://${host}:4000`
   }
   return "http://localhost:4000"
 }
@@ -56,7 +64,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null)
   }, [])
 
-  useEffect(() => { refresh().finally(() => setLoading(false)) }, [refresh])
+  useEffect(() => {
+    refresh().finally(() => setLoading(false))
+  }, [refresh])
 
   // Phase 7.0 — tag Sentry scope with staff identity. Staff role is the most
   // useful tag for triage (FINANCE vs OPERATIONS vs SUPER_ADMIN actions).
@@ -92,13 +102,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.token) setToken(data.token)
 
       const meRes = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
-        headers: data.token ? { Authorization: `Bearer ${data.token}` } : undefined,
+        headers: data.token
+          ? { Authorization: `Bearer ${data.token}` }
+          : undefined,
         credentials: "include",
       })
       const me = await meRes.json()
       if (me.userType !== "STAFF") {
         clearToken()
-        throw new Error("This portal is for staff only. Please sign in at the correct portal.")
+        throw new Error(
+          "This portal is for staff only. Please sign in at the correct portal.",
+        )
       }
       setUser(me)
     } finally {

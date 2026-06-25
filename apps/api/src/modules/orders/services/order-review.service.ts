@@ -1,9 +1,24 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../../common/prisma.service"
-import { AuditService } from "../../audit/audit.service"
-import { QueueService } from "../../queues/queue.service"
-import { QUEUES, recomputePublisherTrustCore, orderEventMetadata, getSettlementReviewDays, type PublisherTier } from "@guestpost/shared"
-import { resolvePlatformFeeFraction, splitPlatformFee } from "../../../common/platform-fee"
+import {
+  getSettlementReviewDays,
+  orderEventMetadata,
+  type PublisherTier,
+  QUEUES,
+  recomputePublisherTrustCore,
+} from "@guestpost/shared"
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import {
+  resolvePlatformFeeFraction,
+  splitPlatformFee,
+} from "../../../common/platform-fee"
+import type { PrismaService } from "../../../common/prisma.service"
+import type { AuditService } from "../../audit/audit.service"
+import type { QueueService } from "../../queues/queue.service"
 
 @Injectable()
 export class OrderReviewService {
@@ -15,7 +30,13 @@ export class OrderReviewService {
 
   // Customer review for a completed order. One per order. Recomputes the
   // publisher's aggregate rating (the trust score in TR-B3 builds on this).
-  async submitReview(orderId: string, organizationId: string, userId: string, rating: number, comment?: string) {
+  async submitReview(
+    orderId: string,
+    organizationId: string,
+    userId: string,
+    rating: number,
+    comment?: string,
+  ) {
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
       throw new BadRequestException("Rating must be an integer from 1 to 5")
     }
@@ -25,18 +46,34 @@ export class OrderReviewService {
     })
     if (!order) throw new NotFoundException("Order not found")
     if (!["DELIVERED", "SETTLED", "COMPLETED"].includes(order.status)) {
-      throw new BadRequestException("You can review an order once it is delivered")
+      throw new BadRequestException(
+        "You can review an order once it is delivered",
+      )
     }
     const isCreator = order.customerId === userId
-    const isOwner = await this.prisma.membership.findFirst({ where: { organizationId, userId, role: "OWNER" } })
-    if (!isCreator && !isOwner) throw new ForbiddenException("Only the order creator or organization owner can review")
+    const isOwner = await this.prisma.membership.findFirst({
+      where: { organizationId, userId, role: "OWNER" },
+    })
+    if (!isCreator && !isOwner)
+      throw new ForbiddenException(
+        "Only the order creator or organization owner can review",
+      )
 
     const publisherId = order.website?.publisherId ?? null
 
-    const existing = await this.prisma.orderReview.findUnique({ where: { orderId }, select: { id: true } })
+    const existing = await this.prisma.orderReview.findUnique({
+      where: { orderId },
+      select: { id: true },
+    })
     const review = await this.prisma.orderReview.upsert({
       where: { orderId },
-      create: { orderId, publisherId, customerId: userId, rating, comment: comment?.slice(0, 2000) || null },
+      create: {
+        orderId,
+        publisherId,
+        customerId: userId,
+        rating,
+        comment: comment?.slice(0, 2000) || null,
+      },
       update: { rating, comment: comment?.slice(0, 2000) || null },
     })
 
@@ -48,7 +85,12 @@ export class OrderReviewService {
     )
 
     await this.prisma.orderEvent.create({
-      data: { orderId, eventType: "DELIVERY_CONFIRMED", actorId: userId, message: `Customer left a ${rating}-star review` },
+      data: {
+        orderId,
+        eventType: "DELIVERY_CONFIRMED",
+        actorId: userId,
+        message: `Customer left a ${rating}-star review`,
+      },
     })
     await this.audit.log({
       action: "ORDER_REVIEWED",
@@ -64,12 +106,24 @@ export class OrderReviewService {
   // Synchronous recompute (manual admin endpoint). The shared core is the single
   // implementation; the worker uses the same one for the event-driven path.
   async recomputePublisherTrust(publisherId: string, sourceEvent = "MANUAL") {
-    const r = await recomputePublisherTrustCore(this.prisma, publisherId, { sourceEvent })
-    return r ? { publisherId, score: r.newScore, tier: r.newTier, band: r.newScore >= 70 ? "High" : r.newScore >= 40 ? "Medium" : "Low" } : null
+    const r = await recomputePublisherTrustCore(this.prisma, publisherId, {
+      sourceEvent,
+    })
+    return r
+      ? {
+          publisherId,
+          score: r.newScore,
+          tier: r.newTier,
+          band: r.newScore >= 70 ? "High" : r.newScore >= 40 ? "Medium" : "Low",
+        }
+      : null
   }
 
   async getReview(orderId: string, organizationId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, organizationId }, select: { id: true } })
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, organizationId },
+      select: { id: true },
+    })
     if (!order) throw new NotFoundException("Order not found")
     return this.prisma.orderReview.findUnique({ where: { orderId } })
   }
@@ -80,19 +134,29 @@ export class OrderReviewService {
       data: { ...data, version: { increment: 1 } },
     })
     if (r.count === 0) {
-      throw new ConflictException("Order was modified by another request. Retry.")
+      throw new ConflictException(
+        "Order was modified by another request. Retry.",
+      )
     }
     return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
   }
 
-  async approveContent(orderId: string, organizationId: string, userId: string) {
+  async approveContent(
+    orderId: string,
+    organizationId: string,
+    userId: string,
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
-      include: { items: { include: { website: { select: { publisherId: true } } } } },
+      include: {
+        items: { include: { website: { select: { publisherId: true } } } },
+      },
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "CUSTOMER_REVIEW") {
-      throw new BadRequestException("Order must be in CUSTOMER_REVIEW to approve content")
+      throw new BadRequestException(
+        "Order must be in CUSTOMER_REVIEW to approve content",
+      )
     }
 
     const membership = await this.prisma.membership.findFirst({
@@ -101,10 +165,14 @@ export class OrderReviewService {
     const isOwner = membership?.role === "OWNER"
     const isCreator = order.customerId === userId
     if (!isOwner && !isCreator) {
-      throw new ForbiddenException("Only organization owner or order creator can approve content")
+      throw new ForbiddenException(
+        "Only organization owner or order creator can approve content",
+      )
     }
 
-    const updated = await this.transition(orderId, order.version, { status: "APPROVED" })
+    const updated = await this.transition(orderId, order.version, {
+      status: "APPROVED",
+    })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -125,7 +193,12 @@ export class OrderReviewService {
     return updated
   }
 
-  async requestRevision(orderId: string, organizationId: string, userId: string, notes: string) {
+  async requestRevision(
+    orderId: string,
+    organizationId: string,
+    userId: string,
+    notes: string,
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
       include: {
@@ -136,7 +209,9 @@ export class OrderReviewService {
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "CUSTOMER_REVIEW") {
-      throw new BadRequestException("Order must be in CUSTOMER_REVIEW to request revision")
+      throw new BadRequestException(
+        "Order must be in CUSTOMER_REVIEW to request revision",
+      )
     }
 
     // Phase 7: revision-rounds cap moved off the deprecated listing-level
@@ -152,7 +227,9 @@ export class OrderReviewService {
       if (ls?.revisionRounds != null) maxRevisions = ls.revisionRounds
     }
     if (order.revisionCount >= maxRevisions) {
-      throw new BadRequestException(`Maximum revisions (${maxRevisions}) reached. Open a dispute if unsatisfied.`)
+      throw new BadRequestException(
+        `Maximum revisions (${maxRevisions}) reached. Open a dispute if unsatisfied.`,
+      )
     }
 
     const updated = await this.transition(orderId, order.version, {
@@ -178,7 +255,10 @@ export class OrderReviewService {
       action: "REVISION_REQUESTED",
       entityType: "Order",
       entityId: orderId,
-      metadata: { ...orderEventMetadata(order), revisionNumber: order.revisionCount + 1 },
+      metadata: {
+        ...orderEventMetadata(order),
+        revisionNumber: order.revisionCount + 1,
+      },
       userId,
       organizationId,
     })
@@ -186,13 +266,19 @@ export class OrderReviewService {
     return updated
   }
 
-  async confirmDelivery(orderId: string, organizationId: string, userId: string) {
+  async confirmDelivery(
+    orderId: string,
+    organizationId: string,
+    userId: string,
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "VERIFIED") {
-      throw new BadRequestException("Order must be VERIFIED before confirming delivery")
+      throw new BadRequestException(
+        "Order must be VERIFIED before confirming delivery",
+      )
     }
 
     const membership = await this.prisma.membership.findFirst({
@@ -201,7 +287,9 @@ export class OrderReviewService {
     const isOwner = membership?.role === "OWNER"
     const isCreator = order.customerId === userId
     if (!isOwner && !isCreator) {
-      throw new ForbiddenException("Only organization owner or order creator can confirm delivery")
+      throw new ForbiddenException(
+        "Only organization owner or order creator can confirm delivery",
+      )
     }
 
     // Delivery transition and settlement/revenue creation commit atomically —
@@ -218,10 +306,16 @@ export class OrderReviewService {
       // this race deterministic — the second tx fails fast with 409.
       const r = await tx.order.updateMany({
         where: { id: orderId, version: order.version, status: "VERIFIED" },
-        data: { status: "DELIVERED", deliveredAt: new Date(), version: { increment: 1 } },
+        data: {
+          status: "DELIVERED",
+          deliveredAt: new Date(),
+          version: { increment: 1 },
+        },
       })
       if (r.count === 0) {
-        throw new ConflictException("Order was modified by another request. Retry.")
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
       }
       const fresh = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
 
@@ -236,17 +330,20 @@ export class OrderReviewService {
 
       await this.createSettlementForOrder(tx, orderId)
 
-      await this.audit.log({
-        action: "DELIVERY_CONFIRMED",
-        entityType: "Order",
-        entityId: orderId,
-        // Use `fresh` so the audit row carries the post-transition state
-        // (status=DELIVERED, version+1). orderEventMetadata reads the
-        // snapshot trio which is immutable after creation either way.
-        metadata: { ...orderEventMetadata(fresh) },
-        userId,
-        organizationId,
-      }, tx)
+      await this.audit.log(
+        {
+          action: "DELIVERY_CONFIRMED",
+          entityType: "Order",
+          entityId: orderId,
+          // Use `fresh` so the audit row carries the post-transition state
+          // (status=DELIVERED, version+1). orderEventMetadata reads the
+          // snapshot trio which is immutable after creation either way.
+          metadata: { ...orderEventMetadata(fresh) },
+          userId,
+          organizationId,
+        },
+        tx,
+      )
 
       return fresh
     })
@@ -264,14 +361,14 @@ export class OrderReviewService {
       where: { id: orderId },
       include: { website: true },
     })
-    if (!order || !order.amount) return
+    if (!order?.amount) return
 
     // Phase 6 snapshot resolver. Reads the order's per-service price from
     // the snapshotted ListingService (or NULL for legacy orders) so both
     // PlatformRevenue and Settlement freeze the same five fields.
-    let snapshotLsId: string | null = order.listingServiceId ?? null
-    let snapshotServiceType: any   = order.type ?? null
-    let snapshotUnitPrice: any     = null
+    const snapshotLsId: string | null = order.listingServiceId ?? null
+    let snapshotServiceType: any = order.type ?? null
+    let snapshotUnitPrice: any = null
     if (order.listingServiceId) {
       const ls = await tx.listingService.findUnique({
         where: { id: order.listingServiceId },
@@ -286,13 +383,20 @@ export class OrderReviewService {
 
     // Platform channel orders: record platform revenue, skip settlement.
     // Channel snapshot wins; ownership fallback for legacy orders only.
-    const channel = order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    const channel =
+      order.fulfillmentChannel ??
+      (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
     if (channel === "PLATFORM") {
-      const existingRevenue = await tx.platformRevenue.findUnique({ where: { orderId } })
+      const existingRevenue = await tx.platformRevenue.findUnique({
+        where: { orderId },
+      })
       if (existingRevenue) return
 
       const feeFraction = await resolvePlatformFeeFraction(tx)
-      const { fee: platformFee, net: netRevenue } = splitPlatformFee(order.amount, feeFraction)
+      const { fee: platformFee, net: netRevenue } = splitPlatformFee(
+        order.amount,
+        feeFraction,
+      )
 
       await tx.platformRevenue.create({
         data: {
@@ -302,11 +406,11 @@ export class OrderReviewService {
           netRevenue,
           recordedAt: new Date(),
           // Phase 6 snapshots — frozen at recognition time.
-          listingServiceId:   snapshotLsId,
-          serviceType:        snapshotServiceType,
-          ownerType:          snapshotOwnerType,
+          listingServiceId: snapshotLsId,
+          serviceType: snapshotServiceType,
+          ownerType: snapshotOwnerType,
           fulfillmentChannel: "PLATFORM",
-          unitPrice:          snapshotUnitPrice,
+          unitPrice: snapshotUnitPrice,
         },
       })
       return
@@ -314,17 +418,23 @@ export class OrderReviewService {
 
     // Publisher-owned websites: create settlement for publisher payout
     if (!order.websiteId) {
-      throw new Error(`Order ${orderId} has no websiteId — cannot create settlement`)
+      throw new Error(
+        `Order ${orderId} has no websiteId — cannot create settlement`,
+      )
     }
     const website = await tx.website.findUnique({
       where: { id: order.websiteId },
       select: { publisherId: true },
     })
     if (!website) {
-      throw new Error(`Website ${order.websiteId} not found for order ${orderId}`)
+      throw new Error(
+        `Website ${order.websiteId} not found for order ${orderId}`,
+      )
     }
     if (!website.publisherId) {
-      throw new Error(`Website ${order.websiteId} has no publisher — cannot create settlement`)
+      throw new Error(
+        `Website ${order.websiteId} has no publisher — cannot create settlement`,
+      )
     }
     const publisher = await tx.publisher.findUnique({
       where: { id: website.publisherId },
@@ -332,11 +442,17 @@ export class OrderReviewService {
     if (!publisher) return
 
     const feeFraction = await resolvePlatformFeeFraction(tx)
-    const { fee: platformFee, net: publisherAmount } = splitPlatformFee(order.amount, feeFraction)
+    const { fee: platformFee, net: publisherAmount } = splitPlatformFee(
+      order.amount,
+      feeFraction,
+    )
     // Phase 7.2 — tier-aware review window (audit #6). Helper applies env
     // override when set (incident-response escape hatch); otherwise per-tier
     // table in packages/shared/src/publisher-tier-policy.ts.
-    const reviewDays = getSettlementReviewDays(publisher.tier as PublisherTier, process.env.SETTLEMENT_REVIEW_DAYS)
+    const reviewDays = getSettlementReviewDays(
+      publisher.tier as PublisherTier,
+      process.env.SETTLEMENT_REVIEW_DAYS,
+    )
     const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
 
     await tx.settlement.create({
@@ -350,11 +466,11 @@ export class OrderReviewService {
         reviewEndsAt,
         // Phase 6 snapshots — same shape as createSettlement() in
         // SettlementsService for parity.
-        listingServiceId:   snapshotLsId,
-        serviceType:        snapshotServiceType,
-        ownerType:          snapshotOwnerType,
+        listingServiceId: snapshotLsId,
+        serviceType: snapshotServiceType,
+        ownerType: snapshotOwnerType,
         fulfillmentChannel: "PUBLISHER",
-        unitPrice:          snapshotUnitPrice,
+        unitPrice: snapshotUnitPrice,
       },
     })
   }

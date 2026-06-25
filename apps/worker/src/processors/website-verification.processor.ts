@@ -1,14 +1,18 @@
-import { connection } from "../redis"
-import { QUEUES, runWebsiteVerify, runWebsiteReverifySweep } from "@guestpost/shared"
-import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
-import { createObservableWorker } from "../lib/queue-observability"
+import { prisma } from "@guestpost/database"
+import {
+  QUEUES,
+  runWebsiteReverifySweep,
+  runWebsiteVerify,
+} from "@guestpost/shared"
 // Node-only DNS lookup — deep import keeps node `dns` out of the shared index
 // (which the browser apps bundle).
 import { checkDnsTxtToken } from "@guestpost/shared/dist/dns-lookup"
+import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { createObservableWorker } from "../lib/queue-observability"
+import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 import { enqueueTrustRecompute } from "../trust-enqueue"
-import { prisma } from "@guestpost/database"
 
 const logger = createLogger("worker.website-verification")
 
@@ -26,21 +30,36 @@ interface VerifyJobData {
 }
 
 export function createWebsiteVerificationWorker() {
-  const deps = { prisma, checkDns: checkDnsTxtToken, onTrustEvent: enqueueTrustRecompute }
+  const deps = {
+    prisma,
+    checkDns: checkDnsTxtToken,
+    onTrustEvent: enqueueTrustRecompute,
+  }
   const worker = createObservableWorker(
     QUEUES.WEBSITE_VERIFICATION,
     async (job) => {
       // Reject anything not HMAC-signed by the API — blocks forged/injected jobs.
       // Phase 7.8 #27 — website-reverify-sweep (repeatable) bypasses freshness.
-      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
+      if (
+        !verifyJobPayload(job.data, {
+          maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined,
+        })
+      ) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
       switch (job.name) {
         case "website-verify": {
           const data = job.data as VerifyJobData
-          const res = await runWebsiteVerify(deps, data.websiteId, data.actorUserId)
-          logger.info("website verification complete", { websiteId: data.websiteId, result: res })
+          const res = await runWebsiteVerify(
+            deps,
+            data.websiteId,
+            data.actorUserId,
+          )
+          logger.info("website verification complete", {
+            websiteId: data.websiteId,
+            result: res,
+          })
           return res
         }
         case "website-reverify-sweep": {
@@ -55,7 +74,11 @@ export function createWebsiteVerificationWorker() {
     { connection, concurrency: 4 },
   )
 
-  worker.on("completed", (job) => logger.info("job completed", { jobId: job.id }))
-  worker.on("failed", (job, err) => logger.error("job failed", { jobId: job?.id, err: err?.message }))
+  worker.on("completed", (job) =>
+    logger.info("job completed", { jobId: job.id }),
+  )
+  worker.on("failed", (job, err) =>
+    logger.error("job failed", { jobId: job?.id, err: err?.message }),
+  )
   return worker
 }

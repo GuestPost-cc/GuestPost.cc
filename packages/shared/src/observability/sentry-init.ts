@@ -88,10 +88,14 @@ function readEnv(key: string): string | undefined {
   return value && value.length > 0 ? value : undefined
 }
 
-function resolveDsn(override: string | undefined, runtime: SentryRuntimeTag): string | undefined {
+function resolveDsn(
+  override: string | undefined,
+  runtime: SentryRuntimeTag,
+): string | undefined {
   if (override) return override
   // Browser bundles inject NEXT_PUBLIC_SENTRY_DSN at build time; Node reads SENTRY_DSN.
-  const isBrowserRuntime = runtime.endsWith("-client") || runtime.endsWith("-edge")
+  const isBrowserRuntime =
+    runtime.endsWith("-client") || runtime.endsWith("-edge")
   if (isBrowserRuntime) {
     return readEnv("NEXT_PUBLIC_SENTRY_DSN") ?? readEnv("SENTRY_DSN")
   }
@@ -131,10 +135,17 @@ export function redactSensitiveData<T>(value: T): T {
   for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
     const lowerKey = key.toLowerCase()
     // Header object: redact known header names case-insensitively.
-    if (lowerKey === "headers" && val && typeof val === "object" && !Array.isArray(val)) {
+    if (
+      lowerKey === "headers" &&
+      val &&
+      typeof val === "object" &&
+      !Array.isArray(val)
+    ) {
       const headers: Record<string, unknown> = {}
       for (const [hk, hv] of Object.entries(val as Record<string, unknown>)) {
-        headers[hk] = (REDACTED_HEADERS as readonly string[]).includes(hk.toLowerCase())
+        headers[hk] = (REDACTED_HEADERS as readonly string[]).includes(
+          hk.toLowerCase(),
+        )
           ? REDACTED_PLACEHOLDER
           : redactSensitiveData(hv)
       }
@@ -142,7 +153,11 @@ export function redactSensitiveData<T>(value: T): T {
       continue
     }
     // Redact any value whose key matches the sensitive list (case-insensitive).
-    if ((REDACTED_KEYS as readonly string[]).some((k) => k.toLowerCase() === lowerKey)) {
+    if (
+      (REDACTED_KEYS as readonly string[]).some(
+        (k) => k.toLowerCase() === lowerKey,
+      )
+    ) {
       out[key] = REDACTED_PLACEHOLDER
       continue
     }
@@ -159,7 +174,9 @@ export function buildBeforeSend() {
   }
 }
 
-export function buildStartupConfig(opts: InitSentryOptions): SentryStartupConfig {
+export function buildStartupConfig(
+  opts: InitSentryOptions,
+): SentryStartupConfig {
   if (!(RUNTIME_TAGS as readonly string[]).includes(opts.runtime)) {
     throw new Error(
       `[SENTRY] invalid runtime tag '${opts.runtime}'. Allowed: ${RUNTIME_TAGS.join(", ")}`,
@@ -175,7 +192,10 @@ export function buildStartupConfig(opts: InitSentryOptions): SentryStartupConfig
   }
 }
 
-export function logSentryStartup(config: SentryStartupConfig, logger?: Pick<Console, "log" | "warn">): void {
+export function logSentryStartup(
+  config: SentryStartupConfig,
+  logger?: Pick<Console, "log" | "warn">,
+): void {
   const log = logger ?? console
   if (!config.dsn) {
     log.warn(`[SENTRY] disabled (no DSN) runtime=${config.runtime}`)
@@ -189,7 +209,10 @@ export function logSentryStartup(config: SentryStartupConfig, logger?: Pick<Cons
 // Main entry. Each runtime calls this once at startup. The Sentry SDK module
 // (Sentry-node or Sentry-nextjs) is passed in so packages/shared takes no
 // SDK dependency.
-export function initSentry(Sentry: SentryLike, opts: InitSentryOptions): SentryStartupConfig {
+export function initSentry(
+  Sentry: SentryLike,
+  opts: InitSentryOptions,
+): SentryStartupConfig {
   const config = buildStartupConfig(opts)
   logSentryStartup(config, opts.logger)
   if (!config.dsn) return config

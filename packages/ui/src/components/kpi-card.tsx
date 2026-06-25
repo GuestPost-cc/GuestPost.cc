@@ -1,9 +1,8 @@
 "use client"
 
-import * as React from "react"
+import { TrendingDown, TrendingUp } from "lucide-react"
 import { cn } from "../lib/utils"
 import { Card, CardContent } from "./card"
-import { TrendingDown, TrendingUp } from "lucide-react"
 
 interface KpiCardProps {
   label: string
@@ -26,7 +25,7 @@ function KpiCard({ label, value, trend, className }: KpiCardProps) {
             <div
               className={cn(
                 "flex items-center gap-1 text-sm font-medium",
-                trend.isPositive ? "text-emerald-600" : "text-red-600"
+                trend.isPositive ? "text-emerald-600" : "text-red-600",
               )}
             >
               {trend.isPositive ? (

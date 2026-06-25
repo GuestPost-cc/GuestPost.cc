@@ -1,6 +1,6 @@
+import type { QueueName } from "@guestpost/shared"
 import { Queue } from "bullmq"
 import { connection } from "../redis"
-import type { QueueName } from "@guestpost/shared"
 
 const queues = new Map<QueueName, Queue>()
 

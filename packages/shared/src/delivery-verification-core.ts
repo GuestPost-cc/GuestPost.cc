@@ -8,9 +8,10 @@
 // the page, persist immutable evidence, run fraud detection, and transition the
 // delivery version VERIFIED / FAILED / MANUAL_REVIEW (version-guarded). All
 // comparisons use normalized URLs.
-import { createHash } from "crypto"
+
+import { createHash } from "node:crypto"
 import * as cheerio from "cheerio"
-import { normalizeUrl, urlsMatch, sameDomain } from "./url-normalize"
+import { normalizeUrl, sameDomain, urlsMatch } from "./url-normalize"
 
 export interface FetchResult {
   finalUrl: string
@@ -22,7 +23,11 @@ export interface FetchResult {
 }
 
 export type DeliveryFetcher = (url: string) => Promise<FetchResult>
-export type ObjectPutter = (key: string, body: string | Buffer, contentType: string) => Promise<{ objectKey: string }>
+export type ObjectPutter = (
+  key: string,
+  body: string | Buffer,
+  contentType: string,
+) => Promise<{ objectKey: string }>
 
 export interface DeliveryDeps {
   prisma: any
@@ -30,7 +35,11 @@ export interface DeliveryDeps {
   putObject: ObjectPutter
   now?: () => Date
   // Optional hook to trigger event-driven publisher trust recompute.
-  onTrustEvent?: (publisherId: string | null | undefined, sourceEvent: string, reason?: string) => void | Promise<void>
+  onTrustEvent?: (
+    publisherId: string | null | undefined,
+    sourceEvent: string,
+    reason?: string,
+  ) => void | Promise<void>
 }
 
 export interface DeliveryVerifyResult {
@@ -43,13 +52,24 @@ export interface DeliveryVerifyResult {
 // HTTP statuses accepted after redirect resolution.
 const ACCEPT_STATUSES = new Set([200, 301, 302])
 
-async function notifyUsers(prisma: any, userIds: string[], organizationId: string | null, type: string, message: string) {
+async function notifyUsers(
+  prisma: any,
+  userIds: string[],
+  organizationId: string | null,
+  type: string,
+  message: string,
+) {
   for (const userId of userIds) {
-    await prisma.notification.create({ data: { userId, organizationId, type, message } }).catch(() => undefined)
+    await prisma.notification
+      .create({ data: { userId, organizationId, type, message } })
+      .catch(() => undefined)
   }
 }
 
-async function publisherOwnerIds(prisma: any, publisherId: string | null): Promise<string[]> {
+async function publisherOwnerIds(
+  prisma: any,
+  publisherId: string | null,
+): Promise<string[]> {
   if (!publisherId) return []
   const owners = await prisma.publisherMembership.findMany({
     where: { publisherId, role: "PUBLISHER_OWNER" },
@@ -59,12 +79,18 @@ async function publisherOwnerIds(prisma: any, publisherId: string | null): Promi
 }
 
 async function staffIds(prisma: any): Promise<string[]> {
-  const staff = await prisma.staffMembership.findMany({ select: { userId: true } })
+  const staff = await prisma.staffMembership.findMany({
+    select: { userId: true },
+  })
   return staff.map((s: any) => s.userId)
 }
 
 // Common audit metadata shape required by spec for every ORDER_DELIVERY_* event.
-function auditMeta(order: any, version: any, extra: Record<string, unknown> = {}) {
+function auditMeta(
+  order: any,
+  version: any,
+  extra: Record<string, unknown> = {},
+) {
   return {
     orderId: order.id,
     deliveryVersionId: version.id,
@@ -76,7 +102,14 @@ function auditMeta(order: any, version: any, extra: Record<string, unknown> = {}
   }
 }
 
-async function audit(prisma: any, action: string, order: any, version: any, actorId: string | null, extra: Record<string, unknown> = {}) {
+async function audit(
+  prisma: any,
+  action: string,
+  order: any,
+  version: any,
+  actorId: string | null,
+  extra: Record<string, unknown> = {},
+) {
   await prisma.auditLog.create({
     data: {
       action,
@@ -90,7 +123,11 @@ async function audit(prisma: any, action: string, order: any, version: any, acto
 }
 
 // Parse the captured HTML for evidence fields + the target link / anchor.
-function analyzeHtml(html: string, targetUrl: string | null, anchorText: string | null) {
+function analyzeHtml(
+  html: string,
+  targetUrl: string | null,
+  anchorText: string | null,
+) {
   const $ = cheerio.load(html)
   const pageTitle = $("title").first().text().trim() || null
   const metaTitle =
@@ -124,7 +161,10 @@ function analyzeHtml(html: string, targetUrl: string | null, anchorText: string 
         verifiedTargetUrl = normalizeUrl(abs)
         const text = $(el).text().trim()
         verifiedAnchorText = text || verifiedAnchorText
-        if (anchorText && text.toLowerCase() === anchorText.trim().toLowerCase()) {
+        if (
+          anchorText &&
+          text.toLowerCase() === anchorText.trim().toLowerCase()
+        ) {
           anchorFound = true
         }
         return false // stop at first exact match
@@ -136,7 +176,16 @@ function analyzeHtml(html: string, targetUrl: string | null, anchorText: string 
   // No anchor requirement -> anchor passes vacuously.
   if (!anchorText) anchorFound = true
 
-  return { pageTitle, metaTitle, canonicalUrl, linkFound, targetUrlMatched, anchorFound, verifiedTargetUrl, verifiedAnchorText }
+  return {
+    pageTitle,
+    metaTitle,
+    canonicalUrl,
+    linkFound,
+    targetUrlMatched,
+    anchorFound,
+    verifiedTargetUrl,
+    verifiedAnchorText,
+  }
 }
 
 // Fraud heuristics. Each match creates a DeliveryFraudFlag (deduped by type) +
@@ -155,29 +204,55 @@ async function runFraudDetection(
     where: { normalizedUrl: version.normalizedUrl, orderId: { not: order.id } },
     select: { id: true, orderId: true },
   })
-  if (reuse) flags.push({ type: "URL_REUSED", details: { otherOrderId: reuse.orderId, otherVersionId: reuse.id } })
+  if (reuse)
+    flags.push({
+      type: "URL_REUSED",
+      details: { otherOrderId: reuse.orderId, otherVersionId: reuse.id },
+    })
 
   // 2. Target URL mismatch (order expected a target but it wasn't matched)
   if (order.targetUrl && !analysis.targetUrlMatched) {
-    flags.push({ type: "TARGET_MISMATCH", details: { expected: order.targetUrl } })
+    flags.push({
+      type: "TARGET_MISMATCH",
+      details: { expected: order.targetUrl },
+    })
   }
 
   // 3. Anchor mismatch
   if (order.anchorText && !analysis.anchorFound) {
-    flags.push({ type: "ANCHOR_MISMATCH", details: { expected: order.anchorText } })
+    flags.push({
+      type: "ANCHOR_MISMATCH",
+      details: { expected: order.anchorText },
+    })
   }
 
   // 4. Domain mismatch — published on a different domain than the order website
-  if (order.website?.url && !sameDomain(version.publishedUrl, order.website.url)) {
-    flags.push({ type: "DOMAIN_MISMATCH", details: { publishedUrl: version.publishedUrl, websiteUrl: order.website.url } })
+  if (
+    order.website?.url &&
+    !sameDomain(version.publishedUrl, order.website.url)
+  ) {
+    flags.push({
+      type: "DOMAIN_MISMATCH",
+      details: {
+        publishedUrl: version.publishedUrl,
+        websiteUrl: order.website.url,
+      },
+    })
   }
 
   // 5. Suspicious rapid delivery — same submitter, many submissions in 60s
-  const since = new Date(((deps.now ?? (() => new Date()))()).getTime() - 60_000)
+  const since = new Date((deps.now ?? (() => new Date()))().getTime() - 60_000)
   const rapid = await prisma.orderDeliveryVersion.count({
-    where: { submittedByUserId: version.submittedByUserId, submittedAt: { gte: since } },
+    where: {
+      submittedByUserId: version.submittedByUserId,
+      submittedAt: { gte: since },
+    },
   })
-  if (rapid >= 5) flags.push({ type: "RAPID_DELIVERY", details: { count: rapid, windowSeconds: 60 } })
+  if (rapid >= 5)
+    flags.push({
+      type: "RAPID_DELIVERY",
+      details: { count: rapid, windowSeconds: 60 },
+    })
 
   for (const f of flags) {
     // Dedupe: one flag per (version, type)
@@ -187,9 +262,17 @@ async function runFraudDetection(
     })
     if (exists) continue
     await prisma.deliveryFraudFlag.create({
-      data: { orderId: order.id, deliveryVersionId: version.id, type: f.type, details: f.details },
+      data: {
+        orderId: order.id,
+        deliveryVersionId: version.id,
+        type: f.type,
+        details: f.details,
+      },
     })
-    await audit(prisma, "ORDER_DELIVERY_FRAUD_FLAGGED", order, version, null, { fraudType: f.type, details: f.details })
+    await audit(prisma, "ORDER_DELIVERY_FRAUD_FLAGGED", order, version, null, {
+      fraudType: f.type,
+      details: f.details,
+    })
   }
 
   if (flags.length > 0) {
@@ -215,10 +298,13 @@ export async function runDeliveryVerification(
   const { prisma, fetchUrl, putObject } = deps
   const now = (deps.now ?? (() => new Date()))()
 
-  const version = await prisma.orderDeliveryVersion.findUnique({ where: { id: deliveryVersionId } })
+  const version = await prisma.orderDeliveryVersion.findUnique({
+    where: { id: deliveryVersionId },
+  })
   if (!version) return { skipped: "not_found" }
   // Idempotent: a delivery already auto-VERIFIED is not re-run by the worker.
-  if (version.verificationStatus === "VERIFIED") return { skipped: "already_verified" }
+  if (version.verificationStatus === "VERIFIED")
+    return { skipped: "already_verified" }
   // Superseded versions are immutable history — never re-verify.
   if (version.supersededByVersion != null) return { skipped: "superseded" }
 
@@ -228,7 +314,13 @@ export async function runDeliveryVerification(
   })
   if (!order) return { skipped: "order_not_found" }
 
-  await audit(prisma, "ORDER_DELIVERY_VERIFICATION_STARTED", order, version, opts.actorUserId ?? null)
+  await audit(
+    prisma,
+    "ORDER_DELIVERY_VERIFICATION_STARTED",
+    order,
+    version,
+    opts.actorUserId ?? null,
+  )
 
   const expectedVersion = version.verificationVersion
 
@@ -237,39 +329,81 @@ export async function runDeliveryVerification(
   try {
     fetched = await fetchUrl(version.publishedUrl)
   } catch (err: any) {
-    fetched = { finalUrl: version.publishedUrl, status: 0, headers: {}, html: "", redirectChain: [], error: err?.message ?? "fetch failed" }
+    fetched = {
+      finalUrl: version.publishedUrl,
+      status: 0,
+      headers: {},
+      html: "",
+      redirectChain: [],
+      error: err?.message ?? "fetch failed",
+    }
   }
 
-  const transientFailure = !!fetched.error || !ACCEPT_STATUSES.has(fetched.status)
+  const transientFailure =
+    !!fetched.error || !ACCEPT_STATUSES.has(fetched.status)
   if (transientFailure) {
     if (!opts.isFinalAttempt) {
       // Throw so BullMQ retries with backoff (5/15/60m).
-      await audit(prisma, "ORDER_DELIVERY_VERIFICATION_RETRIED", order, version, null, {
-        httpStatus: fetched.status,
-        error: fetched.error ?? null,
-      })
+      await audit(
+        prisma,
+        "ORDER_DELIVERY_VERIFICATION_RETRIED",
+        order,
+        version,
+        null,
+        {
+          httpStatus: fetched.status,
+          error: fetched.error ?? null,
+        },
+      )
       await prisma.orderDeliveryVersion.updateMany({
         where: { id: version.id, verificationVersion: expectedVersion },
         data: { verificationStatus: "RETRYING" },
       })
-      throw new Error(`Delivery fetch failed (status ${fetched.status}${fetched.error ? `, ${fetched.error}` : ""}) — retrying`)
+      throw new Error(
+        `Delivery fetch failed (status ${fetched.status}${fetched.error ? `, ${fetched.error}` : ""}) — retrying`,
+      )
     }
     // Exhausted retries → MANUAL_REVIEW (a human must look).
-    const reason = fetched.error ? `Fetch error: ${fetched.error}` : `HTTP ${fetched.status} after redirects`
+    const reason = fetched.error
+      ? `Fetch error: ${fetched.error}`
+      : `HTTP ${fetched.status} after redirects`
     const upd = await prisma.orderDeliveryVersion.updateMany({
       where: { id: version.id, verificationVersion: expectedVersion },
-      data: { verificationStatus: "MANUAL_REVIEW", verificationFailureReason: reason, verificationVersion: expectedVersion + 1 },
+      data: {
+        verificationStatus: "MANUAL_REVIEW",
+        verificationFailureReason: reason,
+        verificationVersion: expectedVersion + 1,
+      },
     })
     if (upd.count === 0) return { skipped: "version_conflict" }
-    await audit(prisma, "ORDER_DELIVERY_AUTO_FAILED", order, version, null, { reason, manualReview: true })
+    await audit(prisma, "ORDER_DELIVERY_AUTO_FAILED", order, version, null, {
+      reason,
+      manualReview: true,
+    })
     const ids = await staffIds(prisma)
-    await notifyUsers(prisma, ids, null, "ORDER_DELIVERY_MANUAL_REVIEW", `Delivery for order ${order.id} needs manual review: ${reason}`)
-    await notifyUsers(prisma, await publisherOwnerIds(prisma, order.website?.publisherId), order.organizationId, "ORDER_DELIVERY_MANUAL_REVIEW", `Your delivery for order ${order.id} could not be auto-verified and is under manual review.`)
+    await notifyUsers(
+      prisma,
+      ids,
+      null,
+      "ORDER_DELIVERY_MANUAL_REVIEW",
+      `Delivery for order ${order.id} needs manual review: ${reason}`,
+    )
+    await notifyUsers(
+      prisma,
+      await publisherOwnerIds(prisma, order.website?.publisherId),
+      order.organizationId,
+      "ORDER_DELIVERY_MANUAL_REVIEW",
+      `Your delivery for order ${order.id} could not be auto-verified and is under manual review.`,
+    )
     return { status: "MANUAL_REVIEW", reason }
   }
 
   // ── Parse + analyze ───────────────────────────────────────────────────────
-  const analysis = analyzeHtml(fetched.html, order.targetUrl ?? null, order.anchorText ?? null)
+  const analysis = analyzeHtml(
+    fetched.html,
+    order.targetUrl ?? null,
+    order.anchorText ?? null,
+  )
   const htmlHash = createHash("sha256").update(fetched.html).digest("hex")
 
   // ── Snapshot (permanent) ───────────────────────────────────────────────────
@@ -278,14 +412,32 @@ export async function runDeliveryVerification(
   try {
     await putObject(htmlKey, fetched.html, "text/html; charset=utf-8")
     await prisma.deliverySnapshot.create({
-      data: { deliveryVersionId: version.id, htmlObjectKey: htmlKey, responseHeaders: fetched.headers as any },
+      data: {
+        deliveryVersionId: version.id,
+        htmlObjectKey: htmlKey,
+        responseHeaders: fetched.headers as any,
+      },
     })
     snapshotStored = true
-    await audit(prisma, "ORDER_DELIVERY_SNAPSHOT_CAPTURED", order, version, null, { htmlObjectKey: htmlKey, htmlHash })
+    await audit(
+      prisma,
+      "ORDER_DELIVERY_SNAPSHOT_CAPTURED",
+      order,
+      version,
+      null,
+      { htmlObjectKey: htmlKey, htmlHash },
+    )
   } catch (err: any) {
     // Snapshot storage failure must not lose the verification result — log via
     // audit and continue. Evidence row still records the hash.
-    await audit(prisma, "ORDER_DELIVERY_SNAPSHOT_CAPTURED", order, version, null, { error: err?.message ?? "snapshot failed" })
+    await audit(
+      prisma,
+      "ORDER_DELIVERY_SNAPSHOT_CAPTURED",
+      order,
+      version,
+      null,
+      { error: err?.message ?? "snapshot failed" },
+    )
   }
 
   // ── Immutable evidence ──────────────────────────────────────────────────────
@@ -309,20 +461,29 @@ export async function runDeliveryVerification(
   })
 
   // ── Decide + transition (version-guarded) ───────────────────────────────────
-  const pass = analysis.linkFound && analysis.targetUrlMatched && analysis.anchorFound
+  const pass =
+    analysis.linkFound && analysis.targetUrlMatched && analysis.anchorFound
   const newStatus = pass ? "VERIFIED" : "FAILED"
   const failureReason = pass
     ? null
     : [
-        !analysis.targetUrlMatched && order.targetUrl ? "target URL not found on page" : null,
-        !analysis.anchorFound && order.anchorText ? "anchor text mismatch" : null,
+        !analysis.targetUrlMatched && order.targetUrl
+          ? "target URL not found on page"
+          : null,
+        !analysis.anchorFound && order.anchorText
+          ? "anchor text mismatch"
+          : null,
       ]
         .filter(Boolean)
         .join("; ") || "link verification failed"
 
   const upd = await prisma.orderDeliveryVersion.updateMany({
     where: { id: version.id, verificationVersion: expectedVersion },
-    data: { verificationStatus: newStatus, verificationFailureReason: failureReason, verificationVersion: expectedVersion + 1 },
+    data: {
+      verificationStatus: newStatus,
+      verificationFailureReason: failureReason,
+      verificationVersion: expectedVersion + 1,
+    },
   })
   if (upd.count === 0) return { skipped: "version_conflict" }
 
@@ -330,7 +491,12 @@ export async function runDeliveryVerification(
   if (pass) {
     await prisma.order.updateMany({
       where: { id: order.id, status: "PUBLISHED" },
-      data: { status: "VERIFIED", verifiedAt: now, verifiedBy: "system", verifyMethod: "auto" },
+      data: {
+        status: "VERIFIED",
+        verifiedAt: now,
+        verifiedBy: "system",
+        verifyMethod: "auto",
+      },
     })
   }
 
@@ -338,24 +504,55 @@ export async function runDeliveryVerification(
   const fraudTypes = await runFraudDetection(deps, order, version, analysis)
 
   // Audit + notify
-  await audit(prisma, pass ? "ORDER_DELIVERY_AUTO_VERIFIED" : "ORDER_DELIVERY_AUTO_FAILED", order, version, null, {
-    httpStatus: fetched.status,
-    resolvedUrl: fetched.finalUrl,
-    targetUrlMatched: analysis.targetUrlMatched,
-    anchorFound: analysis.anchorFound,
-    htmlHash,
-    snapshotStored,
-    fraudTypes,
-    reason: failureReason,
-  })
+  await audit(
+    prisma,
+    pass ? "ORDER_DELIVERY_AUTO_VERIFIED" : "ORDER_DELIVERY_AUTO_FAILED",
+    order,
+    version,
+    null,
+    {
+      httpStatus: fetched.status,
+      resolvedUrl: fetched.finalUrl,
+      targetUrlMatched: analysis.targetUrlMatched,
+      anchorFound: analysis.anchorFound,
+      htmlHash,
+      snapshotStored,
+      fraudTypes,
+      reason: failureReason,
+    },
+  )
 
   const ownerIds = await publisherOwnerIds(prisma, order.website?.publisherId)
   if (pass) {
-    await notifyUsers(prisma, ownerIds, order.organizationId, "ORDER_DELIVERY_VERIFIED", `Delivery verified for order ${order.id}.`)
-    await notifyUsers(prisma, [order.customerId], order.organizationId, "ORDER_VERIFICATION_PASSED", `Your order ${order.id} delivery was verified.`)
+    await notifyUsers(
+      prisma,
+      ownerIds,
+      order.organizationId,
+      "ORDER_DELIVERY_VERIFIED",
+      `Delivery verified for order ${order.id}.`,
+    )
+    await notifyUsers(
+      prisma,
+      [order.customerId],
+      order.organizationId,
+      "ORDER_VERIFICATION_PASSED",
+      `Your order ${order.id} delivery was verified.`,
+    )
   } else {
-    await notifyUsers(prisma, ownerIds, order.organizationId, "ORDER_DELIVERY_FAILED", `Delivery verification failed for order ${order.id}: ${failureReason}.`)
-    await notifyUsers(prisma, [order.customerId], order.organizationId, "ORDER_VERIFICATION_FAILED", `Your order ${order.id} delivery could not be verified.`)
+    await notifyUsers(
+      prisma,
+      ownerIds,
+      order.organizationId,
+      "ORDER_DELIVERY_FAILED",
+      `Delivery verification failed for order ${order.id}: ${failureReason}.`,
+    )
+    await notifyUsers(
+      prisma,
+      [order.customerId],
+      order.organizationId,
+      "ORDER_VERIFICATION_FAILED",
+      `Your order ${order.id} delivery could not be verified.`,
+    )
   }
 
   return { status: newStatus, reason: failureReason ?? undefined }
@@ -373,11 +570,16 @@ export interface LinkRecheckResult {
   restored?: boolean
 }
 
-export async function runDeliveryLinkRecheck(deps: DeliveryDeps, deliveryVersionId: string): Promise<LinkRecheckResult> {
+export async function runDeliveryLinkRecheck(
+  deps: DeliveryDeps,
+  deliveryVersionId: string,
+): Promise<LinkRecheckResult> {
   const { prisma, fetchUrl } = deps
   const now = (deps.now ?? (() => new Date()))()
 
-  const version = await prisma.orderDeliveryVersion.findUnique({ where: { id: deliveryVersionId } })
+  const version = await prisma.orderDeliveryVersion.findUnique({
+    where: { id: deliveryVersionId },
+  })
   if (!version) return { skipped: "not_found" }
   if (version.supersededByVersion != null) return { skipped: "superseded" }
 
@@ -385,9 +587,13 @@ export async function runDeliveryLinkRecheck(deps: DeliveryDeps, deliveryVersion
   // were flagged LINK_REMOVED (detect restoration). Anything else is skipped.
   const hadRemovalFlag =
     version.verificationStatus === "FAILED"
-      ? await prisma.deliveryFraudFlag.findFirst({ where: { deliveryVersionId: version.id, type: "LINK_REMOVED" }, select: { id: true } })
+      ? await prisma.deliveryFraudFlag.findFirst({
+          where: { deliveryVersionId: version.id, type: "LINK_REMOVED" },
+          select: { id: true },
+        })
       : null
-  if (version.verificationStatus !== "VERIFIED" && !hadRemovalFlag) return { skipped: "not_verified" }
+  if (version.verificationStatus !== "VERIFIED" && !hadRemovalFlag)
+    return { skipped: "not_verified" }
 
   const order = await prisma.order.findUnique({
     where: { id: version.orderId },
@@ -400,54 +606,127 @@ export async function runDeliveryLinkRecheck(deps: DeliveryDeps, deliveryVersion
   try {
     fetched = await fetchUrl(version.publishedUrl)
   } catch (err: any) {
-    fetched = { finalUrl: version.publishedUrl, status: 0, headers: {}, html: "", redirectChain: [], error: err?.message ?? "fetch failed" }
+    fetched = {
+      finalUrl: version.publishedUrl,
+      status: 0,
+      headers: {},
+      html: "",
+      redirectChain: [],
+      error: err?.message ?? "fetch failed",
+    }
   }
   // A transient outage is NOT a removal — never penalize the publisher for it.
-  if (fetched.error || !ACCEPT_STATUSES.has(fetched.status)) return { skipped: "transient" }
+  if (fetched.error || !ACCEPT_STATUSES.has(fetched.status))
+    return { skipped: "transient" }
 
-  const analysis = analyzeHtml(fetched.html, order.targetUrl ?? null, order.anchorText ?? null)
-  const stillPresent = analysis.linkFound && analysis.targetUrlMatched && analysis.anchorFound
+  const analysis = analyzeHtml(
+    fetched.html,
+    order.targetUrl ?? null,
+    order.anchorText ?? null,
+  )
+  const stillPresent =
+    analysis.linkFound && analysis.targetUrlMatched && analysis.anchorFound
 
   // ── Restoration path: a previously-removed link is back ──────────────────
   if (hadRemovalFlag) {
     if (!stillPresent) return { ok: true } // still gone
     const upd = await prisma.orderDeliveryVersion.updateMany({
-      where: { id: version.id, verificationVersion: version.verificationVersion },
-      data: { verificationStatus: "VERIFIED", verificationFailureReason: null, verificationVersion: version.verificationVersion + 1 },
+      where: {
+        id: version.id,
+        verificationVersion: version.verificationVersion,
+      },
+      data: {
+        verificationStatus: "VERIFIED",
+        verificationFailureReason: null,
+        verificationVersion: version.verificationVersion + 1,
+      },
     })
     if (upd.count === 0) return { skipped: "version_conflict" }
-    await audit(prisma, "ORDER_DELIVERY_LINK_RESTORED", order, version, null, { httpStatus: fetched.status })
-    await notifyUsers(prisma, await staffIds(prisma), null, "ORDER_DELIVERY_LINK_RESTORED", `Link restored on order ${order.id}. Note: the LINK_REMOVED fraud flag remains for review.`)
+    await audit(prisma, "ORDER_DELIVERY_LINK_RESTORED", order, version, null, {
+      httpStatus: fetched.status,
+    })
+    await notifyUsers(
+      prisma,
+      await staffIds(prisma),
+      null,
+      "ORDER_DELIVERY_LINK_RESTORED",
+      `Link restored on order ${order.id}. Note: the LINK_REMOVED fraud flag remains for review.`,
+    )
     // Restoration re-evaluates trust (historical penalty is kept per the algorithm).
-    await deps.onTrustEvent?.(publisherId, "LINK_RESTORED", `link restored on order ${order.id}`)
+    await deps.onTrustEvent?.(
+      publisherId,
+      "LINK_RESTORED",
+      `link restored on order ${order.id}`,
+    )
     return { restored: true }
   }
 
   // ── Removal path: monitored VERIFIED link is gone ────────────────────────
   if (stillPresent) return { ok: true }
 
-  const reason = "Link removed or changed after delivery (detected during settlement hold)"
+  const reason =
+    "Link removed or changed after delivery (detected during settlement hold)"
   const upd = await prisma.orderDeliveryVersion.updateMany({
     where: { id: version.id, verificationVersion: version.verificationVersion },
-    data: { verificationStatus: "FAILED", verificationFailureReason: reason, verificationVersion: version.verificationVersion + 1 },
+    data: {
+      verificationStatus: "FAILED",
+      verificationFailureReason: reason,
+      verificationVersion: version.verificationVersion + 1,
+    },
   })
   if (upd.count === 0) return { skipped: "version_conflict" }
 
-  const exists = await prisma.deliveryFraudFlag.findFirst({ where: { deliveryVersionId: version.id, type: "LINK_REMOVED" }, select: { id: true } })
+  const exists = await prisma.deliveryFraudFlag.findFirst({
+    where: { deliveryVersionId: version.id, type: "LINK_REMOVED" },
+    select: { id: true },
+  })
   if (!exists) {
     await prisma.deliveryFraudFlag.create({
-      data: { orderId: order.id, deliveryVersionId: version.id, type: "LINK_REMOVED", details: { detectedAt: now.toISOString(), publishedUrl: version.publishedUrl } },
+      data: {
+        orderId: order.id,
+        deliveryVersionId: version.id,
+        type: "LINK_REMOVED",
+        details: {
+          detectedAt: now.toISOString(),
+          publishedUrl: version.publishedUrl,
+        },
+      },
     })
   }
-  await audit(prisma, "ORDER_DELIVERY_LINK_REMOVED", order, version, null, { reason, httpStatus: fetched.status })
+  await audit(prisma, "ORDER_DELIVERY_LINK_REMOVED", order, version, null, {
+    reason,
+    httpStatus: fetched.status,
+  })
 
   const ownerIds = await publisherOwnerIds(prisma, publisherId)
-  await notifyUsers(prisma, ownerIds, order.organizationId, "ORDER_DELIVERY_LINK_REMOVED", `The link for order ${order.id} is no longer live. Settlement is on hold until it is restored.`)
-  await notifyUsers(prisma, [order.customerId], order.organizationId, "ORDER_DELIVERY_LINK_REMOVED", `The placement for your order ${order.id} appears to have been removed. We've paused the publisher's payout and our team is reviewing.`)
-  await notifyUsers(prisma, await staffIds(prisma), null, "ORDER_DELIVERY_LINK_REMOVED", `Link removed on order ${order.id} during settlement hold — payout blocked.`)
+  await notifyUsers(
+    prisma,
+    ownerIds,
+    order.organizationId,
+    "ORDER_DELIVERY_LINK_REMOVED",
+    `The link for order ${order.id} is no longer live. Settlement is on hold until it is restored.`,
+  )
+  await notifyUsers(
+    prisma,
+    [order.customerId],
+    order.organizationId,
+    "ORDER_DELIVERY_LINK_REMOVED",
+    `The placement for your order ${order.id} appears to have been removed. We've paused the publisher's payout and our team is reviewing.`,
+  )
+  await notifyUsers(
+    prisma,
+    await staffIds(prisma),
+    null,
+    "ORDER_DELIVERY_LINK_REMOVED",
+    `Link removed on order ${order.id} during settlement hold — payout blocked.`,
+  )
 
   // Settlement freeze (fraud flag) is intact; trust recompute is now triggered.
-  await deps.onTrustEvent?.(publisherId, "LINK_REMOVED", `link removed on order ${order.id}`)
+  await deps.onTrustEvent?.(
+    publisherId,
+    "LINK_REMOVED",
+    `link removed on order ${order.id}`,
+  )
 
   return { removed: true }
 }
@@ -461,7 +740,9 @@ export interface HoldSweepResult {
 
 // Re-checks the live link for every order whose payout is still on hold
 // (settlement PENDING/UNDER_REVIEW). Run periodically by the worker.
-export async function runSettlementHoldLinkSweep(deps: DeliveryDeps): Promise<HoldSweepResult> {
+export async function runSettlementHoldLinkSweep(
+  deps: DeliveryDeps,
+): Promise<HoldSweepResult> {
   const { prisma } = deps
   const held = await prisma.settlement.findMany({
     where: { status: { in: ["PENDING", "UNDER_REVIEW"] } },

@@ -1,56 +1,57 @@
 "use client"
 
-import { use } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../../lib/api"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Badge, StatusBadge as UIStatusBadge, getOrderStatusPresentation, SupportPanel, BriefRenderer } from "@guestpost/ui"
 import type { OrderStatus } from "@guestpost/database"
-import { Skeleton, ErrorState } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Textarea } from "@guestpost/ui"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@guestpost/ui"
-import {
+  BriefRenderer,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  ErrorState,
+  getOrderStatusPresentation,
+  Input,
+  Label,
+  Skeleton,
+  SupportPanel,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+  StatusBadge as UIStatusBadge,
 } from "@guestpost/ui"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@guestpost/ui"
-import DOMPurify from "isomorphic-dompurify"
-import { Eye, Code, Star } from "lucide-react"
-import {
-  ArrowLeft,
-  Clock,
-  CheckCircle,
-  FileText,
-  MessageSquare,
-  RefreshCw,
-  ExternalLink,
-  XCircle,
-  AlertCircle,
-  Check,
-  User,
-  Globe,
-  ShieldCheck,
-} from "lucide-react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, formatDistanceToNow } from "date-fns"
+import DOMPurify from "isomorphic-dompurify"
+import {
+  AlertCircle,
+  ArrowLeft,
+  Check,
+  CheckCircle,
+  Clock,
+  Code,
+  ExternalLink,
+  Eye,
+  FileText,
+  LifeBuoy,
+  RefreshCw,
+  ShieldCheck,
+  Star,
+  XCircle,
+} from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { use, useState } from "react"
 import { toast } from "sonner"
-import { useState } from "react"
-import { LifeBuoy } from "lucide-react"
+import { api } from "../../../../lib/api"
 
 // Phase 7.9 #28 — color + label live in the central STATUS_PRESENTATION
 // table now (@guestpost/ui). This local map keeps only the page-specific
@@ -63,32 +64,35 @@ import { LifeBuoy } from "lucide-react"
 // that `<StatusBadge>` does internally, so visuals stay aligned with
 // the badge inside the card.
 const VARIANT_CIRCLE_BG: Record<string, string> = {
-  default:     "bg-primary/10 text-primary",
-  success:     "bg-emerald-100 text-emerald-700",
-  warning:     "bg-amber-100 text-amber-700",
+  default: "bg-primary/10 text-primary",
+  success: "bg-emerald-100 text-emerald-700",
+  warning: "bg-amber-100 text-amber-700",
   destructive: "bg-red-100 text-red-700",
-  info:        "bg-blue-100 text-blue-700",
-  pending:     "bg-gray-100 text-gray-700",
+  info: "bg-blue-100 text-blue-700",
+  pending: "bg-gray-100 text-gray-700",
 }
-const statusConfig: Record<string, { icon: React.ElementType; description: string }> = {
-  DRAFT:             { icon: FileText,    description: "Order is in draft state" },
-  PENDING_PAYMENT:   { icon: Clock,       description: "Awaiting payment" },
-  PAID:              { icon: CheckCircle, description: "Payment received" },
-  SUBMITTED:         { icon: CheckCircle, description: "Order submitted" },
-  ACCEPTED:          { icon: CheckCircle, description: "Order accepted" },
-  CONTENT_REQUESTED: { icon: FileText,    description: "Content requested" },
-  CONTENT_CREATION:  { icon: FileText,    description: "Creating content" },
-  CONTENT_READY:     { icon: Check,       description: "Content ready" },
-  CUSTOMER_REVIEW:   { icon: AlertCircle, description: "Awaiting your review" },
-  APPROVED:          { icon: Check,       description: "Content approved" },
-  PUBLISHED:         { icon: Check,       description: "Content published" },
-  VERIFIED:          { icon: ShieldCheck, description: "Content verified" },
-  DELIVERED:         { icon: CheckCircle, description: "Order delivered" },
-  SETTLED:           { icon: CheckCircle, description: "Settlement processed" },
-  COMPLETED:         { icon: CheckCircle, description: "Order completed" },
-  CANCELLED:         { icon: XCircle,     description: "Order cancelled" },
-  REFUNDED:          { icon: RefreshCw,   description: "Refund issued" },
-  DISPUTED:          { icon: AlertCircle, description: "Order disputed" },
+const statusConfig: Record<
+  string,
+  { icon: React.ElementType; description: string }
+> = {
+  DRAFT: { icon: FileText, description: "Order is in draft state" },
+  PENDING_PAYMENT: { icon: Clock, description: "Awaiting payment" },
+  PAID: { icon: CheckCircle, description: "Payment received" },
+  SUBMITTED: { icon: CheckCircle, description: "Order submitted" },
+  ACCEPTED: { icon: CheckCircle, description: "Order accepted" },
+  CONTENT_REQUESTED: { icon: FileText, description: "Content requested" },
+  CONTENT_CREATION: { icon: FileText, description: "Creating content" },
+  CONTENT_READY: { icon: Check, description: "Content ready" },
+  CUSTOMER_REVIEW: { icon: AlertCircle, description: "Awaiting your review" },
+  APPROVED: { icon: Check, description: "Content approved" },
+  PUBLISHED: { icon: Check, description: "Content published" },
+  VERIFIED: { icon: ShieldCheck, description: "Content verified" },
+  DELIVERED: { icon: CheckCircle, description: "Order delivered" },
+  SETTLED: { icon: CheckCircle, description: "Settlement processed" },
+  COMPLETED: { icon: CheckCircle, description: "Order completed" },
+  CANCELLED: { icon: XCircle, description: "Order cancelled" },
+  REFUNDED: { icon: RefreshCw, description: "Refund issued" },
+  DISPUTED: { icon: AlertCircle, description: "Order disputed" },
 }
 
 const eventLabels: Record<string, string> = {
@@ -121,16 +125,21 @@ interface TimelineEvent {
 function eventDetail(event: TimelineEvent): string | null {
   const m = (event.metadata ?? {}) as Record<string, any>
   // Server message is already human ("Content published at https://…").
-  if (event.message && event.message.trim()) return event.message.trim()
+  if (event.message?.trim()) return event.message.trim()
 
   const parts: string[] = []
   const url = m.publishedUrl ?? m.url
   if (url) parts.push(`Published at ${url}`)
   if (m.reason) parts.push(`Reason: ${m.reason}`)
   if (m.notes) parts.push(String(m.notes))
-  if (m.newStatus) parts.push(`Status → ${String(m.newStatus).replace(/_/g, " ").toLowerCase()}`)
-  if (typeof m.amount === "number") parts.push(`Amount: $${m.amount.toLocaleString()}`)
-  if (typeof m.publisherAmount === "number") parts.push(`Publisher payout: $${m.publisherAmount.toLocaleString()}`)
+  if (m.newStatus)
+    parts.push(
+      `Status → ${String(m.newStatus).replace(/_/g, " ").toLowerCase()}`,
+    )
+  if (typeof m.amount === "number")
+    parts.push(`Amount: $${m.amount.toLocaleString()}`)
+  if (typeof m.publisherAmount === "number")
+    parts.push(`Publisher payout: $${m.publisherAmount.toLocaleString()}`)
   if (m.version != null && url == null) parts.push(`Revision v${m.version}`)
   return parts.length ? parts.join(" · ") : null
 }
@@ -157,8 +166,19 @@ interface OrderDetail {
       verificationStatus: string
     }>
   }>
-  submittedContent?: { title: string | null; brief: string | null; deliverable: string | null; status: string } | null
-  revisions?: Array<{ id: string; notes: string | null; files: unknown; status: string; createdAt: string }>
+  submittedContent?: {
+    title: string | null
+    brief: string | null
+    deliverable: string | null
+    status: string
+  } | null
+  revisions?: Array<{
+    id: string
+    notes: string | null
+    files: unknown
+    status: string
+    createdAt: string
+  }>
   publishedUrl?: string | null
   totalAmount: number | null
   currency: string
@@ -196,8 +216,12 @@ function SubmittedContentBody({ content }: { content: string }) {
   return (
     <Tabs defaultValue="preview" className="w-full">
       <TabsList>
-        <TabsTrigger value="preview" className="gap-1"><Eye className="h-3.5 w-3.5" /> Preview</TabsTrigger>
-        <TabsTrigger value="html" className="gap-1"><Code className="h-3.5 w-3.5" /> HTML</TabsTrigger>
+        <TabsTrigger value="preview" className="gap-1">
+          <Eye className="h-3.5 w-3.5" /> Preview
+        </TabsTrigger>
+        <TabsTrigger value="html" className="gap-1">
+          <Code className="h-3.5 w-3.5" /> HTML
+        </TabsTrigger>
       </TabsList>
       <TabsContent value="preview">
         <div
@@ -206,7 +230,9 @@ function SubmittedContentBody({ content }: { content: string }) {
         />
       </TabsContent>
       <TabsContent value="html">
-        <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg border bg-muted/30 p-3 text-xs">{content}</pre>
+        <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-lg border bg-muted/30 p-3 text-xs">
+          {content}
+        </pre>
       </TabsContent>
     </Tabs>
   )
@@ -217,10 +243,14 @@ function fileEntries(files: unknown): Array<{ url: string; name: string }> {
   if (!Array.isArray(files)) return []
   return files
     .map((f: any) => {
-      if (typeof f === "string") return { url: f, name: f.split("/").pop() || f }
+      if (typeof f === "string")
+        return { url: f, name: f.split("/").pop() || f }
       if (f && typeof f === "object" && (f.url || f.href)) {
         const url = f.url ?? f.href
-        return { url, name: f.name ?? f.filename ?? url.split("/").pop() ?? url }
+        return {
+          url,
+          name: f.name ?? f.filename ?? url.split("/").pop() ?? url,
+        }
       }
       return null
     })
@@ -229,7 +259,7 @@ function fileEntries(files: unknown): Array<{ url: string; name: string }> {
 
 function OrderTimeline({ events }: { events: TimelineEvent[] }) {
   const sortedEvents = [...events].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   )
 
   return (
@@ -248,20 +278,33 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
                   isLatest ? "bg-primary" : "bg-muted"
                 }`}
               >
-                <Icon className={`h-3 w-3 ${isLatest ? "text-primary-foreground" : "text-muted-foreground"}`} />
+                <Icon
+                  className={`h-3 w-3 ${isLatest ? "text-primary-foreground" : "text-muted-foreground"}`}
+                />
               </div>
               <div className="flex flex-col">
                 <span className="font-medium">
-                  {eventLabels[event.eventType] || event.eventType.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {eventLabels[event.eventType] ||
+                    event.eventType
+                      .replace(/_/g, " ")
+                      .toLowerCase()
+                      .replace(/\b\w/g, (c) => c.toUpperCase())}
                 </span>
                 {(() => {
                   const detail = eventDetail(event)
                   return detail ? (
-                    <span className="mt-0.5 text-sm text-muted-foreground break-words">{detail}</span>
+                    <span className="mt-0.5 text-sm text-muted-foreground break-words">
+                      {detail}
+                    </span>
                   ) : null
                 })()}
-                <span className="mt-0.5 text-xs text-muted-foreground" title={format(new Date(event.createdAt), "PPpp")}>
-                  {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
+                <span
+                  className="mt-0.5 text-xs text-muted-foreground"
+                  title={format(new Date(event.createdAt), "PPpp")}
+                >
+                  {formatDistanceToNow(new Date(event.createdAt), {
+                    addSuffix: true,
+                  })}
                 </span>
               </div>
             </div>
@@ -280,14 +323,24 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <UIStatusBadge variant={p.variant} className="gap-1.5">
       <Icon className="h-3.5 w-3.5" />
-      {p.label}</UIStatusBadge>
+      {p.label}
+    </UIStatusBadge>
   )
 }
 
 // Visual lifecycle so the customer always knows where the order stands.
 const PROGRESS_STEPS = [
   { label: "Payment", statuses: ["DRAFT", "PENDING_PAYMENT", "PAID"] },
-  { label: "Content", statuses: ["SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY"] },
+  {
+    label: "Content",
+    statuses: [
+      "SUBMITTED",
+      "ACCEPTED",
+      "CONTENT_REQUESTED",
+      "CONTENT_CREATION",
+      "CONTENT_READY",
+    ],
+  },
   { label: "Review", statuses: ["CUSTOMER_REVIEW", "APPROVED"] },
   { label: "Published", statuses: ["PUBLISHED"] },
   { label: "Verified", statuses: ["VERIFIED"] },
@@ -297,14 +350,31 @@ const PROGRESS_STEPS = [
 
 function OrderProgress({ status }: { status: string }) {
   // Off-track states get a banner instead of a progress bar.
-  if (status === "CANCELLED" || status === "REFUNDED" || status === "DISPUTED") {
+  if (
+    status === "CANCELLED" ||
+    status === "REFUNDED" ||
+    status === "DISPUTED"
+  ) {
     const map: Record<string, { text: string; cls: string }> = {
-      CANCELLED: { text: "This order was cancelled.", cls: "bg-gray-100 text-gray-700" },
-      REFUNDED: { text: "This order was refunded.", cls: "bg-orange-100 text-orange-700" },
-      DISPUTED: { text: "A dispute is open — settlement to the publisher is paused while we review.", cls: "bg-red-100 text-red-700" },
+      CANCELLED: {
+        text: "This order was cancelled.",
+        cls: "bg-gray-100 text-gray-700",
+      },
+      REFUNDED: {
+        text: "This order was refunded.",
+        cls: "bg-orange-100 text-orange-700",
+      },
+      DISPUTED: {
+        text: "A dispute is open — settlement to the publisher is paused while we review.",
+        cls: "bg-red-100 text-red-700",
+      },
     }
     const m = map[status]
-    return <div className={`rounded-lg px-4 py-3 text-sm font-medium ${m.cls}`}>{m.text}</div>
+    return (
+      <div className={`rounded-lg px-4 py-3 text-sm font-medium ${m.cls}`}>
+        {m.text}
+      </div>
+    )
   }
 
   let current = PROGRESS_STEPS.findIndex((s) => s.statuses.includes(status))
@@ -316,18 +386,33 @@ function OrderProgress({ status }: { status: string }) {
         const done = i < current
         const active = i === current
         return (
-          <div key={step.label} className="flex flex-1 items-center last:flex-none">
+          <div
+            key={step.label}
+            className="flex flex-1 items-center last:flex-none"
+          >
             <div className="flex flex-col items-center gap-1.5">
               <div
                 className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                  done ? "bg-primary text-primary-foreground" : active ? "bg-primary/15 text-primary ring-2 ring-primary" : "bg-muted text-muted-foreground"
+                  done
+                    ? "bg-primary text-primary-foreground"
+                    : active
+                      ? "bg-primary/15 text-primary ring-2 ring-primary"
+                      : "bg-muted text-muted-foreground"
                 }`}
               >
                 {done ? <CheckCircle className="h-4 w-4" /> : i + 1}
               </div>
-              <span className={`text-[11px] ${active ? "font-medium text-foreground" : "text-muted-foreground"}`}>{step.label}</span>
+              <span
+                className={`text-[11px] ${active ? "font-medium text-foreground" : "text-muted-foreground"}`}
+              >
+                {step.label}
+              </span>
             </div>
-            {i < PROGRESS_STEPS.length - 1 && <div className={`mx-1 h-0.5 flex-1 ${done ? "bg-primary" : "bg-muted"}`} />}
+            {i < PROGRESS_STEPS.length - 1 && (
+              <div
+                className={`mx-1 h-0.5 flex-1 ${done ? "bg-primary" : "bg-muted"}`}
+              />
+            )}
           </div>
         )
       })}
@@ -344,19 +429,39 @@ function OrderDetailSkeleton() {
       </div>
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
-          <Card><CardContent className="pt-6"><Skeleton className="h-32 w-full" /></CardContent></Card>
-          <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-32 w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-48 w-full" />
+            </CardContent>
+          </Card>
         </div>
         <div className="space-y-6">
-          <Card><CardContent className="pt-6"><Skeleton className="h-24 w-full" /></CardContent></Card>
-          <Card><CardContent className="pt-6"><Skeleton className="h-48 w-full" /></CardContent></Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-24 w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-48 w-full" />
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>
   )
 }
 
-export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function OrderDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
   const resolvedParams = use(params)
   const queryClient = useQueryClient()
   const [showRevisionDialog, setShowRevisionDialog] = useState(false)
@@ -369,28 +474,48 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [supportMessage, setSupportMessage] = useState("")
   const router = useRouter()
 
-  const { data: order, isLoading, error, refetch } = useQuery<OrderDetail>({
+  const {
+    data: order,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<OrderDetail>({
     queryKey: ["order", resolvedParams.id],
-    queryFn: () => api.orders.getById(resolvedParams.id) as Promise<OrderDetail>,
+    queryFn: () =>
+      api.orders.getById(resolvedParams.id) as Promise<OrderDetail>,
   })
 
   const { data: proof } = useQuery<any>({
     queryKey: ["order-proof", resolvedParams.id],
     queryFn: () => api.orders.deliveryProof(resolvedParams.id),
-    enabled: !!order && ["PUBLISHED", "VERIFIED", "DELIVERED", "SETTLED", "COMPLETED", "DISPUTED"].includes(order.status),
+    enabled:
+      !!order &&
+      [
+        "PUBLISHED",
+        "VERIFIED",
+        "DELIVERED",
+        "SETTLED",
+        "COMPLETED",
+        "DISPUTED",
+      ].includes(order.status),
   })
 
   // Phase 7.9 #29 — lifted from OrderSupportPanel (now deleted). Shared
   // <SupportPanel> is presentational; parent owns the fetch.
-  const { data: orderTickets = [], isLoading: ticketsLoading } = useQuery<any[]>({
+  const { data: orderTickets = [], isLoading: ticketsLoading } = useQuery<
+    any[]
+  >({
     queryKey: ["order-tickets", resolvedParams.id],
     queryFn: async () => {
       const all = await api.support.listTickets()
-      return ((all ?? []) as any[]).filter((t: any) => t.order?.id === resolvedParams.id)
+      return ((all ?? []) as any[]).filter(
+        (t: any) => t.order?.id === resolvedParams.id,
+      )
     },
   })
 
-  const reviewable = !!order && ["DELIVERED", "SETTLED", "COMPLETED"].includes(order.status)
+  const reviewable =
+    !!order && ["DELIVERED", "SETTLED", "COMPLETED"].includes(order.status)
   const { data: existingReview } = useQuery<any>({
     queryKey: ["order-review", resolvedParams.id],
     queryFn: () => api.orders.getReview(resolvedParams.id),
@@ -399,16 +524,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [reviewRating, setReviewRating] = useState(0)
   const [reviewComment, setReviewComment] = useState("")
   const reviewMutation = useMutation({
-    mutationFn: () => api.orders.submitReview(resolvedParams.id, reviewRating, reviewComment.trim() || undefined),
+    mutationFn: () =>
+      api.orders.submitReview(
+        resolvedParams.id,
+        reviewRating,
+        reviewComment.trim() || undefined,
+      ),
     onSuccess: () => {
       toast.success("Thanks for your review")
-      queryClient.invalidateQueries({ queryKey: ["order-review", resolvedParams.id] })
+      queryClient.invalidateQueries({
+        queryKey: ["order-review", resolvedParams.id],
+      })
     },
     onError: (e: Error) => toast.error(e.message || "Failed to submit review"),
   })
 
   const cancelMutation = useMutation({
-    mutationFn: () => api.orders.transitionStatus(resolvedParams.id, "CANCELLED"),
+    mutationFn: () =>
+      api.orders.transitionStatus(resolvedParams.id, "CANCELLED"),
     onSuccess: () => {
       toast.success("Order cancelled successfully")
       queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })
@@ -423,7 +556,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const supportMutation = useMutation({
     mutationFn: () =>
       api.support.createTicket({
-        subject: supportSubject.trim() || `Help with order #${resolvedParams.id.slice(0, 8)}`,
+        subject:
+          supportSubject.trim() ||
+          `Help with order #${resolvedParams.id.slice(0, 8)}`,
         message: supportMessage.trim(),
         orderId: resolvedParams.id,
       }),
@@ -434,11 +569,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       setSupportMessage("")
       if (t?.id) router.push(`/dashboard/support/${t.id}`)
     },
-    onError: (err: Error) => toast.error(err.message || "Failed to create ticket"),
+    onError: (err: Error) =>
+      toast.error(err.message || "Failed to create ticket"),
   })
 
   const disputeMutation = useMutation({
-    mutationFn: () => api.orders.openDispute(resolvedParams.id, disputeReason.trim()),
+    mutationFn: () =>
+      api.orders.openDispute(resolvedParams.id, disputeReason.trim()),
     onSuccess: () => {
       toast.success("Dispute opened — our team will review it")
       queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })
@@ -453,31 +590,46 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const refreshOrder = () => {
     queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })
-    queryClient.invalidateQueries({ queryKey: ["order-proof", resolvedParams.id] })
+    queryClient.invalidateQueries({
+      queryKey: ["order-proof", resolvedParams.id],
+    })
     queryClient.invalidateQueries({ queryKey: ["orders"] })
   }
 
   const approveContentMutation = useMutation({
     mutationFn: () => api.orders.approveContent(resolvedParams.id),
-    onSuccess: () => { toast.success("Content approved — publisher can now publish"); refreshOrder() },
-    onError: (e: Error) => toast.error(e.message || "Failed to approve content"),
+    onSuccess: () => {
+      toast.success("Content approved — publisher can now publish")
+      refreshOrder()
+    },
+    onError: (e: Error) =>
+      toast.error(e.message || "Failed to approve content"),
   })
 
   const confirmDeliveryMutation = useMutation({
     mutationFn: () => api.orders.confirmDelivery(resolvedParams.id),
-    onSuccess: () => { toast.success("Delivery confirmed — order complete"); refreshOrder() },
-    onError: (e: Error) => toast.error(e.message || "Failed to confirm delivery"),
+    onSuccess: () => {
+      toast.success("Delivery confirmed — order complete")
+      refreshOrder()
+    },
+    onError: (e: Error) =>
+      toast.error(e.message || "Failed to confirm delivery"),
   })
 
   // Fallback: accept manually when the automated check could not verify.
   const acceptDeliveryMutation = useMutation({
     mutationFn: () => api.orders.acceptDelivery(resolvedParams.id),
-    onSuccess: () => { toast.success("Delivery accepted — order complete"); refreshOrder() },
-    onError: (e: Error) => toast.error(e.message || "Failed to accept delivery"),
+    onSuccess: () => {
+      toast.success("Delivery accepted — order complete")
+      refreshOrder()
+    },
+    onError: (e: Error) =>
+      toast.error(e.message || "Failed to accept delivery"),
   })
 
   const requestRevisionMutation = useMutation({
-    mutationFn: () => api.orders.requestRevision(resolvedParams.id, revisionMessage.trim()),
+    mutationFn: () =>
+      api.orders.requestRevision(resolvedParams.id, revisionMessage.trim()),
     onSuccess: () => {
       toast.success("Revision request submitted")
       refreshOrder()
@@ -504,7 +656,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   if (error) {
-    return <ErrorState title="Failed to load order" description={(error as Error).message} onRetry={() => refetch()} />
+    return (
+      <ErrorState
+        title="Failed to load order"
+        description={(error as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
   }
 
   if (!order) {
@@ -513,7 +671,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         <AlertCircle className="h-12 w-12 text-destructive" />
         <h2 className="mt-4 text-xl font-semibold">Order Not Found</h2>
         <p className="mt-2 text-muted-foreground">
-          The order you&apos;re looking for doesn&apos;t exist or you don&apos;t have access to it.
+          The order you&apos;re looking for doesn&apos;t exist or you don&apos;t
+          have access to it.
         </p>
         <Button className="mt-4" asChild>
           <Link href="/dashboard/orders">View All Orders</Link>
@@ -529,15 +688,28 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   // Draft orders only enter the publisher/ops queue after payment.
   const canPay = order.status === "DRAFT" || order.status === "PENDING_PAYMENT"
   const canApproveContent = order.status === "CUSTOMER_REVIEW"
-  const canRequestRevision = order.status === "CUSTOMER_REVIEW"
+  const _canRequestRevision = order.status === "CUSTOMER_REVIEW"
   // Platform verified the live placement — customer confirms to complete + settle
   const canConfirmDelivery = order.status === "VERIFIED"
   // System check is primary; manual accept is the fallback only when the
   // automated check failed or needs review (and not already accepted).
-  const autoUnverified = proof?.hasDelivery && ["FAILED", "MANUAL_REVIEW"].includes(proof.verificationStatus) && proof.interventionStatus === "NONE"
+  const autoUnverified =
+    proof?.hasDelivery &&
+    ["FAILED", "MANUAL_REVIEW"].includes(proof.verificationStatus) &&
+    proof.interventionStatus === "NONE"
   const canManualAccept = order.status === "PUBLISHED" && autoUnverified
-  const verifyInProgress = order.status === "PUBLISHED" && proof?.hasDelivery && ["PENDING", "RETRYING"].includes(proof.verificationStatus)
-  const canCancel = !["COMPLETED", "CANCELLED", "REFUNDED", "DELIVERED", "SETTLED", "DISPUTED"].includes(order.status)
+  const verifyInProgress =
+    order.status === "PUBLISHED" &&
+    proof?.hasDelivery &&
+    ["PENDING", "RETRYING"].includes(proof.verificationStatus)
+  const canCancel = ![
+    "COMPLETED",
+    "CANCELLED",
+    "REFUNDED",
+    "DELIVERED",
+    "SETTLED",
+    "DISPUTED",
+  ].includes(order.status)
   // Backend allows disputes on PUBLISHED/VERIFIED/DELIVERED/CANCELLED or any
   // paid order; surface the button once money has moved and no terminal state
   const canDispute =
@@ -555,7 +727,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </Button>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight">Order #{order.id.slice(0, 8)}</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                Order #{order.id.slice(0, 8)}
+              </h1>
               <StatusBadge status={order.status} />
             </div>
             <p className="text-sm text-muted-foreground">
@@ -566,7 +740,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
         <div className="flex gap-3">
           {canDispute && (
-            <Button variant="outline" onClick={() => setShowDisputeDialog(true)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowDisputeDialog(true)}
+            >
               <AlertCircle className="mr-2 h-4 w-4" />
               Open Dispute
             </Button>
@@ -576,7 +753,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             Get Help
           </Button>
           {canCancel && (
-            <Button variant="destructive" onClick={() => setShowCancelDialog(true)}>
+            <Button
+              variant="destructive"
+              onClick={() => setShowCancelDialog(true)}
+            >
               <XCircle className="mr-2 h-4 w-4" />
               Cancel Order
             </Button>
@@ -598,36 +778,55 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 {canPay
                   ? "Complete payment to start your order"
                   : canConfirmDelivery
-                  ? "Delivery verified — ready to confirm"
-                  : "Content ready for your review"}
+                    ? "Delivery verified — ready to confirm"
+                    : "Content ready for your review"}
               </p>
               <p className="text-sm text-muted-foreground">
                 {canPay
                   ? "Your order is in draft. Pay from your wallet to send it to the publisher."
                   : canConfirmDelivery
-                  ? "Confirm the live placement to complete the order and release settlement to the publisher."
-                  : "Approve to let the publisher publish, or request changes."}
+                    ? "Confirm the live placement to complete the order and release settlement to the publisher."
+                    : "Approve to let the publisher publish, or request changes."}
               </p>
             </div>
             <div className="flex gap-2 shrink-0">
               {canPay && (
-                <Button onClick={() => router.push(`/dashboard/orders/checkout/${resolvedParams.id}`)}>
+                <Button
+                  onClick={() =>
+                    router.push(
+                      `/dashboard/orders/checkout/${resolvedParams.id}`,
+                    )
+                  }
+                >
                   Complete Payment
                 </Button>
               )}
               {canApproveContent && (
                 <>
-                  <Button variant="outline" onClick={() => setShowRevisionDialog(true)}>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowRevisionDialog(true)}
+                  >
                     Request Revision
                   </Button>
-                  <Button onClick={() => approveContentMutation.mutate()} disabled={approveContentMutation.isPending}>
-                    {approveContentMutation.isPending ? "Approving..." : "Approve Content"}
+                  <Button
+                    onClick={() => approveContentMutation.mutate()}
+                    disabled={approveContentMutation.isPending}
+                  >
+                    {approveContentMutation.isPending
+                      ? "Approving..."
+                      : "Approve Content"}
                   </Button>
                 </>
               )}
               {canConfirmDelivery && (
-                <Button onClick={() => confirmDeliveryMutation.mutate()} disabled={confirmDeliveryMutation.isPending}>
-                  {confirmDeliveryMutation.isPending ? "Confirming..." : "Confirm Delivery"}
+                <Button
+                  onClick={() => confirmDeliveryMutation.mutate()}
+                  disabled={confirmDeliveryMutation.isPending}
+                >
+                  {confirmDeliveryMutation.isPending
+                    ? "Confirming..."
+                    : "Confirm Delivery"}
                 </Button>
               )}
             </div>
@@ -639,7 +838,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         <Card>
           <CardContent className="flex items-center gap-3 pt-6 text-sm text-muted-foreground">
             <RefreshCw className="h-4 w-4 animate-spin" />
-            Automated verification is running. We&apos;re checking the live placement — this usually takes a few minutes.
+            Automated verification is running. We&apos;re checking the live
+            placement — this usually takes a few minutes.
           </CardContent>
         </Card>
       )}
@@ -648,20 +848,40 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         <Card className="border-amber-300 bg-amber-50">
           <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="font-medium text-amber-900">Automated check couldn&apos;t verify this delivery</p>
+              <p className="font-medium text-amber-900">
+                Automated check couldn&apos;t verify this delivery
+              </p>
               <p className="text-sm text-amber-800">
-                Our system couldn&apos;t confirm the live placement. Review the published page yourself — if it looks correct, accept it to complete the order. Otherwise open a dispute.
+                Our system couldn&apos;t confirm the live placement. Review the
+                published page yourself — if it looks correct, accept it to
+                complete the order. Otherwise open a dispute.
               </p>
             </div>
             <div className="flex shrink-0 flex-wrap gap-2">
               {proof?.publishedUrl && (
                 <Button variant="outline" asChild>
-                  <a href={proof.publishedUrl} target="_blank" rel="noopener noreferrer">Review page</a>
+                  <a
+                    href={proof.publishedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Review page
+                  </a>
                 </Button>
               )}
-              <Button variant="outline" onClick={() => setShowDisputeDialog(true)}>Open Dispute</Button>
-              <Button onClick={() => acceptDeliveryMutation.mutate()} disabled={acceptDeliveryMutation.isPending}>
-                {acceptDeliveryMutation.isPending ? "Accepting..." : "Accept Delivery"}
+              <Button
+                variant="outline"
+                onClick={() => setShowDisputeDialog(true)}
+              >
+                Open Dispute
+              </Button>
+              <Button
+                onClick={() => acceptDeliveryMutation.mutate()}
+                disabled={acceptDeliveryMutation.isPending}
+              >
+                {acceptDeliveryMutation.isPending
+                  ? "Accepting..."
+                  : "Accept Delivery"}
               </Button>
             </div>
           </CardContent>
@@ -674,21 +894,45 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <ShieldCheck className="h-5 w-5 text-green-600" /> Delivery Proof
+                  <ShieldCheck className="h-5 w-5 text-green-600" /> Delivery
+                  Proof
                 </CardTitle>
-                <CardDescription>Independently verified by the platform — no manual checking needed.</CardDescription>
+                <CardDescription>
+                  Independently verified by the platform — no manual checking
+                  needed.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Published URL</p>
-                  <a href={proof.publishedUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline break-all">{proof.publishedUrl}</a>
+                  <a
+                    href={proof.publishedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary hover:underline break-all"
+                  >
+                    {proof.publishedUrl}
+                  </a>
                 </div>
                 {proof.pageTitle && (
-                  <div className="space-y-1"><p className="text-sm text-muted-foreground">Page Title</p><p className="font-medium">{proof.pageTitle}</p></div>
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">Page Title</p>
+                    <p className="font-medium">{proof.pageTitle}</p>
+                  </div>
                 )}
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">Verification:</span>
-                  <StatusBadge status={proof.verificationStatus === "VERIFIED" || proof.interventionStatus === "APPROVED" || proof.interventionStatus === "OVERRIDDEN" ? "VERIFIED" : proof.verificationStatus} />
+                  <span className="text-sm text-muted-foreground">
+                    Verification:
+                  </span>
+                  <StatusBadge
+                    status={
+                      proof.verificationStatus === "VERIFIED" ||
+                      proof.interventionStatus === "APPROVED" ||
+                      proof.interventionStatus === "OVERRIDDEN"
+                        ? "VERIFIED"
+                        : proof.verificationStatus
+                    }
+                  />
                 </div>
                 {proof.results && (
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -698,21 +942,50 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       ["Target URL Matched", proof.results.targetUrlMatched],
                       ["Anchor Verified", proof.results.anchorVerified],
                     ].map(([label, ok]) => (
-                      <div key={label as string} className="flex items-center gap-2">
-                        {ok ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-muted-foreground" />}
-                        <span className={ok ? "" : "text-muted-foreground"}>{label}</span>
+                      <div
+                        key={label as string}
+                        className="flex items-center gap-2"
+                      >
+                        {ok ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <XCircle className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <span className={ok ? "" : "text-muted-foreground"}>
+                          {label}
+                        </span>
                       </div>
                     ))}
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground pt-2">
                   <span>Delivered by: {proof.deliveredBy}</span>
-                  {proof.submittedAt && <span>Submitted: {format(new Date(proof.submittedAt), "PPp")}</span>}
-                  {proof.verifiedAt && <span>Verified: {format(new Date(proof.verifiedAt), "PPp")}</span>}
-                  {proof.results?.checkedAt && <span>Checked: {format(new Date(proof.results.checkedAt), "PPp")}</span>}
+                  {proof.submittedAt && (
+                    <span>
+                      Submitted: {format(new Date(proof.submittedAt), "PPp")}
+                    </span>
+                  )}
+                  {proof.verifiedAt && (
+                    <span>
+                      Verified: {format(new Date(proof.verifiedAt), "PPp")}
+                    </span>
+                  )}
+                  {proof.results?.checkedAt && (
+                    <span>
+                      Checked:{" "}
+                      {format(new Date(proof.results.checkedAt), "PPp")}
+                    </span>
+                  )}
                 </div>
                 {proof.screenshotUrl && (
-                  <a href={proof.screenshotUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">View screenshot</a>
+                  <a
+                    href={proof.screenshotUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline"
+                  >
+                    View screenshot
+                  </a>
                 )}
               </CardContent>
             </Card>
@@ -720,37 +993,77 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           {(() => {
             const sc = order.submittedContent
             const hasContent = sc && (sc.deliverable || sc.brief)
-            const pubs = (order.items ?? []).flatMap((i: any) => i.publications ?? []).filter((p: any) => p.publishedUrl)
-            const files = (order.revisions ?? []).flatMap((r: any) => fileEntries(r.files))
-            if (!hasContent && pubs.length === 0 && files.length === 0) return null
+            const pubs = (order.items ?? [])
+              .flatMap((i: any) => i.publications ?? [])
+              .filter((p: any) => p.publishedUrl)
+            const files = (order.revisions ?? []).flatMap((r: any) =>
+              fileEntries(r.files),
+            )
+            if (!hasContent && pubs.length === 0 && files.length === 0)
+              return null
             return (
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" /> Submitted Content</CardTitle>
-                  <CardDescription>What the publisher submitted for this order.</CardDescription>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" /> Submitted Content
+                  </CardTitle>
+                  <CardDescription>
+                    What the publisher submitted for this order.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {hasContent && (
                     <div className="space-y-1.5">
-                      {sc!.title && <p className="font-medium">{sc!.title}</p>}
-                      <SubmittedContentBody content={(sc!.deliverable || sc!.brief)!} />
+                      {sc?.title && <p className="font-medium">{sc?.title}</p>}
+                      <SubmittedContentBody
+                        content={(sc?.deliverable || sc?.brief)!}
+                      />
                     </div>
                   )}
                   {pubs.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Published links</p>
                       {pubs.map((p: any) => (
-                        <div key={p.id} className="flex flex-col gap-1 rounded-lg border p-3">
-                          <a href={p.publishedUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 break-all text-sm font-medium text-primary hover:underline">
-                            {p.publishedUrl} <ExternalLink className="h-3 w-3 shrink-0" />
+                        <div
+                          key={p.id}
+                          className="flex flex-col gap-1 rounded-lg border p-3"
+                        >
+                          <a
+                            href={p.publishedUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 break-all text-sm font-medium text-primary hover:underline"
+                          >
+                            {p.publishedUrl}{" "}
+                            <ExternalLink className="h-3 w-3 shrink-0" />
                           </a>
                           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            {p.anchorText && <span>Anchor: <span className="text-foreground">{p.anchorText}</span></span>}
-                            {p.targetUrl && <span className="break-all">→ {p.targetUrl}</span>}
-                            {p.publicationDate && <span>{format(new Date(p.publicationDate), "PP")}</span>}
+                            {p.anchorText && (
+                              <span>
+                                Anchor:{" "}
+                                <span className="text-foreground">
+                                  {p.anchorText}
+                                </span>
+                              </span>
+                            )}
+                            {p.targetUrl && (
+                              <span className="break-all">→ {p.targetUrl}</span>
+                            )}
+                            {p.publicationDate && (
+                              <span>
+                                {format(new Date(p.publicationDate), "PP")}
+                              </span>
+                            )}
                           </div>
                           {p.screenshotUrl && (
-                            <a href={p.screenshotUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">View screenshot</a>
+                            <a
+                              href={p.screenshotUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-primary hover:underline"
+                            >
+                              View screenshot
+                            </a>
                           )}
                         </div>
                       ))}
@@ -761,8 +1074,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       <p className="text-sm font-medium">Files</p>
                       <div className="flex flex-col gap-1">
                         {files.map((f, i) => (
-                          <a key={i} href={f.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-primary hover:underline">
-                            <FileText className="h-3.5 w-3.5 shrink-0" /> {f.name}
+                          <a
+                            key={i}
+                            href={f.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-sm text-primary hover:underline"
+                          >
+                            <FileText className="h-3.5 w-3.5 shrink-0" />{" "}
+                            {f.name}
                           </a>
                         ))}
                       </div>
@@ -776,25 +1096,48 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           {reviewable && (
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2"><Star className="h-5 w-5" /> Your Review</CardTitle>
-                <CardDescription>Rate this order — your feedback shapes the publisher&apos;s trust rating.</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Star className="h-5 w-5" /> Your Review
+                </CardTitle>
+                <CardDescription>
+                  Rate this order — your feedback shapes the publisher&apos;s
+                  trust rating.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {existingReview ? (
                   <div className="space-y-1">
                     <div className="flex gap-0.5">
                       {[1, 2, 3, 4, 5].map((n) => (
-                        <Star key={n} className={`h-5 w-5 ${n <= existingReview.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`} />
+                        <Star
+                          key={n}
+                          className={`h-5 w-5 ${n <= existingReview.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`}
+                        />
                       ))}
                     </div>
-                    {existingReview.comment && <p className="text-sm text-muted-foreground">{existingReview.comment}</p>}
-                    <p className="text-xs text-muted-foreground">Submitted {format(new Date(existingReview.createdAt), "PP")} — you can update it by rating again.</p>
+                    {existingReview.comment && (
+                      <p className="text-sm text-muted-foreground">
+                        {existingReview.comment}
+                      </p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Submitted{" "}
+                      {format(new Date(existingReview.createdAt), "PP")} — you
+                      can update it by rating again.
+                    </p>
                   </div>
                 ) : null}
                 <div className="flex gap-1">
                   {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} type="button" onClick={() => setReviewRating(n)} aria-label={`${n} star`}>
-                      <Star className={`h-7 w-7 transition-colors ${n <= (reviewRating || existingReview?.rating || 0) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-300"}`} />
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => setReviewRating(n)}
+                      aria-label={`${n} star`}
+                    >
+                      <Star
+                        className={`h-7 w-7 transition-colors ${n <= (reviewRating || existingReview?.rating || 0) ? "fill-amber-400 text-amber-400" : "text-muted-foreground/40 hover:text-amber-300"}`}
+                      />
                     </button>
                   ))}
                 </div>
@@ -807,9 +1150,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 />
                 <Button
                   onClick={() => reviewMutation.mutate()}
-                  disabled={reviewMutation.isPending || (reviewRating === 0 && !existingReview)}
+                  disabled={
+                    reviewMutation.isPending ||
+                    (reviewRating === 0 && !existingReview)
+                  }
                 >
-                  {reviewMutation.isPending ? "Submitting..." : existingReview ? "Update Review" : "Submit Review"}
+                  {reviewMutation.isPending
+                    ? "Submitting..."
+                    : existingReview
+                      ? "Update Review"
+                      : "Submit Review"}
                 </Button>
               </CardContent>
             </Card>
@@ -825,7 +1175,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Service Type</p>
                   <p className="font-medium capitalize">
-                    {order.items?.[0]?.serviceType?.replace(/_/g, " ").toLowerCase() ?? "—"}
+                    {order.items?.[0]?.serviceType
+                      ?.replace(/_/g, " ")
+                      .toLowerCase() ?? "—"}
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -841,17 +1193,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         {new URL(order.items[0].website.url).hostname}
                         <ExternalLink className="h-3 w-3" />
                       </a>
-                    ) : "—"}
+                    ) : (
+                      "—"
+                    )}
                   </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Topic / Title</p>
-                  <p className="font-medium">{order.items?.[0]?.topic || "—"}</p>
+                  <p className="font-medium">
+                    {order.items?.[0]?.topic || "—"}
+                  </p>
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Total Amount</p>
                   <p className="font-medium font-mono">
-                    {order.totalAmount ? `$${order.totalAmount.toFixed(2)}` : "—"}
+                    {order.totalAmount
+                      ? `$${order.totalAmount.toFixed(2)}`
+                      : "—"}
                   </p>
                 </div>
               </div>
@@ -859,10 +1217,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {order.items?.[0]?.instructions && (
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Instructions</p>
-                  <p className="whitespace-pre-wrap text-sm">{order.items[0].instructions}</p>
+                  <p className="whitespace-pre-wrap text-sm">
+                    {order.items[0].instructions}
+                  </p>
                 </div>
               )}
-
             </CardContent>
           </Card>
 
@@ -878,7 +1237,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     legacy single-string display when briefData is NULL,
                     so this is a no-regression swap for existing orders. */}
                 <BriefRenderer
-                  serviceType={(order.items?.[0] as any)?.serviceType ?? (order as any).type}
+                  serviceType={
+                    (order.items?.[0] as any)?.serviceType ??
+                    (order as any).type
+                  }
                   briefData={(order as any).briefData}
                   fallback={{
                     title: (order.items?.[0] as any)?.title,
@@ -899,16 +1261,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-3">
-                <div className={`flex h-12 w-12 items-center justify-center rounded-full ${VARIANT_CIRCLE_BG[getOrderStatusPresentation(order.status as OrderStatus).variant]}`}>
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-full ${VARIANT_CIRCLE_BG[getOrderStatusPresentation(order.status as OrderStatus).variant]}`}
+                >
                   {(() => {
                     const Icon = currentStatusIcon
                     return Icon ? <Icon className="h-6 w-6" /> : null
                   })()}
                 </div>
                 <div>
-                  <p className="font-medium">{currentStatusConfig.description}</p>
+                  <p className="font-medium">
+                    {currentStatusConfig.description}
+                  </p>
                   <p className="text-sm text-muted-foreground">
-                    Updated {formatDistanceToNow(new Date(order.updatedAt), { addSuffix: true })}
+                    Updated{" "}
+                    {formatDistanceToNow(new Date(order.updatedAt), {
+                      addSuffix: true,
+                    })}
                   </p>
                 </div>
               </div>
@@ -946,14 +1315,21 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRevisionDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowRevisionDialog(false)}
+            >
               Cancel
             </Button>
             <Button
               onClick={() => requestRevisionMutation.mutate()}
-              disabled={!revisionMessage.trim() || requestRevisionMutation.isPending}
+              disabled={
+                !revisionMessage.trim() || requestRevisionMutation.isPending
+              }
             >
-              {requestRevisionMutation.isPending ? "Submitting..." : "Submit Revision"}
+              {requestRevisionMutation.isPending
+                ? "Submitting..."
+                : "Submit Revision"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -964,11 +1340,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <DialogHeader>
             <DialogTitle>Cancel Order</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel this order? This action cannot be undone.
+              Are you sure you want to cancel this order? This action cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowCancelDialog(false)}
+            >
               Keep Order
             </Button>
             <Button
@@ -995,7 +1375,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <DialogHeader>
             <DialogTitle>Get help with this order</DialogTitle>
             <DialogDescription>
-              Opens a support ticket linked to order #{resolvedParams.id.slice(0, 8)}. Our team replies in the ticket thread.
+              Opens a support ticket linked to order #
+              {resolvedParams.id.slice(0, 8)}. Our team replies in the ticket
+              thread.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -1022,10 +1404,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSupportDialog(false)}>Cancel</Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowSupportDialog(false)}
+            >
+              Cancel
+            </Button>
             <Button
               onClick={() => supportMutation.mutate()}
-              disabled={supportMutation.isPending || supportMessage.trim().length < 10}
+              disabled={
+                supportMutation.isPending || supportMessage.trim().length < 10
+              }
             >
               {supportMutation.isPending ? "Creating..." : "Create Ticket"}
             </Button>
@@ -1038,8 +1427,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <DialogHeader>
             <DialogTitle>Open a Dispute</DialogTitle>
             <DialogDescription>
-              Tell us what went wrong with this order. Our team reviews every dispute —
-              settlement to the publisher is paused while a dispute is active.
+              Tell us what went wrong with this order. Our team reviews every
+              dispute — settlement to the publisher is paused while a dispute is
+              active.
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -1050,13 +1440,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             maxLength={2000}
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDisputeDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowDisputeDialog(false)}
+            >
               Back
             </Button>
             <Button
               variant="destructive"
               onClick={() => disputeMutation.mutate()}
-              disabled={disputeMutation.isPending || disputeReason.trim().length < 10}
+              disabled={
+                disputeMutation.isPending || disputeReason.trim().length < 10
+              }
             >
               {disputeMutation.isPending ? "Submitting..." : "Open Dispute"}
             </Button>

@@ -11,7 +11,12 @@
 
 import { IsIn, IsISO8601, IsOptional } from "class-validator"
 
-export const REVENUE_GROUP_BY_VALUES = ["channel", "month", "serviceType", "listing"] as const
+export const REVENUE_GROUP_BY_VALUES = [
+  "channel",
+  "month",
+  "serviceType",
+  "listing",
+] as const
 export type RevenueGroupBy = (typeof REVENUE_GROUP_BY_VALUES)[number]
 
 export const REVENUE_FORMAT_VALUES = ["json", "csv"] as const

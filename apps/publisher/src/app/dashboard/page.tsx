@@ -1,40 +1,76 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
-import { api } from "../../lib/api"
-import { useAuth } from "../../lib/auth"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
 import {
-  Clock,
+  Badge,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Skeleton,
+} from "@guestpost/ui"
+import { useQuery } from "@tanstack/react-query"
+import {
   CheckCircle2,
-  DollarSign,
-  Wallet,
-  TrendingUp,
+  Clock,
   RefreshCw,
+  TrendingUp,
+  Wallet,
 } from "lucide-react"
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
 } from "recharts"
-import { toast } from "sonner"
+import { api } from "../../lib/api"
+import { useAuth } from "../../lib/auth"
 
-const kpiConfig = [
-  { key: "pending", label: "Pending Orders", icon: Clock, color: "text-amber-500" },
-  { key: "active", label: "Active Orders", icon: RefreshCw, color: "text-blue-500" },
-  { key: "withdrawable", label: "Withdrawable", icon: Wallet, color: "text-emerald-500" },
-  { key: "lifetime", label: "Lifetime Earnings", icon: TrendingUp, color: "text-purple-500" },
+const _kpiConfig = [
+  {
+    key: "pending",
+    label: "Pending Orders",
+    icon: Clock,
+    color: "text-amber-500",
+  },
+  {
+    key: "active",
+    label: "Active Orders",
+    icon: RefreshCw,
+    color: "text-blue-500",
+  },
+  {
+    key: "withdrawable",
+    label: "Withdrawable",
+    icon: Wallet,
+    color: "text-emerald-500",
+  },
+  {
+    key: "lifetime",
+    label: "Lifetime Earnings",
+    icon: TrendingUp,
+    color: "text-purple-500",
+  },
 ]
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+]
 
 function aggregateMonthlyData(orders: any[], field: string) {
   const data: Record<string, number> = {}
@@ -108,7 +144,12 @@ function ChartCard({
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const { data: balance, isLoading, error, refetch } = useQuery({
+  const {
+    data: balance,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["publisher-balance", user?.publisherId],
     queryFn: () => api.publisherPayouts.getBalance(),
     enabled: !!user?.publisherId,
@@ -124,7 +165,9 @@ export default function DashboardPage() {
       <div className="flex flex-col items-center justify-center py-16">
         <div className="text-center">
           <p className="text-lg font-medium">Failed to load dashboard</p>
-          <p className="text-sm text-muted-foreground">Please try again later</p>
+          <p className="text-sm text-muted-foreground">
+            Please try again later
+          </p>
           <button
             onClick={() => refetch()}
             className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
@@ -138,13 +181,19 @@ export default function DashboardPage() {
   }
 
   const chartData = aggregateMonthlyData(orders, "totalAmount")
-  const ordersChartData = aggregateMonthlyData(orders, "totalAmount").map((d, i) => ({
-    ...d,
-    orders: orders.filter((o) => new Date(o.createdAt).getMonth() === i).length,
-  }))
+  const ordersChartData = aggregateMonthlyData(orders, "totalAmount").map(
+    (d, i) => ({
+      ...d,
+      orders: orders.filter((o) => new Date(o.createdAt).getMonth() === i)
+        .length,
+    }),
+  )
 
   const pendingOrders = orders.filter(
-    (o) => o.status === "PENDING_PAYMENT" || o.status === "PAID" || o.status === "SUBMITTED"
+    (o) =>
+      o.status === "PENDING_PAYMENT" ||
+      o.status === "PAID" ||
+      o.status === "SUBMITTED",
   ).length
   const activeOrders = orders.filter(
     (o) =>
@@ -153,7 +202,7 @@ export default function DashboardPage() {
       o.status === "CONTENT_CREATION" ||
       o.status === "CONTENT_READY" ||
       o.status === "CUSTOMER_REVIEW" ||
-      o.status === "APPROVED"
+      o.status === "APPROVED",
   ).length
 
   const withdrawable = balance
@@ -168,7 +217,9 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">Welcome back! Here&apos;s your overview.</p>
+          <p className="text-sm text-muted-foreground">
+            Welcome back! Here&apos;s your overview.
+          </p>
         </div>
         <button
           onClick={() => refetch()}
@@ -214,15 +265,39 @@ export default function DashboardPage() {
         <ChartCard title="Earnings Overview">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData.length > 0 ? chartData : [{ month: "No data", earnings: 0 }]}>
+              <AreaChart
+                data={
+                  chartData.length > 0
+                    ? chartData
+                    : [{ month: "No data", earnings: 0 }]
+                }
+              >
                 <defs>
-                  <linearGradient id="colorEarnings" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="currentColor" stopOpacity={0.1} />
-                    <stop offset="95%" stopColor="currentColor" stopOpacity={0} />
+                  <linearGradient
+                    id="colorEarnings"
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="5%"
+                      stopColor="currentColor"
+                      stopOpacity={0.1}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="currentColor"
+                      stopOpacity={0}
+                    />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" tick={{ fontSize: 12 }} />
+                <XAxis
+                  dataKey="month"
+                  className="text-xs"
+                  tick={{ fontSize: 12 }}
+                />
                 <YAxis className="text-xs" tick={{ fontSize: 12 }} />
                 <Tooltip
                   contentStyle={{
@@ -247,9 +322,19 @@ export default function DashboardPage() {
         <ChartCard title="Orders Volume">
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={ordersChartData.length > 0 ? ordersChartData : [{ month: "No data", orders: 0 }]}>
+              <BarChart
+                data={
+                  ordersChartData.length > 0
+                    ? ordersChartData
+                    : [{ month: "No data", orders: 0 }]
+                }
+              >
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" tick={{ fontSize: 12 }} />
+                <XAxis
+                  dataKey="month"
+                  className="text-xs"
+                  tick={{ fontSize: 12 }}
+                />
                 <YAxis className="text-xs" tick={{ fontSize: 12 }} />
                 <Tooltip
                   contentStyle={{
@@ -279,7 +364,9 @@ export default function DashboardPage() {
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <CheckCircle2 className="mb-3 h-10 w-10 text-muted-foreground/50" />
               <p className="font-medium">No orders yet</p>
-              <p className="text-sm text-muted-foreground">Orders will appear here when assigned to you</p>
+              <p className="text-sm text-muted-foreground">
+                Orders will appear here when assigned to you
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -294,7 +381,8 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <p className="font-medium">
-                        {order.items[0]?.serviceType?.replace(/_/g, " ") ?? "Order"}
+                        {order.items[0]?.serviceType?.replace(/_/g, " ") ??
+                          "Order"}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {order.items[0]?.website?.url ?? "No website"}
@@ -307,8 +395,8 @@ export default function DashboardPage() {
                         order.status === "PUBLISHED"
                           ? "success"
                           : order.status === "CONTENT_CREATION"
-                          ? "info"
-                          : "secondary"
+                            ? "info"
+                            : "secondary"
                       }
                     >
                       {order.status.replace(/_/g, " ")}

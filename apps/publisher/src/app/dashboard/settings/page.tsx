@@ -1,24 +1,24 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  ErrorState,
+  Input,
+  Label,
+  Separator,
+  Switch,
+} from "@guestpost/ui"
 import { useMutation, useQuery } from "@tanstack/react-query"
+import { Bell, CreditCard, RefreshCw, Save, Shield, User } from "lucide-react"
+import { useEffect, useState } from "react"
+import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
-import { toast } from "sonner"
-import {
-  User,
-  CreditCard,
-  Shield,
-  Bell,
-  Save,
-  RefreshCw,
-} from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, ErrorState } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Separator } from "@guestpost/ui"
-import { Switch } from "@guestpost/ui"
 
 export default function SettingsPage() {
   const { user } = useAuth()
@@ -44,7 +44,11 @@ export default function SettingsPage() {
     pushEarnings: true,
   })
 
-  const { data: profileData, error, refetch } = useQuery({
+  const {
+    data: profileData,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["publisher-settings"],
     queryFn: () => api.identity.me(),
     enabled: !!user?.id,
@@ -52,11 +56,17 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!profileData) return
-    setProfile(prev => ({ ...prev, name: (profileData as any).name ?? prev.name }))
+    setProfile((prev) => ({
+      ...prev,
+      name: (profileData as any).name ?? prev.name,
+    }))
     try {
-      const meta = (profileData as any).metadata ? JSON.parse((profileData as any).metadata) : {}
-      if (meta.payment) setPayment(prev => ({ ...prev, ...meta.payment }))
-      if (meta.emailOrders !== undefined) setNotifications(prev => ({ ...prev, ...meta }))
+      const meta = (profileData as any).metadata
+        ? JSON.parse((profileData as any).metadata)
+        : {}
+      if (meta.payment) setPayment((prev) => ({ ...prev, ...meta.payment }))
+      if (meta.emailOrders !== undefined)
+        setNotifications((prev) => ({ ...prev, ...meta }))
     } catch {}
   }, [profileData])
 
@@ -71,10 +81,11 @@ export default function SettingsPage() {
   })
 
   const paymentMutation = useMutation({
-    mutationFn: () => api.identity.updateProfile({
-      name: user?.name ?? "",
-      metadata: JSON.stringify({ payment }),
-    } as any),
+    mutationFn: () =>
+      api.identity.updateProfile({
+        name: user?.name ?? "",
+        metadata: JSON.stringify({ payment }),
+      } as any),
     onSuccess: () => {
       toast.success("Payment information updated")
     },
@@ -84,10 +95,11 @@ export default function SettingsPage() {
   })
 
   const notificationsMutation = useMutation({
-    mutationFn: () => api.identity.updateProfile({
-      name: user?.name ?? "",
-      metadata: JSON.stringify(notifications),
-    } as any),
+    mutationFn: () =>
+      api.identity.updateProfile({
+        name: user?.name ?? "",
+        metadata: JSON.stringify(notifications),
+      } as any),
     onSuccess: () => {
       toast.success("Notification preferences updated")
     },
@@ -134,9 +146,7 @@ export default function SettingsPage() {
             <Input
               id="name"
               value={profile.name}
-              onChange={(e) =>
-                setProfile({ ...profile, name: e.target.value })
-              }
+              onChange={(e) => setProfile({ ...profile, name: e.target.value })}
             />
           </div>
           <div className="space-y-2">
@@ -155,7 +165,10 @@ export default function SettingsPage() {
             </p>
           </div>
           <div className="flex justify-end">
-            <Button onClick={handleSaveProfile} disabled={profileMutation.isPending}>
+            <Button
+              onClick={handleSaveProfile}
+              disabled={profileMutation.isPending}
+            >
               {profileMutation.isPending ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
@@ -263,7 +276,10 @@ export default function SettingsPage() {
           </div>
 
           <div className="flex justify-end">
-            <Button onClick={handleSavePayment} disabled={paymentMutation.isPending}>
+            <Button
+              onClick={handleSavePayment}
+              disabled={paymentMutation.isPending}
+            >
               {paymentMutation.isPending ? (
                 <>
                   <RefreshCw className="mr-2 h-4 w-4 animate-spin" />

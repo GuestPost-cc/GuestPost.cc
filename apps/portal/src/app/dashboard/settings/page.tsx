@@ -1,32 +1,37 @@
 "use client"
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { useQuery, useMutation } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, ErrorState } from "@guestpost/ui"
-import { Separator } from "@guestpost/ui"
-import { Switch } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
 import {
-  User,
-  Shield,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  ErrorState,
+  Input,
+  Label,
+  Separator,
+  Switch,
+} from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery } from "@tanstack/react-query"
+import {
   Bell,
-  Palette,
   Globe,
-  Key,
-  Sun,
-  Moon,
-  Monitor,
   Loader2,
+  Monitor,
+  Moon,
+  Palette,
+  Sun,
+  User,
 } from "lucide-react"
 import { useTheme } from "next-themes"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
 import { toast } from "sonner"
+import { z } from "zod"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -64,9 +69,15 @@ function loadNotificationPrefs(): NotificationPrefs {
 export default function SettingsPage() {
   const { user, refresh } = useAuth()
   const { theme, setTheme } = useTheme()
-  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(loadNotificationPrefs)
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>(
+    loadNotificationPrefs,
+  )
 
-  const { data: walletData, error, refetch } = useQuery({
+  const {
+    data: walletData,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["wallet"],
     queryFn: () => api.billing.getWallet(),
   })
@@ -81,7 +92,8 @@ export default function SettingsPage() {
   })
 
   const profileMutation = useMutation({
-    mutationFn: (data: ProfileForm) => api.identity.updateProfile({ name: data.name }),
+    mutationFn: (data: ProfileForm) =>
+      api.identity.updateProfile({ name: data.name }),
     onSuccess: () => {
       toast.success("Profile updated successfully")
       refresh()
@@ -102,13 +114,22 @@ export default function SettingsPage() {
     profileMutation.mutate(data)
   }
 
-  if (error) return <ErrorState title="Failed to load settings" description={(error as Error).message} onRetry={() => refetch()} />
+  if (error)
+    return (
+      <ErrorState
+        title="Failed to load settings"
+        description={(error as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">Manage your account and preferences</p>
+        <p className="text-muted-foreground">
+          Manage your account and preferences
+        </p>
       </div>
 
       <div className="grid gap-8 max-w-2xl">
@@ -123,12 +144,17 @@ export default function SettingsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit(onProfileSubmit)} className="space-y-4">
+            <form
+              onSubmit={handleSubmit(onProfileSubmit)}
+              className="space-y-4"
+            >
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
                 <Input id="name" {...register("name")} />
                 {errors.name?.message && (
-                  <p className="text-sm text-destructive">{errors.name.message}</p>
+                  <p className="text-sm text-destructive">
+                    {errors.name.message}
+                  </p>
                 )}
               </div>
               <div className="space-y-2">
@@ -136,7 +162,9 @@ export default function SettingsPage() {
                 <Input id="email" value={user?.email || ""} disabled />
               </div>
               <Button type="submit" disabled={profileMutation.isPending}>
-                {profileMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {profileMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Save
               </Button>
             </form>
@@ -144,12 +172,16 @@ export default function SettingsPage() {
             <dl className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Account Type</dt>
-                <dd className="font-medium capitalize">{user?.userType?.toLowerCase()}</dd>
+                <dd className="font-medium capitalize">
+                  {user?.userType?.toLowerCase()}
+                </dd>
               </div>
               <Separator />
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Email Verified</dt>
-                <dd className="font-medium">{user?.emailVerified ? "Yes" : "No"}</dd>
+                <dd className="font-medium">
+                  {user?.emailVerified ? "Yes" : "No"}
+                </dd>
               </div>
             </dl>
           </CardContent>
@@ -161,7 +193,9 @@ export default function SettingsPage() {
               <Bell className="h-5 w-5 text-muted-foreground" />
               <div>
                 <CardTitle className="text-base">Notifications</CardTitle>
-                <CardDescription>Manage your email notification preferences</CardDescription>
+                <CardDescription>
+                  Manage your email notification preferences
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -169,37 +203,61 @@ export default function SettingsPage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label htmlFor="emailOrders" className="font-medium">Order Updates</Label>
-                  <p className="text-sm text-muted-foreground">Receive emails about order status changes</p>
+                  <Label htmlFor="emailOrders" className="font-medium">
+                    Order Updates
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive emails about order status changes
+                  </p>
                 </div>
                 <Switch
                   id="emailOrders"
                   checked={notifPrefs.emailOrders}
-                  onCheckedChange={(checked) => setNotifPrefs((prev) => ({ ...prev, emailOrders: checked }))}
+                  onCheckedChange={(checked) =>
+                    setNotifPrefs((prev) => ({ ...prev, emailOrders: checked }))
+                  }
                 />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <div>
-                  <Label htmlFor="emailEarnings" className="font-medium">Earnings Reports</Label>
-                  <p className="text-sm text-muted-foreground">Receive weekly earnings summaries</p>
+                  <Label htmlFor="emailEarnings" className="font-medium">
+                    Earnings Reports
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive weekly earnings summaries
+                  </p>
                 </div>
                 <Switch
                   id="emailEarnings"
                   checked={notifPrefs.emailEarnings}
-                  onCheckedChange={(checked) => setNotifPrefs((prev) => ({ ...prev, emailEarnings: checked }))}
+                  onCheckedChange={(checked) =>
+                    setNotifPrefs((prev) => ({
+                      ...prev,
+                      emailEarnings: checked,
+                    }))
+                  }
                 />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <div>
-                  <Label htmlFor="emailMarketing" className="font-medium">Marketing</Label>
-                  <p className="text-sm text-muted-foreground">Receive promotional offers and updates</p>
+                  <Label htmlFor="emailMarketing" className="font-medium">
+                    Marketing
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    Receive promotional offers and updates
+                  </p>
                 </div>
                 <Switch
                   id="emailMarketing"
                   checked={notifPrefs.emailMarketing}
-                  onCheckedChange={(checked) => setNotifPrefs((prev) => ({ ...prev, emailMarketing: checked }))}
+                  onCheckedChange={(checked) =>
+                    setNotifPrefs((prev) => ({
+                      ...prev,
+                      emailMarketing: checked,
+                    }))
+                  }
                 />
               </div>
               <Button
@@ -207,7 +265,9 @@ export default function SettingsPage() {
                 disabled={notifMutation.isPending}
                 className="mt-2"
               >
-                {notifMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {notifMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
                 Save Preferences
               </Button>
             </div>
@@ -220,7 +280,9 @@ export default function SettingsPage() {
               <Palette className="h-5 w-5 text-muted-foreground" />
               <div>
                 <CardTitle className="text-base">Appearance</CardTitle>
-                <CardDescription>Customize your theme preference</CardDescription>
+                <CardDescription>
+                  Customize your theme preference
+                </CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -239,8 +301,12 @@ export default function SettingsPage() {
                         : "border-muted hover:border-muted-foreground/30"
                     }`}
                   >
-                    <Icon className={`h-5 w-5 ${isActive ? "text-primary" : "text-muted-foreground"}`} />
-                    <span className={`text-sm font-medium ${isActive ? "text-primary" : ""}`}>
+                    <Icon
+                      className={`h-5 w-5 ${isActive ? "text-primary" : "text-muted-foreground"}`}
+                    />
+                    <span
+                      className={`text-sm font-medium ${isActive ? "text-primary" : ""}`}
+                    >
                       {option.label}
                     </span>
                   </button>
@@ -269,14 +335,18 @@ export default function SettingsPage() {
               <Separator />
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Organization ID</dt>
-                <dd className="font-mono text-xs">{user?.organizationId || "—"}</dd>
+                <dd className="font-mono text-xs">
+                  {user?.organizationId || "—"}
+                </dd>
               </div>
               {walletData && (
                 <>
                   <Separator />
                   <div className="flex justify-between">
                     <dt className="text-muted-foreground">Wallet Balance</dt>
-                    <dd className="font-mono font-medium">${Number(walletData?.availableBalance ?? 0).toFixed(2)}</dd>
+                    <dd className="font-mono font-medium">
+                      ${Number(walletData?.availableBalance ?? 0).toFixed(2)}
+                    </dd>
                   </div>
                 </>
               )}

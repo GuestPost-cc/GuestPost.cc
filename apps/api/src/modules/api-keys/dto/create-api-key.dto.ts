@@ -36,7 +36,8 @@ export class CreateApiKeyDto {
   @MaxLength(50, { each: true })
   @Matches(/^[a-z0-9_]+:[a-z0-9_]+$/, {
     each: true,
-    message: "Each permission must be a `domain:action` slug (lowercase letters, digits, underscores)",
+    message:
+      "Each permission must be a `domain:action` slug (lowercase letters, digits, underscores)",
   })
   permissions?: string[]
 }

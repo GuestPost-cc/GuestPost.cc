@@ -13,10 +13,10 @@ jest.mock("better-auth/api", () => ({
 }))
 
 import {
-  emailRateLimitPlugin,
-  hashEmail,
   EMAIL_RATE_LIMIT_ROUTES,
   type EmailRateLimitOptions,
+  emailRateLimitPlugin,
+  hashEmail,
 } from "../plugins/email-rate-limit"
 
 function makeRedisMock() {
@@ -32,7 +32,9 @@ function makeRedisMock() {
   }
 }
 
-function makeOpts(overrides: Partial<EmailRateLimitOptions> = {}): EmailRateLimitOptions {
+function makeOpts(
+  overrides: Partial<EmailRateLimitOptions> = {},
+): EmailRateLimitOptions {
   return {
     redis: makeRedisMock() as any,
     windowMs: 3_600_000,
@@ -52,9 +54,13 @@ async function runHook(
   routePath: string,
   ctx: { body?: { email?: unknown } },
 ): Promise<Response | undefined> {
-  const hook = pluginInstance.hooks.before.find((h) => h.matcher({ path: routePath } as any))
+  const hook = pluginInstance.hooks.before.find((h) =>
+    h.matcher({ path: routePath } as any),
+  )
   if (!hook) throw new Error(`no hook matched ${routePath}`)
-  return (await (hook.handler as any)({ ...ctx, path: routePath })) as Response | undefined
+  return (await (hook.handler as any)({ ...ctx, path: routePath })) as
+    | Response
+    | undefined
 }
 
 describe("emailRateLimitPlugin", () => {
@@ -93,7 +99,9 @@ describe("emailRateLimitPlugin", () => {
     it("returns early when email is non-string", async () => {
       const redis = makeRedisMock()
       const plugin = emailRateLimitPlugin(makeOpts({ redis: redis as any }))
-      const result = await runHook(plugin, "/sign-in/email", { body: { email: 123 as any } })
+      const result = await runHook(plugin, "/sign-in/email", {
+        body: { email: 123 as any },
+      })
       expect(result).toBeUndefined()
       expect(redis.incr).not.toHaveBeenCalled()
     })
@@ -101,7 +109,9 @@ describe("emailRateLimitPlugin", () => {
     it("calls INCR + PEXPIRE on first hit with hashed-email key", async () => {
       const redis = makeRedisMock()
       const plugin = emailRateLimitPlugin(makeOpts({ redis: redis as any }))
-      await runHook(plugin, "/sign-in/email", { body: { email: "alice@example.com" } })
+      await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
       expect(redis.incr).toHaveBeenCalledTimes(1)
       const key = (redis.incr as jest.Mock).mock.calls[0][0]
       expect(key).toBe(`auth-rl:signin:${hashEmail("alice@example.com")}`)
@@ -115,25 +125,42 @@ describe("emailRateLimitPlugin", () => {
     it("does NOT call PEXPIRE on subsequent hits (only sets TTL once)", async () => {
       const redis = makeRedisMock()
       const plugin = emailRateLimitPlugin(makeOpts({ redis: redis as any }))
-      await runHook(plugin, "/sign-in/email", { body: { email: "alice@example.com" } })
-      await runHook(plugin, "/sign-in/email", { body: { email: "alice@example.com" } })
+      await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
+      await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
       expect(redis.pexpire).toHaveBeenCalledTimes(1)
     })
 
     it("returns 429 Response when count exceeds the limit", async () => {
       const redis = makeRedisMock()
-      const plugin = emailRateLimitPlugin(makeOpts({ redis: redis as any, limits: { signIn: 2, signUp: 2, magicLink: 2, resetPassword: 2 } }))
-      const r1 = await runHook(plugin, "/sign-in/email", { body: { email: "alice@example.com" } })
-      const r2 = await runHook(plugin, "/sign-in/email", { body: { email: "alice@example.com" } })
-      const r3 = await runHook(plugin, "/sign-in/email", { body: { email: "alice@example.com" } })
+      const plugin = emailRateLimitPlugin(
+        makeOpts({
+          redis: redis as any,
+          limits: { signIn: 2, signUp: 2, magicLink: 2, resetPassword: 2 },
+        }),
+      )
+      const r1 = await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
+      const r2 = await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
+      const r3 = await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
       expect(r1).toBeUndefined()
       expect(r2).toBeUndefined()
       expect(r3).toBeInstanceOf(Response)
-      expect(r3!.status).toBe(429)
-      expect(r3!.statusText).toBe("Too Many Requests")
-      expect(r3!.headers.get("X-Retry-After")).toBe("3600")
-      const body = await r3!.json()
-      expect(body).toEqual({ message: "Too many requests. Please try again later." })
+      expect(r3?.status).toBe(429)
+      expect(r3?.statusText).toBe("Too Many Requests")
+      expect(r3?.headers.get("X-Retry-After")).toBe("3600")
+      const body = await r3?.json()
+      expect(body).toEqual({
+        message: "Too many requests. Please try again later.",
+      })
     })
 
     it("uses per-endpoint prefixes (signin/signup/magic/reset)", async () => {
@@ -144,28 +171,47 @@ describe("emailRateLimitPlugin", () => {
       await runHook(plugin, "/sign-up/email", { body: { email } })
       await runHook(plugin, "/sign-in/magic-link", { body: { email } })
       await runHook(plugin, "/request-password-reset", { body: { email } })
-      const prefixes = (redis.incr as jest.Mock).mock.calls.map((c) => c[0].split(":")[1])
+      const prefixes = (redis.incr as jest.Mock).mock.calls.map(
+        (c) => c[0].split(":")[1],
+      )
       expect(prefixes).toEqual(["signin", "signup", "magic", "reset"])
     })
 
     it("uses per-endpoint buckets (sign-in counter does not affect sign-up)", async () => {
       const redis = makeRedisMock()
-      const plugin = emailRateLimitPlugin(makeOpts({ redis: redis as any, limits: { signIn: 2, signUp: 2, magicLink: 2, resetPassword: 2 } }))
+      const plugin = emailRateLimitPlugin(
+        makeOpts({
+          redis: redis as any,
+          limits: { signIn: 2, signUp: 2, magicLink: 2, resetPassword: 2 },
+        }),
+      )
       const email = "alice@example.com"
       await runHook(plugin, "/sign-in/email", { body: { email } })
       await runHook(plugin, "/sign-in/email", { body: { email } })
       // sign-in is now at its limit; sign-up should still pass for the
       // same email since the buckets are per-endpoint.
-      const result = await runHook(plugin, "/sign-up/email", { body: { email } })
+      const result = await runHook(plugin, "/sign-up/email", {
+        body: { email },
+      })
       expect(result).toBeUndefined()
     })
 
     it("logs INFO with emailHash (never raw email) when limit triggers", async () => {
       const redis = makeRedisMock()
       const logger = { info: jest.fn() }
-      const plugin = emailRateLimitPlugin(makeOpts({ redis: redis as any, logger, limits: { signIn: 1, signUp: 1, magicLink: 1, resetPassword: 1 } }))
-      await runHook(plugin, "/sign-in/email", { body: { email: "alice@example.com" } })
-      await runHook(plugin, "/sign-in/email", { body: { email: "alice@example.com" } })
+      const plugin = emailRateLimitPlugin(
+        makeOpts({
+          redis: redis as any,
+          logger,
+          limits: { signIn: 1, signUp: 1, magicLink: 1, resetPassword: 1 },
+        }),
+      )
+      await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
+      await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
       expect(logger.info).toHaveBeenCalledWith(
         "auth email rate limit triggered",
         expect.objectContaining({
@@ -198,7 +244,9 @@ describe("emailRateLimitPlugin", () => {
       for (const v of variants) {
         await runHook(plugin, "/sign-in/email", { body: { email: v } })
       }
-      const keys = new Set((redis.incr as jest.Mock).mock.calls.map((c) => c[0]))
+      const keys = new Set(
+        (redis.incr as jest.Mock).mock.calls.map((c) => c[0]),
+      )
       expect(keys.size).toBe(1) // all variants share one Redis key
       const onlyKey = [...keys][0]
       expect(onlyKey).toBe(`auth-rl:signin:${hashEmail("alice@example.com")}`)
@@ -219,8 +267,8 @@ describe("emailRateLimitPlugin", () => {
       // Look for patterns like `${email}` inside backtick strings used as
       // keys. The legitimate usage is `${hashEmail(email)}`.
       const offending = [
-        /`[^`]*\$\{email\}[^`]*`/,            // `...${email}...`
-        /"auth-rl[^"]*"\s*\+\s*email\b/,      // "auth-rl..." + email
+        /`[^`]*\$\{email\}[^`]*`/, // `...${email}...`
+        /"auth-rl[^"]*"\s*\+\s*email\b/, // "auth-rl..." + email
       ]
       for (const re of offending) {
         expect(src.match(re)).toBeNull()

@@ -16,8 +16,9 @@
  * (queue GET) + TestAuthGuard + supertest api-client land in Phase 7.10.2.1
  * as a fast-follow PR.
  */
-import { Test } from "@nestjs/testing"
+
 import type { INestApplication } from "@nestjs/common"
+import { Test } from "@nestjs/testing"
 import { createTestDatabase, type TestDatabase } from "./test-db"
 
 export interface TestAppContext {
@@ -47,7 +48,9 @@ export async function createTestApp(): Promise<TestAppContext> {
   // 3. Boot the testing module + get a real PrismaService bound to the
   //    ephemeral DB. .compile() runs all module providers' OnModuleInit hooks
   //    (e.g. PrismaService.$connect()).
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile()
+  const moduleRef = await Test.createTestingModule({
+    imports: [AppModule],
+  }).compile()
   const app = moduleRef.createNestApplication()
   await app.init() // triggers OnModuleInit / lifecycle hooks
   const prisma = app.get(PrismaService)

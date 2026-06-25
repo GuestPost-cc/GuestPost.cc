@@ -1,5 +1,12 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from "@nestjs/common"
-import { Response } from "express"
+import {
+  type ArgumentsHost,
+  Catch,
+  type ExceptionFilter,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from "@nestjs/common"
+import type { Response } from "express"
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -15,11 +22,14 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus()
       const res = exception.getResponse()
-      message = typeof res === "string" ? res : (res as any).message ?? message
+      message =
+        typeof res === "string" ? res : ((res as any).message ?? message)
     }
 
     if (status >= 500) {
-      this.logger.error(exception instanceof Error ? exception.stack : exception)
+      this.logger.error(
+        exception instanceof Error ? exception.stack : exception,
+      )
       message = "Internal server error"
     } else if (status === 429) {
       message = "Too many requests, try again later"

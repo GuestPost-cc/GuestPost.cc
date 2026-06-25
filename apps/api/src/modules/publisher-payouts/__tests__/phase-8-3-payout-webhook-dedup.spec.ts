@@ -13,7 +13,7 @@
 //     with no jobId override (preserves pre-fix behavior; logger.warn fires
 //     so payload-shape drift is visible).
 
-import { createHmac, createSign, generateKeyPairSync } from "crypto"
+import { createHmac, createSign, generateKeyPairSync } from "node:crypto"
 import { PayoutWebhookController } from "../payout-webhook.controller"
 
 const ORIGINAL_ENV = { ...process.env }
@@ -31,8 +31,14 @@ describe("Phase 8.3 — payout-webhook BullMQ jobId dedup (audit #3)", () => {
     controller = new PayoutWebhookController(queueMock)
   })
 
-  function stripeSig(secret: string, body: string, timestamp = Math.floor(Date.now() / 1000)) {
-    const v1 = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")
+  function stripeSig(
+    secret: string,
+    body: string,
+    timestamp = Math.floor(Date.now() / 1000),
+  ) {
+    const v1 = createHmac("sha256", secret)
+      .update(`${timestamp}.${body}`)
+      .digest("hex")
     return `t=${timestamp},v1=${v1}`
   }
 
@@ -54,26 +60,43 @@ describe("Phase 8.3 — payout-webhook BullMQ jobId dedup (audit #3)", () => {
     const rawBody = Buffer.from(payload, "utf8")
     const sig = stripeSig("whsec_phase83", payload)
 
-    await controller.handleWebhook("stripe_connect", { "stripe-signature": sig }, { rawBody } as any)
+    await controller.handleWebhook(
+      "stripe_connect",
+      { "stripe-signature": sig },
+      { rawBody } as any,
+    )
 
     expect(queueMock.addJob).toHaveBeenCalledTimes(1)
     const jobIdArg = queueMock.addJob.mock.calls[0][3]
-    expect(jobIdArg).toEqual({ jobId: "payout-webhook:stripe_connect:tr_abc123" })
+    expect(jobIdArg).toEqual({
+      jobId: "payout-webhook:stripe_connect:tr_abc123",
+    })
   })
 
   // ─── b) Wise payload with known transfer id → deterministic jobId ───
 
   it("Wise webhook with a transfer id passes jobId 'payout-webhook:wise:<id>' to addJob", async () => {
-    const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 })
-    process.env.WISE_WEBHOOK_PUBLIC_KEY = publicKey.export({ type: "spki", format: "pem" }).toString()
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    })
+    process.env.WISE_WEBHOOK_PUBLIC_KEY = publicKey
+      .export({ type: "spki", format: "pem" })
+      .toString()
     const payload = JSON.stringify({
       event_type: "transfers#state-change",
-      data: { resource: { id: "wise_xyz789" }, current_state: "outgoing_payment_sent" },
+      data: {
+        resource: { id: "wise_xyz789" },
+        current_state: "outgoing_payment_sent",
+      },
     })
     const rawBody = Buffer.from(payload, "utf8")
     const signature = signWise(rawBody, privateKey)
 
-    await controller.handleWebhook("wise", { "x-signature-sha256": signature }, { rawBody } as any)
+    await controller.handleWebhook(
+      "wise",
+      { "x-signature-sha256": signature },
+      { rawBody } as any,
+    )
 
     expect(queueMock.addJob).toHaveBeenCalledTimes(1)
     const jobIdArg = queueMock.addJob.mock.calls[0][3]
@@ -93,8 +116,16 @@ describe("Phase 8.3 — payout-webhook BullMQ jobId dedup (audit #3)", () => {
     const sig = stripeSig("whsec_phase83", payload)
 
     // Two identical handleWebhook calls (simulating provider retry / ops replay).
-    await controller.handleWebhook("stripe_connect", { "stripe-signature": sig }, { rawBody } as any)
-    await controller.handleWebhook("stripe_connect", { "stripe-signature": sig }, { rawBody } as any)
+    await controller.handleWebhook(
+      "stripe_connect",
+      { "stripe-signature": sig },
+      { rawBody } as any,
+    )
+    await controller.handleWebhook(
+      "stripe_connect",
+      { "stripe-signature": sig },
+      { rawBody } as any,
+    )
 
     expect(queueMock.addJob).toHaveBeenCalledTimes(2)
     // Capture the jobId arg from BOTH calls and assert deterministic identity.
@@ -122,7 +153,11 @@ describe("Phase 8.3 — payout-webhook BullMQ jobId dedup (audit #3)", () => {
     const rawBody = Buffer.from(payload, "utf8")
     const sig = stripeSig("whsec_phase83", payload)
 
-    await controller.handleWebhook("stripe_connect", { "stripe-signature": sig }, { rawBody } as any)
+    await controller.handleWebhook(
+      "stripe_connect",
+      { "stripe-signature": sig },
+      { rawBody } as any,
+    )
 
     expect(queueMock.addJob).toHaveBeenCalledTimes(1)
     // 4th arg should be undefined (no override) — preserves the pre-fix

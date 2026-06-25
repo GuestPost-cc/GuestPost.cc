@@ -1,6 +1,6 @@
 "use client"
 
-import * as React from "react"
+import type * as React from "react"
 
 interface RoleGuardProps {
   allowedRoles: string[]
@@ -9,7 +9,12 @@ interface RoleGuardProps {
   fallback?: React.ReactNode
 }
 
-function RoleGuard({ allowedRoles, userRole = "", children, fallback = null }: RoleGuardProps) {
+function RoleGuard({
+  allowedRoles,
+  userRole = "",
+  children,
+  fallback = null,
+}: RoleGuardProps) {
   const hasRole = allowedRoles.includes(userRole)
 
   if (!hasRole) {

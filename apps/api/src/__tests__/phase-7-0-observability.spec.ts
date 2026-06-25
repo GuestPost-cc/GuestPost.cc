@@ -4,14 +4,16 @@
 // All three primitives ship in packages/shared/src/observability.
 
 import {
-  RUNTIME_TAGS,
-  REDACTED_KEYS,
   buildBeforeSend,
   buildStartupConfig,
   initSentry,
   logSentryStartup,
+  REDACTED_KEYS,
+  RUNTIME_TAGS,
   redactSensitiveData,
   type SentryRuntimeTag,
+  type SentryScopeLike,
+  setBusinessContext,
 } from "@guestpost/shared"
 // Deep import — request-context uses node:async_hooks; not in the shared
 // browser-safe barrel.
@@ -22,7 +24,6 @@ import {
   requireRequestId,
   runWithRequestId,
 } from "@guestpost/shared/dist/observability/request-context"
-import { setBusinessContext, type SentryScopeLike } from "@guestpost/shared"
 
 describe("Phase 7.0 — sentry-init", () => {
   const originalEnv = { ...process.env }
@@ -52,7 +53,9 @@ describe("Phase 7.0 — sentry-init", () => {
 
   it("buildStartupConfig throws on invalid runtime tag", () => {
     expect(() =>
-      buildStartupConfig({ runtime: "web-client" as unknown as SentryRuntimeTag }),
+      buildStartupConfig({
+        runtime: "web-client" as unknown as SentryRuntimeTag,
+      }),
     ).toThrow(/invalid runtime tag/)
   })
 
@@ -81,7 +84,9 @@ describe("Phase 7.0 — sentry-init", () => {
     expect(buildStartupConfig({ runtime: "api" }).environment).toBe("staging")
     delete process.env.SENTRY_ENVIRONMENT
     process.env.NODE_ENV = "production"
-    expect(buildStartupConfig({ runtime: "api" }).environment).toBe("production")
+    expect(buildStartupConfig({ runtime: "api" }).environment).toBe(
+      "production",
+    )
   })
 
   it("buildStartupConfig sets 10% sample rate in production, 100% in development", () => {
@@ -99,7 +104,9 @@ describe("Phase 7.0 — sentry-init", () => {
     const logger = { log: jest.fn(), warn: jest.fn() }
     const config = buildStartupConfig({ runtime: "api" })
     logSentryStartup(config, logger)
-    expect(logger.warn).toHaveBeenCalledWith("[SENTRY] disabled (no DSN) runtime=api")
+    expect(logger.warn).toHaveBeenCalledWith(
+      "[SENTRY] disabled (no DSN) runtime=api",
+    )
     expect(logger.log).not.toHaveBeenCalled()
   })
 
@@ -133,10 +140,14 @@ describe("Phase 7.0 — sentry-init", () => {
     const init = jest.fn()
     initSentry(
       { init },
-      { runtime: "api", logger: { log: jest.fn(), warn: jest.fn() }, extra: { foo: "bar" } },
+      {
+        runtime: "api",
+        logger: { log: jest.fn(), warn: jest.fn() },
+        extra: { foo: "bar" },
+      },
     )
     expect(init).toHaveBeenCalledTimes(1)
-    const opts = init.mock.calls[0]![0] as Record<string, unknown>
+    const opts = init.mock.calls[0]?.[0] as Record<string, unknown>
     expect(opts.dsn).toBe("https://test@sentry.example/1")
     expect(opts.release).toBe("abc")
     expect(opts.environment).toBe("production")
@@ -184,7 +195,9 @@ describe("Phase 7.0 — beforeSend redaction", () => {
         },
       },
     }
-    const result = beforeSend(event) as { request: { headers: Record<string, string> } }
+    const result = beforeSend(event) as {
+      request: { headers: Record<string, string> }
+    }
     expect(result.request.headers.Authorization).toBe("[REDACTED]")
     expect(result.request.headers.cookie).toBe("[REDACTED]")
     expect(result.request.headers["Set-Cookie"]).toBe("[REDACTED]")
@@ -201,9 +214,11 @@ describe("Phase 7.0 — beforeSend redaction", () => {
     const result = beforeSend(event) as {
       breadcrumbs: Array<{ data: Record<string, unknown> }>
     }
-    expect(result.breadcrumbs[0]!.data.password).toBe("[REDACTED]")
-    expect(result.breadcrumbs[0]!.data.note).toBe("ok")
-    expect((result.breadcrumbs[1]!.data.nested as Record<string, string>).apiKey).toBe("[REDACTED]")
+    expect(result.breadcrumbs[0]?.data.password).toBe("[REDACTED]")
+    expect(result.breadcrumbs[0]?.data.note).toBe("ok")
+    expect(
+      (result.breadcrumbs[1]?.data.nested as Record<string, string>).apiKey,
+    ).toBe("[REDACTED]")
   })
 
   it("does not mutate the input event", () => {
@@ -244,7 +259,8 @@ describe("Phase 7.0 — request-context (AsyncLocalStorage)", () => {
   })
 
   it("isolates concurrent async frames", async () => {
-    const observed: Array<{ id: string; observedAfterAwait: string | null }> = []
+    const observed: Array<{ id: string; observedAfterAwait: string | null }> =
+      []
     await Promise.all([
       runWithRequestId("req-A", async () => {
         await new Promise((r) => setTimeout(r, 5))
@@ -280,10 +296,14 @@ describe("Phase 7.0 — request-context (AsyncLocalStorage)", () => {
 
   describe("isValidRequestId — allowlist regex", () => {
     it("accepts UUIDv4", () => {
-      expect(isValidRequestId("550e8400-e29b-41d4-a716-446655440000")).toBe(true)
+      expect(isValidRequestId("550e8400-e29b-41d4-a716-446655440000")).toBe(
+        true,
+      )
     })
     it("accepts UUIDv7", () => {
-      expect(isValidRequestId("018f9c1d-7e3a-7000-8a00-1234567890ab")).toBe(true)
+      expect(isValidRequestId("018f9c1d-7e3a-7000-8a00-1234567890ab")).toBe(
+        true,
+      )
     })
     it("accepts short trusted ID", () => {
       expect(isValidRequestId("test-12345")).toBe(true)

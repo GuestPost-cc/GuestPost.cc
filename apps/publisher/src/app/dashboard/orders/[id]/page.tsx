@@ -1,48 +1,75 @@
 "use client"
 
-import { useState } from "react"
-import { useForm } from "react-hook-form"
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  ErrorState,
+  Input,
+  Label,
+  Separator,
+  Skeleton,
+  Textarea,
+} from "@guestpost/ui"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { useParams, useRouter } from "next/navigation"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../../lib/api"
-import { toast } from "sonner"
-import Link from "next/link"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   ArrowLeft,
-  FileText,
-  Upload,
-  Clock,
   CheckCircle,
-  XCircle,
-  Send,
-  ExternalLink,
+  Clock,
   Download,
+  ExternalLink,
+  FileText,
   MessageSquare,
-  Paperclip,
-  ChevronRight,
+  Upload,
+  XCircle,
 } from "lucide-react"
-import { Button } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
-import { ErrorState } from "@guestpost/ui"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Textarea } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import { Separator } from "@guestpost/ui"
+import Link from "next/link"
+import { useParams, useRouter } from "next/navigation"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
+import { api } from "../../../../lib/api"
 
 const statusConfig: Record<
   string,
   { label: string; icon: React.ElementType; color: string }
 > = {
-  ORDER_CREATED: { label: "Order Created", icon: Clock, color: "text-muted-foreground" },
-  PAYMENT_RECEIVED: { label: "Payment Received", icon: CheckCircle, color: "text-emerald-500" },
-  ASSIGNED: { label: "Assigned to Publisher", icon: CheckCircle, color: "text-blue-500" },
-  CONTENT_SUBMITTED: { label: "Content Submitted", icon: FileText, color: "text-blue-500" },
-  CONTENT_APPROVED: { label: "Content Approved", icon: CheckCircle, color: "text-emerald-500" },
-  PUBLISHED: { label: "Published", icon: ExternalLink, color: "text-emerald-500" },
+  ORDER_CREATED: {
+    label: "Order Created",
+    icon: Clock,
+    color: "text-muted-foreground",
+  },
+  PAYMENT_RECEIVED: {
+    label: "Payment Received",
+    icon: CheckCircle,
+    color: "text-emerald-500",
+  },
+  ASSIGNED: {
+    label: "Assigned to Publisher",
+    icon: CheckCircle,
+    color: "text-blue-500",
+  },
+  CONTENT_SUBMITTED: {
+    label: "Content Submitted",
+    icon: FileText,
+    color: "text-blue-500",
+  },
+  CONTENT_APPROVED: {
+    label: "Content Approved",
+    icon: CheckCircle,
+    color: "text-emerald-500",
+  },
+  PUBLISHED: {
+    label: "Published",
+    icon: ExternalLink,
+    color: "text-emerald-500",
+  },
   VERIFIED: { label: "Verified", icon: CheckCircle, color: "text-emerald-500" },
   UNDER_REVIEW: { label: "Under Review", icon: Clock, color: "text-amber-500" },
   CANCELLED: { label: "Cancelled", icon: XCircle, color: "text-destructive" },
@@ -85,7 +112,7 @@ function TimelineItem({
 
 export default function OrderDetailPage() {
   const params = useParams()
-  const router = useRouter()
+  const _router = useRouter()
   const orderId = params.id as string
   const queryClient = useQueryClient()
   const [attachments, setAttachments] = useState<File[]>([])
@@ -106,7 +133,11 @@ export default function OrderDetailPage() {
     resolver: zodResolver(contentSchema),
   })
 
-  const { data: order, isLoading, error } = useQuery({
+  const {
+    data: order,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["order", orderId],
     queryFn: () => api.orders.getById(orderId),
   })
@@ -171,7 +202,9 @@ export default function OrderDetailPage() {
       <ErrorState
         title="Failed to load order"
         description={(orderError as Error).message}
-        onRetry={() => queryClient.invalidateQueries({ queryKey: ["order", orderId] })}
+        onRetry={() =>
+          queryClient.invalidateQueries({ queryKey: ["order", orderId] })
+        }
       />
     )
 
@@ -196,7 +229,8 @@ export default function OrderDetailPage() {
 
   const currentStatus = order.status
   const canAccept = currentStatus === "SUBMITTED"
-  const canSubmitContent = currentStatus === "ACCEPTED" || currentStatus === "CONTENT_REQUESTED"
+  const canSubmitContent =
+    currentStatus === "ACCEPTED" || currentStatus === "CONTENT_REQUESTED"
   const canMarkPublished = currentStatus === "APPROVED"
 
   return (
@@ -218,8 +252,8 @@ export default function OrderDetailPage() {
             currentStatus === "PUBLISHED" || currentStatus === "VERIFIED"
               ? "success"
               : currentStatus === "CONTENT_CREATION"
-              ? "info"
-              : "secondary"
+                ? "info"
+                : "secondary"
           }
           className="text-sm"
         >
@@ -263,8 +297,8 @@ export default function OrderDetailPage() {
                     {order.totalAmount
                       ? `$${Number(order.totalAmount).toFixed(2)}`
                       : order.items[0]?.budget
-                      ? `$${Number(order.items[0].budget).toFixed(2)}`
-                      : "—"}
+                        ? `$${Number(order.items[0].budget).toFixed(2)}`
+                        : "—"}
                   </p>
                 </div>
               </div>
@@ -320,7 +354,11 @@ export default function OrderDetailPage() {
                     placeholder="Paste your article content here..."
                     {...register("content")}
                   />
-                  {errors.content && <p className="text-sm text-destructive">{errors.content.message}</p>}
+                  {errors.content && (
+                    <p className="text-sm text-destructive">
+                      {errors.content.message}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -348,7 +386,9 @@ export default function OrderDetailPage() {
                   onClick={handleFormSubmit(handleContentSubmit)}
                   disabled={contentSubmitMutation.isPending}
                 >
-                  {contentSubmitMutation.isPending ? "Submitting..." : "Submit for Review"}
+                  {contentSubmitMutation.isPending
+                    ? "Submitting..."
+                    : "Submit for Review"}
                 </Button>
               </CardContent>
             </Card>
@@ -361,7 +401,8 @@ export default function OrderDetailPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Confirm that the guest post has been published on the target website.
+                  Confirm that the guest post has been published on the target
+                  website.
                 </p>
                 <div className="space-y-2">
                   <Label htmlFor="publishedUrl">Published URL</Label>
@@ -399,10 +440,10 @@ export default function OrderDetailPage() {
                       event={event}
                       isLast={
                         index ===
-                        ((events.length > 0 ? events : order.events).length - 1)
+                        (events.length > 0 ? events : order.events).length - 1
                       }
                     />
-                  )
+                  ),
                 )}
               </div>
             </CardContent>
@@ -413,8 +454,14 @@ export default function OrderDetailPage() {
               <CardTitle className="text-base">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button variant="outline" className="w-full justify-start" asChild>
-                <Link href={`/dashboard/support?new=true&subject=Order%20${orderId}`}>
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                asChild
+              >
+                <Link
+                  href={`/dashboard/support?new=true&subject=Order%20${orderId}`}
+                >
                   <MessageSquare className="mr-2 h-4 w-4" />
                   Contact Support
                 </Link>
@@ -428,7 +475,9 @@ export default function OrderDetailPage() {
                     amount: order?.totalAmount,
                     date: order?.createdAt,
                   }
-                  const blob = new Blob([JSON.stringify(invoice, null, 2)], { type: "application/json" })
+                  const blob = new Blob([JSON.stringify(invoice, null, 2)], {
+                    type: "application/json",
+                  })
                   const url = URL.createObjectURL(blob)
                   const a = document.createElement("a")
                   a.href = url

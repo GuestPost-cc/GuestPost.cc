@@ -23,7 +23,9 @@ function makeTxMock() {
   return {
     settlement: {
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
-      findUniqueOrThrow: jest.fn().mockResolvedValue({ id: "s1", status: "UNDER_REVIEW", version: 6 }),
+      findUniqueOrThrow: jest
+        .fn()
+        .mockResolvedValue({ id: "s1", status: "UNDER_REVIEW", version: 6 }),
     },
     settlementApproval: {
       findUnique: jest.fn().mockResolvedValue(null),
@@ -62,7 +64,11 @@ function makeQueueMock() {
   return { enqueueTrustRecompute: jest.fn().mockResolvedValue({}) }
 }
 
-function makeService(prisma: any, audit: any = makeAuditMock(), queue: any = makeQueueMock()) {
+function makeService(
+  prisma: any,
+  audit: any = makeAuditMock(),
+  queue: any = makeQueueMock(),
+) {
   return new SettlementsService(prisma, audit as any, queue as any)
 }
 
@@ -98,12 +104,14 @@ describe("Phase 8.1 (audit #1) — returnToReview version guard", () => {
 
   it("throws ConflictException when the version has advanced (concurrent adminApprove won)", async () => {
     const { tx, service } = setup()
-    tx.settlement.updateMany.mockResolvedValue({ count: 0 })  // race lost
+    tx.settlement.updateMany.mockResolvedValue({ count: 0 }) // race lost
 
-    await expect(service.returnToReview("s1", "user-1", "reason here")).rejects.toThrow(ConflictException)
-    await expect(service.returnToReview("s1", "user-1", "reason here")).rejects.toThrow(
-      /modified by another request/,
-    )
+    await expect(
+      service.returnToReview("s1", "user-1", "reason here"),
+    ).rejects.toThrow(ConflictException)
+    await expect(
+      service.returnToReview("s1", "user-1", "reason here"),
+    ).rejects.toThrow(/modified by another request/)
     // Refetch must NOT be called when the conflict is detected
     expect(tx.settlement.findUniqueOrThrow).not.toHaveBeenCalled()
   })
@@ -114,7 +122,7 @@ describe("Phase 8.1 (audit #1) — returnToReview version guard", () => {
     prisma.settlement.findUnique.mockResolvedValue({
       id: "s1",
       version: 5,
-      status: "RELEASED",  // wrong status
+      status: "RELEASED", // wrong status
       orderId: "ord-1",
       order: { organizationId: "org-1" },
     })
@@ -122,10 +130,12 @@ describe("Phase 8.1 (audit #1) — returnToReview version guard", () => {
 
     // Pre-tx BadRequestException at line 446 is the user-friendly 400; the
     // in-tx version+status guard is the load-bearing 409 for the race case.
-    await expect(service.returnToReview("s1", "user-1", "reason here")).rejects.toThrow(
+    await expect(
+      service.returnToReview("s1", "user-1", "reason here"),
+    ).rejects.toThrow(
       /Only customer-approved settlements can be returned to review/,
     )
-    expect(prisma.$transaction).not.toHaveBeenCalled()  // never entered tx
+    expect(prisma.$transaction).not.toHaveBeenCalled() // never entered tx
   })
 })
 
@@ -178,7 +188,7 @@ describe("Phase 8.2 (audit #2) — releaseFundsInternal Order.status version gua
     const { tx, service, settlement } = setup(3)
     const audit = (service as any).audit
     audit.log = jest.fn().mockResolvedValue({})
-    tx.order.updateMany.mockResolvedValue({ count: 0 })  // race lost on Order
+    tx.order.updateMany.mockResolvedValue({ count: 0 }) // race lost on Order
 
     await expect(
       (service as any).releaseFundsInternal(tx, "s1", settlement, "user-1"),
@@ -190,7 +200,7 @@ describe("Phase 8.2 (audit #2) — releaseFundsInternal Order.status version gua
 
   it("throws NotFoundException when order disappears between settlement creation and release", async () => {
     const { tx, service, settlement } = setup()
-    tx.order.findUnique.mockResolvedValue(null)  // order vanished
+    tx.order.findUnique.mockResolvedValue(null) // order vanished
 
     await expect(
       (service as any).releaseFundsInternal(tx, "s1", settlement, "user-1"),

@@ -1,35 +1,33 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery } from "@tanstack/react-query"
 import { sortOrdersByPriority } from "@guestpost/shared"
-import Link from "next/link"
-import { api } from "../../../lib/api"
-import { toast } from "sonner"
 import {
-  ShoppingCart,
-  Clock,
-  CheckCircle,
-  FileText,
-  Send,
-  ExternalLink,
-  ChevronRight,
-  RefreshCw,
-  AlertCircle,
-} from "lucide-react"
-import { Badge } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { ErrorState } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import { Card, CardContent } from "@guestpost/ui"
-import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  ErrorState,
+  Skeleton,
   Table,
-  TableHeader,
   TableBody,
-  TableHead,
-  TableRow,
   TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@guestpost/ui"
+import { useQuery } from "@tanstack/react-query"
+import {
+  AlertCircle,
+  CheckCircle,
+  ChevronRight,
+  Clock,
+  ExternalLink,
+  FileText,
+  ShoppingCart,
+} from "lucide-react"
+import Link from "next/link"
+import { useState } from "react"
+import { api } from "../../../lib/api"
 
 type OrderStatus =
   | "DRAFT"
@@ -53,17 +51,43 @@ type OrderStatus =
 
 const statusConfig: Record<
   OrderStatus,
-  { label: string; icon: React.ElementType; variant: "default" | "secondary" | "destructive" | "success" | "warning" | "info" }
+  {
+    label: string
+    icon: React.ElementType
+    variant:
+      | "default"
+      | "secondary"
+      | "destructive"
+      | "success"
+      | "warning"
+      | "info"
+  }
 > = {
   DRAFT: { label: "Draft", icon: FileText, variant: "secondary" },
-  PENDING_PAYMENT: { label: "Pending Payment", icon: Clock, variant: "warning" },
+  PENDING_PAYMENT: {
+    label: "Pending Payment",
+    icon: Clock,
+    variant: "warning",
+  },
   PAID: { label: "Paid", icon: Clock, variant: "info" },
-  SUBMITTED: { label: "Awaiting Acceptance", icon: AlertCircle, variant: "info" },
+  SUBMITTED: {
+    label: "Awaiting Acceptance",
+    icon: AlertCircle,
+    variant: "info",
+  },
   ACCEPTED: { label: "Accepted", icon: CheckCircle, variant: "info" },
-  CONTENT_REQUESTED: { label: "Content Requested", icon: FileText, variant: "info" },
+  CONTENT_REQUESTED: {
+    label: "Content Requested",
+    icon: FileText,
+    variant: "info",
+  },
   CONTENT_CREATION: { label: "In Progress", icon: FileText, variant: "info" },
   CONTENT_READY: { label: "Content Ready", icon: FileText, variant: "info" },
-  CUSTOMER_REVIEW: { label: "Customer Review", icon: Clock, variant: "warning" },
+  CUSTOMER_REVIEW: {
+    label: "Customer Review",
+    icon: Clock,
+    variant: "warning",
+  },
   APPROVED: { label: "Approved", icon: CheckCircle, variant: "info" },
   PUBLISHED: { label: "Published", icon: CheckCircle, variant: "success" },
   VERIFIED: { label: "Verified", icon: CheckCircle, variant: "success" },
@@ -77,7 +101,15 @@ const statusConfig: Record<
 
 const WORKFLOW_STEPS = [
   { statuses: ["SUBMITTED"], label: "Accept" },
-  { statuses: ["ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY"], label: "Create Content" },
+  {
+    statuses: [
+      "ACCEPTED",
+      "CONTENT_REQUESTED",
+      "CONTENT_CREATION",
+      "CONTENT_READY",
+    ],
+    label: "Create Content",
+  },
   { statuses: ["CUSTOMER_REVIEW", "APPROVED"], label: "Review" },
   { statuses: ["PUBLISHED", "VERIFIED"], label: "Publish" },
   { statuses: ["DELIVERED", "SETTLED", "COMPLETED"], label: "Complete" },
@@ -88,11 +120,7 @@ function getWorkflowStep(status: OrderStatus): number {
   return stepIndex === -1 ? 0 : stepIndex
 }
 
-function OrderCard({
-  order,
-}: {
-  order: any
-}) {
+function OrderCard({ order }: { order: any }) {
   const config = statusConfig[order.status as OrderStatus] || statusConfig.DRAFT
   const Icon = config.icon
   const currentStep = getWorkflowStep(order.status)
@@ -113,10 +141,18 @@ function OrderCard({
       <CardContent className="p-4">
         <div className="mb-4">
           <h3 className="font-medium">
-            {(order.items?.[0]?.serviceType ?? order.type ?? order.serviceType ?? "Order").replace(/_/g, " ")}
+            {(
+              order.items?.[0]?.serviceType ??
+              order.type ??
+              order.serviceType ??
+              "Order"
+            ).replace(/_/g, " ")}
           </h3>
           <p className="text-sm text-muted-foreground">
-            {order.customerName ?? order.customer?.name ?? order.customer?.email ?? "—"}
+            {order.customerName ??
+              order.customer?.name ??
+              order.customer?.email ??
+              "—"}
           </p>
         </div>
 
@@ -126,12 +162,17 @@ function OrderCard({
             {order.website?.url ?? order.items?.[0]?.website?.url ?? "—"}
           </div>
           <span className="font-medium">
-            ${Number(order.totalAmount ?? order.items?.[0]?.budget ?? 0).toFixed(2)}
+            $
+            {Number(order.totalAmount ?? order.items?.[0]?.budget ?? 0).toFixed(
+              2,
+            )}
           </span>
         </div>
 
         <div className="mb-4">
-          <p className="mb-2 text-xs text-muted-foreground">Workflow Progress</p>
+          <p className="mb-2 text-xs text-muted-foreground">
+            Workflow Progress
+          </p>
           <div className="flex items-center gap-1">
             {WORKFLOW_STEPS.map((step, index) => (
               <div key={step.label} className="flex items-center">
@@ -181,7 +222,12 @@ export default function OrdersPage() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
   const [statusFilter, setStatusFilter] = useState<OrderStatus | "ALL">("ALL")
 
-  const { data: orders = [], isLoading, refetch, error } = useQuery({
+  const {
+    data: orders = [],
+    isLoading,
+    refetch,
+    error,
+  } = useQuery({
     queryKey: ["publisher-orders"],
     queryFn: () => api.orders.list(),
   })
@@ -189,7 +235,9 @@ export default function OrdersPage() {
   // Orders awaiting publisher action (unsettled/in-flight) rank above closed
   // ones, newest first — so work to do is always at the top.
   const filteredOrders = sortOrdersByPriority(
-    orders.filter((order: any) => statusFilter === "ALL" || order.status === statusFilter),
+    orders.filter(
+      (order: any) => statusFilter === "ALL" || order.status === statusFilter,
+    ),
   )
 
   if (error)
@@ -301,7 +349,9 @@ export default function OrdersPage() {
             </TableHeader>
             <TableBody>
               {filteredOrders.map((order: any) => {
-                const config = statusConfig[order.status as OrderStatus] || statusConfig.DRAFT
+                const config =
+                  statusConfig[order.status as OrderStatus] ||
+                  statusConfig.DRAFT
                 return (
                   <TableRow key={order.id}>
                     <TableCell className="font-mono text-xs">
@@ -314,7 +364,9 @@ export default function OrdersPage() {
                         "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {order.items?.[0]?.website?.url ?? order.website?.url ?? "—"}
+                      {order.items?.[0]?.website?.url ??
+                        order.website?.url ??
+                        "—"}
                     </TableCell>
                     <TableCell>
                       <Badge variant={config.variant}>{config.label}</Badge>
@@ -323,8 +375,8 @@ export default function OrdersPage() {
                       {order.totalAmount
                         ? `$${Number(order.totalAmount).toFixed(2)}`
                         : order.price
-                        ? `$${order.price}`
-                        : "—"}
+                          ? `$${order.price}`
+                          : "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {order.dueDate

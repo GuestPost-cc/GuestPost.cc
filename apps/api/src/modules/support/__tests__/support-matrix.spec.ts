@@ -15,10 +15,10 @@
  */
 import { ForbiddenException, NotFoundException } from "@nestjs/common"
 import {
-  SupportService,
-  resolveParticipantRole,
   buildActorSnapshot,
+  resolveParticipantRole,
   type SupportActor,
+  SupportService,
 } from "../support.service"
 
 type Channel = "PUBLISHER" | "PLATFORM"
@@ -65,24 +65,28 @@ function mockPrisma(opts: {
   return {
     _created: created,
     ticket: {
-      findUnique: jest.fn().mockImplementation(async ({ where, include }: any) => {
-        if (!include) return { ...opts.ticket }
-        return {
-          ...opts.ticket,
-          organization: {
-            memberships: (opts.customerOrgMembers ?? [opts.ticket.userId, "owner_orgA"]).map(
-              (userId) => ({ userId, status: "ACTIVE" }),
-            ),
-          },
-          assignedPublisher: opts.ticket.assignedPublisherId
-            ? {
-                publisherMemberships: (opts.publisherMembers ?? ["pubowner1"]).map((userId) => ({
-                  userId,
-                })),
-              }
-            : null,
-        }
-      }),
+      findUnique: jest
+        .fn()
+        .mockImplementation(async ({ where, include }: any) => {
+          if (!include) return { ...opts.ticket }
+          return {
+            ...opts.ticket,
+            organization: {
+              memberships: (
+                opts.customerOrgMembers ?? [opts.ticket.userId, "owner_orgA"]
+              ).map((userId) => ({ userId, status: "ACTIVE" })),
+            },
+            assignedPublisher: opts.ticket.assignedPublisherId
+              ? {
+                  publisherMemberships: (
+                    opts.publisherMembers ?? ["pubowner1"]
+                  ).map((userId) => ({
+                    userId,
+                  })),
+                }
+              : null,
+          }
+        }),
       findFirst: jest.fn(),
       findUniqueOrThrow: jest.fn().mockResolvedValue({ ...opts.ticket }),
       update: jest.fn().mockResolvedValue({}),
@@ -100,7 +104,9 @@ function mockPrisma(opts: {
     staffMembership: {
       findMany: jest.fn().mockImplementation(async ({ where }: any) => {
         if (where.role === "SUPER_ADMIN") {
-          return (opts.staff?.superAdmins ?? ["admin1"]).map((userId) => ({ userId }))
+          return (opts.staff?.superAdmins ?? ["admin1"]).map((userId) => ({
+            userId,
+          }))
         }
         if (where.role === "FINANCE") {
           return (opts.staff?.finance ?? ["fin1"]).map((userId) => ({ userId }))
@@ -170,24 +176,41 @@ describe("SupportService.addMessage — reply matrix", () => {
     it("can post PUBLIC on their org's ticket", async () => {
       const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-      const msg = await svc.addMessage(ticket.id, customerActor(), { content: "hi" })
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
+      const msg = await svc.addMessage(ticket.id, customerActor(), {
+        content: "hi",
+      })
       expect(msg.visibility).toBe("PUBLIC")
     })
 
     it("cannot post INTERNAL", async () => {
       const ticket = makeTicket()
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
       await expect(
-        svc.addMessage(ticket.id, customerActor(), { content: "secret", visibility: "INTERNAL" }),
+        svc.addMessage(ticket.id, customerActor(), {
+          content: "secret",
+          visibility: "INTERNAL",
+        }),
       ).rejects.toBeInstanceOf(ForbiddenException)
     })
 
     it("cannot read or reply to another org's ticket", async () => {
       const ticket = makeTicket({ organizationId: "orgB" })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
       await expect(
         svc.addMessage(ticket.id, customerActor("orgA"), { content: "hi" }),
       ).rejects.toBeInstanceOf(NotFoundException)
@@ -202,24 +225,40 @@ describe("SupportService.addMessage — reply matrix", () => {
         assignedPublisherId: "pub1",
       })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-      const msg = await svc.addMessage(ticket.id, staffActor("FINANCE"), { content: "billing reply" })
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
+      const msg = await svc.addMessage(ticket.id, staffActor("FINANCE"), {
+        content: "billing reply",
+      })
       expect(msg.visibility).toBe("PUBLIC")
     })
 
     it("CANNOT post PUBLIC on a PLATFORM ticket", async () => {
       const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
       await expect(
-        svc.addMessage(ticket.id, staffActor("FINANCE"), { content: "should fail" }),
+        svc.addMessage(ticket.id, staffActor("FINANCE"), {
+          content: "should fail",
+        }),
       ).rejects.toBeInstanceOf(ForbiddenException)
     })
 
     it("CAN post INTERNAL on a PLATFORM ticket (escape valve)", async () => {
       const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
       const msg = await svc.addMessage(ticket.id, staffActor("FINANCE"), {
         content: "flag for admin",
         visibility: "INTERNAL",
@@ -230,38 +269,71 @@ describe("SupportService.addMessage — reply matrix", () => {
 
   describe("OPERATIONS", () => {
     it("can post PUBLIC + INTERNAL on a ticket assigned to them", async () => {
-      const ticket = makeTicket({ fulfillmentChannel: "PLATFORM", assignedToUserId: "opsA" })
-      const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-
-      const pub = await svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsA"), {
-        content: "on it",
+      const ticket = makeTicket({
+        fulfillmentChannel: "PLATFORM",
+        assignedToUserId: "opsA",
       })
+      const prisma = mockPrisma({ ticket })
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
+
+      const pub = await svc.addMessage(
+        ticket.id,
+        staffActor("OPERATIONS", "opsA"),
+        {
+          content: "on it",
+        },
+      )
       expect(pub.visibility).toBe("PUBLIC")
 
-      const internal = await svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsA"), {
-        content: "fyi internal",
-        visibility: "INTERNAL",
-      })
+      const internal = await svc.addMessage(
+        ticket.id,
+        staffActor("OPERATIONS", "opsA"),
+        {
+          content: "fyi internal",
+          visibility: "INTERNAL",
+        },
+      )
       expect(internal.visibility).toBe("INTERNAL")
     })
 
     it("CANNOT post on a PLATFORM ticket assigned to another Ops (unassigned pool is read-only)", async () => {
-      const ticket = makeTicket({ fulfillmentChannel: "PLATFORM", assignedToUserId: "opsA" })
+      const ticket = makeTicket({
+        fulfillmentChannel: "PLATFORM",
+        assignedToUserId: "opsA",
+      })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
       await expect(
-        svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsB"), { content: "claim" }),
+        svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsB"), {
+          content: "claim",
+        }),
       ).rejects.toBeInstanceOf(NotFoundException) // assertVisible refuses first
     })
 
     it("CANNOT post on unassigned platform pool until claimed", async () => {
-      const ticket = makeTicket({ fulfillmentChannel: "PLATFORM", assignedToUserId: null })
+      const ticket = makeTicket({
+        fulfillmentChannel: "PLATFORM",
+        assignedToUserId: null,
+      })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
       // Visible (unassigned pool), but reply is gated:
       await expect(
-        svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsB"), { content: "I'll take it" }),
+        svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsB"), {
+          content: "I'll take it",
+        }),
       ).rejects.toBeInstanceOf(ForbiddenException)
     })
   })
@@ -274,8 +346,14 @@ describe("SupportService.addMessage — reply matrix", () => {
         assignedPublisherId: "pub1",
       })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-      const msg = await svc.addMessage(ticket.id, publisherActor("pub1"), { content: "on it" })
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
+      const msg = await svc.addMessage(ticket.id, publisherActor("pub1"), {
+        content: "on it",
+      })
       expect(msg.visibility).toBe("PUBLIC")
     })
 
@@ -285,7 +363,11 @@ describe("SupportService.addMessage — reply matrix", () => {
         assignedPublisherId: "pub1",
       })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
       await expect(
         svc.addMessage(ticket.id, publisherActor("pub1"), {
           content: "leak attempt",
@@ -300,7 +382,11 @@ describe("SupportService.addMessage — reply matrix", () => {
         assignedPublisherId: "pub1",
       })
       const prisma = mockPrisma({ ticket })
-      const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+      const svc = new SupportService(
+        prisma as any,
+        mockQueue() as any,
+        mockAudit() as any,
+      )
       await expect(
         svc.addMessage(ticket.id, publisherActor("pub2"), { content: "hi" }),
       ).rejects.toBeInstanceOf(NotFoundException)
@@ -313,15 +399,26 @@ describe("SupportService.getTicket — INTERNAL message filtering", () => {
     const ticket = makeTicket()
     const prisma = mockPrisma({ ticket })
     // Override findUnique to return both visibilities
-    ;(prisma.ticket.findUnique as jest.Mock).mockImplementationOnce(async ({ where }: any) => ({
-      ...ticket,
-      user: { id: "u1" },
-      messages: [
-        { id: "m1", content: "hi", visibility: "PUBLIC", user: { id: "u1" } },
-        { id: "m2", content: "internal", visibility: "INTERNAL", user: { id: "s1" } },
-      ],
-    }))
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+    ;(prisma.ticket.findUnique as jest.Mock).mockImplementationOnce(
+      async ({ where }: any) => ({
+        ...ticket,
+        user: { id: "u1" },
+        messages: [
+          { id: "m1", content: "hi", visibility: "PUBLIC", user: { id: "u1" } },
+          {
+            id: "m2",
+            content: "internal",
+            visibility: "INTERNAL",
+            user: { id: "s1" },
+          },
+        ],
+      }),
+    )
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
     // For CUSTOMER, the prisma query passes `where: { visibility: "PUBLIC" }`
     // — assert via the call arg.
     await svc.getTicket(ticket.id, customerActor())
@@ -332,12 +429,18 @@ describe("SupportService.getTicket — INTERNAL message filtering", () => {
   it("does NOT filter for STAFF actors", async () => {
     const ticket = makeTicket()
     const prisma = mockPrisma({ ticket })
-    ;(prisma.ticket.findUnique as jest.Mock).mockImplementationOnce(async () => ({
-      ...ticket,
-      user: { id: "u1" },
-      messages: [],
-    }))
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+    ;(prisma.ticket.findUnique as jest.Mock).mockImplementationOnce(
+      async () => ({
+        ...ticket,
+        user: { id: "u1" },
+        messages: [],
+      }),
+    )
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
     await svc.getTicket(ticket.id, staffActor("FINANCE"))
     const call = (prisma.ticket.findUnique as jest.Mock).mock.calls[0][0]
     expect(call.include.messages.where).toBeUndefined()
@@ -357,8 +460,14 @@ describe("SupportService.addMessage — notification fan-out", () => {
       staff: { superAdmins: ["admin1"], finance: ["fin1", "fin2"] },
     })
     const queue = mockQueue()
-    const svc = new SupportService(prisma as any, queue as any, mockAudit() as any)
-    await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "admin1"), { content: "answer" })
+    const svc = new SupportService(
+      prisma as any,
+      queue as any,
+      mockAudit() as any,
+    )
+    await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "admin1"), {
+      content: "answer",
+    })
 
     const recipients = queue._jobs.map((j) => j[2].userId).sort()
     expect(recipients).toEqual(["customer1", "ops1", "orgOwner"].sort())
@@ -379,8 +488,14 @@ describe("SupportService.addMessage — notification fan-out", () => {
       staff: { superAdmins: ["admin1"], finance: ["fin1"] },
     })
     const queue = mockQueue()
-    const svc = new SupportService(prisma as any, queue as any, mockAudit() as any)
-    await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "admin1"), { content: "reply" })
+    const svc = new SupportService(
+      prisma as any,
+      queue as any,
+      mockAudit() as any,
+    )
+    await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "admin1"), {
+      content: "reply",
+    })
 
     const recipients = queue._jobs.map((j) => j[2].userId).sort()
     expect(recipients).toEqual(
@@ -401,7 +516,11 @@ describe("SupportService.addMessage — notification fan-out", () => {
       staff: { superAdmins: ["admin1"], finance: ["fin1"] },
     })
     const queue = mockQueue()
-    const svc = new SupportService(prisma as any, queue as any, mockAudit() as any)
+    const svc = new SupportService(
+      prisma as any,
+      queue as any,
+      mockAudit() as any,
+    )
     await svc.addMessage(ticket.id, staffActor("FINANCE", "fin1"), {
       content: "flag for admin",
       visibility: "INTERNAL",
@@ -426,7 +545,11 @@ describe("SupportService.addMessage — notification fan-out", () => {
       staff: { superAdmins: ["admin1"], finance: ["fin1", "fin2"] },
     })
     const queue = mockQueue()
-    const svc = new SupportService(prisma as any, queue as any, mockAudit() as any)
+    const svc = new SupportService(
+      prisma as any,
+      queue as any,
+      mockAudit() as any,
+    )
     await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "admin1"), {
       content: "fyi finance",
       visibility: "INTERNAL",
@@ -451,9 +574,15 @@ describe("SupportService.addMessage — notification fan-out", () => {
       staff: { superAdmins: ["admin1"], finance: [] },
     })
     const queue = mockQueue()
-    const svc = new SupportService(prisma as any, queue as any, mockAudit() as any)
+    const svc = new SupportService(
+      prisma as any,
+      queue as any,
+      mockAudit() as any,
+    )
     // Ops replies — admin1 should be notified ONCE despite holding two roles.
-    await svc.addMessage(ticket.id, staffActor("OPERATIONS", "ops1"), { content: "update" })
+    await svc.addMessage(ticket.id, staffActor("OPERATIONS", "ops1"), {
+      content: "update",
+    })
 
     const recipients = queue._jobs.map((j) => j[2].userId)
     const admin1Count = recipients.filter((r) => r === "admin1").length
@@ -491,8 +620,14 @@ describe("SupportService.addMessage — participantRole + messageType snapshot",
     const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
     const prisma = mockPrisma({ ticket })
     const audit = mockAudit()
-    const svc = new SupportService(prisma as any, mockQueue() as any, audit as any)
-    const msg = await svc.addMessage(ticket.id, customerActor(), { content: "hi" })
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      audit as any,
+    )
+    const msg = await svc.addMessage(ticket.id, customerActor(), {
+      content: "hi",
+    })
     expect(msg.participantRole).toBe("CUSTOMER")
     expect(msg.messageType).toBe("MESSAGE")
     expect(msg.visibility).toBe("PUBLIC")
@@ -508,19 +643,36 @@ describe("SupportService.addMessage — participantRole + messageType snapshot",
       assignedPublisherId: "pub1",
     })
     const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-    const msg = await svc.addMessage(ticket.id, publisherActor("pub1"), { content: "ok" })
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
+    const msg = await svc.addMessage(ticket.id, publisherActor("pub1"), {
+      content: "ok",
+    })
     expect(msg.participantRole).toBe("PUBLISHER")
     expect(msg.messageType).toBe("MESSAGE")
   })
 
   it("OPS PUBLIC on assigned ticket → (OPS, MESSAGE, PUBLIC)", async () => {
-    const ticket = makeTicket({ fulfillmentChannel: "PLATFORM", assignedToUserId: "opsA" })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-    const msg = await svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsA"), {
-      content: "fixing it",
+    const ticket = makeTicket({
+      fulfillmentChannel: "PLATFORM",
+      assignedToUserId: "opsA",
     })
+    const prisma = mockPrisma({ ticket })
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
+    const msg = await svc.addMessage(
+      ticket.id,
+      staffActor("OPERATIONS", "opsA"),
+      {
+        content: "fixing it",
+      },
+    )
     expect(msg.participantRole).toBe("OPS")
     expect(msg.messageType).toBe("MESSAGE")
   })
@@ -528,10 +680,18 @@ describe("SupportService.addMessage — participantRole + messageType snapshot",
   it("ADMIN PUBLIC → (ADMIN, MESSAGE, PUBLIC)", async () => {
     const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
     const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-    const msg = await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "adm1"), {
-      content: "stepping in",
-    })
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
+    const msg = await svc.addMessage(
+      ticket.id,
+      staffActor("SUPER_ADMIN", "adm1"),
+      {
+        content: "stepping in",
+      },
+    )
     expect(msg.participantRole).toBe("ADMIN")
     expect(msg.messageType).toBe("MESSAGE")
   })
@@ -542,7 +702,11 @@ describe("SupportService.addMessage — participantRole + messageType snapshot",
       assignedPublisherId: "pub1",
     })
     const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
     const msg = await svc.addMessage(ticket.id, staffActor("FINANCE"), {
       content: "billing reply",
     })
@@ -557,7 +721,11 @@ describe("SupportService.addMessage — participantRole + messageType snapshot",
     const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
     const prisma = mockPrisma({ ticket })
     const audit = mockAudit()
-    const svc = new SupportService(prisma as any, mockQueue() as any, audit as any)
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      audit as any,
+    )
     const msg = await svc.addMessage(ticket.id, staffActor("FINANCE"), {
       content: "Settlement amount looks off, flagging for admin.",
       visibility: "INTERNAL",
@@ -571,13 +739,24 @@ describe("SupportService.addMessage — participantRole + messageType snapshot",
   })
 
   it("OPS INTERNAL on assigned PLATFORM → (OPS, INTERNAL_NOTE, INTERNAL)", async () => {
-    const ticket = makeTicket({ fulfillmentChannel: "PLATFORM", assignedToUserId: "opsA" })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-    const msg = await svc.addMessage(ticket.id, staffActor("OPERATIONS", "opsA"), {
-      content: "Publisher unresponsive — escalating",
-      visibility: "INTERNAL",
+    const ticket = makeTicket({
+      fulfillmentChannel: "PLATFORM",
+      assignedToUserId: "opsA",
     })
+    const prisma = mockPrisma({ ticket })
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
+    const msg = await svc.addMessage(
+      ticket.id,
+      staffActor("OPERATIONS", "opsA"),
+      {
+        content: "Publisher unresponsive — escalating",
+        visibility: "INTERNAL",
+      },
+    )
     expect(msg.participantRole).toBe("OPS")
     expect(msg.messageType).toBe("INTERNAL_NOTE")
   })
@@ -585,12 +764,23 @@ describe("SupportService.addMessage — participantRole + messageType snapshot",
   it("snapshot is immutable: role at write time persists even when actor role would later differ", async () => {
     // Today the actor is OPS. Tomorrow they get promoted to SUPER_ADMIN. The
     // row written today must still say OPS — we never derive dynamically.
-    const ticket = makeTicket({ fulfillmentChannel: "PLATFORM", assignedToUserId: "alice" })
-    const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-    const msg = await svc.addMessage(ticket.id, staffActor("OPERATIONS", "alice"), {
-      content: "Delivery verified",
+    const ticket = makeTicket({
+      fulfillmentChannel: "PLATFORM",
+      assignedToUserId: "alice",
     })
+    const prisma = mockPrisma({ ticket })
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
+    const msg = await svc.addMessage(
+      ticket.id,
+      staffActor("OPERATIONS", "alice"),
+      {
+        content: "Delivery verified",
+      },
+    )
     expect(msg.participantRole).toBe("OPS")
     // The row in the DB is the snapshot — checked via the mock's _created log.
     expect(prisma._created[0].participantRole).toBe("OPS")
@@ -617,7 +807,9 @@ describe("buildActorSnapshot (pure helper)", () => {
     })
   })
   it("PUBLISHER PUBLISHER_OWNER → publisherRole:PUBLISHER_OWNER", () => {
-    expect(buildActorSnapshot(publisherActor("pub1", "p1", "PUBLISHER_OWNER"))).toEqual({
+    expect(
+      buildActorSnapshot(publisherActor("pub1", "p1", "PUBLISHER_OWNER")),
+    ).toEqual({
       kind: "PUBLISHER",
       staffRole: null,
       organizationRole: null,
@@ -625,7 +817,9 @@ describe("buildActorSnapshot (pure helper)", () => {
     })
   })
   it("PUBLISHER PUBLISHER_MEMBER → publisherRole:PUBLISHER_MEMBER", () => {
-    expect(buildActorSnapshot(publisherActor("pub1", "p1", "PUBLISHER_MEMBER"))).toEqual({
+    expect(
+      buildActorSnapshot(publisherActor("pub1", "p1", "PUBLISHER_MEMBER")),
+    ).toEqual({
       kind: "PUBLISHER",
       staffRole: null,
       organizationRole: null,
@@ -657,7 +851,11 @@ describe("buildActorSnapshot (pure helper)", () => {
     })
   })
   it("missing optional roles default to null (stable JSON shape)", () => {
-    const bare: SupportActor = { userId: "u1", kind: "CUSTOMER", organizationId: "orgA" }
+    const bare: SupportActor = {
+      userId: "u1",
+      kind: "CUSTOMER",
+      organizationId: "orgA",
+    }
     expect(buildActorSnapshot(bare)).toEqual({
       kind: "CUSTOMER",
       staffRole: null,
@@ -671,8 +869,14 @@ describe("SupportService.addMessage — actorSnapshot persisted on row", () => {
   it("CUSTOMER OWNER → row carries { kind:CUSTOMER, organizationRole:OWNER }", async () => {
     const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
     const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-    await svc.addMessage(ticket.id, customerActor("orgA", "c1", "OWNER"), { content: "hi" })
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
+    await svc.addMessage(ticket.id, customerActor("orgA", "c1", "OWNER"), {
+      content: "hi",
+    })
     expect(prisma._created[0].actorSnapshot).toEqual({
       kind: "CUSTOMER",
       staffRole: null,
@@ -688,10 +892,18 @@ describe("SupportService.addMessage — actorSnapshot persisted on row", () => {
       assignedPublisherId: "pub1",
     })
     const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
-    await svc.addMessage(ticket.id, publisherActor("pub1", "p1", "PUBLISHER_MEMBER"), {
-      content: "on it",
-    })
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
+    await svc.addMessage(
+      ticket.id,
+      publisherActor("pub1", "p1", "PUBLISHER_MEMBER"),
+      {
+        content: "on it",
+      },
+    )
     expect(prisma._created[0].actorSnapshot).toEqual({
       kind: "PUBLISHER",
       staffRole: null,
@@ -704,7 +916,11 @@ describe("SupportService.addMessage — actorSnapshot persisted on row", () => {
     const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
     const prisma = mockPrisma({ ticket })
     const audit = mockAudit()
-    const svc = new SupportService(prisma as any, mockQueue() as any, audit as any)
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      audit as any,
+    )
     await svc.addMessage(ticket.id, staffActor("FINANCE"), {
       content: "settlement amount off",
       visibility: "INTERNAL",
@@ -730,7 +946,11 @@ describe("SupportService.addMessage — actorSnapshot persisted on row", () => {
     // StaffMembership history.
     const ticket = makeTicket({ fulfillmentChannel: "PLATFORM" })
     const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
     await svc.addMessage(ticket.id, staffActor("SUPER_ADMIN", "adm1"), {
       content: "stepping in",
     })
@@ -742,14 +962,23 @@ describe("SupportService.addMessage — actorSnapshot persisted on row", () => {
     // If we ever mutate the actor object post-write (unlikely but defensible),
     // the row's snapshot must be unaffected. Verifies we're storing a value,
     // not holding a reference.
-    const ticket = makeTicket({ fulfillmentChannel: "PUBLISHER", assignedPublisherId: "pub1" })
+    const ticket = makeTicket({
+      fulfillmentChannel: "PUBLISHER",
+      assignedPublisherId: "pub1",
+    })
     const prisma = mockPrisma({ ticket })
-    const svc = new SupportService(prisma as any, mockQueue() as any, mockAudit() as any)
+    const svc = new SupportService(
+      prisma as any,
+      mockQueue() as any,
+      mockAudit() as any,
+    )
     const actor = publisherActor("pub1", "p1", "PUBLISHER_OWNER")
     await svc.addMessage(ticket.id, actor, { content: "ok" })
     // Mutate the live actor after the write.
     ;(actor as any).publisherRole = "PUBLISHER_MEMBER"
     // The persisted row still reflects what was true at write time.
-    expect(prisma._created[0].actorSnapshot.publisherRole).toBe("PUBLISHER_OWNER")
+    expect(prisma._created[0].actorSnapshot.publisherRole).toBe(
+      "PUBLISHER_OWNER",
+    )
   })
 })

@@ -1,25 +1,25 @@
 "use client"
 
-import Link from "next/link"
-import { useRouter, usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
 import { cn, Drawer, DrawerContent, DrawerTitle } from "@guestpost/ui"
 import {
-  LayoutDashboard,
-  ShoppingCart,
-  DollarSign,
-  LogOut,
-  Globe,
-  Wallet,
-  CreditCard,
-  Settings,
   ArrowUpRight,
-  Store,
+  CreditCard,
+  DollarSign,
+  Globe,
+  LayoutDashboard,
+  LogOut,
   Menu,
+  Settings,
+  ShoppingCart,
+  Store,
+  Wallet,
   X,
 } from "lucide-react"
-import { useAuth } from "../../lib/auth"
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
 import { Notifications } from "../../components/notifications"
+import { useAuth } from "../../lib/auth"
 
 const navItems = [
   { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
@@ -28,11 +28,19 @@ const navItems = [
   { href: "/dashboard/listings", label: "Listings", icon: Store },
   { href: "/dashboard/earnings", label: "Earnings", icon: DollarSign },
   { href: "/dashboard/withdrawals", label: "Withdrawals", icon: Wallet },
-  { href: "/dashboard/payout-methods", label: "Payout Methods", icon: CreditCard },
+  {
+    href: "/dashboard/payout-methods",
+    label: "Payout Methods",
+    icon: CreditCard,
+  },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   const { user, loading, signOut } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -44,13 +52,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Pathname-auto-close — lives at the layout level so @guestpost/ui
   // stays framework-agnostic.
-  useEffect(() => { setMobileOpen(false) }, [pathname])
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [])
 
-  if (loading) return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-    </div>
-  )
+  if (loading)
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    )
   if (!user) return null
   // Local non-null alias so the nested SidebarContents closure has a
   // narrowed type without each ref needing a `!` non-null assertion.
@@ -60,7 +71,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between border-b px-6 py-5">
-          <Link href="/dashboard" className="flex items-center gap-2 font-bold tracking-tight">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 font-bold tracking-tight"
+          >
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <ArrowUpRight className="h-4 w-4" />
             </div>
@@ -79,7 +93,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
           {navItems.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href))
             return (
               <Link
                 key={item.href}
@@ -100,7 +116,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="border-t p-4">
           <div className="flex items-center gap-2 rounded-lg bg-card p-3">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">{u.name ?? u.email}</p>
+              <p className="truncate text-sm font-medium">
+                {u.name ?? u.email}
+              </p>
               <p className="text-xs text-muted-foreground">Publisher</p>
             </div>
             <Notifications />

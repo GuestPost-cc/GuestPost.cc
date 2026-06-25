@@ -1,4 +1,10 @@
-import { IsEnum, IsOptional, IsString, MaxLength, MinLength } from "class-validator"
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator"
 
 // Phase 6.6: visibility scope for a ticket reply.
 //   PUBLIC   — customer-visible message (default). Default participants are

@@ -1,15 +1,24 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, ForbiddenException } from "@nestjs/common"
-import { SettlementsService } from "./settlements.service"
-import { CurrentUser } from "../../common/decorators/current-user.decorator"
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from "@nestjs/common"
 import { ActorType } from "../../common/decorators/actor-type.decorator"
-import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
-import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
-import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
 import { RequireOrderOwnership } from "../../common/decorators/order-ownership.decorator"
+import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
+import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
+import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { OrderOwnershipGuard } from "../../common/guards/order-ownership.guard"
-import { SettlementReasonDto } from "./dto/settlement-reason.dto"
+import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import type { SettlementReasonDto } from "./dto/settlement-reason.dto"
+import type { SettlementsService } from "./settlements.service"
 
 @Controller("settlements")
 export class SettlementsController {
@@ -22,7 +31,13 @@ export class SettlementsController {
   @MemberRoles("OWNER", "MEMBER")
   @RequireOrderOwnership()
   customerApprove(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.settlements.customerApprove(id, user.id, user.organizationId, user.role, user.customerRole)
+    return this.settlements.customerApprove(
+      id,
+      user.id,
+      user.organizationId,
+      user.role,
+      user.customerRole,
+    )
   }
 
   // Staff approves settlement
@@ -44,14 +59,22 @@ export class SettlementsController {
   @Post(":id/cancel")
   @UseGuards(StaffRolesGuard)
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  cancel(@Param("id") id: string, @Body() body: SettlementReasonDto, @CurrentUser() user: any) {
+  cancel(
+    @Param("id") id: string,
+    @Body() body: SettlementReasonDto,
+    @CurrentUser() user: any,
+  ) {
     return this.settlements.cancelSettlement(id, user.id, body.reason)
   }
 
   @Post(":id/return-to-review")
   @UseGuards(StaffRolesGuard)
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  returnToReview(@Param("id") id: string, @Body() body: SettlementReasonDto, @CurrentUser() user: any) {
+  returnToReview(
+    @Param("id") id: string,
+    @Body() body: SettlementReasonDto,
+    @CurrentUser() user: any,
+  ) {
     return this.settlements.returnToReview(id, user.id, body.reason)
   }
 

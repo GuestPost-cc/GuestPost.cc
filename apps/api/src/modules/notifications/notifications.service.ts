@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
+import type { PrismaService } from "../../common/prisma.service"
 
 // Read surface over Notification rows written by the worker and services.
 // Strictly self-scoped: every query filters by the authenticated userId —
@@ -8,7 +8,15 @@ import { PrismaService } from "../../common/prisma.service"
 export class NotificationsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(userId: string, params: { unreadOnly?: boolean; type?: string; page?: number; limit?: number }) {
+  async list(
+    userId: string,
+    params: {
+      unreadOnly?: boolean
+      type?: string
+      page?: number
+      limit?: number
+    },
+  ) {
     const page = Math.max(params.page ?? 1, 1)
     const limit = Math.min(Math.max(params.limit ?? 20, 1), 100)
     const where: any = { userId }
@@ -26,11 +34,20 @@ export class NotificationsService {
       this.prisma.notification.count({ where: { userId, read: false } }),
     ])
 
-    return { items, total, unreadCount, page, limit, totalPages: Math.ceil(total / limit) || 1 }
+    return {
+      items,
+      total,
+      unreadCount,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
+    }
   }
 
   async unreadCount(userId: string) {
-    const count = await this.prisma.notification.count({ where: { userId, read: false } })
+    const count = await this.prisma.notification.count({
+      where: { userId, read: false },
+    })
     return { count }
   }
 
@@ -39,7 +56,8 @@ export class NotificationsService {
       where: { id, userId },
       data: { read: true },
     })
-    if (result.count === 0) throw new NotFoundException("Notification not found")
+    if (result.count === 0)
+      throw new NotFoundException("Notification not found")
     return { ok: true }
   }
 

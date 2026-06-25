@@ -25,8 +25,8 @@
  * Promise.allSettled race" integration belongs in the manual-smoke step or
  * the future Phase 7.10.2 Nest+supertest harness — not jest.
  */
-import { readFileSync, readdirSync } from "fs"
-import { join } from "path"
+import { readdirSync, readFileSync } from "node:fs"
+import { join } from "node:path"
 
 describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
   const servicePath = join(
@@ -48,7 +48,9 @@ describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
       expect(endIdx).toBeGreaterThan(startIdx)
       const block = serviceSource.slice(startIdx, endIdx)
       expect(block).toMatch(/try\s*\{[\s\S]*?await\s+this\.upsertAssignment\(/)
-      expect(block).toMatch(/catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(["']Order is already assigned["']\)/)
+      expect(block).toMatch(
+        /catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(["']Order is already assigned["']\)/,
+      )
     })
 
     it("claim() NO LONGER contains the pre-7.14 findFirst pre-check (regression guard)", () => {
@@ -57,7 +59,9 @@ describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
       const block = serviceSource.slice(startIdx, endIdx)
       // The bug: a findFirst-on-fulfillmentAssignment outside the tx.
       // The fix removes it entirely; the constraint is now authoritative.
-      expect(block).not.toMatch(/this\.prisma\.fulfillmentAssignment\.findFirst/)
+      expect(block).not.toMatch(
+        /this\.prisma\.fulfillmentAssignment\.findFirst/,
+      )
     })
 
     it("assign() wraps upsertAssignment in try/catch and maps P2002 to the concurrent-change message", () => {
@@ -67,7 +71,9 @@ describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
       expect(endIdx).toBeGreaterThan(startIdx)
       const block = serviceSource.slice(startIdx, endIdx)
       expect(block).toMatch(/try\s*\{[\s\S]*?await\s+this\.upsertAssignment\(/)
-      expect(block).toMatch(/catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(["']Order assignment changed concurrently[^"']*["']\)/)
+      expect(block).toMatch(
+        /catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(["']Order assignment changed concurrently[^"']*["']\)/,
+      )
     })
 
     it("reassign() wraps upsertAssignment in try/catch and maps P2002 to the concurrent-change message", () => {
@@ -75,7 +81,9 @@ describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
       expect(startIdx).toBeGreaterThan(-1)
       const block = serviceSource.slice(startIdx, startIdx + 800)
       expect(block).toMatch(/try\s*\{[\s\S]*?await\s+this\.upsertAssignment\(/)
-      expect(block).toMatch(/catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(["']Order assignment changed concurrently[^"']*["']\)/)
+      expect(block).toMatch(
+        /catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(["']Order assignment changed concurrently[^"']*["']\)/,
+      )
     })
   })
 
@@ -97,7 +105,10 @@ describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
         d.includes("phase714_fulfillment_assignment_active_orderid_unique"),
       )
       expect(phase714Dirs.length).toBe(1)
-      const migSql = readFileSync(join(migrationsDir, phase714Dirs[0], "migration.sql"), "utf-8")
+      const migSql = readFileSync(
+        join(migrationsDir, phase714Dirs[0], "migration.sql"),
+        "utf-8",
+      )
       // Single-statement migration (prisma@7.8.0 wraps multi-statement files in tx — would break CONCURRENTLY)
       expect(migSql).toMatch(
         /CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS "FulfillmentAssignment_orderId_active_unique"[\s\S]*ON "FulfillmentAssignment"\("orderId"\)[\s\S]*WHERE status IN \('ASSIGNED', 'IN_PROGRESS'\)/,

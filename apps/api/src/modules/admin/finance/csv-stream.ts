@@ -35,12 +35,26 @@ export function csvRow(values: unknown[]): string {
  *
  * Header order: bucket,gross_amount,platform_fee,net_revenue,row_count,reversed_count,currency
  */
-export function streamRevenueCsv(res: Response, revenue: RevenueResponse, filename: string): void {
+export function streamRevenueCsv(
+  res: Response,
+  revenue: RevenueResponse,
+  filename: string,
+): void {
   res.setHeader("Content-Type", "text/csv; charset=utf-8")
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`)
   res.setHeader("Cache-Control", "no-store")
 
-  res.write(csvRow(["bucket", "gross_amount", "platform_fee", "net_revenue", "row_count", "reversed_count", "currency"]))
+  res.write(
+    csvRow([
+      "bucket",
+      "gross_amount",
+      "platform_fee",
+      "net_revenue",
+      "row_count",
+      "reversed_count",
+      "currency",
+    ]),
+  )
 
   for (const b of revenue.buckets) {
     res.write(
@@ -58,17 +72,41 @@ export function streamRevenueCsv(res: Response, revenue: RevenueResponse, filena
 
   // Trailer rows so the CSV alone tells the same story as the UI.
   const c = revenue.totals.current
-  res.write(csvRow(["TOTAL_CURRENT", c.grossAmount, c.platformFee, c.netRevenue, c.rowCount, c.reversedCount, c.currency]))
+  res.write(
+    csvRow([
+      "TOTAL_CURRENT",
+      c.grossAmount,
+      c.platformFee,
+      c.netRevenue,
+      c.rowCount,
+      c.reversedCount,
+      c.currency,
+    ]),
+  )
 
   if (revenue.totals.previous) {
     const p = revenue.totals.previous
-    res.write(csvRow(["TOTAL_PREVIOUS", p.grossAmount, p.platformFee, p.netRevenue, p.rowCount, p.reversedCount, p.currency]))
+    res.write(
+      csvRow([
+        "TOTAL_PREVIOUS",
+        p.grossAmount,
+        p.platformFee,
+        p.netRevenue,
+        p.rowCount,
+        p.reversedCount,
+        p.currency,
+      ]),
+    )
   }
 
   res.end()
 }
 
-export function buildRevenueCsvFilename(opts: { from?: string; to?: string; groupBy: string }): string {
+export function buildRevenueCsvFilename(opts: {
+  from?: string
+  to?: string
+  groupBy: string
+}): string {
   const f = opts.from ?? "all"
   const t = opts.to ?? "all"
   return `revenue-${f}-${t}-by-${opts.groupBy}.csv`

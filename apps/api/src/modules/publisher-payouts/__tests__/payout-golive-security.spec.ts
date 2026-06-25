@@ -1,10 +1,18 @@
-import { BadRequestException, ConflictException, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common"
-import { createHmac, createSign, generateKeyPairSync } from "crypto"
-import { PayoutWebhookController } from "../payout-webhook.controller"
-import { WisePayoutAdapter, idempotencyKeyToUuid } from "../providers/wise-payout.adapter"
-import { StripeConnectPayoutAdapter } from "../providers/stripe-connect-payout.adapter"
-import { PayoutExecutionService } from "../payout-execution.service"
+import { createHmac, createSign, generateKeyPairSync } from "node:crypto"
+import {
+  BadRequestException,
+  ConflictException,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import { PayoutExecutionService } from "../payout-execution.service"
+import { PayoutWebhookController } from "../payout-webhook.controller"
+import { StripeConnectPayoutAdapter } from "../providers/stripe-connect-payout.adapter"
+import {
+  idempotencyKeyToUuid,
+  WisePayoutAdapter,
+} from "../providers/wise-payout.adapter"
 
 const ORIGINAL_ENV = { ...process.env }
 
@@ -20,7 +28,10 @@ describe("PayoutWebhookController — signature verification", () => {
   // normalizeProviderWebhook's envelope-or-inner tolerance. The Stripe-specific
   // "queues a correctly signed Stripe webhook" test overrides with the real
   // Stripe envelope shape so the Phase 8.3 jobId dedup path is exercised.
-  const payload = JSON.stringify({ data: { id: "transfer-1", status: "COMPLETED" }, event: "transfer.state-change" })
+  const payload = JSON.stringify({
+    data: { id: "transfer-1", status: "COMPLETED" },
+    event: "transfer.state-change",
+  })
   const rawBody = Buffer.from(payload, "utf8")
 
   beforeEach(() => {
@@ -28,8 +39,14 @@ describe("PayoutWebhookController — signature verification", () => {
     controller = new PayoutWebhookController(queueMock)
   })
 
-  function stripeSig(secret: string, body: string, timestamp = Math.floor(Date.now() / 1000)) {
-    const v1 = createHmac("sha256", secret).update(`${timestamp}.${body}`).digest("hex")
+  function stripeSig(
+    secret: string,
+    body: string,
+    timestamp = Math.floor(Date.now() / 1000),
+  ) {
+    const v1 = createHmac("sha256", secret)
+      .update(`${timestamp}.${body}`)
+      .digest("hex")
     return `t=${timestamp},v1=${v1}`
   }
 
@@ -43,7 +60,11 @@ describe("PayoutWebhookController — signature verification", () => {
     delete process.env.STRIPE_PAYOUT_WEBHOOK_SECRET
     delete process.env.STRIPE_WEBHOOK_SECRET
     await expect(
-      controller.handleWebhook("stripe_connect", { "stripe-signature": "t=1,v1=abc" }, { rawBody } as any),
+      controller.handleWebhook(
+        "stripe_connect",
+        { "stripe-signature": "t=1,v1=abc" },
+        { rawBody } as any,
+      ),
     ).rejects.toThrow(ServiceUnavailableException)
     expect(queueMock.addJob).not.toHaveBeenCalled()
   })
@@ -60,16 +81,28 @@ describe("PayoutWebhookController — signature verification", () => {
     process.env.STRIPE_PAYOUT_WEBHOOK_SECRET = "whsec_test"
     const forged = stripeSig("wrong-secret", payload)
     await expect(
-      controller.handleWebhook("stripe_connect", { "stripe-signature": forged }, { rawBody } as any),
+      controller.handleWebhook(
+        "stripe_connect",
+        { "stripe-signature": forged },
+        { rawBody } as any,
+      ),
     ).rejects.toThrow(UnauthorizedException)
     expect(queueMock.addJob).not.toHaveBeenCalled()
   })
 
   it("rejects Stripe webhook with a stale timestamp (replay protection)", async () => {
     process.env.STRIPE_PAYOUT_WEBHOOK_SECRET = "whsec_test"
-    const stale = stripeSig("whsec_test", payload, Math.floor(Date.now() / 1000) - 3600)
+    const stale = stripeSig(
+      "whsec_test",
+      payload,
+      Math.floor(Date.now() / 1000) - 3600,
+    )
     await expect(
-      controller.handleWebhook("stripe_connect", { "stripe-signature": stale }, { rawBody } as any),
+      controller.handleWebhook(
+        "stripe_connect",
+        { "stripe-signature": stale },
+        { rawBody } as any,
+      ),
     ).rejects.toThrow(UnauthorizedException)
   })
 
@@ -84,7 +117,11 @@ describe("PayoutWebhookController — signature verification", () => {
     })
     const stripeRaw = Buffer.from(stripePayload, "utf8")
     const sig = stripeSig("whsec_test", stripePayload)
-    const result = await controller.handleWebhook("stripe_connect", { "stripe-signature": sig }, { rawBody: stripeRaw } as any)
+    const result = await controller.handleWebhook(
+      "stripe_connect",
+      { "stripe-signature": sig },
+      { rawBody: stripeRaw } as any,
+    )
     expect(result).toEqual({ received: true, jobId: "job-1" })
     expect(queueMock.addJob).toHaveBeenCalledWith(
       "payout",
@@ -97,16 +134,26 @@ describe("PayoutWebhookController — signature verification", () => {
   it("rejects Wise webhook when no public key is configured (fail closed)", async () => {
     delete process.env.WISE_WEBHOOK_PUBLIC_KEY
     await expect(
-      controller.handleWebhook("wise", { "x-signature-sha256": "abc" }, { rawBody } as any),
+      controller.handleWebhook("wise", { "x-signature-sha256": "abc" }, {
+        rawBody,
+      } as any),
     ).rejects.toThrow(ServiceUnavailableException)
   })
 
   it("rejects Wise webhook with a forged signature and queues a valid one", async () => {
-    const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 })
-    process.env.WISE_WEBHOOK_PUBLIC_KEY = publicKey.export({ type: "spki", format: "pem" }).toString()
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    })
+    process.env.WISE_WEBHOOK_PUBLIC_KEY = publicKey
+      .export({ type: "spki", format: "pem" })
+      .toString()
 
     await expect(
-      controller.handleWebhook("wise", { "x-signature-sha256": Buffer.from("forged").toString("base64") }, { rawBody } as any),
+      controller.handleWebhook(
+        "wise",
+        { "x-signature-sha256": Buffer.from("forged").toString("base64") },
+        { rawBody } as any,
+      ),
     ).rejects.toThrow(UnauthorizedException)
     expect(queueMock.addJob).not.toHaveBeenCalled()
 
@@ -114,7 +161,11 @@ describe("PayoutWebhookController — signature verification", () => {
     signer.update(rawBody)
     const signature = signer.sign(privateKey, "base64")
 
-    const result = await controller.handleWebhook("wise", { "x-signature-sha256": signature }, { rawBody } as any)
+    const result = await controller.handleWebhook(
+      "wise",
+      { "x-signature-sha256": signature },
+      { rawBody } as any,
+    )
     expect(result).toEqual({ received: true, jobId: "job-1" })
     // Phase 8.3 (audit #3) — normalizer pulls data.id as the providerExecutionId
     // for Wise via inner.resource.id ?? inner.id fallback → deterministic jobId.
@@ -134,7 +185,9 @@ describe("Provider adapters — idempotency and production safety", () => {
     const c = idempotencyKeyToUuid("payout-wd-1-v4")
     expect(a).toBe(b)
     expect(a).not.toBe(c)
-    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/)
+    expect(a).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-8[0-9a-f]{3}-[0-9a-f]{12}$/,
+    )
   })
 
   it("Wise adapter sends customerTransactionId to the API", async () => {
@@ -155,7 +208,9 @@ describe("Provider adapters — idempotency and production safety", () => {
     })
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body)
-    expect(body.customerTransactionId).toBe(idempotencyKeyToUuid("payout-wd-1-v0"))
+    expect(body.customerTransactionId).toBe(
+      idempotencyKeyToUuid("payout-wd-1-v0"),
+    )
     expect(body.idempotencyKey).toBeUndefined()
   })
 
@@ -188,14 +243,31 @@ describe("Provider adapters — idempotency and production safety", () => {
 
     const wise = new WisePayoutAdapter()
     const stripe = new StripeConnectPayoutAdapter()
-    const params = { amount: 100, currency: "usd", recipientDetails: {}, providerConfig: {}, idempotencyKey: "k", description: "" }
+    const params = {
+      amount: 100,
+      currency: "usd",
+      recipientDetails: {},
+      providerConfig: {},
+      idempotencyKey: "k",
+      description: "",
+    }
 
-    await expect(wise.createTransfer(params as any)).rejects.toThrow(/production/)
-    await expect(stripe.createTransfer(params as any)).rejects.toThrow(/production/)
+    await expect(wise.createTransfer(params as any)).rejects.toThrow(
+      /production/,
+    )
+    await expect(stripe.createTransfer(params as any)).rejects.toThrow(
+      /production/,
+    )
     await expect(wise.checkTransferStatus("t-1")).rejects.toThrow(/production/)
-    await expect(stripe.checkTransferStatus("t-1")).rejects.toThrow(/production/)
-    await expect(wise.cancelTransfer("t-1", "test-key")).rejects.toThrow(/production/)
-    await expect(stripe.cancelTransfer("t-1", "test-key")).rejects.toThrow(/production/)
+    await expect(stripe.checkTransferStatus("t-1")).rejects.toThrow(
+      /production/,
+    )
+    await expect(wise.cancelTransfer("t-1", "test-key")).rejects.toThrow(
+      /production/,
+    )
+    await expect(stripe.cancelTransfer("t-1", "test-key")).rejects.toThrow(
+      /production/,
+    )
   })
 
   it("Stripe adapter sends the Idempotency-Key header on cancelTransfer", async () => {
@@ -245,10 +317,14 @@ describe("PayoutExecutionService.retryExecution — double-payment prevention", 
         findUnique: jest.fn(),
       },
       publisherBalance: {
-        findUnique: jest.fn().mockResolvedValue({ publisherId: "pub-1", version: 1 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ publisherId: "pub-1", version: 1 }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
-      $transaction: jest.fn().mockImplementation(async (cb: any) => cb(prismaMock)),
+      $transaction: jest
+        .fn()
+        .mockImplementation(async (cb: any) => cb(prismaMock)),
     }
     const adapterMock = {
       checkTransferStatus: jest.fn().mockResolvedValue(providerStatus),
@@ -256,31 +332,53 @@ describe("PayoutExecutionService.retryExecution — double-payment prevention", 
     }
     const providerMock = {
       getAdapter: jest.fn().mockReturnValue(adapterMock),
-      getActiveProvider: jest.fn().mockResolvedValue({ id: "prov-1", name: "wise", decryptedConfig: {} }),
+      getActiveProvider: jest
+        .fn()
+        .mockResolvedValue({ id: "prov-1", name: "wise", decryptedConfig: {} }),
     }
-    const encryptionMock = { decrypt: jest.fn(), redactSensitive: jest.fn((s: string) => s) }
-    const service = new PayoutExecutionService(prismaMock, auditMock as any, encryptionMock as any, providerMock as any)
+    const encryptionMock = {
+      decrypt: jest.fn(),
+      redactSensitive: jest.fn((s: string) => s),
+    }
+    const service = new PayoutExecutionService(
+      prismaMock,
+      auditMock as any,
+      encryptionMock as any,
+      providerMock as any,
+    )
     return { service, prismaMock, auditMock, adapterMock }
   }
 
   it("recovers a provider-completed transfer instead of paying again", async () => {
-    const { service, prismaMock, auditMock, adapterMock } = makeService({ status: "COMPLETED", fee: 1.5 })
+    const { service, prismaMock, auditMock, adapterMock } = makeService({
+      status: "COMPLETED",
+      fee: 1.5,
+    })
 
     const result = await service.retryExecution("exec-1", "staff-1")
 
-    expect(result).toMatchObject({ status: "COMPLETED", recoveredFromProvider: true })
+    expect(result).toMatchObject({
+      status: "COMPLETED",
+      recoveredFromProvider: true,
+    })
     expect(adapterMock.createTransfer).not.toHaveBeenCalled()
     expect(prismaMock.publisherBalance.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ lifetimePaid: { increment: 100 } }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ lifetimePaid: { increment: 100 } }),
+      }),
     )
-    const audit = auditMock.log.mock.calls.find((c: any[]) => c[0].action === "PAYOUT_EXECUTION_RECOVERED_COMPLETED")
+    const audit = auditMock.log.mock.calls.find(
+      (c: any[]) => c[0].action === "PAYOUT_EXECUTION_RECOVERED_COMPLETED",
+    )
     expect(audit).toBeDefined()
   })
 
   it("refuses retry while the provider transfer is still processing", async () => {
     const { service, adapterMock } = makeService({ status: "PROCESSING" })
 
-    await expect(service.retryExecution("exec-1", "staff-1")).rejects.toThrow(ConflictException)
+    await expect(service.retryExecution("exec-1", "staff-1")).rejects.toThrow(
+      ConflictException,
+    )
     expect(adapterMock.createTransfer).not.toHaveBeenCalled()
   })
 })

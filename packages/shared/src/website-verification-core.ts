@@ -7,7 +7,10 @@
 import type { DnsCheckResult } from "./dns-verification"
 import { generateVerificationToken } from "./dns-verification"
 
-export type DnsChecker = (websiteUrl: string, token: string) => Promise<DnsCheckResult>
+export type DnsChecker = (
+  websiteUrl: string,
+  token: string,
+) => Promise<DnsCheckResult>
 
 export interface VerificationDeps {
   // Structurally-typed slice of PrismaClient — keeps this file framework-free.
@@ -15,7 +18,11 @@ export interface VerificationDeps {
   checkDns: DnsChecker
   now?: () => Date
   // Optional hook to trigger event-driven publisher trust recompute.
-  onTrustEvent?: (publisherId: string | null | undefined, sourceEvent: string, reason?: string) => void | Promise<void>
+  onTrustEvent?: (
+    publisherId: string | null | undefined,
+    sourceEvent: string,
+    reason?: string,
+  ) => void | Promise<void>
 }
 
 // Notify every owner user of a publisher. Best-effort — a failed notification
@@ -39,10 +46,14 @@ async function notifyPublisherOwners(
 }
 
 async function notifyOps(prisma: any, type: string, message: string) {
-  const staff = await prisma.staffMembership.findMany({ select: { userId: true } })
+  const staff = await prisma.staffMembership.findMany({
+    select: { userId: true },
+  })
   for (const s of staff) {
     await prisma.notification
-      .create({ data: { userId: s.userId, organizationId: null, type, message } })
+      .create({
+        data: { userId: s.userId, organizationId: null, type, message },
+      })
       .catch(() => undefined)
   }
 }
@@ -67,10 +78,14 @@ export async function runWebsiteVerify(
 
   const website = await prisma.website.findUnique({ where: { id: websiteId } })
   if (!website) return { skipped: "not_found" }
-  if (!website.publisherId || !website.verificationToken) return { skipped: "no_token" }
-  if (website.verificationStatus === "VERIFIED") return { skipped: "already_verified" }
+  if (!website.publisherId || !website.verificationToken)
+    return { skipped: "no_token" }
+  if (website.verificationStatus === "VERIFIED")
+    return { skipped: "already_verified" }
 
-  const publisher = await prisma.publisher.findUnique({ where: { id: website.publisherId } })
+  const publisher = await prisma.publisher.findUnique({
+    where: { id: website.publisherId },
+  })
   const organizationId = publisher?.organizationId ?? null
   const expectedVersion = website.verificationVersion
 
@@ -102,7 +117,12 @@ export async function runWebsiteVerify(
         action: "WEBSITE_VERIFIED",
         entityType: "Website",
         entityId: website.id,
-        metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, matchedHost: result.matchedHost },
+        metadata: {
+          domain: website.domain,
+          publisherId: website.publisherId,
+          organizationId,
+          matchedHost: result.matchedHost,
+        },
         userId: actorUserId ?? null,
         organizationId,
       },
@@ -112,7 +132,11 @@ export async function runWebsiteVerify(
         action: "WEBSITE_VERIFICATION_TOKEN_ROTATED",
         entityType: "Website",
         entityId: website.id,
-        metadata: { domain: website.domain, publisherId: website.publisherId, organizationId },
+        metadata: {
+          domain: website.domain,
+          publisherId: website.publisherId,
+          organizationId,
+        },
         userId: actorUserId ?? null,
         organizationId,
       },
@@ -124,7 +148,11 @@ export async function runWebsiteVerify(
       "WEBSITE_VERIFIED",
       `Domain ownership verified for ${website.domain ?? website.url}. Your website can now be listed on the marketplace.`,
     )
-    await deps.onTrustEvent?.(website.publisherId, "WEBSITE_REVERIFIED", `website ${website.domain ?? website.url} verified`)
+    await deps.onTrustEvent?.(
+      website.publisherId,
+      "WEBSITE_REVERIFIED",
+      `website ${website.domain ?? website.url} verified`,
+    )
     return { ok: true, status: "VERIFIED" }
   }
 
@@ -144,7 +172,12 @@ export async function runWebsiteVerify(
       action: "WEBSITE_VERIFICATION_FAILED",
       entityType: "Website",
       entityId: website.id,
-      metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, reason },
+      metadata: {
+        domain: website.domain,
+        publisherId: website.publisherId,
+        organizationId,
+        reason,
+      },
       userId: actorUserId ?? null,
       organizationId,
     },
@@ -170,9 +203,16 @@ export interface SweepResult {
 // Revocation enforcement: a REVOKED domain's marketplace listings are hidden
 // (PAUSED) so it can no longer sell, take new orders, or be approved/edited.
 // Completed orders, settlements, and historical reporting are untouched.
-export async function enforceRevocation(prisma: any, website: any, organizationId: string | null) {
+export async function enforceRevocation(
+  prisma: any,
+  website: any,
+  organizationId: string | null,
+) {
   const hidden = await prisma.marketplaceListing.updateMany({
-    where: { websiteId: website.id, status: { in: ["APPROVED", "PENDING_REVIEW", "DRAFT", "PAUSED"] } },
+    where: {
+      websiteId: website.id,
+      status: { in: ["APPROVED", "PENDING_REVIEW", "DRAFT", "PAUSED"] },
+    },
     data: { status: "PAUSED" },
   })
   await prisma.auditLog.create({
@@ -180,13 +220,28 @@ export async function enforceRevocation(prisma: any, website: any, organizationI
       action: "WEBSITE_REVOKED_ENFORCEMENT",
       entityType: "Website",
       entityId: website.id,
-      metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, listingsHidden: hidden.count },
+      metadata: {
+        domain: website.domain,
+        publisherId: website.publisherId,
+        organizationId,
+        listingsHidden: hidden.count,
+      },
       userId: null,
       organizationId,
     },
   })
-  await notifyPublisherOwners(prisma, website.publisherId, organizationId, "WEBSITE_REVOKED_ENFORCEMENT", `Listings for ${website.domain ?? website.url} were hidden because domain ownership is no longer verified.`)
-  await notifyOps(prisma, "WEBSITE_REVOKED_ENFORCEMENT", `Revocation enforced on ${website.domain ?? website.url}: ${hidden.count} listing(s) hidden.`)
+  await notifyPublisherOwners(
+    prisma,
+    website.publisherId,
+    organizationId,
+    "WEBSITE_REVOKED_ENFORCEMENT",
+    `Listings for ${website.domain ?? website.url} were hidden because domain ownership is no longer verified.`,
+  )
+  await notifyOps(
+    prisma,
+    "WEBSITE_REVOKED_ENFORCEMENT",
+    `Revocation enforced on ${website.domain ?? website.url}: ${hidden.count} listing(s) hidden.`,
+  )
   return hidden.count
 }
 
@@ -194,7 +249,9 @@ export async function enforceRevocation(prisma: any, website: any, organizationI
 // not instantly revoke: a domain is REVOKED only after 3 consecutive failed
 // checks. 1 failure warns the publisher, 2 notifies Operations, 3 revokes +
 // enforces. A successful check resets the failure streak.
-export async function runWebsiteReverifySweep(deps: VerificationDeps): Promise<SweepResult> {
+export async function runWebsiteReverifySweep(
+  deps: VerificationDeps,
+): Promise<SweepResult> {
   const { prisma, checkDns } = deps
   const sites = await prisma.website.findMany({
     where: { verificationStatus: "VERIFIED", publisherId: { not: null } },
@@ -206,13 +263,15 @@ export async function runWebsiteReverifySweep(deps: VerificationDeps): Promise<S
   let warned = 0
   for (const { id } of sites) {
     const website = await prisma.website.findUnique({ where: { id } })
-    if (!website || !website.publisherId) continue
+    if (!website?.publisherId) continue
     if (website.verificationStatus !== "VERIFIED") continue
     // Re-check the token actually proven present in DNS (survives rotation).
     const checkToken = website.activeVerifiedToken ?? website.verificationToken
     if (!checkToken) continue
 
-    const publisher = await prisma.publisher.findUnique({ where: { id: website.publisherId } })
+    const publisher = await prisma.publisher.findUnique({
+      where: { id: website.publisherId },
+    })
     const organizationId = publisher?.organizationId ?? null
     const expectedVersion = website.verificationVersion
     const now = (deps.now ?? (() => new Date()))()
@@ -244,7 +303,11 @@ export async function runWebsiteReverifySweep(deps: VerificationDeps): Promise<S
 
     if (failures >= 3) {
       const upd = await prisma.website.updateMany({
-        where: { id: website.id, verificationVersion: expectedVersion, verificationStatus: "VERIFIED" },
+        where: {
+          id: website.id,
+          verificationVersion: expectedVersion,
+          verificationStatus: "VERIFIED",
+        },
         data: {
           verificationStatus: "REVOKED",
           lastVerificationCheckAt: now,
@@ -261,15 +324,35 @@ export async function runWebsiteReverifySweep(deps: VerificationDeps): Promise<S
           action: "WEBSITE_VERIFICATION_REVOKED",
           entityType: "Website",
           entityId: website.id,
-          metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, reason, consecutiveFailures: failures },
+          metadata: {
+            domain: website.domain,
+            publisherId: website.publisherId,
+            organizationId,
+            reason,
+            consecutiveFailures: failures,
+          },
           userId: null,
           organizationId,
         },
       })
-      await notifyPublisherOwners(prisma, website.publisherId, organizationId, "WEBSITE_VERIFICATION_REVOKED", `Domain verification REVOKED for ${website.domain ?? website.url} after ${failures} failed checks. Re-add the TXT record and re-verify.`)
-      await notifyOps(prisma, "WEBSITE_VERIFICATION_REVOKED", `Website ${website.domain ?? website.url} (publisher ${website.publisherId}) REVOKED after ${failures} consecutive failures.`)
+      await notifyPublisherOwners(
+        prisma,
+        website.publisherId,
+        organizationId,
+        "WEBSITE_VERIFICATION_REVOKED",
+        `Domain verification REVOKED for ${website.domain ?? website.url} after ${failures} failed checks. Re-add the TXT record and re-verify.`,
+      )
+      await notifyOps(
+        prisma,
+        "WEBSITE_VERIFICATION_REVOKED",
+        `Website ${website.domain ?? website.url} (publisher ${website.publisherId}) REVOKED after ${failures} consecutive failures.`,
+      )
       await enforceRevocation(prisma, website, organizationId)
-      await deps.onTrustEvent?.(website.publisherId, "WEBSITE_REVOKED", `website ${website.domain ?? website.url} revoked`)
+      await deps.onTrustEvent?.(
+        website.publisherId,
+        "WEBSITE_REVOKED",
+        `website ${website.domain ?? website.url} revoked`,
+      )
       continue
     }
 
@@ -289,14 +372,30 @@ export async function runWebsiteReverifySweep(deps: VerificationDeps): Promise<S
         action: "WEBSITE_VERIFICATION_HEALTH_WARNING",
         entityType: "Website",
         entityId: website.id,
-        metadata: { domain: website.domain, publisherId: website.publisherId, organizationId, consecutiveFailures: failures, reason },
+        metadata: {
+          domain: website.domain,
+          publisherId: website.publisherId,
+          organizationId,
+          consecutiveFailures: failures,
+          reason,
+        },
         userId: null,
         organizationId,
       },
     })
-    await notifyPublisherOwners(prisma, website.publisherId, organizationId, "WEBSITE_VERIFICATION_HEALTH_WARNING", `Health check ${failures}/3 failed for ${website.domain ?? website.url}: ${reason}. Verify the TXT record is still present.`)
+    await notifyPublisherOwners(
+      prisma,
+      website.publisherId,
+      organizationId,
+      "WEBSITE_VERIFICATION_HEALTH_WARNING",
+      `Health check ${failures}/3 failed for ${website.domain ?? website.url}: ${reason}. Verify the TXT record is still present.`,
+    )
     if (failures >= 2) {
-      await notifyOps(prisma, "WEBSITE_VERIFICATION_HEALTH_WARNING", `Website ${website.domain ?? website.url} (publisher ${website.publisherId}) has ${failures} consecutive failed checks — one more revokes it.`)
+      await notifyOps(
+        prisma,
+        "WEBSITE_VERIFICATION_HEALTH_WARNING",
+        `Website ${website.domain ?? website.url} (publisher ${website.publisherId}) has ${failures} consecutive failed checks — one more revokes it.`,
+      )
     }
   }
   return { ok: true, total: sites.length, revoked, refreshed, warned }

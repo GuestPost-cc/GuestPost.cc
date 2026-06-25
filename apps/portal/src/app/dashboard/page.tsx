@@ -1,13 +1,17 @@
 "use client"
 
-import { useQuery } from "@tanstack/react-query"
-import { api } from "../../lib/api"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Skeleton, ErrorState } from "@guestpost/ui"
-import { Badge, getOrderStatusPresentation } from "@guestpost/ui"
 import type { OrderStatus } from "@guestpost/database"
-import { Button } from "@guestpost/ui"
 import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  ErrorState,
+  getOrderStatusPresentation,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -15,35 +19,34 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
+import { useQuery } from "@tanstack/react-query"
+import { format, formatDistanceToNow } from "date-fns"
 import {
-  Wallet,
-  PiggyBank,
-  ShoppingCart,
+  ArrowRight,
   CheckCircle,
   Clock,
-  TrendingUp,
-  Plus,
-  ArrowRight,
-  FileText,
   CreditCard,
-  AlertCircle,
+  FileText,
+  PiggyBank,
+  Plus,
+  ShoppingCart,
+  TrendingUp,
+  Wallet,
 } from "lucide-react"
-import { format, formatDistanceToNow } from "date-fns"
 import Link from "next/link"
 import {
-  AreaChart,
   Area,
+  AreaChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
 } from "recharts"
+import { api } from "../../lib/api"
 
 // Phase 7.9 #28 — chart colors come from the centralized table via
 // getOrderStatusPresentation(...).chartColor. Local helper memoizes the
@@ -74,7 +77,9 @@ function KPICard({
   return (
     <Card className="relative overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
           <Icon className="h-5 w-5 text-primary" />
         </div>
@@ -86,8 +91,12 @@ function KPICard({
         )}
         {trend !== undefined && (
           <div className="mt-2 flex items-center gap-1">
-            <span className={`flex items-center text-xs font-medium ${trend >= 0 ? "text-emerald-500" : "text-red-500"}`}>
-              <TrendingUp className={`h-3 w-3 ${trend < 0 ? "rotate-180" : ""}`} />
+            <span
+              className={`flex items-center text-xs font-medium ${trend >= 0 ? "text-emerald-500" : "text-red-500"}`}
+            >
+              <TrendingUp
+                className={`h-3 w-3 ${trend < 0 ? "rotate-180" : ""}`}
+              />
               {Math.abs(trend)}%
             </span>
             <span className="text-xs text-muted-foreground">{trendLabel}</span>
@@ -118,11 +127,14 @@ function ChartCard({
   )
 }
 
-function RecentOrdersSkeleton() {
+function _RecentOrdersSkeleton() {
   return (
     <div className="space-y-3">
       {[...Array(5)].map((_, i) => (
-        <div key={i} className="flex items-center justify-between rounded-lg border p-3">
+        <div
+          key={i}
+          className="flex items-center justify-between rounded-lg border p-3"
+        >
           <div className="space-y-2">
             <Skeleton className="h-4 w-32" />
             <Skeleton className="h-3 w-24" />
@@ -153,30 +165,53 @@ function KPICardsSkeleton() {
 }
 
 export default function DashboardPage() {
-  const { data: walletData, isLoading: walletLoading, error: walletError, refetch: refetchWallet } = useQuery({
+  const {
+    data: walletData,
+    isLoading: walletLoading,
+    error: walletError,
+    refetch: refetchWallet,
+  } = useQuery({
     queryKey: ["wallet"],
     queryFn: () => api.billing.getWallet(),
   })
 
-  const { data: ordersData, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
+  const {
+    data: ordersData,
+    isLoading: ordersLoading,
+    error: ordersError,
+    refetch: refetchOrders,
+  } = useQuery({
     queryKey: ["orders"],
     queryFn: () => api.orders.list(),
   })
 
-  const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError, refetch: refetchCampaigns } = useQuery({
+  const {
+    data: campaignsData,
+    isLoading: campaignsLoading,
+    error: campaignsError,
+    refetch: refetchCampaigns,
+  } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns(),
   })
 
   const orders = ordersData ?? []
-  const campaigns = campaignsData ?? []
+  const _campaigns = campaignsData ?? []
 
-  const activeOrders = orders.filter((o: any) => !["COMPLETED", "CANCELLED", "REFUNDED"].includes(o.status)).length
-  const underReviewOrders = orders.filter((o: any) => o.status === "UNDER_REVIEW").length
-  const completedOrders = orders.filter((o: any) => o.status === "COMPLETED").length
+  const activeOrders = orders.filter(
+    (o: any) => !["COMPLETED", "CANCELLED", "REFUNDED"].includes(o.status),
+  ).length
+  const underReviewOrders = orders.filter(
+    (o: any) => o.status === "UNDER_REVIEW",
+  ).length
+  const completedOrders = orders.filter(
+    (o: any) => o.status === "COMPLETED",
+  ).length
 
   const reservedBalance = orders
-    .filter((o: any) => !["COMPLETED", "CANCELLED", "REFUNDED"].includes(o.status))
+    .filter(
+      (o: any) => !["COMPLETED", "CANCELLED", "REFUNDED"].includes(o.status),
+    )
     .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
 
   const now = new Date()
@@ -188,20 +223,29 @@ export default function DashboardPage() {
   const monthlySpend = orders
     .filter((o: any) => {
       const created = new Date(o.createdAt)
-      return created.getMonth() === currentMonth && created.getFullYear() === currentYear
+      return (
+        created.getMonth() === currentMonth &&
+        created.getFullYear() === currentYear
+      )
     })
     .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
 
   const lastMonthSpend = orders
     .filter((o: any) => {
       const created = new Date(o.createdAt)
-      return created.getMonth() === lastMonth && created.getFullYear() === lastMonthYear
+      return (
+        created.getMonth() === lastMonth &&
+        created.getFullYear() === lastMonthYear
+      )
     })
     .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
 
-  const spendTrend = lastMonthSpend > 0
-    ? Math.round(((monthlySpend - lastMonthSpend) / lastMonthSpend) * 100)
-    : monthlySpend > 0 ? 100 : 0
+  const spendTrend =
+    lastMonthSpend > 0
+      ? Math.round(((monthlySpend - lastMonthSpend) / lastMonthSpend) * 100)
+      : monthlySpend > 0
+        ? 100
+        : 0
 
   const monthlyData = Array.from({ length: 6 }, (_, i) => {
     const d = new Date()
@@ -210,12 +254,18 @@ export default function DashboardPage() {
       month: format(d, "MMM"),
       orders: orders.filter((o: any) => {
         const created = new Date(o.createdAt)
-        return created.getMonth() === d.getMonth() && created.getFullYear() === d.getFullYear()
+        return (
+          created.getMonth() === d.getMonth() &&
+          created.getFullYear() === d.getFullYear()
+        )
       }).length,
       spend: orders
         .filter((o: any) => {
           const created = new Date(o.createdAt)
-          return created.getMonth() === d.getMonth() && created.getFullYear() === d.getFullYear()
+          return (
+            created.getMonth() === d.getMonth() &&
+            created.getFullYear() === d.getFullYear()
+          )
         })
         .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0),
     }
@@ -225,7 +275,7 @@ export default function DashboardPage() {
     orders.reduce((acc: Record<string, number>, o: any) => {
       acc[o.status] = (acc[o.status] || 0) + 1
       return acc
-    }, {}) as Record<string, number>
+    }, {}) as Record<string, number>,
   ).map(([name, value]) => ({ name, value }))
 
   const activityFeed = orders
@@ -236,19 +286,35 @@ export default function DashboardPage() {
         eventType: e.eventType,
         createdAt: e.createdAt,
         metadata: e.metadata,
-      }))
+      })),
     )
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
     .slice(0, 10)
 
   const recentOrders = [...orders]
-    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .sort(
+      (a: any, b: any) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    )
     .slice(0, 5)
 
   const dashboardError = walletError || ordersError || campaignsError
 
   if (dashboardError) {
-    return <ErrorState title="Failed to load dashboard" description={(dashboardError as Error).message} onRetry={() => { refetchWallet(); refetchOrders(); refetchCampaigns(); }} />
+    return (
+      <ErrorState
+        title="Failed to load dashboard"
+        description={(dashboardError as Error).message}
+        onRetry={() => {
+          refetchWallet()
+          refetchOrders()
+          refetchCampaigns()
+        }}
+      />
+    )
   }
 
   const isLoading = walletLoading || ordersLoading || campaignsLoading
@@ -259,13 +325,23 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-            <p className="text-muted-foreground">Welcome back! Here&apos;s your overview.</p>
+            <p className="text-muted-foreground">
+              Welcome back! Here&apos;s your overview.
+            </p>
           </div>
         </div>
         <KPICardsSkeleton />
         <div className="grid gap-6 lg:grid-cols-2">
-          <Card><CardContent className="pt-6"><Skeleton className="h-64 w-full" /></CardContent></Card>
-          <Card><CardContent className="pt-6"><Skeleton className="h-64 w-full" /></CardContent></Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
@@ -276,7 +352,9 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Welcome back! Here&apos;s your overview.</p>
+          <p className="text-muted-foreground">
+            Welcome back! Here&apos;s your overview.
+          </p>
         </div>
         <div className="flex gap-3">
           <Button variant="outline" asChild>
@@ -342,8 +420,16 @@ export default function DashboardPage() {
               <AreaChart data={monthlyData}>
                 <defs>
                   <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                    <stop
+                      offset="5%"
+                      stopColor="hsl(var(--primary))"
+                      stopOpacity={0.3}
+                    />
+                    <stop
+                      offset="95%"
+                      stopColor="hsl(var(--primary))"
+                      stopOpacity={0}
+                    />
                   </linearGradient>
                   <linearGradient id="colorSpend" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
@@ -353,9 +439,9 @@ export default function DashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                 <XAxis dataKey="month" className="text-xs" />
                 <YAxis className="text-xs" />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: "hsl(var(--card))", 
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--card))",
                     border: "1px solid hsl(var(--border))",
                     borderRadius: "8px",
                     boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
@@ -399,15 +485,15 @@ export default function DashboardPage() {
                     dataKey="value"
                   >
                     {statusDistribution.map((entry, index) => (
-                      <Cell 
-                        key={`cell-${index}`} 
+                      <Cell
+                        key={`cell-${index}`}
                         fill={orderChartColor(entry.name)}
                       />
                     ))}
                   </Pie>
-                  <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: "hsl(var(--card))", 
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
                       border: "1px solid hsl(var(--border))",
                       borderRadius: "8px",
                     }}
@@ -418,8 +504,8 @@ export default function DashboardPage() {
             <div className="flex-1 space-y-2">
               {statusDistribution.slice(0, 5).map((item) => (
                 <div key={item.name} className="flex items-center gap-2">
-                  <div 
-                    className="h-3 w-3 rounded-full" 
+                  <div
+                    className="h-3 w-3 rounded-full"
                     style={{ backgroundColor: orderChartColor(item.name) }}
                   />
                   <span className="flex-1 text-sm text-muted-foreground">
@@ -443,7 +529,9 @@ export default function DashboardPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Recent Orders</CardTitle>
-              <CardDescription>Latest orders across all campaigns</CardDescription>
+              <CardDescription>
+                Latest orders across all campaigns
+              </CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/dashboard/orders">
@@ -479,25 +567,38 @@ export default function DashboardPage() {
                 </TableHeader>
                 <TableBody>
                   {recentOrders.map((order: any) => (
-                    <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50">
+                    <TableRow
+                      key={order.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                    >
                       <TableCell className="font-mono text-xs">
-                        <Link href={`/dashboard/orders/${order.id}`} className="hover:text-primary">
+                        <Link
+                          href={`/dashboard/orders/${order.id}`}
+                          className="hover:text-primary"
+                        >
                           #{order.id.slice(0, 8)}
                         </Link>
                       </TableCell>
                       <TableCell>
-                        {order.items?.[0]?.serviceType?.replace(/_/g, " ") ?? "—"}
+                        {order.items?.[0]?.serviceType?.replace(/_/g, " ") ??
+                          "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge 
-                          variant={order.status === "COMPLETED" ? "default" : "secondary"}
+                        <Badge
+                          variant={
+                            order.status === "COMPLETED"
+                              ? "default"
+                              : "secondary"
+                          }
                           className="capitalize"
                         >
                           {order.status.replace(/_/g, " ").toLowerCase()}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {order.totalAmount ? `$${order.totalAmount.toFixed(2)}` : "—"}
+                        {order.totalAmount
+                          ? `$${order.totalAmount.toFixed(2)}`
+                          : "—"}
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {format(new Date(order.createdAt), "PP")}
@@ -519,7 +620,9 @@ export default function DashboardPage() {
             {activityFeed.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Clock className="h-8 w-8 text-muted-foreground/50" />
-                <p className="mt-2 text-sm text-muted-foreground">No recent activity</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No recent activity
+                </p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -538,7 +641,9 @@ export default function DashboardPage() {
                         </span>
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(event.createdAt), {
+                          addSuffix: true,
+                        })}
                       </p>
                     </div>
                   </div>

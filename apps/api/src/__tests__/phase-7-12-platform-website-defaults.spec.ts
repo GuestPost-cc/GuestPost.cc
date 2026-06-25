@@ -12,11 +12,17 @@
  * integration-level "create site, query DB row" test belongs in the future
  * Phase 7.10.2 Nest+supertest harness.
  */
-import { readFileSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 describe("Phase 7.12 #24 — Platform website + auto-listing defaults", () => {
-  const adminServicePath = join(__dirname, "..", "modules", "admin", "admin.service.ts")
+  const adminServicePath = join(
+    __dirname,
+    "..",
+    "modules",
+    "admin",
+    "admin.service.ts",
+  )
   const adminServiceSource = readFileSync(adminServicePath, "utf-8")
 
   // The createPlatformWebsite function is a single contiguous block; we
@@ -39,7 +45,7 @@ describe("Phase 7.12 #24 — Platform website + auto-listing defaults", () => {
       )
     })
 
-    it("uses the strongly-typed enum, not the string literal \"VERIFIED\"", () => {
+    it('uses the strongly-typed enum, not the string literal "VERIFIED"', () => {
       // Regression guard: a future refactor that swaps the enum for a string
       // would lose tsc protection against enum renames.
       expect(createPlatformWebsiteBlock).not.toMatch(

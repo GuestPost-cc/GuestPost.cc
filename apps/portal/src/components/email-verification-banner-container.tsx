@@ -1,8 +1,8 @@
 "use client"
 
+import { EmailVerificationBanner } from "@guestpost/ui"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { EmailVerificationBanner } from "@guestpost/ui"
 import { useAuth } from "../lib/auth"
 
 // 60s client-side cooldown stacks on top of Phase 7.8 #26's per-IP +
@@ -15,7 +15,8 @@ function getBaseUrl(): string {
   if (envUrl) return envUrl
   if (typeof window !== "undefined") {
     const host = window.location.hostname
-    if (host !== "localhost" && host !== "127.0.0.1") return `http://${host}:4000`
+    if (host !== "localhost" && host !== "127.0.0.1")
+      return `http://${host}:4000`
   }
   return "http://localhost:4000"
 }
@@ -44,7 +45,7 @@ export function EmailVerificationBannerContainer() {
   // Phase 7.8 #25; verified customers don't need it; signed-out users
   // won't see it (this component lives inside the authenticated
   // dashboard layout).
-  if (!user || user.emailVerified !== false || user.userType !== "CUSTOMER") return null
+  if (user?.emailVerified !== false || user.userType !== "CUSTOMER") return null
 
   const cooldownSeconds = Math.max(0, Math.ceil((cooldownUntil - now) / 1000))
 
@@ -52,12 +53,18 @@ export function EmailVerificationBannerContainer() {
     if (sending || cooldownSeconds > 0) return
     setSending(true)
     try {
-      const res = await fetch(`${getBaseUrl()}/api/v1/auth/send-verification-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email: user!.email, callbackURL: "/dashboard" }),
-      })
+      const res = await fetch(
+        `${getBaseUrl()}/api/v1/auth/send-verification-email`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            email: user?.email,
+            callbackURL: "/dashboard",
+          }),
+        },
+      )
       if (!res.ok) {
         let message = "Couldn't send verification email"
         try {

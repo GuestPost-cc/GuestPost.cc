@@ -31,11 +31,16 @@ export interface CancelTransferResult {
 export interface PayoutProviderAdapter {
   readonly providerName: string
 
-  validateRecipient(details: Record<string, unknown>): Promise<{ valid: boolean; error?: string }>
+  validateRecipient(
+    details: Record<string, unknown>,
+  ): Promise<{ valid: boolean; error?: string }>
 
   createTransfer(params: CreateTransferParams): Promise<CreateTransferResult>
 
   checkTransferStatus(providerExecutionId: string): Promise<CheckStatusResult>
 
-  cancelTransfer(providerExecutionId: string, idempotencyKey: string): Promise<CancelTransferResult>
+  cancelTransfer(
+    providerExecutionId: string,
+    idempotencyKey: string,
+  ): Promise<CancelTransferResult>
 }

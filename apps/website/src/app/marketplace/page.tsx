@@ -1,8 +1,12 @@
+import { Button } from "@guestpost/ui"
+import { Globe, ShieldCheck, Star, TrendingUp } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Button } from "@guestpost/ui"
-import { Globe, Star, TrendingUp, ShieldCheck } from "lucide-react"
-import { SiteHeader, SiteFooter, PORTAL_URL } from "../../components/site-chrome"
+import {
+  PORTAL_URL,
+  SiteFooter,
+  SiteHeader,
+} from "../../components/site-chrome"
 
 export const metadata: Metadata = {
   title: "Marketplace — Browse Guest Post & Link Placements | GuestPost",
@@ -32,16 +36,28 @@ interface PublicListing {
   category?: { name: string } | null
 }
 
-async function getListings(q?: string, category?: string): Promise<{ listings: PublicListing[]; categories: Array<{ id: string; name: string; slug: string }> }> {
+async function getListings(
+  q?: string,
+  category?: string,
+): Promise<{
+  listings: PublicListing[]
+  categories: Array<{ id: string; name: string; slug: string }>
+}> {
   const params = new URLSearchParams({ limit: "24" })
   if (q) params.set("search", q)
   if (category) params.set("category", category)
   try {
     const [listingsRes, categoriesRes] = await Promise.all([
-      fetch(`${API}/api/v1/marketplace/listings?${params}`, { next: { revalidate: 300 } }),
-      fetch(`${API}/api/v1/marketplace/categories`, { next: { revalidate: 3600 } }),
+      fetch(`${API}/api/v1/marketplace/listings?${params}`, {
+        next: { revalidate: 300 },
+      }),
+      fetch(`${API}/api/v1/marketplace/categories`, {
+        next: { revalidate: 3600 },
+      }),
     ])
-    const listings = listingsRes.ok ? (await listingsRes.json()).listings ?? [] : []
+    const listings = listingsRes.ok
+      ? ((await listingsRes.json()).listings ?? [])
+      : []
     const categories = categoriesRes.ok ? await categoriesRes.json() : []
     return { listings, categories: Array.isArray(categories) ? categories : [] }
   } catch {
@@ -52,10 +68,22 @@ async function getListings(q?: string, category?: string): Promise<{ listings: P
 
 function OwnershipBadge({ type }: { type?: string }) {
   if (type === "INTERNAL")
-    return <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Platform</span>
+    return (
+      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+        Platform
+      </span>
+    )
   if (type === "HYBRID")
-    return <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600">Hybrid</span>
-  return <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Publisher</span>
+    return (
+      <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600">
+        Hybrid
+      </span>
+    )
+  return (
+    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+      Publisher
+    </span>
+  )
 }
 
 export default async function MarketplacePage({
@@ -74,10 +102,15 @@ export default async function MarketplacePage({
           <div className="container">
             <h1 className="text-4xl font-bold tracking-tight">Marketplace</h1>
             <p className="mt-3 max-w-2xl text-lg text-muted-foreground">
-              Vetted placements across platform-managed and independent publisher websites.
-              Every order is escrowed until delivery is verified.
+              Vetted placements across platform-managed and independent
+              publisher websites. Every order is escrowed until delivery is
+              verified.
             </p>
-            <form className="mt-6 flex max-w-xl gap-2" action="/marketplace" method="get">
+            <form
+              className="mt-6 flex max-w-xl gap-2"
+              action="/marketplace"
+              method="get"
+            >
               <input
                 type="search"
                 name="q"
@@ -115,34 +148,66 @@ export default async function MarketplacePage({
             <div className="flex flex-col items-center py-24 text-center">
               <Globe className="h-12 w-12 text-muted-foreground/40" />
               <h2 className="mt-4 text-xl font-semibold">No listings match</h2>
-              <p className="mt-2 text-muted-foreground">Try a different search, or check back soon — new inventory is reviewed daily.</p>
+              <p className="mt-2 text-muted-foreground">
+                Try a different search, or check back soon — new inventory is
+                reviewed daily.
+              </p>
             </div>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {listings.map((l) => (
-                <div key={l.id} className="group flex flex-col rounded-xl border p-5 transition-shadow hover:shadow-md">
+                <div
+                  key={l.id}
+                  className="group flex flex-col rounded-xl border p-5 transition-shadow hover:shadow-md"
+                >
                   <div className="flex items-center gap-2">
-                    {l.category && <span className="text-xs font-medium text-primary">{l.category.name}</span>}
-                    <span className="text-xs text-muted-foreground">{l.type.replace(/_/g, " ")}</span>
-                    <span className="ml-auto"><OwnershipBadge type={l.fulfillmentType} /></span>
+                    {l.category && (
+                      <span className="text-xs font-medium text-primary">
+                        {l.category.name}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground">
+                      {l.type.replace(/_/g, " ")}
+                    </span>
+                    <span className="ml-auto">
+                      <OwnershipBadge type={l.fulfillmentType} />
+                    </span>
                   </div>
-                  <h3 className="mt-2 font-semibold leading-snug line-clamp-2">{l.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground line-clamp-2">{l.shortDescription ?? l.description}</p>
+                  <h3 className="mt-2 font-semibold leading-snug line-clamp-2">
+                    {l.title}
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                    {l.shortDescription ?? l.description}
+                  </p>
                   <div className="mt-4 flex items-center gap-4 text-sm text-muted-foreground">
                     {typeof l.domainRating === "number" && (
-                      <span className="inline-flex items-center gap-1"><TrendingUp className="h-3.5 w-3.5" /> DR {l.domainRating}</span>
+                      <span className="inline-flex items-center gap-1">
+                        <TrendingUp className="h-3.5 w-3.5" /> DR{" "}
+                        {l.domainRating}
+                      </span>
                     )}
                     {typeof l.traffic === "number" && l.traffic > 0 && (
-                      <span>{Intl.NumberFormat("en", { notation: "compact" }).format(l.traffic)} visits/mo</span>
+                      <span>
+                        {Intl.NumberFormat("en", {
+                          notation: "compact",
+                        }).format(l.traffic)}{" "}
+                        visits/mo
+                      </span>
                     )}
                     {l.verified && (
-                      <span className="inline-flex items-center gap-1 text-green-600"><ShieldCheck className="h-3.5 w-3.5" /> Verified</span>
+                      <span className="inline-flex items-center gap-1 text-green-600">
+                        <ShieldCheck className="h-3.5 w-3.5" /> Verified
+                      </span>
                     )}
                   </div>
                   <div className="mt-auto flex items-center justify-between pt-5">
-                    <span className="text-lg font-bold">${Number(l.price).toFixed(0)}</span>
+                    <span className="text-lg font-bold">
+                      ${Number(l.price).toFixed(0)}
+                    </span>
                     <Button size="sm" asChild>
-                      <a href={`${PORTAL_URL}/dashboard/marketplace/${l.slug}`}>Order</a>
+                      <a href={`${PORTAL_URL}/dashboard/marketplace/${l.slug}`}>
+                        Order
+                      </a>
                     </Button>
                   </div>
                 </div>
@@ -154,9 +219,12 @@ export default async function MarketplacePage({
         <section className="border-t bg-muted/30 py-16">
           <div className="container flex flex-col items-center text-center">
             <Star className="h-8 w-8 text-primary" />
-            <h2 className="mt-4 text-2xl font-bold">Funds stay in escrow until your link is live and verified</h2>
+            <h2 className="mt-4 text-2xl font-bold">
+              Funds stay in escrow until your link is live and verified
+            </h2>
             <p className="mt-2 max-w-xl text-muted-foreground">
-              Publishers are paid only after delivery confirmation — disputes pause settlement automatically.
+              Publishers are paid only after delivery confirmation — disputes
+              pause settlement automatically.
             </p>
             <Button className="mt-6" size="lg" asChild>
               <a href={PORTAL_URL}>Create your account</a>

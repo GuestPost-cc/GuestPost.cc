@@ -1,12 +1,30 @@
-import { Type } from "class-transformer"
-import { IsString, IsOptional, IsNumber, IsBoolean, IsArray, IsEnum, IsUrl, IsObject, ValidateNested, Min, Max, MinLength, MaxLength } from "class-validator"
 import { ListingStatus, ServiceType } from "@guestpost/database"
-import { WebsiteOwnershipType } from "@guestpost/shared"
+import type { WebsiteOwnershipType } from "@guestpost/shared"
+import { Type } from "class-transformer"
+import {
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUrl,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateNested,
+} from "class-validator"
 
 // Public-facing availability values must mirror the Prisma enum without
 // importing it as a type at runtime (Prisma re-exports it as a union).
-export const SERVICE_AVAILABILITY_VALUES = ["AVAILABLE", "PAUSED", "WAITLIST"] as const
-export type ServiceAvailability = typeof SERVICE_AVAILABILITY_VALUES[number]
+export const SERVICE_AVAILABILITY_VALUES = [
+  "AVAILABLE",
+  "PAUSED",
+  "WAITLIST",
+] as const
+export type ServiceAvailability = (typeof SERVICE_AVAILABILITY_VALUES)[number]
 
 // One service offering on a listing. The same listing can carry many.
 // Price + turnaround are snapshotted onto the Order at creation, so
@@ -167,7 +185,16 @@ export class SearchListingsDto {
 
   @IsOptional()
   @IsString()
-  sortBy?: "recommended" | "dr" | "traffic" | "price_asc" | "price_desc" | "newest" | "popular" | "best_rated" | "most_ordered"
+  sortBy?:
+    | "recommended"
+    | "dr"
+    | "traffic"
+    | "price_asc"
+    | "price_desc"
+    | "newest"
+    | "popular"
+    | "best_rated"
+    | "most_ordered"
 
   @IsOptional()
   @Type(() => Number)

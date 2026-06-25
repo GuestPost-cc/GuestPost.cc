@@ -1,9 +1,14 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
-import { CustomerRole, QUEUES } from "@guestpost/shared"
+import { type CustomerRole, QUEUES } from "@guestpost/shared"
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
-import { QueueService } from "../queues/queue.service"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
+import type { QueueService } from "../queues/queue.service"
 
 @Injectable()
 export class IdentityService {
@@ -24,7 +29,11 @@ export class IdentityService {
     })
   }
 
-  async createOrganization(data: { name: string; slug: string; ownerId: string }) {
+  async createOrganization(data: {
+    name: string
+    slug: string
+    ownerId: string
+  }) {
     const org = await this.prisma.organization.create({
       data: {
         name: data.name,
@@ -88,7 +97,10 @@ export class IdentityService {
 
     const publisher = await this.prisma.$transaction(async (tx: any) => {
       const org = await tx.organization.create({
-        data: { name: `Publisher org for ${user.email}`, slug: `pub-${userId.slice(0, 12)}` },
+        data: {
+          name: `Publisher org for ${user.email}`,
+          slug: `pub-${userId.slice(0, 12)}`,
+        },
       })
       const created = await tx.publisher.create({
         data: {
@@ -102,16 +114,22 @@ export class IdentityService {
       await tx.publisherMembership.create({
         data: { userId, publisherId: created.id, role: "PUBLISHER_OWNER" },
       })
-      await tx.user.update({ where: { id: userId }, data: { userType: "PUBLISHER" } })
+      await tx.user.update({
+        where: { id: userId },
+        data: { userType: "PUBLISHER" },
+      })
 
-      await this.audit.log({
-        action: "PUBLISHER_SELF_ONBOARDED",
-        entityType: "Publisher",
-        entityId: created.id,
-        metadata: { userId, name, organizationId: org.id },
-        userId,
-        organizationId: org.id,
-      }, tx)
+      await this.audit.log(
+        {
+          action: "PUBLISHER_SELF_ONBOARDED",
+          entityType: "Publisher",
+          entityId: created.id,
+          metadata: { userId, name, organizationId: org.id },
+          userId,
+          organizationId: org.id,
+        },
+        tx,
+      )
 
       return created
     })
@@ -125,9 +143,13 @@ export class IdentityService {
   async listOrganizations(userId: string) {
     const memberships = await this.prisma.membership.findMany({
       where: { userId, status: "ACTIVE" },
-      include: { organization: { select: { id: true, name: true, slug: true } } },
+      include: {
+        organization: { select: { id: true, name: true, slug: true } },
+      },
     })
-    const activeCtx = await this.prisma.activeContext.findUnique({ where: { userId } })
+    const activeCtx = await this.prisma.activeContext.findUnique({
+      where: { userId },
+    })
     return memberships.map((m) => ({
       id: m.organization.id,
       name: m.organization.name,
@@ -141,7 +163,9 @@ export class IdentityService {
   async listPendingInvites(userId: string) {
     const pending = await this.prisma.membership.findMany({
       where: { userId, status: "PENDING" },
-      include: { organization: { select: { id: true, name: true, slug: true } } },
+      include: {
+        organization: { select: { id: true, name: true, slug: true } },
+      },
       orderBy: { createdAt: "desc" },
     })
     return pending.map((m) => ({
@@ -177,11 +201,18 @@ export class IdentityService {
         action: "MEMBER_INVITE_ACCEPTED",
         entityType: "Membership",
         entityId: membershipId,
-        metadata: { organizationId: membership.organization.id, role: membership.role },
+        metadata: {
+          organizationId: membership.organization.id,
+          role: membership.role,
+        },
         userId,
         organizationId: membership.organization.id,
       })
-      return { accepted: true, organizationId: membership.organization.id, role: updated.role }
+      return {
+        accepted: true,
+        organizationId: membership.organization.id,
+        role: updated.role,
+      }
     }
 
     await this.prisma.membership.delete({ where: { id: membershipId } })
@@ -196,12 +227,20 @@ export class IdentityService {
     return { accepted: false }
   }
 
-  async inviteMember(organizationId: string, callerUserId: string, email: string, role: CustomerRole) {
+  async inviteMember(
+    organizationId: string,
+    callerUserId: string,
+    email: string,
+    role: CustomerRole,
+  ) {
     const membership = await this.prisma.membership.findFirst({
       where: { organizationId, userId: callerUserId, role: { in: ["OWNER"] } },
     })
 
-    if (!membership) throw new ForbiddenException("Only organization owners can invite members")
+    if (!membership)
+      throw new ForbiddenException(
+        "Only organization owners can invite members",
+      )
 
     const user = await this.prisma.user.findUnique({ where: { email } })
     if (!user) throw new NotFoundException("User not found")
@@ -213,7 +252,10 @@ export class IdentityService {
     const existing = await this.prisma.membership.findUnique({
       where: { userId_organizationId: { userId: user.id, organizationId } },
     })
-    if (existing) throw new ForbiddenException("User is already a member of this organization")
+    if (existing)
+      throw new ForbiddenException(
+        "User is already a member of this organization",
+      )
 
     // Invite is PENDING until the user accepts — they get no access and the
     // org doesn't appear in their list until then.
@@ -226,12 +268,14 @@ export class IdentityService {
       },
     })
     // Notify the invited user
-    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
-      userId: user.id,
-      organizationId,
-      type: "ORG_INVITE",
-      message: `You've been invited to join an organization as ${role}.`,
-    }).catch(() => {})
+    await this.queue
+      .addJob(QUEUES.NOTIFICATION, "push-in-app", {
+        userId: user.id,
+        organizationId,
+        type: "ORG_INVITE",
+        message: `You've been invited to join an organization as ${role}.`,
+      })
+      .catch(() => {})
 
     await this.audit.log({
       action: "MEMBER_INVITED",
@@ -245,25 +289,36 @@ export class IdentityService {
     return invited
   }
 
-  async removeMember(organizationId: string, callerUserId: string, targetUserId: string) {
+  async removeMember(
+    organizationId: string,
+    callerUserId: string,
+    targetUserId: string,
+  ) {
     const callerMembership = await this.prisma.membership.findFirst({
       where: { organizationId, userId: callerUserId, role: { in: ["OWNER"] } },
     })
     if (!callerMembership) {
-      throw new ForbiddenException("Only organization owners can remove members")
+      throw new ForbiddenException(
+        "Only organization owners can remove members",
+      )
     }
 
     const targetMembership = await this.prisma.membership.findUnique({
-      where: { userId_organizationId: { userId: targetUserId, organizationId } },
+      where: {
+        userId_organizationId: { userId: targetUserId, organizationId },
+      },
     })
-    if (!targetMembership) throw new NotFoundException("Member not found in this organization")
+    if (!targetMembership)
+      throw new NotFoundException("Member not found in this organization")
 
     if (targetMembership.role === "OWNER") {
       const ownerCount = await this.prisma.membership.count({
         where: { organizationId, role: "OWNER", status: "ACTIVE" },
       })
       if (ownerCount <= 1) {
-        throw new ForbiddenException("Cannot remove the last owner of the organization")
+        throw new ForbiddenException(
+          "Cannot remove the last owner of the organization",
+        )
       }
     }
 
@@ -274,7 +329,10 @@ export class IdentityService {
       action: "MEMBER_REMOVED",
       entityType: "Membership",
       entityId: targetMembership.id,
-      metadata: { removedUserId: targetUserId, removedRole: targetMembership.role },
+      metadata: {
+        removedUserId: targetUserId,
+        removedRole: targetMembership.role,
+      },
       userId: callerUserId,
       organizationId,
     })
@@ -285,9 +343,12 @@ export class IdentityService {
       where: { organizationId, userId, role: { in: ["OWNER"] } },
     })
 
-    if (!membership) throw new ForbiddenException("Only organization owners can create teams")
+    if (!membership)
+      throw new ForbiddenException("Only organization owners can create teams")
 
-    const team = await this.prisma.team.create({ data: { name, organizationId } })
+    const team = await this.prisma.team.create({
+      data: { name, organizationId },
+    })
 
     await this.audit.log({
       action: "TEAM_CREATED",
@@ -305,7 +366,8 @@ export class IdentityService {
     const membership = await this.prisma.membership.findFirst({
       where: { organizationId, userId, role: { in: ["OWNER"] } },
     })
-    if (!membership) throw new ForbiddenException("Only organization owners can delete teams")
+    if (!membership)
+      throw new ForbiddenException("Only organization owners can delete teams")
 
     const team = await this.prisma.team.findFirst({
       where: { id: teamId, organizationId },
@@ -329,7 +391,8 @@ export class IdentityService {
       where: { organizationId, userId },
     })
 
-    if (!membership) throw new ForbiddenException("You don't belong to this organization")
+    if (!membership)
+      throw new ForbiddenException("You don't belong to this organization")
 
     return this.prisma.team.findMany({ where: { organizationId } })
   }
@@ -338,7 +401,8 @@ export class IdentityService {
     const membership = await this.prisma.membership.findFirst({
       where: { organizationId, userId },
     })
-    if (!membership) throw new ForbiddenException("You don't belong to this organization")
+    if (!membership)
+      throw new ForbiddenException("You don't belong to this organization")
 
     const org = await this.prisma.organization.findUnique({
       where: { id: organizationId },
@@ -364,11 +428,23 @@ export class IdentityService {
     const membership = await this.prisma.membership.findFirst({
       where: { organizationId, userId },
     })
-    if (!membership) throw new ForbiddenException("You don't belong to this organization")
+    if (!membership)
+      throw new ForbiddenException("You don't belong to this organization")
 
     const members = await this.prisma.membership.findMany({
       where: { organizationId },
-      include: { user: { select: { id: true, name: true, email: true, image: true, banned: true, createdAt: true } } },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            image: true,
+            banned: true,
+            createdAt: true,
+          },
+        },
+      },
       orderBy: { createdAt: "asc" },
     })
 

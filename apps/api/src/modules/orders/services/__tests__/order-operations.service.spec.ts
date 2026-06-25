@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
+import {
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+} from "@nestjs/common"
 import { OrderOperationsService } from "../order-operations.service"
 
 describe("OrderOperationsService", () => {
@@ -40,8 +44,15 @@ describe("OrderOperationsService", () => {
       $transaction: jest.fn(),
     }
 
-    const deliveryMock = { submitDelivery: jest.fn().mockResolvedValue({ id: "dv-1" }) }
-    service = new OrderOperationsService(prismaMock as any, auditMock as any, queueMock as any, deliveryMock as any)
+    const deliveryMock = {
+      submitDelivery: jest.fn().mockResolvedValue({ id: "dv-1" }),
+    }
+    service = new OrderOperationsService(
+      prismaMock as any,
+      auditMock as any,
+      queueMock as any,
+      deliveryMock as any,
+    )
   })
 
   describe("acceptOrder", () => {
@@ -117,12 +128,19 @@ describe("OrderOperationsService", () => {
         version: 2,
       })
 
-      const result = await service.submitContent("order-1", "ops-user", "Sample content")
+      const result = await service.submitContent(
+        "order-1",
+        "ops-user",
+        "Sample content",
+      )
 
       expect(result.status).toBe("CONTENT_CREATION")
       expect(prismaMock.contentOrder.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          create: expect.objectContaining({ brief: "Sample content", status: "IN_PROGRESS" }),
+          create: expect.objectContaining({
+            brief: "Sample content",
+            status: "IN_PROGRESS",
+          }),
         }),
       )
     })
@@ -130,9 +148,9 @@ describe("OrderOperationsService", () => {
     it("rejects content for non-ACCEPTED orders", async () => {
       prismaMock.order.findUnique.mockResolvedValue(mockPlatformOrder)
 
-      await expect(service.submitContent("order-1", "ops-user", "content")).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.submitContent("order-1", "ops-user", "content"),
+      ).rejects.toThrow(BadRequestException)
     })
   })
 
@@ -151,14 +169,20 @@ describe("OrderOperationsService", () => {
         version: 2,
       })
 
-      const result = await service.markPublished("order-1", "ops-user", "https://example.com/article")
+      const result = await service.markPublished(
+        "order-1",
+        "ops-user",
+        "https://example.com/article",
+      )
 
       expect(result.status).toBe("PUBLISHED")
       // Delegates to the shared delivery service (immutable version + verify enqueue)
       expect((service as any).delivery.submitDelivery).toHaveBeenCalledWith(
         approvedOrder,
         "ops-user",
-        expect.objectContaining({ publishedUrl: "https://example.com/article" }),
+        expect.objectContaining({
+          publishedUrl: "https://example.com/article",
+        }),
       )
       expect(prismaMock.fulfillmentAssignment.updateMany).toHaveBeenCalled()
     })
@@ -166,10 +190,16 @@ describe("OrderOperationsService", () => {
     it("rejects publish when ops user has no active assignment", async () => {
       const approvedOrder = { ...mockPlatformOrder, status: "APPROVED" }
       prismaMock.order.findUnique.mockResolvedValue(approvedOrder)
-      prismaMock.fulfillmentAssignment = { findFirst: jest.fn().mockResolvedValue(null) }
+      prismaMock.fulfillmentAssignment = {
+        findFirst: jest.fn().mockResolvedValue(null),
+      }
 
       await expect(
-        service.markPublished("order-1", "ops-user", "https://example.com/article"),
+        service.markPublished(
+          "order-1",
+          "ops-user",
+          "https://example.com/article",
+        ),
       ).rejects.toThrow(BadRequestException)
     })
 
@@ -177,7 +207,11 @@ describe("OrderOperationsService", () => {
       prismaMock.order.findUnique.mockResolvedValue(mockPlatformOrder)
 
       await expect(
-        service.markPublished("order-1", "ops-user", "https://example.com/article"),
+        service.markPublished(
+          "order-1",
+          "ops-user",
+          "https://example.com/article",
+        ),
       ).rejects.toThrow(BadRequestException)
     })
 
@@ -185,7 +219,11 @@ describe("OrderOperationsService", () => {
       prismaMock.order.findUnique.mockResolvedValue(mockPublisherOrder)
 
       await expect(
-        service.markPublished("order-2", "ops-user", "https://example.com/article"),
+        service.markPublished(
+          "order-2",
+          "ops-user",
+          "https://example.com/article",
+        ),
       ).rejects.toThrow(BadRequestException)
     })
   })

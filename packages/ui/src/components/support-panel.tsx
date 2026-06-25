@@ -10,12 +10,21 @@
 //   - `actorScope` only controls the empty-state copy — it does NOT scope
 //     the data. Server-side authz already enforces visibility.
 
-import * as React from "react"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "./card"
-import { Button } from "./button"
-import { Skeleton } from "./skeleton"
-import { FulfillmentChannelBadge, type FulfillmentChannelValue } from "./fulfillment-channel-badge"
+import type * as React from "react"
 import { cn } from "../lib/utils"
+import { Button } from "./button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./card"
+import {
+  FulfillmentChannelBadge,
+  type FulfillmentChannelValue,
+} from "./fulfillment-channel-badge"
+import { Skeleton } from "./skeleton"
 
 export interface SupportPanelTicket {
   id: string
@@ -25,7 +34,14 @@ export interface SupportPanelTicket {
   createdAt?: string | null
   fulfillmentChannel?: FulfillmentChannelValue
   lastMessagePreview?: string | null
-  lastResponderRole?: "CUSTOMER" | "PUBLISHER" | "OPERATIONS" | "ADMIN" | "FINANCE" | string | null
+  lastResponderRole?:
+    | "CUSTOMER"
+    | "PUBLISHER"
+    | "OPERATIONS"
+    | "ADMIN"
+    | "FINANCE"
+    | string
+    | null
 }
 
 export type SupportPanelActorScope =
@@ -48,11 +64,13 @@ export interface SupportPanelProps {
 }
 
 const EMPTY_COPY: Record<SupportPanelActorScope, string> = {
-  customer:    "No tickets yet for this order. Open one if something's blocking you.",
-  publisher:   "No tickets on this order. Customers will reach you here if they need help.",
-  operations:  "No support activity on this order yet.",
-  admin:       "No support activity on this order yet.",
-  finance:     "No support activity on this order yet.",
+  customer:
+    "No tickets yet for this order. Open one if something's blocking you.",
+  publisher:
+    "No tickets on this order. Customers will reach you here if they need help.",
+  operations: "No support activity on this order yet.",
+  admin: "No support activity on this order yet.",
+  finance: "No support activity on this order yet.",
 }
 
 export function SupportPanel({
@@ -88,9 +106,11 @@ export function SupportPanel({
             <Skeleton className="h-16 w-full" />
           </div>
         ) : !tickets || tickets.length === 0 ? (
-          emptyState ?? (
-            <p className="text-sm text-muted-foreground">{EMPTY_COPY[actorScope]}</p>
-          )
+          (emptyState ?? (
+            <p className="text-sm text-muted-foreground">
+              {EMPTY_COPY[actorScope]}
+            </p>
+          ))
         ) : (
           <ul className="space-y-2">
             {tickets.map((ticket) => (
@@ -133,7 +153,9 @@ function SupportTicketRow({
           </p>
         )}
         {updatedLabel && (
-          <p className="text-xs text-muted-foreground">Updated {updatedLabel}</p>
+          <p className="text-xs text-muted-foreground">
+            Updated {updatedLabel}
+          </p>
         )}
       </div>
       <StatusPill status={ticket.status} />
@@ -143,7 +165,10 @@ function SupportTicketRow({
   if (!linkHref) return content
 
   return (
-    <a href={linkHref(ticket.id)} className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
+    <a
+      href={linkHref(ticket.id)}
+      className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+    >
       {content}
     </a>
   )

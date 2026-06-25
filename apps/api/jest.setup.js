@@ -19,5 +19,6 @@
 // it controls its own env via jest.isolateModules + delete process.env
 // inside the test callback, so the global default here doesn't interfere.
 if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = "postgresql://test:test@localhost:5432/test_jest_default"
+  process.env.DATABASE_URL =
+    "postgresql://test:test@localhost:5432/test_jest_default"
 }

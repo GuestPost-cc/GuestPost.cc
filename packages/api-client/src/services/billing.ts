@@ -1,4 +1,4 @@
-import { HttpClient } from "../client"
+import type { HttpClient } from "../client"
 
 export interface TransactionResponse {
   id: string
@@ -33,21 +33,42 @@ export class BillingService {
   }
 
   deposit(data: { walletId: string; amount: number; reference?: string }) {
-    return this.client.post<WalletResponse>(`/billing/wallet/${data.walletId}/deposit`, {
-      json: { amount: data.amount, ...(data.reference ? { reference: data.reference } : {}) },
-    })
+    return this.client.post<WalletResponse>(
+      `/billing/wallet/${data.walletId}/deposit`,
+      {
+        json: {
+          amount: data.amount,
+          ...(data.reference ? { reference: data.reference } : {}),
+        },
+      },
+    )
   }
 
   createCheckoutSession(data: { walletId: string; amount: number }) {
-    return this.client.post<{ url: string }>(`/billing/wallet/${data.walletId}/checkout`, {
-      json: { amount: data.amount },
-    })
+    return this.client.post<{ url: string }>(
+      `/billing/wallet/${data.walletId}/checkout`,
+      {
+        json: { amount: data.amount },
+      },
+    )
   }
 
-  withdraw(data: { walletId: string; amount: number; idempotencyKey?: string }) {
-    return this.client.post<WalletResponse>(`/billing/wallet/${data.walletId}/withdraw`, {
-      json: { amount: data.amount, ...(data.idempotencyKey ? { idempotencyKey: data.idempotencyKey } : {}) },
-    })
+  withdraw(data: {
+    walletId: string
+    amount: number
+    idempotencyKey?: string
+  }) {
+    return this.client.post<WalletResponse>(
+      `/billing/wallet/${data.walletId}/withdraw`,
+      {
+        json: {
+          amount: data.amount,
+          ...(data.idempotencyKey
+            ? { idempotencyKey: data.idempotencyKey }
+            : {}),
+        },
+      },
+    )
   }
 
   listTransactions() {

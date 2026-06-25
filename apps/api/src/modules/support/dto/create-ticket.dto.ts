@@ -1,4 +1,10 @@
-import { IsOptional, IsString, MaxLength, MinLength, Matches } from "class-validator"
+import {
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from "class-validator"
 
 // Phase 6.7 — Audit finding V-1 closure.
 //

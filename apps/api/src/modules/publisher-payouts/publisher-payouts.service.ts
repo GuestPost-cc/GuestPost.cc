@@ -1,11 +1,21 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
-import { QueueService } from "../queues/queue.service"
-import { PayoutEncryptionService } from "./payout-encryption.service"
-import { PayoutExecutionService } from "./payout-execution.service"
-import { QUEUES, getWithdrawalHoldDays, type PublisherTier } from "@guestpost/shared"
+import {
+  getWithdrawalHoldDays,
+  type PublisherTier,
+  QUEUES,
+} from "@guestpost/shared"
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
+import type { QueueService } from "../queues/queue.service"
+import type { PayoutEncryptionService } from "./payout-encryption.service"
+import type { PayoutExecutionService } from "./payout-execution.service"
 
 // Phase 7.2 — TIER_WITHDRAWAL_HOLDS lifted to packages/shared/src/publisher-tier-policy.ts
 // (audit #6 sibling rider). Single source of truth across the platform for
@@ -19,7 +29,7 @@ export class PublisherPayoutsService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
     private readonly encryption: PayoutEncryptionService,
-    private readonly execution: PayoutExecutionService,
+    readonly _execution: PayoutExecutionService,
   ) {}
 
   async getBalance(publisherId: string) {
@@ -40,18 +50,33 @@ export class PublisherPayoutsService {
     const membership = await this.prisma.publisherMembership.findFirst({
       where: { userId, publisherId },
     })
-    if (!membership) throw new ForbiddenException("You do not own this publisher account")
+    if (!membership)
+      throw new ForbiddenException("You do not own this publisher account")
   }
 
-  async createPayoutMethod(publisherId: string, userId: string, dto: { type: string; label: string; details: Record<string, unknown>; isDefault?: boolean }) {
+  async createPayoutMethod(
+    publisherId: string,
+    userId: string,
+    dto: {
+      type: string
+      label: string
+      details: Record<string, unknown>
+      isDefault?: boolean
+    },
+  ) {
     await this.assertPublisherMember(userId, publisherId)
     const allowed = ["bank_transfer", "paypal", "wise"]
     if (!allowed.includes(dto.type)) {
-      throw new BadRequestException(`Payout method type must be one of: ${allowed.join(", ")}`)
+      throw new BadRequestException(
+        `Payout method type must be one of: ${allowed.join(", ")}`,
+      )
     }
 
     const { ciphertext, version } = this.encryption.encrypt(dto.details)
-    const displayDetails = this.encryption.extractDisplayDetails(dto.details, dto.type)
+    const displayDetails = this.encryption.extractDisplayDetails(
+      dto.details,
+      dto.type,
+    )
 
     return this.prisma.$transaction(async (tx: any) => {
       if (dto.isDefault) {
@@ -71,16 +96,27 @@ export class PublisherPayoutsService {
           isDefault: dto.isDefault ?? false,
         },
       })
-      const publisher = await tx.publisher.findUnique({ where: { id: publisherId } })
-      await this.audit.log({
-        action: "PAYOUT_METHOD_CREATED",
-        entityType: "PayoutMethod",
-        entityId: method.id,
-        metadata: { publisherId, type: dto.type, label: dto.label },
-        userId,
-        organizationId: publisher?.organizationId as string | null,
-      }, tx)
-      return { id: method.id, type: method.type, label: method.label, isDefault: method.isDefault, displayDetails }
+      const publisher = await tx.publisher.findUnique({
+        where: { id: publisherId },
+      })
+      await this.audit.log(
+        {
+          action: "PAYOUT_METHOD_CREATED",
+          entityType: "PayoutMethod",
+          entityId: method.id,
+          metadata: { publisherId, type: dto.type, label: dto.label },
+          userId,
+          organizationId: publisher?.organizationId as string | null,
+        },
+        tx,
+      )
+      return {
+        id: method.id,
+        type: method.type,
+        label: method.label,
+        isDefault: method.isDefault,
+        displayDetails,
+      }
     })
   }
 
@@ -89,7 +125,16 @@ export class PublisherPayoutsService {
     const methods = await this.prisma.payoutMethod.findMany({
       where: { publisherId, isActive: true },
       orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
-      select: { id: true, type: true, label: true, displayDetails: true, isDefault: true, isActive: true, createdAt: true, updatedAt: true },
+      select: {
+        id: true,
+        type: true,
+        label: true,
+        displayDetails: true,
+        isDefault: true,
+        isActive: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     })
     return methods.map((m: any) => ({
       id: m.id,
@@ -100,20 +145,38 @@ export class PublisherPayoutsService {
     }))
   }
 
-  async decryptPayoutMethod(methodId: string, userId: string, reason: string, ipAddress: string, userAgent: string): Promise<{ details: Record<string, unknown>; methodId: string; publisherId: string }> {
+  async decryptPayoutMethod(
+    methodId: string,
+    userId: string,
+    reason: string,
+    ipAddress: string,
+    userAgent: string,
+  ): Promise<{
+    details: Record<string, unknown>
+    methodId: string
+    publisherId: string
+  }> {
     const method = await this.prisma.payoutMethod.findUnique({
       where: { id: methodId },
       include: { publisher: { select: { organizationId: true } } },
     })
     if (!method) throw new NotFoundException("Payout method not found")
 
-    const details = this.encryption.decrypt(method.details as unknown as string, method.encryptionKeyVersion)
+    const details = this.encryption.decrypt(
+      method.details as unknown as string,
+      method.encryptionKeyVersion,
+    )
 
     await this.audit.log({
       action: "PAYOUT_METHOD_DECRYPTED",
       entityType: "PayoutMethod",
       entityId: methodId,
-      metadata: { publisherId: method.publisherId, reason, ipAddress, userAgent },
+      metadata: {
+        publisherId: method.publisherId,
+        reason,
+        ipAddress,
+        userAgent,
+      },
       userId,
       organizationId: method.publisher?.organizationId ?? null,
     })
@@ -121,12 +184,20 @@ export class PublisherPayoutsService {
     return { details, methodId, publisherId: method.publisherId }
   }
 
-  async deactivatePayoutMethod(publisherId: string, userId: string, id: string) {
+  async deactivatePayoutMethod(
+    publisherId: string,
+    userId: string,
+    id: string,
+  ) {
     await this.assertPublisherMember(userId, publisherId)
-    const method = await this.prisma.payoutMethod.findFirst({ where: { id, publisherId } })
+    const method = await this.prisma.payoutMethod.findFirst({
+      where: { id, publisherId },
+    })
     if (!method) throw new NotFoundException("Payout method not found")
 
-    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
     await this.prisma.payoutMethod.update({
       where: { id },
       data: { isActive: false, isDefault: false },
@@ -154,7 +225,9 @@ export class PublisherPayoutsService {
   ) {
     await this.assertPublisherMember(userId, publisherId)
 
-    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
     if (!publisher) throw new NotFoundException("Publisher not found")
 
     if (!Number.isFinite(amount) || amount <= 0) {
@@ -165,7 +238,8 @@ export class PublisherPayoutsService {
       const payoutMethod = await this.prisma.payoutMethod.findFirst({
         where: { id: payoutMethodId, publisherId, isActive: true },
       })
-      if (!payoutMethod) throw new BadRequestException("Payout method not found or inactive")
+      if (!payoutMethod)
+        throw new BadRequestException("Payout method not found or inactive")
     }
 
     // Tier hold: fraud window before staff may approve the payout.
@@ -217,7 +291,9 @@ export class PublisherPayoutsService {
       } catch (err: any) {
         if (err?.code === "P2002") {
           // Concurrent duplicate with same idempotency key
-          const existing = await tx.withdrawal.findFirst({ where: { publisherId, idempotencyKey } })
+          const existing = await tx.withdrawal.findFirst({
+            where: { publisherId, idempotencyKey },
+          })
           if (existing) return existing
         }
         throw err
@@ -231,7 +307,9 @@ export class PublisherPayoutsService {
         },
       })
       if (updated.count === 0) {
-        throw new ConflictException("Publisher balance was modified by another request. Retry.")
+        throw new ConflictException(
+          "Publisher balance was modified by another request. Retry.",
+        )
       }
 
       // Ledger row at REQUEST time — this is when the balance moves. A
@@ -246,14 +324,23 @@ export class PublisherPayoutsService {
         },
       })
 
-      await this.audit.log({
-        action: "WITHDRAWAL_REQUESTED",
-        entityType: "Withdrawal",
-        entityId: created.id,
-        metadata: { publisherId, amount, method, holdDays, availableAt: availableAt.toISOString() },
-        userId,
-        organizationId: publisher.organizationId,
-      }, tx)
+      await this.audit.log(
+        {
+          action: "WITHDRAWAL_REQUESTED",
+          entityType: "Withdrawal",
+          entityId: created.id,
+          metadata: {
+            publisherId,
+            amount,
+            method,
+            holdDays,
+            availableAt: availableAt.toISOString(),
+          },
+          userId,
+          organizationId: publisher.organizationId,
+        },
+        tx,
+      )
 
       return created
     })
@@ -272,7 +359,10 @@ export class PublisherPayoutsService {
     }
 
     // Tier hold is a hard gate, not advisory metadata.
-    if (withdrawal.availableAt && withdrawal.availableAt.getTime() > Date.now()) {
+    if (
+      withdrawal.availableAt &&
+      withdrawal.availableAt.getTime() > Date.now()
+    ) {
       throw new BadRequestException(
         `Withdrawal is in its ${withdrawal.publisher.tier} tier hold until ${withdrawal.availableAt.toISOString()}`,
       )
@@ -282,31 +372,52 @@ export class PublisherPayoutsService {
       // Status-guarded write: concurrent approve/reject — only one transition wins
       const transitioned = await tx.withdrawal.updateMany({
         where: { id, status: "PENDING", version: withdrawal.version },
-        data: { status: "APPROVED", approvedBy, approvedAt: new Date(), version: { increment: 1 } },
+        data: {
+          status: "APPROVED",
+          approvedBy,
+          approvedAt: new Date(),
+          version: { increment: 1 },
+        },
       })
       if (transitioned.count === 0) {
         throw new ConflictException("Withdrawal is no longer pending")
       }
       const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
 
-      await this.audit.log({
-        action: "WITHDRAWAL_APPROVED",
-        entityType: "Withdrawal",
-        entityId: id,
-        metadata: { publisherId: withdrawal.publisherId, amount: Number(withdrawal.amount) },
-        userId: approvedBy,
-        organizationId: withdrawal.publisher.organizationId,
-      }, tx)
+      await this.audit.log(
+        {
+          action: "WITHDRAWAL_APPROVED",
+          entityType: "Withdrawal",
+          entityId: id,
+          metadata: {
+            publisherId: withdrawal.publisherId,
+            amount: Number(withdrawal.amount),
+          },
+          userId: approvedBy,
+          organizationId: withdrawal.publisher.organizationId,
+        },
+        tx,
+      )
 
       return updated
     })
 
-    await this.notifyPublisherMembers(withdrawal.publisherId, withdrawal.publisher.organizationId, "WITHDRAWAL_APPROVED", `Withdrawal of ${withdrawal.amount} has been approved.`)
+    await this.notifyPublisherMembers(
+      withdrawal.publisherId,
+      withdrawal.publisher.organizationId,
+      "WITHDRAWAL_APPROVED",
+      `Withdrawal of ${withdrawal.amount} has been approved.`,
+    )
 
     return result
   }
 
-  private async notifyPublisherMembers(publisherId: string, organizationId: string, type: string, message: string) {
+  private async notifyPublisherMembers(
+    publisherId: string,
+    organizationId: string,
+    type: string,
+    message: string,
+  ) {
     const memberships = await this.prisma.publisherMembership.findMany({
       where: { publisherId },
       select: { userId: true },
@@ -327,8 +438,13 @@ export class PublisherPayoutsService {
       include: { publisher: true },
     })
     if (!withdrawal) throw new NotFoundException("Withdrawal not found")
-    if (withdrawal.status !== "APPROVED" && withdrawal.status !== "PROCESSING") {
-      throw new BadRequestException("Withdrawal must be approved before marking as paid")
+    if (
+      withdrawal.status !== "APPROVED" &&
+      withdrawal.status !== "PROCESSING"
+    ) {
+      throw new BadRequestException(
+        "Withdrawal must be approved before marking as paid",
+      )
     }
 
     // PROCESSING means a payout execution is in flight. Only a MANUAL
@@ -341,7 +457,7 @@ export class PublisherPayoutsService {
         where: { withdrawalId: id, status: "PROCESSING" },
         include: { provider: true },
       })
-      if (!inFlightManualExecution || inFlightManualExecution.provider.name !== "manual") {
+      if (inFlightManualExecution?.provider.name !== "manual") {
         throw new BadRequestException(
           "Withdrawal is being processed by an automated provider — completion comes from the provider, not mark-paid",
         )
@@ -352,7 +468,12 @@ export class PublisherPayoutsService {
       // Status-guarded write: prevents double mark-paid (double lifetimePaid increment)
       const transitioned = await tx.withdrawal.updateMany({
         where: { id, status: withdrawal.status, version: withdrawal.version },
-        data: { status: "COMPLETED", approvedBy, approvedAt: new Date(), version: { increment: 1 } },
+        data: {
+          status: "COMPLETED",
+          approvedBy,
+          approvedAt: new Date(),
+          version: { increment: 1 },
+        },
       })
       if (transitioned.count === 0) {
         throw new ConflictException("Withdrawal state changed — retry")
@@ -363,14 +484,22 @@ export class PublisherPayoutsService {
         // Complete the in-flight manual execution instead of creating a duplicate
         const execDone = await tx.payoutExecution.updateMany({
           where: { id: inFlightManualExecution.id, status: "PROCESSING" },
-          data: { status: "COMPLETED", providerMetadata: { markedBy: approvedBy, markedAt: new Date().toISOString() } },
+          data: {
+            status: "COMPLETED",
+            providerMetadata: {
+              markedBy: approvedBy,
+              markedAt: new Date().toISOString(),
+            },
+          },
         })
         if (execDone.count === 0) {
           throw new ConflictException("Execution state changed — retry")
         }
       } else {
         // Direct mark-paid without an execution: record one for traceability
-        const manualProvider = await tx.payoutProvider.findUnique({ where: { name: "manual" } })
+        const manualProvider = await tx.payoutProvider.findUnique({
+          where: { name: "manual" },
+        })
         if (manualProvider) {
           await tx.payoutExecution.create({
             data: {
@@ -379,7 +508,10 @@ export class PublisherPayoutsService {
               status: "COMPLETED",
               amount: withdrawal.amount,
               providerExecutionId: `manual-${id}-${Date.now()}`,
-              providerMetadata: { markedBy: approvedBy, markedAt: new Date().toISOString() },
+              providerMetadata: {
+                markedBy: approvedBy,
+                markedAt: new Date().toISOString(),
+              },
             },
           })
         }
@@ -390,7 +522,10 @@ export class PublisherPayoutsService {
       })
       if (balance) {
         await tx.publisherBalance.updateMany({
-          where: { publisherId: withdrawal.publisherId, version: balance.version },
+          where: {
+            publisherId: withdrawal.publisherId,
+            version: balance.version,
+          },
           data: {
             lifetimePaid: { increment: Number(withdrawal.amount) },
             version: { increment: 1 },
@@ -398,14 +533,20 @@ export class PublisherPayoutsService {
         })
       }
 
-      await this.audit.log({
-        action: "WITHDRAWAL_COMPLETED",
-        entityType: "Withdrawal",
-        entityId: id,
-        metadata: { publisherId: withdrawal.publisherId, amount: Number(withdrawal.amount) },
-        userId: approvedBy,
-        organizationId: withdrawal.publisher.organizationId,
-      }, tx)
+      await this.audit.log(
+        {
+          action: "WITHDRAWAL_COMPLETED",
+          entityType: "Withdrawal",
+          entityId: id,
+          metadata: {
+            publisherId: withdrawal.publisherId,
+            amount: Number(withdrawal.amount),
+          },
+          userId: approvedBy,
+          organizationId: withdrawal.publisher.organizationId,
+        },
+        tx,
+      )
 
       return updated
     })
@@ -425,7 +566,12 @@ export class PublisherPayoutsService {
       // Status-guarded write: prevents double reject (double balance restore)
       const transitioned = await tx.withdrawal.updateMany({
         where: { id, status: "PENDING", version: withdrawal.version },
-        data: { status: "REJECTED", approvedBy, approvedAt: new Date(), version: { increment: 1 } },
+        data: {
+          status: "REJECTED",
+          approvedBy,
+          approvedAt: new Date(),
+          version: { increment: 1 },
+        },
       })
       if (transitioned.count === 0) {
         throw new ConflictException("Withdrawal is no longer pending")
@@ -437,14 +583,19 @@ export class PublisherPayoutsService {
       })
       if (balance) {
         const restored = await tx.publisherBalance.updateMany({
-          where: { publisherId: withdrawal.publisherId, version: balance.version },
+          where: {
+            publisherId: withdrawal.publisherId,
+            version: balance.version,
+          },
           data: {
             withdrawableBalance: { increment: Number(withdrawal.amount) },
             version: { increment: 1 },
           },
         })
         if (restored.count === 0) {
-          throw new ConflictException("Publisher balance was modified by another request. Retry.")
+          throw new ConflictException(
+            "Publisher balance was modified by another request. Retry.",
+          )
         }
       }
 
@@ -459,19 +610,30 @@ export class PublisherPayoutsService {
         },
       })
 
-      await this.audit.log({
-        action: "WITHDRAWAL_REJECTED",
-        entityType: "Withdrawal",
-        entityId: id,
-        metadata: { publisherId: withdrawal.publisherId, amount: Number(withdrawal.amount) },
-        userId: approvedBy,
-        organizationId: withdrawal.publisher.organizationId,
-      }, tx)
+      await this.audit.log(
+        {
+          action: "WITHDRAWAL_REJECTED",
+          entityType: "Withdrawal",
+          entityId: id,
+          metadata: {
+            publisherId: withdrawal.publisherId,
+            amount: Number(withdrawal.amount),
+          },
+          userId: approvedBy,
+          organizationId: withdrawal.publisher.organizationId,
+        },
+        tx,
+      )
 
       return updated
     })
 
-    await this.notifyPublisherMembers(withdrawal.publisherId, withdrawal.publisher.organizationId, "WITHDRAWAL_REJECTED", `Withdrawal of ${withdrawal.amount} was rejected.`)
+    await this.notifyPublisherMembers(
+      withdrawal.publisherId,
+      withdrawal.publisher.organizationId,
+      "WITHDRAWAL_REJECTED",
+      `Withdrawal of ${withdrawal.amount} was rejected.`,
+    )
 
     return result
   }
@@ -481,14 +643,20 @@ export class PublisherPayoutsService {
   // traps the publisher's funds forever: the balance was decremented at
   // request time and rejectWithdrawal only handles PENDING. Returns the money
   // to withdrawableBalance so the publisher can fix details and re-request.
-  async reverseFailedWithdrawal(id: string, reversedBy: string, reason: string) {
+  async reverseFailedWithdrawal(
+    id: string,
+    reversedBy: string,
+    reason: string,
+  ) {
     const withdrawal = await this.prisma.withdrawal.findUnique({
       where: { id },
       include: { publisher: true },
     })
     if (!withdrawal) throw new NotFoundException("Withdrawal not found")
     if (withdrawal.status !== "FAILED") {
-      throw new BadRequestException(`Only FAILED withdrawals can be reversed (current: ${withdrawal.status})`)
+      throw new BadRequestException(
+        `Only FAILED withdrawals can be reversed (current: ${withdrawal.status})`,
+      )
     }
 
     // Money must not have actually moved at the provider. A COMPLETED
@@ -508,10 +676,17 @@ export class PublisherPayoutsService {
       // Status+version guard: double reversal would double-restore the balance
       const transitioned = await tx.withdrawal.updateMany({
         where: { id, status: "FAILED", version: withdrawal.version },
-        data: { status: "REVERSED", approvedBy: reversedBy, approvedAt: new Date(), version: { increment: 1 } },
+        data: {
+          status: "REVERSED",
+          approvedBy: reversedBy,
+          approvedAt: new Date(),
+          version: { increment: 1 },
+        },
       })
       if (transitioned.count === 0) {
-        throw new ConflictException("Withdrawal is no longer FAILED — already reversed or retried")
+        throw new ConflictException(
+          "Withdrawal is no longer FAILED — already reversed or retried",
+        )
       }
       const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
 
@@ -520,14 +695,19 @@ export class PublisherPayoutsService {
       })
       if (!balance) throw new NotFoundException("Publisher balance not found")
       const restored = await tx.publisherBalance.updateMany({
-        where: { publisherId: withdrawal.publisherId, version: balance.version },
+        where: {
+          publisherId: withdrawal.publisherId,
+          version: balance.version,
+        },
         data: {
           withdrawableBalance: { increment: Number(withdrawal.amount) },
           version: { increment: 1 },
         },
       })
       if (restored.count === 0) {
-        throw new ConflictException("Publisher balance was modified by another request. Retry.")
+        throw new ConflictException(
+          "Publisher balance was modified by another request. Retry.",
+        )
       }
 
       // Offsetting ledger row for the WITHDRAWAL written at request time.
@@ -543,14 +723,21 @@ export class PublisherPayoutsService {
         },
       })
 
-      await this.audit.log({
-        action: "WITHDRAWAL_REVERSED",
-        entityType: "Withdrawal",
-        entityId: id,
-        metadata: { publisherId: withdrawal.publisherId, amount: Number(withdrawal.amount), reason },
-        userId: reversedBy,
-        organizationId: withdrawal.publisher.organizationId,
-      }, tx)
+      await this.audit.log(
+        {
+          action: "WITHDRAWAL_REVERSED",
+          entityType: "Withdrawal",
+          entityId: id,
+          metadata: {
+            publisherId: withdrawal.publisherId,
+            amount: Number(withdrawal.amount),
+            reason,
+          },
+          userId: reversedBy,
+          organizationId: withdrawal.publisher.organizationId,
+        },
+        tx,
+      )
 
       return updated
     })
@@ -571,7 +758,10 @@ export class PublisherPayoutsService {
       this.prisma.withdrawal.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        include: { publisher: true, payoutMethod: { select: { id: true, type: true, label: true } } },
+        include: {
+          publisher: true,
+          payoutMethod: { select: { id: true, type: true, label: true } },
+        },
         take,
         skip,
       }),

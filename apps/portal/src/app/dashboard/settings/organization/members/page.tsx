@@ -1,25 +1,54 @@
 "use client"
 
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  EmptyState,
+  ErrorState,
+  Input,
+  Label,
+  LoadingState,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  Loader2,
+  Mail,
+  Search,
+  ShieldAlert,
+  UserMinus,
+  UserPlus,
+  Users,
+} from "lucide-react"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
 import { z } from "zod"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
+import { RoleBadge } from "../../../../../components/RoleBadge"
 import { api } from "../../../../../lib/api"
 import { useAuth } from "../../../../../lib/auth"
-import {
-  Card, CardContent, CardHeader, CardTitle, CardDescription,
-  Input, Button, Table, TableHeader, TableBody, TableHead, TableRow, TableCell,
-  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription,
-  DialogFooter, DialogClose, Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-  Label,
-} from "@guestpost/ui"
-import {
-  Skeleton, ErrorState, EmptyState, LoadingState,
-} from "@guestpost/ui"
-import { RoleBadge } from "../../../../../components/RoleBadge"
-import { toast } from "sonner"
-import { Search, Users, UserPlus, UserMinus, Loader2, Mail, ShieldAlert } from "lucide-react"
 
 export default function OrgMembersPage() {
   const { user } = useAuth()
@@ -29,16 +58,26 @@ export default function OrgMembersPage() {
 
   const [search, setSearch] = useState("")
   const [inviteOpen, setInviteOpen] = useState(false)
-  const [removeTarget, setRemoveTarget] = useState<{ id: string; name: string | null; email: string } | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<{
+    id: string
+    name: string | null
+    email: string
+  } | null>(null)
 
-  const { data: members, isLoading, error, refetch } = useQuery({
+  const {
+    data: members,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["org-members", orgId],
     queryFn: () => api.identity.listMembers(orgId!),
     enabled: !!orgId,
   })
 
   const inviteMutation = useMutation({
-    mutationFn: (data: { email: string; role: string }) => api.identity.inviteMember(orgId!, data),
+    mutationFn: (data: { email: string; role: string }) =>
+      api.identity.inviteMember(orgId!, data),
     onSuccess: () => {
       toast.success("Member invited successfully")
       setInviteOpen(false)
@@ -48,7 +87,8 @@ export default function OrgMembersPage() {
   })
 
   const removeMutation = useMutation({
-    mutationFn: (targetUserId: string) => api.identity.removeMember(orgId!, targetUserId),
+    mutationFn: (targetUserId: string) =>
+      api.identity.removeMember(orgId!, targetUserId),
     onSuccess: () => {
       toast.success("Member removed")
       setRemoveTarget(null)
@@ -60,11 +100,19 @@ export default function OrgMembersPage() {
   const filtered = members?.filter((m) => {
     if (!search) return true
     const q = search.toLowerCase()
-    return m.name?.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+    return (
+      m.name?.toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+    )
   })
 
   if (!orgId) {
-    return <EmptyState icon={Users} title="No organization" description="You are not part of an organization." />
+    return (
+      <EmptyState
+        icon={Users}
+        title="No organization"
+        description="You are not part of an organization."
+      />
+    )
   }
 
   return (
@@ -100,18 +148,32 @@ export default function OrgMembersPage() {
       {isLoading ? (
         <LoadingState variant="table" />
       ) : error ? (
-        <ErrorState title="Failed to load members" description={(error as Error).message} onRetry={() => refetch()} />
+        <ErrorState
+          title="Failed to load members"
+          description={(error as Error).message}
+          onRetry={() => refetch()}
+        />
       ) : !filtered || filtered.length === 0 ? (
         <EmptyState
           icon={Users}
           title={search ? "No members match your search" : "No members yet"}
-          description={search ? "Try a different search term." : "Invite members to collaborate on campaigns."}
-          action={isOwner && !search ? { label: "Invite Member", onClick: () => setInviteOpen(true) } : undefined}
+          description={
+            search
+              ? "Try a different search term."
+              : "Invite members to collaborate on campaigns."
+          }
+          action={
+            isOwner && !search
+              ? { label: "Invite Member", onClick: () => setInviteOpen(true) }
+              : undefined
+          }
         />
       ) : (
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">{filtered.length} member{filtered.length !== 1 ? "s" : ""}</CardTitle>
+            <CardTitle className="text-base">
+              {filtered.length} member{filtered.length !== 1 ? "s" : ""}
+            </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <Table>
@@ -127,9 +189,15 @@ export default function OrgMembersPage() {
               <TableBody>
                 {filtered.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium">{m.name || "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{m.email}</TableCell>
-                    <TableCell><RoleBadge role={m.role} /></TableCell>
+                    <TableCell className="font-medium">
+                      {m.name || "—"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {m.email}
+                    </TableCell>
+                    <TableCell>
+                      <RoleBadge role={m.role} />
+                    </TableCell>
                     <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
                       {new Date(m.joinedAt).toLocaleDateString()}
                     </TableCell>
@@ -139,7 +207,13 @@ export default function OrgMembersPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => setRemoveTarget({ id: m.userId, name: m.name, email: m.email })}
+                          onClick={() =>
+                            setRemoveTarget({
+                              id: m.userId,
+                              name: m.name,
+                              email: m.email,
+                            })
+                          }
                         >
                           <UserMinus className="h-4 w-4" />
                         </Button>
@@ -153,19 +227,27 @@ export default function OrgMembersPage() {
         </Card>
       )}
 
-      <Dialog open={!!removeTarget} onOpenChange={(open) => { if (!open) setRemoveTarget(null) }}>
+      <Dialog
+        open={!!removeTarget}
+        onOpenChange={(open) => {
+          if (!open) setRemoveTarget(null)
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Remove Member</DialogTitle>
             <DialogDescription>
-              This will remove <strong>{removeTarget?.name || removeTarget?.email}</strong> from the organization.
-              They will lose access to all organization resources.
+              This will remove{" "}
+              <strong>{removeTarget?.name || removeTarget?.email}</strong> from
+              the organization. They will lose access to all organization
+              resources.
             </DialogDescription>
           </DialogHeader>
           <div className="flex items-center gap-3 rounded-lg border bg-muted/50 p-4 text-sm">
             <ShieldAlert className="h-5 w-5 text-destructive shrink-0" />
             <p className="text-muted-foreground">
-              This action cannot be undone. The member will need a new invitation to rejoin.
+              This action cannot be undone. The member will need a new
+              invitation to rejoin.
             </p>
           </div>
           <DialogFooter>
@@ -174,10 +256,14 @@ export default function OrgMembersPage() {
             </DialogClose>
             <Button
               variant="destructive"
-              onClick={() => removeTarget && removeMutation.mutate(removeTarget.id)}
+              onClick={() =>
+                removeTarget && removeMutation.mutate(removeTarget.id)
+              }
               disabled={removeMutation.isPending}
             >
-              {removeMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {removeMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Remove Member
             </Button>
           </DialogFooter>
@@ -205,16 +291,22 @@ function InviteMemberForm({
       z.object({
         email: z.string().email("Invalid email address"),
         role: z.string().min(1, "Role is required"),
-      })
+      }),
     ),
     defaultValues: { email: "", role: "MEMBER" },
   })
 
   return (
-    <form onSubmit={handleSubmit((data) => onSubmit({ email: data.email.trim(), role: data.role }))}>
+    <form
+      onSubmit={handleSubmit((data) =>
+        onSubmit({ email: data.email.trim(), role: data.role }),
+      )}
+    >
       <DialogHeader className="mb-4">
         <DialogTitle>Invite Member</DialogTitle>
-        <DialogDescription>Send an invitation to join this organization.</DialogDescription>
+        <DialogDescription>
+          Send an invitation to join this organization.
+        </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
         <div className="space-y-2">
@@ -236,7 +328,10 @@ function InviteMemberForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="role">Role</Label>
-          <Select value={watch("role")} onValueChange={(v) => setValue("role", v)}>
+          <Select
+            value={watch("role")}
+            onValueChange={(v) => setValue("role", v)}
+          >
             <SelectTrigger id="role">
               <SelectValue />
             </SelectTrigger>
@@ -252,7 +347,9 @@ function InviteMemberForm({
       </div>
       <DialogFooter className="mt-6">
         <DialogClose asChild>
-          <Button type="button" variant="outline">Cancel</Button>
+          <Button type="button" variant="outline">
+            Cancel
+          </Button>
         </DialogClose>
         <Button type="submit" disabled={isLoading}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

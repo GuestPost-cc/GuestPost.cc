@@ -1,50 +1,46 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../../lib/api"
-import { Button } from "@guestpost/ui"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Textarea } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
-import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  ErrorState,
+  Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Skeleton,
+  Textarea,
 } from "@guestpost/ui"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@guestpost/ui"
-import {
+  ArrowLeft,
+  Check,
   ChevronLeft,
   ChevronRight,
-  Check,
-  Loader2,
-  Search,
-  Globe,
-  Star,
   DollarSign,
   FileText,
+  Globe,
+  Loader2,
+  Search,
   Send,
-  ArrowLeft,
+  Star,
 } from "lucide-react"
-import { useForm, Controller } from "react-hook-form"
-import { z } from "zod"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { toast } from "sonner"
 import Link from "next/link"
-import { format } from "date-fns"
+import { useRouter } from "next/navigation"
+import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
 import { BriefForm } from "../../../../components/BriefForm"
+import { api } from "../../../../lib/api"
 
 const STORAGE_KEY = "guestpost-order-draft"
 
@@ -139,8 +135,8 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
                 currentStep > step.number
                   ? "border-primary bg-primary text-primary-foreground"
                   : currentStep === step.number
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-muted bg-muted text-muted-foreground"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-muted bg-muted text-muted-foreground"
               }`}
             >
               {currentStep > step.number ? (
@@ -149,7 +145,9 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
                 <span className="text-sm font-semibold">{step.number}</span>
               )}
             </div>
-            <span className={`mt-2 text-xs font-medium ${currentStep >= step.number ? "text-foreground" : "text-muted-foreground"}`}>
+            <span
+              className={`mt-2 text-xs font-medium ${currentStep >= step.number ? "text-foreground" : "text-muted-foreground"}`}
+            >
               {step.title}
             </span>
           </div>
@@ -177,7 +175,9 @@ function ServiceSelection({
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold">Select Service Type</h2>
-        <p className="text-muted-foreground">Choose the type of link building service you need</p>
+        <p className="text-muted-foreground">
+          Choose the type of link building service you need
+        </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -204,7 +204,9 @@ function ServiceSelection({
                   )}
                 </div>
                 <CardTitle className="mt-4 text-base">{service.name}</CardTitle>
-                <CardDescription className="line-clamp-2">{service.description}</CardDescription>
+                <CardDescription className="line-clamp-2">
+                  {service.description}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
@@ -242,14 +244,21 @@ function WebsiteSelection({
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["placements", search, categoryFilter],
-    queryFn: () => api.marketplace.searchPlacements({
-      search: search || undefined,
-      category: categoryFilter !== "all" ? categoryFilter : undefined,
-    }) as Promise<Placement[]>,
+    queryFn: () =>
+      api.marketplace.searchPlacements({
+        search: search || undefined,
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
+      }) as Promise<Placement[]>,
   })
 
   if (error) {
-    return <ErrorState title="Failed to load websites" description={(error as Error).message} onRetry={() => refetch()} />
+    return (
+      <ErrorState
+        title="Failed to load websites"
+        description={(error as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
   }
 
   const placements = data ?? []
@@ -261,17 +270,25 @@ function WebsiteSelection({
       <div>
         <h2 className="text-xl font-semibold">Select a Website</h2>
         <p className="text-muted-foreground">
-          Pick where your {serviceType.replace(/_/g, " ").toLowerCase()} goes. The fulfiller is set automatically from the site.
+          Pick where your {serviceType.replace(/_/g, " ").toLowerCase()} goes.
+          The fulfiller is set automatically from the site.
         </p>
       </div>
 
       <div className="flex flex-col gap-4 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search websites..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+          <Input
+            placeholder="Search websites..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-40"><SelectValue placeholder="Category" /></SelectTrigger>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             <SelectItem value="technology">Technology</SelectItem>
@@ -286,14 +303,23 @@ function WebsiteSelection({
       {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
-            <Card key={i}><CardHeader className="pb-2"><Skeleton className="h-5 w-32" /></CardHeader><CardContent><Skeleton className="h-4 w-full" /></CardContent></Card>
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-5 w-32" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-full" />
+              </CardContent>
+            </Card>
           ))}
         </div>
       ) : placements.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12">
           <Globe className="h-12 w-12 text-muted-foreground/50" />
           <h3 className="mt-4 text-lg font-medium">No websites found</h3>
-          <p className="mt-1 text-sm text-muted-foreground">Try adjusting your search or filters</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Try adjusting your search or filters
+          </p>
         </div>
       ) : (
         <>
@@ -309,26 +335,46 @@ function WebsiteSelection({
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted"><Globe className="h-5 w-5" /></div>
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                        <Globe className="h-5 w-5" />
+                      </div>
                       {isSelected && (
-                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary"><Check className="h-4 w-4 text-primary-foreground" /></div>
+                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary">
+                          <Check className="h-4 w-4 text-primary-foreground" />
+                        </div>
                       )}
                     </div>
                     <CardTitle className="mt-3 text-base">{p.name}</CardTitle>
-                    <p className="truncate text-xs text-muted-foreground">{p.websiteUrl}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {p.websiteUrl}
+                    </p>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-lg font-semibold">{p.currency} {p.price.toLocaleString()}</span>
+                      <span className="text-lg font-semibold">
+                        {p.currency} {p.price.toLocaleString()}
+                      </span>
                       <Badge variant="secondary">DR {p.domainRating}</Badge>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      {p.traffic > 0 && <span>{p.traffic.toLocaleString()} traffic</span>}
-                      {p.turnaroundDays ? <span>· {p.turnaroundDays}d turnaround</span> : null}
+                      {p.traffic > 0 && (
+                        <span>{p.traffic.toLocaleString()} traffic</span>
+                      )}
+                      {p.turnaroundDays ? (
+                        <span>· {p.turnaroundDays}d turnaround</span>
+                      ) : null}
                     </div>
                     {/* Auto-derived fulfiller — never chosen by hand */}
-                    <Badge className={platform ? "bg-indigo-100 text-indigo-700" : "bg-emerald-100 text-emerald-700"}>
-                      {platform ? "Fulfilled by Platform" : `Fulfilled by ${p.fulfilledBy.name}`}
+                    <Badge
+                      className={
+                        platform
+                          ? "bg-indigo-100 text-indigo-700"
+                          : "bg-emerald-100 text-emerald-700"
+                      }
+                    >
+                      {platform
+                        ? "Fulfilled by Platform"
+                        : `Fulfilled by ${p.fulfilledBy.name}`}
                     </Badge>
                   </CardContent>
                 </Card>
@@ -338,9 +384,25 @@ function WebsiteSelection({
 
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}><ChevronLeft className="h-4 w-4" /></Button>
-              <span className="text-sm text-muted-foreground">Page {page + 1} of {totalPages}</span>
-              <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}><ChevronRight className="h-4 w-4" /></Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+                disabled={page === 0}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Page {page + 1} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                disabled={page >= totalPages - 1}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
           )}
         </>
@@ -349,7 +411,13 @@ function WebsiteSelection({
   )
 }
 
-function ContentRequirements({ data, onUpdate }: { data: Partial<OrderFormData>; onUpdate: (data: Partial<OrderFormData>) => void }) {
+function ContentRequirements({
+  data,
+  onUpdate,
+}: {
+  data: Partial<OrderFormData>
+  onUpdate: (data: Partial<OrderFormData>) => void
+}) {
   // Phase 6: when a serviceType is known, render the per-service BriefForm
   // instead of the generic 4-field form. The legacy fields (title /
   // instructions / targetUrl) are still snapshotted onto Order — we derive
@@ -365,10 +433,17 @@ function ContentRequirements({ data, onUpdate }: { data: Partial<OrderFormData>;
     // working. The full brief is sent as briefData on submit.
     const derivedTitle = String(brief.title ?? brief.topic ?? "").slice(0, 100)
     const derivedTargetUrl = (brief.targetUrl as string) ?? ""
-    const derivedKeywords = Array.isArray(brief.targetKeywords) ? (brief.targetKeywords as string[]).join(", ") : ""
+    const derivedKeywords = Array.isArray(brief.targetKeywords)
+      ? (brief.targetKeywords as string[]).join(", ")
+      : ""
     onUpdate({
       ...data,
-      brief: typeof brief.topic === "string" ? brief.topic : (typeof brief.notes === "string" ? brief.notes : "filled via brief form"),
+      brief:
+        typeof brief.topic === "string"
+          ? brief.topic
+          : typeof brief.notes === "string"
+            ? brief.notes
+            : "filled via brief form",
       title: derivedTitle || "Untitled",
       targetUrl: derivedTargetUrl,
       targetKeywords: derivedKeywords,
@@ -380,7 +455,9 @@ function ContentRequirements({ data, onUpdate }: { data: Partial<OrderFormData>;
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold">Content Requirements</h2>
-        <p className="text-muted-foreground">Provide details about your content needs</p>
+        <p className="text-muted-foreground">
+          Provide details about your content needs
+        </p>
       </div>
 
       {/* Phase 6: per-service brief form. Falls back to the legacy 4-field
@@ -397,13 +474,24 @@ function ContentRequirements({ data, onUpdate }: { data: Partial<OrderFormData>;
 
       {/* Legacy form (only rendered when serviceType is unknown).
           Kept for back-compat; expected not to render in the locked Phase 6 flow. */}
-      {!data.serviceType && <LegacyBriefFields data={data} updateField={updateField} />}
+      {!data.serviceType && (
+        <LegacyBriefFields data={data} updateField={updateField} />
+      )}
     </div>
   )
 }
 
-function LegacyBriefFields({ data, updateField }: { data: Partial<OrderFormData>; updateField: (k: keyof OrderFormData, v: any) => void }) {
-  const { register, formState: { errors } } = useForm({
+function LegacyBriefFields({
+  data,
+  updateField,
+}: {
+  data: Partial<OrderFormData>
+  updateField: (k: keyof OrderFormData, v: any) => void
+}) {
+  const {
+    register,
+    formState: { errors },
+  } = useForm({
     defaultValues: {
       title: data.title || "",
       brief: data.brief || "",
@@ -416,7 +504,9 @@ function LegacyBriefFields({ data, updateField }: { data: Partial<OrderFormData>
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold">Content Requirements</h2>
-        <p className="text-muted-foreground">Provide details about your content needs</p>
+        <p className="text-muted-foreground">
+          Provide details about your content needs
+        </p>
       </div>
 
       <div className="space-y-4">
@@ -462,7 +552,9 @@ function LegacyBriefFields({ data, updateField }: { data: Partial<OrderFormData>
             Separate multiple keywords with commas
           </p>
           {errors.targetKeywords && (
-            <p className="text-sm text-destructive">{errors.targetKeywords.message}</p>
+            <p className="text-sm text-destructive">
+              {errors.targetKeywords.message}
+            </p>
           )}
         </div>
 
@@ -478,7 +570,9 @@ function LegacyBriefFields({ data, updateField }: { data: Partial<OrderFormData>
             The page on your website you want the link to point to
           </p>
           {errors.targetUrl && (
-            <p className="text-sm text-destructive">{errors.targetUrl.message}</p>
+            <p className="text-sm text-destructive">
+              {errors.targetUrl.message}
+            </p>
           )}
         </div>
       </div>
@@ -487,13 +581,23 @@ function LegacyBriefFields({ data, updateField }: { data: Partial<OrderFormData>
 }
 
 function ReviewStep({ data }: { data: Partial<OrderFormData> }) {
-  const { data: campaignsData, error: campaignsError, refetch: refetchCampaigns } = useQuery({
+  const {
+    data: campaignsData,
+    error: campaignsError,
+    refetch: refetchCampaigns,
+  } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns() as Promise<any[]>,
   })
 
   if (campaignsError) {
-    return <ErrorState title="Failed to load campaigns" description={(campaignsError as Error).message} onRetry={() => refetchCampaigns()} />
+    return (
+      <ErrorState
+        title="Failed to load campaigns"
+        description={(campaignsError as Error).message}
+        onRetry={() => refetchCampaigns()}
+      />
+    )
   }
 
   const campaign = campaignsData?.find((c: any) => c.id === data.campaignId)
@@ -502,7 +606,9 @@ function ReviewStep({ data }: { data: Partial<OrderFormData> }) {
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold">Review Your Order</h2>
-        <p className="text-muted-foreground">Please review all details before submitting</p>
+        <p className="text-muted-foreground">
+          Please review all details before submitting
+        </p>
       </div>
 
       <Card>
@@ -513,7 +619,9 @@ function ReviewStep({ data }: { data: Partial<OrderFormData> }) {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Service Type</p>
-              <p className="font-medium">{data.serviceType?.replace(/_/g, " ")}</p>
+              <p className="font-medium">
+                {data.serviceType?.replace(/_/g, " ")}
+              </p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Campaign</p>
@@ -522,12 +630,20 @@ function ReviewStep({ data }: { data: Partial<OrderFormData> }) {
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Website</p>
               <p className="font-medium">{data.placementName ?? "—"}</p>
-              {data.placementUrl && <p className="text-xs text-muted-foreground">{data.placementUrl}</p>}
+              {data.placementUrl && (
+                <p className="text-xs text-muted-foreground">
+                  {data.placementUrl}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Fulfilled by</p>
               <p className="font-medium">{data.fulfilledByLabel ?? "—"}</p>
-              {data.placementPrice != null && <p className="text-xs text-muted-foreground">Price: ${data.placementPrice.toLocaleString()}</p>}
+              {data.placementPrice != null && (
+                <p className="text-xs text-muted-foreground">
+                  Price: ${data.placementPrice.toLocaleString()}
+                </p>
+              )}
             </div>
           </div>
 
@@ -565,7 +681,9 @@ function ReviewStep({ data }: { data: Partial<OrderFormData> }) {
         <CardContent className="pt-6">
           <div className="flex items-center gap-2 text-sm text-primary">
             <FileText className="h-4 w-4" />
-            <span>Your order will be reviewed and confirmed within 24 hours</span>
+            <span>
+              Your order will be reviewed and confirmed within 24 hours
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -573,7 +691,15 @@ function ReviewStep({ data }: { data: Partial<OrderFormData> }) {
   )
 }
 
-function SubmitStep({ data, isSubmitting, onSubmit }: { data: Partial<OrderFormData>; isSubmitting: boolean; onSubmit: () => void }) {
+function SubmitStep({
+  data,
+  isSubmitting,
+  onSubmit,
+}: {
+  data: Partial<OrderFormData>
+  isSubmitting: boolean
+  onSubmit: () => void
+}) {
   return (
     <div className="space-y-6">
       <div className="text-center">
@@ -589,7 +715,9 @@ function SubmitStep({ data, isSubmitting, onSubmit }: { data: Partial<OrderFormD
       <Card>
         <CardContent className="pt-6">
           <div className="space-y-2 text-sm">
-            <p className="text-muted-foreground">By submitting this order, you agree to our:</p>
+            <p className="text-muted-foreground">
+              By submitting this order, you agree to our:
+            </p>
             <ul className="list-inside list-disc space-y-1 text-muted-foreground">
               <li>Terms of Service</li>
               <li>Content Guidelines</li>
@@ -627,9 +755,13 @@ export default function NewOrderPage() {
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState<Partial<OrderFormData>>({})
   const [submitSuccess, setSubmitSuccess] = useState(false)
-  const [submitError, setSubmitError] = useState("")
+  const [_submitError, setSubmitError] = useState("")
 
-  const { data: campaignsData, error: campaignsError, refetch: refetchCampaigns } = useQuery({
+  const {
+    data: campaignsData,
+    error: campaignsError,
+    refetch: refetchCampaigns,
+  } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns(),
   })
@@ -658,11 +790,14 @@ export default function NewOrderPage() {
     if (saved) {
       try {
         const draft: DraftData = JSON.parse(saved)
-        if (draft.data && Date.now() - new Date(draft.savedAt).getTime() < 24 * 60 * 60 * 1000) {
+        if (
+          draft.data &&
+          Date.now() - new Date(draft.savedAt).getTime() < 24 * 60 * 60 * 1000
+        ) {
           setFormData(draft.data)
           setCurrentStep(draft.step)
         }
-      } catch (e) {
+      } catch (_e) {
         // Ignore invalid draft
       }
     }
@@ -699,7 +834,9 @@ export default function NewOrderPage() {
       serviceType: sp.get("type") || prev.serviceType,
       placementName: sp.get("name") || prev.placementName,
       placementUrl: sp.get("url") || prev.placementUrl,
-      placementPrice: sp.get("price") ? Number(sp.get("price")) : prev.placementPrice,
+      placementPrice: sp.get("price")
+        ? Number(sp.get("price"))
+        : prev.placementPrice,
       fulfilledByLabel: sp.get("fulfilledBy") || prev.fulfilledByLabel,
       listingServiceId,
       locked,
@@ -762,7 +899,12 @@ export default function NewOrderPage() {
     createMutation.mutate({
       type: formData.serviceType as any,
       title: formData.title,
-      instructions: [formData.brief, formData.targetKeywords ? `Target keywords: ${formData.targetKeywords}` : ""]
+      instructions: [
+        formData.brief,
+        formData.targetKeywords
+          ? `Target keywords: ${formData.targetKeywords}`
+          : "",
+      ]
         .filter(Boolean)
         .join("\n\n")
         .slice(0, 5000),
@@ -771,15 +913,23 @@ export default function NewOrderPage() {
       // Phase 6: forward the structured brief. Server re-validates against
       // the per-service Zod registry — a 400 here surfaces field paths.
       briefData: formData.briefData as Record<string, unknown> | undefined,
-      items: [{
-        websiteId: formData.websiteId || undefined,
-        targetUrl: formData.targetUrl || undefined,
-      }],
+      items: [
+        {
+          websiteId: formData.websiteId || undefined,
+          targetUrl: formData.targetUrl || undefined,
+        },
+      ],
     })
   }
 
   if (campaignsError) {
-    return <ErrorState title="Failed to load campaigns" description={(campaignsError as Error).message} onRetry={() => refetchCampaigns()} />
+    return (
+      <ErrorState
+        title="Failed to load campaigns"
+        description={(campaignsError as Error).message}
+        onRetry={() => refetchCampaigns()}
+      />
+    )
   }
 
   if (submitSuccess) {
@@ -790,7 +940,8 @@ export default function NewOrderPage() {
         </div>
         <h2 className="mt-4 text-2xl font-semibold">Order Submitted!</h2>
         <p className="mt-2 text-muted-foreground">
-          Your order has been submitted successfully. You&apos;ll receive a confirmation email shortly.
+          Your order has been submitted successfully. You&apos;ll receive a
+          confirmation email shortly.
         </p>
         <div className="mt-6 flex flex-col gap-3">
           <Button onClick={() => router.push("/dashboard/orders")}>
@@ -834,29 +985,33 @@ export default function NewOrderPage() {
           {currentStep === 2 && (
             <WebsiteSelection
               selected={formData.websiteId || ""}
-              onSelect={(p) => updateFormData({
-                websiteId: p.websiteId,
-                placementName: p.name,
-                placementUrl: p.websiteUrl,
-                placementPrice: p.price,
-                fulfilledByLabel: p.fulfilledBy.kind === "PLATFORM" ? "Platform" : p.fulfilledBy.name,
-              })}
+              onSelect={(p) =>
+                updateFormData({
+                  websiteId: p.websiteId,
+                  placementName: p.name,
+                  placementUrl: p.websiteUrl,
+                  placementPrice: p.price,
+                  fulfilledByLabel:
+                    p.fulfilledBy.kind === "PLATFORM"
+                      ? "Platform"
+                      : p.fulfilledBy.name,
+                })
+              }
               serviceType={formData.serviceType || ""}
             />
           )}
 
           {currentStep === 3 && (
-            <ContentRequirements
-              data={formData}
-              onUpdate={updateFormData}
-            />
+            <ContentRequirements data={formData} onUpdate={updateFormData} />
           )}
 
           {currentStep === 4 && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-xl font-semibold">Select Campaign</h2>
-                <p className="text-muted-foreground">Choose which campaign to add this order to</p>
+                <p className="text-muted-foreground">
+                  Choose which campaign to add this order to
+                </p>
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">
@@ -864,13 +1019,17 @@ export default function NewOrderPage() {
                   <Card
                     key={campaign.id}
                     className={`cursor-pointer transition-all hover:border-primary/50 ${
-                      formData.campaignId === campaign.id ? "border-primary bg-primary/5" : ""
+                      formData.campaignId === campaign.id
+                        ? "border-primary bg-primary/5"
+                        : ""
                     }`}
                     onClick={() => updateFormData({ campaignId: campaign.id })}
                   >
                     <CardHeader className="pb-2">
                       <div className="flex items-center justify-between">
-                        <CardTitle className="text-base">{campaign.name}</CardTitle>
+                        <CardTitle className="text-base">
+                          {campaign.name}
+                        </CardTitle>
                         {formData.campaignId === campaign.id && (
                           <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary">
                             <Check className="h-4 w-4 text-primary-foreground" />

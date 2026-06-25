@@ -1,14 +1,14 @@
+import { prisma } from "@guestpost/database"
 import {
-  QUEUES,
   getDedupHitsTotal,
   incrementDedupHits,
   isUniqueViolation,
+  QUEUES,
 } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
-import { prisma } from "@guestpost/database"
-import { connection } from "../redis"
-import { createObservableWorker } from "../lib/queue-observability"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { createObservableWorker } from "../lib/queue-observability"
+import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.notification")
@@ -18,7 +18,11 @@ export function createNotificationWorker() {
     QUEUES.NOTIFICATION,
     async (job) => {
       // Phase 7.8 #27 — repeatable cron jobs bypass freshness.
-      if (!verifyJobPayload(job.data, { maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined })) {
+      if (
+        !verifyJobPayload(job.data, {
+          maxAgeMs: isRepeatableJob(job.name) ? 0 : undefined,
+        })
+      ) {
         logger.error("job signature invalid — rejecting", { jobId: job.id })
         throw new Error("Invalid job signature")
       }
@@ -39,7 +43,13 @@ export function createNotificationWorker() {
         case "push-in-app":
           try {
             await prisma.notification.create({
-              data: { userId, organizationId, type, message, dedupKey: dedupKey ?? null },
+              data: {
+                userId,
+                organizationId,
+                type,
+                message,
+                dedupKey: dedupKey ?? null,
+              },
             })
             logger.info("in-app notification created", { userId })
           } catch (err) {

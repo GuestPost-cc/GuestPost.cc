@@ -1,12 +1,21 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
+import {
+  ListingStatus,
+  WebsiteOwnershipType,
+  WebsiteVerificationStatus,
+} from "@guestpost/database"
+import type { StaffRole } from "@guestpost/shared"
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
-import { QueueService } from "../queues/queue.service"
-import { RefundService } from "../orders/services/refund.service"
-import { StaffRole, QUEUES } from "@guestpost/shared"
-import { ListingStatus, WebsiteOwnershipType, WebsiteVerificationStatus } from "@guestpost/database"
 import { normalizeDomain } from "../../common/domain"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
+import type { RefundService } from "../orders/services/refund.service"
+import type { QueueService } from "../queues/queue.service"
 
 const VALID_STAFF_ROLES: StaffRole[] = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
 
@@ -19,11 +28,7 @@ export class AdminService {
     private readonly refund: RefundService,
   ) {}
 
-  private isSuperAdmin(user?: any): boolean {
-    return user?.staffRole === "SUPER_ADMIN"
-  }
-
-  async listUsers(take = 50, skip = 0, user?: any) {
+  async listUsers(take = 50, skip = 0, _user?: any) {
     const users = await this.prisma.user.findMany({
       orderBy: { createdAt: "desc" },
       take,
@@ -47,7 +52,7 @@ export class AdminService {
     }))
   }
 
-  async getUser(id: string, user?: any) {
+  async getUser(id: string, _user?: any) {
     const u = await this.prisma.user.findUnique({
       where: { id },
       include: {
@@ -91,7 +96,10 @@ export class AdminService {
     const PUBLISHER_ROLES = ["PUBLISHER_OWNER"] as const
 
     if ((CUSTOMER_ROLES as readonly string[]).includes(role)) {
-      let membership = await this.prisma.membership.findFirst({ where: { userId }, orderBy: { createdAt: "asc" } })
+      let membership = await this.prisma.membership.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "asc" },
+      })
       if (!membership) {
         const orgName = `Org for ${u.email}`
         const orgSlug = `org-${userId.slice(0, 8)}`
@@ -116,52 +124,77 @@ export class AdminService {
         })
       }
       if (u.userType !== "CUSTOMER") {
-        await this.prisma.user.update({ where: { id: userId }, data: { userType: "CUSTOMER" } })
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { userType: "CUSTOMER" },
+        })
       }
       await this.audit.log({
-        action: "CUSTOMER_ROLE_UPDATE", entityType: "CustomerMembership",
-        entityId: membership.id, metadata: { newRole: role, userId },
-        userId: user.id, organizationId: membership.organizationId,
+        action: "CUSTOMER_ROLE_UPDATE",
+        entityType: "CustomerMembership",
+        entityId: membership.id,
+        metadata: { newRole: role, userId },
+        userId: user.id,
+        organizationId: membership.organizationId,
       })
       return membership
     }
 
     if ((PUBLISHER_ROLES as readonly string[]).includes(role)) {
-      let pubMembership = await this.prisma.publisherMembership.findFirst({ where: { userId }, orderBy: { createdAt: "asc" } })
+      let pubMembership = await this.prisma.publisherMembership.findFirst({
+        where: { userId },
+        orderBy: { createdAt: "asc" },
+      })
       if (!pubMembership) {
         // A user with no publisher membership gets a FRESH publisher entity.
         // Never attach to an existing publisher here — picking one (e.g. the
         // oldest) hands this user control of someone else's listings,
         // balance, and withdrawals.
-        let orgId = (await this.prisma.membership.findFirst({
-          where: { userId },
-          orderBy: { createdAt: "asc" },
-          select: { organizationId: true },
-        }))?.organizationId
+        let orgId = (
+          await this.prisma.membership.findFirst({
+            where: { userId },
+            orderBy: { createdAt: "asc" },
+            select: { organizationId: true },
+          })
+        )?.organizationId
         if (!orgId) {
           const org = await this.prisma.organization.create({
-            data: { name: `Org for ${u.email}`, slug: `org-${userId.slice(0, 8)}` },
+            data: {
+              name: `Org for ${u.email}`,
+              slug: `org-${userId.slice(0, 8)}`,
+            },
           })
           orgId = org.id
         }
         const publisher = await this.prisma.publisher.create({
-          data: { name: u.name ?? `${u.email}'s Publisher`, email: u.email, organizationId: orgId },
+          data: {
+            name: u.name ?? `${u.email}'s Publisher`,
+            email: u.email,
+            organizationId: orgId,
+          },
         })
         pubMembership = await this.prisma.publisherMembership.create({
           data: { userId, publisherId: publisher.id, role: "PUBLISHER_OWNER" },
         })
       } else {
         pubMembership = await this.prisma.publisherMembership.update({
-          where: { id: pubMembership.id }, data: { role: "PUBLISHER_OWNER" },
+          where: { id: pubMembership.id },
+          data: { role: "PUBLISHER_OWNER" },
         })
       }
       if (u.userType !== "PUBLISHER") {
-        await this.prisma.user.update({ where: { id: userId }, data: { userType: "PUBLISHER" } })
+        await this.prisma.user.update({
+          where: { id: userId },
+          data: { userType: "PUBLISHER" },
+        })
       }
       await this.audit.log({
-        action: "PUBLISHER_ROLE_UPDATE", entityType: "PublisherMembership",
-        entityId: pubMembership.id, metadata: { newRole: role, userId },
-        userId: user.id, organizationId: null,
+        action: "PUBLISHER_ROLE_UPDATE",
+        entityType: "PublisherMembership",
+        entityId: pubMembership.id,
+        metadata: { newRole: role, userId },
+        userId: user.id,
+        organizationId: null,
       })
       return pubMembership
     }
@@ -213,7 +246,7 @@ export class AdminService {
     return result
   }
 
-  async listOrganizations(take = 50, skip = 0, user?: any) {
+  async listOrganizations(take = 50, skip = 0, _user?: any) {
     // Phase 6.7 — explicit projection. Drops `settings` JSON (opaque config
     // that might hold OAuth secrets, webhook URLs, etc.) and exposes only
     // the fields a staff investigation needs.
@@ -231,7 +264,7 @@ export class AdminService {
     })
   }
 
-  async listOrders(take = 50, skip = 0, user?: any) {
+  async listOrders(take = 50, skip = 0, _user?: any) {
     // Phase 6.7 — explicit projection. The previous `include: { website: true }`
     // leaked Website.verificationToken (the DNS-TXT verification secret) to
     // every Finance/Ops staffer. Customer is also narrowed (no banReason,
@@ -244,8 +277,18 @@ export class AdminService {
       skip,
       include: {
         organization: { select: { id: true, name: true, slug: true } },
-        customer:     { select: { id: true, name: true, email: true, userType: true } },
-        website:      { select: { id: true, url: true, name: true, ownershipType: true, verificationStatus: true } },
+        customer: {
+          select: { id: true, name: true, email: true, userType: true },
+        },
+        website: {
+          select: {
+            id: true,
+            url: true,
+            name: true,
+            ownershipType: true,
+            verificationStatus: true,
+          },
+        },
       },
     })
   }
@@ -274,7 +317,7 @@ export class AdminService {
     return { orders, pagination: { take, skip, total } }
   }
 
-  async getStats(user?: any) {
+  async getStats(_user?: any) {
     const [users, organizations, orders] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.organization.count(),
@@ -286,7 +329,10 @@ export class AdminService {
   async manualVerify(orderId: string, method: string, userId: string) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException("Order not found")
-    if (order.status !== "PUBLISHED") throw new BadRequestException("Order must be in PUBLISHED status to verify")
+    if (order.status !== "PUBLISHED")
+      throw new BadRequestException(
+        "Order must be in PUBLISHED status to verify",
+      )
 
     return this.prisma.$transaction(async (tx: any) => {
       const verified = await tx.order.updateMany({
@@ -300,9 +346,13 @@ export class AdminService {
         },
       })
       if (verified.count === 0) {
-        throw new ConflictException("Order was modified by another request. Retry.")
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
       }
-      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      const updated = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+      })
 
       await tx.orderEvent.create({
         data: {
@@ -337,14 +387,20 @@ export class AdminService {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status === "COMPLETED" || order.status === "CANCELLED") {
-      throw new BadRequestException(`Order cannot be force-cancelled in ${order.status} status`)
+      throw new BadRequestException(
+        `Order cannot be force-cancelled in ${order.status} status`,
+      )
     }
 
     // Captured payments must go through the canonical refund path —
     // cancelling here would keep the customer's money while killing the
     // order, and would skip released-settlement clawback.
     if (order.paymentStatus === "PAID") {
-      return this.refund.refundOrder(orderId, `Force-cancelled by admin: ${reason}`, userId)
+      return this.refund.refundOrder(
+        orderId,
+        `Force-cancelled by admin: ${reason}`,
+        userId,
+      )
     }
 
     return this.prisma.$transaction(async (tx: any) => {
@@ -358,7 +414,9 @@ export class AdminService {
           data: { status: "CANCELLED", version: { increment: 1 } },
         })
         if (cancelled.count === 0) {
-          throw new ConflictException("Settlement was modified by another request. Retry.")
+          throw new ConflictException(
+            "Settlement was modified by another request. Retry.",
+          )
         }
       }
 
@@ -367,9 +425,13 @@ export class AdminService {
         data: { status: "CANCELLED", version: { increment: 1 } },
       })
       if (cancelled.count === 0) {
-        throw new ConflictException("Order was modified by another request. Retry.")
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
       }
-      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      const updated = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+      })
 
       await tx.orderEvent.create({
         data: {
@@ -407,7 +469,10 @@ export class AdminService {
     // Phase 7: the listing-level `type` column is gone. The `type` filter
     // now means "listings with at least one AVAILABLE service of this
     // serviceType" — matches the public search semantics.
-    if (params.type) where.services = { some: { availability: "AVAILABLE", serviceType: params.type as any } }
+    if (params.type)
+      where.services = {
+        some: { availability: "AVAILABLE", serviceType: params.type as any },
+      }
 
     const [listings, total] = await Promise.all([
       this.prisma.marketplaceListing.findMany({
@@ -419,11 +484,20 @@ export class AdminService {
           category: { select: { name: true } },
           organization: { select: { name: true } },
           publisher: { select: { name: true } },
-          website: { select: { verificationStatus: true, verifiedAt: true, domain: true } },
+          website: {
+            select: {
+              verificationStatus: true,
+              verifiedAt: true,
+              domain: true,
+            },
+          },
           // Phase 7: service rows back the priceFrom + serviceTypes the
           // admin browse table renders. Only AVAILABLE rows; sorted asc
           // so services[0] is the cheapest = priceFrom source.
-          services: { where: { availability: "AVAILABLE" }, orderBy: { price: "asc" } },
+          services: {
+            where: { availability: "AVAILABLE" },
+            orderBy: { price: "asc" },
+          },
         },
       }),
       this.prisma.marketplaceListing.count({ where }),
@@ -439,8 +513,9 @@ export class AdminService {
         // services. Legacy fields removed; consumers should read priceFrom +
         // serviceTypes (also surfaced here for the admin browse table).
         type: l.services[0]?.serviceType ?? null,
-        serviceTypes: Array.from(new Set(l.services.map(s => s.serviceType))),
-        priceFrom: l.services[0]?.price != null ? Number(l.services[0].price) : null,
+        serviceTypes: Array.from(new Set(l.services.map((s) => s.serviceType))),
+        priceFrom:
+          l.services[0]?.price != null ? Number(l.services[0].price) : null,
         status: l.status,
         price: l.services[0]?.price != null ? Number(l.services[0].price) : 0,
         currency: l.currency,
@@ -462,12 +537,15 @@ export class AdminService {
   }
 
   async getMarketplaceStats() {
-    const [totalListings, activeListings, totalReviews, avgRating] = await Promise.all([
-      this.prisma.marketplaceListing.count(),
-      this.prisma.marketplaceListing.count({ where: { status: ListingStatus.APPROVED } }),
-      this.prisma.marketplaceReview.count(),
-      this.prisma.marketplaceReview.aggregate({ _avg: { rating: true } }),
-    ])
+    const [totalListings, activeListings, totalReviews, avgRating] =
+      await Promise.all([
+        this.prisma.marketplaceListing.count(),
+        this.prisma.marketplaceListing.count({
+          where: { status: ListingStatus.APPROVED },
+        }),
+        this.prisma.marketplaceReview.count(),
+        this.prisma.marketplaceReview.aggregate({ _avg: { rating: true } }),
+      ])
     return {
       totalListings,
       activeListings,
@@ -476,13 +554,21 @@ export class AdminService {
     }
   }
 
-  async updateListingStatus(id: string, status: string, user: any, force = false) {
+  async updateListingStatus(
+    id: string,
+    status: string,
+    user: any,
+    force = false,
+  ) {
     if (!Object.values(ListingStatus).includes(status as ListingStatus)) {
       throw new BadRequestException(`Invalid listing status: ${status}`)
     }
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id },
-      include: { publisher: { select: { email: true } }, website: { select: { verificationStatus: true, domain: true } } },
+      include: {
+        publisher: { select: { email: true } },
+        website: { select: { verificationStatus: true, domain: true } },
+      },
     })
     if (!listing) throw new NotFoundException("Listing not found")
 
@@ -490,7 +576,11 @@ export class AdminService {
     // website is VERIFIED. Platform listings have no website (or a VERIFIED one)
     // and pass through. Only SUPER_ADMIN may emergency-override, and the bypass
     // is audited.
-    if (status === ListingStatus.APPROVED && listing.website && listing.website.verificationStatus !== "VERIFIED") {
+    if (
+      status === ListingStatus.APPROVED &&
+      listing.website &&
+      listing.website.verificationStatus !== "VERIFIED"
+    ) {
       if (!(force && user.role === "SUPER_ADMIN")) {
         throw new BadRequestException({
           code: "WEBSITE_NOT_VERIFIED",
@@ -501,7 +591,11 @@ export class AdminService {
         action: "WEBSITE_VERIFICATION_OVERRIDE",
         entityType: "MarketplaceListing",
         entityId: id,
-        metadata: { domain: listing.website.domain, websiteStatus: listing.website.verificationStatus, reason: "SUPER_ADMIN emergency approval" },
+        metadata: {
+          domain: listing.website.domain,
+          websiteStatus: listing.website.verificationStatus,
+          reason: "SUPER_ADMIN emergency approval",
+        },
         userId: user.id,
         organizationId: listing.organizationId ?? null,
       })
@@ -516,16 +610,27 @@ export class AdminService {
       action: "LISTING_STATUS_UPDATED",
       entityType: "MarketplaceListing",
       entityId: id,
-      metadata: { previousStatus: listing.status, newStatus: status, listingTitle: listing.title },
+      metadata: {
+        previousStatus: listing.status,
+        newStatus: status,
+        listingTitle: listing.title,
+      },
       userId: user.id,
       organizationId: listing.organizationId ?? null,
     })
 
-    if (status === ListingStatus.APPROVED || status === ListingStatus.REJECTED) {
-      const notificationType = status === ListingStatus.APPROVED ? "LISTING_APPROVED" : "LISTING_REJECTED"
-      const message = status === ListingStatus.APPROVED
-        ? `Your listing "${listing.title}" has been approved and is now live in the marketplace.`
-        : `Your listing "${listing.title}" has been rejected.`
+    if (
+      status === ListingStatus.APPROVED ||
+      status === ListingStatus.REJECTED
+    ) {
+      const notificationType =
+        status === ListingStatus.APPROVED
+          ? "LISTING_APPROVED"
+          : "LISTING_REJECTED"
+      const message =
+        status === ListingStatus.APPROVED
+          ? `Your listing "${listing.title}" has been approved and is now live in the marketplace.`
+          : `Your listing "${listing.title}" has been rejected.`
 
       await this.queue.pushNotification("push-in-app", {
         userId: listing.publisherId ?? "",
@@ -547,7 +652,9 @@ export class AdminService {
   }
 
   async toggleListingFeatured(id: string, featured: boolean, user: any) {
-    const listing = await this.prisma.marketplaceListing.findUnique({ where: { id } })
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { id },
+    })
     if (!listing) throw new NotFoundException("Listing not found")
 
     const updated = await this.prisma.marketplaceListing.update({
@@ -568,7 +675,9 @@ export class AdminService {
   }
 
   async toggleListingVerified(id: string, verified: boolean, user: any) {
-    const listing = await this.prisma.marketplaceListing.findUnique({ where: { id } })
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { id },
+    })
     if (!listing) throw new NotFoundException("Listing not found")
 
     const updated = await this.prisma.marketplaceListing.update({
@@ -589,7 +698,9 @@ export class AdminService {
   }
 
   async deleteListing(id: string, user: any) {
-    const listing = await this.prisma.marketplaceListing.findUnique({ where: { id } })
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { id },
+    })
     if (!listing) throw new NotFoundException("Listing not found")
 
     const updated = await this.prisma.marketplaceListing.update({
@@ -616,7 +727,10 @@ export class AdminService {
     const existing = await this.prisma.website.findFirst({
       where: { OR: [{ url: dto.url }, { domain }] },
     })
-    if (existing) throw new BadRequestException(`Website with this domain already exists (${existing.url})`)
+    if (existing)
+      throw new BadRequestException(
+        `Website with this domain already exists (${existing.url})`,
+      )
 
     // Phase 6.5 default ownership: an OPERATIONS staffer who adds a site is
     // its default manager — auto-assignment + ticket routing flow through
@@ -628,7 +742,7 @@ export class AdminService {
         where: { userId: dto.managedByUserId },
         select: { role: true },
       })
-      if (!target || target.role !== "OPERATIONS") {
+      if (target?.role !== "OPERATIONS") {
         throw new BadRequestException({
           code: "INVALID_OWNER",
           message: "managedByUserId must reference an OPERATIONS staff member",
@@ -652,7 +766,10 @@ export class AdminService {
         country: dto.country ?? null,
         language: dto.language ?? null,
         category: dto.category ?? null,
-        metrics: { dr: dto.domainRating ?? 0, traffic: dto.monthlyTraffic ?? 0 },
+        metrics: {
+          dr: dto.domainRating ?? 0,
+          traffic: dto.monthlyTraffic ?? 0,
+        },
         ownershipType: WebsiteOwnershipType.PLATFORM,
         isActive: true,
         managedByUserId,
@@ -718,11 +835,18 @@ export class AdminService {
   ) {
     const website = await this.prisma.website.findUnique({
       where: { id: websiteId },
-      select: { id: true, ownershipType: true, managedByUserId: true, url: true },
+      select: {
+        id: true,
+        ownershipType: true,
+        managedByUserId: true,
+        url: true,
+      },
     })
     if (!website) throw new NotFoundException("Website not found")
     if (website.ownershipType !== "PLATFORM") {
-      throw new BadRequestException("Only platform websites have a managed-by owner")
+      throw new BadRequestException(
+        "Only platform websites have a managed-by owner",
+      )
     }
 
     let newOwnerId: string | null = null
@@ -731,7 +855,7 @@ export class AdminService {
         where: { userId: body.managedByUserId },
         select: { role: true },
       })
-      if (!target || target.role !== "OPERATIONS") {
+      if (target?.role !== "OPERATIONS") {
         throw new BadRequestException({
           code: "INVALID_OWNER",
           message: "managedByUserId must reference an OPERATIONS staff member",
@@ -742,7 +866,7 @@ export class AdminService {
 
     await this.prisma.website.update({
       where: { id: websiteId },
-      data:  { managedByUserId: newOwnerId },
+      data: { managedByUserId: newOwnerId },
     })
 
     await this.audit.log({
@@ -769,13 +893,20 @@ export class AdminService {
       include: { user: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: "asc" },
     })
-    return memberships.map(m => ({ id: m.user.id, name: m.user.name, email: m.user.email }))
+    return memberships.map((m) => ({
+      id: m.user.id,
+      name: m.user.name,
+      email: m.user.email,
+    }))
   }
 
   async updatePlatformWebsite(id: string, dto: any, user: any) {
     const website = await this.prisma.website.findUnique({ where: { id } })
     if (!website) throw new NotFoundException("Website not found")
-    if (website.ownershipType !== "PLATFORM") throw new BadRequestException("Only platform websites can be updated via admin")
+    if (website.ownershipType !== "PLATFORM")
+      throw new BadRequestException(
+        "Only platform websites can be updated via admin",
+      )
 
     const updated = await this.prisma.website.update({
       where: { id },
@@ -902,7 +1033,9 @@ export class AdminService {
     if (listing) {
       await this.prisma.marketplaceListing.update({
         where: { id: listing.id },
-        data: { status: paused ? ListingStatus.PAUSED : ListingStatus.APPROVED },
+        data: {
+          status: paused ? ListingStatus.PAUSED : ListingStatus.APPROVED,
+        },
       })
     }
 
@@ -921,7 +1054,10 @@ export class AdminService {
   async deleteWebsite(id: string, user: any) {
     const website = await this.prisma.website.findUnique({ where: { id } })
     if (!website) throw new NotFoundException("Website not found")
-    if (website.ownershipType !== "PLATFORM") throw new BadRequestException("Only platform websites can be deleted via admin")
+    if (website.ownershipType !== "PLATFORM")
+      throw new BadRequestException(
+        "Only platform websites can be deleted via admin",
+      )
 
     const updated = await this.prisma.website.update({
       where: { id },
@@ -966,7 +1102,8 @@ export class AdminService {
     const page = Math.max(params.page ?? 1, 1)
     const limit = Math.min(Math.max(params.limit ?? 50, 1), 100)
     const where: any = {}
-    if (params.action) where.action = { contains: params.action, mode: "insensitive" }
+    if (params.action)
+      where.action = { contains: params.action, mode: "insensitive" }
     if (params.entityType) where.entityType = params.entityType
     if (params.entityId) where.entityId = params.entityId
     if (params.userId) where.userId = params.userId
@@ -1003,7 +1140,8 @@ export class AdminService {
         // Phase 7.7 A2: surface the indexed column so the FE copy button has
         // a stable field to render. Falls back to metadata.requestId for legacy
         // rows where backfill couldn't fill the column (pre-Phase-7.0).
-        requestId: r.requestId ?? (r.metadata?.requestId as string | undefined) ?? null,
+        requestId:
+          r.requestId ?? (r.metadata?.requestId as string | undefined) ?? null,
         ipAddress: r.ipAddress,
         createdAt: r.createdAt,
       })),
@@ -1016,7 +1154,11 @@ export class AdminService {
 
   // ── Publisher directory (staff) ─────────────────────────────────────────
 
-  async listPublishers(params: { search?: string; page?: number; limit?: number }) {
+  async listPublishers(params: {
+    search?: string
+    page?: number
+    limit?: number
+  }) {
     const page = Math.max(params.page ?? 1, 1)
     const limit = Math.min(Math.max(params.limit ?? 50, 1), 100)
     const where: any = params.search
@@ -1032,12 +1174,33 @@ export class AdminService {
       this.prisma.publisher.findMany({
         where,
         include: {
-          balance: { select: { withdrawableBalance: true, lifetimeEarnings: true, debtBalance: true } },
-          profile: { select: { trustScore: true, rating: true, totalReviews: true, completionRate: true } },
-          _count: { select: { websites: true, marketplaceListings: true, settlements: true } },
+          balance: {
+            select: {
+              withdrawableBalance: true,
+              lifetimeEarnings: true,
+              debtBalance: true,
+            },
+          },
+          profile: {
+            select: {
+              trustScore: true,
+              rating: true,
+              totalReviews: true,
+              completionRate: true,
+            },
+          },
+          _count: {
+            select: {
+              websites: true,
+              marketplaceListings: true,
+              settlements: true,
+            },
+          },
           publisherMemberships: {
             take: 1,
-            include: { user: { select: { id: true, email: true, banned: true } } },
+            include: {
+              user: { select: { id: true, email: true, banned: true } },
+            },
           },
         },
         orderBy: { createdAt: "desc" },
@@ -1075,12 +1238,20 @@ export class AdminService {
 
   // Tier is the backend's real trust lever (NEW/TRUSTED/VERIFIED drive
   // withdrawal holds) — there is no separate approve/suspend workflow.
-  async updatePublisherTier(publisherId: string, tier: string, actor: { id: string }) {
+  async updatePublisherTier(
+    publisherId: string,
+    tier: string,
+    actor: { id: string },
+  ) {
     const valid = ["NEW", "TRUSTED", "VERIFIED"]
     if (!valid.includes(tier)) {
-      throw new BadRequestException(`Invalid tier — must be one of ${valid.join(", ")}`)
+      throw new BadRequestException(
+        `Invalid tier — must be one of ${valid.join(", ")}`,
+      )
     }
-    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
     if (!publisher) throw new NotFoundException("Publisher not found")
 
     const updated = await this.prisma.publisher.update({

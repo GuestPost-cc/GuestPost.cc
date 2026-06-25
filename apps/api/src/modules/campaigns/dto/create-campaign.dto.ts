@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength, MaxLength } from "class-validator"
+import { IsOptional, IsString, MaxLength, MinLength } from "class-validator"
 
 export class CreateCampaignDto {
   @IsString()

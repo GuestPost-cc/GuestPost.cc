@@ -17,7 +17,9 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>()
 
-export function getCachedAuthContext(userId: string): Record<string, unknown> | null {
+export function getCachedAuthContext(
+  userId: string,
+): Record<string, unknown> | null {
   const entry = cache.get(userId)
   if (!entry) return null
   if (Date.now() > entry.expiresAt) {
@@ -27,7 +29,10 @@ export function getCachedAuthContext(userId: string): Record<string, unknown> | 
   return entry.value
 }
 
-export function setCachedAuthContext(userId: string, value: Record<string, unknown>) {
+export function setCachedAuthContext(
+  userId: string,
+  value: Record<string, unknown>,
+) {
   if (cache.size >= MAX_ENTRIES) {
     // Drop oldest entries (Map preserves insertion order)
     const excess = cache.size - MAX_ENTRIES + 1

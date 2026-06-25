@@ -1,4 +1,11 @@
-import { createApiClient, setToken, clearToken, getToken, buildAuthErrorHandler, isAuthEndpointPath } from "@guestpost/api-client"
+import {
+  buildAuthErrorHandler,
+  clearToken,
+  createApiClient,
+  getToken,
+  isAuthEndpointPath,
+  setToken,
+} from "@guestpost/api-client"
 
 export const getApiUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL
@@ -21,7 +28,7 @@ export const api = createApiClient({
   baseUrl: getApiUrl(),
   onAuthError,
 })
-export { setToken, clearToken, getToken }
+export { clearToken, getToken, setToken }
 
 // The two helpers below predate Phase 6.8 and bypass the typed HttpClient,
 // so they need their own 401 handling. Mirror the same contract: skip the

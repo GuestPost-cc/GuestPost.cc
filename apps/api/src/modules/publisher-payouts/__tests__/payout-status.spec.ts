@@ -1,4 +1,8 @@
-import { checkProviderTransferStatus, checkWiseTransferStatus, checkStripeTransferStatus } from "@guestpost/shared"
+import {
+  checkProviderTransferStatus,
+  checkStripeTransferStatus,
+  checkWiseTransferStatus,
+} from "@guestpost/shared"
 
 const ORIGINAL_ENV = { ...process.env }
 
@@ -17,7 +21,9 @@ describe("payout-status provider checks", () => {
 
   it("returns null for manual and unknown providers", async () => {
     expect(await checkProviderTransferStatus("manual", "t-1")).toBeNull()
-    expect(await checkProviderTransferStatus("something-else", "t-1")).toBeNull()
+    expect(
+      await checkProviderTransferStatus("something-else", "t-1"),
+    ).toBeNull()
   })
 
   it("maps Wise statuses correctly", async () => {
@@ -44,8 +50,12 @@ describe("payout-status provider checks", () => {
 
   it("throws on provider API errors instead of guessing a status", async () => {
     process.env.WISE_API_KEY = "key"
-    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 503 }) as any
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue({ ok: false, status: 503 }) as any
 
-    await expect(checkWiseTransferStatus("t-1")).rejects.toThrow("Wise status check failed: 503")
+    await expect(checkWiseTransferStatus("t-1")).rejects.toThrow(
+      "Wise status check failed: 503",
+    )
   })
 })

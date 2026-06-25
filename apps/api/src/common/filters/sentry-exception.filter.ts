@@ -14,7 +14,7 @@
 // When SENTRY_DSN is unset, Sentry.captureException is a safe no-op so this
 // filter is dev-mode safe out of the box.
 
-import { Catch, ArgumentsHost, HttpException } from "@nestjs/common"
+import { type ArgumentsHost, Catch, HttpException } from "@nestjs/common"
 import * as Sentry from "@sentry/node"
 import { AllExceptionsFilter } from "./all-exceptions.filter"
 

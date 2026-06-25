@@ -9,18 +9,39 @@
 // existing FulfillmentAssignment row keeps its current owner). Only new
 // orders + new tickets routed by `createTicket` route to the new owner.
 
-import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
 import {
-  Button, Card, CardContent, CardHeader, CardTitle, CardDescription,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-  Badge, Skeleton,
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-  Input, Label,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@guestpost/ui"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 import { toast } from "sonner"
+import { api } from "../../../lib/api"
 
 interface PlatformWebsiteRow {
   id: string
@@ -33,13 +54,16 @@ interface PlatformWebsiteRow {
 
 export default function PlatformWebsitesPage() {
   const qc = useQueryClient()
-  const [reassignFor, setReassignFor] = useState<PlatformWebsiteRow | null>(null)
+  const [reassignFor, setReassignFor] = useState<PlatformWebsiteRow | null>(
+    null,
+  )
   const [pickedOwnerId, setPickedOwnerId] = useState<string>("")
   const [reason, setReason] = useState("")
 
   const websitesQ = useQuery({
     queryKey: ["admin", "platform-websites"],
-    queryFn: () => api.admin.listPlatformWebsites() as Promise<PlatformWebsiteRow[]>,
+    queryFn: () =>
+      api.admin.listPlatformWebsites() as Promise<PlatformWebsiteRow[]>,
   })
 
   // Ops staff for the picker — only loaded when the reassign dialog opens.
@@ -50,8 +74,15 @@ export default function PlatformWebsitesPage() {
   })
 
   const reassignMut = useMutation({
-    mutationFn: (vars: { id: string; managedByUserId: string | null; reason: string }) =>
-      api.admin.assignWebsite(vars.id, { managedByUserId: vars.managedByUserId, reason: vars.reason || undefined }),
+    mutationFn: (vars: {
+      id: string
+      managedByUserId: string | null
+      reason: string
+    }) =>
+      api.admin.assignWebsite(vars.id, {
+        managedByUserId: vars.managedByUserId,
+        reason: vars.reason || undefined,
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "platform-websites"] })
       toast.success("Owner updated")
@@ -67,19 +98,25 @@ export default function PlatformWebsitesPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Platform Websites</h1>
         <p className="text-muted-foreground">
-          Reassign platform sites between Operations staff. In-flight orders are not migrated; new orders + tickets route to the new owner.
+          Reassign platform sites between Operations staff. In-flight orders are
+          not migrated; new orders + tickets route to the new owner.
         </p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle>Ownership map</CardTitle>
-          <CardDescription>Click <strong>Reassign</strong> to change a site&apos;s manager. Unassigned sites fall back to the shared Operations queue.</CardDescription>
+          <CardDescription>
+            Click <strong>Reassign</strong> to change a site&apos;s manager.
+            Unassigned sites fall back to the shared Operations queue.
+          </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           {websitesQ.isLoading ? (
             <div className="p-4 space-y-2">
-              {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
             </div>
           ) : (
             <Table>
@@ -91,19 +128,26 @@ export default function PlatformWebsitesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {((websitesQ.data ?? []) as PlatformWebsiteRow[]).map(w => (
+                {((websitesQ.data ?? []) as PlatformWebsiteRow[]).map((w) => (
                   <TableRow key={w.id}>
                     <TableCell className="font-medium">{w.url}</TableCell>
                     <TableCell>
-                      {w.managedBy
-                        ? <span className="text-sm">{w.managedBy.name || w.managedBy.id}</span>
-                        : <Badge variant="outline">Unassigned</Badge>}
+                      {w.managedBy ? (
+                        <span className="text-sm">
+                          {w.managedBy.name || w.managedBy.id}
+                        </span>
+                      ) : (
+                        <Badge variant="outline">Unassigned</Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => { setReassignFor(w); setPickedOwnerId(w.managedByUserId ?? "") }}
+                        onClick={() => {
+                          setReassignFor(w)
+                          setPickedOwnerId(w.managedByUserId ?? "")
+                        }}
                       >
                         Reassign
                       </Button>
@@ -111,7 +155,14 @@ export default function PlatformWebsitesPage() {
                   </TableRow>
                 ))}
                 {(websitesQ.data ?? []).length === 0 && (
-                  <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-6">No platform websites.</TableCell></TableRow>
+                  <TableRow>
+                    <TableCell
+                      colSpan={3}
+                      className="text-center text-muted-foreground py-6"
+                    >
+                      No platform websites.
+                    </TableCell>
+                  </TableRow>
                 )}
               </TableBody>
             </Table>
@@ -119,40 +170,65 @@ export default function PlatformWebsitesPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={!!reassignFor} onOpenChange={(v) => !v && setReassignFor(null)}>
+      <Dialog
+        open={!!reassignFor}
+        onOpenChange={(v) => !v && setReassignFor(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reassign “{reassignFor?.url}”</DialogTitle>
             <DialogDescription>
-              The new owner sees new orders on this site in their inbox automatically and is the default support assignee for new tickets.
+              The new owner sees new orders on this site in their inbox
+              automatically and is the default support assignee for new tickets.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1">
               <Label>New owner</Label>
               <Select value={pickedOwnerId} onValueChange={setPickedOwnerId}>
-                <SelectTrigger><SelectValue placeholder={opsQ.isLoading ? "Loading…" : "Pick an Ops member"} /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      opsQ.isLoading ? "Loading…" : "Pick an Ops member"
+                    }
+                  />
+                </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__unassigned__">— Unassigned (shared queue) —</SelectItem>
-                  {(opsQ.data ?? []).map(o => (
-                    <SelectItem key={o.id} value={o.id}>{o.name || o.email}</SelectItem>
+                  <SelectItem value="__unassigned__">
+                    — Unassigned (shared queue) —
+                  </SelectItem>
+                  {(opsQ.data ?? []).map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.name || o.email}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
               <Label>Reason (audit log)</Label>
-              <Input placeholder="e.g. workload rebalance, vacation handoff" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} />
+              <Input
+                placeholder="e.g. workload rebalance, vacation handoff"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                maxLength={200}
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReassignFor(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setReassignFor(null)}>
+              Cancel
+            </Button>
             <Button
-              onClick={() => reassignFor && reassignMut.mutate({
-                id: reassignFor.id,
-                managedByUserId: pickedOwnerId === "__unassigned__" ? null : pickedOwnerId,
-                reason,
-              })}
+              onClick={() =>
+                reassignFor &&
+                reassignMut.mutate({
+                  id: reassignFor.id,
+                  managedByUserId:
+                    pickedOwnerId === "__unassigned__" ? null : pickedOwnerId,
+                  reason,
+                })
+              }
               disabled={!pickedOwnerId || reassignMut.isPending}
             >
               {reassignMut.isPending ? "Saving..." : "Save"}

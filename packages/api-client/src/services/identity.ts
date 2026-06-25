@@ -1,4 +1,4 @@
-import { HttpClient } from "../client"
+import type { HttpClient } from "../client"
 
 export type OrganizationMember = {
   id: string
@@ -33,73 +33,111 @@ export class IdentityService {
   constructor(private client: HttpClient) {}
 
   me() {
-    return this.client.get<{ id: string; email: string; name: string }>("/identity/me")
+    return this.client.get<{ id: string; email: string; name: string }>(
+      "/identity/me",
+    )
   }
 
   createOrganization(data: { name: string; slug: string }) {
-    return this.client.post<{ id: string; name: string; slug: string }>("/identity/organizations", { json: data })
+    return this.client.post<{ id: string; name: string; slug: string }>(
+      "/identity/organizations",
+      { json: data },
+    )
   }
 
   // Self-serve publisher onboarding — fresh accounts only (backend enforces)
   becomePublisher(publisherName?: string) {
-    return this.client.post<{ id: string; name: string; tier: string }>("/identity/become-publisher", {
-      json: publisherName ? { publisherName } : {},
-    })
+    return this.client.post<{ id: string; name: string; tier: string }>(
+      "/identity/become-publisher",
+      {
+        json: publisherName ? { publisherName } : {},
+      },
+    )
   }
 
   listOrganizations() {
-    return this.client.get<Array<{ id: string; name: string; slug: string; role: string; isActive: boolean }>>("/identity/organizations")
+    return this.client.get<
+      Array<{
+        id: string
+        name: string
+        slug: string
+        role: string
+        isActive: boolean
+      }>
+    >("/identity/organizations")
   }
 
   switchOrganization(organizationId: string) {
-    return this.client.post<{ activeOrganizationId: string }>("/identity/switch-organization", {
-      json: { organizationId },
-    })
+    return this.client.post<{ activeOrganizationId: string }>(
+      "/identity/switch-organization",
+      {
+        json: { organizationId },
+      },
+    )
   }
 
   // Pending org invitations awaiting this user's response
   listInvites() {
-    return this.client.get<Array<{
-      membershipId: string
-      organizationId: string
-      organizationName: string
-      role: string
-      invitedAt: string
-    }>>("/identity/invites")
+    return this.client.get<
+      Array<{
+        membershipId: string
+        organizationId: string
+        organizationName: string
+        role: string
+        invitedAt: string
+      }>
+    >("/identity/invites")
   }
 
   acceptInvite(membershipId: string) {
-    return this.client.post<{ accepted: boolean; organizationId: string; role: string }>(
-      `/identity/invites/${membershipId}/accept`,
-    )
+    return this.client.post<{
+      accepted: boolean
+      organizationId: string
+      role: string
+    }>(`/identity/invites/${membershipId}/accept`)
   }
 
   declineInvite(membershipId: string) {
-    return this.client.post<{ accepted: boolean }>(`/identity/invites/${membershipId}/decline`)
+    return this.client.post<{ accepted: boolean }>(
+      `/identity/invites/${membershipId}/decline`,
+    )
   }
 
   getOrganization(orgId: string) {
-    return this.client.get<OrganizationDetail>(`/identity/organizations/${orgId}`)
+    return this.client.get<OrganizationDetail>(
+      `/identity/organizations/${orgId}`,
+    )
   }
 
   inviteMember(orgId: string, data: { email: string; role: string }) {
-    return this.client.post(`/identity/organizations/${orgId}/invite`, { json: data })
+    return this.client.post(`/identity/organizations/${orgId}/invite`, {
+      json: data,
+    })
   }
 
   removeMember(orgId: string, userId: string) {
-    return this.client.delete(`/identity/organizations/${orgId}/members/${userId}`)
+    return this.client.delete(
+      `/identity/organizations/${orgId}/members/${userId}`,
+    )
   }
 
   listMembers(orgId: string) {
-    return this.client.get<OrganizationMember[]>(`/identity/organizations/${orgId}/members`)
+    return this.client.get<OrganizationMember[]>(
+      `/identity/organizations/${orgId}/members`,
+    )
   }
 
   createTeam(orgId: string, data: { name: string }) {
-    return this.client.post<{ id: string; name: string }>(`/identity/organizations/${orgId}/teams`, { json: data })
+    return this.client.post<{ id: string; name: string }>(
+      `/identity/organizations/${orgId}/teams`,
+      { json: data },
+    )
   }
 
   deleteTeam(orgId: string, teamId: string) {
-    return this.client.delete(`/identity/organizations/${orgId}/teams/${teamId}`)
+    return this.client.delete(
+      `/identity/organizations/${orgId}/teams/${teamId}`,
+    )
   }
 
   listTeams(orgId: string) {

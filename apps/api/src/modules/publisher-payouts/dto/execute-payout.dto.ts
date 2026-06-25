@@ -1,4 +1,4 @@
-import { IsString, IsIn, IsOptional, IsNumber, IsPositive } from "class-validator"
+import { IsIn, IsString } from "class-validator"
 
 export class ExecutePayoutDto {
   @IsString()

@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "crypto"
+import { createHmac, timingSafeEqual } from "node:crypto"
 
 let warnedFallback = false
 
@@ -9,16 +9,22 @@ function getSecret(): string {
   // Production must use a dedicated secret — sharing JWT_SECRET couples
   // queue trust to auth token trust
   if (process.env.NODE_ENV === "production") {
-    throw new Error("QUEUE_SIGNING_SECRET must be set in production to sign queue jobs")
+    throw new Error(
+      "QUEUE_SIGNING_SECRET must be set in production to sign queue jobs",
+    )
   }
 
   const fallback = process.env.JWT_SECRET
   if (!fallback) {
-    throw new Error("QUEUE_SIGNING_SECRET (or JWT_SECRET in development) must be set to sign queue jobs")
+    throw new Error(
+      "QUEUE_SIGNING_SECRET (or JWT_SECRET in development) must be set to sign queue jobs",
+    )
   }
   if (!warnedFallback) {
     warnedFallback = true
-    console.warn("[job-signing] QUEUE_SIGNING_SECRET not set — falling back to JWT_SECRET (development only)")
+    console.warn(
+      "[job-signing] QUEUE_SIGNING_SECRET not set — falling back to JWT_SECRET (development only)",
+    )
   }
   return fallback
 }
@@ -78,7 +84,9 @@ export function signJobPayload<T extends Record<string, unknown>>(
   data: T,
 ): T & { signature: string; iat: number; v: typeof SIGNED_PAYLOAD_VERSION } {
   const enriched = { ...data, iat: Date.now(), v: SIGNED_PAYLOAD_VERSION }
-  const signature = createHmac("sha256", getSecret()).update(canonicalize(enriched)).digest("hex")
+  const signature = createHmac("sha256", getSecret())
+    .update(canonicalize(enriched))
+    .digest("hex")
   return { ...enriched, signature }
 }
 
@@ -87,12 +95,19 @@ export function verifyJobPayload(
   opts: VerifyOptions = {},
 ): boolean {
   if (!data || typeof data !== "object") return false
-  const { signature, ...payload } = data as Record<string, unknown> & { signature?: string }
+  const { signature, ...payload } = data as Record<string, unknown> & {
+    signature?: string
+  }
   if (typeof signature !== "string" || signature.length !== 64) return false
-  const expected = createHmac("sha256", getSecret()).update(canonicalize(payload)).digest("hex")
+  const expected = createHmac("sha256", getSecret())
+    .update(canonicalize(payload))
+    .digest("hex")
   let hmacValid: boolean
   try {
-    hmacValid = timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"))
+    hmacValid = timingSafeEqual(
+      Buffer.from(signature, "hex"),
+      Buffer.from(expected, "hex"),
+    )
   } catch {
     return false
   }
@@ -101,7 +116,8 @@ export function verifyJobPayload(
   const maxAgeMs = opts.maxAgeMs ?? ROLLOUT_DEFAULTS.maxAgeMs
   if (maxAgeMs === 0) return true // explicit bypass — repeatable cron
 
-  const allowMissingIat = opts.allowMissingIat ?? ROLLOUT_DEFAULTS.allowMissingIat
+  const allowMissingIat =
+    opts.allowMissingIat ?? ROLLOUT_DEFAULTS.allowMissingIat
   const iat = (payload as { iat?: unknown }).iat
   if (typeof iat !== "number") return allowMissingIat
 

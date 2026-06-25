@@ -16,9 +16,9 @@
 //     has no currency column; Order does. Mismatch detection lives at the
 //     Order layer.
 
-import { Injectable } from "@nestjs/common"
-import { PrismaService } from "../../../common/prisma.service"
 import type { Prisma } from "@guestpost/database"
+import { Injectable } from "@nestjs/common"
+import type { PrismaService } from "../../../common/prisma.service"
 import type { RevenueGroupBy } from "../dto/get-revenue-query.dto"
 
 const USD = "USD"
@@ -90,7 +90,10 @@ function parseDate(value: string | undefined): Date | null {
   return d
 }
 
-function resolveRange(from: string | undefined, to: string | undefined): ResolvedRange {
+function resolveRange(
+  from: string | undefined,
+  to: string | undefined,
+): ResolvedRange {
   const f = parseDate(from)
   const t = parseDate(to)
   if (f && t && t.getTime() < f.getTime()) {
@@ -100,7 +103,9 @@ function resolveRange(from: string | undefined, to: string | undefined): Resolve
   return { from: f, to: t, durationMs }
 }
 
-function rangeFilter(range: ResolvedRange): Prisma.PlatformRevenueWhereInput["recordedAt"] | undefined {
+function rangeFilter(
+  range: ResolvedRange,
+): Prisma.PlatformRevenueWhereInput["recordedAt"] | undefined {
   if (!range.from && !range.to) return undefined
   const f: { gte?: Date; lte?: Date } = {}
   if (range.from) f.gte = range.from
@@ -108,7 +113,7 @@ function rangeFilter(range: ResolvedRange): Prisma.PlatformRevenueWhereInput["re
   return f
 }
 
-function zeroTotals(): RevenueTotalsSlice {
+function _zeroTotals(): RevenueTotalsSlice {
   return {
     grossAmount: "0",
     platformFee: "0",
@@ -128,10 +133,13 @@ function addMoney(a: string, b: string): string {
   return ((aCents + bCents) / 100).toFixed(2)
 }
 
-function toMoneyString(v: Prisma.Decimal | string | number | null | undefined): string {
+function toMoneyString(
+  v: Prisma.Decimal | string | number | null | undefined,
+): string {
   if (v === null || v === undefined) return "0.00"
   // Prisma.Decimal has toFixed(); plain numbers/strings go through Number first.
-  if (typeof v === "object" && "toFixed" in v) return (v as { toFixed: (n: number) => string }).toFixed(2)
+  if (typeof v === "object" && "toFixed" in v)
+    return (v as { toFixed: (n: number) => string }).toFixed(2)
   return Number(v).toFixed(2)
 }
 
@@ -164,14 +172,21 @@ export class RevenueService {
           }
         : { from: null, to: null, durationMs: null }
 
-    const [buckets, currentTotals, previousTotals, currencyMismatch] = await Promise.all([
-      this.aggregateBuckets(range, input.groupBy),
-      this.aggregateTotals(range),
-      previousRange.from ? this.aggregateTotals(previousRange) : Promise.resolve(null),
-      this.detectCurrencyMismatch(range),
-    ])
+    const [buckets, currentTotals, previousTotals, currencyMismatch] =
+      await Promise.all([
+        this.aggregateBuckets(range, input.groupBy),
+        this.aggregateTotals(range),
+        previousRange.from
+          ? this.aggregateTotals(previousRange)
+          : Promise.resolve(null),
+        this.detectCurrencyMismatch(range),
+      ])
 
-    const totalsSlice: { current: RevenueTotalsSlice; previous: RevenueTotalsSlice | null; deltaPct: RevenueDeltaPct | null } = {
+    const totalsSlice: {
+      current: RevenueTotalsSlice
+      previous: RevenueTotalsSlice | null
+      deltaPct: RevenueDeltaPct | null
+    } = {
       current: currentTotals,
       previous: previousTotals,
       deltaPct: null,
@@ -182,9 +197,18 @@ export class RevenueService {
       // Hide deltaPct when previous gross is zero — avoids "+∞%" / "NaN%".
       if (prevGross !== 0) {
         totalsSlice.deltaPct = {
-          grossAmount: deltaPct(currentTotals.grossAmount, previousTotals.grossAmount),
-          platformFee: deltaPct(currentTotals.platformFee, previousTotals.platformFee),
-          netRevenue: deltaPct(currentTotals.netRevenue, previousTotals.netRevenue),
+          grossAmount: deltaPct(
+            currentTotals.grossAmount,
+            previousTotals.grossAmount,
+          ),
+          platformFee: deltaPct(
+            currentTotals.platformFee,
+            previousTotals.platformFee,
+          ),
+          netRevenue: deltaPct(
+            currentTotals.netRevenue,
+            previousTotals.netRevenue,
+          ),
         }
       }
     }
@@ -204,9 +228,14 @@ export class RevenueService {
 
   // ── Buckets ──────────────────────────────────────────────────────────────
 
-  private async aggregateBuckets(range: ResolvedRange, groupBy: RevenueGroupBy): Promise<RevenueBucket[]> {
+  private async aggregateBuckets(
+    range: ResolvedRange,
+    groupBy: RevenueGroupBy,
+  ): Promise<RevenueBucket[]> {
     const recordedAt = rangeFilter(range)
-    const baseWhere: Prisma.PlatformRevenueWhereInput = recordedAt ? { recordedAt } : {}
+    const baseWhere: Prisma.PlatformRevenueWhereInput = recordedAt
+      ? { recordedAt }
+      : {}
 
     if (groupBy === "channel") {
       return this.groupBySingleField(baseWhere, "fulfillmentChannel")
@@ -228,18 +257,24 @@ export class RevenueService {
     field: "fulfillmentChannel" | "serviceType",
   ): Promise<RevenueBucket[]> {
     // Sum non-reversed + count
-    const nonReversedSums = await (this.prisma as unknown as {
-      platformRevenue: {
-        groupBy: (args: unknown) => Promise<
-          Array<{
-            fulfillmentChannel?: string | null
-            serviceType?: string | null
-            _sum: { amount: Prisma.Decimal | null; platformFee: Prisma.Decimal | null; netRevenue: Prisma.Decimal | null }
-            _count: { _all: number }
-          }>
-        >
+    const nonReversedSums = await (
+      this.prisma as unknown as {
+        platformRevenue: {
+          groupBy: (args: unknown) => Promise<
+            Array<{
+              fulfillmentChannel?: string | null
+              serviceType?: string | null
+              _sum: {
+                amount: Prisma.Decimal | null
+                platformFee: Prisma.Decimal | null
+                netRevenue: Prisma.Decimal | null
+              }
+              _count: { _all: number }
+            }>
+          >
+        }
       }
-    }).platformRevenue.groupBy({
+    ).platformRevenue.groupBy({
       by: [field],
       where: { ...baseWhere, reversedAt: null },
       _sum: { amount: true, platformFee: true, netRevenue: true },
@@ -247,17 +282,19 @@ export class RevenueService {
     })
 
     // Count reversed separately (we never sum reversed rows into gross/fee/net)
-    const reversedCounts = await (this.prisma as unknown as {
-      platformRevenue: {
-        groupBy: (args: unknown) => Promise<
-          Array<{
-            fulfillmentChannel?: string | null
-            serviceType?: string | null
-            _count: { _all: number }
-          }>
-        >
+    const reversedCounts = await (
+      this.prisma as unknown as {
+        platformRevenue: {
+          groupBy: (args: unknown) => Promise<
+            Array<{
+              fulfillmentChannel?: string | null
+              serviceType?: string | null
+              _count: { _all: number }
+            }>
+          >
+        }
       }
-    }).platformRevenue.groupBy({
+    ).platformRevenue.groupBy({
       by: [field],
       where: { ...baseWhere, reversedAt: { not: null } },
       _count: { _all: true },
@@ -265,7 +302,9 @@ export class RevenueService {
 
     const reversedMap = new Map<string, number>()
     for (const r of reversedCounts) {
-      const key = String((r as Record<string, unknown>)[field] ?? UNKNOWN_BUCKET)
+      const key = String(
+        (r as Record<string, unknown>)[field] ?? UNKNOWN_BUCKET,
+      )
       reversedMap.set(key, r._count._all)
     }
 
@@ -300,7 +339,9 @@ export class RevenueService {
       }
     }
 
-    buckets.sort((a, b) => (a.bucketKey < b.bucketKey ? -1 : a.bucketKey > b.bucketKey ? 1 : 0))
+    buckets.sort((a, b) =>
+      a.bucketKey < b.bucketKey ? -1 : a.bucketKey > b.bucketKey ? 1 : 0,
+    )
     return buckets
   }
 
@@ -311,7 +352,9 @@ export class RevenueService {
     // Build a parameterized query that returns sums per UTC month.
     // Using raw SQL because Prisma groupBy doesn't support date_trunc.
     const fromClause = range.from ? `AND "recordedAt" >= $1::timestamptz` : ""
-    const toClause = range.to ? `AND "recordedAt" <= ${range.from ? "$2" : "$1"}::timestamptz` : ""
+    const toClause = range.to
+      ? `AND "recordedAt" <= ${range.from ? "$2" : "$1"}::timestamptz`
+      : ""
 
     const params: unknown[] = []
     if (range.from) params.push(range.from)
@@ -358,29 +401,43 @@ export class RevenueService {
     })
   }
 
-  private async groupByListing(baseWhere: Prisma.PlatformRevenueWhereInput): Promise<RevenueBucket[]> {
+  private async groupByListing(
+    baseWhere: Prisma.PlatformRevenueWhereInput,
+  ): Promise<RevenueBucket[]> {
     type Row = {
       listingServiceId: string | null
-      _sum: { amount: Prisma.Decimal | null; platformFee: Prisma.Decimal | null; netRevenue: Prisma.Decimal | null }
+      _sum: {
+        amount: Prisma.Decimal | null
+        platformFee: Prisma.Decimal | null
+        netRevenue: Prisma.Decimal | null
+      }
       _count: { _all: number }
     }
 
-    const nonReversedSums = (await (this.prisma as unknown as {
-      platformRevenue: {
-        groupBy: (args: unknown) => Promise<Row[]>
+    const nonReversedSums = (await (
+      this.prisma as unknown as {
+        platformRevenue: {
+          groupBy: (args: unknown) => Promise<Row[]>
+        }
       }
-    }).platformRevenue.groupBy({
+    ).platformRevenue.groupBy({
       by: ["listingServiceId"],
       where: { ...baseWhere, reversedAt: null },
       _sum: { amount: true, platformFee: true, netRevenue: true },
       _count: { _all: true },
     })) as Row[]
 
-    const reversedCounts = (await (this.prisma as unknown as {
-      platformRevenue: {
-        groupBy: (args: unknown) => Promise<Array<{ listingServiceId: string | null; _count: { _all: number } }>>
+    const reversedCounts = (await (
+      this.prisma as unknown as {
+        platformRevenue: {
+          groupBy: (
+            args: unknown,
+          ) => Promise<
+            Array<{ listingServiceId: string | null; _count: { _all: number } }>
+          >
+        }
       }
-    }).platformRevenue.groupBy({
+    ).platformRevenue.groupBy({
       by: ["listingServiceId"],
       where: { ...baseWhere, reversedAt: { not: null } },
       _count: { _all: true },
@@ -395,7 +452,11 @@ export class RevenueService {
     const ids = nonReversedSums
       .map((r) => r.listingServiceId)
       .filter((v): v is string => v !== null)
-      .concat(reversedCounts.map((r) => r.listingServiceId).filter((v): v is string => v !== null))
+      .concat(
+        reversedCounts
+          .map((r) => r.listingServiceId)
+          .filter((v): v is string => v !== null),
+      )
     const distinctIds = Array.from(new Set(ids))
     const listingServiceRows = distinctIds.length
       ? await this.prisma.listingService.findMany({
@@ -407,9 +468,15 @@ export class RevenueService {
           },
         })
       : []
-    const lsLookup = new Map<string, { listingId: string; listingTitle: string | null }>()
+    const lsLookup = new Map<
+      string,
+      { listingId: string; listingTitle: string | null }
+    >()
     for (const ls of listingServiceRows) {
-      lsLookup.set(ls.id, { listingId: ls.listingId, listingTitle: ls.listing?.title ?? null })
+      lsLookup.set(ls.id, {
+        listingId: ls.listingId,
+        listingTitle: ls.listing?.title ?? null,
+      })
     }
 
     const out: RevenueBucket[] = []
@@ -422,7 +489,8 @@ export class RevenueService {
       const meta = lsId ? lsLookup.get(lsId) : undefined
       const title = meta?.listingTitle ?? null
       out.push({
-        bucket: lsId == null ? UNKNOWN_BUCKET : title ?? "(listing not found)",
+        bucket:
+          lsId == null ? UNKNOWN_BUCKET : (title ?? "(listing not found)"),
         bucketKey,
         listingServiceId: lsId,
         listingId: meta?.listingId ?? null,
@@ -443,7 +511,8 @@ export class RevenueService {
       const meta = lsId ? lsLookup.get(lsId) : undefined
       const title = meta?.listingTitle ?? null
       out.push({
-        bucket: lsId == null ? UNKNOWN_BUCKET : title ?? "(listing not found)",
+        bucket:
+          lsId == null ? UNKNOWN_BUCKET : (title ?? "(listing not found)"),
         bucketKey: key,
         listingServiceId: lsId,
         listingId: meta?.listingId ?? null,
@@ -471,9 +540,13 @@ export class RevenueService {
 
   // ── Totals (current + previous window) ───────────────────────────────────
 
-  private async aggregateTotals(range: ResolvedRange): Promise<RevenueTotalsSlice> {
+  private async aggregateTotals(
+    range: ResolvedRange,
+  ): Promise<RevenueTotalsSlice> {
     const recordedAt = rangeFilter(range)
-    const baseWhere: Prisma.PlatformRevenueWhereInput = recordedAt ? { recordedAt } : {}
+    const baseWhere: Prisma.PlatformRevenueWhereInput = recordedAt
+      ? { recordedAt }
+      : {}
 
     const [nonReversed, reversed] = await Promise.all([
       this.prisma.platformRevenue.aggregate({
@@ -481,7 +554,9 @@ export class RevenueService {
         _sum: { amount: true, platformFee: true, netRevenue: true },
         _count: { _all: true },
       }),
-      this.prisma.platformRevenue.count({ where: { ...baseWhere, reversedAt: { not: null } } }),
+      this.prisma.platformRevenue.count({
+        where: { ...baseWhere, reversedAt: { not: null } },
+      }),
     ])
 
     return {
@@ -496,7 +571,9 @@ export class RevenueService {
 
   // ── Currency mismatch (queries Order, not PlatformRevenue) ──────────────
 
-  private async detectCurrencyMismatch(range: ResolvedRange): Promise<RevenueCurrencyMismatch | null> {
+  private async detectCurrencyMismatch(
+    range: ResolvedRange,
+  ): Promise<RevenueCurrencyMismatch | null> {
     // Phase 0 finding: PlatformRevenue has no `currency` column. We check
     // the source Orders for non-USD currency in the same date window. The
     // mapping is "Orders that contributed revenue in this range" — which
@@ -508,8 +585,10 @@ export class RevenueService {
     }
     if (range.from || range.to) {
       where.deliveredAt = {}
-      if (range.from) (where.deliveredAt as { gte?: Date; lte?: Date }).gte = range.from
-      if (range.to) (where.deliveredAt as { gte?: Date; lte?: Date }).lte = range.to
+      if (range.from)
+        (where.deliveredAt as { gte?: Date; lte?: Date }).gte = range.from
+      if (range.to)
+        (where.deliveredAt as { gte?: Date; lte?: Date }).lte = range.to
     }
 
     const distinctRows = await this.prisma.order.findMany({

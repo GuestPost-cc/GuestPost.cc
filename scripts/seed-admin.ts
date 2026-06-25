@@ -3,11 +3,15 @@ const EMAIL = process.env.SEED_ADMIN_EMAIL || "admin@guestpost.local"
 const PASSWORD = process.env.SEED_ADMIN_PASSWORD || "Admin123!"
 
 async function seed() {
-  const headers = { "Content-Type": "application/json", Origin: "http://localhost:3000" }
+  const headers = {
+    "Content-Type": "application/json",
+    Origin: "http://localhost:3000",
+  }
 
   // Sign up admin user (may fail if already exists)
   const signupRes = await fetch(`${API}/api/v1/auth/sign-up/email`, {
-    method: "POST", headers,
+    method: "POST",
+    headers,
     body: JSON.stringify({ email: EMAIL, password: PASSWORD, name: "Admin" }),
   })
   let userId: string | null = null
@@ -22,7 +26,8 @@ async function seed() {
 
   // Sign in
   const signinRes = await fetch(`${API}/api/v1/auth/sign-in/email`, {
-    method: "POST", headers,
+    method: "POST",
+    headers,
     body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
   })
   if (!signinRes.ok) throw new Error(`Signin failed: ${await signinRes.text()}`)
@@ -34,7 +39,10 @@ async function seed() {
   if (userId) {
     const updateRes = await fetch(`${API}/api/v1/identity/me/set-staff`, {
       method: "POST",
-      headers: { ...headers, Cookie: signinRes.headers.get("set-cookie") ?? "" },
+      headers: {
+        ...headers,
+        Cookie: signinRes.headers.get("set-cookie") ?? "",
+      },
       body: JSON.stringify({ role: "SUPER_ADMIN" }),
     })
     if (updateRes.ok) {
@@ -49,7 +57,12 @@ async function seed() {
     headers: { ...headers, Cookie: signinRes.headers.get("set-cookie") ?? "" },
   })
   const me = await meRes.json()
-  console.log(`Me: ${me.name} (userType: ${me.userType}, staffRole: ${me.staffRole ?? "?"})`)
+  console.log(
+    `Me: ${me.name} (userType: ${me.userType}, staffRole: ${me.staffRole ?? "?"})`,
+  )
 }
 
-seed().catch((e) => { console.error(e); process.exit(1) })
+seed().catch((e) => {
+  console.error(e)
+  process.exit(1)
+})

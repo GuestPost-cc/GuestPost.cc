@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
-import { Button } from "@guestpost/ui"
 import { sanitizeReturnTo } from "@guestpost/api-client"
-import { useAuth } from "../lib/auth"
-import { useForm } from "react-hook-form"
+import { Button } from "@guestpost/ui"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { useAuth } from "../lib/auth"
 
 function LoginContent() {
   const { signIn, signUp } = useAuth()
@@ -17,7 +17,9 @@ function LoginContent() {
   const [name, setName] = useState("")
   const [error, setError] = useState("")
   // Phase 6.8 — banner copy stashed by the 401-redirect handler.
-  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<string | null>(null)
+  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<
+    string | null
+  >(null)
 
   const loginSchema = z.object({
     email: z.string().email("Valid email required"),
@@ -41,7 +43,9 @@ function LoginContent() {
         setSessionExpiredBanner(reason)
         sessionStorage.removeItem("guestpost:auth-redirect-reason")
       }
-    } catch { /* private mode */ }
+    } catch {
+      /* private mode */
+    }
   }, [])
 
   const onSubmit = async (data: LoginFormData) => {
@@ -55,7 +59,9 @@ function LoginContent() {
       // Phase 6.8 — honor sanitized returnTo so the user lands back where
       // the 401 bounced them. The sanitizer rejects cross-origin paths.
       const safeReturnTo = sanitizeReturnTo(searchParams.get("returnTo"))
-      router.push(safeReturnTo && safeReturnTo !== "/" ? safeReturnTo : "/dashboard")
+      router.push(
+        safeReturnTo && safeReturnTo !== "/" ? safeReturnTo : "/dashboard",
+      )
     } catch (err: any) {
       setError(err.message ?? "Something went wrong")
     }
@@ -69,7 +75,9 @@ function LoginContent() {
             {isSignUp ? "Publisher Sign Up" : "Publisher Sign In"}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {isSignUp ? "Create an account to start publishing" : "Sign in to manage your orders and content"}
+            {isSignUp
+              ? "Create an account to start publishing"
+              : "Sign in to manage your orders and content"}
           </p>
         </div>
 
@@ -101,7 +109,9 @@ function LoginContent() {
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             required
           />
-          {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
+          {errors.email && (
+            <p className="text-sm text-destructive">{errors.email.message}</p>
+          )}
           <input
             type="password"
             placeholder="Password"
@@ -109,31 +119,50 @@ function LoginContent() {
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             required
           />
-          {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+          {errors.password && (
+            <p className="text-sm text-destructive">
+              {errors.password.message}
+            </p>
+          )}
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting ? "Loading..." : isSignUp ? "Create Account" : "Sign In"}
+            {isSubmitting
+              ? "Loading..."
+              : isSignUp
+                ? "Create Account"
+                : "Sign In"}
           </Button>
         </form>
 
         <div className="space-y-4">
           <p className="text-center text-sm text-muted-foreground">
             {isSignUp ? (
-              <>Already have an account?{" "}
-                <button onClick={() => setIsSignUp(false)} className="underline underline-offset-4 hover:text-primary">
+              <>
+                Already have an account?{" "}
+                <button
+                  onClick={() => setIsSignUp(false)}
+                  className="underline underline-offset-4 hover:text-primary"
+                >
                   Sign in
                 </button>
               </>
             ) : (
-              <>Don&apos;t have an account?{" "}
-                <button onClick={() => setIsSignUp(true)} className="underline underline-offset-4 hover:text-primary">
+              <>
+                Don&apos;t have an account?{" "}
+                <button
+                  onClick={() => setIsSignUp(true)}
+                  className="underline underline-offset-4 hover:text-primary"
+                >
                   Sign up
                 </button>
               </>
             )}
           </p>
           <p className="text-center text-sm text-muted-foreground">
-            <a href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"} className="underline underline-offset-4 hover:text-primary">
+            <a
+              href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"}
+              className="underline underline-offset-4 hover:text-primary"
+            >
               Back to homepage
             </a>
           </p>
@@ -145,7 +174,13 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          Loading...
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   )

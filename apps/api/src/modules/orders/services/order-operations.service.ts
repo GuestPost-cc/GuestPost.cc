@@ -1,9 +1,14 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../../common/prisma.service"
-import { AuditService } from "../../audit/audit.service"
-import { QueueService } from "../../queues/queue.service"
-import { QUEUES, orderEventMetadata } from "@guestpost/shared"
-import { OrderDeliveryService } from "./order-delivery.service"
+import { orderEventMetadata, QUEUES } from "@guestpost/shared"
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import type { PrismaService } from "../../../common/prisma.service"
+import type { AuditService } from "../../audit/audit.service"
+import type { QueueService } from "../../queues/queue.service"
+import type { OrderDeliveryService } from "./order-delivery.service"
 
 @Injectable()
 export class OrderOperationsService {
@@ -14,13 +19,24 @@ export class OrderOperationsService {
     private readonly delivery: OrderDeliveryService,
   ) {}
 
-  private async transition(orderId: string, fromVersion: number, expectedStatus: string, data: any) {
+  private async transition(
+    orderId: string,
+    fromVersion: number,
+    expectedStatus: string,
+    data: any,
+  ) {
     const r = await this.prisma.order.updateMany({
-      where: { id: orderId, version: fromVersion, status: expectedStatus as any },
+      where: {
+        id: orderId,
+        version: fromVersion,
+        status: expectedStatus as any,
+      },
       data: { ...data, version: { increment: 1 } },
     })
     if (r.count === 0) {
-      throw new ConflictException("Order was modified by another request. Retry.")
+      throw new ConflictException(
+        "Order was modified by another request. Retry.",
+      )
     }
     return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
   }
@@ -35,16 +51,21 @@ export class OrderOperationsService {
     // and is authoritative — website.ownershipType is the legacy fallback
     // for orders created before the snapshot existed. Once Phase 4 lands
     // and the backfill runs, this fallback is dead code.
-    const channel = order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    const channel =
+      order.fulfillmentChannel ??
+      (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
     if (channel !== "PLATFORM") {
-      throw new BadRequestException("Only platform orders can be fulfilled via operations")
+      throw new BadRequestException(
+        "Only platform orders can be fulfilled via operations",
+      )
     }
     return order
   }
 
   async acceptOrder(orderId: string, userId: string) {
     const order = await this.assertPlatformOrder(orderId)
-    if (order.status !== "SUBMITTED") throw new BadRequestException("Order must be SUBMITTED to accept")
+    if (order.status !== "SUBMITTED")
+      throw new BadRequestException("Order must be SUBMITTED to accept")
 
     const updated = await this.transition(orderId, order.version, "SUBMITTED", {
       status: "ACCEPTED",
@@ -64,7 +85,11 @@ export class OrderOperationsService {
       action: "ORDER_ACCEPTED",
       entityType: "Order",
       entityId: orderId,
-      metadata: { ...orderEventMetadata(order), fromStatus: order.status, fulfilledBy: "operations" },
+      metadata: {
+        ...orderEventMetadata(order),
+        fromStatus: order.status,
+        fulfilledBy: "operations",
+      },
       userId,
       organizationId: order.organizationId,
     })
@@ -75,16 +100,28 @@ export class OrderOperationsService {
   async submitContent(orderId: string, userId: string, content?: string) {
     const order = await this.assertPlatformOrder(orderId)
     if (order.status !== "ACCEPTED" && order.status !== "CONTENT_REQUESTED") {
-      throw new BadRequestException("Order must be ACCEPTED or CONTENT_REQUESTED to submit content")
+      throw new BadRequestException(
+        "Order must be ACCEPTED or CONTENT_REQUESTED to submit content",
+      )
     }
 
-    const updated = await this.transition(orderId, order.version, order.status, {
-      status: "CONTENT_CREATION",
-    })
+    const updated = await this.transition(
+      orderId,
+      order.version,
+      order.status,
+      {
+        status: "CONTENT_CREATION",
+      },
+    )
 
     await this.prisma.contentOrder.upsert({
       where: { orderId },
-      create: { orderId, title: order.title ?? "Content", brief: content, status: "IN_PROGRESS" },
+      create: {
+        orderId,
+        title: order.title ?? "Content",
+        brief: content,
+        status: "IN_PROGRESS",
+      },
       update: { brief: content, status: "IN_PROGRESS" },
     })
 
@@ -112,11 +149,17 @@ export class OrderOperationsService {
 
   async markContentReady(orderId: string, userId: string) {
     const order = await this.assertPlatformOrder(orderId)
-    if (order.status !== "CONTENT_CREATION") throw new BadRequestException("Order must be in CONTENT_CREATION status")
+    if (order.status !== "CONTENT_CREATION")
+      throw new BadRequestException("Order must be in CONTENT_CREATION status")
 
-    const updated = await this.transition(orderId, order.version, "CONTENT_CREATION", {
-      status: "CONTENT_READY",
-    })
+    const updated = await this.transition(
+      orderId,
+      order.version,
+      "CONTENT_CREATION",
+      {
+        status: "CONTENT_READY",
+      },
+    )
 
     await this.prisma.orderEvent.create({
       data: {
@@ -141,11 +184,19 @@ export class OrderOperationsService {
 
   async submitForReview(orderId: string, userId: string) {
     const order = await this.assertPlatformOrder(orderId)
-    if (order.status !== "CONTENT_READY") throw new BadRequestException("Order must be CONTENT_READY to submit for review")
+    if (order.status !== "CONTENT_READY")
+      throw new BadRequestException(
+        "Order must be CONTENT_READY to submit for review",
+      )
 
-    const updated = await this.transition(orderId, order.version, "CONTENT_READY", {
-      status: "CUSTOMER_REVIEW",
-    })
+    const updated = await this.transition(
+      orderId,
+      order.version,
+      "CONTENT_READY",
+      {
+        status: "CUSTOMER_REVIEW",
+      },
+    )
 
     await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
       userId: order.customerId,
@@ -182,24 +233,42 @@ export class OrderOperationsService {
     orderId: string,
     userId: string,
     publishedUrl: string,
-    extra: { articleTitle?: string; notes?: string; screenshotUrl?: string } = {},
+    extra: {
+      articleTitle?: string
+      notes?: string
+      screenshotUrl?: string
+    } = {},
   ) {
     const order = await this.assertPlatformOrder(orderId)
-    if (order.status !== "APPROVED") throw new BadRequestException("Order must be APPROVED to mark published")
+    if (order.status !== "APPROVED")
+      throw new BadRequestException("Order must be APPROVED to mark published")
 
     const assignment = await this.prisma.fulfillmentAssignment.findFirst({
-      where: { orderId, assignedToUserId: userId, status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
+      where: {
+        orderId,
+        assignedToUserId: userId,
+        status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+      },
     })
     if (!assignment) {
-      throw new BadRequestException("You must be assigned this order before submitting a delivery")
+      throw new BadRequestException(
+        "You must be assigned this order before submitting a delivery",
+      )
     }
 
-    const version = await this.delivery.submitDelivery(order, userId, { publishedUrl, ...extra })
+    const version = await this.delivery.submitDelivery(order, userId, {
+      publishedUrl,
+      ...extra,
+    })
 
     // Mark the assignment delivered (version-guarded)
     await this.prisma.fulfillmentAssignment.updateMany({
       where: { id: assignment.id, version: assignment.version },
-      data: { status: "DELIVERED", completedAt: new Date(), version: { increment: 1 } },
+      data: {
+        status: "DELIVERED",
+        completedAt: new Date(),
+        version: { increment: 1 },
+      },
     })
 
     void version

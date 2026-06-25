@@ -1,26 +1,39 @@
-import { connection } from "../redis"
-import { QUEUES, checkProviderTransferStatus, normalizeProviderWebhook } from "@guestpost/shared"
-import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
-import { isRepeatableJob } from "../repeatable-job-registry"
 import { prisma } from "@guestpost/database"
-import { createObservableWorker } from "../lib/queue-observability"
+import {
+  checkProviderTransferStatus,
+  normalizeProviderWebhook,
+  QUEUES,
+} from "@guestpost/shared"
+import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { createObservableWorker } from "../lib/queue-observability"
+import { connection } from "../redis"
+import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.payout")
 
 // Shared state transitions for "the provider says this transfer finished".
 // Used by both the webhook path and the status poller. All guards are
 // conditional updateMany — a concurrent webhook/poller loses the race cleanly.
-async function completeExecution(execution: any, source: string, metadata: Record<string, unknown>) {
+async function completeExecution(
+  execution: any,
+  source: string,
+  metadata: Record<string, unknown>,
+) {
   await prisma.$transaction(async (tx: any) => {
     const execUpdated = await tx.payoutExecution.updateMany({
       where: { id: execution.id, status: "PROCESSING" },
       data: { status: "COMPLETED", providerMetadata: metadata as any },
     })
-    if (execUpdated.count === 0) throw new Error("Execution already transitioned")
+    if (execUpdated.count === 0)
+      throw new Error("Execution already transitioned")
 
     const wdUpdated = await tx.withdrawal.updateMany({
-      where: { id: execution.withdrawalId, status: "PROCESSING", version: execution.withdrawal.version },
+      where: {
+        id: execution.withdrawalId,
+        status: "PROCESSING",
+        version: execution.withdrawal.version,
+      },
       data: { status: "COMPLETED", version: { increment: 1 } },
     })
     if (wdUpdated.count === 0) {
@@ -36,17 +49,30 @@ async function completeExecution(execution: any, source: string, metadata: Recor
     })
     if (balance) {
       await tx.publisherBalance.updateMany({
-        where: { publisherId: execution.withdrawal.publisherId, version: balance.version },
-        data: { lifetimePaid: { increment: Number(execution.amount) }, version: { increment: 1 } },
+        where: {
+          publisherId: execution.withdrawal.publisherId,
+          version: balance.version,
+        },
+        data: {
+          lifetimePaid: { increment: Number(execution.amount) },
+          version: { increment: 1 },
+        },
       })
     }
 
     await tx.auditLog.create({
       data: {
-        action: source === "webhook" ? "PAYOUT_WEBHOOK_COMPLETED" : "PAYOUT_STATUS_POLL_COMPLETED",
+        action:
+          source === "webhook"
+            ? "PAYOUT_WEBHOOK_COMPLETED"
+            : "PAYOUT_STATUS_POLL_COMPLETED",
         entityType: "PayoutExecution",
         entityId: execution.id,
-        metadata: { providerExecutionId: execution.providerExecutionId, source, ...metadata },
+        metadata: {
+          providerExecutionId: execution.providerExecutionId,
+          source,
+          ...metadata,
+        },
         userId: null,
         organizationId: null,
       },
@@ -54,25 +80,47 @@ async function completeExecution(execution: any, source: string, metadata: Recor
   })
 }
 
-async function failExecution(execution: any, source: string, errorMessage: string, metadata: Record<string, unknown>) {
+async function failExecution(
+  execution: any,
+  source: string,
+  errorMessage: string,
+  metadata: Record<string, unknown>,
+) {
   await prisma.$transaction(async (tx: any) => {
     const execUpdated = await tx.payoutExecution.updateMany({
       where: { id: execution.id, status: "PROCESSING" },
-      data: { status: "FAILED", errorMessage, providerMetadata: metadata as any },
+      data: {
+        status: "FAILED",
+        errorMessage,
+        providerMetadata: metadata as any,
+      },
     })
-    if (execUpdated.count === 0) throw new Error("Execution already transitioned")
+    if (execUpdated.count === 0)
+      throw new Error("Execution already transitioned")
 
     await tx.withdrawal.updateMany({
-      where: { id: execution.withdrawalId, status: "PROCESSING", version: execution.withdrawal.version },
+      where: {
+        id: execution.withdrawalId,
+        status: "PROCESSING",
+        version: execution.withdrawal.version,
+      },
       data: { status: "FAILED", version: { increment: 1 } },
     })
 
     await tx.auditLog.create({
       data: {
-        action: source === "webhook" ? "PAYOUT_WEBHOOK_FAILED" : "PAYOUT_STATUS_POLL_FAILED",
+        action:
+          source === "webhook"
+            ? "PAYOUT_WEBHOOK_FAILED"
+            : "PAYOUT_STATUS_POLL_FAILED",
         entityType: "PayoutExecution",
         entityId: execution.id,
-        metadata: { providerExecutionId: execution.providerExecutionId, source, error: errorMessage, ...metadata },
+        metadata: {
+          providerExecutionId: execution.providerExecutionId,
+          source,
+          error: errorMessage,
+          ...metadata,
+        },
         userId: null,
         organizationId: null,
       },
@@ -88,7 +136,9 @@ async function handleCheckStatus(job: any) {
     orderBy: { createdAt: "asc" },
     include: { provider: true, withdrawal: { include: { publisher: true } } },
   })
-  logger.info("polling provider status", { pendingCount: pendingExecutions.length })
+  logger.info("polling provider status", {
+    pendingCount: pendingExecutions.length,
+  })
 
   let completed = 0
   let failed = 0
@@ -96,10 +146,16 @@ async function handleCheckStatus(job: any) {
   for (const execution of pendingExecutions) {
     let result
     try {
-      result = await checkProviderTransferStatus(execution.provider.name, execution.providerExecutionId!)
+      result = await checkProviderTransferStatus(
+        execution.provider.name,
+        execution.providerExecutionId!,
+      )
     } catch (err: any) {
       // Provider API hiccup on one transfer must not abort the sweep
-      logger.error("status check failed", { executionId: execution.id, err: err?.message ?? String(err) })
+      logger.error("status check failed", {
+        executionId: execution.id,
+        err: err?.message ?? String(err),
+      })
       skipped++
       continue
     }
@@ -111,17 +167,32 @@ async function handleCheckStatus(job: any) {
 
     try {
       if (result.status === "COMPLETED") {
-        await completeExecution(execution, "status-poll", { ...result.metadata, fee: result.fee })
+        await completeExecution(execution, "status-poll", {
+          ...result.metadata,
+          fee: result.fee,
+        })
         completed++
-        logger.info("execution completed via status poll", { executionId: execution.id })
+        logger.info("execution completed via status poll", {
+          executionId: execution.id,
+        })
       } else if (result.status === "FAILED") {
-        await failExecution(execution, "status-poll", "Provider reports transfer failed/cancelled", result.metadata ?? {})
+        await failExecution(
+          execution,
+          "status-poll",
+          "Provider reports transfer failed/cancelled",
+          result.metadata ?? {},
+        )
         failed++
-        logger.info("execution failed via status poll", { executionId: execution.id })
+        logger.info("execution failed via status poll", {
+          executionId: execution.id,
+        })
       }
     } catch (err: any) {
       // Lost a race against a webhook — fine, the state already moved
-      logger.warn("transition skipped (lost race against webhook)", { executionId: execution.id, err: err?.message ?? String(err) })
+      logger.warn("transition skipped (lost race against webhook)", {
+        executionId: execution.id,
+        err: err?.message ?? String(err),
+      })
       skipped++
     }
   }
@@ -135,8 +206,13 @@ async function handleWebhook(job: any) {
     throw new Error("Missing provider, event, or data in webhook job")
   }
   if (!verified) {
-    logger.error("unverified webhook job rejected — must be verified by API before queueing", { provider, event })
-    throw new Error("Unverified webhook — signature check required before enqueueing")
+    logger.error(
+      "unverified webhook job rejected — must be verified by API before queueing",
+      { provider, event },
+    )
+    throw new Error(
+      "Unverified webhook — signature check required before enqueueing",
+    )
   }
   logger.info("processing webhook event", { provider, event })
 
@@ -155,26 +231,56 @@ async function handleWebhook(job: any) {
     include: { withdrawal: { include: { publisher: true } } },
   })
   if (!execution) {
-    logger.warn("no execution found for providerExecutionId", { providerExecutionId: normalized.providerExecutionId })
+    logger.warn("no execution found for providerExecutionId", {
+      providerExecutionId: normalized.providerExecutionId,
+    })
     return { skipped: true, reason: "Execution not found" }
   }
 
   if (execution.status !== "PROCESSING") {
-    logger.warn("execution not PROCESSING — ignoring webhook", { executionId: execution.id, status: execution.status })
-    return { skipped: true, reason: `Execution is ${execution.status}, not PROCESSING` }
+    logger.warn("execution not PROCESSING — ignoring webhook", {
+      executionId: execution.id,
+      status: execution.status,
+    })
+    return {
+      skipped: true,
+      reason: `Execution is ${execution.status}, not PROCESSING`,
+    }
   }
 
   const webhookStatus = normalized.status
   if (webhookStatus === "COMPLETED") {
-    await completeExecution(execution, "webhook", { provider, event, rawStatus: normalized.rawStatus })
-    logger.info("withdrawal completed via webhook", { withdrawalId: execution.withdrawalId, executionId: execution.id })
+    await completeExecution(execution, "webhook", {
+      provider,
+      event,
+      rawStatus: normalized.rawStatus,
+    })
+    logger.info("withdrawal completed via webhook", {
+      withdrawalId: execution.withdrawalId,
+      executionId: execution.id,
+    })
   } else if (webhookStatus === "FAILED") {
-    await failExecution(execution, "webhook", normalized.error ?? "Provider reported failure", { provider, event, rawStatus: normalized.rawStatus })
-    logger.info("withdrawal failed via webhook", { withdrawalId: execution.withdrawalId, executionId: execution.id })
+    await failExecution(
+      execution,
+      "webhook",
+      normalized.error ?? "Provider reported failure",
+      { provider, event, rawStatus: normalized.rawStatus },
+    )
+    logger.info("withdrawal failed via webhook", {
+      withdrawalId: execution.withdrawalId,
+      executionId: execution.id,
+    })
   } else {
-    logger.info("webhook state non-terminal — no transition", { rawStatus: normalized.rawStatus, executionId: execution.id })
+    logger.info("webhook state non-terminal — no transition", {
+      rawStatus: normalized.rawStatus,
+      executionId: execution.id,
+    })
   }
-  return { executionId: execution.id, webhookStatus, rawStatus: normalized.rawStatus }
+  return {
+    executionId: execution.id,
+    webhookStatus,
+    rawStatus: normalized.rawStatus,
+  }
 }
 
 export function createPayoutWorker() {
@@ -191,8 +297,10 @@ export function createPayoutWorker() {
         throw new Error("Invalid job signature")
       }
       switch (job.name) {
-        case "payout-check-status": return handleCheckStatus(job)
-        case "payout-webhook": return handleWebhook(job)
+        case "payout-check-status":
+          return handleCheckStatus(job)
+        case "payout-webhook":
+          return handleWebhook(job)
         default:
           logger.warn("unknown job name", { jobName: job.name })
       }
@@ -200,7 +308,11 @@ export function createPayoutWorker() {
     { connection, concurrency: 5 },
   )
 
-  worker.on("completed", (job) => logger.info("job completed", { jobId: job.id }))
-  worker.on("failed", (job, err) => logger.error("job failed", { jobId: job?.id, err: err?.message }))
+  worker.on("completed", (job) =>
+    logger.info("job completed", { jobId: job.id }),
+  )
+  worker.on("failed", (job, err) =>
+    logger.error("job failed", { jobId: job?.id, err: err?.message }),
+  )
   return worker
 }

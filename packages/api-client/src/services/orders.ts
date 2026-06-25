@@ -1,5 +1,9 @@
-import type { OrderStatus, ServiceType, OrderEventType } from "@guestpost/shared"
-import { HttpClient } from "../client"
+import type {
+  OrderEventType,
+  OrderStatus,
+  ServiceType,
+} from "@guestpost/shared"
+import type { HttpClient } from "../client"
 
 // Mirrors CreateOrderDto exactly — the API whitelists properties, so any
 // extra field is a 400. Service type/title/instructions live on the ORDER;
@@ -67,9 +71,27 @@ interface RawOrder {
   campaignId: string | null
   website?: { id: string; url: string; name?: string | null } | null
   items?: RawOrderItem[]
-  events?: Array<{ id: string; eventType: OrderEventType; message?: string | null; metadata: Record<string, unknown> | null; createdAt: string }>
-  contentOrder?: { id: string; title: string | null; brief: string | null; deliverable: string | null; status: string } | null
-  revisions?: Array<{ id: string; notes: string | null; files: unknown; status: string; createdAt: string }>
+  events?: Array<{
+    id: string
+    eventType: OrderEventType
+    message?: string | null
+    metadata: Record<string, unknown> | null
+    createdAt: string
+  }>
+  contentOrder?: {
+    id: string
+    title: string | null
+    brief: string | null
+    deliverable: string | null
+    status: string
+  } | null
+  revisions?: Array<{
+    id: string
+    notes: string | null
+    files: unknown
+    status: string
+    createdAt: string
+  }>
   settlements?: unknown[]
   dispute?: unknown
   createdAt: string
@@ -109,8 +131,19 @@ export interface OrderResponse {
     }>
   }>
   // Content the publisher/operations submitted for this order.
-  submittedContent: { title: string | null; brief: string | null; deliverable: string | null; status: string } | null
-  revisions: Array<{ id: string; notes: string | null; files: unknown; status: string; createdAt: string }>
+  submittedContent: {
+    title: string | null
+    brief: string | null
+    deliverable: string | null
+    status: string
+  } | null
+  revisions: Array<{
+    id: string
+    notes: string | null
+    files: unknown
+    status: string
+    createdAt: string
+  }>
   totalAmount: number | null
   currency: string
   createdAt: string
@@ -162,9 +195,20 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
       })),
     })),
     submittedContent: raw.contentOrder
-      ? { title: raw.contentOrder.title ?? null, brief: raw.contentOrder.brief ?? null, deliverable: raw.contentOrder.deliverable ?? null, status: raw.contentOrder.status }
+      ? {
+          title: raw.contentOrder.title ?? null,
+          brief: raw.contentOrder.brief ?? null,
+          deliverable: raw.contentOrder.deliverable ?? null,
+          status: raw.contentOrder.status,
+        }
       : null,
-    revisions: (raw.revisions ?? []).map((r) => ({ id: r.id, notes: r.notes ?? null, files: r.files ?? null, status: r.status, createdAt: r.createdAt })),
+    revisions: (raw.revisions ?? []).map((r) => ({
+      id: r.id,
+      notes: r.notes ?? null,
+      files: r.files ?? null,
+      status: r.status,
+      createdAt: r.createdAt,
+    })),
     totalAmount: raw.amount != null ? Number(raw.amount) : null,
     currency: raw.currency,
     createdAt: raw.createdAt,
@@ -185,14 +229,22 @@ export class OrdersService {
   constructor(private client: HttpClient) {}
 
   async create(data: CreateOrderData) {
-    const raw = await this.client.post<RawOrder>("/orders", { json: data as unknown as Record<string, unknown> })
+    const raw = await this.client.post<RawOrder>("/orders", {
+      json: data as unknown as Record<string, unknown>,
+    })
     return normalizeOrder(raw)
   }
 
   // GET /orders returns a paginated envelope { items, total, take, skip };
   // unwrap to the array all callers expect.
-  async list(params?: { status?: OrderStatus; campaignId?: string }): Promise<OrderResponse[]> {
-    const res = await this.client.get<{ items: RawOrder[] } | RawOrder[]>("/orders", { params })
+  async list(params?: {
+    status?: OrderStatus
+    campaignId?: string
+  }): Promise<OrderResponse[]> {
+    const res = await this.client.get<{ items: RawOrder[] } | RawOrder[]>(
+      "/orders",
+      { params },
+    )
     const rows = Array.isArray(res) ? res : (res?.items ?? [])
     return rows.map(normalizeOrder)
   }
@@ -202,23 +254,39 @@ export class OrdersService {
     return normalizeOrder(raw)
   }
 
-  updateStatus(id: string, status: OrderStatus, metadata?: Record<string, unknown>) {
+  updateStatus(
+    id: string,
+    status: OrderStatus,
+    metadata?: Record<string, unknown>,
+  ) {
     return this.transitionStatus(id, status, metadata)
   }
 
-  async transitionStatus(id: string, status: OrderStatus, metadata?: Record<string, unknown>) {
+  async transitionStatus(
+    id: string,
+    status: OrderStatus,
+    metadata?: Record<string, unknown>,
+  ) {
     const raw = await this.client.patch<RawOrder>(`/orders/${id}/status`, {
-      json: { status, ...(metadata ? { metadata } : {}) } as Record<string, unknown>,
+      json: { status, ...(metadata ? { metadata } : {}) } as Record<
+        string,
+        unknown
+      >,
     })
     return normalizeOrder(raw)
   }
 
   getEvents(id: string) {
-    return this.client.get<Array<{ id: string; eventType: OrderEventType; createdAt: string }>>(`/orders/${id}/events`)
+    return this.client.get<
+      Array<{ id: string; eventType: OrderEventType; createdAt: string }>
+    >(`/orders/${id}/events`)
   }
 
   openDispute(id: string, reason: string) {
-    return this.client.post<{ id: string; status: string }>(`/orders/${id}/dispute`, { json: { reason } })
+    return this.client.post<{ id: string; status: string }>(
+      `/orders/${id}/dispute`,
+      { json: { reason } },
+    )
   }
 
   async submitPayment(id: string) {
@@ -239,22 +307,32 @@ export class OrdersService {
   }
 
   async submitContent(id: string, content?: string) {
-    const raw = await this.client.post<RawOrder>(`/orders/${id}/submit-content`, { json: { content } })
+    const raw = await this.client.post<RawOrder>(
+      `/orders/${id}/submit-content`,
+      { json: { content } },
+    )
     return normalizeOrder(raw)
   }
 
   async markContentReady(id: string) {
-    const raw = await this.client.post<RawOrder>(`/orders/${id}/mark-content-ready`)
+    const raw = await this.client.post<RawOrder>(
+      `/orders/${id}/mark-content-ready`,
+    )
     return normalizeOrder(raw)
   }
 
   async submitForReview(id: string) {
-    const raw = await this.client.post<RawOrder>(`/orders/${id}/submit-for-review`)
+    const raw = await this.client.post<RawOrder>(
+      `/orders/${id}/submit-for-review`,
+    )
     return normalizeOrder(raw)
   }
 
   async markPublished(id: string, url: string) {
-    const raw = await this.client.post<RawOrder>(`/orders/${id}/mark-published`, { json: { url } })
+    const raw = await this.client.post<RawOrder>(
+      `/orders/${id}/mark-published`,
+      { json: { url } },
+    )
     return normalizeOrder(raw)
   }
 
@@ -265,25 +343,41 @@ export class OrdersService {
 
   // ── Customer review flow ──────────────────────────────────────────────────
   async approveContent(id: string) {
-    const raw = await this.client.post<RawOrder>(`/orders/${id}/approve-content`)
+    const raw = await this.client.post<RawOrder>(
+      `/orders/${id}/approve-content`,
+    )
     return normalizeOrder(raw)
   }
   async requestRevision(id: string, notes: string) {
-    const raw = await this.client.post<RawOrder>(`/orders/${id}/request-revision`, { json: { notes } })
+    const raw = await this.client.post<RawOrder>(
+      `/orders/${id}/request-revision`,
+      { json: { notes } },
+    )
     return normalizeOrder(raw)
   }
   async confirmDelivery(id: string) {
-    const raw = await this.client.post<RawOrder>(`/orders/${id}/confirm-delivery`)
+    const raw = await this.client.post<RawOrder>(
+      `/orders/${id}/confirm-delivery`,
+    )
     return normalizeOrder(raw)
   }
   // Manual fallback acceptance (only valid when auto-verification FAILED/MANUAL_REVIEW).
   acceptDelivery(id: string) {
-    return this.client.post<{ status: string; acceptedBy: string }>(`/orders/${id}/accept-delivery`)
+    return this.client.post<{ status: string; acceptedBy: string }>(
+      `/orders/${id}/accept-delivery`,
+    )
   }
   submitReview(id: string, rating: number, comment?: string) {
-    return this.client.post<any>(`/orders/${id}/review`, { json: { rating, comment } })
+    return this.client.post<any>(`/orders/${id}/review`, {
+      json: { rating, comment },
+    })
   }
   getReview(id: string) {
-    return this.client.get<{ id: string; rating: number; comment: string | null; createdAt: string } | null>(`/orders/${id}/review`)
+    return this.client.get<{
+      id: string
+      rating: number
+      comment: string | null
+      createdAt: string
+    } | null>(`/orders/${id}/review`)
   }
 }

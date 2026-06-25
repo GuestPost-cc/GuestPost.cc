@@ -1,15 +1,15 @@
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsIn,
   IsOptional,
   IsString,
   IsUrl,
-  ArrayMaxSize,
-  ArrayMinSize,
+  Matches,
   MaxLength,
   MinLength,
-  Matches,
   ValidateIf,
 } from "class-validator"
 
@@ -64,7 +64,11 @@ export class BulkRetryVerificationDto {
   websiteIds!: string[]
 }
 
-const VERIFY_METHODS = ["MANUAL_CHECK", "ADMIN_OVERRIDE", "PUBLISHER_REPLY"] as const
+const VERIFY_METHODS = [
+  "MANUAL_CHECK",
+  "ADMIN_OVERRIDE",
+  "PUBLISHER_REPLY",
+] as const
 
 export class ManualVerifyDto {
   @IsString()
@@ -95,7 +99,9 @@ export class MarkPlatformPublishedDto {
 // review of every destructive financial action.
 export class ReasonRequiredDto {
   @IsString()
-  @MinLength(10, { message: "Reason must be at least 10 characters for audit clarity" })
+  @MinLength(10, {
+    message: "Reason must be at least 10 characters for audit clarity",
+  })
   @MaxLength(2_000)
   reason!: string
 }
@@ -118,7 +124,8 @@ export class ExecuteWithdrawalDto {
   @MinLength(2)
   @MaxLength(50)
   @Matches(/^[a-z][a-z0-9_-]*$/, {
-    message: "providerName must be lowercase alphanumeric with hyphens/underscores",
+    message:
+      "providerName must be lowercase alphanumeric with hyphens/underscores",
   })
   providerName!: string
 }

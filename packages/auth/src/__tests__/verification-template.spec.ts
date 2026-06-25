@@ -3,13 +3,17 @@ import { renderVerificationEmail } from "../email-templates/verification"
 describe("Phase 7.10 — verification email template", () => {
   describe("happy path", () => {
     it("includes the verify-email URL inside an <a href>", () => {
-      const url = "https://app.example.com/api/v1/auth/verify-email?token=abc123"
+      const url =
+        "https://app.example.com/api/v1/auth/verify-email?token=abc123"
       const html = renderVerificationEmail({ name: "Alice", url })
       expect(html).toContain(`href="${url}"`)
     })
 
     it("greets the user by name when name is present", () => {
-      const html = renderVerificationEmail({ name: "Alice", url: "https://x/y" })
+      const html = renderVerificationEmail({
+        name: "Alice",
+        url: "https://x/y",
+      })
       expect(html).toContain("Hi Alice")
     })
 
@@ -38,7 +42,9 @@ describe("Phase 7.10 — verification email template", () => {
       })
       // The literal closing-quote-plus-onmouseover should not appear unescaped
       // inside the href attribute.
-      expect(html).not.toMatch(/href="https:\/\/evil\.example\/path"onmouseover/)
+      expect(html).not.toMatch(
+        /href="https:\/\/evil\.example\/path"onmouseover/,
+      )
       // The unsafe quote is escaped to its entity.
       expect(html).toContain("&quot;onmouseover=")
     })
@@ -55,7 +61,10 @@ describe("Phase 7.10 — verification email template", () => {
 
   describe("structure sanity", () => {
     it("returns a complete HTML document", () => {
-      const html = renderVerificationEmail({ name: "Alice", url: "https://x/y" })
+      const html = renderVerificationEmail({
+        name: "Alice",
+        url: "https://x/y",
+      })
       expect(html).toContain("<!DOCTYPE html>")
       expect(html).toContain("</body></html>")
     })

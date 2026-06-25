@@ -1,6 +1,6 @@
 "use client"
 
-import * as React from "react"
+import type * as React from "react"
 import { cn } from "../lib/utils"
 
 interface PageHeaderProps {
@@ -10,7 +10,12 @@ interface PageHeaderProps {
   className?: string
 }
 
-function PageHeader({ title, description, actions, className }: PageHeaderProps) {
+function PageHeader({
+  title,
+  description,
+  actions,
+  className,
+}: PageHeaderProps) {
   return (
     <div className={cn("mb-8 flex items-center justify-between", className)}>
       <div>

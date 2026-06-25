@@ -17,12 +17,12 @@
  * (verified during Phase 7.8 pre-impl).
  */
 
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 // better-auth ESM modules are stubbed globally via jest.config.js
 // moduleNameMapper → apps/api/src/__mocks__/better-auth.ts. No per-spec
 // jest.mock calls needed.
 import { emailRateLimitPlugin } from "@guestpost/auth"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 
 function makeRedisMock() {
   return {
@@ -37,9 +37,14 @@ async function pluginRunHook(routePath: string) {
     windowMs: 3_600_000,
     limits: { signIn: 0, signUp: 0, magicLink: 0, resetPassword: 0 },
   })
-  const hook = plugin.hooks.before.find((h) => h.matcher({ path: routePath } as any))
+  const hook = plugin.hooks.before.find((h) =>
+    h.matcher({ path: routePath } as any),
+  )
   if (!hook) throw new Error(`no hook matched ${routePath}`)
-  return (await (hook.handler as any)({ body: { email: "alice@example.com" }, path: routePath })) as Response
+  return (await (hook.handler as any)({
+    body: { email: "alice@example.com" },
+    path: routePath,
+  })) as Response
 }
 
 // Reconstruct the IP-layer response by inspecting the same source main.ts
@@ -70,7 +75,9 @@ describe("Phase 7.8 #26 — rate-limit 429 byte parity (enumeration safeguard)",
     })
     it("body is {message: 'Too many requests. Please try again later.'} — no extra fields", async () => {
       const body = await r.json()
-      expect(body).toEqual({ message: "Too many requests. Please try again later." })
+      expect(body).toEqual({
+        message: "Too many requests. Please try again later.",
+      })
       // Extra-field guard: no `code`, no `path`, no `error`, no `email`,
       // no `endpoint` — anything that could differentiate IP vs email
       // layer.
@@ -91,7 +98,9 @@ describe("Phase 7.8 #26 — rate-limit 429 byte parity (enumeration safeguard)",
       const match = src.match(/const BETTER_AUTH_429_BODY = \{[\s\S]*?\}/)
       expect(match).not.toBeNull()
       // The constant in source — string-match the exact message.
-      expect(match![0]).toContain(`"Too many requests. Please try again later."`)
+      expect(match?.[0]).toContain(
+        `"Too many requests. Please try again later."`,
+      )
     })
     it("createAuthLimiter handler emits status 429 + X-Retry-After header + BETTER_AUTH_429_BODY", () => {
       // Source-shape assertions — the handler closure isn't importable
@@ -118,10 +127,14 @@ describe("Phase 7.8 #26 — rate-limit 429 byte parity (enumeration safeguard)",
       expect(pluginResponse.status).toBe(expressLayerCanonicalShape().status)
     })
     it("plugin response statusText == Express layer statusText", () => {
-      expect(pluginResponse.statusText).toBe(expressLayerCanonicalShape().statusText)
+      expect(pluginResponse.statusText).toBe(
+        expressLayerCanonicalShape().statusText,
+      )
     })
     it("plugin response carries the same X-Retry-After header key", () => {
-      expect(pluginResponse.headers.has(expressLayerCanonicalShape().headerKey)).toBe(true)
+      expect(
+        pluginResponse.headers.has(expressLayerCanonicalShape().headerKey),
+      ).toBe(true)
     })
   })
 
@@ -133,7 +146,18 @@ describe("Phase 7.8 #26 — rate-limit 429 byte parity (enumeration safeguard)",
       // trigger the same 429 with the same response shape. Verified by
       // source-grep: no Prisma / database imports in the plugin file.
       const pluginSrc = readFileSync(
-        join(__dirname, "..", "..", "..", "..", "packages", "auth", "src", "plugins", "email-rate-limit.ts"),
+        join(
+          __dirname,
+          "..",
+          "..",
+          "..",
+          "..",
+          "packages",
+          "auth",
+          "src",
+          "plugins",
+          "email-rate-limit.ts",
+        ),
         "utf8",
       )
       expect(pluginSrc).not.toMatch(/from\s+["']@guestpost\/database/)

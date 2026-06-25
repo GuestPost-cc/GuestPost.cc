@@ -1,18 +1,27 @@
 "use client"
 
-import { use } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../../../lib/api"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
-import { ArrowLeft, AlertCircle, Wallet, ExternalLink } from "lucide-react"
-import { format } from "date-fns"
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Skeleton,
+} from "@guestpost/ui"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { AlertCircle, ArrowLeft, ExternalLink, Wallet } from "lucide-react"
 import Link from "next/link"
+import { use } from "react"
 import { toast } from "sonner"
+import { api } from "../../../../../lib/api"
 
-export default function CheckoutPage({ params }: { params: Promise<{ id: string }> }) {
+export default function CheckoutPage({
+  params,
+}: {
+  params: Promise<{ id: string }>
+}) {
   const resolvedParams = use(params)
   const queryClient = useQueryClient()
 
@@ -97,18 +106,27 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Service Type</p>
               <p className="font-medium capitalize">
-                {order.items?.[0]?.serviceType?.replace(/_/g, " ").toLowerCase() ?? "—"}
+                {order.items?.[0]?.serviceType
+                  ?.replace(/_/g, " ")
+                  .toLowerCase() ?? "—"}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">Website</p>
               <p className="font-medium">
                 {order.items?.[0]?.website?.url ? (
-                  <a href={order.items[0].website.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-primary hover:underline">
+                  <a
+                    href={order.items[0].website.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-primary hover:underline"
+                  >
                     {new URL(order.items[0].website.url).hostname}
                     <ExternalLink className="h-3 w-3" />
                   </a>
-                ) : "—"}
+                ) : (
+                  "—"
+                )}
               </p>
             </div>
             <div className="space-y-1">
@@ -134,19 +152,25 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
           <div className="rounded-lg border p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Order Total</span>
-              <span className="text-xl font-bold font-mono">${amount.toFixed(2)}</span>
+              <span className="text-xl font-bold font-mono">
+                ${amount.toFixed(2)}
+              </span>
             </div>
             <div className="flex items-center justify-between">
               <span className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Wallet className="h-4 w-4" />
                 Available Balance
               </span>
-              <span className="font-medium font-mono">${(balance ?? 0).toFixed(2)}</span>
+              <span className="font-medium font-mono">
+                ${(balance ?? 0).toFixed(2)}
+              </span>
             </div>
             <div className="border-t pt-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Amount to Deduct</span>
-                <span className={`text-lg font-bold font-mono ${hasSufficientBalance ? "text-primary" : "text-destructive"}`}>
+                <span
+                  className={`text-lg font-bold font-mono ${hasSufficientBalance ? "text-primary" : "text-destructive"}`}
+                >
                   ${amount.toFixed(2)}
                 </span>
               </div>
@@ -159,14 +183,19 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
               <div>
                 <p className="font-medium">Insufficient Balance</p>
                 <p className="mt-1 text-amber-700">
-                  You need ${(amount - balance).toFixed(2)} more. Please deposit funds first.
+                  You need ${(amount - balance).toFixed(2)} more. Please deposit
+                  funds first.
                 </p>
               </div>
             </div>
           )}
 
           <div className="flex gap-3">
-            <Button variant={hasSufficientBalance ? "outline" : "default"} className="flex-1" asChild>
+            <Button
+              variant={hasSufficientBalance ? "outline" : "default"}
+              className="flex-1"
+              asChild
+            >
               <Link
                 href={
                   hasSufficientBalance
@@ -174,7 +203,9 @@ export default function CheckoutPage({ params }: { params: Promise<{ id: string 
                     : `/dashboard/billing?deposit=${Math.ceil(amount - balance)}&returnTo=${encodeURIComponent(`/dashboard/orders/checkout/${resolvedParams.id}`)}`
                 }
               >
-                {hasSufficientBalance ? "Deposit More" : `Deposit $${Math.ceil(amount - balance).toLocaleString()} to continue`}
+                {hasSufficientBalance
+                  ? "Deposit More"
+                  : `Deposit $${Math.ceil(amount - balance).toLocaleString()} to continue`}
               </Link>
             </Button>
             {hasSufficientBalance && (

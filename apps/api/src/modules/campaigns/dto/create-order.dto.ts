@@ -1,5 +1,5 @@
-import { IsString, IsOptional, IsEnum, IsUrl, MaxLength } from "class-validator"
 import { ServiceType } from "@guestpost/database"
+import { IsEnum, IsOptional, IsString, IsUrl, MaxLength } from "class-validator"
 
 export class CreateOrderDto {
   @IsEnum(ServiceType)

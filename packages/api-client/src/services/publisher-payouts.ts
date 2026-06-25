@@ -1,5 +1,5 @@
 import type { WithdrawalStatus } from "@guestpost/shared"
-import { HttpClient, type RequestOptions } from "../client"
+import type { HttpClient, RequestOptions } from "../client"
 
 export interface PaginatedResponse<T> {
   items: T[]
@@ -70,7 +70,12 @@ export class PublisherPayoutsService {
     return normalizeBalance(raw)
   }
 
-  async requestWithdrawal(data: { amount: number; method?: string; payoutMethodId?: string; idempotencyKey?: string }) {
+  async requestWithdrawal(data: {
+    amount: number
+    method?: string
+    payoutMethodId?: string
+    idempotencyKey?: string
+  }) {
     const raw = await this.client.post<any>("/publisher-payouts/withdrawals", {
       json: data as unknown as Record<string, unknown>,
     })
@@ -78,23 +83,38 @@ export class PublisherPayoutsService {
   }
 
   async listWithdrawals(take?: number, skip?: number) {
-    const raw = await this.client.get<PaginatedResponse<any>>("/publisher-payouts/withdrawals", {
-      params: { take, skip },
-    } as RequestOptions)
+    const raw = await this.client.get<PaginatedResponse<any>>(
+      "/publisher-payouts/withdrawals",
+      {
+        params: { take, skip },
+      } as RequestOptions,
+    )
     return { ...raw, items: (raw.items ?? []).map(normalizeWithdrawal) }
   }
 
   listPayoutMethods() {
-    return this.client.get<PayoutMethodResponse[]>("/publisher-payouts/payout-methods")
+    return this.client.get<PayoutMethodResponse[]>(
+      "/publisher-payouts/payout-methods",
+    )
   }
 
-  createPayoutMethod(data: { type: string; label: string; details: Record<string, unknown>; isDefault?: boolean }) {
-    return this.client.post<PayoutMethodResponse>("/publisher-payouts/payout-methods", {
-      json: data as unknown as Record<string, unknown>,
-    })
+  createPayoutMethod(data: {
+    type: string
+    label: string
+    details: Record<string, unknown>
+    isDefault?: boolean
+  }) {
+    return this.client.post<PayoutMethodResponse>(
+      "/publisher-payouts/payout-methods",
+      {
+        json: data as unknown as Record<string, unknown>,
+      },
+    )
   }
 
   deactivatePayoutMethod(id: string) {
-    return this.client.post<{ id: string; isActive: boolean }>(`/publisher-payouts/payout-methods/${id}/deactivate`)
+    return this.client.post<{ id: string; isActive: boolean }>(
+      `/publisher-payouts/payout-methods/${id}/deactivate`,
+    )
   }
 }

@@ -1,61 +1,59 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Badge, StatusBadge, getCampaignStatusPresentation } from "@guestpost/ui"
 import type { CampaignStatus } from "@guestpost/database"
-import { Skeleton, ErrorState } from "@guestpost/ui"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@guestpost/ui"
-import {
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@guestpost/ui"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  ErrorState,
+  getCampaignStatusPresentation,
+  Input,
+  Label,
+  Skeleton,
+  StatusBadge,
 } from "@guestpost/ui"
-import {
-  Plus,
-  MoreHorizontal,
-  Eye,
-  Edit,
-  Trash2,
-  Megaphone,
-  FolderOpen,
-  ArrowRight,
-  Search,
-} from "lucide-react"
-import { format } from "date-fns"
-import Link from "next/link"
-import { toast } from "sonner"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { format } from "date-fns"
+import {
+  Edit,
+  Eye,
+  FolderOpen,
+  Megaphone,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react"
+import Link from "next/link"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 const createCampaignSchema = z.object({
   // Mirrors CreateCampaignDto (MinLength 3 / MaxLength 200) so users get an
   // inline message instead of a server 400
-  name: z.string().min(3, "Campaign name must be at least 3 characters").max(200),
+  name: z
+    .string()
+    .min(3, "Campaign name must be at least 3 characters")
+    .max(200),
 })
 
 type CreateCampaignForm = z.infer<typeof createCampaignSchema>
@@ -93,22 +91,38 @@ export default function CampaignsPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [showCreateCampaign, setShowCreateCampaign] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
+    null,
+  )
   const [editTarget, setEditTarget] = useState<Campaign | null>(null)
   const [editName, setEditName] = useState("")
   const [searchQuery, setSearchQuery] = useState("")
 
-  const { data: campaignsData, isLoading, error: campaignsError, refetch: refetchCampaigns } = useQuery({
+  const {
+    data: campaignsData,
+    isLoading,
+    error: campaignsError,
+    refetch: refetchCampaigns,
+  } = useQuery({
     queryKey: ["campaigns"],
     queryFn: () => api.campaigns.listCampaigns(),
   })
 
-  const { data: ordersData, error: ordersError, refetch: refetchOrders } = useQuery({
+  const {
+    data: ordersData,
+    error: ordersError,
+    refetch: refetchOrders,
+  } = useQuery({
     queryKey: ["orders"],
     queryFn: () => api.orders.list() as Promise<any[]>,
   })
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, reset } = useForm<CreateCampaignForm>({
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+  } = useForm<CreateCampaignForm>({
     resolver: zodResolver(createCampaignSchema),
   })
 
@@ -143,15 +157,25 @@ export default function CampaignsPage() {
   }
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: { name?: string; status?: "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED" } }) =>
-      api.campaigns.updateCampaign(id, data),
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string
+      data: {
+        name?: string
+        status?: "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED"
+      }
+    }) => api.campaigns.updateCampaign(id, data),
     // Optimistic status flip — safe: status is cosmetic for existing orders
     onMutate: async ({ id, data }) => {
       if (!data.status) return
       await queryClient.cancelQueries({ queryKey: ["campaigns"] })
       const prev = queryClient.getQueryData<Campaign[]>(["campaigns"])
       queryClient.setQueryData<Campaign[]>(["campaigns"], (old) =>
-        (old ?? []).map((c) => (c.id === id ? { ...c, status: data.status! } : c)),
+        (old ?? []).map((c) =>
+          c.id === id ? { ...c, status: data.status! } : c,
+        ),
       )
       return { prev }
     },
@@ -173,22 +197,35 @@ export default function CampaignsPage() {
       toast.success("Campaign duplicated")
       queryClient.invalidateQueries({ queryKey: ["campaigns"] })
     },
-    onError: (err: Error) => toast.error(err.message || "Failed to duplicate campaign"),
+    onError: (err: Error) =>
+      toast.error(err.message || "Failed to duplicate campaign"),
   })
 
   const campaigns = campaignsData ?? []
   const filteredCampaigns = campaigns.filter((campaign: Campaign) =>
-    campaign.name.toLowerCase().includes(searchQuery.toLowerCase())
+    campaign.name.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
   const getOrderCount = (campaignId: string) => {
-    return ordersData?.filter((order: any) => order.campaignId === campaignId).length ?? 0
+    return (
+      ordersData?.filter((order: any) => order.campaignId === campaignId)
+        .length ?? 0
+    )
   }
 
   const campaignsErrorCombined = campaignsError || ordersError
 
   if (campaignsErrorCombined) {
-    return <ErrorState title="Failed to load campaigns" description={(campaignsErrorCombined as Error).message} onRetry={() => { refetchCampaigns(); refetchOrders(); }} />
+    return (
+      <ErrorState
+        title="Failed to load campaigns"
+        description={(campaignsErrorCombined as Error).message}
+        onRetry={() => {
+          refetchCampaigns()
+          refetchOrders()
+        }}
+      />
+    )
   }
 
   if (isLoading) {
@@ -197,7 +234,9 @@ export default function CampaignsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Campaigns</h1>
-            <p className="text-muted-foreground">Manage your marketing campaigns</p>
+            <p className="text-muted-foreground">
+              Manage your marketing campaigns
+            </p>
           </div>
         </div>
         <Card>
@@ -217,7 +256,9 @@ export default function CampaignsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Campaigns</h1>
-          <p className="text-muted-foreground">Manage your marketing campaigns</p>
+          <p className="text-muted-foreground">
+            Manage your marketing campaigns
+          </p>
         </div>
         <Button onClick={() => setShowCreateCampaign(true)}>
           <Plus className="mr-2 h-4 w-4" />
@@ -231,7 +272,8 @@ export default function CampaignsPage() {
             <div>
               <CardTitle>All Campaigns</CardTitle>
               <CardDescription>
-                {filteredCampaigns.length} campaign{filteredCampaigns.length !== 1 ? "s" : ""}
+                {filteredCampaigns.length} campaign
+                {filteredCampaigns.length !== 1 ? "s" : ""}
               </CardDescription>
             </div>
             <div className="relative">
@@ -256,7 +298,10 @@ export default function CampaignsPage() {
                   : "Create your first campaign to get started"}
               </p>
               {!searchQuery && (
-                <Button className="mt-4" onClick={() => setShowCreateCampaign(true)}>
+                <Button
+                  className="mt-4"
+                  onClick={() => setShowCreateCampaign(true)}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   New Campaign
                 </Button>
@@ -282,7 +327,8 @@ export default function CampaignsPage() {
                       </Link>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-sm text-muted-foreground">
-                          {getOrderCount(campaign.id)} order{getOrderCount(campaign.id) !== 1 ? "s" : ""}
+                          {getOrderCount(campaign.id)} order
+                          {getOrderCount(campaign.id) !== 1 ? "s" : ""}
                         </span>
                         <span className="text-sm text-muted-foreground">
                           Created {format(new Date(campaign.createdAt), "PP")}
@@ -292,8 +338,12 @@ export default function CampaignsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     {(() => {
-                      const p = getCampaignStatusPresentation(campaign.status as CampaignStatus)
-                      return <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+                      const p = getCampaignStatusPresentation(
+                        campaign.status as CampaignStatus,
+                      )
+                      return (
+                        <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
+                      )
                     })()}
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -309,30 +359,60 @@ export default function CampaignsPage() {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <Link href={`/dashboard/orders/new?campaign=${campaign.id}`}>
+                          <Link
+                            href={`/dashboard/orders/new?campaign=${campaign.id}`}
+                          >
                             <Plus className="mr-2 h-4 w-4" />
                             Add Order
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setEditTarget(campaign); setEditName(campaign.name) }}>
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditTarget(campaign)
+                            setEditName(campaign.name)
+                          }}
+                        >
                           <Edit className="mr-2 h-4 w-4" />
                           Rename
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => duplicateMutation.mutate(campaign)}>
+                        <DropdownMenuItem
+                          onClick={() => duplicateMutation.mutate(campaign)}
+                        >
                           <Plus className="mr-2 h-4 w-4" />
                           Duplicate
                         </DropdownMenuItem>
                         {campaign.status === "ACTIVE" ? (
-                          <DropdownMenuItem onClick={() => updateMutation.mutate({ id: campaign.id, data: { status: "PAUSED" } })}>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              updateMutation.mutate({
+                                id: campaign.id,
+                                data: { status: "PAUSED" },
+                              })
+                            }
+                          >
                             Pause
                           </DropdownMenuItem>
                         ) : campaign.status === "PAUSED" ? (
-                          <DropdownMenuItem onClick={() => updateMutation.mutate({ id: campaign.id, data: { status: "ACTIVE" } })}>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              updateMutation.mutate({
+                                id: campaign.id,
+                                data: { status: "ACTIVE" },
+                              })
+                            }
+                          >
                             Activate
                           </DropdownMenuItem>
                         ) : null}
                         {campaign.status !== "ARCHIVED" && (
-                          <DropdownMenuItem onClick={() => updateMutation.mutate({ id: campaign.id, data: { status: "ARCHIVED" } })}>
+                          <DropdownMenuItem
+                            onClick={() =>
+                              updateMutation.mutate({
+                                id: campaign.id,
+                                data: { status: "ARCHIVED" },
+                              })
+                            }
+                          >
                             Archive
                           </DropdownMenuItem>
                         )}
@@ -372,11 +452,17 @@ export default function CampaignsPage() {
                 className="mt-1.5"
               />
               {errors.name && (
-                <p className="mt-1 text-sm text-destructive">{errors.name.message}</p>
+                <p className="mt-1 text-sm text-destructive">
+                  {errors.name.message}
+                </p>
               )}
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setShowCreateCampaign(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowCreateCampaign(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
@@ -387,22 +473,32 @@ export default function CampaignsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!showDeleteConfirm} onOpenChange={(open) => !open && setShowDeleteConfirm(null)}>
+      <Dialog
+        open={!!showDeleteConfirm}
+        onOpenChange={(open) => !open && setShowDeleteConfirm(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Campaign</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this campaign? Orders linked to this campaign will remain but will no longer be grouped. This action cannot be undone.
+              Are you sure you want to delete this campaign? Orders linked to
+              this campaign will remain but will no longer be grouped. This
+              action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(null)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(null)}
+            >
               Cancel
             </Button>
             <Button
               variant="destructive"
               disabled={deleteMutation.isPending}
-              onClick={() => showDeleteConfirm && deleteMutation.mutate(showDeleteConfirm)}
+              onClick={() =>
+                showDeleteConfirm && deleteMutation.mutate(showDeleteConfirm)
+              }
             >
               {deleteMutation.isPending ? "Deleting..." : "Delete Campaign"}
             </Button>
@@ -410,11 +506,16 @@ export default function CampaignsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editTarget} onOpenChange={(open) => !open && setEditTarget(null)}>
+      <Dialog
+        open={!!editTarget}
+        onOpenChange={(open) => !open && setEditTarget(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Rename Campaign</DialogTitle>
-            <DialogDescription>Orders attached to this campaign are unaffected.</DialogDescription>
+            <DialogDescription>
+              Orders attached to this campaign are unaffected.
+            </DialogDescription>
           </DialogHeader>
           <Input
             value={editName}
@@ -423,9 +524,17 @@ export default function CampaignsPage() {
             autoFocus
           />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditTarget(null)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setEditTarget(null)}>
+              Cancel
+            </Button>
             <Button
-              onClick={() => editTarget && updateMutation.mutate({ id: editTarget.id, data: { name: editName.trim() } })}
+              onClick={() =>
+                editTarget &&
+                updateMutation.mutate({
+                  id: editTarget.id,
+                  data: { name: editName.trim() },
+                })
+              }
               disabled={updateMutation.isPending || editName.trim().length < 2}
             >
               {updateMutation.isPending ? "Saving..." : "Save"}

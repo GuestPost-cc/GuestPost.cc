@@ -1,11 +1,15 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common"
-import { PublisherPayoutsService } from "../publisher-payouts.service"
+import { Decimal } from "@prisma/client/runtime/client"
+import { PermissionsGuard } from "../../../common/guards/permissions.guard"
 import { PayoutEncryptionService } from "../payout-encryption.service"
 import { PayoutExecutionService } from "../payout-execution.service"
-import { PermissionsGuard } from "../../../common/guards/permissions.guard"
-import { Decimal } from "@prisma/client/runtime/client"
+import { PublisherPayoutsService } from "../publisher-payouts.service"
 
-const SECRET_DETAILS = { accountNumber: "DE89370400440532013000", routingNumber: "021000021", bankName: "Test Bank" }
+const SECRET_DETAILS = {
+  accountNumber: "DE89370400440532013000",
+  routingNumber: "021000021",
+  bankName: "Test Bank",
+}
 
 function makeContext(user: any, requiredPermissions?: string[]) {
   const reflector = {
@@ -28,22 +32,35 @@ describe("PermissionsGuard — FINANCIAL_DATA_DECRYPT", () => {
 
   it("denies SUPER_ADMIN without an explicit FINANCIAL_DATA_DECRYPT grant", async () => {
     prismaMock.staffMembership.findUnique.mockResolvedValue({ permissions: [] })
-    const { reflector, context } = makeContext({ id: "u1", staffRole: "SUPER_ADMIN" }, ["FINANCIAL_DATA_DECRYPT"])
+    const { reflector, context } = makeContext(
+      { id: "u1", staffRole: "SUPER_ADMIN" },
+      ["FINANCIAL_DATA_DECRYPT"],
+    )
     const guard = new PermissionsGuard(reflector as any, prismaMock)
 
-    await expect(guard.canActivate(context as any)).rejects.toThrow(ForbiddenException)
+    await expect(guard.canActivate(context as any)).rejects.toThrow(
+      ForbiddenException,
+    )
   })
 
   it("allows SUPER_ADMIN with an explicit FINANCIAL_DATA_DECRYPT grant", async () => {
-    prismaMock.staffMembership.findUnique.mockResolvedValue({ permissions: ["FINANCIAL_DATA_DECRYPT"] })
-    const { reflector, context } = makeContext({ id: "u1", staffRole: "SUPER_ADMIN" }, ["FINANCIAL_DATA_DECRYPT"])
+    prismaMock.staffMembership.findUnique.mockResolvedValue({
+      permissions: ["FINANCIAL_DATA_DECRYPT"],
+    })
+    const { reflector, context } = makeContext(
+      { id: "u1", staffRole: "SUPER_ADMIN" },
+      ["FINANCIAL_DATA_DECRYPT"],
+    )
     const guard = new PermissionsGuard(reflector as any, prismaMock)
 
     await expect(guard.canActivate(context as any)).resolves.toBe(true)
   })
 
   it("still lets SUPER_ADMIN bypass non-sensitive permissions", async () => {
-    const { reflector, context } = makeContext({ id: "u1", staffRole: "SUPER_ADMIN" }, ["SOME_ORDINARY_PERMISSION"])
+    const { reflector, context } = makeContext(
+      { id: "u1", staffRole: "SUPER_ADMIN" },
+      ["SOME_ORDINARY_PERMISSION"],
+    )
     const guard = new PermissionsGuard(reflector as any, prismaMock)
 
     await expect(guard.canActivate(context as any)).resolves.toBe(true)
@@ -51,34 +68,53 @@ describe("PermissionsGuard — FINANCIAL_DATA_DECRYPT", () => {
   })
 
   it("allows FINANCE staff with an explicit grant", async () => {
-    prismaMock.staffMembership.findUnique.mockResolvedValue({ permissions: ["FINANCIAL_DATA_DECRYPT"] })
-    const { reflector, context } = makeContext({ id: "u2", staffRole: "FINANCE" }, ["FINANCIAL_DATA_DECRYPT"])
+    prismaMock.staffMembership.findUnique.mockResolvedValue({
+      permissions: ["FINANCIAL_DATA_DECRYPT"],
+    })
+    const { reflector, context } = makeContext(
+      { id: "u2", staffRole: "FINANCE" },
+      ["FINANCIAL_DATA_DECRYPT"],
+    )
     const guard = new PermissionsGuard(reflector as any, prismaMock)
 
     await expect(guard.canActivate(context as any)).resolves.toBe(true)
   })
 
   it("denies FINANCE staff without the grant", async () => {
-    prismaMock.staffMembership.findUnique.mockResolvedValue({ permissions: ["SOMETHING_ELSE"] })
-    const { reflector, context } = makeContext({ id: "u2", staffRole: "FINANCE" }, ["FINANCIAL_DATA_DECRYPT"])
+    prismaMock.staffMembership.findUnique.mockResolvedValue({
+      permissions: ["SOMETHING_ELSE"],
+    })
+    const { reflector, context } = makeContext(
+      { id: "u2", staffRole: "FINANCE" },
+      ["FINANCIAL_DATA_DECRYPT"],
+    )
     const guard = new PermissionsGuard(reflector as any, prismaMock)
 
-    await expect(guard.canActivate(context as any)).rejects.toThrow(ForbiddenException)
+    await expect(guard.canActivate(context as any)).rejects.toThrow(
+      ForbiddenException,
+    )
   })
 
   it("denies users with no staff membership", async () => {
     prismaMock.staffMembership.findUnique.mockResolvedValue(null)
-    const { reflector, context } = makeContext({ id: "u3", staffRole: "OPERATIONS" }, ["FINANCIAL_DATA_DECRYPT"])
+    const { reflector, context } = makeContext(
+      { id: "u3", staffRole: "OPERATIONS" },
+      ["FINANCIAL_DATA_DECRYPT"],
+    )
     const guard = new PermissionsGuard(reflector as any, prismaMock)
 
-    await expect(guard.canActivate(context as any)).rejects.toThrow(ForbiddenException)
+    await expect(guard.canActivate(context as any)).rejects.toThrow(
+      ForbiddenException,
+    )
   })
 
   it("denies unauthenticated requests", async () => {
     const { reflector, context } = makeContext(null, ["FINANCIAL_DATA_DECRYPT"])
     const guard = new PermissionsGuard(reflector as any, prismaMock)
 
-    await expect(guard.canActivate(context as any)).rejects.toThrow(ForbiddenException)
+    await expect(guard.canActivate(context as any)).rejects.toThrow(
+      ForbiddenException,
+    )
   })
 })
 
@@ -174,16 +210,26 @@ describe("PublisherPayoutsService — decrypt access path", () => {
     encryptionMock = {
       encrypt: jest.fn().mockReturnValue({ ciphertext: "enc", version: 1 }),
       decrypt: jest.fn().mockReturnValue(SECRET_DETAILS),
-      extractDisplayDetails: jest.fn().mockReturnValue({ bankName: "Test Bank", last4: "3000" }),
+      extractDisplayDetails: jest
+        .fn()
+        .mockReturnValue({ bankName: "Test Bank", last4: "3000" }),
     }
     prismaMock = {
-      publisherMembership: { findFirst: jest.fn().mockResolvedValue({ id: "mem-1" }) },
+      publisherMembership: {
+        findFirst: jest.fn().mockResolvedValue({ id: "mem-1" }),
+      },
       payoutMethod: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
       },
     }
-    service = new PublisherPayoutsService(prismaMock as any, auditMock as any, {} as any, encryptionMock as any, {} as any)
+    service = new PublisherPayoutsService(
+      prismaMock as any,
+      auditMock as any,
+      {} as any,
+      encryptionMock as any,
+      {} as any,
+    )
   })
 
   it("decryptPayoutMethod writes a PAYOUT_METHOD_DECRYPTED audit entry with actor, reason, IP, UA", async () => {
@@ -195,7 +241,13 @@ describe("PublisherPayoutsService — decrypt access path", () => {
       publisher: { organizationId: "org-1" },
     })
 
-    const result = await service.decryptPayoutMethod("pm-1", "staff-1", "KYC verification for withdrawal #42", "1.2.3.4", "TestAgent/1.0")
+    const result = await service.decryptPayoutMethod(
+      "pm-1",
+      "staff-1",
+      "KYC verification for withdrawal #42",
+      "1.2.3.4",
+      "TestAgent/1.0",
+    )
 
     expect(result.details).toEqual(SECRET_DETAILS)
     expect(auditMock.log).toHaveBeenCalledWith(
@@ -217,14 +269,28 @@ describe("PublisherPayoutsService — decrypt access path", () => {
   it("decryptPayoutMethod 404s on unknown method without decrypting", async () => {
     prismaMock.payoutMethod.findUnique.mockResolvedValue(null)
 
-    await expect(service.decryptPayoutMethod("nope", "staff-1", "reason text here", "ip", "ua")).rejects.toThrow(NotFoundException)
+    await expect(
+      service.decryptPayoutMethod(
+        "nope",
+        "staff-1",
+        "reason text here",
+        "ip",
+        "ua",
+      ),
+    ).rejects.toThrow(NotFoundException)
     expect(encryptionMock.decrypt).not.toHaveBeenCalled()
     expect(auditMock.log).not.toHaveBeenCalled()
   })
 
   it("listPayoutMethods never selects or returns encrypted details", async () => {
     prismaMock.payoutMethod.findMany.mockResolvedValue([
-      { id: "pm-1", type: "bank_transfer", label: "Main", displayDetails: { bankName: "Test Bank", last4: "3000" }, isDefault: true },
+      {
+        id: "pm-1",
+        type: "bank_transfer",
+        label: "Main",
+        displayDetails: { bankName: "Test Bank", last4: "3000" },
+        isDefault: true,
+      },
     ])
 
     const result = await service.listPayoutMethods("pub-1", "user-1")
@@ -233,7 +299,10 @@ describe("PublisherPayoutsService — decrypt access path", () => {
     expect(select.details).toBeUndefined()
     expect(encryptionMock.decrypt).not.toHaveBeenCalled()
     expect(JSON.stringify(result)).not.toContain("DE89370400440532013000")
-    expect(result[0].displayDetails).toEqual({ bankName: "Test Bank", last4: "3000" })
+    expect(result[0].displayDetails).toEqual({
+      bankName: "Test Bank",
+      last4: "3000",
+    })
   })
 })
 
@@ -251,37 +320,66 @@ describe("PayoutExecutionService — provider error redaction", () => {
       amount: new Decimal(100),
       publisherId: "pub-1",
       publisher: { organizationId: "org-1" },
-      payoutMethod: { id: "pm-1", isActive: true, details: ciphertext, encryptionKeyVersion: version },
+      payoutMethod: {
+        id: "pm-1",
+        isActive: true,
+        details: ciphertext,
+        encryptionKeyVersion: version,
+      },
     }
     const auditMock = { log: jest.fn().mockResolvedValue(undefined) }
     const prismaMock: any = {
       withdrawal: {
-        findUnique: jest.fn().mockResolvedValueOnce(withdrawal).mockResolvedValue({ ...withdrawal, version: 1 }),
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce(withdrawal)
+          .mockResolvedValue({ ...withdrawal, version: 1 }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       payoutExecution: {
         create: jest.fn().mockResolvedValue({ id: "exec-1" }),
         update: jest.fn().mockResolvedValue({}),
       },
-      $transaction: jest.fn().mockImplementation(async (cb: any) => cb(prismaMock)),
+      $transaction: jest
+        .fn()
+        .mockImplementation(async (cb: any) => cb(prismaMock)),
     }
-    const leakyError = new Error(`Wise API 422: invalid payload {"accountNumber":"DE89370400440532013000"}`)
+    const leakyError = new Error(
+      `Wise API 422: invalid payload {"accountNumber":"DE89370400440532013000"}`,
+    )
     const providerMock = {
-      getAdapter: jest.fn().mockReturnValue({ createTransfer: jest.fn().mockRejectedValue(leakyError) }),
-      getActiveProvider: jest.fn().mockResolvedValue({ id: "prov-1", name: "wise", decryptedConfig: {} }),
+      getAdapter: jest.fn().mockReturnValue({
+        createTransfer: jest.fn().mockRejectedValue(leakyError),
+      }),
+      getActiveProvider: jest
+        .fn()
+        .mockResolvedValue({ id: "prov-1", name: "wise", decryptedConfig: {} }),
     }
 
-    const service = new PayoutExecutionService(prismaMock, auditMock as any, encryption, providerMock as any)
+    const service = new PayoutExecutionService(
+      prismaMock,
+      auditMock as any,
+      encryption,
+      providerMock as any,
+    )
 
-    await expect(service.executeWithdrawal("wd-1", "wise", "staff-1")).rejects.toThrow(/\[REDACTED\]/)
+    await expect(
+      service.executeWithdrawal("wd-1", "wise", "staff-1"),
+    ).rejects.toThrow(/\[REDACTED\]/)
 
     const updateCall = prismaMock.payoutExecution.update.mock.calls.find(
       (c: any[]) => c[0].data.status === "FAILED",
     )
-    expect(updateCall[0].data.errorMessage).not.toContain("DE89370400440532013000")
+    expect(updateCall[0].data.errorMessage).not.toContain(
+      "DE89370400440532013000",
+    )
     expect(updateCall[0].data.errorMessage).toContain("[REDACTED]")
 
-    const failAudit = auditMock.log.mock.calls.find((c: any[]) => c[0].action === "PAYOUT_EXECUTION_FAILED")
-    expect(JSON.stringify(failAudit[0].metadata)).not.toContain("DE89370400440532013000")
+    const failAudit = auditMock.log.mock.calls.find(
+      (c: any[]) => c[0].action === "PAYOUT_EXECUTION_FAILED",
+    )
+    expect(JSON.stringify(failAudit[0].metadata)).not.toContain(
+      "DE89370400440532013000",
+    )
   })
 })

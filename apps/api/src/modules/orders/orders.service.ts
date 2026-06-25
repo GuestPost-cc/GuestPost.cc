@@ -1,46 +1,64 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
-import { QueueService } from "../queues/queue.service"
-import { RefundService } from "./services/refund.service"
-import { QUEUES, validateBrief, UnknownServiceTypeError, orderEventMetadata } from "@guestpost/shared"
-import { ZodError } from "zod"
 import { Prisma } from "@guestpost/database"
+import {
+  orderEventMetadata,
+  UnknownServiceTypeError,
+  validateBrief,
+} from "@guestpost/shared"
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import { ZodError } from "zod"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
+import type { QueueService } from "../queues/queue.service"
+import type { RefundService } from "./services/refund.service"
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
-    private readonly queue: QueueService,
+    readonly _queue: QueueService,
     private readonly refund: RefundService,
   ) {}
 
-  async createOrder(data: {
-    type: string
-    title?: string
-    instructions?: string
-    customerId: string
-    organizationId: string
-    campaignId?: string
-    idempotencyKey?: string
-    targetUrl?: string
-    anchorText?: string
-    // Phase 2 preferred: the customer's locked pick from the listing detail
-    // page. When set, the server snapshots its serviceType / price /
-    // turnaroundDays / fulfillmentChannel onto the order; downstream code
-    // never re-reads the listing for pricing or routing.
-    listingServiceId?: string
-    // Phase 6: structured per-service brief. Server validates against the
-    // shared Zod registry keyed on the resolved serviceType (snapshot).
-    briefData?: Record<string, unknown>
-    items?: Array<{ websiteId?: string; targetUrl?: string; anchorText?: string }>
-  }, userId: string) {
+  async createOrder(
+    data: {
+      type: string
+      title?: string
+      instructions?: string
+      customerId: string
+      organizationId: string
+      campaignId?: string
+      idempotencyKey?: string
+      targetUrl?: string
+      anchorText?: string
+      // Phase 2 preferred: the customer's locked pick from the listing detail
+      // page. When set, the server snapshots its serviceType / price /
+      // turnaroundDays / fulfillmentChannel onto the order; downstream code
+      // never re-reads the listing for pricing or routing.
+      listingServiceId?: string
+      // Phase 6: structured per-service brief. Server validates against the
+      // shared Zod registry keyed on the resolved serviceType (snapshot).
+      briefData?: Record<string, unknown>
+      items?: Array<{
+        websiteId?: string
+        targetUrl?: string
+        anchorText?: string
+      }>
+    },
+    userId: string,
+  ) {
     // INVARIANT: one website per order. Settlement, refund clawback, and
     // publisher fulfillment all resolve a single publisher from the order's
     // website — items on different websites would pay the wrong publisher.
     // Multi-website purchases are modeled as multiple orders in a campaign.
-    const websiteIds = new Set((data.items ?? []).map((i) => i.websiteId ?? null))
+    const websiteIds = new Set(
+      (data.items ?? []).map((i) => i.websiteId ?? null),
+    )
     if (websiteIds.size > 1) {
       throw new BadRequestException(
         "All items in an order must target the same website. Create separate orders (within one campaign) for multiple websites.",
@@ -99,9 +117,25 @@ export class OrdersService {
       if (data.listingServiceId) {
         const ls = await tx.listingService.findUnique({
           where: { id: data.listingServiceId },
-          include: { listing: { include: { website: { select: { id: true, ownershipType: true, verificationStatus: true, managedByUserId: true } } } } },
+          include: {
+            listing: {
+              include: {
+                website: {
+                  select: {
+                    id: true,
+                    ownershipType: true,
+                    verificationStatus: true,
+                    managedByUserId: true,
+                  },
+                },
+              },
+            },
+          },
         })
-        if (!ls) throw new BadRequestException(`Listing service ${data.listingServiceId} not found`)
+        if (!ls)
+          throw new BadRequestException(
+            `Listing service ${data.listingServiceId} not found`,
+          )
         if (ls.availability !== "AVAILABLE") {
           throw new ConflictException({
             code: "SERVICE_UNAVAILABLE",
@@ -112,18 +146,31 @@ export class OrdersService {
           throw new BadRequestException("Listing is not approved")
         }
         const site = ls.listing.website
-        if (site?.ownershipType === "PUBLISHER" && site.verificationStatus === "REVOKED") {
-          throw new BadRequestException({ code: "WEBSITE_REVOKED", message: "Website ownership is revoked and cannot take new orders" })
+        if (
+          site?.ownershipType === "PUBLISHER" &&
+          site.verificationStatus === "REVOKED"
+        ) {
+          throw new BadRequestException({
+            code: "WEBSITE_REVOKED",
+            message: "Website ownership is revoked and cannot take new orders",
+          })
         }
         // The item's websiteId (if present) must agree with the listing's.
         // Mismatches indicate a tampered client payload — reject outright.
-        if (firstItem?.websiteId && site?.id && firstItem.websiteId !== site.id) {
-          throw new BadRequestException("Item websiteId does not match the listing's website")
+        if (
+          firstItem?.websiteId &&
+          site?.id &&
+          firstItem.websiteId !== site.id
+        ) {
+          throw new BadRequestException(
+            "Item websiteId does not match the listing's website",
+          )
         }
         snapshot = {
           listingId: ls.listingId,
           listingServiceId: ls.id,
-          fulfillmentChannel: ls.listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
+          fulfillmentChannel:
+            ls.listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
           turnaroundDays: ls.turnaroundDays,
           snapshotPrice: Number(ls.price),
           snapshotServiceType: ls.serviceType,
@@ -135,17 +182,27 @@ export class OrdersService {
         // (websiteId, type) so historical clients still get snapshot columns.
         const listing = await tx.marketplaceListing.findFirst({
           where: { websiteId: firstItem.websiteId, status: "APPROVED" },
-          select: { id: true, ownerType: true, website: { select: { managedByUserId: true } } },
+          select: {
+            id: true,
+            ownerType: true,
+            website: { select: { managedByUserId: true } },
+          },
         })
         if (listing) {
           const ls = await tx.listingService.findUnique({
-            where: { listingId_serviceType: { listingId: listing.id, serviceType: data.type as any } },
+            where: {
+              listingId_serviceType: {
+                listingId: listing.id,
+                serviceType: data.type as any,
+              },
+            },
           })
           if (ls && ls.availability === "AVAILABLE") {
             snapshot = {
               listingId: listing.id,
               listingServiceId: ls.id,
-              fulfillmentChannel: listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
+              fulfillmentChannel:
+                listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
               turnaroundDays: ls.turnaroundDays,
               snapshotPrice: Number(ls.price),
               snapshotServiceType: ls.serviceType,
@@ -169,7 +226,8 @@ export class OrdersService {
       if (!snapshot.listingServiceId) {
         throw new BadRequestException({
           code: "LISTING_SERVICE_REQUIRED",
-          message: "Order requires a listingServiceId (or a websiteId+type that maps to an AVAILABLE ListingService).",
+          message:
+            "Order requires a listingServiceId (or a websiteId+type that maps to an AVAILABLE ListingService).",
         })
       }
 
@@ -184,13 +242,19 @@ export class OrdersService {
       if (data.briefData !== undefined && data.briefData !== null) {
         const serviceTypeForBrief = snapshot.snapshotServiceType ?? data.type
         try {
-          validatedBrief = validateBrief(serviceTypeForBrief, data.briefData) as Prisma.InputJsonValue
+          validatedBrief = validateBrief(
+            serviceTypeForBrief,
+            data.briefData,
+          ) as Prisma.InputJsonValue
         } catch (err) {
           if (err instanceof ZodError) {
             throw new BadRequestException({
               code: "BRIEF_INVALID",
               message: "Brief failed validation",
-              issues: err.issues.map(i => ({ path: i.path.join("."), message: i.message })),
+              issues: err.issues.map((i) => ({
+                path: i.path.join("."),
+                message: i.message,
+              })),
             })
           }
           if (err instanceof UnknownServiceTypeError) {
@@ -239,21 +303,34 @@ export class OrdersService {
           if (item.websiteId) {
             // Block orders on a revoked domain — defence in depth beyond listing
             // pause (a REVOKED publisher site may never take new orders).
-            const site = await tx.website.findUnique({ where: { id: item.websiteId }, select: { verificationStatus: true, ownershipType: true } })
-            if (site?.ownershipType === "PUBLISHER" && site.verificationStatus === "REVOKED") {
-              throw new BadRequestException({ code: "WEBSITE_REVOKED", message: `Website ${item.websiteId} ownership is revoked and cannot take new orders` })
+            const site = await tx.website.findUnique({
+              where: { id: item.websiteId },
+              select: { verificationStatus: true, ownershipType: true },
+            })
+            if (
+              site?.ownershipType === "PUBLISHER" &&
+              site.verificationStatus === "REVOKED"
+            ) {
+              throw new BadRequestException({
+                code: "WEBSITE_REVOKED",
+                message: `Website ${item.websiteId} ownership is revoked and cannot take new orders`,
+              })
             }
             // Post-Phase-4: snapshot.snapshotPrice is always set (the order
             // already failed if listingServiceId was unresolvable above), so
             // the listing-level fallback is gone.
             if (snapshot.snapshotPrice == null) {
-              throw new BadRequestException("Internal: order snapshot missing price")
+              throw new BadRequestException(
+                "Internal: order snapshot missing price",
+              )
             }
             price = snapshot.snapshotPrice
           } else {
             // Orders without a website are no longer accepted — the
             // listingServiceId snapshot always implies a website.
-            throw new BadRequestException("Order items must reference a website")
+            throw new BadRequestException(
+              "Order items must reference a website",
+            )
           }
 
           await tx.orderItem.create({
@@ -268,7 +345,10 @@ export class OrdersService {
           })
           total += price
         }
-        await tx.order.update({ where: { id: order.id }, data: { amount: total } })
+        await tx.order.update({
+          where: { id: order.id },
+          data: { amount: total },
+        })
       }
 
       // ── Phase 6.5: auto-assign PLATFORM orders to the site's Ops owner ──
@@ -279,7 +359,10 @@ export class OrdersService {
       // inbox immediately, no manual claim required. Sites without an owner
       // fall back to the shared unassigned-Ops queue (no row written).
       let autoAssignedToUserId: string | null = null
-      if (snapshot.fulfillmentChannel === "PLATFORM" && snapshot.managedByUserId) {
+      if (
+        snapshot.fulfillmentChannel === "PLATFORM" &&
+        snapshot.managedByUserId
+      ) {
         await tx.fulfillmentAssignment.create({
           data: {
             orderId: order.id,
@@ -319,12 +402,19 @@ export class OrdersService {
     })
   }
 
-  async addOrderItem(orderId: string, organizationId: string, data: {
-    websiteId?: string
-    targetUrl?: string
-    anchorText?: string
-  }, userId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, organizationId } })
+  async addOrderItem(
+    orderId: string,
+    organizationId: string,
+    data: {
+      websiteId?: string
+      targetUrl?: string
+      anchorText?: string
+    },
+    userId: string,
+  ) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, organizationId },
+    })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "DRAFT") {
       throw new BadRequestException("Can only add items to draft orders")
@@ -335,8 +425,14 @@ export class OrdersService {
       where: { orderId },
       select: { websiteId: true },
     })
-    const existingWebsiteId = order.websiteId ?? existingItems.find((i) => i.websiteId)?.websiteId ?? null
-    if (existingItems.length > 0 && (data.websiteId ?? null) !== existingWebsiteId) {
+    const existingWebsiteId =
+      order.websiteId ??
+      existingItems.find((i) => i.websiteId)?.websiteId ??
+      null
+    if (
+      existingItems.length > 0 &&
+      (data.websiteId ?? null) !== existingWebsiteId
+    ) {
       throw new BadRequestException(
         "All items in an order must target the same website. Create a separate order for a different website.",
       )
@@ -347,14 +443,18 @@ export class OrdersService {
     // for pricing — the legacy listing-level / Service-table fallbacks are
     // removed.
     if (!order.listingServiceId) {
-      throw new BadRequestException("Order has no listingServiceId — recreate with the new flow")
+      throw new BadRequestException(
+        "Order has no listingServiceId — recreate with the new flow",
+      )
     }
     const ls = await this.prisma.listingService.findUnique({
       where: { id: order.listingServiceId },
       select: { price: true, availability: true },
     })
-    if (!ls) throw new BadRequestException("Order's listing service no longer exists")
-    if (ls.availability !== "AVAILABLE") throw new BadRequestException("Order's service is not available")
+    if (!ls)
+      throw new BadRequestException("Order's listing service no longer exists")
+    if (ls.availability !== "AVAILABLE")
+      throw new BadRequestException("Order's service is not available")
     const price: number = Number(ls.price)
 
     const item = await this.prisma.orderItem.create({
@@ -368,7 +468,10 @@ export class OrdersService {
       },
     })
 
-    const total = await this.prisma.orderItem.aggregate({ where: { orderId }, _sum: { price: true } })
+    const total = await this.prisma.orderItem.aggregate({
+      where: { orderId },
+      _sum: { price: true },
+    })
     await this.prisma.order.update({
       where: { id: orderId },
       data: {
@@ -377,7 +480,11 @@ export class OrdersService {
         // publisher fulfillment matches on order.website.publisherId, so an
         // order without it can never be accepted.
         ...(data.websiteId && !order.websiteId
-          ? { websiteId: data.websiteId, targetUrl: order.targetUrl ?? data.targetUrl, anchorText: order.anchorText ?? data.anchorText }
+          ? {
+              websiteId: data.websiteId,
+              targetUrl: order.targetUrl ?? data.targetUrl,
+              anchorText: order.anchorText ?? data.anchorText,
+            }
           : {}),
       },
     })
@@ -395,36 +502,67 @@ export class OrdersService {
     return item
   }
 
-  async removeOrderItem(orderId: string, itemId: string, organizationId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, organizationId } })
+  async removeOrderItem(
+    orderId: string,
+    itemId: string,
+    organizationId: string,
+  ) {
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, organizationId },
+    })
     if (!order) throw new NotFoundException("Order not found")
-    if (order.status !== "DRAFT") throw new BadRequestException("Can only remove items from draft orders")
+    if (order.status !== "DRAFT")
+      throw new BadRequestException("Can only remove items from draft orders")
 
-    const item = await this.prisma.orderItem.findFirst({ where: { id: itemId, orderId } })
+    const item = await this.prisma.orderItem.findFirst({
+      where: { id: itemId, orderId },
+    })
     if (!item) throw new NotFoundException("Item not found")
 
     await this.prisma.orderItem.delete({ where: { id: itemId } })
 
-    const total = await this.prisma.orderItem.aggregate({ where: { orderId }, _sum: { price: true } })
+    const total = await this.prisma.orderItem.aggregate({
+      where: { orderId },
+      _sum: { price: true },
+    })
     const remaining = await this.prisma.orderItem.findFirst({
       where: { orderId, websiteId: { not: null } },
       select: { websiteId: true },
     })
     await this.prisma.order.update({
       where: { id: orderId },
-      data: { amount: total._sum.price ?? 0, websiteId: remaining?.websiteId ?? null },
+      data: {
+        amount: total._sum.price ?? 0,
+        websiteId: remaining?.websiteId ?? null,
+      },
     })
 
     return { success: true }
   }
 
   async cancelOrder(orderId: string, organizationId: string, userId: string) {
-    const order = await this.prisma.order.findFirst({ where: { id: orderId, organizationId } })
+    const order = await this.prisma.order.findFirst({
+      where: { id: orderId, organizationId },
+    })
     if (!order) throw new NotFoundException("Order not found")
 
-    const cancellableStatuses = ["DRAFT", "PENDING_PAYMENT", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW", "APPROVED", "PUBLISHED", "VERIFIED"]
+    const cancellableStatuses = [
+      "DRAFT",
+      "PENDING_PAYMENT",
+      "SUBMITTED",
+      "ACCEPTED",
+      "CONTENT_REQUESTED",
+      "CONTENT_CREATION",
+      "CONTENT_READY",
+      "CUSTOMER_REVIEW",
+      "APPROVED",
+      "PUBLISHED",
+      "VERIFIED",
+    ]
     if (!cancellableStatuses.includes(order.status)) {
-      throw new BadRequestException(`Order cannot be cancelled in ${order.status} status`)
+      throw new BadRequestException(
+        `Order cannot be cancelled in ${order.status} status`,
+      )
     }
 
     const amount = order.amount ? Number(order.amount) : 0
@@ -432,14 +570,21 @@ export class OrdersService {
     // PAID orders: delegate to RefundService for canonical refund path
     // (settlement cancel + clawback + wallet credit + transaction + event + audit)
     if (order.paymentStatus === "PAID") {
-      await this.refund.refundOrder(orderId, "Order cancelled by customer", userId)
+      await this.refund.refundOrder(
+        orderId,
+        "Order cancelled by customer",
+        userId,
+      )
       return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
     }
 
     // NON-PAID orders: release reservation + cancel order
     return this.prisma.$transaction(async (tx: any) => {
       // Release reserved funds if any
-      if (order.paymentStatus === "PENDING" && order.status === "PENDING_PAYMENT") {
+      if (
+        order.paymentStatus === "PENDING" &&
+        order.status === "PENDING_PAYMENT"
+      ) {
         const wallet = await tx.wallet.findFirst({ where: { organizationId } })
         if (wallet && amount > 0) {
           const released = await tx.wallet.updateMany({
@@ -451,7 +596,9 @@ export class OrdersService {
             },
           })
           if (released.count === 0) {
-            throw new ConflictException("Wallet was modified by another request. Retry.")
+            throw new ConflictException(
+              "Wallet was modified by another request. Retry.",
+            )
           }
         }
       }
@@ -464,9 +611,13 @@ export class OrdersService {
         },
       })
       if (cancelled.count === 0) {
-        throw new ConflictException("Order was modified by another request. Retry.")
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
       }
-      const updated = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      const updated = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+      })
 
       await tx.orderEvent.create({
         data: {
@@ -512,7 +663,12 @@ export class OrdersService {
     return order
   }
 
-  async listOrders(organizationId: string, campaignId?: string, take = 50, skip = 0) {
+  async listOrders(
+    organizationId: string,
+    campaignId?: string,
+    take = 50,
+    skip = 0,
+  ) {
     const where: any = { organizationId }
     if (campaignId) where.campaignId = campaignId
     const [items, total] = await this.prisma.$transaction([
@@ -542,7 +698,13 @@ export class OrdersService {
         orderBy: { createdAt: "desc" },
         take,
         skip,
-        include: { items: true, website: true, campaign: true, settlements: { include: { approvals: true } }, dispute: true },
+        include: {
+          items: true,
+          website: true,
+          campaign: true,
+          settlements: { include: { approvals: true } },
+          dispute: true,
+        },
       }),
       this.prisma.order.count({ where }),
     ])

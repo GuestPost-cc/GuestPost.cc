@@ -1,4 +1,4 @@
-import { IsString, IsUrl, IsOptional, MaxLength } from "class-validator"
+import { IsOptional, IsString, IsUrl, MaxLength } from "class-validator"
 
 export class AddWebsiteDto {
   @IsUrl()

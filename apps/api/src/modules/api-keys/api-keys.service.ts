@@ -1,7 +1,7 @@
-import { Injectable, BadRequestException, NotFoundException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
-import * as crypto from "crypto"
+import * as crypto from "node:crypto"
+import { Injectable, NotFoundException } from "@nestjs/common"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
 
 function hashKey(key: string): string {
   return crypto.createHash("sha256").update(key).digest("hex")
@@ -19,7 +19,12 @@ export class ApiKeysService {
     private readonly audit: AuditService,
   ) {}
 
-  async createKey(organizationId: string, name: string, permissions: string[], userId: string) {
+  async createKey(
+    organizationId: string,
+    name: string,
+    permissions: string[],
+    userId: string,
+  ) {
     const { raw, hash } = generateApiKey()
 
     await this.prisma.apiKey.create({
@@ -39,7 +44,11 @@ export class ApiKeysService {
       organizationId,
     })
 
-    return { name, key: raw, message: "Store this key securely — it will not be shown again" }
+    return {
+      name,
+      key: raw,
+      message: "Store this key securely — it will not be shown again",
+    }
   }
 
   async listKeys(organizationId: string) {
@@ -79,9 +88,15 @@ export class ApiKeysService {
     return { message: "API key revoked" }
   }
 
-  async validateKey(rawKey: string): Promise<{ valid: boolean; permissions?: string[]; organizationId?: string }> {
+  async validateKey(rawKey: string): Promise<{
+    valid: boolean
+    permissions?: string[]
+    organizationId?: string
+  }> {
     const hash = hashKey(rawKey)
-    const key = await this.prisma.apiKey.findUnique({ where: { keyHash: hash } })
+    const key = await this.prisma.apiKey.findUnique({
+      where: { keyHash: hash },
+    })
     if (!key) return { valid: false }
     if (key.expiresAt && key.expiresAt < new Date()) return { valid: false }
 
@@ -90,6 +105,10 @@ export class ApiKeysService {
       data: { lastUsedAt: new Date() },
     })
 
-    return { valid: true, permissions: key.permissions as string[], organizationId: key.organizationId }
+    return {
+      valid: true,
+      permissions: key.permissions as string[],
+      organizationId: key.organizationId,
+    }
   }
 }

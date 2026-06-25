@@ -1,7 +1,12 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from "@nestjs/common"
-import { Reflector } from "@nestjs/core"
-import { STAFF_ROLES_KEY } from "../decorators/staff-roles.decorator"
 import type { StaffRole } from "@guestpost/shared"
+import {
+  type CanActivate,
+  type ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from "@nestjs/common"
+import type { Reflector } from "@nestjs/core"
+import { STAFF_ROLES_KEY } from "../decorators/staff-roles.decorator"
 
 // Phase 6.7 — Audit finding #2 remediation.
 //
@@ -26,10 +31,10 @@ export class StaffRolesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<StaffRole[]>(STAFF_ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ])
+    const requiredRoles = this.reflector.getAllAndOverride<StaffRole[]>(
+      STAFF_ROLES_KEY,
+      [context.getHandler(), context.getClass()],
+    )
 
     // Fail-closed on missing or empty metadata.
     if (!requiredRoles || requiredRoles.length === 0) {
@@ -40,7 +45,7 @@ export class StaffRolesGuard implements CanActivate {
 
     const user = context.switchToHttp().getRequest().user
 
-    if (!user || user.userType !== "STAFF") {
+    if (user?.userType !== "STAFF") {
       throw new ForbiddenException("Only staff can access this resource")
     }
 

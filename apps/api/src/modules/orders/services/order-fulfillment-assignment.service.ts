@@ -1,6 +1,11 @@
-import { Injectable, BadRequestException, NotFoundException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../../common/prisma.service"
-import { AuditService } from "../../audit/audit.service"
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import type { PrismaService } from "../../../common/prisma.service"
+import type { AuditService } from "../../audit/audit.service"
 
 // Platform fulfillment assignment. Platform-owned orders enter the Operations
 // queue; Operations users claim / assign / reassign before delivering. Finance
@@ -18,9 +23,13 @@ export class OrderFulfillmentAssignmentService {
       include: { website: { select: { ownershipType: true } } },
     })
     if (!order) throw new NotFoundException("Order not found")
-    const channel = order.fulfillmentChannel ?? (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    const channel =
+      order.fulfillmentChannel ??
+      (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
     if (channel !== "PLATFORM") {
-      throw new BadRequestException("Only platform-owned orders use fulfillment assignment")
+      throw new BadRequestException(
+        "Only platform-owned orders use fulfillment assignment",
+      )
     }
     return order
   }
@@ -35,7 +44,19 @@ export class OrderFulfillmentAssignmentService {
           { fulfillmentChannel: "PLATFORM" },
           { fulfillmentChannel: null, website: { ownershipType: "PLATFORM" } },
         ],
-        status: { in: ["PAID", "SUBMITTED", "ACCEPTED", "CONTENT_REQUESTED", "CONTENT_CREATION", "CONTENT_READY", "CUSTOMER_REVIEW", "APPROVED", "PUBLISHED"] },
+        status: {
+          in: [
+            "PAID",
+            "SUBMITTED",
+            "ACCEPTED",
+            "CONTENT_REQUESTED",
+            "CONTENT_CREATION",
+            "CONTENT_READY",
+            "CUSTOMER_REVIEW",
+            "APPROVED",
+            "PUBLISHED",
+          ],
+        },
       },
       include: {
         website: { select: { url: true, domain: true } },
@@ -47,7 +68,13 @@ export class OrderFulfillmentAssignmentService {
     return orders
   }
 
-  private async upsertAssignment(orderId: string, assignedToUserId: string, assignedByUserId: string, organizationId: string, action: "ORDER_DELIVERY_ASSIGNED" | "ORDER_DELIVERY_REASSIGNED") {
+  private async upsertAssignment(
+    orderId: string,
+    assignedToUserId: string,
+    assignedByUserId: string,
+    organizationId: string,
+    action: "ORDER_DELIVERY_ASSIGNED" | "ORDER_DELIVERY_REASSIGNED",
+  ) {
     return this.prisma.$transaction(async (tx: any) => {
       // Cancel any existing open assignment (reassignment)
       await tx.fulfillmentAssignment.updateMany({
@@ -55,7 +82,12 @@ export class OrderFulfillmentAssignmentService {
         data: { status: "CANCELLED" },
       })
       const assignment = await tx.fulfillmentAssignment.create({
-        data: { orderId, assignedToUserId, assignedByUserId, status: "ASSIGNED" },
+        data: {
+          orderId,
+          assignedToUserId,
+          assignedByUserId,
+          status: "ASSIGNED",
+        },
       })
       await this.audit.log(
         {
@@ -82,7 +114,13 @@ export class OrderFulfillmentAssignmentService {
   async claim(orderId: string, userId: string) {
     const order = await this.assertPlatformOrder(orderId)
     try {
-      return await this.upsertAssignment(orderId, userId, userId, order.organizationId, "ORDER_DELIVERY_ASSIGNED")
+      return await this.upsertAssignment(
+        orderId,
+        userId,
+        userId,
+        order.organizationId,
+        "ORDER_DELIVERY_ASSIGNED",
+      )
     } catch (e: any) {
       if (e?.code === "P2002") {
         throw new ConflictException("Order is already assigned")
@@ -96,13 +134,25 @@ export class OrderFulfillmentAssignmentService {
   // but the order's assignment state changed mid-flight. Different message
   // from claim() because the user (admin) wasn't trying to "take" an
   // unowned order; they were trying to redirect ownership.
-  async assign(orderId: string, assignedToUserId: string, assignedByUserId: string) {
+  async assign(
+    orderId: string,
+    assignedToUserId: string,
+    assignedByUserId: string,
+  ) {
     const order = await this.assertPlatformOrder(orderId)
     try {
-      return await this.upsertAssignment(orderId, assignedToUserId, assignedByUserId, order.organizationId, "ORDER_DELIVERY_ASSIGNED")
+      return await this.upsertAssignment(
+        orderId,
+        assignedToUserId,
+        assignedByUserId,
+        order.organizationId,
+        "ORDER_DELIVERY_ASSIGNED",
+      )
     } catch (e: any) {
       if (e?.code === "P2002") {
-        throw new ConflictException("Order assignment changed concurrently — refresh and try again")
+        throw new ConflictException(
+          "Order assignment changed concurrently — refresh and try again",
+        )
       }
       throw e
     }
@@ -112,13 +162,25 @@ export class OrderFulfillmentAssignmentService {
   // as assign(); the cancel-then-create in upsertAssignment runs in a single
   // tx, so P2002 only fires when another tx committed an active row between
   // this tx's cancel and its create — i.e. a true concurrent collision.
-  async reassign(orderId: string, assignedToUserId: string, assignedByUserId: string) {
+  async reassign(
+    orderId: string,
+    assignedToUserId: string,
+    assignedByUserId: string,
+  ) {
     const order = await this.assertPlatformOrder(orderId)
     try {
-      return await this.upsertAssignment(orderId, assignedToUserId, assignedByUserId, order.organizationId, "ORDER_DELIVERY_REASSIGNED")
+      return await this.upsertAssignment(
+        orderId,
+        assignedToUserId,
+        assignedByUserId,
+        order.organizationId,
+        "ORDER_DELIVERY_REASSIGNED",
+      )
     } catch (e: any) {
       if (e?.code === "P2002") {
-        throw new ConflictException("Order assignment changed concurrently — refresh and try again")
+        throw new ConflictException(
+          "Order assignment changed concurrently — refresh and try again",
+        )
       }
       throw e
     }

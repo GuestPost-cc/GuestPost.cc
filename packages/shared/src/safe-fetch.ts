@@ -21,29 +21,41 @@
 // validateResolvedAddress() function so it's unit-testable without
 // undici/dns mocking — the Agent's lookup callback is a thin wrapper.
 
-import { isIP } from "net"
-import dns from "dns"
+import dns from "node:dns"
+import { isIP } from "node:net"
 import { Agent, fetch as undiciFetch } from "undici"
 
 // Single source of truth for private-IP patterns. Includes IPv4-mapped
 // IPv6 forms (e.g. ::ffff:127.0.0.1) that the original list missed.
 export const PRIVATE_IP_PATTERNS = [
-  /^127\./, /^10\./, /^192\.168\./, /^169\.254\./,
-  /^172\.(1[6-9]|2\d|3[01])\./, /^0\./,
-  /^::1$/, /^f[cd]/i, /^fe80:/i,
-  /^::ffff:127\./i, /^::ffff:10\./i, /^::ffff:192\.168\./i,
-  /^::ffff:169\.254\./i, /^::ffff:172\.(1[6-9]|2\d|3[01])\./i,
+  /^127\./,
+  /^10\./,
+  /^192\.168\./,
+  /^169\.254\./,
+  /^172\.(1[6-9]|2\d|3[01])\./,
+  /^0\./,
+  /^::1$/,
+  /^f[cd]/i,
+  /^fe80:/i,
+  /^::ffff:127\./i,
+  /^::ffff:10\./i,
+  /^::ffff:192\.168\./i,
+  /^::ffff:169\.254\./i,
+  /^::ffff:172\.(1[6-9]|2\d|3[01])\./i,
   /^::ffff:0\./i,
 ]
 
 export type SafeFetchErrorCode =
-  | "UNSAFE_URL"        // protocol / host pattern / literal-private-IP fail
-  | "DNS_REBINDING"     // hostname resolved to a private IP
+  | "UNSAFE_URL" // protocol / host pattern / literal-private-IP fail
+  | "DNS_REBINDING" // hostname resolved to a private IP
   | "DNS_LOOKUP_FAILED" // hostname couldn't resolve at all
-  | "BODY_TOO_LARGE"    // response body exceeded the cap
+  | "BODY_TOO_LARGE" // response body exceeded the cap
 
 export class SafeFetchError extends Error {
-  constructor(public code: SafeFetchErrorCode, message: string) {
+  constructor(
+    public code: SafeFetchErrorCode,
+    message: string,
+  ) {
     super(message)
     this.name = "SafeFetchError"
   }
@@ -56,10 +68,20 @@ export class SafeFetchError extends Error {
  */
 export function isSafePublicUrl(rawUrl: string): boolean {
   let url: URL
-  try { url = new URL(rawUrl) } catch { return false }
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    return false
+  }
   if (url.protocol !== "http:" && url.protocol !== "https:") return false
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "")
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal")
+  )
+    return false
   if (isIP(host) && PRIVATE_IP_PATTERNS.some((p) => p.test(host))) return false
   return true
 }
@@ -71,7 +93,10 @@ export function isSafePublicUrl(rawUrl: string): boolean {
  * wiring so it's testable without undici / dns mocking — the lookup
  * callback below is a thin wrapper that just delegates here.
  */
-export function validateResolvedAddress(hostname: string, address: string): SafeFetchError | null {
+export function validateResolvedAddress(
+  hostname: string,
+  address: string,
+): SafeFetchError | null {
   if (!address) return null
   if (PRIVATE_IP_PATTERNS.some((p) => p.test(address))) {
     return new SafeFetchError(
@@ -95,15 +120,19 @@ const SAFE_LOOKUP_AGENT = new Agent({
     lookup: (hostname, options, callback) => {
       // Force single-address resolution — the dispatcher binds the
       // connection to one IP, so we don't need the array overload.
-      dns.lookup(hostname, { ...options, all: false }, (err, address, family) => {
-        if (err) return callback(err, "", 0)
-        // With all: false, address is always a string (the overload's
-        // array form requires all: true).
-        const addr = address as string
-        const violation = validateResolvedAddress(hostname, addr)
-        if (violation) return callback(violation, "", 0)
-        callback(null, addr, family as number)
-      })
+      dns.lookup(
+        hostname,
+        { ...options, all: false },
+        (err, address, family) => {
+          if (err) return callback(err, "", 0)
+          // With all: false, address is always a string (the overload's
+          // array form requires all: true).
+          const addr = address as string
+          const violation = validateResolvedAddress(hostname, addr)
+          if (violation) return callback(violation, "", 0)
+          callback(null, addr, family as number)
+        },
+      )
     },
   },
 })
@@ -117,9 +146,15 @@ const SAFE_LOOKUP_AGENT = new Agent({
  * Caller is responsible for reading the body — use readBodyWithCap
  * to enforce a size limit.
  */
-export async function safeFetch(rawUrl: string, init?: RequestInit): Promise<Response> {
+export async function safeFetch(
+  rawUrl: string,
+  init?: RequestInit,
+): Promise<Response> {
   if (!isSafePublicUrl(rawUrl)) {
-    throw new SafeFetchError("UNSAFE_URL", `URL failed pre-flight safety check: ${rawUrl}`)
+    throw new SafeFetchError(
+      "UNSAFE_URL",
+      `URL failed pre-flight safety check: ${rawUrl}`,
+    )
   }
   return (await undiciFetch(rawUrl, {
     ...(init as any),
@@ -133,7 +168,10 @@ export async function safeFetch(rawUrl: string, init?: RequestInit): Promise<Res
  * via TextDecoder's streaming mode. Cancels the underlying connection
  * on overrun.
  */
-export async function readBodyWithCap(res: Response, maxBytes: number): Promise<string> {
+export async function readBodyWithCap(
+  res: Response,
+  maxBytes: number,
+): Promise<string> {
   if (!res.body) return ""
   const reader = res.body.getReader()
   const decoder = new TextDecoder("utf-8")
@@ -146,7 +184,10 @@ export async function readBodyWithCap(res: Response, maxBytes: number): Promise<
       total += value.byteLength
       if (total > maxBytes) {
         await reader.cancel().catch(() => {})
-        throw new SafeFetchError("BODY_TOO_LARGE", `response body exceeded ${maxBytes} bytes`)
+        throw new SafeFetchError(
+          "BODY_TOO_LARGE",
+          `response body exceeded ${maxBytes} bytes`,
+        )
       }
       out += decoder.decode(value, { stream: true })
     }

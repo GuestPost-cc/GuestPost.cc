@@ -1,11 +1,11 @@
-import { Injectable, Logger, OnModuleInit } from "@nestjs/common"
-import { ModuleRef } from "@nestjs/core"
-import { PrismaService } from "../../common/prisma.service"
-import { PayoutEncryptionService } from "./payout-encryption.service"
-import type { PayoutProviderAdapter } from "./providers/payout-provider.interface"
+import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
+import type { ModuleRef } from "@nestjs/core"
+import type { PrismaService } from "../../common/prisma.service"
+import type { PayoutEncryptionService } from "./payout-encryption.service"
 import { ManualPayoutAdapter } from "./providers/manual-payout.adapter"
-import { WisePayoutAdapter } from "./providers/wise-payout.adapter"
+import type { PayoutProviderAdapter } from "./providers/payout-provider.interface"
 import { StripeConnectPayoutAdapter } from "./providers/stripe-connect-payout.adapter"
+import { WisePayoutAdapter } from "./providers/wise-payout.adapter"
 
 @Injectable()
 export class PayoutProviderService implements OnModuleInit {
@@ -15,19 +15,23 @@ export class PayoutProviderService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly encryption: PayoutEncryptionService,
-    private readonly moduleRef: ModuleRef,
+    readonly _moduleRef: ModuleRef,
   ) {}
 
   async onModuleInit() {
     this.register(new ManualPayoutAdapter())
     this.register(new WisePayoutAdapter())
     this.register(new StripeConnectPayoutAdapter())
-    this.logger.log("Registered built-in provider adapters: manual, wise, stripe_connect")
+    this.logger.log(
+      "Registered built-in provider adapters: manual, wise, stripe_connect",
+    )
   }
 
   register(adapter: PayoutProviderAdapter) {
     if (this.adapters.has(adapter.providerName)) {
-      this.logger.warn(`Provider adapter "${adapter.providerName}" already registered — skipping`)
+      this.logger.warn(
+        `Provider adapter "${adapter.providerName}" already registered — skipping`,
+      )
       return
     }
     this.adapters.set(adapter.providerName, adapter)
@@ -46,8 +50,10 @@ export class PayoutProviderService implements OnModuleInit {
     const provider = await this.prisma.payoutProvider.findUnique({
       where: { name: providerName },
     })
-    if (!provider || !provider.isActive) {
-      throw new Error(`Payout provider "${providerName}" is not active or not found`)
+    if (!provider?.isActive) {
+      throw new Error(
+        `Payout provider "${providerName}" is not active or not found`,
+      )
     }
     // Providers without secrets (manual) store an empty/plain JSON config —
     // only string payloads are encrypted ciphertext.

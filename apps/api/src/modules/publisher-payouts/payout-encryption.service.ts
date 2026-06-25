@@ -1,12 +1,30 @@
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  scryptSync,
+} from "node:crypto"
 import { Injectable, Logger } from "@nestjs/common"
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from "crypto"
 
 const ALGORITHM = "aes-256-gcm"
 const IV_LENGTH = 12
 const TAG_LENGTH = 16
 const KEY_LENGTH = 32
 
-const SENSITIVE_FIELDS = ["accountNumber", "routingNumber", "iban", "swift", "accountHolderName", "bankName", "branchCode", "email", "recipientId", "connectedAccountId", "accessToken", "refreshToken"]
+const SENSITIVE_FIELDS = [
+  "accountNumber",
+  "routingNumber",
+  "iban",
+  "swift",
+  "accountHolderName",
+  "bankName",
+  "branchCode",
+  "email",
+  "recipientId",
+  "connectedAccountId",
+  "accessToken",
+  "refreshToken",
+]
 
 @Injectable()
 export class PayoutEncryptionService {
@@ -18,10 +36,18 @@ export class PayoutEncryptionService {
     const hexKey = process.env.PAYOUT_ENCRYPTION_KEY
     if (!hexKey || hexKey.length < 64) {
       if (process.env.NODE_ENV === "production") {
-        throw new Error("PAYOUT_ENCRYPTION_KEY must be set to a 64+ character hex string in production")
+        throw new Error(
+          "PAYOUT_ENCRYPTION_KEY must be set to a 64+ character hex string in production",
+        )
       }
-      this.logger.warn("PAYOUT_ENCRYPTION_KEY not set or too short — using dev-only derived key. NEVER run this in production.")
-      this.masterKey = scryptSync("dev-only-key-do-not-use-in-production", "salt", KEY_LENGTH)
+      this.logger.warn(
+        "PAYOUT_ENCRYPTION_KEY not set or too short — using dev-only derived key. NEVER run this in production.",
+      )
+      this.masterKey = scryptSync(
+        "dev-only-key-do-not-use-in-production",
+        "salt",
+        KEY_LENGTH,
+      )
       this.currentVersion = 0
     } else {
       this.masterKey = Buffer.from(hexKey.slice(0, 64), "hex")
@@ -29,12 +55,18 @@ export class PayoutEncryptionService {
     }
   }
 
-  encrypt(plaintext: Record<string, unknown>, version?: number): { ciphertext: string; version: number } {
+  encrypt(
+    plaintext: Record<string, unknown>,
+    version?: number,
+  ): { ciphertext: string; version: number } {
     const key = this.deriveKey(version ?? this.currentVersion)
     const iv = randomBytes(IV_LENGTH)
     const cipher = createCipheriv(ALGORITHM, key, iv)
     const json = JSON.stringify(plaintext)
-    const encrypted = Buffer.concat([cipher.update(json, "utf8"), cipher.final()])
+    const encrypted = Buffer.concat([
+      cipher.update(json, "utf8"),
+      cipher.final(),
+    ])
     const tag = cipher.getAuthTag()
     const combined = Buffer.concat([iv, tag, encrypted])
     return {
@@ -58,7 +90,10 @@ export class PayoutEncryptionService {
     return JSON.parse(decrypted.toString("utf8"))
   }
 
-  extractDisplayDetails(details: Record<string, unknown>, type: string): Record<string, unknown> {
+  extractDisplayDetails(
+    details: Record<string, unknown>,
+    type: string,
+  ): Record<string, unknown> {
     const display: Record<string, unknown> = {}
     if (type === "bank_transfer") {
       if (details.bankName) display.bankName = details.bankName
@@ -70,11 +105,15 @@ export class PayoutEncryptionService {
       if (details.email) {
         const e = String(details.email)
         const at = e.indexOf("@")
-        display.maskedEmail = at > 0 ? `${e[0]}${"*".repeat(Math.min(at - 1, 4))}@${e.slice(at + 1)}` : "****"
+        display.maskedEmail =
+          at > 0
+            ? `${e[0]}${"*".repeat(Math.min(at - 1, 4))}@${e.slice(at + 1)}`
+            : "****"
       }
     } else if (type === "wise") {
       if (details.currency) display.currency = details.currency
-      if (details.targetCurrency) display.targetCurrency = details.targetCurrency
+      if (details.targetCurrency)
+        display.targetCurrency = details.targetCurrency
     }
     return display
   }
@@ -83,7 +122,10 @@ export class PayoutEncryptionService {
     const masked: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(details)) {
       if (SENSITIVE_FIELDS.includes(key) && typeof value === "string") {
-        masked[key] = value.length > 4 ? `${value.slice(0, 4)}${"*".repeat(Math.min(value.length - 4, 8))}` : "****"
+        masked[key] =
+          value.length > 4
+            ? `${value.slice(0, 4)}${"*".repeat(Math.min(value.length - 4, 8))}`
+            : "****"
       } else {
         masked[key] = value
       }
@@ -94,7 +136,10 @@ export class PayoutEncryptionService {
   redactSensitive(message: string): string {
     for (const field of SENSITIVE_FIELDS) {
       const regex = new RegExp(`("${field}"\\s*:\\s*")([^"]+)(")`, "gi")
-      message = message.replace(regex, (_, pre, __, post) => `${pre}[REDACTED]${post}`)
+      message = message.replace(
+        regex,
+        (_, pre, __, post) => `${pre}[REDACTED]${post}`,
+      )
     }
     return message
   }

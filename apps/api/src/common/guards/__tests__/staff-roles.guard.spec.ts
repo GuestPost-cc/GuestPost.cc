@@ -1,7 +1,6 @@
 import { ForbiddenException } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
 import { StaffRolesGuard } from "../staff-roles.guard"
-import { STAFF_ROLES_KEY } from "../../decorators/staff-roles.decorator"
 
 describe("StaffRolesGuard", () => {
   let guard: StaffRolesGuard
@@ -30,30 +29,46 @@ describe("StaffRolesGuard", () => {
   it("DENIES access when no @StaffRoles metadata is declared (fail-closed)", () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(undefined)
     expect(() =>
-      guard.canActivate(mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" })),
+      guard.canActivate(
+        mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" }),
+      ),
     ).toThrow(ForbiddenException)
   })
 
   it("DENIES access when an empty roles array is declared (fail-closed)", () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue([])
     expect(() =>
-      guard.canActivate(mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" })),
+      guard.canActivate(
+        mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" }),
+      ),
     ).toThrow(ForbiddenException)
   })
 
   it("allows SUPER_ADMIN access", () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    expect(guard.canActivate(mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" }))).toBe(true)
+    expect(
+      guard.canActivate(
+        mockContext({ userType: "STAFF", staffRole: "SUPER_ADMIN" }),
+      ),
+    ).toBe(true)
   })
 
   it("allows FINANCE access when FINANCE is required", () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["FINANCE"])
-    expect(guard.canActivate(mockContext({ userType: "STAFF", staffRole: "FINANCE" }))).toBe(true)
+    expect(
+      guard.canActivate(
+        mockContext({ userType: "STAFF", staffRole: "FINANCE" }),
+      ),
+    ).toBe(true)
   })
 
   it("allows OPERATIONS access when OPERATIONS is required", () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["OPERATIONS"])
-    expect(guard.canActivate(mockContext({ userType: "STAFF", staffRole: "OPERATIONS" }))).toBe(true)
+    expect(
+      guard.canActivate(
+        mockContext({ userType: "STAFF", staffRole: "OPERATIONS" }),
+      ),
+    ).toBe(true)
   })
 
   it("denies CUSTOMER user", () => {
@@ -73,17 +88,23 @@ describe("StaffRolesGuard", () => {
   it("denies user with insufficient role", () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
     expect(() =>
-      guard.canActivate(mockContext({ userType: "STAFF", staffRole: "OPERATIONS" })),
+      guard.canActivate(
+        mockContext({ userType: "STAFF", staffRole: "OPERATIONS" }),
+      ),
     ).toThrow(ForbiddenException)
   })
 
   it("throws when user is null", () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    expect(() => guard.canActivate(mockContext(null))).toThrow(ForbiddenException)
+    expect(() => guard.canActivate(mockContext(null))).toThrow(
+      ForbiddenException,
+    )
   })
 
   it("throws when user is undefined", () => {
     jest.spyOn(reflector, "getAllAndOverride").mockReturnValue(["SUPER_ADMIN"])
-    expect(() => guard.canActivate(mockContext(undefined))).toThrow(ForbiddenException)
+    expect(() => guard.canActivate(mockContext(undefined))).toThrow(
+      ForbiddenException,
+    )
   })
 })

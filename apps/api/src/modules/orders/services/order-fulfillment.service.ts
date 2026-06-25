@@ -1,9 +1,14 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../../common/prisma.service"
-import { AuditService } from "../../audit/audit.service"
-import { QueueService } from "../../queues/queue.service"
-import { QUEUES, orderEventMetadata } from "@guestpost/shared"
-import { OrderDeliveryService } from "./order-delivery.service"
+import { orderEventMetadata, QUEUES } from "@guestpost/shared"
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import type { PrismaService } from "../../../common/prisma.service"
+import type { AuditService } from "../../audit/audit.service"
+import type { QueueService } from "../../queues/queue.service"
+import type { OrderDeliveryService } from "./order-delivery.service"
 
 @Injectable()
 export class OrderFulfillmentService {
@@ -17,13 +22,24 @@ export class OrderFulfillmentService {
   // Optimistic-lock status transition: the row only changes if its version
   // AND current status still match what the caller read, preventing lost
   // updates / concurrent state corruption. Returns the fresh row.
-  private async transition(orderId: string, fromVersion: number, expectedStatus: string, data: any) {
+  private async transition(
+    orderId: string,
+    fromVersion: number,
+    expectedStatus: string,
+    data: any,
+  ) {
     const r = await this.prisma.order.updateMany({
-      where: { id: orderId, version: fromVersion, status: expectedStatus as any },
+      where: {
+        id: orderId,
+        version: fromVersion,
+        status: expectedStatus as any,
+      },
       data: { ...data, version: { increment: 1 } },
     })
     if (r.count === 0) {
-      throw new ConflictException("Order was modified by another request. Retry.")
+      throw new ConflictException(
+        "Order was modified by another request. Retry.",
+      )
     }
     return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
   }
@@ -33,9 +49,13 @@ export class OrderFulfillmentService {
       where: { id: orderId, website: { publisherId } },
     })
     if (!order) throw new NotFoundException("Order not found")
-    if (order.status !== "SUBMITTED") throw new BadRequestException("Order must be SUBMITTED to accept")
+    if (order.status !== "SUBMITTED")
+      throw new BadRequestException("Order must be SUBMITTED to accept")
 
-    const updated = await this.transition(orderId, order.version, "SUBMITTED", { status: "ACCEPTED", assigneeId: userId })
+    const updated = await this.transition(orderId, order.version, "SUBMITTED", {
+      status: "ACCEPTED",
+      assigneeId: userId,
+    })
 
     await this.prisma.orderEvent.create({
       data: {
@@ -59,21 +79,38 @@ export class OrderFulfillmentService {
     return updated
   }
 
-  async submitContent(orderId: string, publisherId: string, userId: string, content?: string) {
+  async submitContent(
+    orderId: string,
+    publisherId: string,
+    userId: string,
+    content?: string,
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, website: { publisherId } },
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "ACCEPTED" && order.status !== "CONTENT_REQUESTED") {
-      throw new BadRequestException("Order must be ACCEPTED or CONTENT_REQUESTED to submit content")
+      throw new BadRequestException(
+        "Order must be ACCEPTED or CONTENT_REQUESTED to submit content",
+      )
     }
 
-    const updated = await this.transition(orderId, order.version, order.status, { status: "CONTENT_CREATION" })
+    const updated = await this.transition(
+      orderId,
+      order.version,
+      order.status,
+      { status: "CONTENT_CREATION" },
+    )
 
     // Upsert content order
     await this.prisma.contentOrder.upsert({
       where: { orderId },
-      create: { orderId, title: order.title ?? "Content", brief: content, status: "IN_PROGRESS" },
+      create: {
+        orderId,
+        title: order.title ?? "Content",
+        brief: content,
+        status: "IN_PROGRESS",
+      },
       update: { brief: content, status: "IN_PROGRESS" },
     })
 
@@ -96,10 +133,17 @@ export class OrderFulfillmentService {
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "CONTENT_CREATION") {
-      throw new BadRequestException("Order must be in CONTENT_CREATION to mark content ready")
+      throw new BadRequestException(
+        "Order must be in CONTENT_CREATION to mark content ready",
+      )
     }
 
-    const updated = await this.transition(orderId, order.version, "CONTENT_CREATION", { status: "CONTENT_READY" })
+    const updated = await this.transition(
+      orderId,
+      order.version,
+      "CONTENT_CREATION",
+      { status: "CONTENT_READY" },
+    )
 
     await this.prisma.orderEvent.create({
       data: {
@@ -119,10 +163,17 @@ export class OrderFulfillmentService {
     })
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "CONTENT_READY") {
-      throw new BadRequestException("Content must be ready before submitting for review")
+      throw new BadRequestException(
+        "Content must be ready before submitting for review",
+      )
     }
 
-    const updated = await this.transition(orderId, order.version, "CONTENT_READY", { status: "CUSTOMER_REVIEW" })
+    const updated = await this.transition(
+      orderId,
+      order.version,
+      "CONTENT_READY",
+      { status: "CUSTOMER_REVIEW" },
+    )
 
     await this.prisma.orderEvent.create({
       data: {
@@ -150,15 +201,25 @@ export class OrderFulfillmentService {
     publisherId: string,
     userId: string,
     publishedUrl: string,
-    extra: { articleTitle?: string; notes?: string; screenshotUrl?: string } = {},
+    extra: {
+      articleTitle?: string
+      notes?: string
+      screenshotUrl?: string
+    } = {},
   ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, website: { publisherId } },
     })
     if (!order) throw new NotFoundException("Order not found")
-    if (order.status !== "APPROVED") throw new BadRequestException("Content must be APPROVED before publishing")
+    if (order.status !== "APPROVED")
+      throw new BadRequestException(
+        "Content must be APPROVED before publishing",
+      )
 
-    await this.delivery.submitDelivery(order, userId, { publishedUrl, ...extra })
+    await this.delivery.submitDelivery(order, userId, {
+      publishedUrl,
+      ...extra,
+    })
     return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
   }
 }

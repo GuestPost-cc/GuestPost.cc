@@ -1,9 +1,9 @@
 "use client"
 
-// Phase 7.0 — branded 404 for admin app.
-import { useRouter } from "next/navigation"
 import { EmptyState } from "@guestpost/ui"
 import { FileQuestion } from "lucide-react"
+// Phase 7.0 — branded 404 for admin app.
+import { useRouter } from "next/navigation"
 
 export default function NotFound() {
   const router = useRouter()

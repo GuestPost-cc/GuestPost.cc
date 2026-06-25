@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common"
+import { OrdersModule } from "../orders/orders.module"
 import { CampaignsController } from "./campaigns.controller"
 import { CampaignsService } from "./campaigns.service"
-import { OrdersModule } from "../orders/orders.module"
 
 @Module({
   imports: [OrdersModule],

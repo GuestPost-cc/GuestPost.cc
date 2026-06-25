@@ -18,34 +18,58 @@ function req(opts: { authorization?: string; cookie?: string }) {
 describe("hasAuthCredentials", () => {
   describe("Bearer token", () => {
     it("returns true for any Bearer authorization header", () => {
-      expect(hasAuthCredentials(req({ authorization: "Bearer abc.def" }))).toBe(true)
+      expect(hasAuthCredentials(req({ authorization: "Bearer abc.def" }))).toBe(
+        true,
+      )
     })
     it("returns false for non-Bearer authorization", () => {
-      expect(hasAuthCredentials(req({ authorization: "Basic dXNlcjpwYXNz" }))).toBe(false)
+      expect(
+        hasAuthCredentials(req({ authorization: "Basic dXNlcjpwYXNz" })),
+      ).toBe(false)
     })
   })
 
   describe("session cookie shape — junk rejected (audit §5.8 sub-finding)", () => {
     it("rejects the trivial bypass: `guestpost-session_token=anything`", () => {
-      expect(hasAuthCredentials(req({ cookie: "guestpost-session_token=anything" }))).toBe(false)
+      expect(
+        hasAuthCredentials(req({ cookie: "guestpost-session_token=anything" })),
+      ).toBe(false)
     })
     it("rejects an empty value", () => {
-      expect(hasAuthCredentials(req({ cookie: "guestpost.session_token=" }))).toBe(false)
+      expect(
+        hasAuthCredentials(req({ cookie: "guestpost.session_token=" })),
+      ).toBe(false)
     })
     it("rejects a single-segment value (no `.` separator)", () => {
-      expect(hasAuthCredentials(req({ cookie: `guestpost.session_token=${REAL_SHAPED_TOKEN}` }))).toBe(false)
+      expect(
+        hasAuthCredentials(
+          req({ cookie: `guestpost.session_token=${REAL_SHAPED_TOKEN}` }),
+        ),
+      ).toBe(false)
     })
     it("rejects a too-short token half", () => {
-      expect(hasAuthCredentials(req({ cookie: `guestpost.session_token=abc.${REAL_SHAPED_SIG}` }))).toBe(false)
+      expect(
+        hasAuthCredentials(
+          req({ cookie: `guestpost.session_token=abc.${REAL_SHAPED_SIG}` }),
+        ),
+      ).toBe(false)
     })
     it("rejects a too-short sig half", () => {
-      expect(hasAuthCredentials(req({ cookie: `guestpost.session_token=${REAL_SHAPED_TOKEN}.tooshort` }))).toBe(false)
+      expect(
+        hasAuthCredentials(
+          req({
+            cookie: `guestpost.session_token=${REAL_SHAPED_TOKEN}.tooshort`,
+          }),
+        ),
+      ).toBe(false)
     })
     it("rejects a missing cookie header entirely", () => {
       expect(hasAuthCredentials(req({}))).toBe(false)
     })
     it("rejects an unrelated cookie", () => {
-      expect(hasAuthCredentials(req({ cookie: "sid=abc; foo=bar" }))).toBe(false)
+      expect(hasAuthCredentials(req({ cookie: "sid=abc; foo=bar" }))).toBe(
+        false,
+      )
     })
   })
 
@@ -72,7 +96,9 @@ describe("hasAuthCredentials", () => {
     it("the trivial bypass that PASSED before Phase 7.8 now FAILS", () => {
       // Pre-Phase-7.8 code returned true for this. The whole point of the
       // sub-finding fix is that this no longer counts as authed credentials.
-      expect(hasAuthCredentials(req({ cookie: "guestpost-session=garbage" }))).toBe(false)
+      expect(
+        hasAuthCredentials(req({ cookie: "guestpost-session=garbage" })),
+      ).toBe(false)
     })
   })
 })

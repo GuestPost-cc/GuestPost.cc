@@ -54,9 +54,7 @@ const COLOR_MAP: Record<LogLevel, string> = {
 const RESET = "\x1b[0m"
 
 function streamFor(level: LogLevel): NodeJS.WriteStream {
-  return level === "error" || level === "warn"
-    ? process.stderr
-    : process.stdout
+  return level === "error" || level === "warn" ? process.stderr : process.stdout
 }
 
 function emit(
@@ -82,7 +80,9 @@ function emit(
   if (USE_PRETTY) {
     const ridSuffix = requestId ? ` rid=${requestId.slice(0, 8)}` : ""
     const merged = { ...baseCtx, ...ctx }
-    const ctxStr = Object.keys(merged).length ? " " + JSON.stringify(merged) : ""
+    const ctxStr = Object.keys(merged).length
+      ? ` ${JSON.stringify(merged)}`
+      : ""
     // env + release intentionally omitted from pretty output (dev noise
     // reduction); always present in JSON mode for prod log aggregation.
     streamFor(level).write(
@@ -94,7 +94,7 @@ function emit(
   // JSON.stringify natively omits keys whose value is `undefined` — this
   // keeps the requestId field absent (rather than `null`) when no ALS frame
   // is active, matching log-aggregator expectations.
-  streamFor(level).write(JSON.stringify(record) + "\n")
+  streamFor(level).write(`${JSON.stringify(record)}\n`)
 }
 
 /**
@@ -104,7 +104,10 @@ function emit(
  * @param service Stable dotted name, e.g. "api.audit", "worker.settlement"
  * @param baseCtx Optional context merged into every emit (e.g. { category: "x" })
  */
-export function createLogger(service: string, baseCtx: LogContext = {}): Logger {
+export function createLogger(
+  service: string,
+  baseCtx: LogContext = {},
+): Logger {
   return {
     debug: (msg, ctx) => emit("debug", service, baseCtx, msg, ctx),
     info: (msg, ctx) => emit("info", service, baseCtx, msg, ctx),

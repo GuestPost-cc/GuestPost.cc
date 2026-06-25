@@ -17,8 +17,9 @@
 //
 // Run: pnpm tsx scripts/backfill-order-listing-snapshot.ts [--dry-run]
 
+import { resolve } from "node:path"
 import { config } from "dotenv"
-import { resolve } from "path"
+
 // Load the same env file the API uses so DATABASE_URL is available when this
 // script is invoked from the repo root.
 config({ path: resolve(__dirname, "../.env.development") })
@@ -41,11 +42,13 @@ async function backfill() {
     },
   })
 
-  console.log(`Found ${orders.length} orders without fulfillmentChannel snapshot${DRY_RUN ? " [DRY RUN]" : ""}`)
+  console.log(
+    `Found ${orders.length} orders without fulfillmentChannel snapshot${DRY_RUN ? " [DRY RUN]" : ""}`,
+  )
 
-  let channelOnly = 0      // orders we could classify but couldn't resolve a service for
-  let fullSnapshot = 0     // orders we fully snapshotted
-  let skipped = 0          // orders with no website — nothing to snapshot
+  let channelOnly = 0 // orders we could classify but couldn't resolve a service for
+  let fullSnapshot = 0 // orders we fully snapshotted
+  let skipped = 0 // orders with no website — nothing to snapshot
   let errors = 0
 
   for (const order of orders) {
@@ -54,7 +57,8 @@ async function backfill() {
         skipped++
         continue
       }
-      const channel = order.website.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER"
+      const channel =
+        order.website.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER"
 
       // Find the matching listing + service. Both nullable on this side —
       // a publisher may have deleted their listing, etc.
@@ -69,7 +73,12 @@ async function backfill() {
       if (listing) {
         listingId = listing.id
         const ls = await prisma.listingService.findUnique({
-          where: { listingId_serviceType: { listingId: listing.id, serviceType: order.type } },
+          where: {
+            listingId_serviceType: {
+              listingId: listing.id,
+              serviceType: order.type,
+            },
+          },
           select: { id: true, turnaroundDays: true },
         })
         if (ls) {
@@ -79,11 +88,18 @@ async function backfill() {
       }
 
       if (DRY_RUN) {
-        console.log(`  [dry-run] order=${order.id} channel=${channel} listing=${listingId ?? "—"} service=${listingServiceId ?? "—"} TAT=${turnaroundDays ?? "—"}`)
+        console.log(
+          `  [dry-run] order=${order.id} channel=${channel} listing=${listingId ?? "—"} service=${listingServiceId ?? "—"} TAT=${turnaroundDays ?? "—"}`,
+        )
       } else {
         await prisma.order.update({
           where: { id: order.id },
-          data: { fulfillmentChannel: channel, listingId, listingServiceId, turnaroundDays },
+          data: {
+            fulfillmentChannel: channel,
+            listingId,
+            listingServiceId,
+            turnaroundDays,
+          },
         })
       }
 
@@ -97,12 +113,19 @@ async function backfill() {
 
   console.log("")
   console.log("Backfill complete:")
-  console.log(`  Fully snapshotted (channel + listing + service): ${fullSnapshot}`)
-  console.log(`  Channel only (no matching ListingService):       ${channelOnly}`)
+  console.log(
+    `  Fully snapshotted (channel + listing + service): ${fullSnapshot}`,
+  )
+  console.log(
+    `  Channel only (no matching ListingService):       ${channelOnly}`,
+  )
   console.log(`  Skipped (no website on order):                   ${skipped}`)
   console.log(`  Errors:                                          ${errors}`)
 }
 
 backfill()
-  .catch((e) => { console.error(e); process.exit(1) })
+  .catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
   .finally(() => prisma.$disconnect())

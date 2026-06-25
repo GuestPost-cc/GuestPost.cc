@@ -1,5 +1,5 @@
 import type { OrderStatus, ServiceType } from "@guestpost/shared"
-import { HttpClient } from "../client"
+import type { HttpClient } from "../client"
 
 export type Campaign = {
   id: string
@@ -32,7 +32,9 @@ export class CampaignsService {
   // both rejected (forbidNonWhitelisted) and the tenant-escape-shaped field
   // a client must never control.
   createCampaign(data: { name: string; description?: string }) {
-    return this.client.post<{ id: string; name: string }>("/campaigns", { json: data })
+    return this.client.post<{ id: string; name: string }>("/campaigns", {
+      json: data,
+    })
   }
 
   // Returns the items array; use listCampaignsPaginated for totals
@@ -50,12 +52,25 @@ export class CampaignsService {
   }
 
   async listCampaignOrders(id: string, params?: PaginationParams) {
-    const res = await this.client.get<Paginated<any>>(`/campaigns/${id}/orders`, { params })
+    const res = await this.client.get<Paginated<any>>(
+      `/campaigns/${id}/orders`,
+      { params },
+    )
     return res.items
   }
 
-  updateCampaign(id: string, data: { name?: string; description?: string; status?: "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED" }) {
-    return this.client.patch<{ id: string; name: string; status: string }>(`/campaigns/${id}`, { json: data })
+  updateCampaign(
+    id: string,
+    data: {
+      name?: string
+      description?: string
+      status?: "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED"
+    },
+  ) {
+    return this.client.patch<{ id: string; name: string; status: string }>(
+      `/campaigns/${id}`,
+      { json: data },
+    )
   }
 
   deleteCampaign(id: string) {
@@ -72,14 +87,21 @@ export class CampaignsService {
     campaignId?: string
     idempotencyKey?: string
   }) {
-    return this.client.post<{ id: string; status: string }>("/campaigns/orders", { json: data })
+    return this.client.post<{ id: string; status: string }>(
+      "/campaigns/orders",
+      { json: data },
+    )
   }
 
   async listOrders(params?: PaginationParams) {
-    const res = await this.client.get<Paginated<{ id: string; type: ServiceType; status: OrderStatus; createdAt: string }>>(
-      "/campaigns/orders",
-      { params },
-    )
+    const res = await this.client.get<
+      Paginated<{
+        id: string
+        type: ServiceType
+        status: OrderStatus
+        createdAt: string
+      }>
+    >("/campaigns/orders", { params })
     return res.items
   }
 
@@ -96,6 +118,8 @@ export class CampaignsService {
   }
 
   requestRevision(orderId: string, data: { notes: string }) {
-    return this.client.post(`/campaigns/orders/${orderId}/revisions`, { json: data })
+    return this.client.post(`/campaigns/orders/${orderId}/revisions`, {
+      json: data,
+    })
   }
 }

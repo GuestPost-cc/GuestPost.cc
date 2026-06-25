@@ -16,12 +16,17 @@
 //
 // Port defaults to 3004 (only free port in 3000–4000). Override via WORKER_HEALTH_PORT.
 
-import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http"
-import { connection } from "../redis"
+import {
+  createServer,
+  type IncomingMessage,
+  type Server,
+  type ServerResponse,
+} from "node:http"
 import { prisma } from "@guestpost/database"
-import { Queue } from "bullmq"
-import { QUEUES, getDedupHitsTotal } from "@guestpost/shared"
+import { getDedupHitsTotal, QUEUES } from "@guestpost/shared"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { Queue } from "bullmq"
+import { connection } from "../redis"
 import { getStalledHitsTotal } from "./queue-observability"
 
 const logger = createLogger("worker.health-server")
@@ -47,10 +52,14 @@ interface ReadinessResponse {
 async function checkRedis(): Promise<ReadinessCheck> {
   try {
     const result = await connection.ping()
-    if (result !== "PONG") return { status: "error", message: `unexpected PING response: ${result}` }
+    if (result !== "PONG")
+      return { status: "error", message: `unexpected PING response: ${result}` }
     return { status: "ok" }
   } catch (err) {
-    return { status: "error", message: err instanceof Error ? err.message : String(err) }
+    return {
+      status: "error",
+      message: err instanceof Error ? err.message : String(err),
+    }
   }
 }
 
@@ -59,7 +68,10 @@ async function checkDatabase(): Promise<ReadinessCheck> {
     await prisma.$queryRaw`SELECT 1`
     return { status: "ok" }
   } catch (err) {
-    return { status: "error", message: err instanceof Error ? err.message : String(err) }
+    return {
+      status: "error",
+      message: err instanceof Error ? err.message : String(err),
+    }
   }
 }
 
@@ -81,7 +93,9 @@ interface QueueCounts {
   paused: number
 }
 
-async function getQueueCounts(queueName: string): Promise<QueueCounts | { error: string }> {
+async function getQueueCounts(
+  queueName: string,
+): Promise<QueueCounts | { error: string }> {
   const queue = new Queue(queueName, { connection })
   try {
     const counts = await queue.getJobCounts(
@@ -161,7 +175,10 @@ function writeJson(res: ServerResponse, status: number, body: unknown): void {
   res.end(payload)
 }
 
-async function handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+async function handleRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+): Promise<void> {
   if (req.method !== "GET") {
     writeJson(res, 405, { error: "method not allowed" })
     return
@@ -203,7 +220,9 @@ export async function startHealthServer(): Promise<HealthServerHandle> {
   const port = Number(process.env.WORKER_HEALTH_PORT) || 3004
   const server: Server = createServer((req, res) => {
     handleRequest(req, res).catch((err) => {
-      logger.error("health handler crashed", { err: err instanceof Error ? err.message : String(err) })
+      logger.error("health handler crashed", {
+        err: err instanceof Error ? err.message : String(err),
+      })
       if (!res.headersSent) {
         writeJson(res, 500, { error: "internal server error" })
       }
@@ -222,7 +241,10 @@ export async function startHealthServer(): Promise<HealthServerHandle> {
     server.once("listening", onListening)
     server.listen(port)
   })
-  logger.info("worker health server listening", { port, routes: ["/health", "/ready", "/metrics/queues"] })
+  logger.info("worker health server listening", {
+    port,
+    routes: ["/health", "/ready", "/metrics/queues"],
+  })
   return {
     port,
     close: () =>

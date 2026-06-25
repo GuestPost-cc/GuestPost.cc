@@ -20,17 +20,36 @@
  * remove other row, query DB" integration belongs in the future
  * Phase 7.10.2 Nest+supertest harness.
  */
-import { readFileSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
-  const servicePath = join(__dirname, "..", "modules", "marketplace", "marketplace.service.ts")
+  const servicePath = join(
+    __dirname,
+    "..",
+    "modules",
+    "marketplace",
+    "marketplace.service.ts",
+  )
   const serviceSource = readFileSync(servicePath, "utf-8")
 
-  const dtoPath = join(__dirname, "..", "modules", "marketplace", "dto", "marketplace.dto.ts")
+  const dtoPath = join(
+    __dirname,
+    "..",
+    "modules",
+    "marketplace",
+    "dto",
+    "marketplace.dto.ts",
+  )
   const dtoSource = readFileSync(dtoPath, "utf-8")
 
-  const controllerPath = join(__dirname, "..", "modules", "marketplace", "marketplace.controller.ts")
+  const controllerPath = join(
+    __dirname,
+    "..",
+    "modules",
+    "marketplace",
+    "marketplace.controller.ts",
+  )
   const controllerSource = readFileSync(controllerPath, "utf-8")
 
   // ─── #16: removeFavorite scope ──────────────────────────────────────────
@@ -39,7 +58,9 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       const startIdx = serviceSource.indexOf("async removeFavorite(")
       expect(startIdx).toBeGreaterThan(-1)
       const block = serviceSource.slice(startIdx, startIdx + 600)
-      expect(block).toMatch(/deleteMany\(\{[\s\S]*?where:\s*\{[^}]*serviceType:\s*null/)
+      expect(block).toMatch(
+        /deleteMany\(\{[\s\S]*?where:\s*\{[^}]*serviceType:\s*null/,
+      )
     })
 
     it("does NOT contain the legacy unscoped `where: { userId, listingId }` form (regression guard)", () => {
@@ -61,7 +82,9 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
     it("removeFavoriteService scopes deleteMany to the supplied serviceType", () => {
       const startIdx = serviceSource.indexOf("async removeFavoriteService(")
       const block = serviceSource.slice(startIdx, startIdx + 500)
-      expect(block).toMatch(/where:\s*\{\s*userId,\s*listingId,\s*serviceType\s*\}/)
+      expect(block).toMatch(
+        /where:\s*\{\s*userId,\s*listingId,\s*serviceType\s*\}/,
+      )
     })
   })
 
@@ -79,14 +102,18 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       const block = serviceSource.slice(startIdx, endIdx)
       // Non-null branch must hit listingService.findFirst with the PAUSED filter
       expect(block).toMatch(/listingService\.findFirst/)
-      expect(block).toMatch(/availability:\s*\{\s*not:\s*ServiceAvailability\.PAUSED\s*\}/)
+      expect(block).toMatch(
+        /availability:\s*\{\s*not:\s*ServiceAvailability\.PAUSED\s*\}/,
+      )
     })
 
     it("addFavorite throws NotFoundException when serviceType is set but the service doesn't exist", () => {
       const startIdx = serviceSource.indexOf("async addFavorite(")
       const endIdx = serviceSource.indexOf("async removeFavorite(")
       const block = serviceSource.slice(startIdx, endIdx)
-      expect(block).toMatch(/throw\s+new\s+NotFoundException\([^)]*\$\{serviceType\}/)
+      expect(block).toMatch(
+        /throw\s+new\s+NotFoundException\([^)]*\$\{serviceType\}/,
+      )
     })
 
     it("CreateFavoriteDto exposes optional serviceType field with @IsEnum(ServiceType)", () => {
@@ -110,10 +137,17 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       const startIdx = controllerSource.indexOf("async removeFavoriteService(")
       expect(startIdx).toBeGreaterThan(-1)
       const block = controllerSource.slice(startIdx, startIdx + 800)
-      expect(block).toMatch(/@Param\("serviceType",\s*new\s+ParseEnumPipe\(ServiceType\)\)/)
+      expect(block).toMatch(
+        /@Param\("serviceType",\s*new\s+ParseEnumPipe\(ServiceType\)\)/,
+      )
       // And the route decorator above it
-      const routeBlock = controllerSource.slice(Math.max(0, startIdx - 400), startIdx)
-      expect(routeBlock).toMatch(/@Delete\("favorites\/:listingId\/services\/:serviceType"\)/)
+      const routeBlock = controllerSource.slice(
+        Math.max(0, startIdx - 400),
+        startIdx,
+      )
+      expect(routeBlock).toMatch(
+        /@Delete\("favorites\/:listingId\/services\/:serviceType"\)/,
+      )
     })
   })
 
@@ -132,7 +166,9 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       const startIdx = serviceSource.indexOf("async getFavorites(")
       const endIdx = serviceSource.indexOf("async addFavorite(")
       const block = serviceSource.slice(startIdx, endIdx)
-      expect(block).toMatch(/availability:\s*\{\s*not:\s*ServiceAvailability\.PAUSED\s*\}/)
+      expect(block).toMatch(
+        /availability:\s*\{\s*not:\s*ServiceAvailability\.PAUSED\s*\}/,
+      )
     })
 
     it("getFavorites uses the strongly-typed enum (NOT a string literal)", () => {
@@ -141,7 +177,9 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       const block = serviceSource.slice(startIdx, endIdx)
       // Regression guard: a refactor that swaps the enum for a string would
       // silently rot on a future enum rename.
-      expect(block).not.toMatch(/availability:\s*\{\s*not:\s*["']PAUSED["']\s*\}/)
+      expect(block).not.toMatch(
+        /availability:\s*\{\s*not:\s*["']PAUSED["']\s*\}/,
+      )
     })
   })
 
@@ -174,7 +212,9 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       // Plan B markers: try { create }, catch (P2002), findFirst-on-catch
       expect(block).toMatch(/try\s*\{[\s\S]*?marketplaceFavorite\.create/)
       expect(block).toMatch(/catch\s*\([^)]+\)\s*\{[\s\S]*?P2002/)
-      expect(block).toMatch(/marketplaceFavorite\.findFirst\(\{[\s\S]*?serviceType[\s\S]*?\}\)/)
+      expect(block).toMatch(
+        /marketplaceFavorite\.findFirst\(\{[\s\S]*?serviceType[\s\S]*?\}\)/,
+      )
     })
 
     it("addFavorite NO LONGER contains the pre-7.13.2A findFirst-then-create emulation pattern (regression guard)", () => {
@@ -185,25 +225,58 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       const block = serviceSource.slice(startIdx, endIdx)
       // The old emulation: `const existing = ... findFirst({where: { userId, listingId, serviceType }}); const favorite = existing ?? await ... create(...)`
       // Regression guard: the `?? await this.prisma.marketplaceFavorite.create` literal must not reappear.
-      expect(block).not.toMatch(/existing\s*\?\?\s*await\s+this\.prisma\.marketplaceFavorite\.create/)
+      expect(block).not.toMatch(
+        /existing\s*\?\?\s*await\s+this\.prisma\.marketplaceFavorite\.create/,
+      )
     })
 
     it("Phase 7.13.2A migration exists with NULLS NOT DISTINCT clause", () => {
-      const fs = require("fs") as typeof import("fs")
-      const path = require("path") as typeof import("path")
-      const migrationsDir = path.join(__dirname, "..", "..", "..", "..", "packages", "database", "prisma", "migrations")
-      const migDirs = fs.readdirSync(migrationsDir).filter((d: string) => d.includes("phase7132a_marketplace_favorite_new_unique_nulls_not_distinct"))
+      const fs = require("node:fs") as typeof import("fs")
+      const path = require("node:path") as typeof import("path")
+      const migrationsDir = path.join(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "..",
+        "packages",
+        "database",
+        "prisma",
+        "migrations",
+      )
+      const migDirs = fs
+        .readdirSync(migrationsDir)
+        .filter((d: string) =>
+          d.includes(
+            "phase7132a_marketplace_favorite_new_unique_nulls_not_distinct",
+          ),
+        )
       expect(migDirs.length).toBe(1)
-      const migSql = fs.readFileSync(path.join(migrationsDir, migDirs[0], "migration.sql"), "utf-8")
-      expect(migSql).toMatch(/CREATE UNIQUE INDEX CONCURRENTLY "MarketplaceFavorite_uniq_nullsnotdistinct"/)
+      const migSql = fs.readFileSync(
+        path.join(migrationsDir, migDirs[0], "migration.sql"),
+        "utf-8",
+      )
+      expect(migSql).toMatch(
+        /CREATE UNIQUE INDEX CONCURRENTLY "MarketplaceFavorite_uniq_nullsnotdistinct"/,
+      )
       expect(migSql).toMatch(/NULLS NOT DISTINCT/)
     })
 
     it("schema.prisma MarketplaceFavorite model NOTE documents the post-7.13.2B canonical-name + NULLS NOT DISTINCT state", () => {
-      const fs = require("fs") as typeof import("fs")
-      const path = require("path") as typeof import("path")
+      const fs = require("node:fs") as typeof import("fs")
+      const path = require("node:path") as typeof import("path")
       const schema = fs.readFileSync(
-        path.join(__dirname, "..", "..", "..", "..", "packages", "database", "prisma", "schema.prisma"),
+        path.join(
+          __dirname,
+          "..",
+          "..",
+          "..",
+          "..",
+          "packages",
+          "database",
+          "prisma",
+          "schema.prisma",
+        ),
         "utf-8",
       )
       const modelIdx = schema.indexOf("model MarketplaceFavorite {")
@@ -212,31 +285,61 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
       // Post-7.13.2B: NOTE mentions the canonical name (the new index was
       // renamed to take over the original's _key name) + NULLS NOT DISTINCT
       // + the Phase 7.13.2A/B migration history.
-      expect(modelBlock).toMatch(/MarketplaceFavorite_userId_listingId_serviceType_key/)
+      expect(modelBlock).toMatch(
+        /MarketplaceFavorite_userId_listingId_serviceType_key/,
+      )
       expect(modelBlock).toMatch(/NULLS NOT DISTINCT/)
       expect(modelBlock).toMatch(/Phase 7\.13\.2[AB]/)
     })
 
     it("Phase 7.13.2B migrations exist — part-1 DROP + part-2 RENAME (split for prisma@7.8.0 single-statement requirement)", () => {
-      const fs = require("fs") as typeof import("fs")
-      const path = require("path") as typeof import("path")
-      const migrationsDir = path.join(__dirname, "..", "..", "..", "..", "packages", "database", "prisma", "migrations")
-      const part1Dirs = fs.readdirSync(migrationsDir).filter((d: string) =>
-        d.includes("phase7132b_part1_drop_marketplace_favorite_original_unique"),
+      const fs = require("node:fs") as typeof import("fs")
+      const path = require("node:path") as typeof import("path")
+      const migrationsDir = path.join(
+        __dirname,
+        "..",
+        "..",
+        "..",
+        "..",
+        "packages",
+        "database",
+        "prisma",
+        "migrations",
       )
-      const part2Dirs = fs.readdirSync(migrationsDir).filter((d: string) =>
-        d.includes("phase7132b_part2_rename_marketplace_favorite_new_unique_to_canonical"),
-      )
+      const part1Dirs = fs
+        .readdirSync(migrationsDir)
+        .filter((d: string) =>
+          d.includes(
+            "phase7132b_part1_drop_marketplace_favorite_original_unique",
+          ),
+        )
+      const part2Dirs = fs
+        .readdirSync(migrationsDir)
+        .filter((d: string) =>
+          d.includes(
+            "phase7132b_part2_rename_marketplace_favorite_new_unique_to_canonical",
+          ),
+        )
       expect(part1Dirs.length).toBe(1)
       expect(part2Dirs.length).toBe(1)
 
       // Part-1: single DROP INDEX CONCURRENTLY IF EXISTS statement.
-      const dropSql = fs.readFileSync(path.join(migrationsDir, part1Dirs[0], "migration.sql"), "utf-8")
-      expect(dropSql).toMatch(/DROP INDEX CONCURRENTLY IF EXISTS "MarketplaceFavorite_userId_listingId_serviceType_key"/)
+      const dropSql = fs.readFileSync(
+        path.join(migrationsDir, part1Dirs[0], "migration.sql"),
+        "utf-8",
+      )
+      expect(dropSql).toMatch(
+        /DROP INDEX CONCURRENTLY IF EXISTS "MarketplaceFavorite_userId_listingId_serviceType_key"/,
+      )
 
       // Part-2: single ALTER INDEX RENAME statement targeting canonical name.
-      const renameSql = fs.readFileSync(path.join(migrationsDir, part2Dirs[0], "migration.sql"), "utf-8")
-      expect(renameSql).toMatch(/ALTER INDEX "MarketplaceFavorite_uniq_nullsnotdistinct"[\s\S]*RENAME TO "MarketplaceFavorite_userId_listingId_serviceType_key"/)
+      const renameSql = fs.readFileSync(
+        path.join(migrationsDir, part2Dirs[0], "migration.sql"),
+        "utf-8",
+      )
+      expect(renameSql).toMatch(
+        /ALTER INDEX "MarketplaceFavorite_uniq_nullsnotdistinct"[\s\S]*RENAME TO "MarketplaceFavorite_userId_listingId_serviceType_key"/,
+      )
 
       // Order check: part-1 timestamp prefix must lexicographically precede part-2's,
       // so the runner applies DROP before RENAME (or part-2 errors on name conflict).

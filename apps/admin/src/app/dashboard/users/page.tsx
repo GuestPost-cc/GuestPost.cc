@@ -1,14 +1,22 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
-import { Card, CardContent, CardHeader, CardTitle } from "@guestpost/ui"
-import { Button, buttonVariants } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
 import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
   Table,
   TableBody,
   TableCell,
@@ -16,43 +24,32 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@guestpost/ui"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import {
-  User,
-  Search,
-  Shield,
-  Ban,
-  CheckCircle,
-  AlertCircle,
-} from "lucide-react"
-import { format } from "date-fns"
-import { toast } from "sonner"
-import {
+  type ColumnDef,
   createColumnHelper,
+  flexRender,
   getCoreRowModel,
   getFilteredRowModel,
   getPaginationRowModel,
   useReactTable,
-  flexRender,
-  type ColumnDef,
 } from "@tanstack/react-table"
-import { z } from "zod"
+import { format } from "date-fns"
+import {
+  AlertCircle,
+  Ban,
+  CheckCircle,
+  Search,
+  Shield,
+  User,
+} from "lucide-react"
+import { useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
+import { z } from "zod"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 interface AdminUser {
   id: string
@@ -135,7 +132,9 @@ function RoleUpdateDialog({
                   </>
                 )}
                 {user?.userType === "PUBLISHER" && (
-                  <SelectItem value="PUBLISHER_OWNER">Publisher Owner</SelectItem>
+                  <SelectItem value="PUBLISHER_OWNER">
+                    Publisher Owner
+                  </SelectItem>
                 )}
                 {user?.userType === "STAFF" && (
                   <>
@@ -194,7 +193,12 @@ function UsersPageContent() {
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
 
-  const { data: users = [], isLoading, error, refetch } = useQuery({
+  const {
+    data: users = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["admin", "users"],
     queryFn: () => api.admin.listUsers(),
     retry: 1,
@@ -281,7 +285,9 @@ function UsersPageContent() {
       }),
       columnHelper.accessor("email", {
         header: "Email",
-        cell: (info) => <span className="text-muted-foreground">{info.getValue()}</span>,
+        cell: (info) => (
+          <span className="text-muted-foreground">{info.getValue()}</span>
+        ),
       }),
       columnHelper.accessor("userType", {
         header: "Role",
@@ -291,11 +297,12 @@ function UsersPageContent() {
             user.userType === "STAFF"
               ? user.staffRole
               : user.userType === "PUBLISHER"
-              ? user.publisherRole
-              : user.customerRole
+                ? user.publisherRole
+                : user.customerRole
           return (
             <Badge variant="outline" className="capitalize">
-              {role?.toLowerCase().replace(/_/g, " ") ?? user.userType.toLowerCase()}
+              {role?.toLowerCase().replace(/_/g, " ") ??
+                user.userType.toLowerCase()}
             </Badge>
           )
         },
@@ -343,7 +350,10 @@ function UsersPageContent() {
                   onClick={() =>
                     restoreMutation.mutate({
                       userId: user.id,
-                      role: user.userType === "CUSTOMER" ? "OWNER" : "PUBLISHER_OWNER",
+                      role:
+                        user.userType === "CUSTOMER"
+                          ? "OWNER"
+                          : "PUBLISHER_OWNER",
                     })
                   }
                   disabled={restoreMutation.isPending}
@@ -357,7 +367,9 @@ function UsersPageContent() {
                   variant="ghost"
                   className="text-destructive hover:text-destructive"
                   onClick={() => banMutation.mutate(user.id)}
-                  disabled={user.id === currentUser?.id || banMutation.isPending}
+                  disabled={
+                    user.id === currentUser?.id || banMutation.isPending
+                  }
                 >
                   <Ban className="mr-1 h-3 w-3" />
                   Suspend
@@ -476,7 +488,10 @@ function UsersPageContent() {
                       <TableHead key={h.id}>
                         {h.isPlaceholder
                           ? null
-                          : flexRender(h.column.columnDef.header, h.getContext())}
+                          : flexRender(
+                              h.column.columnDef.header,
+                              h.getContext(),
+                            )}
                       </TableHead>
                     ))}
                   </TableRow>
@@ -487,7 +502,7 @@ function UsersPageContent() {
                   <TableRow key={row.id}>
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id}>
-                        {typeof cell.column.columnDef.cell === 'function' 
+                        {typeof cell.column.columnDef.cell === "function"
                           ? cell.column.columnDef.cell(cell.getContext())
                           : null}
                       </TableCell>

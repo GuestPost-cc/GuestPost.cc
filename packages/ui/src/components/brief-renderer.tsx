@@ -8,7 +8,11 @@
 // (title/instructions/targetUrl/anchorText) when briefData is NULL — older
 // orders predate Phase 6 and only have the denormalized mirror fields.
 
-import { BRIEF_FIELDS, type BriefFieldSpec, type ServiceTypeKey } from "@guestpost/shared"
+import {
+  BRIEF_FIELDS,
+  type BriefFieldSpec,
+  type ServiceTypeKey,
+} from "@guestpost/shared"
 import { cn } from "../lib/utils"
 
 export interface LegacyBriefFallback {
@@ -25,8 +29,14 @@ export interface BriefRendererProps {
   className?: string
 }
 
-export function BriefRenderer({ serviceType, briefData, fallback, className }: BriefRendererProps) {
-  const fields = (serviceType && BRIEF_FIELDS[serviceType as ServiceTypeKey]) || null
+export function BriefRenderer({
+  serviceType,
+  briefData,
+  fallback,
+  className,
+}: BriefRendererProps) {
+  const fields =
+    (serviceType && BRIEF_FIELDS[serviceType as ServiceTypeKey]) || null
 
   if (!briefData || !fields) {
     return <LegacyBriefDisplay fallback={fallback} className={className} />
@@ -38,15 +48,30 @@ export function BriefRenderer({ serviceType, briefData, fallback, className }: B
   }
 
   return (
-    <dl className={cn("grid grid-cols-1 gap-3 sm:grid-cols-[max-content_1fr] sm:gap-x-6", className)}>
+    <dl
+      className={cn(
+        "grid grid-cols-1 gap-3 sm:grid-cols-[max-content_1fr] sm:gap-x-6",
+        className,
+      )}
+    >
       {populated.map((field) => (
-        <BriefFieldRow key={field.name} field={field} value={briefData[field.name]} />
+        <BriefFieldRow
+          key={field.name}
+          field={field}
+          value={briefData[field.name]}
+        />
       ))}
     </dl>
   )
 }
 
-function BriefFieldRow({ field, value }: { field: BriefFieldSpec; value: unknown }) {
+function BriefFieldRow({
+  field,
+  value,
+}: {
+  field: BriefFieldSpec
+  value: unknown
+}) {
   return (
     <>
       <dt className="text-sm font-medium text-muted-foreground sm:pt-0.5">
@@ -59,7 +84,13 @@ function BriefFieldRow({ field, value }: { field: BriefFieldSpec; value: unknown
   )
 }
 
-function FieldValue({ field, value }: { field: BriefFieldSpec; value: unknown }) {
+function FieldValue({
+  field,
+  value,
+}: {
+  field: BriefFieldSpec
+  value: unknown
+}) {
   if (field.widget === "url" && typeof value === "string") {
     return (
       <a
@@ -164,13 +195,17 @@ function LegacyBriefDisplay({
     >
       {title && (
         <>
-          <dt className="text-sm font-medium text-muted-foreground sm:pt-0.5">Title</dt>
+          <dt className="text-sm font-medium text-muted-foreground sm:pt-0.5">
+            Title
+          </dt>
           <dd className="text-sm">{title}</dd>
         </>
       )}
       {targetUrl && (
         <>
-          <dt className="text-sm font-medium text-muted-foreground sm:pt-0.5">Target URL</dt>
+          <dt className="text-sm font-medium text-muted-foreground sm:pt-0.5">
+            Target URL
+          </dt>
           <dd className="text-sm">
             <a
               href={targetUrl}
@@ -185,13 +220,17 @@ function LegacyBriefDisplay({
       )}
       {anchorText && (
         <>
-          <dt className="text-sm font-medium text-muted-foreground sm:pt-0.5">Anchor text</dt>
+          <dt className="text-sm font-medium text-muted-foreground sm:pt-0.5">
+            Anchor text
+          </dt>
           <dd className="text-sm">{anchorText}</dd>
         </>
       )}
       {instructions && (
         <>
-          <dt className="text-sm font-medium text-muted-foreground sm:pt-0.5">Instructions</dt>
+          <dt className="text-sm font-medium text-muted-foreground sm:pt-0.5">
+            Instructions
+          </dt>
           <dd className="whitespace-pre-wrap text-sm">{instructions}</dd>
         </>
       )}
@@ -203,6 +242,7 @@ function hasValue(v: unknown): boolean {
   if (v === null || v === undefined) return false
   if (typeof v === "string") return v.trim().length > 0
   if (Array.isArray(v)) return v.length > 0
-  if (typeof v === "object") return Object.values(v).some((nested) => hasValue(nested))
+  if (typeof v === "object")
+    return Object.values(v).some((nested) => hasValue(nested))
   return true
 }

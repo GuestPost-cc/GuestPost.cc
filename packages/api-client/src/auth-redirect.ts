@@ -63,7 +63,9 @@ export function __resetAuthRedirectGuard() {
  * Returns a safe path. If the input is unsafe, returns `null` so the caller
  * can decide whether to fall back to the dashboard root or omit returnTo.
  */
-export function sanitizeReturnTo(candidate: string | null | undefined): string | null {
+export function sanitizeReturnTo(
+  candidate: string | null | undefined,
+): string | null {
   if (!candidate || typeof candidate !== "string") return null
   // Cheap rejects: protocol-relative + absolute + obvious scheme handlers.
   // `URL` parsing below would catch most of these but explicit checks beat
@@ -123,8 +125,14 @@ export function isAuthEndpointPath(path: string): boolean {
  *      lingering React state / Service Worker / in-memory cache is
  *      flushed by the page reload.
  */
-export function buildAuthErrorHandler(config: AuthErrorHandlerConfig): () => void {
-  const { signInPath, onBeforeRedirect, reason = "Your session expired. Sign in to continue." } = config
+export function buildAuthErrorHandler(
+  config: AuthErrorHandlerConfig,
+): () => void {
+  const {
+    signInPath,
+    onBeforeRedirect,
+    reason = "Your session expired. Sign in to continue.",
+  } = config
 
   return () => {
     if (redirecting) return
@@ -132,17 +140,29 @@ export function buildAuthErrorHandler(config: AuthErrorHandlerConfig): () => voi
 
     // (1) Clear token IMMEDIATELY so any concurrent in-flight fetch from this
     // tick stops sending the stale Authorization header.
-    try { clearToken() } catch { /* swallow — never block redirect on cleanup */ }
+    try {
+      clearToken()
+    } catch {
+      /* swallow — never block redirect on cleanup */
+    }
 
     // SSR guard. Server components should never trigger this path, but if a
     // misconfigured server fetch slips through, exit silently.
     if (typeof window === "undefined") return
 
     // (2) App cleanup hook (cache clear).
-    try { onBeforeRedirect?.() } catch { /* swallow */ }
+    try {
+      onBeforeRedirect?.()
+    } catch {
+      /* swallow */
+    }
 
     // (3) Stash reason so the sign-in page can render a banner.
-    try { sessionStorage.setItem("guestpost:auth-redirect-reason", reason) } catch { /* private mode */ }
+    try {
+      sessionStorage.setItem("guestpost:auth-redirect-reason", reason)
+    } catch {
+      /* private mode */
+    }
 
     // (4) Same-page debounce — never push the user back onto the sign-in
     // page if they're already there. Trim trailing slash for safety.
@@ -157,7 +177,8 @@ export function buildAuthErrorHandler(config: AuthErrorHandlerConfig): () => voi
     // hashes can carry tokens from OAuth flows that we shouldn't echo back).
     const current = window.location.pathname + window.location.search
     const safe = sanitizeReturnTo(current)
-    const query = safe && safe !== signInPath ? `?returnTo=${encodeURIComponent(safe)}` : ""
+    const query =
+      safe && safe !== signInPath ? `?returnTo=${encodeURIComponent(safe)}` : ""
 
     // (6) Full page nav, NOT router.push. Ensures React state, in-memory
     // caches, and any inadvertent module-level singletons are wiped.

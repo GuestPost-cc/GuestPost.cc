@@ -1,21 +1,30 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { 
-  SearchListingsDto, 
-  CreateListingDto, 
-  UpdateListingDto, 
-  CreateReviewDto,
-  CreateFavoriteDto,
-  CreateSavedListDto,
-  AddToSavedListDto,
-  GetListingFiltersDto,
-  GetRecommendationsDto
-} from "./dto/marketplace.dto"
-import { ListingStatus, ServiceType, ServiceAvailability, Prisma } from "@guestpost/database"
-import { slugify } from "../../common/utils/slugify"
-import { ListingServiceInput, UpdateListingServiceInput } from "./dto/marketplace.dto"
+import {
+  ListingStatus,
+  Prisma,
+  ServiceAvailability,
+  type ServiceType,
+} from "@guestpost/database"
 import { computeListingPhase, QUEUES } from "@guestpost/shared"
-import { QueueService } from "../queues/queue.service"
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import type { PrismaService } from "../../common/prisma.service"
+import { slugify } from "../../common/utils/slugify"
+import type { QueueService } from "../queues/queue.service"
+import type {
+  AddToSavedListDto,
+  CreateListingDto,
+  CreateReviewDto,
+  CreateSavedListDto,
+  GetRecommendationsDto,
+  ListingServiceInput,
+  SearchListingsDto,
+  UpdateListingDto,
+  UpdateListingServiceInput,
+} from "./dto/marketplace.dto"
 
 // Phase 7: the LISTING_TYPE_TO_SERVICE_TYPE bridge map was removed. Clients
 // now send `services[]` directly; the legacy single-service shape is gone.
@@ -33,8 +42,17 @@ export class MarketplaceService {
   // marketplace. Whitelist what a buyer legitimately needs to see.
   private toPublicListing(listing: any) {
     const {
-      organizationId, publisherId, semrushData, metricsData, trafficData,
-      publisher, ownerType, services, website, status, ...rest
+      organizationId,
+      publisherId,
+      semrushData,
+      metricsData,
+      trafficData,
+      publisher,
+      ownerType,
+      services,
+      website,
+      status,
+      ...rest
     } = listing
 
     // Phase 6 derived UI phase. Computed from (status, ownerType, website
@@ -53,10 +71,13 @@ export class MarketplaceService {
     // Phase 6 card summary fields: priceFrom + the deduped serviceTypes
     // offered. Driven entirely off AVAILABLE rows so a buyer never sees a
     // chip for a paused/waitlisted service.
-    const priceFrom = availableServices.length > 0
-      ? Math.min(...availableServices.map((s: any) => Number(s.price)))
-      : null
-    const serviceTypes = Array.from(new Set(availableServices.map((s: any) => s.serviceType)))
+    const priceFrom =
+      availableServices.length > 0
+        ? Math.min(...availableServices.map((s: any) => Number(s.price)))
+        : null
+    const serviceTypes = Array.from(
+      new Set(availableServices.map((s: any) => s.serviceType)),
+    )
 
     return {
       ...rest,
@@ -67,9 +88,10 @@ export class MarketplaceService {
       // Listing-level attribution: PLATFORM-owned listings render as
       // "Listed by GuestPost.cc"; PUBLISHER-owned expose the publisher card.
       ownerType,
-      attribution: ownerType === "PLATFORM"
-        ? { kind: "PLATFORM", label: "Listed by GuestPost.cc" }
-        : { kind: "PUBLISHER", label: publisher?.name ?? "Publisher" },
+      attribution:
+        ownerType === "PLATFORM"
+          ? { kind: "PLATFORM", label: "Listed by GuestPost.cc" }
+          : { kind: "PUBLISHER", label: publisher?.name ?? "Publisher" },
       // Service menu — N service rows per listing, each its own price / TAT
       // / requirements / availability. fulfillmentSettings is internal and
       // never exposed publicly.
@@ -78,23 +100,26 @@ export class MarketplaceService {
         : undefined,
       // Publisher reduced to display-safe fields; email/tier/org never exposed.
       // Platform-owned listings return null to avoid leaking the internal org.
-      publisher: ownerType === "PLATFORM" ? null : (publisher
-        ? {
-            id: publisher.id,
-            name: publisher.name,
-            tier: publisher.tier ?? null,
-            profile: publisher.profile
-              ? {
-                  bio: publisher.profile.bio ?? null,
-                  rating: publisher.profile.rating ?? null,
-                  totalReviews: publisher.profile.totalReviews ?? null,
-                  responseTime: publisher.profile.responseTime ?? null,
-                  completionRate: publisher.profile.completionRate ?? null,
-                  trustScore: publisher.profile.trustScore ?? null,
-                }
-              : null,
-          }
-        : null),
+      publisher:
+        ownerType === "PLATFORM"
+          ? null
+          : publisher
+            ? {
+                id: publisher.id,
+                name: publisher.name,
+                tier: publisher.tier ?? null,
+                profile: publisher.profile
+                  ? {
+                      bio: publisher.profile.bio ?? null,
+                      rating: publisher.profile.rating ?? null,
+                      totalReviews: publisher.profile.totalReviews ?? null,
+                      responseTime: publisher.profile.responseTime ?? null,
+                      completionRate: publisher.profile.completionRate ?? null,
+                      trustScore: publisher.profile.trustScore ?? null,
+                    }
+                  : null,
+              }
+            : null,
     }
   }
 
@@ -127,7 +152,7 @@ export class MarketplaceService {
     }
     return {
       ownerType: listing.ownerType,
-      services: listing.services.map(s => this.toPublicListingService(s)),
+      services: listing.services.map((s) => this.toPublicListingService(s)),
     }
   }
 
@@ -136,7 +161,24 @@ export class MarketplaceService {
   // =============================================================================
 
   async searchListings(dto: SearchListingsDto) {
-    const { query, category, type, tags, country, language, minPrice, maxPrice, minDR, maxDR, minTraffic, maxTurnaroundDays, sortBy, page = 1, limit = 20, ownershipType } = dto
+    const {
+      query,
+      category,
+      type,
+      tags,
+      country,
+      language,
+      minPrice,
+      maxPrice,
+      minDR,
+      maxDR,
+      minTraffic,
+      maxTurnaroundDays,
+      sortBy,
+      page = 1,
+      limit = 20,
+      ownershipType,
+    } = dto
 
     const where: any = {
       status: ListingStatus.APPROVED,
@@ -164,13 +206,14 @@ export class MarketplaceService {
     // at least ONE matching AVAILABLE service per returned listing — that
     // also excludes listings whose services are entirely paused/waitlisted.
     const serviceFilter: any = { availability: "AVAILABLE" }
-    if (type)                                                    serviceFilter.serviceType = type
+    if (type) serviceFilter.serviceType = type
     if (minPrice !== undefined || maxPrice !== undefined) {
       serviceFilter.price = {}
       if (minPrice !== undefined) serviceFilter.price.gte = minPrice
       if (maxPrice !== undefined) serviceFilter.price.lte = maxPrice
     }
-    if (maxTurnaroundDays !== undefined) serviceFilter.turnaroundDays = { lte: maxTurnaroundDays }
+    if (maxTurnaroundDays !== undefined)
+      serviceFilter.turnaroundDays = { lte: maxTurnaroundDays }
     where.services = { some: serviceFilter }
 
     // DR / traffic remain listing-level (they're properties of the website,
@@ -188,8 +231,8 @@ export class MarketplaceService {
     if (tags && tags.length > 0) {
       where.tags = {
         some: {
-          tag: { slug: { in: tags } }
-        }
+          tag: { slug: { in: tags } },
+        },
       }
     }
 
@@ -257,13 +300,15 @@ export class MarketplaceService {
       this.prisma.marketplaceListing.count({ where }),
     ])
 
-    const listingsWithStats = listings.map(listing => {
-      const avgRating = listing.reviews.length > 0
-        ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) / listing.reviews.length
-        : null
+    const listingsWithStats = listings.map((listing) => {
+      const avgRating =
+        listing.reviews.length > 0
+          ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) /
+            listing.reviews.length
+          : null
       return this.toPublicListing({
         ...listing,
-        tags: listing.tags.map(t => t.tag),
+        tags: listing.tags.map((t) => t.tag),
         image: listing.images[0]?.url || null,
         reviewCount: listing.reviews.length,
         avgRating,
@@ -339,9 +384,10 @@ export class MarketplaceService {
     // Non-APPROVED listings are visible only to a member of the owning publisher.
     // Everyone else gets 404 — do not reveal existence of draft/rejected/paused/archived.
     if (listing.status !== ListingStatus.APPROVED) {
-      const isOwner = userId && listing.publisherId
-        ? await this.verifyPublisherAccess(userId, listing.publisherId)
-        : false
+      const isOwner =
+        userId && listing.publisherId
+          ? await this.verifyPublisherAccess(userId, listing.publisherId)
+          : false
       if (!isOwner) {
         throw new NotFoundException("Listing not found")
       }
@@ -365,7 +411,16 @@ export class MarketplaceService {
         OR: [
           { categoryId: listing.categoryId },
           ...(ownServiceTypes.length > 0
-            ? [{ services: { some: { availability: "AVAILABLE" as const, serviceType: { in: ownServiceTypes } } } }]
+            ? [
+                {
+                  services: {
+                    some: {
+                      availability: "AVAILABLE" as const,
+                      serviceType: { in: ownServiceTypes },
+                    },
+                  },
+                },
+              ]
             : []),
         ],
       },
@@ -377,9 +432,11 @@ export class MarketplaceService {
       },
     })
 
-    const avgRating = listing.reviews.length > 0
-      ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) / listing.reviews.length
-      : null
+    const avgRating =
+      listing.reviews.length > 0
+        ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) /
+          listing.reviews.length
+        : null
 
     let isFavorited = false
     if (userId) {
@@ -395,23 +452,29 @@ export class MarketplaceService {
     return {
       ...this.toPublicListing({
         ...listing,
-        tags: listing.tags.map(t => t.tag),
+        tags: listing.tags.map((t) => t.tag),
         avgRating,
         reviewCount: listing.reviews.length,
         isFavorited,
       }),
-      relatedListings: relatedListings.map(l => this.toPublicListing({
-        ...l,
-        tags: l.tags.map(t => t.tag),
-        image: l.images[0]?.url || null,
-      })),
+      relatedListings: relatedListings.map((l) =>
+        this.toPublicListing({
+          ...l,
+          tags: l.tags.map((t) => t.tag),
+          image: l.images[0]?.url || null,
+        }),
+      ),
     }
   }
 
   // Resolves and authorizes the owning publisher for a listing mutation.
   // Ownership is keyed on PublisherMembership, NOT organizationId (publishers
   // have no active organization context, so an org check is unsound here).
-  private async resolveOwnedPublisherId(userId: string, activePublisherId: string | null, dtoPublisherId?: string): Promise<string> {
+  private async resolveOwnedPublisherId(
+    userId: string,
+    activePublisherId: string | null,
+    dtoPublisherId?: string,
+  ): Promise<string> {
     const publisherId = dtoPublisherId ?? activePublisherId
     if (!publisherId) {
       throw new BadRequestException("No publisher context for this listing")
@@ -429,20 +492,30 @@ export class MarketplaceService {
   // listings — a platform listing must never carry a publisherId (settlement
   // routing branches on website.ownershipType), and a publisher must never be
   // able to reach this path (admin-guarded route).
-  async createPlatformListing(userId: string, dto: CreateListingDto & { websiteId?: string }) {
+  async createPlatformListing(
+    userId: string,
+    dto: CreateListingDto & { websiteId?: string },
+  ) {
     const slug = slugify(dto.title)
-    const existing = await this.prisma.marketplaceListing.findUnique({ where: { slug } })
-    if (existing) throw new BadRequestException("A listing with this title already exists")
+    const existing = await this.prisma.marketplaceListing.findUnique({
+      where: { slug },
+    })
+    if (existing)
+      throw new BadRequestException("A listing with this title already exists")
 
     let websiteId: string | null = null
     if (dto.websiteId) {
-      const website = await this.prisma.website.findUnique({ where: { id: dto.websiteId } })
+      const website = await this.prisma.website.findUnique({
+        where: { id: dto.websiteId },
+      })
       if (!website) throw new NotFoundException("Website not found")
       // Reject publisher-owned sites — those belong to the publisher's own
       // listing flow; a platform listing on a publisher site would corrupt
       // settlement ownership.
       if (website.ownershipType !== "PLATFORM") {
-        throw new BadRequestException("Platform listings can only be attached to platform-owned websites")
+        throw new BadRequestException(
+          "Platform listings can only be attached to platform-owned websites",
+        )
       }
       websiteId = website.id
     }
@@ -468,35 +541,63 @@ export class MarketplaceService {
         ownerType: "PLATFORM",
         fulfillmentType: "INTERNAL",
         status: dto.status || ListingStatus.PENDING_REVIEW,
-        tags: dto.tags ? { create: dto.tags.map((tagId) => ({ tag: { connect: { id: tagId } } })) } : undefined,
+        tags: dto.tags
+          ? {
+              create: dto.tags.map((tagId) => ({
+                tag: { connect: { id: tagId } },
+              })),
+            }
+          : undefined,
         services: this.listingServicesCreateMany(services),
       },
-      include: { category: true, tags: { include: { tag: true } }, services: true },
+      include: {
+        category: true,
+        tags: { include: { tag: true } },
+        services: true,
+      },
     })
 
-    await this.createAuditLog(userId, null, "PLATFORM_LISTING_CREATED", listing.id, {
-      title: listing.title,
-      websiteId,
-      // Phase 7: audit the actual offered serviceTypes (snapshot) rather
-      // than the deprecated listing-level `type` column.
-      serviceTypes: (services ?? []).map(s => s.serviceType),
-      serviceCount: services?.length ?? 0,
-    })
+    await this.createAuditLog(
+      userId,
+      null,
+      "PLATFORM_LISTING_CREATED",
+      listing.id,
+      {
+        title: listing.title,
+        websiteId,
+        // Phase 7: audit the actual offered serviceTypes (snapshot) rather
+        // than the deprecated listing-level `type` column.
+        serviceTypes: (services ?? []).map((s) => s.serviceType),
+        serviceCount: services?.length ?? 0,
+      },
+    )
 
     return listing
   }
 
-  async createListing(userId: string, activePublisherId: string | null, dto: CreateListingDto) {
+  async createListing(
+    userId: string,
+    activePublisherId: string | null,
+    dto: CreateListingDto,
+  ) {
     const slug = slugify(dto.title)
 
     // Check for duplicate slug
-    const existing = await this.prisma.marketplaceListing.findUnique({ where: { slug } })
+    const existing = await this.prisma.marketplaceListing.findUnique({
+      where: { slug },
+    })
     if (existing) {
       throw new BadRequestException("A listing with this title already exists")
     }
 
-    const publisherId = await this.resolveOwnedPublisherId(userId, activePublisherId, dto.publisherId)
-    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    const publisherId = await this.resolveOwnedPublisherId(
+      userId,
+      activePublisherId,
+      dto.publisherId,
+    )
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
     if (!publisher) throw new NotFoundException("Publisher not found")
 
     const data: any = { ...dto }
@@ -513,9 +614,13 @@ export class MarketplaceService {
         organizationId: publisher.organizationId,
         ownerType: "PUBLISHER",
         status: dto.status || ListingStatus.DRAFT,
-        tags: dto.tags ? {
-          create: dto.tags.map(tagId => ({ tag: { connect: { id: tagId } } }))
-        } : undefined,
+        tags: dto.tags
+          ? {
+              create: dto.tags.map((tagId) => ({
+                tag: { connect: { id: tagId } },
+              })),
+            }
+          : undefined,
         services: this.listingServicesCreateMany(services),
       },
       include: {
@@ -525,16 +630,29 @@ export class MarketplaceService {
       },
     })
 
-    await this.createAuditLog(userId, publisher.organizationId, "LISTING_CREATED", listing.id, {
-      title: listing.title,
-      serviceCount: services?.length ?? 0,
-    })
+    await this.createAuditLog(
+      userId,
+      publisher.organizationId,
+      "LISTING_CREATED",
+      listing.id,
+      {
+        title: listing.title,
+        serviceCount: services?.length ?? 0,
+      },
+    )
 
     return listing
   }
 
-  async updateListing(userId: string, activePublisherId: string | null, listingId: string, dto: UpdateListingDto) {
-    const listing = await this.prisma.marketplaceListing.findUnique({ where: { id: listingId } })
+  async updateListing(
+    userId: string,
+    _activePublisherId: string | null,
+    listingId: string,
+    dto: UpdateListingDto,
+  ) {
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { id: listingId },
+    })
 
     if (!listing) {
       throw new NotFoundException("Listing not found")
@@ -542,16 +660,29 @@ export class MarketplaceService {
     if (!listing.publisherId) {
       throw new ForbiddenException("You don't have access to this listing")
     }
-    const hasAccess = await this.verifyPublisherAccess(userId, listing.publisherId)
+    const hasAccess = await this.verifyPublisherAccess(
+      userId,
+      listing.publisherId,
+    )
     if (!hasAccess) {
       throw new ForbiddenException("You don't have access to this listing")
     }
 
     // Block edits on a revoked domain — ownership must be re-verified first.
     if (listing.websiteId) {
-      const site = await this.prisma.website.findUnique({ where: { id: listing.websiteId }, select: { verificationStatus: true, ownershipType: true } })
-      if (site?.ownershipType === "PUBLISHER" && site.verificationStatus === "REVOKED") {
-        throw new BadRequestException({ code: "WEBSITE_REVOKED", message: "Cannot edit listing: domain ownership is revoked. Re-verify the domain first." })
+      const site = await this.prisma.website.findUnique({
+        where: { id: listing.websiteId },
+        select: { verificationStatus: true, ownershipType: true },
+      })
+      if (
+        site?.ownershipType === "PUBLISHER" &&
+        site.verificationStatus === "REVOKED"
+      ) {
+        throw new BadRequestException({
+          code: "WEBSITE_REVOKED",
+          message:
+            "Cannot edit listing: domain ownership is revoked. Re-verify the domain first.",
+        })
       }
     }
 
@@ -570,10 +701,14 @@ export class MarketplaceService {
       where: { id: listingId },
       data: {
         ...updateData,
-        tags: dto.tags ? {
-          deleteMany: {},
-          create: dto.tags.map(tagId => ({ tag: { connect: { id: tagId } } }))
-        } : undefined,
+        tags: dto.tags
+          ? {
+              deleteMany: {},
+              create: dto.tags.map((tagId) => ({
+                tag: { connect: { id: tagId } },
+              })),
+            }
+          : undefined,
       },
       include: {
         category: true,
@@ -581,7 +716,13 @@ export class MarketplaceService {
       },
     })
 
-    await this.createAuditLog(userId, listing.organizationId, "LISTING_UPDATED", listingId, { changes: Object.keys(dto) })
+    await this.createAuditLog(
+      userId,
+      listing.organizationId,
+      "LISTING_UPDATED",
+      listingId,
+      { changes: Object.keys(dto) },
+    )
 
     return updated
   }
@@ -598,7 +739,9 @@ export class MarketplaceService {
     const seen = new Set<ServiceType>()
     for (const s of dto.services) {
       if (seen.has(s.serviceType)) {
-        throw new BadRequestException(`Duplicate service ${s.serviceType} in listing`)
+        throw new BadRequestException(
+          `Duplicate service ${s.serviceType} in listing`,
+        )
       }
       seen.add(s.serviceType)
     }
@@ -612,16 +755,18 @@ export class MarketplaceService {
   private listingServicesCreateMany(services: ListingServiceInput[] | null) {
     if (!services || services.length === 0) return undefined
     return {
-      create: services.map(s => ({
-        serviceType:    s.serviceType,
-        price:          new Prisma.Decimal(s.price),
-        currency:       s.currency ?? "USD",
+      create: services.map((s) => ({
+        serviceType: s.serviceType,
+        price: new Prisma.Decimal(s.price),
+        currency: s.currency ?? "USD",
         turnaroundDays: s.turnaroundDays,
         revisionRounds: s.revisionRounds ?? 2,
-        warrantyDays:   s.warrantyDays,
-        requirements:   s.requirements as Prisma.InputJsonValue | undefined,
-        fulfillmentSettings: s.fulfillmentSettings as Prisma.InputJsonValue | undefined,
-        availability:   s.availability ?? "AVAILABLE",
+        warrantyDays: s.warrantyDays,
+        requirements: s.requirements as Prisma.InputJsonValue | undefined,
+        fulfillmentSettings: s.fulfillmentSettings as
+          | Prisma.InputJsonValue
+          | undefined,
+        availability: s.availability ?? "AVAILABLE",
       })),
     }
   }
@@ -633,13 +778,23 @@ export class MarketplaceService {
   // does the listing-level access check + version-guarded write.
 
   async addServiceToListing(
-    actor: { userId: string; activePublisherId?: string | null; isStaff?: boolean },
+    actor: {
+      userId: string
+      activePublisherId?: string | null
+      isStaff?: boolean
+    },
     listingId: string,
     input: ListingServiceInput,
   ) {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id: listingId },
-      select: { id: true, publisherId: true, organizationId: true, ownerType: true, websiteId: true },
+      select: {
+        id: true,
+        publisherId: true,
+        organizationId: true,
+        ownerType: true,
+        websiteId: true,
+      },
     })
     if (!listing) throw new NotFoundException("Listing not found")
     await this.assertListingWriteAccess(actor, listing)
@@ -648,40 +803,63 @@ export class MarketplaceService {
       const created = await this.prisma.listingService.create({
         data: {
           listingId,
-          serviceType:    input.serviceType,
-          price:          new Prisma.Decimal(input.price),
-          currency:       input.currency ?? "USD",
+          serviceType: input.serviceType,
+          price: new Prisma.Decimal(input.price),
+          currency: input.currency ?? "USD",
           turnaroundDays: input.turnaroundDays,
           revisionRounds: input.revisionRounds ?? 2,
-          warrantyDays:   input.warrantyDays,
-          requirements:   input.requirements as Prisma.InputJsonValue | undefined,
-          fulfillmentSettings: input.fulfillmentSettings as Prisma.InputJsonValue | undefined,
-          availability:   input.availability ?? "AVAILABLE",
+          warrantyDays: input.warrantyDays,
+          requirements: input.requirements as Prisma.InputJsonValue | undefined,
+          fulfillmentSettings: input.fulfillmentSettings as
+            | Prisma.InputJsonValue
+            | undefined,
+          availability: input.availability ?? "AVAILABLE",
         },
       })
-      await this.createAuditLog(actor.userId, listing.organizationId, "LISTING_SERVICE_ADDED", created.id, {
-        listingId,
-        serviceType: created.serviceType,
-        price: created.price.toString(),
-      })
+      await this.createAuditLog(
+        actor.userId,
+        listing.organizationId,
+        "LISTING_SERVICE_ADDED",
+        created.id,
+        {
+          listingId,
+          serviceType: created.serviceType,
+          price: created.price.toString(),
+        },
+      )
       return created
     } catch (e: any) {
       if (e?.code === "P2002") {
-        throw new BadRequestException(`Service ${input.serviceType} already exists on this listing`)
+        throw new BadRequestException(
+          `Service ${input.serviceType} already exists on this listing`,
+        )
       }
       throw e
     }
   }
 
   async updateServiceOnListing(
-    actor: { userId: string; activePublisherId?: string | null; isStaff?: boolean },
+    actor: {
+      userId: string
+      activePublisherId?: string | null
+      isStaff?: boolean
+    },
     listingId: string,
     serviceId: string,
     input: UpdateListingServiceInput,
   ) {
     const service = await this.prisma.listingService.findUnique({
       where: { id: serviceId },
-      include: { listing: { select: { id: true, publisherId: true, organizationId: true, ownerType: true } } },
+      include: {
+        listing: {
+          select: {
+            id: true,
+            publisherId: true,
+            organizationId: true,
+            ownerType: true,
+          },
+        },
+      },
     })
     if (!service || service.listingId !== listingId) {
       throw new NotFoundException("Service not found on this listing")
@@ -691,15 +869,25 @@ export class MarketplaceService {
     // Version-guarded update — concurrent edits or a stale tab cannot silently
     // overwrite each other. The optimistic lock matches the pattern used
     // throughout orders/settlements.
-    const updateData: Prisma.ListingServiceUncheckedUpdateInput = { version: { increment: 1 } }
-    if (input.price          !== undefined) updateData.price          = new Prisma.Decimal(input.price)
-    if (input.currency       !== undefined) updateData.currency       = input.currency
-    if (input.turnaroundDays !== undefined) updateData.turnaroundDays = input.turnaroundDays
-    if (input.revisionRounds !== undefined) updateData.revisionRounds = input.revisionRounds
-    if (input.warrantyDays   !== undefined) updateData.warrantyDays   = input.warrantyDays
-    if (input.requirements   !== undefined) updateData.requirements   = input.requirements as Prisma.InputJsonValue
-    if (input.fulfillmentSettings !== undefined) updateData.fulfillmentSettings = input.fulfillmentSettings as Prisma.InputJsonValue
-    if (input.availability   !== undefined) updateData.availability   = input.availability
+    const updateData: Prisma.ListingServiceUncheckedUpdateInput = {
+      version: { increment: 1 },
+    }
+    if (input.price !== undefined)
+      updateData.price = new Prisma.Decimal(input.price)
+    if (input.currency !== undefined) updateData.currency = input.currency
+    if (input.turnaroundDays !== undefined)
+      updateData.turnaroundDays = input.turnaroundDays
+    if (input.revisionRounds !== undefined)
+      updateData.revisionRounds = input.revisionRounds
+    if (input.warrantyDays !== undefined)
+      updateData.warrantyDays = input.warrantyDays
+    if (input.requirements !== undefined)
+      updateData.requirements = input.requirements as Prisma.InputJsonValue
+    if (input.fulfillmentSettings !== undefined)
+      updateData.fulfillmentSettings =
+        input.fulfillmentSettings as Prisma.InputJsonValue
+    if (input.availability !== undefined)
+      updateData.availability = input.availability
 
     const res = await this.prisma.listingService.updateMany({
       where: { id: serviceId, version: input.version },
@@ -712,11 +900,19 @@ export class MarketplaceService {
       })
     }
 
-    const updated = await this.prisma.listingService.findUnique({ where: { id: serviceId } })
-    await this.createAuditLog(actor.userId, service.listing.organizationId, "LISTING_SERVICE_UPDATED", serviceId, {
-      listingId,
-      changes: Object.keys(input).filter(k => k !== "version"),
+    const updated = await this.prisma.listingService.findUnique({
+      where: { id: serviceId },
     })
+    await this.createAuditLog(
+      actor.userId,
+      service.listing.organizationId,
+      "LISTING_SERVICE_UPDATED",
+      serviceId,
+      {
+        listingId,
+        changes: Object.keys(input).filter((k) => k !== "version"),
+      },
+    )
 
     // ── Phase 6: waitlist → available fan-out ────────────────────────────
     // Notifies every user with a MarketplaceFavorite scoped to this
@@ -725,7 +921,10 @@ export class MarketplaceService {
     // queue — no new processor needed since the recipient set is small.
     // Sites toggling rapidly aren't a real concern (this is a publisher-
     // initiated edit, not a system-driven flap), so we don't rate-limit.
-    if (service.availability === "WAITLIST" && input.availability === "AVAILABLE") {
+    if (
+      service.availability === "WAITLIST" &&
+      input.availability === "AVAILABLE"
+    ) {
       const favorites = await this.prisma.marketplaceFavorite.findMany({
         where: {
           listingId,
@@ -741,11 +940,17 @@ export class MarketplaceService {
           message: `A service you favorited is now available`,
         })
       }
-      await this.createAuditLog(actor.userId, service.listing.organizationId, "LISTING_SERVICE_WAITLIST_RELEASED", serviceId, {
-        listingId,
-        serviceType: service.serviceType,
-        notifiedCount: favorites.length,
-      })
+      await this.createAuditLog(
+        actor.userId,
+        service.listing.organizationId,
+        "LISTING_SERVICE_WAITLIST_RELEASED",
+        serviceId,
+        {
+          listingId,
+          serviceType: service.serviceType,
+          notifiedCount: favorites.length,
+        },
+      )
     }
 
     return updated
@@ -755,27 +960,49 @@ export class MarketplaceService {
   // historical Order that snapshotted its id, so order detail can still
   // resolve listingService.* fields. Removing the row would orphan those.
   async pauseServiceOnListing(
-    actor: { userId: string; activePublisherId?: string | null; isStaff?: boolean },
+    actor: {
+      userId: string
+      activePublisherId?: string | null
+      isStaff?: boolean
+    },
     listingId: string,
     serviceId: string,
   ) {
     return this.updateServiceOnListing(actor, listingId, serviceId, {
       availability: "PAUSED",
-      version: (await this.prisma.listingService.findUnique({ where: { id: serviceId }, select: { version: true } }))?.version ?? 0,
+      version:
+        (
+          await this.prisma.listingService.findUnique({
+            where: { id: serviceId },
+            select: { version: true },
+          })
+        )?.version ?? 0,
     })
   }
 
   // Listing write access: publisher path uses the existing membership check,
   // platform path requires a staff actor (route guard already enforces it).
   private async assertListingWriteAccess(
-    actor: { userId: string; activePublisherId?: string | null; isStaff?: boolean },
-    listing: { publisherId: string | null; ownerType?: "PUBLISHER" | "PLATFORM" | null },
+    actor: {
+      userId: string
+      activePublisherId?: string | null
+      isStaff?: boolean
+    },
+    listing: {
+      publisherId: string | null
+      ownerType?: "PUBLISHER" | "PLATFORM" | null
+    },
   ) {
     if (actor.isStaff) return
     if (!listing.publisherId) {
-      throw new ForbiddenException("Only platform staff can edit this listing's services")
+      throw new ForbiddenException(
+        "Only platform staff can edit this listing's services",
+      )
     }
-    const hasAccess = await this.verifyPublisherAccess(actor.userId, listing.publisherId)
+    const hasAccess = await this.verifyPublisherAccess(
+      actor.userId,
+      listing.publisherId,
+    )
     if (!hasAccess) {
       throw new ForbiddenException("You don't have access to this listing")
     }
@@ -794,11 +1021,17 @@ export class MarketplaceService {
   //   - pause / unpause: must be APPROVED / PAUSED respectively.
   //   - archive: any non-ARCHIVED → ARCHIVED.
 
-  async submitListingForReview(userId: string, activePublisherId: string | null, listingId: string) {
+  async submitListingForReview(
+    userId: string,
+    _activePublisherId: string | null,
+    listingId: string,
+  ) {
     const listing = await this.assertPublisherOwnedListing(userId, listingId)
 
     if (listing.status !== ListingStatus.DRAFT) {
-      throw new BadRequestException(`Listing must be DRAFT to submit (currently ${listing.status})`)
+      throw new BadRequestException(
+        `Listing must be DRAFT to submit (currently ${listing.status})`,
+      )
     }
     if (listing.website?.verificationStatus !== "VERIFIED") {
       throw new BadRequestException({
@@ -812,66 +1045,130 @@ export class MarketplaceService {
     if (availableCount === 0) {
       throw new BadRequestException({
         code: "NO_AVAILABLE_SERVICES",
-        message: "Add at least one available service before submitting for review.",
+        message:
+          "Add at least one available service before submitting for review.",
       })
     }
 
     const res = await this.prisma.marketplaceListing.updateMany({
       where: { id: listingId, status: ListingStatus.DRAFT },
-      data:  { status: ListingStatus.PENDING_REVIEW },
+      data: { status: ListingStatus.PENDING_REVIEW },
     })
     if (res.count === 0) {
-      throw new BadRequestException({ code: "STATUS_CONFLICT", message: "Listing was modified — reload and retry." })
+      throw new BadRequestException({
+        code: "STATUS_CONFLICT",
+        message: "Listing was modified — reload and retry.",
+      })
     }
 
-    await this.createAuditLog(userId, listing.organizationId, "LISTING_SUBMITTED_FOR_REVIEW", listingId, {
-      title: listing.title,
-      websiteId: listing.websiteId,
-    })
+    await this.createAuditLog(
+      userId,
+      listing.organizationId,
+      "LISTING_SUBMITTED_FOR_REVIEW",
+      listingId,
+      {
+        title: listing.title,
+        websiteId: listing.websiteId,
+      },
+    )
 
-    return this.prisma.marketplaceListing.findUniqueOrThrow({ where: { id: listingId } })
+    return this.prisma.marketplaceListing.findUniqueOrThrow({
+      where: { id: listingId },
+    })
   }
 
-  async pauseListing(userId: string, activePublisherId: string | null, listingId: string) {
+  async pauseListing(
+    userId: string,
+    _activePublisherId: string | null,
+    listingId: string,
+  ) {
     const listing = await this.assertPublisherOwnedListing(userId, listingId)
     if (listing.status !== ListingStatus.APPROVED) {
-      throw new BadRequestException(`Only APPROVED listings can be paused (currently ${listing.status})`)
+      throw new BadRequestException(
+        `Only APPROVED listings can be paused (currently ${listing.status})`,
+      )
     }
     const res = await this.prisma.marketplaceListing.updateMany({
       where: { id: listingId, status: ListingStatus.APPROVED },
-      data:  { status: ListingStatus.PAUSED },
+      data: { status: ListingStatus.PAUSED },
     })
-    if (res.count === 0) throw new BadRequestException({ code: "STATUS_CONFLICT", message: "Listing was modified — reload and retry." })
-    await this.createAuditLog(userId, listing.organizationId, "LISTING_PAUSED", listingId, { title: listing.title })
-    return this.prisma.marketplaceListing.findUniqueOrThrow({ where: { id: listingId } })
+    if (res.count === 0)
+      throw new BadRequestException({
+        code: "STATUS_CONFLICT",
+        message: "Listing was modified — reload and retry.",
+      })
+    await this.createAuditLog(
+      userId,
+      listing.organizationId,
+      "LISTING_PAUSED",
+      listingId,
+      { title: listing.title },
+    )
+    return this.prisma.marketplaceListing.findUniqueOrThrow({
+      where: { id: listingId },
+    })
   }
 
-  async unpauseListing(userId: string, activePublisherId: string | null, listingId: string) {
+  async unpauseListing(
+    userId: string,
+    _activePublisherId: string | null,
+    listingId: string,
+  ) {
     const listing = await this.assertPublisherOwnedListing(userId, listingId)
     if (listing.status !== ListingStatus.PAUSED) {
-      throw new BadRequestException(`Only PAUSED listings can be unpaused (currently ${listing.status})`)
+      throw new BadRequestException(
+        `Only PAUSED listings can be unpaused (currently ${listing.status})`,
+      )
     }
     const res = await this.prisma.marketplaceListing.updateMany({
       where: { id: listingId, status: ListingStatus.PAUSED },
-      data:  { status: ListingStatus.APPROVED },
+      data: { status: ListingStatus.APPROVED },
     })
-    if (res.count === 0) throw new BadRequestException({ code: "STATUS_CONFLICT", message: "Listing was modified — reload and retry." })
-    await this.createAuditLog(userId, listing.organizationId, "LISTING_UNPAUSED", listingId, { title: listing.title })
-    return this.prisma.marketplaceListing.findUniqueOrThrow({ where: { id: listingId } })
+    if (res.count === 0)
+      throw new BadRequestException({
+        code: "STATUS_CONFLICT",
+        message: "Listing was modified — reload and retry.",
+      })
+    await this.createAuditLog(
+      userId,
+      listing.organizationId,
+      "LISTING_UNPAUSED",
+      listingId,
+      { title: listing.title },
+    )
+    return this.prisma.marketplaceListing.findUniqueOrThrow({
+      where: { id: listingId },
+    })
   }
 
-  async archiveListing(userId: string, activePublisherId: string | null, listingId: string) {
+  async archiveListing(
+    userId: string,
+    _activePublisherId: string | null,
+    listingId: string,
+  ) {
     const listing = await this.assertPublisherOwnedListing(userId, listingId)
     if (listing.status === ListingStatus.ARCHIVED) {
       throw new BadRequestException("Listing is already archived")
     }
     const res = await this.prisma.marketplaceListing.updateMany({
       where: { id: listingId, status: listing.status },
-      data:  { status: ListingStatus.ARCHIVED },
+      data: { status: ListingStatus.ARCHIVED },
     })
-    if (res.count === 0) throw new BadRequestException({ code: "STATUS_CONFLICT", message: "Listing was modified — reload and retry." })
-    await this.createAuditLog(userId, listing.organizationId, "LISTING_ARCHIVED", listingId, { title: listing.title, fromStatus: listing.status })
-    return this.prisma.marketplaceListing.findUniqueOrThrow({ where: { id: listingId } })
+    if (res.count === 0)
+      throw new BadRequestException({
+        code: "STATUS_CONFLICT",
+        message: "Listing was modified — reload and retry.",
+      })
+    await this.createAuditLog(
+      userId,
+      listing.organizationId,
+      "LISTING_ARCHIVED",
+      listingId,
+      { title: listing.title, fromStatus: listing.status },
+    )
+    return this.prisma.marketplaceListing.findUniqueOrThrow({
+      where: { id: listingId },
+    })
   }
 
   // Shared ownership + load helper for the four transitions above. Loads
@@ -879,19 +1176,33 @@ export class MarketplaceService {
   private async assertPublisherOwnedListing(userId: string, listingId: string) {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id: listingId },
-      include: { website: { select: { verificationStatus: true, ownershipType: true } } },
+      include: {
+        website: { select: { verificationStatus: true, ownershipType: true } },
+      },
     })
     if (!listing) throw new NotFoundException("Listing not found")
     if (!listing.publisherId) {
-      throw new ForbiddenException("Platform listings use admin-side transitions, not publisher endpoints")
+      throw new ForbiddenException(
+        "Platform listings use admin-side transitions, not publisher endpoints",
+      )
     }
-    const hasAccess = await this.verifyPublisherAccess(userId, listing.publisherId)
-    if (!hasAccess) throw new ForbiddenException("You don't have access to this listing")
+    const hasAccess = await this.verifyPublisherAccess(
+      userId,
+      listing.publisherId,
+    )
+    if (!hasAccess)
+      throw new ForbiddenException("You don't have access to this listing")
     return listing
   }
 
-  async deleteListing(userId: string, activePublisherId: string | null, listingId: string) {
-    const listing = await this.prisma.marketplaceListing.findUnique({ where: { id: listingId } })
+  async deleteListing(
+    userId: string,
+    _activePublisherId: string | null,
+    listingId: string,
+  ) {
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { id: listingId },
+    })
 
     if (!listing) {
       throw new NotFoundException("Listing not found")
@@ -899,7 +1210,10 @@ export class MarketplaceService {
     if (!listing.publisherId) {
       throw new ForbiddenException("You don't have access to this listing")
     }
-    const hasAccess = await this.verifyPublisherAccess(userId, listing.publisherId)
+    const hasAccess = await this.verifyPublisherAccess(
+      userId,
+      listing.publisherId,
+    )
     if (!hasAccess) {
       throw new ForbiddenException("You don't have access to this listing")
     }
@@ -909,7 +1223,13 @@ export class MarketplaceService {
       data: { status: ListingStatus.ARCHIVED },
     })
 
-    await this.createAuditLog(userId, listing.organizationId, "LISTING_DELETED", listingId, { title: listing.title })
+    await this.createAuditLog(
+      userId,
+      listing.organizationId,
+      "LISTING_DELETED",
+      listingId,
+      { title: listing.title },
+    )
   }
 
   // =============================================================================
@@ -919,7 +1239,9 @@ export class MarketplaceService {
   async getCategories() {
     return this.prisma.marketplaceCategory.findMany({
       where: { isActive: true, parentId: null },
-      include: { children: { where: { isActive: true }, orderBy: { sortOrder: "asc" } } },
+      include: {
+        children: { where: { isActive: true }, orderBy: { sortOrder: "asc" } },
+      },
       orderBy: { sortOrder: "asc" },
     })
   }
@@ -935,7 +1257,9 @@ export class MarketplaceService {
   // =============================================================================
 
   async createReview(userId: string, dto: CreateReviewDto) {
-    const listing = await this.prisma.marketplaceListing.findUnique({ where: { id: dto.listingId } })
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { id: dto.listingId },
+    })
     if (!listing) {
       throw new NotFoundException("Listing not found")
     }
@@ -946,9 +1270,11 @@ export class MarketplaceService {
     }
 
     // Prevent self-review: publisher cannot review own listing
-    const publisherMembership = await this.prisma.publisherMembership.findFirst({
-      where: { userId, publisherId: listingPublisherId },
-    })
+    const publisherMembership = await this.prisma.publisherMembership.findFirst(
+      {
+        where: { userId, publisherId: listingPublisherId },
+      },
+    )
     if (publisherMembership) {
       throw new ForbiddenException("You cannot review your own listing")
     }
@@ -965,7 +1291,9 @@ export class MarketplaceService {
       },
     })
     if (!completedOrder) {
-      throw new ForbiddenException("You must complete an order before reviewing")
+      throw new ForbiddenException(
+        "You must complete an order before reviewing",
+      )
     }
 
     // Prevent duplicate review
@@ -1029,8 +1357,14 @@ export class MarketplaceService {
     })
   }
 
-  async addFavorite(userId: string, listingId: string, serviceType: ServiceType | null = null) {
-    const listing = await this.prisma.marketplaceListing.findUnique({ where: { id: listingId } })
+  async addFavorite(
+    userId: string,
+    listingId: string,
+    serviceType: ServiceType | null = null,
+  ) {
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { id: listingId },
+    })
     if (!listing) {
       throw new NotFoundException("Listing not found")
     }
@@ -1051,7 +1385,9 @@ export class MarketplaceService {
         },
       })
       if (!service) {
-        throw new NotFoundException(`Service ${serviceType} not found on this listing`)
+        throw new NotFoundException(
+          `Service ${serviceType} not found on this listing`,
+        )
       }
     }
 
@@ -1099,7 +1435,11 @@ export class MarketplaceService {
     })
   }
 
-  async removeFavoriteService(userId: string, listingId: string, serviceType: ServiceType) {
+  async removeFavoriteService(
+    userId: string,
+    listingId: string,
+    serviceType: ServiceType,
+  ) {
     // Phase 7.12 (#16 sibling): scoped removal for service-specific
     // (WAITLIST notify-me) favorites. Mirrors removeFavorite but for the
     // serviceType-scoped rows that the new addFavorite(serviceType) path
@@ -1148,12 +1488,16 @@ export class MarketplaceService {
   }
 
   async addToSavedList(userId: string, listId: string, dto: AddToSavedListDto) {
-    const list = await this.prisma.marketplaceSavedList.findUnique({ where: { id: listId } })
+    const list = await this.prisma.marketplaceSavedList.findUnique({
+      where: { id: listId },
+    })
     if (!list || list.userId !== userId) {
       throw new NotFoundException("List not found")
     }
 
-    const listing = await this.prisma.marketplaceListing.findUnique({ where: { id: dto.listingId } })
+    const listing = await this.prisma.marketplaceListing.findUnique({
+      where: { id: dto.listingId },
+    })
     if (!listing) {
       throw new NotFoundException("Listing not found")
     }
@@ -1172,7 +1516,9 @@ export class MarketplaceService {
   }
 
   async removeFromSavedList(userId: string, listId: string, listingId: string) {
-    const list = await this.prisma.marketplaceSavedList.findUnique({ where: { id: listId } })
+    const list = await this.prisma.marketplaceSavedList.findUnique({
+      where: { id: listId },
+    })
     if (!list || list.userId !== userId) {
       throw new NotFoundException("List not found")
     }
@@ -1211,7 +1557,9 @@ export class MarketplaceService {
   // =============================================================================
 
   async getPublisherListings(publisherId: string, userId?: string) {
-    const hasAccess = userId ? await this.verifyPublisherAccess(userId, publisherId) : false
+    const hasAccess = userId
+      ? await this.verifyPublisherAccess(userId, publisherId)
+      : false
 
     return this.prisma.marketplaceListing.findMany({
       where: {
@@ -1236,15 +1584,16 @@ export class MarketplaceService {
     const { listingId, type = "recommended", limit = 10 } = dto
 
     // Try to get AI recommendations first
-    const recommendations = await this.prisma.marketplaceRecommendation.findMany({
-      where: { userId, type },
-      orderBy: { score: "desc" },
-      take: limit,
-    })
+    const recommendations =
+      await this.prisma.marketplaceRecommendation.findMany({
+        where: { userId, type },
+        orderBy: { score: "desc" },
+        take: limit,
+      })
 
     if (recommendations.length > 0) {
       // Fetch listings separately since relation isn't defined in schema
-      const listingIds = recommendations.map(r => r.listingId)
+      const listingIds = recommendations.map((r) => r.listingId)
       const listings = await this.prisma.marketplaceListing.findMany({
         where: { id: { in: listingIds } },
         include: {
@@ -1254,36 +1603,47 @@ export class MarketplaceService {
         },
       })
 
-      const listingMap = new Map(listings.map(l => [l.id, l]))
+      const listingMap = new Map(listings.map((l) => [l.id, l]))
 
-      return recommendations.map(r => {
-        const listing = listingMap.get(r.listingId)
-        if (!listing) return null
-        return {
-          ...listing,
-          tags: listing.tags.map((t: any) => t.tag),
-          image: listing.images[0]?.url || null,
-          recommendationScore: r.score,
-          recommendationReason: r.reason,
-        }
-      }).filter(Boolean)
+      return recommendations
+        .map((r) => {
+          const listing = listingMap.get(r.listingId)
+          if (!listing) return null
+          return {
+            ...listing,
+            tags: listing.tags.map((t: any) => t.tag),
+            image: listing.images[0]?.url || null,
+            recommendationScore: r.score,
+            recommendationReason: r.reason,
+          }
+        })
+        .filter(Boolean)
     }
 
     // Fallback to rule-based recommendations
     return this.getRuleBasedRecommendations(listingId, type, limit)
   }
 
-  private async getRuleBasedRecommendations(listingId?: string, type?: string, limit = 10) {
+  private async getRuleBasedRecommendations(
+    listingId?: string,
+    _type?: string,
+    limit = 10,
+  ) {
     if (listingId) {
       // Phase 7: pull the offered serviceTypes off the source listing's
       // child services so we can match recommendations on service overlap
       // instead of the deprecated listing-level `type` column.
       const listing = await this.prisma.marketplaceListing.findUnique({
         where: { id: listingId },
-        include: { services: { where: { availability: "AVAILABLE" }, select: { serviceType: true } } },
+        include: {
+          services: {
+            where: { availability: "AVAILABLE" },
+            select: { serviceType: true },
+          },
+        },
       })
       if (!listing) return []
-      const ownServiceTypes = listing.services.map(s => s.serviceType)
+      const ownServiceTypes = listing.services.map((s) => s.serviceType)
 
       return this.prisma.marketplaceListing.findMany({
         where: {
@@ -1292,7 +1652,16 @@ export class MarketplaceService {
           OR: [
             { categoryId: listing.categoryId },
             ...(ownServiceTypes.length > 0
-              ? [{ services: { some: { availability: "AVAILABLE" as const, serviceType: { in: ownServiceTypes } } } }]
+              ? [
+                  {
+                    services: {
+                      some: {
+                        availability: "AVAILABLE" as const,
+                        serviceType: { in: ownServiceTypes },
+                      },
+                    },
+                  },
+                ]
               : []),
             { publisherId: listing.publisherId },
           ],
@@ -1309,7 +1678,7 @@ export class MarketplaceService {
 
     // Trending - get most viewed in last 7 days
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    
+
     const trendingIds = await this.prisma.marketplaceListingView.groupBy({
       by: ["listingId"],
       where: { createdAt: { gte: sevenDaysAgo } },
@@ -1320,7 +1689,7 @@ export class MarketplaceService {
 
     const listings = await this.prisma.marketplaceListing.findMany({
       where: {
-        id: { in: trendingIds.map(t => t.listingId) },
+        id: { in: trendingIds.map((t) => t.listingId) },
         status: ListingStatus.APPROVED,
       },
       include: {
@@ -1331,15 +1700,17 @@ export class MarketplaceService {
     })
 
     // Maintain trending order
-    return trendingIds.map(t => {
-      const listing = listings.find(l => l.id === t.listingId)
-      if (!listing) return null
-      return {
-        ...listing,
-        tags: listing.tags.map(tag => tag.tag),
-        image: listing.images[0]?.url || null,
-      }
-    }).filter(Boolean)
+    return trendingIds
+      .map((t) => {
+        const listing = listings.find((l) => l.id === t.listingId)
+        if (!listing) return null
+        return {
+          ...listing,
+          tags: listing.tags.map((tag) => tag.tag),
+          image: listing.images[0]?.url || null,
+        }
+      })
+      .filter(Boolean)
   }
 
   // =============================================================================
@@ -1347,10 +1718,19 @@ export class MarketplaceService {
   // =============================================================================
 
   async getMarketplaceStats() {
-    const [totalListings, activeListings, totalReviews, avgRating,
-           totalServices, activeServices, servicesByTypeRaw] = await Promise.all([
+    const [
+      totalListings,
+      activeListings,
+      totalReviews,
+      avgRating,
+      totalServices,
+      activeServices,
+      servicesByTypeRaw,
+    ] = await Promise.all([
       this.prisma.marketplaceListing.count(),
-      this.prisma.marketplaceListing.count({ where: { status: ListingStatus.APPROVED } }),
+      this.prisma.marketplaceListing.count({
+        where: { status: ListingStatus.APPROVED },
+      }),
       this.prisma.marketplaceReview.count({ where: { status: "APPROVED" } }),
       this.prisma.marketplaceReview.aggregate({
         _avg: { rating: true },
@@ -1361,7 +1741,9 @@ export class MarketplaceService {
       // dashboards have a denominator that matches the buyer-side
       // inventory shape.
       this.prisma.listingService.count(),
-      this.prisma.listingService.count({ where: { availability: "AVAILABLE" } }),
+      this.prisma.listingService.count({
+        where: { availability: "AVAILABLE" },
+      }),
       this.prisma.listingService.groupBy({
         by: ["serviceType"],
         where: { availability: "AVAILABLE" },
@@ -1381,9 +1763,11 @@ export class MarketplaceService {
     const categoryData = await Promise.all(
       topCategories.map(async (c) => {
         if (!c.categoryId) return null
-        const category = await this.prisma.marketplaceCategory.findUnique({ where: { id: c.categoryId } })
+        const category = await this.prisma.marketplaceCategory.findUnique({
+          where: { id: c.categoryId },
+        })
         return { category, count: c._count.id }
-      })
+      }),
     )
 
     return {
@@ -1395,7 +1779,7 @@ export class MarketplaceService {
       // Phase 6: per-service breakdown.
       totalServices,
       activeServices,
-      servicesByType: servicesByTypeRaw.map(s => ({
+      servicesByType: servicesByTypeRaw.map((s) => ({
         serviceType: s.serviceType,
         count: s._count.id,
         avgPrice: s._avg.price !== null ? Number(s._avg.price) : null,
@@ -1407,7 +1791,10 @@ export class MarketplaceService {
   // HELPER METHODS
   // =============================================================================
 
-  private async verifyPublisherAccess(userId: string, publisherId: string): Promise<boolean> {
+  private async verifyPublisherAccess(
+    userId: string,
+    publisherId: string,
+  ): Promise<boolean> {
     const membership = await this.prisma.publisherMembership.findFirst({
       where: { userId, publisherId },
     })
@@ -1417,9 +1804,9 @@ export class MarketplaceService {
   private async createAuditLog(
     userId: string,
     organizationId: string | null,
-    action: string, 
-    entityId?: string, 
-    metadata?: any
+    action: string,
+    entityId?: string,
+    metadata?: any,
   ) {
     await this.prisma.auditLog.create({
       data: {

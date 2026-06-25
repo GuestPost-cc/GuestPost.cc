@@ -28,7 +28,12 @@ export function candidateHostnames(websiteUrl: string): string[] {
     host = new URL(websiteUrl).hostname.toLowerCase()
   } catch {
     // Bare hostname fallback
-    host = String(websiteUrl).trim().toLowerCase().replace(/^https?:\/\//, "").split("/")[0].split(":")[0]
+    host = String(websiteUrl)
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, "")
+      .split("/")[0]
+      .split(":")[0]
   }
   if (!host) return []
   const root = host.replace(/^www\./, "")

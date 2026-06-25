@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
-import { OrdersService } from "../orders/orders.service"
-import { ServiceType } from "@guestpost/shared"
+import type { ServiceType } from "@guestpost/shared"
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
+import type { OrdersService } from "../orders/orders.service"
 
 @Injectable()
 export class CampaignsService {
@@ -12,31 +17,38 @@ export class CampaignsService {
     private readonly orders: OrdersService,
   ) {}
 
-  async createOrder(data: {
-    type: ServiceType
-    title?: string
-    instructions?: string
-    targetUrl?: string
-    anchorText?: string
-    customerId: string
-    websiteId?: string
-    organizationId: string
-    campaignId?: string
-    idempotencyKey?: string
-  }, userId: string) {
+  async createOrder(
+    data: {
+      type: ServiceType
+      title?: string
+      instructions?: string
+      targetUrl?: string
+      anchorText?: string
+      customerId: string
+      websiteId?: string
+      organizationId: string
+      campaignId?: string
+      idempotencyKey?: string
+    },
+    userId: string,
+  ) {
     if (data.websiteId) {
       const website = await this.prisma.website.findUnique({
         where: { id: data.websiteId },
       })
       if (!website) throw new NotFoundException("Website not found")
-      if (!website.isActive) throw new ForbiddenException("Website is not active")
+      if (!website.isActive)
+        throw new ForbiddenException("Website is not active")
 
       // Orders may only target websites with an approved marketplace listing
       const listing = await this.prisma.marketplaceListing.findFirst({
         where: { websiteId: data.websiteId, status: "APPROVED" },
         select: { id: true },
       })
-      if (!listing) throw new ForbiddenException("Website does not have an approved marketplace listing")
+      if (!listing)
+        throw new ForbiddenException(
+          "Website does not have an approved marketplace listing",
+        )
     }
     if (data.campaignId) {
       const campaign = await this.prisma.campaign.findUnique({
@@ -44,26 +56,37 @@ export class CampaignsService {
       })
       if (!campaign) throw new NotFoundException("Campaign not found")
       if (campaign.organizationId !== data.organizationId) {
-        throw new ForbiddenException("Campaign does not belong to your organization")
+        throw new ForbiddenException(
+          "Campaign does not belong to your organization",
+        )
       }
     }
 
     // Delegate to the canonical order creation path: idempotency, item +
     // amount calculation from the approved listing, and ORDER_CREATED event
-    const order = await this.orders.createOrder({
-      type: data.type,
-      title: data.title,
-      instructions: data.instructions,
-      customerId: data.customerId,
-      organizationId: data.organizationId,
-      campaignId: data.campaignId,
-      idempotencyKey: data.idempotencyKey,
-      targetUrl: data.targetUrl,
-      anchorText: data.anchorText,
-      items: data.websiteId
-        ? [{ websiteId: data.websiteId, targetUrl: data.targetUrl, anchorText: data.anchorText }]
-        : undefined,
-    }, userId)
+    const order = await this.orders.createOrder(
+      {
+        type: data.type,
+        title: data.title,
+        instructions: data.instructions,
+        customerId: data.customerId,
+        organizationId: data.organizationId,
+        campaignId: data.campaignId,
+        idempotencyKey: data.idempotencyKey,
+        targetUrl: data.targetUrl,
+        anchorText: data.anchorText,
+        items: data.websiteId
+          ? [
+              {
+                websiteId: data.websiteId,
+                targetUrl: data.targetUrl,
+                anchorText: data.anchorText,
+              },
+            ]
+          : undefined,
+      },
+      userId,
+    )
 
     await this.audit.log({
       action: "ORDER_CREATED",
@@ -110,7 +133,10 @@ export class CampaignsService {
     return { items, total, take, skip }
   }
 
-  async createCampaign(data: { name: string; description?: string; organizationId: string }, userId: string) {
+  async createCampaign(
+    data: { name: string; description?: string; organizationId: string },
+    userId: string,
+  ) {
     const campaign = await this.prisma.campaign.create({ data })
     await this.audit.log({
       action: "CAMPAIGN_CREATED",
@@ -149,7 +175,12 @@ export class CampaignsService {
     }
   }
 
-  async listCampaignOrders(campaignId: string, organizationId: string, take = 50, skip = 0) {
+  async listCampaignOrders(
+    campaignId: string,
+    organizationId: string,
+    take = 50,
+    skip = 0,
+  ) {
     const campaign = await this.prisma.campaign.findFirst({
       where: { id: campaignId, organizationId },
     })
@@ -178,19 +209,25 @@ export class CampaignsService {
     userId: string,
     data: { name?: string; description?: string; status?: string },
   ) {
-    const campaign = await this.prisma.campaign.findFirst({ where: { id, organizationId } })
+    const campaign = await this.prisma.campaign.findFirst({
+      where: { id, organizationId },
+    })
     if (!campaign) throw new NotFoundException("Campaign not found")
 
     const VALID_STATUSES = ["ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"]
     if (data.status && !VALID_STATUSES.includes(data.status)) {
-      throw new BadRequestException(`Invalid status — must be one of ${VALID_STATUSES.join(", ")}`)
+      throw new BadRequestException(
+        `Invalid status — must be one of ${VALID_STATUSES.join(", ")}`,
+      )
     }
 
     const updated = await this.prisma.campaign.update({
       where: { id },
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.description !== undefined
+          ? { description: data.description }
+          : {}),
         ...(data.status !== undefined ? { status: data.status as any } : {}),
       },
     })
@@ -242,7 +279,12 @@ export class CampaignsService {
     return { items, total, take, skip }
   }
 
-  async requestRevision(orderId: string, organizationId: string, notes: string, userId: string) {
+  async requestRevision(
+    orderId: string,
+    organizationId: string,
+    notes: string,
+    userId: string,
+  ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
     })

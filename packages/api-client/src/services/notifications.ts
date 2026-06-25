@@ -1,4 +1,4 @@
-import { HttpClient } from "../client"
+import type { HttpClient } from "../client"
 
 export interface NotificationItem {
   id: string
@@ -21,7 +21,12 @@ export interface NotificationListResponse {
 export class NotificationsService {
   constructor(private client: HttpClient) {}
 
-  list(params?: { unreadOnly?: boolean; type?: string; page?: number; limit?: number }) {
+  list(params?: {
+    unreadOnly?: boolean
+    type?: string
+    page?: number
+    limit?: number
+  }) {
     return this.client.get<NotificationListResponse>("/notifications", {
       params: {
         ...(params?.unreadOnly ? { unreadOnly: "true" } : {}),
@@ -41,6 +46,8 @@ export class NotificationsService {
   }
 
   markAllRead() {
-    return this.client.post<{ ok: boolean; marked: number }>("/notifications/mark-all-read")
+    return this.client.post<{ ok: boolean; marked: number }>(
+      "/notifications/mark-all-read",
+    )
   }
 }

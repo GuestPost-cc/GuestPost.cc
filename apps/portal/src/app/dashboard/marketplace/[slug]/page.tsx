@@ -1,28 +1,35 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
-import { useParams, useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../../lib/api"
-import { Button } from "@guestpost/ui"
-import { Skeleton, ErrorState } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@guestpost/ui"
-import { Avatar, AvatarFallback } from "@guestpost/ui"
 import {
-  Star,
-  Heart,
-  Share2,
-  ExternalLink,
+  Avatar,
+  AvatarFallback,
+  Badge,
+  Button,
+  ErrorState,
+  Skeleton,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@guestpost/ui"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import {
+  AlertCircle,
   ArrowLeft,
   Clock,
+  ExternalLink,
   Globe,
+  Heart,
   Languages,
+  Share2,
   ShieldCheck,
+  Star,
   TrendingUp,
-  AlertCircle,
 } from "lucide-react"
+import Link from "next/link"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useMemo, useState } from "react"
+import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
 
 interface Listing {
@@ -64,8 +71,19 @@ interface Listing {
   images: Array<{ url: string; isPrimary: boolean }>
   // pricingTiers removed in Phase 5 — replaced by `services[]` (each row is
   // its own purchasable offering with price/TAT/requirements).
-  reviews: Array<{ id: string; rating: number; title?: string; content: string; user: { name?: string; image?: string }; createdAt: string }>
-  publisher?: { id: string; name: string; profile?: { rating?: number; totalReviews?: number; responseTime?: number } }
+  reviews: Array<{
+    id: string
+    rating: number
+    title?: string
+    content: string
+    user: { name?: string; image?: string }
+    createdAt: string
+  }>
+  publisher?: {
+    id: string
+    name: string
+    profile?: { rating?: number; totalReviews?: number; responseTime?: number }
+  }
   avgRating?: number
   reviewCount: number
   isFavorited?: boolean
@@ -97,11 +115,21 @@ export default function ListingDetailPage() {
   // The customer's locked pick. URL-bound (?service=GUEST_POST) so deep
   // links carry the choice; defaults to the first AVAILABLE row when the
   // listing loads.
-  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null)
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
+    null,
+  )
 
-  const { data: listing, isLoading, error, refetch } = useQuery<Listing>({
+  const {
+    data: listing,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery<Listing>({
     queryKey: ["listing", params.slug],
-    queryFn: () => api.marketplace.getListing(params.slug as string).then(r => r as unknown as Listing),
+    queryFn: () =>
+      api.marketplace
+        .getListing(params.slug as string)
+        .then((r) => r as unknown as Listing),
     enabled: !!params.slug,
   })
 
@@ -109,11 +137,11 @@ export default function ListingDetailPage() {
   const searchParams = useSearchParams()
   const services = listing?.services ?? []
   const orderableServices = useMemo(
-    () => services.filter(s => s.availability === "AVAILABLE"),
+    () => services.filter((s) => s.availability === "AVAILABLE"),
     [services],
   )
   const selectedService = useMemo(
-    () => services.find(s => s.id === selectedServiceId) ?? null,
+    () => services.find((s) => s.id === selectedServiceId) ?? null,
     [services, selectedServiceId],
   )
 
@@ -121,9 +149,14 @@ export default function ListingDetailPage() {
   // to the first AVAILABLE row (cheapest, since the API sorts by price asc).
   useEffect(() => {
     if (!listing || services.length === 0) return
-    if (selectedServiceId && services.some(s => s.id === selectedServiceId)) return
+    if (selectedServiceId && services.some((s) => s.id === selectedServiceId))
+      return
     const requested = searchParams?.get("service")
-    const fromUrl = requested ? services.find(s => s.serviceType === requested && s.availability === "AVAILABLE") : null
+    const fromUrl = requested
+      ? services.find(
+          (s) => s.serviceType === requested && s.availability === "AVAILABLE",
+        )
+      : null
     const fallback = orderableServices[0] ?? null
     const picked = fromUrl ?? fallback
     if (picked) setSelectedServiceId(picked.id)
@@ -136,11 +169,15 @@ export default function ListingDetailPage() {
         ? api.marketplace.removeFavorite(listing.id)
         : api.marketplace.addFavorite(listing.id)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["listing", params.slug] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["listing", params.slug] }),
   })
 
   function formatPrice(price: number, currency: string = "USD") {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(price)
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    }).format(price)
   }
 
   if (isLoading) {
@@ -165,7 +202,13 @@ export default function ListingDetailPage() {
   }
 
   if (error) {
-    return <ErrorState title="Failed to load listing" description={(error as Error).message} onRetry={() => refetch()} />
+    return (
+      <ErrorState
+        title="Failed to load listing"
+        description={(error as Error).message}
+        onRetry={() => refetch()}
+      />
+    )
   }
 
   if (!listing) {
@@ -173,7 +216,9 @@ export default function ListingDetailPage() {
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-semibold mb-2">Listing Not Found</h2>
-        <p className="text-muted-foreground mb-4">This listing doesn't exist or has been removed.</p>
+        <p className="text-muted-foreground mb-4">
+          This listing doesn't exist or has been removed.
+        </p>
         <Button asChild>
           <Link href="/dashboard/marketplace">Back to Marketplace</Link>
         </Button>
@@ -181,7 +226,8 @@ export default function ListingDetailPage() {
     )
   }
 
-  const images = listing.images.length > 0 ? listing.images : [{ url: "", isPrimary: true }]
+  const images =
+    listing.images.length > 0 ? listing.images : [{ url: "", isPrimary: true }]
 
   return (
     <div className="space-y-6">
@@ -191,8 +237,15 @@ export default function ListingDetailPage() {
           Back to Marketplace
         </Button>
         <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => toggleFavorite()} disabled={favoriting}>
-            <Heart className={`h-4 w-4 mr-2 ${listing.isFavorited ? "fill-red-500 text-red-500" : ""}`} />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => toggleFavorite()}
+            disabled={favoriting}
+          >
+            <Heart
+              className={`h-4 w-4 mr-2 ${listing.isFavorited ? "fill-red-500 text-red-500" : ""}`}
+            />
             {listing.isFavorited ? "Saved" : "Save"}
           </Button>
           <Button variant="outline" size="sm">
@@ -213,7 +266,9 @@ export default function ListingDetailPage() {
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <span className="text-6xl font-bold text-primary/20">{listing.title[0]}</span>
+                <span className="text-6xl font-bold text-primary/20">
+                  {listing.title[0]}
+                </span>
               </div>
             )}
             {listing.featured && (
@@ -232,7 +287,11 @@ export default function ListingDetailPage() {
                     i === activeImage ? "border-primary" : "border-transparent"
                   }`}
                 >
-                  <img src={img.url} alt="" className="w-full h-full object-cover" />
+                  <img
+                    src={img.url}
+                    alt=""
+                    className="w-full h-full object-cover"
+                  />
                 </button>
               ))}
             </div>
@@ -246,7 +305,13 @@ export default function ListingDetailPage() {
                 <Badge variant="secondary">{listing.category.name}</Badge>
               )}
               {/* Phase 7: prefer the first AVAILABLE service. */}
-              <Badge variant="outline">{(((listing as any).serviceTypes?.[0]) ?? listing.type ?? "").replace(/_/g, " ")}</Badge>
+              <Badge variant="outline">
+                {(
+                  (listing as any).serviceTypes?.[0] ??
+                  listing.type ??
+                  ""
+                ).replace(/_/g, " ")}
+              </Badge>
               {listing.fulfillmentType === "INTERNAL" ? (
                 <Badge>Platform fulfilled</Badge>
               ) : listing.fulfillmentType === "HYBRID" ? (
@@ -275,8 +340,12 @@ export default function ListingDetailPage() {
                     />
                   ))}
                 </div>
-                <span className="font-medium">{listing.avgRating.toFixed(1)}</span>
-                <span className="text-muted-foreground">({listing.reviewCount} reviews)</span>
+                <span className="font-medium">
+                  {listing.avgRating.toFixed(1)}
+                </span>
+                <span className="text-muted-foreground">
+                  ({listing.reviewCount} reviews)
+                </span>
               </div>
             )}
           </div>
@@ -286,36 +355,50 @@ export default function ListingDetailPage() {
                 is picked, otherwise priceFrom (min AVAILABLE). Legacy
                 listing.price is the last-resort fallback. */}
             <div className="flex items-baseline justify-between">
-              <span className="text-3xl font-bold">{
-                formatPrice(
-                  selectedService?.price
-                    ?? (listing as any).priceFrom
-                    ?? listing.price
-                    ?? 0,
+              <span className="text-3xl font-bold">
+                {formatPrice(
+                  selectedService?.price ??
+                    (listing as any).priceFrom ??
+                    listing.price ??
+                    0,
                   listing.currency,
-                )
-              }</span>
+                )}
+              </span>
               {(listing as any).priceFrom != null && !selectedService && (
-                <span className="text-muted-foreground text-sm">starting at</span>
+                <span className="text-muted-foreground text-sm">
+                  starting at
+                </span>
               )}
             </div>
             <div className="grid grid-cols-3 gap-4">
               {listing.domainRating && (
                 <div className="text-center p-3 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold">{listing.domainRating}</div>
-                  <div className="text-xs text-muted-foreground">Domain Rating</div>
+                  <div className="text-2xl font-bold">
+                    {listing.domainRating}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Domain Rating
+                  </div>
                 </div>
               )}
               {listing.traffic && (
                 <div className="text-center p-3 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold">{listing.traffic.toLocaleString()}</div>
-                  <div className="text-xs text-muted-foreground">Monthly Traffic</div>
+                  <div className="text-2xl font-bold">
+                    {listing.traffic.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Monthly Traffic
+                  </div>
                 </div>
               )}
               {listing.referringDomains && (
                 <div className="text-center p-3 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold">{listing.referringDomains.toLocaleString()}</div>
-                  <div className="text-xs text-muted-foreground">Referring Domains</div>
+                  <div className="text-2xl font-bold">
+                    {listing.referringDomains.toLocaleString()}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Referring Domains
+                  </div>
                 </div>
               )}
             </div>
@@ -326,9 +409,15 @@ export default function ListingDetailPage() {
               re-selectable downstream.
             */}
             {services.length > 0 && (
-              <div className="space-y-2" role="radiogroup" aria-label="Choose a service">
-                <div className="text-sm font-medium text-muted-foreground">Available services</div>
-                {services.map(svc => {
+              <div
+                className="space-y-2"
+                role="radiogroup"
+                aria-label="Choose a service"
+              >
+                <div className="text-sm font-medium text-muted-foreground">
+                  Available services
+                </div>
+                {services.map((svc) => {
                   const isSelected = svc.id === selectedServiceId
                   const isWaitlist = svc.availability === "WAITLIST"
                   return (
@@ -342,14 +431,23 @@ export default function ListingDetailPage() {
                     >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <div className="font-medium text-sm">{svc.serviceType.replace(/_/g, " ")}</div>
+                          <div className="font-medium text-sm">
+                            {svc.serviceType.replace(/_/g, " ")}
+                          </div>
                           <div className="text-xs text-muted-foreground">
-                            {svc.turnaroundDays}d turnaround · {svc.revisionRounds} revisions
-                            {isWaitlist && <span className="ml-2 text-amber-600">Waitlist</span>}
+                            {svc.turnaroundDays}d turnaround ·{" "}
+                            {svc.revisionRounds} revisions
+                            {isWaitlist && (
+                              <span className="ml-2 text-amber-600">
+                                Waitlist
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-semibold">{formatPrice(svc.price, svc.currency)}</div>
+                          <div className="font-semibold">
+                            {formatPrice(svc.price, svc.currency)}
+                          </div>
                         </div>
                       </div>
                     </button>
@@ -377,19 +475,29 @@ export default function ListingDetailPage() {
                   // No service picked yet — fall through to the first
                   // AVAILABLE service's type, then the deprecated listing
                   // column as a last resort.
-                  const fallbackType = (listing as any).serviceTypes?.[0] ?? listing.type
+                  const fallbackType =
+                    (listing as any).serviceTypes?.[0] ?? listing.type
                   if (fallbackType) params.set("type", fallbackType)
-                  const fallbackPrice = (listing as any).priceFrom ?? listing.price
-                  if (fallbackPrice != null) params.set("price", String(fallbackPrice))
+                  const fallbackPrice =
+                    (listing as any).priceFrom ?? listing.price
+                  if (fallbackPrice != null)
+                    params.set("price", String(fallbackPrice))
                 }
-                if (listing.websiteId) params.set("websiteId", listing.websiteId)
+                if (listing.websiteId)
+                  params.set("websiteId", listing.websiteId)
                 if (listing.websiteUrl) params.set("url", listing.websiteUrl)
-                const attributionLabel = listing.attribution?.label ?? (listing.fulfillmentType === "INTERNAL" ? "Platform" : (listing.publisher?.name ?? "Publisher"))
+                const attributionLabel =
+                  listing.attribution?.label ??
+                  (listing.fulfillmentType === "INTERNAL"
+                    ? "Platform"
+                    : (listing.publisher?.name ?? "Publisher"))
                 params.set("fulfilledBy", attributionLabel)
                 router.push(`/dashboard/orders/new?${params.toString()}`)
               }}
             >
-              {services.length > 0 && !selectedService ? "Pick a service to continue" : "Order Now"}
+              {services.length > 0 && !selectedService
+                ? "Pick a service to continue"
+                : "Order Now"}
             </Button>
             <Button
               variant="outline"
@@ -407,9 +515,11 @@ export default function ListingDetailPage() {
             {/* Phase 7: prefer the selected service's TAT; fall back to the
                 first AVAILABLE service; last resort is the legacy column. */}
             {(() => {
-              const td = selectedService?.turnaroundDays
-                ?? services.find(s => s.availability === "AVAILABLE")?.turnaroundDays
-                ?? listing.turnaroundDays
+              const td =
+                selectedService?.turnaroundDays ??
+                services.find((s) => s.availability === "AVAILABLE")
+                  ?.turnaroundDays ??
+                listing.turnaroundDays
               return td ? (
                 <div className="flex items-center gap-3 text-sm">
                   <Clock className="h-4 w-4 text-muted-foreground" />
@@ -432,9 +542,11 @@ export default function ListingDetailPage() {
             {(() => {
               // Phase 7: same fallback chain as turnaround days. Hide the
               // row entirely if no service or legacy column declares it.
-              const rr = selectedService?.revisionRounds
-                ?? services.find(s => s.availability === "AVAILABLE")?.revisionRounds
-                ?? listing.revisionRounds
+              const rr =
+                selectedService?.revisionRounds ??
+                services.find((s) => s.availability === "AVAILABLE")
+                  ?.revisionRounds ??
+                listing.revisionRounds
               return rr != null ? (
                 <div className="flex items-center gap-3 text-sm">
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -472,15 +584,21 @@ export default function ListingDetailPage() {
                         </span>
                       )}
                       {listing.publisher.profile.totalReviews && (
-                        <span>{listing.publisher.profile.totalReviews} reviews</span>
+                        <span>
+                          {listing.publisher.profile.totalReviews} reviews
+                        </span>
                       )}
                       {listing.publisher.profile.responseTime && (
-                        <span className="ml-3">~{listing.publisher.profile.responseTime}h response</span>
+                        <span className="ml-3">
+                          ~{listing.publisher.profile.responseTime}h response
+                        </span>
                       )}
                     </div>
                   )}
                 </div>
-                <Button variant="outline" size="sm">View Profile</Button>
+                <Button variant="outline" size="sm">
+                  View Profile
+                </Button>
               </div>
             </div>
           )}
@@ -491,7 +609,9 @@ export default function ListingDetailPage() {
         <TabsList>
           <TabsTrigger value="description">Description</TabsTrigger>
           <TabsTrigger value="pricing">Pricing</TabsTrigger>
-          <TabsTrigger value="reviews">Reviews ({listing.reviewCount})</TabsTrigger>
+          <TabsTrigger value="reviews">
+            Reviews ({listing.reviewCount})
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="description" className="mt-4 space-y-4">
           <div className="prose max-w-none">
@@ -516,18 +636,31 @@ export default function ListingDetailPage() {
           */}
           {services.length > 0 ? (
             <div className="grid md:grid-cols-3 gap-4">
-              {services.map(svc => (
+              {services.map((svc) => (
                 <div key={svc.id} className="p-6 border rounded-lg">
-                  <h3 className="font-semibold mb-2">{svc.serviceType.replace(/_/g, " ")}</h3>
-                  <div className="text-2xl font-bold mb-2">{formatPrice(svc.price, svc.currency)}</div>
-                  <p className="text-sm text-muted-foreground">{svc.turnaroundDays}d turnaround · {svc.revisionRounds} revisions</p>
-                  {svc.availability === "WAITLIST" && <p className="text-xs text-amber-600 mt-2">Currently waitlisted</p>}
+                  <h3 className="font-semibold mb-2">
+                    {svc.serviceType.replace(/_/g, " ")}
+                  </h3>
+                  <div className="text-2xl font-bold mb-2">
+                    {formatPrice(svc.price, svc.currency)}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {svc.turnaroundDays}d turnaround · {svc.revisionRounds}{" "}
+                    revisions
+                  </p>
+                  {svc.availability === "WAITLIST" && (
+                    <p className="text-xs text-amber-600 mt-2">
+                      Currently waitlisted
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
           ) : (
             <div className="p-6 border rounded-lg text-center">
-              <p className="text-lg font-medium">{formatPrice(listing.price ?? 0, listing.currency)}</p>
+              <p className="text-lg font-medium">
+                {formatPrice(listing.price ?? 0, listing.currency)}
+              </p>
               <p className="text-muted-foreground">Fixed price</p>
             </div>
           )}
@@ -543,14 +676,20 @@ export default function ListingDetailPage() {
                         <Star
                           key={i}
                           className={`h-4 w-4 ${
-                            i < review.rating ? "fill-yellow-400 text-yellow-400" : "text-gray-300"
+                            i < review.rating
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-gray-300"
                           }`}
                         />
                       ))}
                     </div>
-                    {review.title && <span className="font-medium">{review.title}</span>}
+                    {review.title && (
+                      <span className="font-medium">{review.title}</span>
+                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground">{review.content}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {review.content}
+                  </p>
                   <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                     <Avatar className="h-5 w-5">
                       <AvatarFallback className="text-[10px]">
@@ -559,7 +698,9 @@ export default function ListingDetailPage() {
                     </Avatar>
                     <span>{review.user.name || "Anonymous"}</span>
                     <span>•</span>
-                    <span>{new Date(review.createdAt).toLocaleDateString()}</span>
+                    <span>
+                      {new Date(review.createdAt).toLocaleDateString()}
+                    </span>
                   </div>
                 </div>
               ))}

@@ -1,19 +1,31 @@
 import { Module } from "@nestjs/common"
+import { PermissionsGuard } from "../../common/guards/permissions.guard"
+import { MarketplaceModule } from "../marketplace/marketplace.module"
+import { OrdersModule } from "../orders/orders.module"
+import { PublisherPayoutsModule } from "../publisher-payouts/publisher-payouts.module"
+import { SettlementsModule } from "../settlements/settlements.module"
+import { SupportModule } from "../support/support.module"
 import { AdminController } from "./admin.controller"
 import { AdminService } from "./admin.service"
-import { ReconciliationService } from "./reconciliation.service"
 import { RevenueService } from "./finance/revenue.service"
+import { ReconciliationService } from "./reconciliation.service"
 import { WebsiteVerificationService } from "./website-verification.service"
-import { PermissionsGuard } from "../../common/guards/permissions.guard"
-import { SettlementsModule } from "../settlements/settlements.module"
-import { PublisherPayoutsModule } from "../publisher-payouts/publisher-payouts.module"
-import { OrdersModule } from "../orders/orders.module"
-import { MarketplaceModule } from "../marketplace/marketplace.module"
-import { SupportModule } from "../support/support.module"
 
 @Module({
-  imports: [SettlementsModule, PublisherPayoutsModule, OrdersModule, MarketplaceModule, SupportModule],
+  imports: [
+    SettlementsModule,
+    PublisherPayoutsModule,
+    OrdersModule,
+    MarketplaceModule,
+    SupportModule,
+  ],
   controllers: [AdminController],
-  providers: [AdminService, ReconciliationService, RevenueService, WebsiteVerificationService, PermissionsGuard],
+  providers: [
+    AdminService,
+    ReconciliationService,
+    RevenueService,
+    WebsiteVerificationService,
+    PermissionsGuard,
+  ],
 })
 export class AdminModule {}

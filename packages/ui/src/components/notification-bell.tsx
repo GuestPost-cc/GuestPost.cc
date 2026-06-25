@@ -1,14 +1,13 @@
 "use client"
 
-import * as React from "react"
 import { Bell, CheckCheck, Loader2 } from "lucide-react"
+import { cn } from "../lib/utils"
+import { Button } from "./button"
 import {
   DropdownMenu,
-  DropdownMenuTrigger,
   DropdownMenuContent,
+  DropdownMenuTrigger,
 } from "./dropdown-menu"
-import { Button } from "./button"
-import { cn } from "../lib/utils"
 
 export interface NotificationBellItem {
   id: string
@@ -55,7 +54,12 @@ export function NotificationBell({
   return (
     <DropdownMenu onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative"
+          aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
+        >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
             <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
@@ -68,7 +72,12 @@ export function NotificationBell({
         <div className="flex items-center justify-between border-b px-4 py-2">
           <span className="text-sm font-semibold">Notifications</span>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={onMarkAllRead}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={onMarkAllRead}
+            >
               <CheckCheck className="mr-1 h-3 w-3" />
               Mark all read
             </Button>
@@ -80,7 +89,9 @@ export function NotificationBell({
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : items.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">No notifications</div>
+            <div className="py-8 text-center text-sm text-muted-foreground">
+              No notifications
+            </div>
           ) : (
             items.map((n) => (
               <button
@@ -93,11 +104,19 @@ export function NotificationBell({
                 )}
               >
                 <span className="flex items-start gap-2">
-                  {!n.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" aria-hidden />}
-                  <span className={cn("text-sm", !n.read && "font-medium")}>{n.message}</span>
+                  {!n.read && (
+                    <span
+                      className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary"
+                      aria-hidden
+                    />
+                  )}
+                  <span className={cn("text-sm", !n.read && "font-medium")}>
+                    {n.message}
+                  </span>
                 </span>
                 <span className="pl-4 text-xs text-muted-foreground">
-                  {n.type.replace(/_/g, " ").toLowerCase()} — {timeAgo(n.createdAt)}
+                  {n.type.replace(/_/g, " ").toLowerCase()} —{" "}
+                  {timeAgo(n.createdAt)}
                 </span>
               </button>
             ))

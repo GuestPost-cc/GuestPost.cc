@@ -2,7 +2,7 @@
  * downloadCsv is the single CSV export path for every app — its formula
  * injection neutralization is a security control, so it gets exact tests.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { beforeEach, describe, expect, it, vi } from "vitest"
 import { downloadCsv } from "../csv"
 
 function captureCsv(): { get: () => string } {
@@ -49,7 +49,10 @@ describe("downloadCsv", () => {
   })
 
   it("neutralizes formula-injection prefixes (= + - @ tab CR)", async () => {
-    const csv = await run(["v"], [["=HYPERLINK(1)"], ["+1"], ["-1"], ["@cmd"], ["\tx"], ["\rx"]])
+    const csv = await run(
+      ["v"],
+      [["=HYPERLINK(1)"], ["+1"], ["-1"], ["@cmd"], ["\tx"], ["\rx"]],
+    )
     for (const line of csv.split("\n").slice(1)) {
       expect(line.startsWith("\"'")).toBe(true)
     }

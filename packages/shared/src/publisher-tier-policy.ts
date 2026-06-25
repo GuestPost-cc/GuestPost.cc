@@ -25,6 +25,7 @@
 // clauses below, plus the runtime exhaustive-coverage test in
 // phase-7-2-tier-policy.spec.ts.
 import type { PublisherTier } from "./types"
+
 export type { PublisherTier }
 
 /**

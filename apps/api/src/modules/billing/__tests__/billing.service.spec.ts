@@ -1,6 +1,10 @@
-import { BadRequestException, ConflictException, ForbiddenException } from "@nestjs/common"
-import { BillingService } from "../billing.service"
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import { BillingService } from "../billing.service"
 
 describe("BillingService", () => {
   let service: BillingService
@@ -50,7 +54,11 @@ describe("BillingService", () => {
         prismaMock.wallet.updateMany.mockResolvedValue({ count: 1 })
         prismaMock.wallet.findUniqueOrThrow
           .mockResolvedValueOnce(mockWallet)
-          .mockResolvedValueOnce({ ...mockWallet, availableBalance: new Decimal(1500), version: 2 })
+          .mockResolvedValueOnce({
+            ...mockWallet,
+            availableBalance: new Decimal(1500),
+            version: 2,
+          })
         return cb(prismaMock)
       })
 
@@ -59,19 +67,24 @@ describe("BillingService", () => {
       expect(Number(result.availableBalance)).toBe(1500)
       expect(result.version).toBe(2)
       expect(auditMock.log).toHaveBeenCalledWith(
-        expect.objectContaining({ action: "WALLET_DEPOSIT", entityId: "wallet-1" }),
+        expect.objectContaining({
+          action: "WALLET_DEPOSIT",
+          entityId: "wallet-1",
+        }),
       )
     })
 
     it("rejects duplicate reference", async () => {
       prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.transaction.findFirst.mockResolvedValue({ id: "existing-tx" })
+        prismaMock.transaction.findFirst.mockResolvedValue({
+          id: "existing-tx",
+        })
         return cb(prismaMock)
       })
 
-      await expect(service.deposit("wallet-1", 500, mockUser, "ref-1")).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.deposit("wallet-1", 500, mockUser, "ref-1"),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("rejects unowned wallet", async () => {
@@ -81,9 +94,9 @@ describe("BillingService", () => {
         return cb(prismaMock)
       })
 
-      await expect(service.deposit("wallet-1", 500, otherUser, "ref-2")).rejects.toThrow(
-        ForbiddenException,
-      )
+      await expect(
+        service.deposit("wallet-1", 500, otherUser, "ref-2"),
+      ).rejects.toThrow(ForbiddenException)
     })
 
     it("throws ConflictException on version mismatch", async () => {
@@ -106,7 +119,11 @@ describe("BillingService", () => {
         prismaMock.wallet.updateMany.mockResolvedValue({ count: 1 })
         prismaMock.wallet.findUniqueOrThrow
           .mockResolvedValueOnce(mockWallet)
-          .mockResolvedValueOnce({ ...mockWallet, availableBalance: new Decimal(800), version: 2 })
+          .mockResolvedValueOnce({
+            ...mockWallet,
+            availableBalance: new Decimal(800),
+            version: 2,
+          })
         return cb(prismaMock)
       })
 
@@ -130,20 +147,22 @@ describe("BillingService", () => {
         return cb(prismaMock)
       })
 
-      await expect(service.withdraw("wallet-1", 2000, mockUser)).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.withdraw("wallet-1", 2000, mockUser),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("rejects duplicate idempotency key", async () => {
       prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.transaction.findFirst.mockResolvedValue({ id: "existing-tx" })
+        prismaMock.transaction.findFirst.mockResolvedValue({
+          id: "existing-tx",
+        })
         return cb(prismaMock)
       })
 
-      await expect(service.withdraw("wallet-1", 200, mockUser, "idem-1")).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.withdraw("wallet-1", 200, mockUser, "idem-1"),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("rejects unowned wallet", async () => {
@@ -153,9 +172,9 @@ describe("BillingService", () => {
         return cb(prismaMock)
       })
 
-      await expect(service.withdraw("wallet-1", 200, otherUser)).rejects.toThrow(
-        ForbiddenException,
-      )
+      await expect(
+        service.withdraw("wallet-1", 200, otherUser),
+      ).rejects.toThrow(ForbiddenException)
     })
   })
 
@@ -195,9 +214,9 @@ describe("BillingService", () => {
         return cb(prismaMock)
       })
 
-      await expect(service.reserve("wallet-1", 5000, "order-1", mockUser)).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.reserve("wallet-1", 5000, "order-1", mockUser),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("throws ConflictException on version mismatch during concurrent reserve", async () => {
@@ -207,9 +226,9 @@ describe("BillingService", () => {
         return cb(prismaMock)
       })
 
-      await expect(service.reserve("wallet-1", 200, "order-1", mockUser)).rejects.toThrow(
-        ConflictException,
-      )
+      await expect(
+        service.reserve("wallet-1", 200, "order-1", mockUser),
+      ).rejects.toThrow(ConflictException)
     })
   })
 
@@ -228,7 +247,12 @@ describe("BillingService", () => {
         return cb(prismaMock)
       })
 
-      const result = await service.payFromReserved("wallet-1", 100, "order-1", mockUser)
+      const result = await service.payFromReserved(
+        "wallet-1",
+        100,
+        "order-1",
+        mockUser,
+      )
 
       expect(Number(result.reservedBalance)).toBe(100)
     })
@@ -275,7 +299,9 @@ describe("BillingService", () => {
       // Reserved funds belong to other orders — refund must not decrement them
       expect(prismaMock.wallet.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.not.objectContaining({ reservedBalance: expect.anything() }),
+          data: expect.not.objectContaining({
+            reservedBalance: expect.anything(),
+          }),
         }),
       )
       expect(auditMock.log).toHaveBeenCalledWith(
@@ -286,13 +312,15 @@ describe("BillingService", () => {
     it("prevents duplicate refund", async () => {
       prismaMock.$transaction.mockImplementation(async (cb: any) => {
         prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        prismaMock.transaction.findFirst.mockResolvedValue({ id: "existing-refund" })
+        prismaMock.transaction.findFirst.mockResolvedValue({
+          id: "existing-refund",
+        })
         return cb(prismaMock)
       })
 
-      await expect(service.refund("wallet-1", 200, "order-1", mockUser)).rejects.toThrow(
-        BadRequestException,
-      )
+      await expect(
+        service.refund("wallet-1", 200, "order-1", mockUser),
+      ).rejects.toThrow(BadRequestException)
     })
 
     it("rejects refund for unowned wallet", async () => {
@@ -302,9 +330,9 @@ describe("BillingService", () => {
         return cb(prismaMock)
       })
 
-      await expect(service.refund("wallet-1", 200, "order-1", otherUser)).rejects.toThrow(
-        ForbiddenException,
-      )
+      await expect(
+        service.refund("wallet-1", 200, "order-1", otherUser),
+      ).rejects.toThrow(ForbiddenException)
     })
   })
 

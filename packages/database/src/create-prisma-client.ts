@@ -1,9 +1,10 @@
-import { PrismaClient } from "./prisma/client"
-import type { Prisma } from "./prisma/client"
 import { PrismaPg } from "@prisma/adapter-pg"
 import type { PoolConfig } from "pg"
+import type { Prisma } from "./prisma/client"
+import { PrismaClient } from "./prisma/client"
 
-export interface CreatePrismaAdapterOptions extends Omit<PoolConfig, "connectionString"> {}
+export interface CreatePrismaAdapterOptions
+  extends Omit<PoolConfig, "connectionString"> {}
 
 export interface CreatePrismaClientOptions {
   pool?: CreatePrismaAdapterOptions
@@ -23,7 +24,9 @@ export interface CreatePrismaClientOptions {
 //
 // Throws if DATABASE_URL is missing — converts what would otherwise be a
 // confusing first-query failure into a clear startup-time error.
-export function createPrismaAdapter(options: CreatePrismaAdapterOptions = {}): PrismaPg {
+export function createPrismaAdapter(
+  options: CreatePrismaAdapterOptions = {},
+): PrismaPg {
   if (!process.env.DATABASE_URL) {
     throw new Error("DATABASE_URL is required")
   }
@@ -38,9 +41,13 @@ export function createPrismaAdapter(options: CreatePrismaAdapterOptions = {}): P
 // singleton in `packages/database/src/index.ts`). For NestJS's
 // `PrismaService extends PrismaClient` where the constructor must call
 // super(...), use createPrismaAdapter directly inside the super() call.
-export function createPrismaClient(options: CreatePrismaClientOptions = {}): PrismaClient {
+export function createPrismaClient(
+  options: CreatePrismaClientOptions = {},
+): PrismaClient {
   return new PrismaClient({
     adapter: createPrismaAdapter(options.pool),
-    ...(options.transactionOptions ? { transactionOptions: options.transactionOptions } : {}),
+    ...(options.transactionOptions
+      ? { transactionOptions: options.transactionOptions }
+      : {}),
   })
 }

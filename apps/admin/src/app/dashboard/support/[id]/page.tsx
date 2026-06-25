@@ -1,35 +1,45 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../../lib/api"
-import { useAuth } from "../../../../lib/auth"
-import { Card, CardContent, CardHeader, CardTitle, FulfillmentChannelBadge } from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import { Textarea } from "@guestpost/ui"
 import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  FulfillmentChannelBadge,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Skeleton,
+  Textarea,
 } from "@guestpost/ui"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { format, formatDistanceToNow } from "date-fns"
 import {
-  ArrowLeft,
-  Send,
   AlertCircle,
-  RefreshCw,
-  Lock,
+  ArrowLeft,
+  Cog,
   Eye,
   Info,
-  Cog,
+  Lock,
+  RefreshCw,
+  Send,
 } from "lucide-react"
-import { format, formatDistanceToNow } from "date-fns"
+import { useParams, useRouter } from "next/navigation"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import { api } from "../../../../lib/api"
+import { useAuth } from "../../../../lib/auth"
 
-const STATUS_OPTIONS = ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER", "RESOLVED", "CLOSED"]
+const STATUS_OPTIONS = [
+  "OPEN",
+  "IN_PROGRESS",
+  "WAITING_ON_CUSTOMER",
+  "RESOLVED",
+  "CLOSED",
+]
 
 type Visibility = "PUBLIC" | "INTERNAL"
 type ParticipantRole = "CUSTOMER" | "PUBLISHER" | "OPS" | "ADMIN" | "FINANCE"
@@ -46,7 +56,8 @@ type ActorSnapshot = {
 // surfaces the raw role + the customer/publisher membership context that
 // the chip can't fit. Used as the title= on the RoleBadge.
 function describeActorSnapshot(snap: ActorSnapshot): string {
-  if (!snap) return "Role at write time — snapshot unavailable (pre-Phase-6.6.2 row)"
+  if (!snap)
+    return "Role at write time — snapshot unavailable (pre-Phase-6.6.2 row)"
   if (snap.kind === "STAFF") {
     return `Role at write time: STAFF · ${snap.staffRole ?? "(no role)"}`
   }
@@ -64,14 +75,20 @@ function describeActorSnapshot(snap: ActorSnapshot): string {
 // posted then Ops verified then Admin closed". Colors are stable across
 // channels — Finance is always green, Admin is always indigo, etc.
 const ROLE_STYLES: Record<ParticipantRole, { label: string; cls: string }> = {
-  CUSTOMER:  { label: "CUSTOMER",  cls: "bg-slate-100 text-slate-800" },
+  CUSTOMER: { label: "CUSTOMER", cls: "bg-slate-100 text-slate-800" },
   PUBLISHER: { label: "PUBLISHER", cls: "bg-sky-100 text-sky-800" },
-  OPS:       { label: "OPS",       cls: "bg-blue-100 text-blue-800" },
-  ADMIN:     { label: "ADMIN",     cls: "bg-indigo-100 text-indigo-800" },
-  FINANCE:   { label: "FINANCE",   cls: "bg-emerald-100 text-emerald-800" },
+  OPS: { label: "OPS", cls: "bg-blue-100 text-blue-800" },
+  ADMIN: { label: "ADMIN", cls: "bg-indigo-100 text-indigo-800" },
+  FINANCE: { label: "FINANCE", cls: "bg-emerald-100 text-emerald-800" },
 }
 
-function RoleBadge({ role, snapshot }: { role: ParticipantRole; snapshot?: ActorSnapshot }) {
+function RoleBadge({
+  role,
+  snapshot,
+}: {
+  role: ParticipantRole
+  snapshot?: ActorSnapshot
+}) {
   const s = ROLE_STYLES[role]
   return (
     <span
@@ -93,7 +110,12 @@ export default function AdminTicketDetailPage() {
   const [replyContent, setReplyContent] = useState("")
   const [visibility, setVisibility] = useState<Visibility>("PUBLIC")
 
-  const { data: ticket, isLoading, error, refetch } = useQuery({
+  const {
+    data: ticket,
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ["admin", "ticket", params.id],
     queryFn: () => api.admin.getTicketDetail(params.id as string),
     enabled: !!params.id,
@@ -105,7 +127,9 @@ export default function AdminTicketDetailPage() {
   const platformChannel = ticket?.fulfillmentChannel === "PLATFORM"
   const financeOnPlatform = staffRole === "FINANCE" && platformChannel
   const publicReplyDisabled = financeOnPlatform
-  const effectiveVisibility: Visibility = publicReplyDisabled ? "INTERNAL" : visibility
+  const effectiveVisibility: Visibility = publicReplyDisabled
+    ? "INTERNAL"
+    : visibility
 
   // Keep the local state coherent if the ticket finishes loading after mount.
   useMemo(() => {
@@ -118,11 +142,14 @@ export default function AdminTicketDetailPage() {
     mutationFn: (status: string) =>
       api.admin.updateTicketStatus(params.id as string, status as any),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "ticket", params.id] })
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "ticket", params.id],
+      })
       queryClient.invalidateQueries({ queryKey: ["admin", "tickets"] })
       toast.success("Status updated")
     },
-    onError: (err: any) => toast.error(err?.message || "Failed to update status"),
+    onError: (err: any) =>
+      toast.error(err?.message || "Failed to update status"),
   })
 
   const { mutate: sendReply, isPending: sendingReply } = useMutation({
@@ -132,9 +159,15 @@ export default function AdminTicketDetailPage() {
         visibility: effectiveVisibility,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin", "ticket", params.id] })
+      queryClient.invalidateQueries({
+        queryKey: ["admin", "ticket", params.id],
+      })
       setReplyContent("")
-      toast.success(effectiveVisibility === "INTERNAL" ? "Internal note added" : "Reply sent")
+      toast.success(
+        effectiveVisibility === "INTERNAL"
+          ? "Internal note added"
+          : "Reply sent",
+      )
     },
     onError: (err: any) => toast.error(err?.message || "Failed to send reply"),
   })
@@ -180,11 +213,15 @@ export default function AdminTicketDetailPage() {
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <CardTitle className="text-xl">{ticket.subject}</CardTitle>
-                <FulfillmentChannelBadge channel={ticket.fulfillmentChannel as any} />
+                <FulfillmentChannelBadge
+                  channel={ticket.fulfillmentChannel as any}
+                />
               </div>
               <p className="text-sm text-muted-foreground">
                 by {ticket.user.name || ticket.user.email} — Created{" "}
-                {formatDistanceToNow(new Date(ticket.createdAt), { addSuffix: true })}
+                {formatDistanceToNow(new Date(ticket.createdAt), {
+                  addSuffix: true,
+                })}
               </p>
               {ticket.organization && (
                 <p className="text-sm text-muted-foreground">
@@ -199,14 +236,18 @@ export default function AdminTicketDetailPage() {
                   )}
                 </p>
               )}
-              {ticket.fulfillmentChannel === "PUBLISHER" && ticket.assignedPublisher && (
-                <p className="text-sm text-muted-foreground">
-                  Publisher: {ticket.assignedPublisher.name}
-                </p>
-              )}
+              {ticket.fulfillmentChannel === "PUBLISHER" &&
+                ticket.assignedPublisher && (
+                  <p className="text-sm text-muted-foreground">
+                    Publisher: {ticket.assignedPublisher.name}
+                  </p>
+                )}
             </div>
             <div className="flex items-center gap-2">
-              <Select defaultValue={ticket.status} onValueChange={(v) => updateStatus(v)}>
+              <Select
+                defaultValue={ticket.status}
+                onValueChange={(v) => updateStatus(v)}
+              >
                 <SelectTrigger className="w-44">
                   <SelectValue />
                 </SelectTrigger>
@@ -227,9 +268,9 @@ export default function AdminTicketDetailPage() {
         <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 flex items-start gap-2">
           <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
           <span>
-            This is a <strong>Platform</strong> ticket. Finance is read-only on the customer
-            thread — public replies are disabled. Use an internal note to flag concerns to
-            Admin / Ops.
+            This is a <strong>Platform</strong> ticket. Finance is read-only on
+            the customer thread — public replies are disabled. Use an internal
+            note to flag concerns to Admin / Ops.
           </span>
         </div>
       )}
@@ -238,9 +279,11 @@ export default function AdminTicketDetailPage() {
         {ticket.messages.map((msg) => {
           const role = msg.participantRole as ParticipantRole
           const msgType = msg.messageType as MessageType
-          const isInternal = msg.visibility === "INTERNAL" || msgType === "INTERNAL_NOTE"
+          const isInternal =
+            msg.visibility === "INTERNAL" || msgType === "INTERNAL_NOTE"
           const isSystem = msgType === "SYSTEM_EVENT"
-          const isStaffRole = role === "OPS" || role === "ADMIN" || role === "FINANCE"
+          const isStaffRole =
+            role === "OPS" || role === "ADMIN" || role === "FINANCE"
 
           // SYSTEM_EVENT: centered, muted row — distinct from human messages.
           if (isSystem) {
@@ -320,9 +363,13 @@ export default function AdminTicketDetailPage() {
                     effectiveVisibility === "PUBLIC"
                       ? "bg-background shadow text-foreground"
                       : "text-muted-foreground",
-                    publicReplyDisabled ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
+                    publicReplyDisabled
+                      ? "opacity-40 cursor-not-allowed"
+                      : "cursor-pointer",
                   ].join(" ")}
-                  onClick={() => !publicReplyDisabled && setVisibility("PUBLIC")}
+                  onClick={() =>
+                    !publicReplyDisabled && setVisibility("PUBLIC")
+                  }
                   title={
                     publicReplyDisabled
                       ? "Finance can't post public replies on Platform tickets"
@@ -366,7 +413,9 @@ export default function AdminTicketDetailPage() {
               <Button
                 onClick={() => sendReply()}
                 disabled={!replyContent.trim() || sendingReply}
-                variant={effectiveVisibility === "INTERNAL" ? "outline" : "default"}
+                variant={
+                  effectiveVisibility === "INTERNAL" ? "outline" : "default"
+                }
               >
                 {effectiveVisibility === "INTERNAL" ? (
                   <Lock className="mr-2 h-4 w-4" />

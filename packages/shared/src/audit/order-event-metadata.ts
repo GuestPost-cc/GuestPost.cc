@@ -30,12 +30,18 @@ export interface OrderEventMetadata {
 
 export function orderEventMetadata(order: OrderLike): OrderEventMetadata {
   const channel = order.fulfillmentChannel ?? null
-  const ownerType = channel === "PLATFORM" ? "PLATFORM" : channel === "PUBLISHER" ? "PUBLISHER" : null
-  const amount = order.amount == null
-    ? null
-    : typeof order.amount === "string" || typeof order.amount === "number"
-      ? String(order.amount)
-      : order.amount.toString()
+  const ownerType =
+    channel === "PLATFORM"
+      ? "PLATFORM"
+      : channel === "PUBLISHER"
+        ? "PUBLISHER"
+        : null
+  const amount =
+    order.amount == null
+      ? null
+      : typeof order.amount === "string" || typeof order.amount === "number"
+        ? String(order.amount)
+        : order.amount.toString()
   return {
     listingId: order.listingId ?? null,
     listingServiceId: order.listingServiceId ?? null,

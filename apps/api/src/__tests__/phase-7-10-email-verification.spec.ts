@@ -21,10 +21,10 @@
  */
 import { buildAuthOptions, type SendEmailArgs } from "@guestpost/auth"
 import {
-  getCachedAuthContext,
-  setCachedAuthContext,
-  invalidateAuthContext,
   clearAuthContextCache,
+  getCachedAuthContext,
+  invalidateAuthContext,
+  setCachedAuthContext,
 } from "../common/auth-context-cache"
 
 describe("Phase 7.10 — buildAuthOptions emailVerification wiring", () => {
@@ -40,10 +40,12 @@ describe("Phase 7.10 — buildAuthOptions emailVerification wiring", () => {
       const sendEmail = jest.fn(async (_args: SendEmailArgs) => {})
       const built = buildAuthOptions({ sendEmail })
 
-      expect(typeof built.emailVerification?.sendVerificationEmail).toBe("function")
+      expect(typeof built.emailVerification?.sendVerificationEmail).toBe(
+        "function",
+      )
 
       // Drive the callback as Better Auth would.
-      await built.emailVerification!.sendVerificationEmail!({
+      await built.emailVerification?.sendVerificationEmail?.({
         user: { id: "u-1", email: "alice@example.com", name: "Alice" } as any,
         url: "https://app.example/api/v1/auth/verify-email?token=abc",
         token: "abc",
@@ -62,7 +64,7 @@ describe("Phase 7.10 — buildAuthOptions emailVerification wiring", () => {
       const sendEmail = jest.fn(async (_args: SendEmailArgs) => {})
       const built = buildAuthOptions({ sendEmail })
       const url = "https://app.example/api/v1/auth/verify-email?token=abc123"
-      await built.emailVerification!.sendVerificationEmail!({
+      await built.emailVerification?.sendVerificationEmail?.({
         user: { id: "u-1", email: "alice@example.com", name: "Alice" } as any,
         url,
         token: "abc123",
@@ -95,9 +97,11 @@ describe("Phase 7.10 — buildAuthOptions emailVerification wiring", () => {
         onEmailVerified,
       })
 
-      expect(typeof built.emailVerification?.afterEmailVerification).toBe("function")
+      expect(typeof built.emailVerification?.afterEmailVerification).toBe(
+        "function",
+      )
 
-      await built.emailVerification!.afterEmailVerification!({
+      await built.emailVerification?.afterEmailVerification?.({
         id: "u-42",
         email: "bob@example.com",
         emailVerified: true,
@@ -124,7 +128,11 @@ describe("Phase 7.10 — verifyEmail → onEmailVerified → cache-invalidation 
     // unverified state on a prior request (the load-bearing precondition
     // for the test — without this, the test would pass even if
     // invalidation did nothing).
-    setCachedAuthContext("u-100", { id: "u-100", emailVerified: false, userType: "CUSTOMER" })
+    setCachedAuthContext("u-100", {
+      id: "u-100",
+      emailVerified: false,
+      userType: "CUSTOMER",
+    })
     expect(getCachedAuthContext("u-100")).not.toBeNull()
 
     // Trigger: simulate Better Auth firing the afterEmailVerification
@@ -135,7 +143,7 @@ describe("Phase 7.10 — verifyEmail → onEmailVerified → cache-invalidation 
       sendEmail: jest.fn(),
       onEmailVerified: (userId) => invalidateAuthContext(userId),
     })
-    await built.emailVerification!.afterEmailVerification!({
+    await built.emailVerification?.afterEmailVerification?.({
       id: "u-100",
       email: "alice@example.com",
       emailVerified: true,
@@ -154,7 +162,7 @@ describe("Phase 7.10 — verifyEmail → onEmailVerified → cache-invalidation 
       sendEmail: jest.fn(),
       onEmailVerified: (userId) => invalidateAuthContext(userId),
     })
-    await built.emailVerification!.afterEmailVerification!({
+    await built.emailVerification?.afterEmailVerification?.({
       id: "u-200",
       email: "alice@example.com",
       emailVerified: true,

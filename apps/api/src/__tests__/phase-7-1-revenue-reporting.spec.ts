@@ -57,19 +57,27 @@ describe("Phase 7.1 — csv-stream (RFC 4180)", () => {
     })
 
     it("quotes any cell that needs quoting independently", () => {
-      expect(csvRow(["plain", "has,comma", 'has"quote'])).toBe('plain,"has,comma","has""quote"\r\n')
+      expect(csvRow(["plain", "has,comma", 'has"quote'])).toBe(
+        'plain,"has,comma","has""quote"\r\n',
+      )
     })
   })
 
   describe("buildRevenueCsvFilename", () => {
     it("includes from/to/groupBy", () => {
-      expect(buildRevenueCsvFilename({ from: "2026-05-01", to: "2026-05-31", groupBy: "channel" })).toBe(
-        "revenue-2026-05-01-2026-05-31-by-channel.csv",
-      )
+      expect(
+        buildRevenueCsvFilename({
+          from: "2026-05-01",
+          to: "2026-05-31",
+          groupBy: "channel",
+        }),
+      ).toBe("revenue-2026-05-01-2026-05-31-by-channel.csv")
     })
 
     it("substitutes 'all' for missing bounds", () => {
-      expect(buildRevenueCsvFilename({ groupBy: "month" })).toBe("revenue-all-all-by-month.csv")
+      expect(buildRevenueCsvFilename({ groupBy: "month" })).toBe(
+        "revenue-all-all-by-month.csv",
+      )
     })
   })
 
@@ -112,16 +120,26 @@ describe("Phase 7.1 — csv-stream (RFC 4180)", () => {
         previous: null,
         deltaPct: null,
       },
-      meta: { from: null, to: null, groupBy: "channel", timezone: "UTC", currencyMismatch: null },
+      meta: {
+        from: null,
+        to: null,
+        groupBy: "channel",
+        timezone: "UTC",
+        currencyMismatch: null,
+      },
     }
 
     it("emits header + bucket row + TOTAL_CURRENT trailer (no previous)", () => {
       const { res, getOutput, headers } = mockRes()
       streamRevenueCsv(res, baseRevenue, "rev.csv")
       expect(headers["Content-Type"]).toBe("text/csv; charset=utf-8")
-      expect(headers["Content-Disposition"]).toBe('attachment; filename="rev.csv"')
+      expect(headers["Content-Disposition"]).toBe(
+        'attachment; filename="rev.csv"',
+      )
       const lines = getOutput().split("\r\n").filter(Boolean)
-      expect(lines[0]).toBe("bucket,gross_amount,platform_fee,net_revenue,row_count,reversed_count,currency")
+      expect(lines[0]).toBe(
+        "bucket,gross_amount,platform_fee,net_revenue,row_count,reversed_count,currency",
+      )
       expect(lines[1]).toBe("PLATFORM,300.00,30.00,270.00,3,1,USD")
       expect(lines[2]).toBe("TOTAL_CURRENT,300.00,30.00,270.00,3,1,USD")
       // No TOTAL_PREVIOUS line
@@ -155,7 +173,13 @@ describe("Phase 7.1 — csv-stream (RFC 4180)", () => {
       const { res, getOutput } = mockRes()
       const oddBucket: RevenueResponse = {
         ...baseRevenue,
-        buckets: [{ ...baseRevenue.buckets[0]!, bucket: "Acme, Inc.", bucketKey: "Acme, Inc." }],
+        buckets: [
+          {
+            ...baseRevenue.buckets[0]!,
+            bucket: "Acme, Inc.",
+            bucketKey: "Acme, Inc.",
+          },
+        ],
       }
       streamRevenueCsv(res, oddBucket, "rev.csv")
       const lines = getOutput().split("\r\n").filter(Boolean)
@@ -166,11 +190,17 @@ describe("Phase 7.1 — csv-stream (RFC 4180)", () => {
       const { res, getOutput } = mockRes()
       const r: RevenueResponse = {
         ...baseRevenue,
-        buckets: [{ ...baseRevenue.buckets[0]!, bucket: 'My "Best" Listing', bucketKey: "lst-1" }],
+        buckets: [
+          {
+            ...baseRevenue.buckets[0]!,
+            bucket: 'My "Best" Listing',
+            bucketKey: "lst-1",
+          },
+        ],
       }
       streamRevenueCsv(res, r, "rev.csv")
       const lines = getOutput().split("\r\n").filter(Boolean)
-      expect(lines[1]!.startsWith('"My ""Best"" Listing"')).toBe(true)
+      expect(lines[1]?.startsWith('"My ""Best"" Listing"')).toBe(true)
     })
   })
 })
@@ -179,16 +209,24 @@ describe("Phase 7.1 — reporting.service #15 fix (channel snapshot wins)", () =
   // We test the fix by constructing the same shape the service produces inline
   // (single-line snapshot-first / ownership-fallback) and asserting the
   // attribution rules. Replicates `(order.fulfillmentChannel ?? website.ownershipType ?? "PUBLISHER")`.
-  const resolveOwnership = (order: { fulfillmentChannel?: string | null; website?: { ownershipType?: string | null } | null }) =>
-    order.fulfillmentChannel ?? order.website?.ownershipType ?? "PUBLISHER"
+  const resolveOwnership = (order: {
+    fulfillmentChannel?: string | null
+    website?: { ownershipType?: string | null } | null
+  }) => order.fulfillmentChannel ?? order.website?.ownershipType ?? "PUBLISHER"
 
   it("snapshot wins over a divergent ownershipType (site reassigned mid-flight)", () => {
-    const order = { fulfillmentChannel: "PUBLISHER", website: { ownershipType: "PLATFORM" } }
+    const order = {
+      fulfillmentChannel: "PUBLISHER",
+      website: { ownershipType: "PLATFORM" },
+    }
     expect(resolveOwnership(order)).toBe("PUBLISHER")
   })
 
   it("falls back to website.ownershipType when snapshot is null (pre-Phase-6 row)", () => {
-    const order = { fulfillmentChannel: null, website: { ownershipType: "PLATFORM" } }
+    const order = {
+      fulfillmentChannel: null,
+      website: { ownershipType: "PLATFORM" },
+    }
     expect(resolveOwnership(order)).toBe("PLATFORM")
   })
 
@@ -207,14 +245,22 @@ describe("Phase 7.1 — reporting.service #15 fix (channel snapshot wins)", () =
   // pre-fix shape, this test fires.
   it("reporting.service.ts source still contains the snapshot-first attribution", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const fs = require("fs") as typeof import("fs")
+    const fs = require("node:fs") as typeof import("fs")
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const path = require("path") as typeof import("path")
+    const path = require("node:path") as typeof import("path")
     const src = fs.readFileSync(
-      path.join(__dirname, "..", "modules", "reporting", "reporting.service.ts"),
+      path.join(
+        __dirname,
+        "..",
+        "modules",
+        "reporting",
+        "reporting.service.ts",
+      ),
       "utf8",
     )
-    expect(src).toMatch(/fulfillmentChannel\s*\?\?\s*\(?\s*order\.website|fulfillmentChannel\s*\?\?\s*[^)]*ownershipType/)
+    expect(src).toMatch(
+      /fulfillmentChannel\s*\?\?\s*\(?\s*order\.website|fulfillmentChannel\s*\?\?\s*[^)]*ownershipType/,
+    )
     expect(src).toMatch(/resolveChannel|fulfillmentChannel ?? o\.website/)
   })
 })

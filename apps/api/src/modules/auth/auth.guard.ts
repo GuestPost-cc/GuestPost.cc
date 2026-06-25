@@ -1,10 +1,19 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, ForbiddenException } from "@nestjs/common"
-import { Reflector } from "@nestjs/core"
 import { auth } from "@guestpost/auth"
 import { prisma } from "@guestpost/database"
+import {
+  type CanActivate,
+  type ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common"
+import type { Reflector } from "@nestjs/core"
+import {
+  getCachedAuthContext,
+  setCachedAuthContext,
+} from "../../common/auth-context-cache"
 import { IS_PUBLIC_KEY } from "../../common/decorators/public.decorator"
-import { ActiveContextService } from "../active-context/active-context.service"
-import { getCachedAuthContext, setCachedAuthContext } from "../../common/auth-context-cache"
+import type { ActiveContextService } from "../active-context/active-context.service"
 import { requiresEmailVerification } from "./email-verification-policy"
 
 @Injectable()
@@ -48,7 +57,9 @@ export class AuthGuard implements CanActivate {
       return true
     }
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } })
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+    })
     if (!user) throw new UnauthorizedException("User not found")
     if (user.banned) throw new ForbiddenException("Account is banned")
 
@@ -77,9 +88,14 @@ export class AuthGuard implements CanActivate {
         // Only ACTIVE memberships grant access — a PENDING (unaccepted) invite
         // must not let the user act in that org
         const membership = await prisma.membership.findUnique({
-          where: { userId_organizationId: { userId: user.id, organizationId: activeOrganizationId } },
+          where: {
+            userId_organizationId: {
+              userId: user.id,
+              organizationId: activeOrganizationId,
+            },
+          },
         })
-        if (!membership || membership.status !== "ACTIVE") {
+        if (membership?.status !== "ACTIVE") {
           await this.activeContext.clearOrganization(user.id)
           activeOrganizationId = null
         }
@@ -92,7 +108,10 @@ export class AuthGuard implements CanActivate {
         })
         if (fallback) {
           activeOrganizationId = fallback.organizationId
-          await this.activeContext.setActiveOrganization(user.id, fallback.organizationId)
+          await this.activeContext.setActiveOrganization(
+            user.id,
+            fallback.organizationId,
+          )
         }
       }
     } else if (user.userType === "PUBLISHER") {
@@ -116,12 +135,17 @@ export class AuthGuard implements CanActivate {
         })
         if (fallback) {
           activePublisherId = fallback.publisherId
-          await this.activeContext.setActivePublisher(user.id, fallback.publisherId)
+          await this.activeContext.setActivePublisher(
+            user.id,
+            fallback.publisherId,
+          )
         }
       }
 
       if (activePublisherId) {
-        const publisher = await prisma.publisher.findUnique({ where: { id: activePublisherId } })
+        const publisher = await prisma.publisher.findUnique({
+          where: { id: activePublisherId },
+        })
         publisherOrgId = publisher?.organizationId ?? null
       }
     }

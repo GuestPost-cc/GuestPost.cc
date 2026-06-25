@@ -12,9 +12,10 @@
  * ...this spec fails CI with the matching file:line so the regression
  * is visible in the PR diff.
  */
-import { describe, it, expect } from "vitest"
-import { readFileSync, readdirSync, statSync } from "node:fs"
+
+import { readdirSync, readFileSync, statSync } from "node:fs"
 import { join, relative } from "node:path"
+import { describe, expect, it } from "vitest"
 
 const REPO_ROOT = join(__dirname, "..", "..", "..", "..", "..")
 const SCAN_ROOTS = ["apps/portal/src", "apps/admin/src", "apps/publisher/src"]
@@ -75,7 +76,7 @@ const FORBIDDEN_PATTERNS: Array<{ name: string; re: RegExp; why: string }> = [
       "isLoading from a parent useQuery.",
   },
   {
-    name: "Inline channel-label ternary (\"Platform\"/\"Publisher\" string)",
+    name: 'Inline channel-label ternary ("Platform"/"Publisher" string)',
     // Only the BADGE pattern: `channel === "PLATFORM" ? "Platform" : ...`.
     // Boolean-only uses like `fulfillmentChannel === "PLATFORM"` that
     // dispatch on downstream business logic (e.g. assignedTo vs
@@ -84,7 +85,7 @@ const FORBIDDEN_PATTERNS: Array<{ name: string; re: RegExp; why: string }> = [
     why:
       "Use <FulfillmentChannelBadge channel={...} /> from @guestpost/ui.\n" +
       "The component already maps PLATFORM/PUBLISHER/null to the right\n" +
-      "label + styling; inline `\"Platform\" : \"Publisher\"` ternaries\n" +
+      'label + styling; inline `"Platform" : "Publisher"` ternaries\n' +
       "duplicate that mapping and drift over time.",
   },
   {
@@ -115,7 +116,9 @@ describe("Phase 7.9 #29 — shared-component adoption regression guard", () => {
           const lines = content.split("\n")
           for (let i = 0; i < lines.length; i++) {
             if (rule.re.test(lines[i])) {
-              hits.push(`${relative(REPO_ROOT, file)}:${i + 1}  ${lines[i].trim()}`)
+              hits.push(
+                `${relative(REPO_ROOT, file)}:${i + 1}  ${lines[i].trim()}`,
+              )
             }
           }
         }
@@ -127,7 +130,7 @@ describe("Phase 7.9 #29 — shared-component adoption regression guard", () => {
             rule.why,
             "",
             "Offending occurrences:",
-            ...hits.map((h) => "  " + h),
+            ...hits.map((h) => `  ${h}`),
           ].join("\n"),
         )
       }

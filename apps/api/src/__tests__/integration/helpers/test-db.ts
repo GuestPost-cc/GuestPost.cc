@@ -15,7 +15,7 @@
  * out via `docker exec` keeps the harness installable on any dev workstation
  * that already runs the dev compose stack.
  */
-import { execFileSync } from "child_process"
+import { execFileSync } from "node:child_process"
 
 const PG_HOST = "localhost"
 const PG_PORT = 5432

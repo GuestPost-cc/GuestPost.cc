@@ -32,8 +32,8 @@
 // dedicated PR.
 
 import js from "@eslint/js"
-import tseslint from "typescript-eslint"
 import reactHooks from "eslint-plugin-react-hooks"
+import tseslint from "typescript-eslint"
 
 export default tseslint.config(
   // 0. Ignore generated + vendored + build output.
@@ -78,8 +78,8 @@ export default tseslint.config(
       "no-control-regex": "off",
       "no-async-promise-executor": "off",
       "no-cond-assign": "off",
-      "no-undef": "off",        // TS handles this; plain JS files trip on globals
-      "no-redeclare": "off",    // overload-style ts patterns
+      "no-undef": "off", // TS handles this; plain JS files trip on globals
+      "no-redeclare": "off", // overload-style ts patterns
       "no-fallthrough": "off",
       "no-misleading-character-class": "off",
       "no-irregular-whitespace": "off",

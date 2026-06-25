@@ -1,8 +1,8 @@
+import { computeTrustScore, QUEUES, trustBand } from "@guestpost/shared"
 import { Injectable } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
-import { QueueService } from "../queues/queue.service"
-import { QUEUES, computeTrustScore, trustBand } from "@guestpost/shared"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
+import type { QueueService } from "../queues/queue.service"
 
 // Verification governance + operations: trust scoring, force-approval oversight,
 // the review center (filter/sections/bulk retry). All staff-only; mounted under
@@ -17,17 +17,36 @@ export class WebsiteVerificationService {
 
   // Recompute + persist a website's internal trust score from platform signals.
   async recomputeTrustScore(websiteId: string) {
-    const website = await this.prisma.website.findUnique({ where: { id: websiteId } })
+    const website = await this.prisma.website.findUnique({
+      where: { id: websiteId },
+    })
     if (!website) return null
 
-    const [revocationCount, listingCount, totalOrderCount, completedOrderCount, disputeCount, refundCount, chargebackCount] = await Promise.all([
-      this.prisma.auditLog.count({ where: { action: "WEBSITE_VERIFICATION_REVOKED", entityId: websiteId } }),
+    const [
+      revocationCount,
+      listingCount,
+      totalOrderCount,
+      completedOrderCount,
+      disputeCount,
+      refundCount,
+      chargebackCount,
+    ] = await Promise.all([
+      this.prisma.auditLog.count({
+        where: { action: "WEBSITE_VERIFICATION_REVOKED", entityId: websiteId },
+      }),
       this.prisma.marketplaceListing.count({ where: { websiteId } }),
       this.prisma.order.count({ where: { websiteId } }),
-      this.prisma.order.count({ where: { websiteId, status: { in: ["DELIVERED", "SETTLED", "COMPLETED"] } } }),
+      this.prisma.order.count({
+        where: {
+          websiteId,
+          status: { in: ["DELIVERED", "SETTLED", "COMPLETED"] },
+        },
+      }),
       this.prisma.orderDispute.count({ where: { order: { websiteId } } }),
       this.prisma.order.count({ where: { websiteId, status: "REFUNDED" } }),
-      this.prisma.transaction.count({ where: { type: "CHARGEBACK", order: { websiteId } } }).catch(() => 0),
+      this.prisma.transaction
+        .count({ where: { type: "CHARGEBACK", order: { websiteId } } })
+        .catch(() => 0),
     ])
 
     const { score, band } = computeTrustScore({
@@ -44,7 +63,10 @@ export class WebsiteVerificationService {
       chargebackCount,
     })
 
-    await this.prisma.website.update({ where: { id: websiteId }, data: { trustScore: score } })
+    await this.prisma.website.update({
+      where: { id: websiteId },
+      data: { trustScore: score },
+    })
     return { websiteId, score, band }
   }
 
@@ -62,15 +84,24 @@ export class WebsiteVerificationService {
     for (const o of overrides) {
       const meta: any = o.metadata ?? {}
       const listing = o.entityId
-        ? await this.prisma.marketplaceListing.findUnique({
-            where: { id: o.entityId },
-            include: { website: { select: { domain: true, canonicalDomain: true } }, publisher: { select: { name: true, email: true } } },
-          }).catch(() => null)
+        ? await this.prisma.marketplaceListing
+            .findUnique({
+              where: { id: o.entityId },
+              include: {
+                website: { select: { domain: true, canonicalDomain: true } },
+                publisher: { select: { name: true, email: true } },
+              },
+            })
+            .catch(() => null)
         : null
       rows.push({
         auditId: o.id,
         listingId: o.entityId,
-        domain: listing?.website?.canonicalDomain ?? listing?.website?.domain ?? meta.domain ?? null,
+        domain:
+          listing?.website?.canonicalDomain ??
+          listing?.website?.domain ??
+          meta.domain ??
+          null,
         actorId: o.userId,
         reason: meta.reason ?? null,
         timestamp: o.createdAt,
@@ -80,8 +111,12 @@ export class WebsiteVerificationService {
 
     const [verified, pending, failed, revoked] = await Promise.all([
       this.prisma.website.count({ where: { verificationStatus: "VERIFIED" } }),
-      this.prisma.website.count({ where: { verificationStatus: "PENDING_VERIFICATION" } }),
-      this.prisma.website.count({ where: { verificationStatus: "VERIFICATION_FAILED" } }),
+      this.prisma.website.count({
+        where: { verificationStatus: "PENDING_VERIFICATION" },
+      }),
+      this.prisma.website.count({
+        where: { verificationStatus: "VERIFICATION_FAILED" },
+      }),
       this.prisma.website.count({ where: { verificationStatus: "REVOKED" } }),
     ])
 
@@ -95,16 +130,29 @@ export class WebsiteVerificationService {
     })
 
     return {
-      metrics: { verified, pending, failed, revoked, forceApproved: rows.length },
+      metrics: {
+        verified,
+        pending,
+        failed,
+        revoked,
+        forceApproved: rows.length,
+      },
       forceApproved: rows,
     }
   }
 
   // Verification review center: filtered website list + section counts.
-  async reviewCenter(filters: { publisherId?: string; domain?: string; status?: string; from?: string; to?: string }) {
+  async reviewCenter(filters: {
+    publisherId?: string
+    domain?: string
+    status?: string
+    from?: string
+    to?: string
+  }) {
     const where: any = { ownershipType: "PUBLISHER" }
     if (filters.publisherId) where.publisherId = filters.publisherId
-    if (filters.domain) where.canonicalDomain = { contains: filters.domain.toLowerCase() }
+    if (filters.domain)
+      where.canonicalDomain = { contains: filters.domain.toLowerCase() }
     if (filters.status) where.verificationStatus = filters.status
     if (filters.from || filters.to) {
       where.createdAt = {}
@@ -120,10 +168,28 @@ export class WebsiteVerificationService {
     })
 
     const [pending, failed, revoked, recentlyVerified] = await Promise.all([
-      this.prisma.website.count({ where: { ownershipType: "PUBLISHER", verificationStatus: "PENDING_VERIFICATION" } }),
-      this.prisma.website.count({ where: { ownershipType: "PUBLISHER", verificationStatus: "VERIFICATION_FAILED" } }),
-      this.prisma.website.count({ where: { ownershipType: "PUBLISHER", verificationStatus: "REVOKED" } }),
-      this.prisma.website.count({ where: { ownershipType: "PUBLISHER", verificationStatus: "VERIFIED", verifiedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } } }),
+      this.prisma.website.count({
+        where: {
+          ownershipType: "PUBLISHER",
+          verificationStatus: "PENDING_VERIFICATION",
+        },
+      }),
+      this.prisma.website.count({
+        where: {
+          ownershipType: "PUBLISHER",
+          verificationStatus: "VERIFICATION_FAILED",
+        },
+      }),
+      this.prisma.website.count({
+        where: { ownershipType: "PUBLISHER", verificationStatus: "REVOKED" },
+      }),
+      this.prisma.website.count({
+        where: {
+          ownershipType: "PUBLISHER",
+          verificationStatus: "VERIFIED",
+          verifiedAt: { gte: new Date(Date.now() - 7 * 86_400_000) },
+        },
+      }),
     ])
 
     return {
@@ -148,13 +214,20 @@ export class WebsiteVerificationService {
   async bulkRetry(websiteIds: string[], actorUserId: string) {
     let queued = 0
     for (const id of websiteIds) {
-      const w = await this.prisma.website.findUnique({ where: { id }, select: { id: true, verificationStatus: true } })
+      const w = await this.prisma.website.findUnique({
+        where: { id },
+        select: { id: true, verificationStatus: true },
+      })
       if (!w || w.verificationStatus === "VERIFIED") continue
       await this.queue.addJob(
         QUEUES.WEBSITE_VERIFICATION,
         "website-verify",
         { websiteId: id, actorUserId },
-        { jobId: `website-verify-${id}-${Date.now()}`, removeOnComplete: { count: 50 }, removeOnFail: { count: 50 } },
+        {
+          jobId: `website-verify-${id}-${Date.now()}`,
+          removeOnComplete: { count: 50 },
+          removeOnFail: { count: 50 },
+        },
       )
       queued++
     }

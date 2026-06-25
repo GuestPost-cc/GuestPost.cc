@@ -14,16 +14,16 @@
 // would duplicate infra those files have set up. The unit-level helper
 // tests + grep guards together guarantee the wiring is correct.
 
+import * as fs from "node:fs"
+import * as path from "node:path"
 import {
-  TIER_SETTLEMENT_REVIEW_DAYS,
-  TIER_WITHDRAWAL_HOLD_DAYS,
   __resetTierPolicyWarnCache,
   getSettlementReviewDays,
   getWithdrawalHoldDays,
   type PublisherTier,
+  TIER_SETTLEMENT_REVIEW_DAYS,
+  TIER_WITHDRAWAL_HOLD_DAYS,
 } from "@guestpost/shared"
-import * as fs from "node:fs"
-import * as path from "node:path"
 
 describe("Phase 7.2 — publisher-tier-policy helpers", () => {
   describe("getSettlementReviewDays", () => {
@@ -94,12 +94,16 @@ describe("Phase 7.2 — publisher-tier-policy helpers", () => {
       for (const t of tiers) {
         expect(TIER_SETTLEMENT_REVIEW_DAYS[t]).toBeGreaterThan(0)
       }
-      expect(Object.keys(TIER_SETTLEMENT_REVIEW_DAYS).sort()).toEqual([...tiers].sort())
+      expect(Object.keys(TIER_SETTLEMENT_REVIEW_DAYS).sort()).toEqual(
+        [...tiers].sort(),
+      )
     })
 
     it("TIER_WITHDRAWAL_HOLD_DAYS covers every PublisherTier value", () => {
       const tiers: PublisherTier[] = ["NEW", "TRUSTED", "VERIFIED"]
-      expect(Object.keys(TIER_WITHDRAWAL_HOLD_DAYS).sort()).toEqual([...tiers].sort())
+      expect(Object.keys(TIER_WITHDRAWAL_HOLD_DAYS).sort()).toEqual(
+        [...tiers].sort(),
+      )
     })
   })
 
@@ -171,7 +175,9 @@ describe("Phase 7.2 — publisher-tier-policy helpers", () => {
     })
 
     it("falls back to console.warn when no logger is supplied", () => {
-      const consoleWarnSpy = jest.spyOn(console, "warn").mockImplementation(() => {})
+      const consoleWarnSpy = jest
+        .spyOn(console, "warn")
+        .mockImplementation(() => {})
       try {
         getSettlementReviewDays("NEW", "uniquely-bad-value")
         expect(consoleWarnSpy).toHaveBeenCalledTimes(1)
@@ -189,20 +195,26 @@ describe("Phase 7.2 — publisher-tier-policy helpers", () => {
     }
 
     it("order-review.service.ts no longer has `SETTLEMENT_REVIEW_DAYS ?? 7`", () => {
-      const src = readSrc("apps/api/src/modules/orders/services/order-review.service.ts")
+      const src = readSrc(
+        "apps/api/src/modules/orders/services/order-review.service.ts",
+      )
       expect(src).not.toMatch(/SETTLEMENT_REVIEW_DAYS\s*\?\?\s*7/)
       // Confirm the new helper is wired in
       expect(src).toMatch(/getSettlementReviewDays\(/)
     })
 
     it("settlements.service.ts no longer has `SETTLEMENT_REVIEW_DAYS ?? 14`", () => {
-      const src = readSrc("apps/api/src/modules/settlements/settlements.service.ts")
+      const src = readSrc(
+        "apps/api/src/modules/settlements/settlements.service.ts",
+      )
       expect(src).not.toMatch(/SETTLEMENT_REVIEW_DAYS\s*\?\?\s*14/)
       expect(src).toMatch(/getSettlementReviewDays\(/)
     })
 
     it("publisher-payouts.service.ts no longer has the local TIER_WITHDRAWAL_HOLDS table", () => {
-      const src = readSrc("apps/api/src/modules/publisher-payouts/publisher-payouts.service.ts")
+      const src = readSrc(
+        "apps/api/src/modules/publisher-payouts/publisher-payouts.service.ts",
+      )
       // The local Record<string, number> declaration is gone
       expect(src).not.toMatch(/const TIER_WITHDRAWAL_HOLDS\s*:\s*Record/)
       // Confirm the shared helper is wired in

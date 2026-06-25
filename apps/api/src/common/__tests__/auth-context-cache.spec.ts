@@ -1,8 +1,8 @@
 import {
-  getCachedAuthContext,
-  setCachedAuthContext,
-  invalidateAuthContext,
   clearAuthContextCache,
+  getCachedAuthContext,
+  invalidateAuthContext,
+  setCachedAuthContext,
 } from "../auth-context-cache"
 
 describe("auth-context-cache", () => {
@@ -13,7 +13,10 @@ describe("auth-context-cache", () => {
 
   it("returns cached context within TTL", () => {
     setCachedAuthContext("u1", { id: "u1", organizationId: "org-1" })
-    expect(getCachedAuthContext("u1")).toEqual({ id: "u1", organizationId: "org-1" })
+    expect(getCachedAuthContext("u1")).toEqual({
+      id: "u1",
+      organizationId: "org-1",
+    })
   })
 
   it("returns null for unknown users", () => {

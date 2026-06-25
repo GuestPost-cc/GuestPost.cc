@@ -1,15 +1,15 @@
 "use client"
 
+import { Button, Input, Label, Switch } from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { RefreshCw, Save } from "lucide-react"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { toast } from "sonner"
 import { z } from "zod"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
-import { Button, Input, Label, Switch } from "@guestpost/ui"
-import { toast } from "sonner"
-import { Save, RefreshCw, User } from "lucide-react"
 
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -61,23 +61,32 @@ export default function SettingsPage() {
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">API URL</dt>
-              <dd className="font-mono text-xs">{process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}</dd>
+              <dd className="font-mono text-xs">
+                {process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000"}
+              </dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Environment</dt>
-              <dd className="font-medium">{process.env.NODE_ENV || "development"}</dd>
+              <dd className="font-medium">
+                {process.env.NODE_ENV || "development"}
+              </dd>
             </div>
           </dl>
         </div>
 
         <div className="rounded-lg border p-6">
           <h2 className="mb-4 text-lg font-semibold">Profile</h2>
-          <form onSubmit={handleSubmit((data) => profileMutation.mutate(data))} className="space-y-4">
+          <form
+            onSubmit={handleSubmit((data) => profileMutation.mutate(data))}
+            className="space-y-4"
+          >
             <div className="space-y-2">
               <Label htmlFor="name">Display Name</Label>
               <Input id="name" {...register("name")} />
               {errors.name && (
-                <p className="text-sm text-destructive">{errors.name.message}</p>
+                <p className="text-sm text-destructive">
+                  {errors.name.message}
+                </p>
               )}
             </div>
             <div className="space-y-2">
@@ -86,9 +95,13 @@ export default function SettingsPage() {
             </div>
             <Button type="submit" disabled={profileMutation.isPending}>
               {profileMutation.isPending ? (
-                <><RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Saving...</>
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                </>
               ) : (
-                <><Save className="mr-2 h-4 w-4" /> Save Changes</>
+                <>
+                  <Save className="mr-2 h-4 w-4" /> Save Changes
+                </>
               )}
             </Button>
           </form>

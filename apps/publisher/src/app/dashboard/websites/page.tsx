@@ -1,57 +1,46 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
-import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { z } from "zod"
-import { toast } from "sonner"
 import {
-  Globe,
-  Plus,
-  Pencil,
-  Archive,
-  Search,
-  RefreshCw,
-  Trash2,
-  ExternalLink,
-  Star,
-  CheckCircle,
-  ShieldCheck,
-  ShieldAlert,
-  ShieldX,
-  Copy,
-} from "lucide-react"
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableHead,
-  TableRow,
-  TableCell,
-} from "@guestpost/ui"
-import { Button } from "@guestpost/ui"
-import { ErrorState } from "@guestpost/ui"
-import { Input } from "@guestpost/ui"
-import { Label } from "@guestpost/ui"
-import { Badge } from "@guestpost/ui"
-import { Skeleton } from "@guestpost/ui"
-import {
+  Badge,
+  Button,
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
+  ErrorState,
+  Input,
+  Label,
+  Skeleton,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
 } from "@guestpost/ui"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@guestpost/ui"
+  Archive,
+  CheckCircle,
+  Copy,
+  ExternalLink,
+  Globe,
+  Pencil,
+  Plus,
+  Search,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldX,
+  Star,
+} from "lucide-react"
+import { useState } from "react"
+import { useForm } from "react-hook-form"
+import { toast } from "sonner"
+import { z } from "zod"
+import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 const websiteSchema = z.object({
   url: z.string().url("Must be a valid URL"),
@@ -75,7 +64,11 @@ interface Website {
   price?: number
   niche?: string
   status: "ACTIVE" | "ARCHIVED" | "PENDING"
-  verificationStatus?: "PENDING_VERIFICATION" | "VERIFIED" | "VERIFICATION_FAILED" | "REVOKED"
+  verificationStatus?:
+    | "PENDING_VERIFICATION"
+    | "VERIFIED"
+    | "VERIFICATION_FAILED"
+    | "REVOKED"
   verifiedAt?: string | null
   verificationFailureReason?: string | null
 }
@@ -87,12 +80,21 @@ interface VerifyInstructions {
   note?: string
 }
 
-const VERIFY_BADGE: Record<string, { label: string; variant: any; Icon: any }> = {
-  VERIFIED: { label: "Verified", variant: "success", Icon: ShieldCheck },
-  PENDING_VERIFICATION: { label: "Pending", variant: "warning", Icon: ShieldAlert },
-  VERIFICATION_FAILED: { label: "Failed", variant: "destructive", Icon: ShieldX },
-  REVOKED: { label: "Revoked", variant: "destructive", Icon: ShieldX },
-}
+const VERIFY_BADGE: Record<string, { label: string; variant: any; Icon: any }> =
+  {
+    VERIFIED: { label: "Verified", variant: "success", Icon: ShieldCheck },
+    PENDING_VERIFICATION: {
+      label: "Pending",
+      variant: "warning",
+      Icon: ShieldAlert,
+    },
+    VERIFICATION_FAILED: {
+      label: "Failed",
+      variant: "destructive",
+      Icon: ShieldX,
+    },
+    REVOKED: { label: "Revoked", variant: "destructive", Icon: ShieldX },
+  }
 
 function WebsiteForm({
   onSubmit,
@@ -156,7 +158,11 @@ function WebsiteForm({
         </div>
         <div className="space-y-2">
           <Label htmlFor="language">Language</Label>
-          <Input id="language" placeholder="English" {...register("language")} />
+          <Input
+            id="language"
+            placeholder="English"
+            {...register("language")}
+          />
         </div>
       </div>
 
@@ -183,7 +189,11 @@ function WebsiteForm({
           </Button>
         )}
         <Button type="submit" disabled={loading}>
-          {loading ? "Saving..." : defaultValues ? "Update Website" : "Add Website"}
+          {loading
+            ? "Saving..."
+            : defaultValues
+              ? "Update Website"
+              : "Add Website"}
         </Button>
       </DialogFooter>
     </form>
@@ -238,16 +248,21 @@ export default function WebsitesPage() {
   const [editingWebsite, setEditingWebsite] = useState<Website | null>(null)
   const [showArchived, setShowArchived] = useState(false)
   const [verifyTarget, setVerifyTarget] = useState<Website | null>(null)
-  const [verifyInstructions, setVerifyInstructions] = useState<VerifyInstructions | null>(null)
+  const [verifyInstructions, setVerifyInstructions] =
+    useState<VerifyInstructions | null>(null)
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const publisherId = user?.publisherId
 
-  const { data: websites = [], isLoading, error } = useQuery({
+  const {
+    data: websites = [],
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ["publisher-websites", publisherId],
     queryFn: async () => {
       if (!publisherId) return []
-      const sites = await api.publishers.getWebsites(publisherId) as any[]
+      const sites = (await api.publishers.getWebsites(publisherId)) as any[]
       return sites.map((s: any) => ({
         id: s.id,
         url: s.url || "",
@@ -335,7 +350,9 @@ export default function WebsitesPage() {
       setVerifyTarget(site)
       setVerifyInstructions(res.instructions)
       queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
-      toast.success("Verification queued — add the TXT record below, then check back shortly")
+      toast.success(
+        "Verification queued — add the TXT record below, then check back shortly",
+      )
     },
     onError: (err: any) => {
       toast.error(err?.message || "Failed to start verification")
@@ -369,7 +386,9 @@ export default function WebsitesPage() {
       <ErrorState
         title="Failed to load websites"
         description={(error as Error).message}
-        onRetry={() => queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })}
+        onRetry={() =>
+          queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
+        }
       />
     )
 
@@ -491,17 +510,15 @@ export default function WebsitesPage() {
                   </TableCell>
                   <TableCell>{site.country ?? "—"}</TableCell>
                   <TableCell>{site.language ?? "—"}</TableCell>
-                  <TableCell>
-                    {site.price ? `$${site.price}` : "—"}
-                  </TableCell>
+                  <TableCell>{site.price ? `$${site.price}` : "—"}</TableCell>
                   <TableCell>
                     <Badge
                       variant={
                         site.status === "ACTIVE"
                           ? "success"
                           : site.status === "ARCHIVED"
-                          ? "secondary"
-                          : "warning"
+                            ? "secondary"
+                            : "warning"
                       }
                     >
                       {site.status}
@@ -509,9 +526,16 @@ export default function WebsitesPage() {
                   </TableCell>
                   <TableCell>
                     {(() => {
-                      const v = VERIFY_BADGE[site.verificationStatus ?? "PENDING_VERIFICATION"]
+                      const v =
+                        VERIFY_BADGE[
+                          site.verificationStatus ?? "PENDING_VERIFICATION"
+                        ]
                       return (
-                        <Badge variant={v.variant} className="gap-1" title={site.verificationFailureReason ?? undefined}>
+                        <Badge
+                          variant={v.variant}
+                          className="gap-1"
+                          title={site.verificationFailureReason ?? undefined}
+                        >
                           <v.Icon className="h-3 w-3" />
                           {v.label}
                         </Badge>
@@ -574,7 +598,8 @@ export default function WebsitesPage() {
         open={!!editingWebsite}
         onOpenChange={(open) => !open && setEditingWebsite(null)}
         onSubmit={(data) =>
-          editingWebsite && updateMutation.mutate({ id: editingWebsite.id, data })
+          editingWebsite &&
+          updateMutation.mutate({ id: editingWebsite.id, data })
         }
         defaultValues={
           editingWebsite
@@ -607,23 +632,35 @@ export default function WebsitesPage() {
           {verifyInstructions && (
             <div className="space-y-4 text-sm">
               <p className="text-muted-foreground">
-                Prove you control <span className="font-medium text-foreground">{verifyTarget?.url}</span> by
-                adding this DNS <span className="font-medium text-foreground">TXT</span> record at your domain
-                registrar.
+                Prove you control{" "}
+                <span className="font-medium text-foreground">
+                  {verifyTarget?.url}
+                </span>{" "}
+                by adding this DNS{" "}
+                <span className="font-medium text-foreground">TXT</span> record
+                at your domain registrar.
               </p>
               <div className="space-y-2 rounded-lg border bg-muted/40 p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Type</span>
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Type
+                  </span>
                   <code className="font-mono">{verifyInstructions.type}</code>
                 </div>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Host / Name</span>
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Host / Name
+                  </span>
                   <code className="font-mono">{verifyInstructions.host}</code>
                 </div>
                 <div className="flex items-start justify-between gap-2">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Value</span>
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Value
+                  </span>
                   <div className="flex items-center gap-2">
-                    <code className="break-all font-mono text-right">{verifyInstructions.value}</code>
+                    <code className="break-all font-mono text-right">
+                      {verifyInstructions.value}
+                    </code>
                     <Button
                       variant="ghost"
                       size="icon"

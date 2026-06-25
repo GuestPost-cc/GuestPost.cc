@@ -1,5 +1,13 @@
 "use client"
 
+import {
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Search,
+} from "lucide-react"
 import * as React from "react"
 import { cn } from "../lib/utils"
 import { Button } from "./button"
@@ -12,7 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from "./table"
-import { ChevronLeft, ChevronRight, Search, ArrowUpDown, ChevronsLeft, ChevronsRight } from "lucide-react"
 
 interface Column<T> {
   accessorKey?: keyof T
@@ -45,7 +52,7 @@ function DataTable<T>({
   const filtered = React.useMemo(() => {
     if (!searchKey || !search) return data
     return data.filter((row) =>
-      String(row[searchKey]).toLowerCase().includes(search.toLowerCase())
+      String(row[searchKey]).toLowerCase().includes(search.toLowerCase()),
     )
   }, [data, searchKey, search])
 
@@ -54,7 +61,9 @@ function DataTable<T>({
     return [...filtered].sort((a, b) => {
       const aVal = String(a[sortKey])
       const bVal = String(b[sortKey])
-      return sortOrder === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      return sortOrder === "asc"
+        ? aVal.localeCompare(bVal)
+        : bVal.localeCompare(aVal)
     })
   }, [filtered, sortKey, sortOrder])
 
@@ -116,14 +125,21 @@ function DataTable<T>({
                 <TableRow key={i}>
                   {columns.map((col) => (
                     <TableCell key={String(col.accessorKey || col.header)}>
-                      {col.cell ? col.cell(row) : col.accessorKey ? String(row[col.accessorKey]) : ""}
+                      {col.cell
+                        ? col.cell(row)
+                        : col.accessorKey
+                          ? String(row[col.accessorKey])
+                          : ""}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+                <TableCell
+                  colSpan={columns.length}
+                  className="h-24 text-center"
+                >
                   No results.
                 </TableCell>
               </TableRow>

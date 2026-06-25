@@ -43,4 +43,5 @@ packages/*/src/**/*.js.map
 packages/database/.env
 packages/ui/coverage/
 scripts/.wise-validation-key*
+repomix-output.xml
 test-results/

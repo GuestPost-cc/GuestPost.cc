@@ -1,4 +1,4 @@
-import { HttpClient } from "../client"
+import type { HttpClient } from "../client"
 
 // A single purchasable service on a listing. The customer's pick locks
 // (listingId, listingServiceId) onto the order — service and website cannot
@@ -62,8 +62,19 @@ export interface MarketplaceListing {
   images: Array<{ url: string; isPrimary: boolean }>
   // pricingTiers removed in Phase 5 — replaced by the per-service price on
   // each ListingService row in `services[]`.
-  reviews?: Array<{ id: string; rating: number; title?: string; content: string; user: { name?: string; image?: string }; createdAt: string }>
-  publisher?: { id: string; name: string; profile?: { rating?: number; totalReviews?: number; responseTime?: number } }
+  reviews?: Array<{
+    id: string
+    rating: number
+    title?: string
+    content: string
+    user: { name?: string; image?: string }
+    createdAt: string
+  }>
+  publisher?: {
+    id: string
+    name: string
+    profile?: { rating?: number; totalReviews?: number; responseTime?: number }
+  }
   image?: string
   avgRating?: number
   reviewCount: number
@@ -79,9 +90,15 @@ export interface MarketplaceListing {
   // Phase 6 derived UI phase + card summary fields. Computed by the API
   // off (status, ownerType, website verification, AVAILABLE service count).
   lifecyclePhase?:
-    | "AWAITING_VERIFICATION" | "AWAITING_SERVICES" | "READY_FOR_REVIEW"
-    | "IN_REVIEW" | "READY_TO_PUBLISH"
-    | "PUBLISHED" | "PAUSED" | "REJECTED" | "ARCHIVED"
+    | "AWAITING_VERIFICATION"
+    | "AWAITING_SERVICES"
+    | "READY_FOR_REVIEW"
+    | "IN_REVIEW"
+    | "READY_TO_PUBLISH"
+    | "PUBLISHED"
+    | "PAUSED"
+    | "REJECTED"
+    | "ARCHIVED"
   // "From $X" — the minimum AVAILABLE service price. NULL when no service
   // is currently available (listing would be excluded from search anyway).
   priceFrom?: number | null
@@ -102,7 +119,16 @@ export interface SearchFilters {
   maxDR?: number
   minTraffic?: number
   maxTurnaroundDays?: number
-  sortBy?: "recommended" | "dr" | "traffic" | "price_asc" | "price_desc" | "newest" | "popular" | "best_rated" | "most_ordered"
+  sortBy?:
+    | "recommended"
+    | "dr"
+    | "traffic"
+    | "price_asc"
+    | "price_desc"
+    | "newest"
+    | "popular"
+    | "best_rated"
+    | "most_ordered"
   page?: number
   limit?: number
 }
@@ -143,25 +169,38 @@ interface DisplayListing {
 }
 
 export function resolveDisplayType(listing: DisplayListing): string {
-  return listing.serviceTypes?.[0] ?? listing.services?.[0]?.serviceType ?? listing.type ?? ""
+  return (
+    listing.serviceTypes?.[0] ??
+    listing.services?.[0]?.serviceType ??
+    listing.type ??
+    ""
+  )
 }
 
 export function resolveDisplayPrice(listing: DisplayListing): number {
   if (listing.priceFrom != null) return listing.priceFrom
   if (listing.services && listing.services.length > 0) {
-    const avail = listing.services.filter(s => s.availability === "AVAILABLE")
-    if (avail.length > 0) return Math.min(...avail.map(s => s.price))
+    const avail = listing.services.filter((s) => s.availability === "AVAILABLE")
+    if (avail.length > 0) return Math.min(...avail.map((s) => s.price))
   }
   return listing.price ?? 0
 }
 
-export function resolveDisplayTurnaroundDays(listing: DisplayListing): number | undefined {
-  const fromService = listing.services?.find(s => s.availability === "AVAILABLE")?.turnaroundDays
+export function resolveDisplayTurnaroundDays(
+  listing: DisplayListing,
+): number | undefined {
+  const fromService = listing.services?.find(
+    (s) => s.availability === "AVAILABLE",
+  )?.turnaroundDays
   return fromService ?? listing.turnaroundDays
 }
 
-export function resolveDisplayRevisionRounds(listing: DisplayListing): number | undefined {
-  const fromService = listing.services?.find(s => s.availability === "AVAILABLE")?.revisionRounds
+export function resolveDisplayRevisionRounds(
+  listing: DisplayListing,
+): number | undefined {
+  const fromService = listing.services?.find(
+    (s) => s.availability === "AVAILABLE",
+  )?.revisionRounds
   return fromService ?? listing.revisionRounds
 }
 
@@ -169,7 +208,9 @@ export class MarketplaceService {
   constructor(private client: HttpClient) {}
 
   searchListings(filters?: SearchFilters): Promise<SearchResult> {
-    return this.client.get<SearchResult>("/marketplace/listings", { params: filters as Record<string, any> })
+    return this.client.get<SearchResult>("/marketplace/listings", {
+      params: filters as Record<string, any>,
+    })
   }
 
   getListing(slug: string): Promise<MarketplaceListing> {
@@ -178,7 +219,10 @@ export class MarketplaceService {
 
   // Lightweight service-menu fetch for the order-flow picker. Returns only
   // AVAILABLE + WAITLIST rows (PAUSED is hidden from buyers).
-  getListingServices(slug: string): Promise<{ ownerType: "PUBLISHER" | "PLATFORM"; services: ListingServiceOption[] }> {
+  getListingServices(slug: string): Promise<{
+    ownerType: "PUBLISHER" | "PLATFORM"
+    services: ListingServiceOption[]
+  }> {
     return this.client.get(`/marketplace/listings/${slug}/services`)
   }
 
@@ -204,13 +248,19 @@ export class MarketplaceService {
     return this.client.get("/marketplace/stats")
   }
 
-  getRecommendations(params?: { listingId?: string; type?: string; limit?: number }): Promise<MarketplaceListing[]> {
+  getRecommendations(params?: {
+    listingId?: string
+    type?: string
+    limit?: number
+  }): Promise<MarketplaceListing[]> {
     return this.client.get("/marketplace/recommendations", {
       params: params as Record<string, string | number | undefined>,
     })
   }
 
-  getFavorites(): Promise<Array<{ id: string; listing: MarketplaceListing; addedAt: string }>> {
+  getFavorites(): Promise<
+    Array<{ id: string; listing: MarketplaceListing; addedAt: string }>
+  > {
     return this.client.get("/marketplace/favorites")
   }
 
@@ -222,31 +272,53 @@ export class MarketplaceService {
     return this.client.delete(`/marketplace/favorites/${listingId}`)
   }
 
-  getSavedLists(): Promise<Array<{
-    id: string
-    name: string
-    slug: string
-    isPublic: boolean
-    items: Array<{ id: string; listing: MarketplaceListing; note?: string; addedAt: string }>
-  }>> {
+  getSavedLists(): Promise<
+    Array<{
+      id: string
+      name: string
+      slug: string
+      isPublic: boolean
+      items: Array<{
+        id: string
+        listing: MarketplaceListing
+        note?: string
+        addedAt: string
+      }>
+    }>
+  > {
     return this.client.get("/marketplace/saved-lists")
   }
 
-  createSavedList(data: { name: string; slug?: string; isPublic?: boolean }): Promise<any> {
+  createSavedList(data: {
+    name: string
+    slug?: string
+    isPublic?: boolean
+  }): Promise<any> {
     return this.client.post("/marketplace/saved-lists", { json: data })
   }
 
-  addToSavedList(listId: string, listingId: string, note?: string): Promise<any> {
+  addToSavedList(
+    listId: string,
+    listingId: string,
+    note?: string,
+  ): Promise<any> {
     return this.client.post(`/marketplace/saved-lists/${listId}/items`, {
       json: { listingId, note },
     })
   }
 
   removeFromSavedList(listId: string, listingId: string): Promise<any> {
-    return this.client.delete(`/marketplace/saved-lists/${listId}/items/${listingId}`)
+    return this.client.delete(
+      `/marketplace/saved-lists/${listId}/items/${listingId}`,
+    )
   }
 
-  createReview(data: { listingId: string; rating: number; title?: string; content: string }): Promise<any> {
+  createReview(data: {
+    listingId: string
+    rating: number
+    title?: string
+    content: string
+  }): Promise<any> {
     return this.client.post("/marketplace/reviews", { json: data })
   }
 
@@ -270,78 +342,121 @@ export class MarketplaceService {
   // Manage individual ListingService rows on a publisher-owned listing.
   // Soft-delete via the DELETE endpoint flips availability to PAUSED — the
   // row is kept so historical orders' listingServiceId never orphan.
-  addListingService(listingId: string, data: {
-    serviceType: string
-    price: number
-    turnaroundDays: number
-    currency?: string
-    revisionRounds?: number
-    warrantyDays?: number
-    requirements?: Record<string, unknown>
-    fulfillmentSettings?: Record<string, unknown>
-    availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
-  }): Promise<ListingServiceOption> {
-    return this.client.post(`/marketplace/listings/${listingId}/services`, { json: data })
+  addListingService(
+    listingId: string,
+    data: {
+      serviceType: string
+      price: number
+      turnaroundDays: number
+      currency?: string
+      revisionRounds?: number
+      warrantyDays?: number
+      requirements?: Record<string, unknown>
+      fulfillmentSettings?: Record<string, unknown>
+      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
+    },
+  ): Promise<ListingServiceOption> {
+    return this.client.post(`/marketplace/listings/${listingId}/services`, {
+      json: data,
+    })
   }
 
-  updateListingService(listingId: string, serviceId: string, data: {
-    version: number
-    price?: number
-    turnaroundDays?: number
-    currency?: string
-    revisionRounds?: number
-    warrantyDays?: number
-    requirements?: Record<string, unknown>
-    fulfillmentSettings?: Record<string, unknown>
-    availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
-  }): Promise<ListingServiceOption> {
-    return this.client.put(`/marketplace/listings/${listingId}/services/${serviceId}`, { json: data })
+  updateListingService(
+    listingId: string,
+    serviceId: string,
+    data: {
+      version: number
+      price?: number
+      turnaroundDays?: number
+      currency?: string
+      revisionRounds?: number
+      warrantyDays?: number
+      requirements?: Record<string, unknown>
+      fulfillmentSettings?: Record<string, unknown>
+      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
+    },
+  ): Promise<ListingServiceOption> {
+    return this.client.put(
+      `/marketplace/listings/${listingId}/services/${serviceId}`,
+      { json: data },
+    )
   }
 
-  pauseListingService(listingId: string, serviceId: string): Promise<ListingServiceOption> {
-    return this.client.delete(`/marketplace/listings/${listingId}/services/${serviceId}`)
+  pauseListingService(
+    listingId: string,
+    serviceId: string,
+  ): Promise<ListingServiceOption> {
+    return this.client.delete(
+      `/marketplace/listings/${listingId}/services/${serviceId}`,
+    )
   }
 
   // ── Per-service endpoints (admin path) ─────────────────────────────────
   // Admin mirrors of the publisher per-service endpoints for PLATFORM-owned
   // listings. Same wire shape; different auth gate on the server.
-  addPlatformListingService(listingId: string, data: {
-    serviceType: string
-    price: number
-    turnaroundDays: number
-    currency?: string
-    revisionRounds?: number
-    warrantyDays?: number
-    requirements?: Record<string, unknown>
-    fulfillmentSettings?: Record<string, unknown>
-    availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
-  }): Promise<ListingServiceOption> {
-    return this.client.post(`/admin/marketplace/listings/${listingId}/services`, { json: data })
+  addPlatformListingService(
+    listingId: string,
+    data: {
+      serviceType: string
+      price: number
+      turnaroundDays: number
+      currency?: string
+      revisionRounds?: number
+      warrantyDays?: number
+      requirements?: Record<string, unknown>
+      fulfillmentSettings?: Record<string, unknown>
+      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
+    },
+  ): Promise<ListingServiceOption> {
+    return this.client.post(
+      `/admin/marketplace/listings/${listingId}/services`,
+      { json: data },
+    )
   }
 
-  updatePlatformListingService(listingId: string, serviceId: string, data: {
-    version: number
-    price?: number
-    turnaroundDays?: number
-    currency?: string
-    revisionRounds?: number
-    warrantyDays?: number
-    requirements?: Record<string, unknown>
-    fulfillmentSettings?: Record<string, unknown>
-    availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
-  }): Promise<ListingServiceOption> {
-    return this.client.put(`/admin/marketplace/listings/${listingId}/services/${serviceId}`, { json: data })
+  updatePlatformListingService(
+    listingId: string,
+    serviceId: string,
+    data: {
+      version: number
+      price?: number
+      turnaroundDays?: number
+      currency?: string
+      revisionRounds?: number
+      warrantyDays?: number
+      requirements?: Record<string, unknown>
+      fulfillmentSettings?: Record<string, unknown>
+      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
+    },
+  ): Promise<ListingServiceOption> {
+    return this.client.put(
+      `/admin/marketplace/listings/${listingId}/services/${serviceId}`,
+      { json: data },
+    )
   }
 
-  pausePlatformListingService(listingId: string, serviceId: string): Promise<ListingServiceOption> {
-    return this.client.delete(`/admin/marketplace/listings/${listingId}/services/${serviceId}`)
+  pausePlatformListingService(
+    listingId: string,
+    serviceId: string,
+  ): Promise<ListingServiceOption> {
+    return this.client.delete(
+      `/admin/marketplace/listings/${listingId}/services/${serviceId}`,
+    )
   }
 
   // ── Phase 6 lifecycle transitions (publisher-side) ───────────────────────
-  submitListing(listingId: string)  { return this.client.post(`/marketplace/listings/${listingId}/submit`) }
-  pauseListing(listingId: string)   { return this.client.post(`/marketplace/listings/${listingId}/pause`) }
-  unpauseListing(listingId: string) { return this.client.post(`/marketplace/listings/${listingId}/unpause`) }
-  archiveListing(listingId: string) { return this.client.post(`/marketplace/listings/${listingId}/archive`) }
+  submitListing(listingId: string) {
+    return this.client.post(`/marketplace/listings/${listingId}/submit`)
+  }
+  pauseListing(listingId: string) {
+    return this.client.post(`/marketplace/listings/${listingId}/pause`)
+  }
+  unpauseListing(listingId: string) {
+    return this.client.post(`/marketplace/listings/${listingId}/unpause`)
+  }
+  archiveListing(listingId: string) {
+    return this.client.post(`/marketplace/listings/${listingId}/archive`)
+  }
 
   // Order-flow website picker. Built on the real listings endpoint and
   // normalized to a flat array — the raw /marketplace/search route returns a
@@ -352,7 +467,12 @@ export class MarketplaceService {
   // auto-derived fulfiller. Publisher-owned site -> that publisher; platform-
   // owned (INTERNAL fulfillment) -> Platform. The customer picks a SITE; the
   // publisher is never chosen by hand.
-  async searchPlacements(params?: { category?: string; language?: string; country?: string; search?: string }) {
+  async searchPlacements(params?: {
+    category?: string
+    language?: string
+    country?: string
+    search?: string
+  }) {
     const res = await this.searchListings({
       query: params?.search,
       category: params?.category,
@@ -401,7 +521,12 @@ export class MarketplaceService {
     return out
   }
 
-  async searchPublishers(params?: { category?: string; language?: string; country?: string; search?: string }) {
+  async searchPublishers(params?: {
+    category?: string
+    language?: string
+    country?: string
+    search?: string
+  }) {
     const res = await this.searchListings({
       query: params?.search,
       category: params?.category,
@@ -410,7 +535,15 @@ export class MarketplaceService {
       limit: 50,
     })
     const seen = new Set<string>()
-    const out: Array<{ id: string; name: string; websiteUrl: string; domainRating: number; category?: string; language?: string; country?: string }> = []
+    const out: Array<{
+      id: string
+      name: string
+      websiteUrl: string
+      domainRating: number
+      category?: string
+      language?: string
+      country?: string
+    }> = []
     for (const l of res.listings ?? []) {
       if (!l.websiteId || seen.has(l.websiteId)) continue
       seen.add(l.websiteId)
@@ -426,6 +559,4 @@ export class MarketplaceService {
     }
     return out
   }
-
-
 }

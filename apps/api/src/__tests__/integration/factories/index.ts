@@ -24,7 +24,10 @@ let counter = 0
 const uniqueSuffix = () => `${process.pid}_${Date.now()}_${counter++}`
 
 // ─── Organization ─────────────────────────────────────────────────────────────
-export async function makeOrganization(prisma: AnyPrisma, overrides: Partial<{ name: string; slug: string; plan: string }> = {}) {
+export async function makeOrganization(
+  prisma: AnyPrisma,
+  overrides: Partial<{ name: string; slug: string; plan: string }> = {},
+) {
   const suffix = uniqueSuffix()
   return prisma.organization.create({
     data: {
@@ -38,7 +41,12 @@ export async function makeOrganization(prisma: AnyPrisma, overrides: Partial<{ n
 // ─── User ─────────────────────────────────────────────────────────────────────
 export async function makeUser(
   prisma: AnyPrisma,
-  overrides: Partial<{ email: string; name: string; userType: "CUSTOMER" | "PUBLISHER" | "STAFF"; emailVerified: boolean }> = {},
+  overrides: Partial<{
+    email: string
+    name: string
+    userType: "CUSTOMER" | "PUBLISHER" | "STAFF"
+    emailVerified: boolean
+  }> = {},
 ) {
   const suffix = uniqueSuffix()
   return prisma.user.create({
@@ -84,8 +92,27 @@ export async function makeOrder(
     organizationId: string
     customerId: string
     websiteId?: string
-    type?: "GUEST_POST" | "NICHE_EDIT" | "EDITORIAL_LINK" | "OUTREACH_LINK" | "LOCAL_CITATION" | "FOUNDATION_LINK" | "BLOG_ARTICLE" | "SEO_CONTENT"
-    status?: "DRAFT" | "PENDING_PAYMENT" | "PAID" | "SUBMITTED" | "ACCEPTED" | "CONTENT_REQUESTED" | "CONTENT_CREATION" | "CONTENT_READY" | "CUSTOMER_REVIEW" | "APPROVED" | "PUBLISHED"
+    type?:
+      | "GUEST_POST"
+      | "NICHE_EDIT"
+      | "EDITORIAL_LINK"
+      | "OUTREACH_LINK"
+      | "LOCAL_CITATION"
+      | "FOUNDATION_LINK"
+      | "BLOG_ARTICLE"
+      | "SEO_CONTENT"
+    status?:
+      | "DRAFT"
+      | "PENDING_PAYMENT"
+      | "PAID"
+      | "SUBMITTED"
+      | "ACCEPTED"
+      | "CONTENT_REQUESTED"
+      | "CONTENT_CREATION"
+      | "CONTENT_READY"
+      | "CUSTOMER_REVIEW"
+      | "APPROVED"
+      | "PUBLISHED"
     fulfillmentChannel?: "PUBLISHER" | "PLATFORM"
     amount?: number
     title?: string

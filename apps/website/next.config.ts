@@ -1,8 +1,12 @@
-import type { NextConfig } from "next"
 import { withSentryConfig } from "@sentry/nextjs"
+import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@guestpost/ui", "@guestpost/shared", "@guestpost/api-client"],
+  transpilePackages: [
+    "@guestpost/ui",
+    "@guestpost/shared",
+    "@guestpost/api-client",
+  ],
 }
 
 // Phase 7.7 C — source-map upload enabled (skipped silently without SENTRY_AUTH_TOKEN).

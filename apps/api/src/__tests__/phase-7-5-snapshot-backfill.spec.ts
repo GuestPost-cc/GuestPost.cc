@@ -35,8 +35,16 @@ describe("Phase 7.5 — migration regression guards", () => {
     })
 
     it("uses COALESCE for every backfilled column (preserves partially-populated rows)", () => {
-      for (const col of ["listingServiceId", "serviceType", "unitPrice", "fulfillmentChannel", "ownerType"]) {
-        expect(sql).toMatch(new RegExp(`"${col}"\\s*=\\s*COALESCE\\(s\\."${col}"`))
+      for (const col of [
+        "listingServiceId",
+        "serviceType",
+        "unitPrice",
+        "fulfillmentChannel",
+        "ownerType",
+      ]) {
+        expect(sql).toMatch(
+          new RegExp(`"${col}"\\s*=\\s*COALESCE\\(s\\."${col}"`),
+        )
       }
     })
 
@@ -51,7 +59,13 @@ describe("Phase 7.5 — migration regression guards", () => {
       // appears at least once. Re-running with all rows already populated
       // matches nothing and updates 0 rows.
       const settlementBlock = sql.split("-- ── PlatformRevenue")[0]!
-      for (const col of ["listingServiceId", "serviceType", "unitPrice", "fulfillmentChannel", "ownerType"]) {
+      for (const col of [
+        "listingServiceId",
+        "serviceType",
+        "unitPrice",
+        "fulfillmentChannel",
+        "ownerType",
+      ]) {
         expect(settlementBlock).toMatch(new RegExp(`s\\."${col}"\\s+IS NULL`))
       }
     })
@@ -69,14 +83,28 @@ describe("Phase 7.5 — migration regression guards", () => {
 
     it("uses COALESCE for every backfilled column", () => {
       const prBlock = sql.split("-- ── PlatformRevenue")[1] ?? ""
-      for (const col of ["listingServiceId", "serviceType", "unitPrice", "fulfillmentChannel", "ownerType"]) {
-        expect(prBlock).toMatch(new RegExp(`"${col}"\\s*=\\s*COALESCE\\(pr\\."${col}"`))
+      for (const col of [
+        "listingServiceId",
+        "serviceType",
+        "unitPrice",
+        "fulfillmentChannel",
+        "ownerType",
+      ]) {
+        expect(prBlock).toMatch(
+          new RegExp(`"${col}"\\s*=\\s*COALESCE\\(pr\\."${col}"`),
+        )
       }
     })
 
     it("WHERE clause includes IS NULL on every backfilled column", () => {
       const prBlock = sql.split("-- ── PlatformRevenue")[1] ?? ""
-      for (const col of ["listingServiceId", "serviceType", "unitPrice", "fulfillmentChannel", "ownerType"]) {
+      for (const col of [
+        "listingServiceId",
+        "serviceType",
+        "unitPrice",
+        "fulfillmentChannel",
+        "ownerType",
+      ]) {
         expect(prBlock).toMatch(new RegExp(`pr\\."${col}"\\s+IS NULL`))
       }
     })
@@ -139,10 +167,12 @@ describe("Phase 7.5 — backfill algorithmic correctness (4 scenarios)", () => {
     const w = f.website
     return {
       orderId: f.settlement.orderId,
-      listingServiceId: f.settlement.listingServiceId ?? f.order.listingServiceId,
+      listingServiceId:
+        f.settlement.listingServiceId ?? f.order.listingServiceId,
       serviceType: f.settlement.serviceType ?? ls?.serviceType ?? null,
       unitPrice: f.settlement.unitPrice ?? ls?.price ?? null,
-      fulfillmentChannel: f.settlement.fulfillmentChannel ?? f.order.fulfillmentChannel,
+      fulfillmentChannel:
+        f.settlement.fulfillmentChannel ?? f.order.fulfillmentChannel,
       ownerType: f.settlement.ownerType ?? w?.ownershipType ?? null,
     }
   }
@@ -163,7 +193,11 @@ describe("Phase 7.5 — backfill algorithmic correctness (4 scenarios)", () => {
         fulfillmentChannel: "PUBLISHER",
         websiteId: "web-1",
       },
-      listingService: { id: "lst-1", serviceType: "GUEST_POST", price: "150.00" },
+      listingService: {
+        id: "lst-1",
+        serviceType: "GUEST_POST",
+        price: "150.00",
+      },
       website: { id: "web-1", ownershipType: "PUBLISHER" },
     })
     expect(result).toEqual({
@@ -195,7 +229,11 @@ describe("Phase 7.5 — backfill algorithmic correctness (4 scenarios)", () => {
         fulfillmentChannel: "PUBLISHER", // would overwrite if migration was blind
         websiteId: "web-2",
       },
-      listingService: { id: "lst-2", serviceType: "GUEST_POST", price: "100.00" },
+      listingService: {
+        id: "lst-2",
+        serviceType: "GUEST_POST",
+        price: "100.00",
+      },
       website: { id: "web-2", ownershipType: "PUBLISHER" },
     })
     // Populated fields preserved; NULL fields filled
@@ -218,8 +256,17 @@ describe("Phase 7.5 — backfill algorithmic correctness (4 scenarios)", () => {
     expect(qualifiesForBackfill(settlement)).toBe(false)
     const result = applyBackfill({
       settlement,
-      order: { id: "ord-3", listingServiceId: "different", fulfillmentChannel: "PLATFORM", websiteId: "web-x" },
-      listingService: { id: "different", serviceType: "OUTREACH_LINK", price: "999.99" },
+      order: {
+        id: "ord-3",
+        listingServiceId: "different",
+        fulfillmentChannel: "PLATFORM",
+        websiteId: "web-x",
+      },
+      listingService: {
+        id: "different",
+        serviceType: "OUTREACH_LINK",
+        price: "999.99",
+      },
       website: { id: "web-x", ownershipType: "PLATFORM" },
     })
     // Identical to input — migration skips this row entirely
@@ -275,7 +322,11 @@ describe("Phase 7.5 — backfill algorithmic correctness (4 scenarios)", () => {
         fulfillmentChannel: null, // Order didn't capture channel either
         websiteId: "web-5",
       },
-      listingService: { id: "lst-5", serviceType: "GUEST_POST", price: "50.00" },
+      listingService: {
+        id: "lst-5",
+        serviceType: "GUEST_POST",
+        price: "50.00",
+      },
       website: { id: "web-5", ownershipType: "PLATFORM" },
     })
     expect(result.ownerType).toBe("PLATFORM")

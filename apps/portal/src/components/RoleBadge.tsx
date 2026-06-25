@@ -2,7 +2,20 @@
 
 import { Badge } from "@guestpost/ui"
 
-const roleConfig: Record<string, { variant: "default" | "secondary" | "destructive" | "outline" | "success" | "warning" | "info"; label: string }> = {
+const roleConfig: Record<
+  string,
+  {
+    variant:
+      | "default"
+      | "secondary"
+      | "destructive"
+      | "outline"
+      | "success"
+      | "warning"
+      | "info"
+    label: string
+  }
+> = {
   OWNER: { variant: "default", label: "Owner" },
   ADMIN: { variant: "warning", label: "Admin" },
   MANAGER: { variant: "info", label: "Manager" },
@@ -11,6 +24,9 @@ const roleConfig: Record<string, { variant: "default" | "secondary" | "destructi
 }
 
 export function RoleBadge({ role }: { role: string }) {
-  const config = roleConfig[role] ?? { variant: "outline" as const, label: role }
+  const config = roleConfig[role] ?? {
+    variant: "outline" as const,
+    label: role,
+  }
   return <Badge variant={config.variant}>{config.label}</Badge>
 }

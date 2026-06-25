@@ -1,11 +1,20 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException, ConflictException } from "@nestjs/common"
-import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
-import { QueueService } from "../queues/queue.service"
-import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
-import { ListingStatus, ListingFulfillmentType } from "@guestpost/database"
+import { ListingFulfillmentType, ListingStatus } from "@guestpost/database"
+import {
+  generateVerificationToken,
+  QUEUES,
+  verificationTxtValue,
+} from "@guestpost/shared"
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common"
 import { normalizeDomain } from "../../common/domain"
-import { QUEUES, generateVerificationToken, verificationTxtValue } from "@guestpost/shared"
+import type { PrismaService } from "../../common/prisma.service"
+import type { AuditService } from "../audit/audit.service"
+import type { QueueService } from "../queues/queue.service"
+import type { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
 
 @Injectable()
 export class WebsitesService {
@@ -15,16 +24,23 @@ export class WebsitesService {
     private readonly queue: QueueService,
   ) {}
 
-  async createWebsite(publisherId: string, organizationId: string, dto: CreateWebsiteDto, user: any) {
+  async createWebsite(
+    publisherId: string,
+    organizationId: string,
+    dto: CreateWebsiteDto,
+    user: any,
+  ) {
     const publisher = await this.prisma.publisher.findUnique({
       where: { id: publisherId },
     })
-    
+
     if (!publisher) {
       throw new NotFoundException("Publisher not found")
     }
     if (publisher.organizationId !== organizationId) {
-      throw new ForbiddenException("Publisher does not belong to this organization")
+      throw new ForbiddenException(
+        "Publisher does not belong to this organization",
+      )
     }
 
     // Canonical domain = dedupe + ownership-uniqueness key (protocol/path/www
@@ -39,17 +55,28 @@ export class WebsitesService {
     })
     if (existingWebsite) {
       // Cross-publisher takeover attempt — audit before refusing.
-      if (existingWebsite.ownershipType === "PUBLISHER" && existingWebsite.publisherId !== publisherId) {
+      if (
+        existingWebsite.ownershipType === "PUBLISHER" &&
+        existingWebsite.publisherId !== publisherId
+      ) {
         await this.audit.log({
           action: "WEBSITE_DUPLICATE_DOMAIN_ATTEMPT",
           entityType: "Website",
           entityId: existingWebsite.id,
-          metadata: { canonicalDomain, attemptedByPublisherId: publisherId, ownedByPublisherId: existingWebsite.publisherId, organizationId },
+          metadata: {
+            canonicalDomain,
+            attemptedByPublisherId: publisherId,
+            ownedByPublisherId: existingWebsite.publisherId,
+            organizationId,
+          },
           userId: user.id,
           organizationId,
         })
       }
-      throw new BadRequestException({ code: "DOMAIN_ALREADY_REGISTERED", message: `Domain ${canonicalDomain} is already registered` })
+      throw new BadRequestException({
+        code: "DOMAIN_ALREADY_REGISTERED",
+        message: `Domain ${canonicalDomain} is already registered`,
+      })
     }
 
     // Domain ownership must be proven before the site can sell. Mint a
@@ -80,22 +107,39 @@ export class WebsitesService {
     } catch (err: any) {
       // Partial unique index is the hard guarantee against a concurrent
       // duplicate-domain race that slips past the findFirst check above.
-      if (err?.code === "P2002" || /Website_canonicalDomain_publisher_key/.test(err?.message ?? "")) {
+      if (
+        err?.code === "P2002" ||
+        /Website_canonicalDomain_publisher_key/.test(err?.message ?? "")
+      ) {
         await this.audit.log({
           action: "WEBSITE_DUPLICATE_DOMAIN_ATTEMPT",
           entityType: "Website",
           entityId: canonicalDomain,
-          metadata: { canonicalDomain, attemptedByPublisherId: publisherId, organizationId, race: true },
+          metadata: {
+            canonicalDomain,
+            attemptedByPublisherId: publisherId,
+            organizationId,
+            race: true,
+          },
           userId: user.id,
           organizationId,
         })
-        throw new BadRequestException({ code: "DOMAIN_ALREADY_REGISTERED", message: `Domain ${canonicalDomain} is already registered` })
+        throw new BadRequestException({
+          code: "DOMAIN_ALREADY_REGISTERED",
+          message: `Domain ${canonicalDomain} is already registered`,
+        })
       }
       throw err
     }
 
     // Create associated MarketplaceListing with PENDING_REVIEW status
-    const slug = dto.url.replace(/^https?:\/\//, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + Date.now()
+    const slug =
+      dto.url
+        .replace(/^https?:\/\//, "")
+        .replace(/[^a-z0-9]+/gi, "-")
+        .toLowerCase() +
+      "-" +
+      Date.now()
 
     // Phase 7: the legacy listing-level type/price/turnaroundDays columns
     // are gone. We materialize a single GUEST_POST ListingService alongside
@@ -119,13 +163,15 @@ export class WebsitesService {
         organizationId,
         ownerType: "PUBLISHER",
         services: {
-          create: [{
-            serviceType: "GUEST_POST",
-            price: dto.price ?? 0,
-            currency: "USD",
-            turnaroundDays: dto.turnaroundDays ?? 7,
-            availability: "AVAILABLE",
-          }],
+          create: [
+            {
+              serviceType: "GUEST_POST",
+              price: dto.price ?? 0,
+              currency: "USD",
+              turnaroundDays: dto.turnaroundDays ?? 7,
+              availability: "AVAILABLE",
+            },
+          ],
         },
       },
     })
@@ -152,12 +198,21 @@ export class WebsitesService {
 
   // Returns the DNS record the publisher must publish + the current status.
   // Enqueues the actual DNS check — lookups never run in the request path.
-  async requestVerification(publisherId: string, organizationId: string, id: string, user: any) {
-    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+  async requestVerification(
+    publisherId: string,
+    organizationId: string,
+    id: string,
+    user: any,
+  ) {
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
     if (!publisher || publisher.organizationId !== organizationId) {
       throw new NotFoundException("Publisher not found")
     }
-    const website = await this.prisma.website.findFirst({ where: { id, publisherId } })
+    const website = await this.prisma.website.findFirst({
+      where: { id, publisherId },
+    })
     if (!website) throw new NotFoundException("Website not found")
     if (website.verificationStatus === "VERIFIED") {
       throw new BadRequestException("Website is already verified")
@@ -169,8 +224,14 @@ export class WebsitesService {
     // ── Rate limiting (anti DNS-abuse / verification spam) ────────────────────
     const now = Date.now()
     const COOLDOWN_MS = Number(process.env.VERIFY_COOLDOWN_SECONDS ?? 60) * 1000
-    if (website.lastVerificationRequestAt && now - new Date(website.lastVerificationRequestAt).getTime() < COOLDOWN_MS) {
-      throw new BadRequestException({ code: "VERIFICATION_RATE_LIMITED", message: "Please wait before requesting verification again" })
+    if (
+      website.lastVerificationRequestAt &&
+      now - new Date(website.lastVerificationRequestAt).getTime() < COOLDOWN_MS
+    ) {
+      throw new BadRequestException({
+        code: "VERIFICATION_RATE_LIMITED",
+        message: "Please wait before requesting verification again",
+      })
     }
     // Per-publisher hourly cap across all their websites.
     const HOURLY_CAP = Number(process.env.VERIFY_HOURLY_CAP ?? 20)
@@ -182,10 +243,16 @@ export class WebsitesService {
       },
     })
     if (recent >= HOURLY_CAP) {
-      throw new BadRequestException({ code: "VERIFICATION_RATE_LIMITED", message: "Hourly verification request limit reached. Try again later." })
+      throw new BadRequestException({
+        code: "VERIFICATION_RATE_LIMITED",
+        message: "Hourly verification request limit reached. Try again later.",
+      })
     }
 
-    await this.prisma.website.update({ where: { id: website.id }, data: { lastVerificationRequestAt: new Date(now) } })
+    await this.prisma.website.update({
+      where: { id: website.id },
+      data: { lastVerificationRequestAt: new Date(now) },
+    })
 
     await this.audit.log({
       action: "WEBSITE_VERIFICATION_REQUESTED",
@@ -202,7 +269,11 @@ export class WebsitesService {
       QUEUES.WEBSITE_VERIFICATION,
       "website-verify",
       { websiteId: website.id, actorUserId: user.id },
-      { jobId: `website-verify-${website.id}`, removeOnComplete: { count: 50 }, removeOnFail: { count: 50 } },
+      {
+        jobId: `website-verify-${website.id}`,
+        removeOnComplete: { count: 50 },
+        removeOnFail: { count: 50 },
+      },
     )
 
     return {
@@ -217,8 +288,16 @@ export class WebsitesService {
     }
   }
 
-  async updateWebsite(publisherId: string, organizationId: string, id: string, dto: UpdateWebsiteDto, user: any) {
-    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+  async updateWebsite(
+    publisherId: string,
+    organizationId: string,
+    id: string,
+    dto: UpdateWebsiteDto,
+    user: any,
+  ) {
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
     if (!publisher || publisher.organizationId !== organizationId) {
       throw new NotFoundException("Publisher not found")
     }
@@ -237,7 +316,9 @@ export class WebsitesService {
         where: { id: { not: id }, OR: [{ url: dto.url }, { domain }] },
       })
       if (duplicate) {
-        throw new BadRequestException(`Website with this domain already exists (${duplicate.url})`)
+        throw new BadRequestException(
+          `Website with this domain already exists (${duplicate.url})`,
+        )
       }
     }
 
@@ -281,8 +362,10 @@ export class WebsitesService {
         await this.prisma.listingService.updateMany({
           where: { listingId: listing.id },
           data: {
-            ...(dto.price != null         ? { price: dto.price } : {}),
-            ...(dto.turnaroundDays != null ? { turnaroundDays: dto.turnaroundDays } : {}),
+            ...(dto.price != null ? { price: dto.price } : {}),
+            ...(dto.turnaroundDays != null
+              ? { turnaroundDays: dto.turnaroundDays }
+              : {}),
           },
         })
       }
@@ -301,7 +384,9 @@ export class WebsitesService {
   }
 
   async getWebsites(publisherId: string, organizationId: string) {
-    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
     if (!publisher || publisher.organizationId !== organizationId) {
       throw new NotFoundException("Publisher not found")
     }
@@ -314,16 +399,26 @@ export class WebsitesService {
         marketplaceListings: {
           select: {
             status: true,
-            services: { where: { availability: "AVAILABLE" }, select: { serviceType: true, price: true, turnaroundDays: true } },
+            services: {
+              where: { availability: "AVAILABLE" },
+              select: { serviceType: true, price: true, turnaroundDays: true },
+            },
           },
-        }
+        },
       },
       orderBy: { createdAt: "desc" },
     })
   }
 
-  async deleteWebsite(publisherId: string, organizationId: string, id: string, user: any) {
-    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+  async deleteWebsite(
+    publisherId: string,
+    organizationId: string,
+    id: string,
+    user: any,
+  ) {
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
     if (!publisher || publisher.organizationId !== organizationId) {
       throw new NotFoundException("Publisher not found")
     }
@@ -358,8 +453,15 @@ export class WebsitesService {
     return { success: true }
   }
 
-  async submitForReview(publisherId: string, organizationId: string, id: string, user: any) {
-    const publisher = await this.prisma.publisher.findUnique({ where: { id: publisherId } })
+  async submitForReview(
+    publisherId: string,
+    organizationId: string,
+    id: string,
+    user: any,
+  ) {
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
     if (!publisher || publisher.organizationId !== organizationId) {
       throw new NotFoundException("Publisher not found")
     }

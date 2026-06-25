@@ -32,7 +32,9 @@ function toScaled(value: unknown): bigint {
   const s = String(value ?? 0)
   const neg = s.startsWith("-")
   const [whole, frac = ""] = (neg ? s.slice(1) : s).split(".")
-  const scaled = BigInt(whole || "0") * SCALE_FACTOR + BigInt((frac + "0".repeat(SCALE)).slice(0, SCALE))
+  const scaled =
+    BigInt(whole || "0") * SCALE_FACTOR +
+    BigInt((frac + "0".repeat(SCALE)).slice(0, SCALE))
   return neg ? -scaled : scaled
 }
 
@@ -41,7 +43,10 @@ function fromScaled(scaled: bigint): string {
   const neg = scaled < 0n
   const abs = neg ? -scaled : scaled
   const whole = abs / SCALE_FACTOR
-  let frac = (abs % SCALE_FACTOR).toString().padStart(SCALE, "0").replace(/0+$/, "")
+  let frac = (abs % SCALE_FACTOR)
+    .toString()
+    .padStart(SCALE, "0")
+    .replace(/0+$/, "")
   if (frac.length < 2) frac = frac.padEnd(2, "0")
   return `${neg ? "-" : ""}${whole}.${frac}`
 }
@@ -58,7 +63,12 @@ export interface ReconciliationReport {
 async function checkWallets(prisma: AnyPrisma) {
   const [wallets, sums] = await Promise.all([
     prisma.wallet.findMany({
-      select: { id: true, organizationId: true, availableBalance: true, reservedBalance: true },
+      select: {
+        id: true,
+        organizationId: true,
+        availableBalance: true,
+        reservedBalance: true,
+      },
     }),
     prisma.transaction.groupBy({
       by: ["walletId", "type"],
@@ -101,7 +111,11 @@ async function checkPublisherBalances(prisma: AnyPrisma) {
   ]
   const [balances, sums] = await Promise.all([
     prisma.publisherBalance.findMany({
-      select: { publisherId: true, withdrawableBalance: true, debtBalance: true },
+      select: {
+        publisherId: true,
+        withdrawableBalance: true,
+        debtBalance: true,
+      },
     }),
     prisma.transaction.groupBy({
       by: ["publisherId"],
@@ -112,7 +126,8 @@ async function checkPublisherBalances(prisma: AnyPrisma) {
 
   const expectedByPublisher = new Map<string, bigint>()
   for (const s of sums) {
-    if (s.publisherId) expectedByPublisher.set(s.publisherId, toScaled(s._sum.amount ?? 0))
+    if (s.publisherId)
+      expectedByPublisher.set(s.publisherId, toScaled(s._sum.amount ?? 0))
   }
 
   const drift: any[] = []
@@ -139,24 +154,35 @@ async function checkStuckOrders(prisma: AnyPrisma) {
       id: true,
       organizationId: true,
       deliveredAt: true,
-      settlements: { where: { status: { not: "CANCELLED" } }, select: { id: true } },
+      settlements: {
+        where: { status: { not: "CANCELLED" } },
+        select: { id: true },
+      },
       platformRevenue: { select: { id: true, reversedAt: true } },
     },
   })
   const stuck = delivered
-    .filter((o: any) => o.settlements.length === 0 && (!o.platformRevenue || o.platformRevenue.reversedAt !== null))
+    .filter(
+      (o: any) =>
+        o.settlements.length === 0 &&
+        (!o.platformRevenue || o.platformRevenue.reversedAt !== null),
+    )
     .map((o: any) => ({
       orderId: o.id,
       organizationId: o.organizationId,
       deliveredAt: o.deliveredAt?.toISOString() ?? null,
-      problem: "DELIVERED order has no active settlement and no platform revenue",
+      problem:
+        "DELIVERED order has no active settlement and no platform revenue",
     }))
 
   // Escrowed customer money must not age silently: paid orders no publisher
   // ever accepted. Surfaced for staff action (force-cancel refunds through
   // the single tested refund path) — deliberately NOT auto-refunded here;
   // the sweep is a detector, not a money mover.
-  const staleDays = Math.max(Number(process.env.ORDER_ACCEPT_STALE_DAYS ?? 7), 1)
+  const staleDays = Math.max(
+    Number(process.env.ORDER_ACCEPT_STALE_DAYS ?? 7),
+    1,
+  )
   const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000)
   const staleSubmitted = await prisma.order.findMany({
     where: { status: "SUBMITTED", updatedAt: { lt: cutoff } },
@@ -192,7 +218,9 @@ async function checkStuckPayouts(prisma: AnyPrisma) {
       },
       _count: true,
     })
-    const hasRecentExecution = new Set(recentExecGroups.map((g: any) => g.withdrawalId))
+    const hasRecentExecution = new Set(
+      recentExecGroups.map((g: any) => g.withdrawalId),
+    )
     for (const w of staleProcessing) {
       if (!hasRecentExecution.has(w.id)) {
         stuck.push({
@@ -207,7 +235,12 @@ async function checkStuckPayouts(prisma: AnyPrisma) {
 
   const staleExecutions = await prisma.payoutExecution.findMany({
     where: { status: "PROCESSING", updatedAt: { lt: twoHoursAgo } },
-    select: { id: true, withdrawalId: true, providerExecutionId: true, updatedAt: true },
+    select: {
+      id: true,
+      withdrawalId: true,
+      providerExecutionId: true,
+      updatedAt: true,
+    },
   })
   for (const e of staleExecutions) {
     stuck.push({
@@ -280,7 +313,10 @@ async function checkStuckPayouts(prisma: AnyPrisma) {
     }),
   ])
   const completedByPublisher = new Map<string, bigint>(
-    completedSums.map((s: any) => [s.publisherId as string, toScaled(s._sum.amount ?? 0)]),
+    completedSums.map((s: any) => [
+      s.publisherId as string,
+      toScaled(s._sum.amount ?? 0),
+    ]),
   )
   for (const b of paidBalances) {
     const expected = completedByPublisher.get(b.publisherId) ?? 0n
@@ -291,7 +327,8 @@ async function checkStuckPayouts(prisma: AnyPrisma) {
         lifetimePaid: fromScaled(actual),
         expectedFromWithdrawals: fromScaled(expected),
         delta: fromScaled(actual - expected),
-        problem: "lifetimePaid does not match sum of COMPLETED withdrawal amounts",
+        problem:
+          "lifetimePaid does not match sum of COMPLETED withdrawal amounts",
       })
     }
   }
@@ -314,7 +351,9 @@ async function checkStuckPayouts(prisma: AnyPrisma) {
   return stuck
 }
 
-export async function runReconciliation(prisma: AnyPrisma): Promise<ReconciliationReport> {
+export async function runReconciliation(
+  prisma: AnyPrisma,
+): Promise<ReconciliationReport> {
   const [wallets, publishers, stuckOrders, stuckPayouts] = await Promise.all([
     checkWallets(prisma),
     checkPublisherBalances(prisma),
@@ -323,7 +362,11 @@ export async function runReconciliation(prisma: AnyPrisma): Promise<Reconciliati
   ])
   return {
     ranAt: new Date().toISOString(),
-    ok: wallets.length === 0 && publishers.length === 0 && stuckOrders.length === 0 && stuckPayouts.length === 0,
+    ok:
+      wallets.length === 0 &&
+      publishers.length === 0 &&
+      stuckOrders.length === 0 &&
+      stuckPayouts.length === 0,
     walletDrift: wallets,
     publisherDrift: publishers,
     stuckOrders,

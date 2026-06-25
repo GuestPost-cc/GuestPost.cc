@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { NotificationBell } from "@guestpost/ui"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useState } from "react"
 import { api } from "../lib/api"
 
 // Live notification bell: unread badge polls every 60s; the list loads on
@@ -25,7 +25,8 @@ export function Notifications() {
     enabled: open,
   })
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["notifications"] })
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ["notifications"] })
   const markRead = useMutation({
     mutationFn: (id: string) => api.notifications.markRead(id),
     onSuccess: invalidate,

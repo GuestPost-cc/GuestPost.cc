@@ -1,7 +1,11 @@
 // Client-side CSV download with spreadsheet-formula-injection neutralization
 // (cells starting with = + - @ tab CR execute in Excel/Sheets — user-supplied
 // strings like titles and reasons must never round-trip as formulas).
-export function downloadCsv(filename: string, header: string[], rows: Array<Array<unknown>>) {
+export function downloadCsv(
+  filename: string,
+  header: string[],
+  rows: Array<Array<unknown>>,
+) {
   const sanitize = (c: unknown) => {
     let s = String(c ?? "").replace(/"/g, '""')
     if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`

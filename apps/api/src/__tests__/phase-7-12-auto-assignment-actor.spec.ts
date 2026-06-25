@@ -15,11 +15,17 @@
  * order, query FulfillmentAssignment row" coverage belongs in Phase 7.10.2's
  * future Nest+supertest harness.
  */
-import { readFileSync } from "fs"
-import { join } from "path"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 describe("Phase 7.12 #18 — Auto-assignment actor correctness", () => {
-  const ordersServicePath = join(__dirname, "..", "modules", "orders", "orders.service.ts")
+  const ordersServicePath = join(
+    __dirname,
+    "..",
+    "modules",
+    "orders",
+    "orders.service.ts",
+  )
   const ordersServiceSource = readFileSync(ordersServicePath, "utf-8")
 
   // Narrow to the autoAssignedToUserId block — the one inside the PLATFORM
@@ -44,9 +50,7 @@ describe("Phase 7.12 #18 — Auto-assignment actor correctness", () => {
     it("does NOT write `assignedByUserId: userId` (the legacy buggy form)", () => {
       // Regression guard — the exact line that was the bug. The auto-block
       // can't contain a write of the customer's userId to assignedByUserId.
-      expect(autoAssignBlock).not.toMatch(
-        /assignedByUserId:\s*userId\b/,
-      )
+      expect(autoAssignBlock).not.toMatch(/assignedByUserId:\s*userId\b/)
     })
   })
 
@@ -58,7 +62,10 @@ describe("Phase 7.12 #18 — Auto-assignment actor correctness", () => {
       // human assignments.
       const orderCreatedIdx = ordersServiceSource.indexOf("ORDER_CREATED")
       expect(orderCreatedIdx).toBeGreaterThan(-1)
-      const eventBlock = ordersServiceSource.slice(orderCreatedIdx, orderCreatedIdx + 1500)
+      const eventBlock = ordersServiceSource.slice(
+        orderCreatedIdx,
+        orderCreatedIdx + 1500,
+      )
       expect(eventBlock).toMatch(/auto:\s*(true|autoAssignedToUserId)/)
     })
   })
