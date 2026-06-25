@@ -1,9 +1,23 @@
 // Phase 7.9 #30 — ESLint flat config (ESLint 9).
 //
-// Tight rule set on purpose:
-//   - @eslint/js recommended (basic correctness)
-//   - typescript-eslint recommended (TS-aware basics)
-//   - eslint-plugin-react-hooks: ONLY rules-of-hooks
+// DIVISION OF LABOR (Repository Hardening phase):
+//
+//   Biome (biome.json) handles:
+//     - Formatting (indent, quotes, semicolons, line endings)
+//     - Import organization (organizeImports)
+//     - General linting (no-debugger, no-console, unused vars, etc.)
+//     - Run via: pnpm format (write) / pnpm lint:format (check)
+//
+//   ESLint (this file) handles — rules Biome cannot yet cover:
+//     - typescript-eslint type-aware rules (when enabled via project config)
+//     - react-hooks/rules-of-hooks
+//     - Future: react-hooks/exhaustive-deps, Next.js plugin, Tailwind
+//
+//   ESLint EXIT STRATEGY: As Biome adds replacement rules in future
+//   releases, the corresponding ESLint rules should be removed here.
+//   The goal is to eventually eliminate ESLint entirely, keeping only
+//   rules Biome cannot replace. Review during each major dependency
+//   upgrade. See docs/TOOLCHAIN.md for details.
 //
 // Explicitly NOT enabled to avoid surfacing dozens of pre-existing
 // warnings that don't belong in the Phase 7.9 PR:
