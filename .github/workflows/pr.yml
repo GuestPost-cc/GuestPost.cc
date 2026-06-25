@@ -69,10 +69,18 @@ jobs:
       - run: pnpm run typecheck
         name: TypeScript check
 
+      # Repository Hardening — Biome check (format + lint + imports).
+      - run: pnpm run lint:format
+        name: Biome check
+
       # Phase 7.9 #30 — ESLint with react-hooks/rules-of-hooks across the
       # 3 frontend apps. See ci.yml for rationale + scope.
       - run: pnpm run lint
         name: ESLint (hooks + TS)
+
+      # Repository Hardening — Dependency graph validation.
+      - run: pnpm depcruise apps packages scripts e2e --include-only '^(apps|packages|scripts|e2e)/'
+        name: Dependency graph
 
       - run: pnpm -F @guestpost/api test
         name: Run tests

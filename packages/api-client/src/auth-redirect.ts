@@ -97,18 +97,8 @@ export function sanitizeReturnTo(
  * returns 401 on first load when the user genuinely IS signed out, and
  * the AuthProvider catches that to render the sign-in page anyway.
  */
-export function isAuthEndpointPath(path: string): boolean {
-  return (
-    path.includes("/auth/sign-in") ||
-    path.includes("/auth/sign-up") ||
-    path.includes("/auth/sign-out") ||
-    path.includes("/auth/magic-link") ||
-    path.includes("/auth/reset-password") ||
-    path.includes("/auth/verify-email") ||
-    path.includes("/identity/me")
-  )
-}
 
+export { isAuthEndpointPath } from "./client"
 /**
  * Build the `onAuthError` callback that `HttpClient` will invoke on a 401
  * from a non-auth endpoint. The callback:

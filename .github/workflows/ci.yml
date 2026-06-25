@@ -78,8 +78,14 @@ jobs:
       # 3 frontend apps. Tight rule set (see eslint.config.mjs): only
       # @eslint/js recommended + typescript-eslint recommended +
       # rules-of-hooks. Catches the next #30-class regression at PR time.
+      - name: Biome check (format + lint + imports)
+        run: pnpm run lint:format
+
       - name: ESLint (hooks + TS)
         run: pnpm run lint
+
+      - name: Dependency graph validation
+        run: pnpm depcruise apps packages scripts e2e --include-only '^(apps|packages|scripts|e2e)/'
 
       - name: API unit tests
         run: pnpm test

@@ -74,9 +74,9 @@ export type { AuthErrorHandlerConfig } from "./auth-redirect"
 // idempotency guard, auth-endpoint skip).
 export {
   buildAuthErrorHandler,
-  isAuthEndpointPath,
   sanitizeReturnTo,
 } from "./auth-redirect"
+export { isAuthEndpointPath } from "./client"
 
 export function createApiClient(config: ApiClientConfig): GuestPostApi {
   const client = new HttpClient(config)

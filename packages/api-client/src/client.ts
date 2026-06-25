@@ -1,5 +1,3 @@
-import { isAuthEndpointPath } from "./auth-redirect"
-
 export interface ApiClientConfig {
   baseUrl: string
   /**
@@ -60,6 +58,23 @@ export function clearToken() {
 }
 export function getToken() {
   return _token
+}
+
+/**
+ * Heuristic that excludes auth endpoints from the 401 handler. A 401 from
+ * `/auth/sign-in/email` means "wrong password", not "session expired";
+ * bouncing the user through a redirect would be confusing.
+ */
+export function isAuthEndpointPath(path: string): boolean {
+  return (
+    path.includes("/auth/sign-in") ||
+    path.includes("/auth/sign-up") ||
+    path.includes("/auth/sign-out") ||
+    path.includes("/auth/magic-link") ||
+    path.includes("/auth/reset-password") ||
+    path.includes("/auth/verify-email") ||
+    path.includes("/identity/me")
+  )
 }
 
 export class HttpClient {
