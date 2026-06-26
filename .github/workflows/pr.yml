@@ -41,7 +41,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Version comes from `packageManager: pnpm@11.5.1` in package.json.
       # Specifying `version:` here ALSO triggers pnpm/action-setup@v6 to error
