@@ -1,0 +1,10 @@
+This commit cleans up and revises the documentation for the backfill
+investigation in  based on the latest recommendations.
+
+- Deleted the restored backfill scripts.
+- Reverted changes to .
+- Rewrote the "Data Integrity Gaps" section in
+  to use "Legacy Data Consideration (Pre-Production)" wording.
+- Simplified recommendations and removed disposable DB numbers.
+- Updated the report table in  to reflect that
+  scripts are not restored, but recoverable from Git history.
