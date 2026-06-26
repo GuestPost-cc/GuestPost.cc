@@ -1,10 +1,10 @@
 This commit cleans up and revises the documentation for the backfill
-investigation in  based on the latest recommendations.
+investigation in `bedrock/Work/risks.md` based on the latest recommendations.
 
 - Deleted the restored backfill scripts.
-- Reverted changes to .
-- Rewrote the "Data Integrity Gaps" section in
+- Reverted changes to `bedrock/Memory/settlements.md`.
+- Rewrote the "Data Integrity Gaps" section in `bedrock/Work/risks.md`
   to use "Legacy Data Consideration (Pre-Production)" wording.
 - Simplified recommendations and removed disposable DB numbers.
-- Updated the report table in  to reflect that
+- Updated the report table in `bedrock/Work/risks.md` to reflect that
   scripts are not restored, but recoverable from Git history.
