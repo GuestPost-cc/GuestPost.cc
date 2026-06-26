@@ -48,12 +48,12 @@ export async function evaluateSettlementEligibility(
     }
   }
 
-  // No open dispute
-  const dispute = await prisma.orderDispute
-    .findUnique({ where: { orderId } })
-    .catch(() => null)
-  if (dispute && dispute.status === "OPEN") {
-    reasons.push("Order has an open dispute")
+  // No open or under-review dispute (same active-status set as auto-approve)
+  const dispute = await prisma.orderDispute.findFirst({
+    where: { orderId, status: { in: ["OPEN", "UNDER_REVIEW"] } },
+  })
+  if (dispute) {
+    reasons.push("Order has an active dispute")
   }
 
   // No active revision

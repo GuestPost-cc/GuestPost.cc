@@ -255,7 +255,7 @@ async function checkStuckPayouts(prisma: AnyPrisma) {
   const execGroups = await prisma.payoutExecution.groupBy({
     by: ["withdrawalId", "status"],
     where: { status: { in: ["FAILED", "COMPLETED"] } },
-    _count: true,
+    _count: { _all: true },
   })
   const hasFailedExec = new Set<string>()
   const hasCompletedExec = new Set<string>()
@@ -264,7 +264,7 @@ async function checkStuckPayouts(prisma: AnyPrisma) {
     if (g.status === "FAILED") hasFailedExec.add(g.withdrawalId)
     if (g.status === "COMPLETED") {
       hasCompletedExec.add(g.withdrawalId)
-      if (g._count > 1) duplicateCompleted.set(g.withdrawalId, g._count)
+      if (g._count._all > 1) duplicateCompleted.set(g.withdrawalId, g._count._all)
     }
   }
 
