@@ -18,16 +18,14 @@ export function splitPlatformFee(
 // Source priority: PlatformSettings row → PLATFORM_FEE_PERCENT env → 20%.
 // Historical settlements are unaffected (rate is captured at creation time).
 export async function resolvePlatformFeeFraction(prisma: any): Promise<number> {
-  let pct = 20
+  const envPct = Number(process.env.PLATFORM_FEE_PERCENT ?? 20)
+  let pct = envPct
   try {
     const settings = await prisma.platformSettings.findFirst()
-    if (settings) {
-      pct = Number(settings.platformFeePct)
-    } else if (process.env.PLATFORM_FEE_PERCENT) {
-      pct = Number(process.env.PLATFORM_FEE_PERCENT)
-    }
+    const dbPct = Number(settings?.platformFeePct)
+    if (Number.isFinite(dbPct)) pct = dbPct
   } catch {
-    pct = Number(process.env.PLATFORM_FEE_PERCENT ?? 20)
+    // keep env/default fallback
   }
   if (!Number.isFinite(pct)) pct = 20
   pct = Math.min(Math.max(pct, 0), 100)
