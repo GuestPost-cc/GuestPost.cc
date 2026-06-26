@@ -200,6 +200,7 @@ build stack
 - **Affected actors**: New customers registering during a deploy or restart window
 - **Business impact**: account registration flow broken intermittently during deploys; signups complete without verification email
 - **Fix**: Move `queueServiceRef = app.get(QueueService)` BEFORE the Better Auth handler is mounted, OR replace lazy-ref pattern with `OnModuleInit` injection into a dedicated VerificationDispatcher service.
+- **Status**: **Resolved** — boot sequence reordered (NestFactory.create + QueueService resolve + startup assertion before auth mount); `queueServiceRef` is now `const` (non-nullable) with `process.exit(1)` on resolution failure; startup logging added. See `apps/api/src/main.ts:435-511`.
 
 **#6. Integration tests cannot run in CI — `guestpost_test_template` DB never created** *[infra]*
 - **Location**: `.github/workflows/ci.yml` (no template-DB setup step); `apps/api/src/__tests__/integration/helpers/test-db.ts:43` (depends on template existing)
