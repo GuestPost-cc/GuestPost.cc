@@ -484,7 +484,7 @@ export default function WebsitesPage() {
                   <TableCell>
                     <div className="flex flex-col">
                       <a
-                        href={`https://${site.url}`}
+                        href={site.url.startsWith("http") ? site.url : `https://${site.url}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center gap-1 font-medium hover:underline"
