@@ -154,7 +154,12 @@ export default function SavedListsPage() {
                   placeholder="List name"
                   value={newListName}
                   onChange={(e) => setNewListName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !creating && newListName.trim() && createList()}
+                  onKeyDown={(e) =>
+                    e.key === "Enter" &&
+                    !creating &&
+                    newListName.trim() &&
+                    createList()
+                  }
                 />
                 <Button
                   onClick={() => createList()}

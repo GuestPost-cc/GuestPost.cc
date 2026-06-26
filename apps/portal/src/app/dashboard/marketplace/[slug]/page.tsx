@@ -162,7 +162,14 @@ export default function ListingDetailPage() {
     const fallback = orderableServices[0] ?? null
     const picked = fromUrl ?? fallback
     if (picked) setSelectedServiceId(picked.id)
-  }, [listing, services, orderableServices, searchParams, selectedServiceId, selectedService])
+  }, [
+    listing,
+    services,
+    orderableServices,
+    searchParams,
+    selectedServiceId,
+    selectedService,
+  ])
 
   const { mutate: toggleFavorite, isPending: favoriting } = useMutation({
     mutationFn: () => {

@@ -271,7 +271,9 @@ export class OrderOperationsService {
       },
     })
     if (delivered.count === 0) {
-      throw new ConflictException("Assignment was modified by another request. Retry.")
+      throw new ConflictException(
+        "Assignment was modified by another request. Retry.",
+      )
     }
 
     void version

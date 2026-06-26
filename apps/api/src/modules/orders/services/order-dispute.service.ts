@@ -283,9 +283,10 @@ export class OrderDisputeService {
             resolution,
           },
         })
-        await this.transitionOrder(order.id, order.version, { status: restoreStatus as any })
+        await this.transitionOrder(order.id, order.version, {
+          status: restoreStatus as any,
+        })
       })
-
     } else if (action === "REFUND") {
       // Refund first — if it fails, the dispute stays open instead of being
       // marked resolved with the customer never refunded. If the order was
@@ -323,9 +324,10 @@ export class OrderDisputeService {
           },
         })
         // Restore order to pre-dispute state
-        await this.transitionOrder(order.id, order.version, { status: restoreStatus as any })
+        await this.transitionOrder(order.id, order.version, {
+          status: restoreStatus as any,
+        })
       })
-
     }
 
     await this.prisma.orderEvent.create({

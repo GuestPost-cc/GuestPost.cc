@@ -343,7 +343,9 @@ export class PayoutExecutionService {
         data: { status: "COMPLETED", version: { increment: 1 } },
       })
       if (wUpdated.count === 0) {
-        throw new ConflictException("Withdrawal state changed during provider recovery")
+        throw new ConflictException(
+          "Withdrawal state changed during provider recovery",
+        )
       }
 
       const balance = await tx.publisherBalance.findUnique({

@@ -423,7 +423,9 @@ export class OrdersService {
     // Backfill websiteId from the order if not provided
     const websiteId = data.websiteId ?? order.websiteId
     if (!websiteId) {
-      throw new BadRequestException("websiteId is required — the order has no associated website")
+      throw new BadRequestException(
+        "websiteId is required — the order has no associated website",
+      )
     }
 
     // One-website-per-order invariant (see createOrder)

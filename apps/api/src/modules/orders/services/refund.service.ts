@@ -190,7 +190,9 @@ export class RefundService {
             data: { status: "CANCELLED" },
           })
           if (cancelledReleased.count === 0) {
-            throw new ConflictException("Settlement was modified by another request. Retry.")
+            throw new ConflictException(
+              "Settlement was modified by another request. Retry.",
+            )
           }
         }
         cancelledSettlementId = activeSettlement?.id ?? null

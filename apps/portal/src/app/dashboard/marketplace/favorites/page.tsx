@@ -50,7 +50,8 @@ export default function FavoritesPage() {
   const { mutate: removeFavorite } = useMutation({
     mutationFn: (listingId: string) =>
       api.marketplace.removeFavorite(listingId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["favorites", user?.id] }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ["favorites", user?.id] }),
   })
 
   function formatPrice(price: number, currency: string = "USD") {

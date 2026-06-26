@@ -93,7 +93,10 @@ export class IdentityService {
       )
     }
 
-    const name = (publisherName?.trim() || user.name || user.email).slice(0, 120)
+    const name = (publisherName?.trim() || user.name || user.email).slice(
+      0,
+      120,
+    )
 
     const publisher = await this.prisma.$transaction(async (tx: any) => {
       const org = await tx.organization.create({

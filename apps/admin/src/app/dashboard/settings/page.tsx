@@ -11,7 +11,6 @@ import { z } from "zod"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 
-
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required"),
 })
@@ -119,11 +118,7 @@ export default function SettingsPage() {
                 When enabled, only admins can access the platform
               </p>
             </div>
-            <Switch
-              id="maintenance-mode"
-              checked={maintenanceMode}
-              disabled
-            />
+            <Switch id="maintenance-mode" checked={maintenanceMode} disabled />
           </div>
         </div>
       </div>

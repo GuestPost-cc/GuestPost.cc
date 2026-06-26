@@ -479,10 +479,13 @@ export default function OrdersPage() {
                   className="pl-9 w-64"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={(value) => {
+              <Select
+                value={statusFilter}
+                onValueChange={(value) => {
                   setStatusFilter(value)
                   setPagination((p) => ({ ...p, pageIndex: 0 }))
-                }}>
+                }}
+              >
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>

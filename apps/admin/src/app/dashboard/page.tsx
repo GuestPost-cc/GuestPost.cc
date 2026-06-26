@@ -244,11 +244,11 @@ function RecentOrdersTable({
                       {(order.status ?? "").replace(/_/g, " ") || "—"}
                     </Badge>
                   </TableCell>
-<TableCell>
-                      {order.amount != null
-                        ? `${order.currency} ${Number(order.amount).toFixed(2)}`
-                        : "—"}
-                    </TableCell>
+                  <TableCell>
+                    {order.amount != null
+                      ? `${order.currency} ${Number(order.amount).toFixed(2)}`
+                      : "—"}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {format(new Date(order.createdAt), "PP")}
                   </TableCell>

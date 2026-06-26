@@ -264,7 +264,8 @@ async function checkStuckPayouts(prisma: AnyPrisma) {
     if (g.status === "FAILED") hasFailedExec.add(g.withdrawalId)
     if (g.status === "COMPLETED") {
       hasCompletedExec.add(g.withdrawalId)
-      if (g._count._all > 1) duplicateCompleted.set(g.withdrawalId, g._count._all)
+      if (g._count._all > 1)
+        duplicateCompleted.set(g.withdrawalId, g._count._all)
     }
   }
 

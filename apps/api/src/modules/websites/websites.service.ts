@@ -106,7 +106,13 @@ export class WebsitesService {
           },
         })
 
-        const slug = dto.url.replace(/^https?:\/\//, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + Date.now()
+        const slug =
+          dto.url
+            .replace(/^https?:\/\//, "")
+            .replace(/[^a-z0-9]+/gi, "-")
+            .toLowerCase() +
+          "-" +
+          Date.now()
 
         await tx.marketplaceListing.create({
           data: {
@@ -126,13 +132,15 @@ export class WebsitesService {
             organizationId,
             ownerType: "PUBLISHER",
             services: {
-              create: [{
-                serviceType: "GUEST_POST",
-                price: dto.price ?? 0,
-                currency: "USD",
-                turnaroundDays: dto.turnaroundDays ?? 7,
-                availability: "AVAILABLE",
-              }],
+              create: [
+                {
+                  serviceType: "GUEST_POST",
+                  price: dto.price ?? 0,
+                  currency: "USD",
+                  turnaroundDays: dto.turnaroundDays ?? 7,
+                  availability: "AVAILABLE",
+                },
+              ],
             },
           },
         })

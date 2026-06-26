@@ -177,7 +177,13 @@ export default function AdminMarketplacePage() {
     isLoading,
     error: listingsError,
   } = useQuery({
-    queryKey: ["admin-marketplace-listings", page, statusFilter, typeFilter, search],
+    queryKey: [
+      "admin-marketplace-listings",
+      page,
+      statusFilter,
+      typeFilter,
+      search,
+    ],
     queryFn: async () => {
       const params: any = { page, limit: 20 }
       if (statusFilter !== "all") params.status = statusFilter
@@ -302,7 +308,9 @@ export default function AdminMarketplacePage() {
     queryKey: ["admin-listing-services", servicesForListing?.id],
     queryFn: async () => {
       if (!servicesForListing?.id) return servicesForListing?.services ?? []
-      const listing = listings.find((l) => l.id === servicesForListing.id) as Listing | undefined
+      const listing = listings.find((l) => l.id === servicesForListing.id) as
+        | Listing
+        | undefined
       return listing?.services ?? []
     },
     enabled: !!servicesForListing?.id,
@@ -968,7 +976,8 @@ export default function AdminMarketplacePage() {
                       <Skeleton className="h-4 w-24 mx-auto" />
                     </TableCell>
                   </TableRow>
-                ) : servicesQuery.data?.length === 0 && !addAdminServiceMut.isPending ? (
+                ) : servicesQuery.data?.length === 0 &&
+                  !addAdminServiceMut.isPending ? (
                   <TableRow>
                     <TableCell
                       colSpan={5}
@@ -978,21 +987,35 @@ export default function AdminMarketplacePage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  servicesQuery.data?.map(s => (
+                  servicesQuery.data?.map((s) => (
                     <TableRow key={s.id}>
-                      <TableCell className="font-medium">{s.serviceType.replace(/_/g, " ")}</TableCell>
-                      <TableCell className="font-mono text-sm">{formatPrice(Number(s.price), s.currency)}</TableCell>
+                      <TableCell className="font-medium">
+                        {s.serviceType.replace(/_/g, " ")}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {formatPrice(Number(s.price), s.currency)}
+                      </TableCell>
                       <TableCell>{s.turnaroundDays}d</TableCell>
                       <TableCell>
                         <Select
                           value={s.availability}
-                          onValueChange={(v) => updateAdminServiceMut.mutate({
-                            listingId: servicesForListing!.id,
-                            serviceId: s.id,
-                            data: { version: s.version, availability: v as "AVAILABLE" | "PAUSED" | "WAITLIST" },
-                          })}
+                          onValueChange={(v) =>
+                            updateAdminServiceMut.mutate({
+                              listingId: servicesForListing!.id,
+                              serviceId: s.id,
+                              data: {
+                                version: s.version,
+                                availability: v as
+                                  | "AVAILABLE"
+                                  | "PAUSED"
+                                  | "WAITLIST",
+                              },
+                            })
+                          }
                         >
-                          <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="h-8 w-[110px]">
+                            <SelectValue />
+                          </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="AVAILABLE">Available</SelectItem>
                             <SelectItem value="PAUSED">Paused</SelectItem>
@@ -1004,7 +1027,12 @@ export default function AdminMarketplacePage() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => pauseAdminServiceMut.mutate({ listingId: servicesForListing!.id, serviceId: s.id })}
+                          onClick={() =>
+                            pauseAdminServiceMut.mutate({
+                              listingId: servicesForListing!.id,
+                              serviceId: s.id,
+                            })
+                          }
                           disabled={s.availability === "PAUSED"}
                         >
                           Pause
@@ -1013,7 +1041,6 @@ export default function AdminMarketplacePage() {
                     </TableRow>
                   ))
                 )}
-
               </TableBody>
             </Table>
             <div className="border-t pt-4 space-y-3">

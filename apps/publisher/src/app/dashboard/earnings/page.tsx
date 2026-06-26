@@ -192,7 +192,10 @@ export default function EarningsPage() {
       <ErrorState
         title="Failed to load earnings"
         description={(balanceError as Error).message}
-        onRetry={() => { refetch(); refetchTxns(); }}
+        onRetry={() => {
+          refetch()
+          refetchTxns()
+        }}
       />
     )
 

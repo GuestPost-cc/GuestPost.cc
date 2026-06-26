@@ -157,7 +157,10 @@ export async function runSettlementAutoApprove(
       const committed = await prisma.$transaction(async (tx: AutoApproveTx) => {
         // Re-check dispute inside the transaction (TOCTOU guard)
         const activeDispute = await tx.orderDispute.findFirst({
-          where: { orderId: settlement.orderId, status: { in: ["OPEN", "UNDER_REVIEW"] } },
+          where: {
+            orderId: settlement.orderId,
+            status: { in: ["OPEN", "UNDER_REVIEW"] },
+          },
         })
         if (activeDispute) return false
 
