@@ -54,7 +54,7 @@ jobs:
       # with "Multiple versions of pnpm specified" — package.json is the
       # single source of truth.
       - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
