@@ -22,7 +22,6 @@ import { OrderOperationsService } from "./services/order-operations.service"
 // (assignment/claim) — separation of duties.
 @Controller()
 @UseGuards(StaffRolesGuard)
-@StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
 export class DeliveriesController {
   constructor(
     private readonly delivery: OrderDeliveryService,
@@ -38,31 +37,37 @@ export class DeliveriesController {
 
   // ── Reads ──────────────────────────────────────────────────────────────
   @Get("orders/:id/deliveries")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listDeliveries(@Param("id") id: string) {
     return this.delivery.listDeliveries(id)
   }
 
   @Get("deliveries/:id")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   getDelivery(@Param("id") id: string) {
     return this.delivery.getDelivery(id)
   }
 
   @Get("orders/:id/evidence")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   evidence(@Param("id") id: string) {
     return this.intervention.orderEvidence(id)
   }
 
   @Get("orders/:id/snapshots")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   snapshots(@Param("id") id: string) {
     return this.intervention.orderSnapshots(id)
   }
 
   @Get("orders/:id/audit")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   audit(@Param("id") id: string) {
     return this.intervention.orderAudit(id)
   }
 
   @Get("disputes/:disputeId/evidence")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   async disputeEvidence(@Param("disputeId") disputeId: string) {
     const dispute = await this.prisma.orderDispute.findUnique({
       where: { id: disputeId },
@@ -132,6 +137,7 @@ export class DeliveriesController {
   }
 
   @Post("deliveries/:id/manual-approve")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   manualApprove(
     @Param("id") id: string,
     @Body("reason") reason: string,
@@ -141,6 +147,7 @@ export class DeliveriesController {
   }
 
   @Post("deliveries/:id/manual-reject")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   manualReject(
     @Param("id") id: string,
     @Body("reason") reason: string,
@@ -150,6 +157,7 @@ export class DeliveriesController {
   }
 
   @Post("deliveries/:id/override")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   override(
     @Param("id") id: string,
     @Body() body: { targetStatus: "VERIFIED" | "FAILED"; reason: string },

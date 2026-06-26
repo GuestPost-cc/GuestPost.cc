@@ -126,6 +126,14 @@ export class BillingService {
       await this.handleChargeback(event.data.object as any)
     } else if (event.type === "charge.dispute.closed") {
       await this.handleChargebackClosed(event.data.object as any)
+    } else if (event.type === "radar.early_fraud_warning.created") {
+      await this.handleEarlyFraudWarning(event)
+    } else {
+      this.logger.warn({
+        eventType: event.type,
+        eventId: event.id,
+        message: "Unhandled Stripe webhook event type",
+      })
     }
 
     return { received: true }
@@ -396,6 +404,101 @@ export class BillingService {
         ? `Chargeback ${dispute.id} WON — ${held.toFixed(2)} released back to the wallet`
         : `Chargeback ${dispute.id} LOST — ${held.toFixed(2)} debited`,
       `chargeback:${dispute.id}:${won ? "won" : "lost"}`,
+    )
+  }
+
+  // Stripe Radar flags a payment as potentially fraudulent before a chargeback
+  // is filed. This handler logs, audits, and notifies Operations — no financial
+  // state changes (wallet holds, settlement freezes, payout blocks) are made
+  // until a confirmed chargeback or a business decision.
+  //
+  // Idempotency: uses the Stripe event ID as the audit record entityId, checked
+  // before creating duplicate audit entries or notifications.
+  private async handleEarlyFraudWarning(event: any) {
+    const eventId: string = event.id ?? "unknown"
+
+    // Validate payload structure before accessing nested fields
+    const object = event.data?.object
+    if (!object || typeof object !== "object") {
+      this.logger.warn({
+        eventId,
+        eventType: event.type,
+        message: "Early fraud warning missing data.object — malformed payload",
+      })
+      return
+    }
+
+    const paymentIntent: string | null = object.payment_intent ?? null
+    const chargeId: string | null = object.charge ?? null
+    const amount: number = object.amount ?? 0
+    const currency: string = object.currency ?? "unknown"
+
+    this.logger.log({
+      eventId,
+      eventType: event.type,
+      paymentIntent,
+      chargeId,
+      message: "Early fraud warning received",
+    })
+
+    // Idempotency: skip if we already logged this event
+    const existing = await this.prisma.auditLog.findFirst({
+      where: { entityId: eventId, action: "STRIPE_EARLY_FRAUD_WARNING" },
+      select: { id: true },
+    })
+    if (existing) {
+      this.logger.warn({
+        eventId,
+        eventType: event.type,
+        message: "Duplicate early fraud warning — already processed, skipped",
+      })
+      return
+    }
+
+    // Locate the internal payment via payment_intent on the deposit transaction
+    const depositTx = paymentIntent
+      ? await this.prisma.transaction.findFirst({
+          where: { providerRef: paymentIntent, type: "DEPOSIT" },
+          select: { id: true, walletId: true, orderId: true, reference: true },
+        })
+      : null
+
+    if (!depositTx) {
+      this.logger.warn({
+        eventId,
+        eventType: event.type,
+        paymentIntent,
+        chargeId,
+        message: "Early fraud warning — no matching deposit transaction found",
+      })
+    }
+
+    // Audit the event (entityId = Stripe event ID for idempotency dedup)
+    await this.audit.log({
+      action: "STRIPE_EARLY_FRAUD_WARNING",
+      entityType: "StripeRadarWarning",
+      entityId: eventId,
+      metadata: {
+        paymentIntent,
+        chargeId,
+        amount,
+        currency,
+        depositTransactionId: depositTx?.id ?? null,
+        walletId: depositTx?.walletId ?? null,
+        orderId: depositTx?.orderId ?? null,
+      },
+      userId: null,
+      organizationId: null,
+    })
+
+    // Notify Operations
+    const amountFormatted = `${String(currency).toUpperCase()} ${(amount / 100).toFixed(2)}`
+    await this.notifyStaff(
+      "STRIPE_EARLY_FRAUD_WARNING",
+      depositTx
+        ? `Early fraud warning for ${amountFormatted} — linked to deposit ${depositTx.reference}. Payment intent: ${paymentIntent ?? "N/A"}`
+        : `Early fraud warning for ${amountFormatted} — no deposit match, manual review needed. Payment intent: ${paymentIntent ?? "N/A"}`,
+      `efw:${eventId}`,
     )
   }
 

@@ -2246,6 +2246,7 @@ Phase 6.8 fixes all four.
 **Recommendations + remaining concerns:**
 
 1. **`DeliveriesController` uses a class-level + per-handler pattern** — class declares the broadest gate (all 3 roles), handlers narrow. This is the *correct* inheritance pattern (broad-then-narrow), not the fail-open variant fixed in `AdminController`. Three handlers (`manual-approve`, `manual-reject`, `override`) inherit all 3 roles — including FINANCE. The file header comment says "Finance is included for read + intervention but excluded from fulfillment (assignment/claim)". Worth a Phase 6.8 review to decide whether Finance should be replying to delivery interventions or only auditing them. **Not changed in this pass** — outside scope, the fail-closed guard handles it correctly.
+   - **Status**: **Resolved** — class-level `@StaffRoles` removed; every handler now has explicit per-handler `@StaffRoles(...)`. Read endpoints include FINANCE; mutation endpoints (`manualApprove`, `manualReject`, `override`) exclude FINANCE (SUPER_ADMIN + OPERATIONS only). RBAC coverage test added at `apps/api/src/modules/orders/__tests__/deliveries-rbac-coverage.spec.ts`.
 
 2. **`PayoutEncryptionService` dev-key fallback** — `payout-encryption.service.ts:24`. Still allows a hardcoded dev key if `PAYOUT_ENCRYPTION_KEY` is unset in non-production. Recommend tightening to unconditional throw outside `NODE_ENV === "development"` (Cfg-1 in §5.9).
 
