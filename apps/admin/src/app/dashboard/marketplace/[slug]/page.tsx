@@ -79,6 +79,8 @@ export default function AdminListingPreviewPage({
     queryClient.invalidateQueries({
       queryKey: ["admin", "listing-preview", slug],
     })
+    queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+    queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
     queryClient.invalidateQueries({ queryKey: ["admin", "marketplace"] })
   }
 

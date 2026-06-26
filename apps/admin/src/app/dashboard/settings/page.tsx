@@ -11,6 +11,7 @@ import { z } from "zod"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 
+
 const profileSchema = z.object({
   name: z.string().min(1, "Name is required"),
 })
@@ -45,7 +46,9 @@ export default function SettingsPage() {
     onError: () => toast.error("Failed to update profile"),
   })
 
-  const [maintenanceMode, setMaintenanceMode] = useState(false)
+  // Maintenance mode requires a backend endpoint — currently inactive
+  // until the API route is implemented.
+  const [maintenanceMode] = useState(false)
 
   return (
     <div>
@@ -119,7 +122,7 @@ export default function SettingsPage() {
             <Switch
               id="maintenance-mode"
               checked={maintenanceMode}
-              onCheckedChange={setMaintenanceMode}
+              disabled
             />
           </div>
         </div>

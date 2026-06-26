@@ -154,6 +154,7 @@ export default function AdminMarketplacePage() {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
       })
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       setShowCreate(false)
       setPform({
         title: "",
@@ -176,11 +177,12 @@ export default function AdminMarketplacePage() {
     isLoading,
     error: listingsError,
   } = useQuery({
-    queryKey: ["admin-marketplace-listings", page, statusFilter, typeFilter],
+    queryKey: ["admin-marketplace-listings", page, statusFilter, typeFilter, search],
     queryFn: async () => {
       const params: any = { page, limit: 20 }
       if (statusFilter !== "all") params.status = statusFilter
       if (typeFilter !== "all") params.type = typeFilter
+      if (search) params.search = search
       const res = await api.admin.listMarketplaceListings(params)
       return res
     },
@@ -211,6 +213,7 @@ export default function AdminMarketplacePage() {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
       })
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       toast.success("Listing status updated")
     },
     onError: (err: any) => {
@@ -237,6 +240,7 @@ export default function AdminMarketplacePage() {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
       })
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       toast.success("Featured status updated")
     },
     onError: () => toast.error("Failed to update featured status"),
@@ -249,6 +253,7 @@ export default function AdminMarketplacePage() {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
       })
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       toast.success("Verified status updated")
     },
     onError: () => toast.error("Failed to update verified status"),
@@ -260,6 +265,7 @@ export default function AdminMarketplacePage() {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
       })
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       toast.success("Listing deleted")
     },
     onError: () => toast.error("Failed to delete listing"),
@@ -291,6 +297,17 @@ export default function AdminMarketplacePage() {
     revisionRounds: "2",
   })
 
+  // Fetch services for the currently open listing to keep dialog in sync
+  const servicesQuery = useQuery<ListingServiceRow[]>({
+    queryKey: ["admin-listing-services", servicesForListing?.id],
+    queryFn: async () => {
+      if (!servicesForListing?.id) return servicesForListing?.services ?? []
+      const listing = listings.find((l) => l.id === servicesForListing.id) as Listing | undefined
+      return listing?.services ?? []
+    },
+    enabled: !!servicesForListing?.id,
+  })
+
   const addAdminServiceMut = useMutation({
     mutationFn: (vars: {
       listingId: string
@@ -305,6 +322,10 @@ export default function AdminMarketplacePage() {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
       })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-listing-services", servicesForListing?.id],
+      })
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       setNewAdminService({
         serviceType: "GUEST_POST",
         price: "",
@@ -322,10 +343,15 @@ export default function AdminMarketplacePage() {
         vars.serviceId,
         vars.data,
       ),
-    onSuccess: () =>
+    onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
-      }),
+      })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-listing-services", servicesForListing?.id],
+      })
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
+    },
     onError: (e: Error) => toast.error(e.message || "Update failed"),
   })
   const pauseAdminServiceMut = useMutation({
@@ -338,6 +364,10 @@ export default function AdminMarketplacePage() {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
       })
+      queryClient.invalidateQueries({
+        queryKey: ["admin-listing-services", servicesForListing?.id],
+      })
+      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       toast.success("Service paused")
     },
     onError: (e: Error) => toast.error(e.message || "Pause failed"),
@@ -711,8 +741,9 @@ export default function AdminMarketplacePage() {
                       <ToggleRight className="h-5 w-5 text-primary" />
                     ) : (
                       <ToggleLeft
-                        className="h-5 w-5 text-muted-foreground cursor-pointer"
+                        className={`h-5 w-5 ${canManage ? "text-muted-foreground cursor-pointer" : "text-muted-foreground"}`}
                         onClick={() =>
+                          canManage &&
                           toggleFeatured.mutate({
                             id: listing.id,
                             featured: true,
@@ -739,30 +770,34 @@ export default function AdminMarketplacePage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() =>
-                            toggleFeatured.mutate({
-                              id: listing.id,
-                              featured: !listing.featured,
-                            })
-                          }
-                        >
-                          {listing.featured
-                            ? "Remove Featured"
-                            : "Mark Featured"}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            toggleVerified.mutate({
-                              id: listing.id,
-                              verified: !listing.verified,
-                            })
-                          }
-                        >
-                          {listing.verified
-                            ? "Remove Verified"
-                            : "Mark Verified"}
-                        </DropdownMenuItem>
+                        {canManage && (
+                          <>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                toggleFeatured.mutate({
+                                  id: listing.id,
+                                  featured: !listing.featured,
+                                })
+                              }
+                            >
+                              {listing.featured
+                                ? "Remove Featured"
+                                : "Mark Featured"}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                toggleVerified.mutate({
+                                  id: listing.id,
+                                  verified: !listing.verified,
+                                })
+                              }
+                            >
+                              {listing.verified
+                                ? "Remove Verified"
+                                : "Mark Verified"}
+                            </DropdownMenuItem>
+                          </>
+                        )}
                         <DropdownMenuItem asChild>
                           {/* In-app preview of the public page (staff cannot
                               enter the customer portal) + moderation actions */}
@@ -784,7 +819,7 @@ export default function AdminMarketplacePage() {
                         >
                           Manage Services ({listing.services?.length ?? 0})
                         </DropdownMenuItem>
-                        {listing.status !== "ARCHIVED" && (
+                        {canManage && listing.status !== "ARCHIVED" && (
                           <>
                             {(() => {
                               const blocked =
@@ -927,7 +962,13 @@ export default function AdminMarketplacePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {servicesForListing?.services.length === 0 && (
+                {servicesQuery.isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-6">
+                      <Skeleton className="h-4 w-24 mx-auto" />
+                    </TableCell>
+                  </TableRow>
+                ) : servicesQuery.data?.length === 0 && !addAdminServiceMut.isPending ? (
                   <TableRow>
                     <TableCell
                       colSpan={5}
@@ -936,60 +977,43 @@ export default function AdminMarketplacePage() {
                       No services configured yet.
                     </TableCell>
                   </TableRow>
+                ) : (
+                  servicesQuery.data?.map(s => (
+                    <TableRow key={s.id}>
+                      <TableCell className="font-medium">{s.serviceType.replace(/_/g, " ")}</TableCell>
+                      <TableCell className="font-mono text-sm">{formatPrice(Number(s.price), s.currency)}</TableCell>
+                      <TableCell>{s.turnaroundDays}d</TableCell>
+                      <TableCell>
+                        <Select
+                          value={s.availability}
+                          onValueChange={(v) => updateAdminServiceMut.mutate({
+                            listingId: servicesForListing!.id,
+                            serviceId: s.id,
+                            data: { version: s.version, availability: v as "AVAILABLE" | "PAUSED" | "WAITLIST" },
+                          })}
+                        >
+                          <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="AVAILABLE">Available</SelectItem>
+                            <SelectItem value="PAUSED">Paused</SelectItem>
+                            <SelectItem value="WAITLIST">Waitlist</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => pauseAdminServiceMut.mutate({ listingId: servicesForListing!.id, serviceId: s.id })}
+                          disabled={s.availability === "PAUSED"}
+                        >
+                          Pause
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
-                {servicesForListing?.services.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">
-                      {s.serviceType.replace(/_/g, " ")}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {formatPrice(Number(s.price), s.currency)}
-                    </TableCell>
-                    <TableCell>{s.turnaroundDays}d</TableCell>
-                    <TableCell>
-                      <Select
-                        value={s.availability}
-                        onValueChange={(v) =>
-                          updateAdminServiceMut.mutate({
-                            listingId: servicesForListing?.id,
-                            serviceId: s.id,
-                            data: {
-                              version: s.version,
-                              availability: v as
-                                | "AVAILABLE"
-                                | "PAUSED"
-                                | "WAITLIST",
-                            },
-                          })
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-[110px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="AVAILABLE">Available</SelectItem>
-                          <SelectItem value="PAUSED">Paused</SelectItem>
-                          <SelectItem value="WAITLIST">Waitlist</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          pauseAdminServiceMut.mutate({
-                            listingId: servicesForListing?.id,
-                            serviceId: s.id,
-                          })
-                        }
-                        disabled={s.availability === "PAUSED"}
-                      >
-                        Pause
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+
               </TableBody>
             </Table>
             <div className="border-t pt-4 space-y-3">
