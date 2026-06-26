@@ -3,11 +3,10 @@
  * TXT joining, root/www fallback, wrong-token rejection, and timeout handling.
  * node `dns` is mocked so the suite never makes a real network call.
  */
-
 import { promises as dns } from "node:dns"
 import { checkDnsTxtToken } from "@guestpost/shared/dist/dns-lookup"
 
-jest.mock("dns", () => ({ promises: { resolveTxt: jest.fn() } }))
+jest.mock("node:dns", () => ({ promises: { resolveTxt: jest.fn() } }))
 const resolveTxt = dns.resolveTxt as unknown as jest.Mock
 
 describe("checkDnsTxtToken", () => {

@@ -75,7 +75,7 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
 
     it("adds a removeFavoriteService method that takes serviceType", () => {
       expect(serviceSource).toMatch(
-        /async\s+removeFavoriteService\(\s*userId:\s*string,\s*listingId:\s*string,\s*serviceType:\s*ServiceType\s*\)/,
+        /async\s+removeFavoriteService\(\s*userId:\s*string,\s*listingId:\s*string,\s*serviceType:\s*ServiceType,?\s*\)/,
       )
     })
 
@@ -92,7 +92,7 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
   describe("#17 — addFavorite accepts optional serviceType", () => {
     it("addFavorite signature accepts serviceType parameter with default null", () => {
       expect(serviceSource).toMatch(
-        /async\s+addFavorite\(\s*userId:\s*string,\s*listingId:\s*string,\s*serviceType:\s*ServiceType\s*\|\s*null\s*=\s*null\s*\)/,
+        /async\s+addFavorite\(\s*userId:\s*string,\s*listingId:\s*string,\s*serviceType:\s*ServiceType\s*\|\s*null\s*=\s*null,?\s*\)/,
       )
     })
 
@@ -126,7 +126,7 @@ describe("Phase 7.12 #16 + #17 + #20 — favorites correctness", () => {
 
     it("Controller POST /favorites threads body.serviceType into the service call", () => {
       expect(controllerSource).toMatch(
-        /addFavorite\(\s*user\.id,\s*body\.listingId,\s*body\.serviceType\s*\?\?\s*null\s*\)/,
+        /addFavorite\(\s*user\.id,\s*body\.listingId,\s*body\.serviceType\s*\?\?\s*null,?\s*\)/,
       )
     })
 

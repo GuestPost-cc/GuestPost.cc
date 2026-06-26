@@ -72,7 +72,7 @@ describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
       const block = serviceSource.slice(startIdx, endIdx)
       expect(block).toMatch(/try\s*\{[\s\S]*?await\s+this\.upsertAssignment\(/)
       expect(block).toMatch(
-        /catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(["']Order assignment changed concurrently[^"']*["']\)/,
+        /catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(\s*["']Order assignment changed concurrently[^"']*["'],?\s*\)/,
       )
     })
 
@@ -82,7 +82,7 @@ describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
       const block = serviceSource.slice(startIdx, startIdx + 800)
       expect(block).toMatch(/try\s*\{[\s\S]*?await\s+this\.upsertAssignment\(/)
       expect(block).toMatch(
-        /catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(["']Order assignment changed concurrently[^"']*["']\)/,
+        /catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(\s*["']Order assignment changed concurrently[^"']*["'],?\s*\)/,
       )
     })
   })

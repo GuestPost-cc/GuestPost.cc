@@ -160,7 +160,9 @@ function extractMoneyAuditCallsites(file: string): AuditCallsite[] {
   for (let i = 0; i < lines.length; i++) {
     // Find the start of an audit.log({...}) literal. Match on `audit.log({` so we
     // catch single-line and multi-line forms uniformly.
-    if (!/audit\.log\(\s*\{/.test(lines[i])) continue
+    if (!/audit\.log\(/.test(lines[i]) || lines[i].trim().startsWith("//")) {
+      continue
+    }
     // Pull the next ~20 lines (enough to cover any audit.log literal in this
     // codebase) and parse the entityType + look for orderEventMetadata / the
     // delivery wrapper.
@@ -308,11 +310,11 @@ describe("Phase 6.9 — money-path OWNER||creator gate coverage", () => {
     )
     // submitPayment must pass user.customerRole as the 4th arg.
     expect(src).toMatch(
-      /payment\.submitPayment\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.customerRole\s*\)/,
+      /payment\.submitPayment\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.customerRole,?\s*\)/,
     )
     // acceptDelivery must pass user.customerRole as the 4th arg.
     expect(src).toMatch(
-      /delivery\.customerAcceptDelivery\(\s*id\s*,\s*user\.organizationId\s*,\s*user\.id\s*,\s*user\.customerRole\s*\)/,
+      /delivery\.customerAcceptDelivery\(\s*id\s*,\s*user\.organizationId\s*,\s*user\.id\s*,\s*user\.customerRole,?\s*\)/,
     )
   })
 
@@ -322,7 +324,7 @@ describe("Phase 6.9 — money-path OWNER||creator gate coverage", () => {
       "utf8",
     )
     expect(src).toMatch(
-      /customerApprove\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.role\s*,\s*user\.customerRole\s*\)/,
+      /customerApprove\(\s*id\s*,\s*user\.id\s*,\s*user\.organizationId\s*,\s*user\.role\s*,\s*user\.customerRole,?\s*\)/,
     )
   })
 })
