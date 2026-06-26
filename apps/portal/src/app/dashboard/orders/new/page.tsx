@@ -242,6 +242,11 @@ function WebsiteSelection({
   const [page, setPage] = useState(0)
   const pageSize = 6
 
+  // Reset pagination when search or category filter changes
+  useEffect(() => {
+    setPage(0)
+  }, [search, categoryFilter])
+
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["placements", search, categoryFilter],
     queryFn: () =>
@@ -978,7 +983,14 @@ export default function NewOrderPage() {
           {currentStep === 1 && (
             <ServiceSelection
               selected={formData.serviceType || ""}
-              onSelect={(id) => updateFormData({ serviceType: id })}
+              onSelect={(id) => updateFormData({
+                serviceType: id,
+                title: "",
+                brief: "",
+                targetKeywords: "",
+                targetUrl: "",
+                briefData: undefined,
+              })}
             />
           )}
 

@@ -68,7 +68,7 @@ const dateRangeOptions = [
   { value: "30", label: "Last 30 days" },
   { value: "90", label: "Last 90 days" },
   { value: "month", label: "This month" },
-  { value: "quarter", label: "This quarter" },
+  { value: "quarter", label: "Last 90 days" },
   { value: "year", label: "This year" },
   { value: "all", label: "All time" },
 ]
@@ -108,6 +108,14 @@ function ReportsTableSkeleton() {
     </div>
   )
 }
+
+const escapeHtml = (value: string) =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
 
 function getFirstPublishedUrl(order: ReportOrder): string | null {
   const pub = order.items?.[0]?.publications?.[0]
@@ -242,10 +250,10 @@ export default function ReportsPage() {
         const publishedUrl = getFirstPublishedUrl(order)
         const publishedDate = getFirstPublishedDate(order)
         return `<tr>
-        <td>${publishedUrl || "—"}</td>
-        <td>${item?.targetUrl || item?.topic || "—"}</td>
-        <td>${item?.anchorText || "—"}</td>
-        <td>${order.status}</td>
+        <td>${escapeHtml(publishedUrl || "—")}</td>
+        <td>${escapeHtml(item?.targetUrl || item?.topic || "—")}</td>
+        <td>${escapeHtml(item?.anchorText || "—")}</td>
+        <td>${escapeHtml(order.status)}</td>
         <td>${publishedDate ? format(new Date(publishedDate), "PP") : "—"}</td>
         <td style="text-align:right">$${(Number(order.amount || order.totalAmount || 0)).toFixed(2)}</td>
       </tr>`

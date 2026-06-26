@@ -472,11 +472,17 @@ export default function OrdersPage() {
                 <Input
                   placeholder="Search orders..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    setPagination((p) => ({ ...p, pageIndex: 0 }))
+                  }}
                   className="pl-9 w-64"
                 />
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value) => {
+                  setStatusFilter(value)
+                  setPagination((p) => ({ ...p, pageIndex: 0 }))
+                }}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>

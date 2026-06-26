@@ -51,14 +51,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
+    const token = getToken()
     try {
-      const token = getToken()
       const res = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         credentials: "include",
       })
       if (res.ok) {
         const me = await res.json()
+        // Guard: if the token changed during this request (e.g. a newer
+        // signIn/signUp happened), discard the stale result.
+        if (getToken() !== token) return
         // Same gate as signIn: a restored PUBLISHER/STAFF session must not
         // land in the customer portal.
         if (me.userType === "CUSTOMER") {
@@ -71,7 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       console.error("Session refresh failed:", e)
     }
-    setUser(null)
+    // Only clear user if token is still what we started with
+    if (getToken() === token) setUser(null)
   }, [])
 
   useEffect(() => {

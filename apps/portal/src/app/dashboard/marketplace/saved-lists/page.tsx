@@ -62,7 +62,7 @@ export default function SavedListsPage() {
     error,
     refetch,
   } = useQuery<SavedList[]>({
-    queryKey: ["saved-lists"],
+    queryKey: ["saved-lists", user?.id],
     queryFn: () => api.marketplace.getSavedLists(),
     enabled: !!user?.id,
   })
@@ -79,7 +79,7 @@ export default function SavedListsPage() {
     mutationFn: () =>
       api.marketplace.createSavedList({ name: newListName.trim() }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["saved-lists"] })
+      queryClient.invalidateQueries({ queryKey: ["saved-lists", user?.id] })
       setNewListName("")
       setCreateOpen(false)
     },
@@ -94,7 +94,7 @@ export default function SavedListsPage() {
       listingId: string
     }) => api.marketplace.removeFromSavedList(listId, listingId),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["saved-lists"] }),
+      queryClient.invalidateQueries({ queryKey: ["saved-lists", user?.id] }),
   })
 
   function formatPrice(price: number, currency: string = "USD") {
@@ -154,7 +154,7 @@ export default function SavedListsPage() {
                   placeholder="List name"
                   value={newListName}
                   onChange={(e) => setNewListName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && createList()}
+                  onKeyDown={(e) => e.key === "Enter" && !creating && newListName.trim() && createList()}
                 />
                 <Button
                   onClick={() => createList()}

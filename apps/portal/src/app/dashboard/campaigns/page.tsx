@@ -152,8 +152,8 @@ export default function CampaignsPage() {
     },
   })
 
-  const onSubmit = (data: CreateCampaignForm) => {
-    createMutation.mutate({ name: data.name })
+  const onSubmit = async (data: CreateCampaignForm) => {
+    await createMutation.mutateAsync({ name: data.name })
   }
 
   const updateMutation = useMutation({
@@ -228,7 +228,7 @@ export default function CampaignsPage() {
     )
   }
 
-  if (isLoading) {
+  if (isLoading || ordersLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -465,8 +465,8 @@ export default function CampaignsPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? "Creating..." : "Create Campaign"}
+              <Button type="submit" disabled={createMutation.isPending}>
+                {createMutation.isPending ? "Creating..." : "Create Campaign"}
               </Button>
             </DialogFooter>
           </form>
