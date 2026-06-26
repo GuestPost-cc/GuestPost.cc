@@ -71,6 +71,7 @@ function makeTxMock() {
     settlementApproval: { upsert: jest.fn().mockResolvedValue({}) },
     orderEvent: { create: jest.fn().mockResolvedValue({}) },
     auditLog: { create: jest.fn().mockResolvedValue({}) },
+    orderDispute: { findFirst: jest.fn().mockResolvedValue(null) },
   }
 }
 
@@ -125,17 +126,23 @@ describe("Phase 7.3 — runSettlementAutoApprove", () => {
     })
   })
 
-  it("skips settlements with an active dispute (no transaction opened)", async () => {
+  it("skips settlements with an active dispute (transaction opened, short-circuits)", async () => {
     const prisma = makePrismaMock()
     prisma.settlement.findMany.mockResolvedValue([makeSettlement({ id: "s1" })])
-    prisma.orderDispute.findFirst.mockResolvedValue({ id: "dispute-1" })
+    const tx = makeTxMock()
+    tx.orderDispute.findFirst.mockResolvedValue({ id: "dispute-1" })
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(tx))
 
     const r = await runSettlementAutoApprove(prisma as any)
 
     expect(r.scanned).toBe(1)
     expect(r.approved).toBe(0)
     expect(r.skipped).toBe(1)
-    expect(prisma.$transaction).not.toHaveBeenCalled()
+    expect(prisma.$transaction).toHaveBeenCalled()
+    expect(tx.settlement.updateMany).not.toHaveBeenCalled()
+    expect(tx.settlementApproval.upsert).not.toHaveBeenCalled()
+    expect(tx.orderEvent.create).not.toHaveBeenCalled()
+    expect(tx.auditLog.create).not.toHaveBeenCalled()
   })
 
   it("version-guard race: updateMany returns count=0 → counted as skipped, not approved", async () => {

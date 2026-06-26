@@ -110,6 +110,7 @@ export default function CampaignsPage() {
 
   const {
     data: ordersData,
+    isLoading: ordersLoading,
     error: ordersError,
     refetch: refetchOrders,
   } = useQuery({
