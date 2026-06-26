@@ -21,10 +21,13 @@ export class ApiKeysController {
 
   @Post()
   create(@Body() body: CreateApiKeyDto, @CurrentUser() user: any) {
+    const permissions = body.permissions?.length
+      ? body.permissions
+      : ["orders:read"]
     return this.apiKeys.createKey(
       user.organizationId,
       body.name,
-      body.permissions ?? ["orders:read"],
+      permissions,
       user.id,
     )
   }

@@ -18,6 +18,7 @@ import {
 // fields here.
 export class CreateTicketDto {
   @IsString()
+  @Matches(/\S/, { message: "Subject is required" })
   @MinLength(3, { message: "Subject must be at least 3 characters" })
   @MaxLength(200)
   subject!: string

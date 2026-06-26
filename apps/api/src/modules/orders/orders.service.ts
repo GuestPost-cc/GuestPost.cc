@@ -420,6 +420,12 @@ export class OrdersService {
       throw new BadRequestException("Can only add items to draft orders")
     }
 
+    // Backfill websiteId from the order if not provided
+    const websiteId = data.websiteId ?? order.websiteId
+    if (!websiteId) {
+      throw new BadRequestException("websiteId is required — the order has no associated website")
+    }
+
     // One-website-per-order invariant (see createOrder)
     const existingItems = await this.prisma.orderItem.findMany({
       where: { orderId },
@@ -429,10 +435,7 @@ export class OrdersService {
       order.websiteId ??
       existingItems.find((i) => i.websiteId)?.websiteId ??
       null
-    if (
-      existingItems.length > 0 &&
-      (data.websiteId ?? null) !== existingWebsiteId
-    ) {
+    if (existingItems.length > 0 && websiteId !== existingWebsiteId) {
       throw new BadRequestException(
         "All items in an order must target the same website. Create a separate order for a different website.",
       )
@@ -460,7 +463,7 @@ export class OrdersService {
     const item = await this.prisma.orderItem.create({
       data: {
         orderId,
-        websiteId: data.websiteId,
+        websiteId,
         targetUrl: data.targetUrl,
         anchorText: data.anchorText,
         price,

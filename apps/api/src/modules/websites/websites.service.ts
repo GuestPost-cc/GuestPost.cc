@@ -86,24 +86,60 @@ export class WebsitesService {
 
     let website
     try {
-      website = await this.prisma.website.create({
-        data: {
-          url: dto.url,
-          domain,
-          canonicalDomain,
-          country: dto.country,
-          language: dto.language,
-          category: dto.category,
-          metrics: {
-            dr: dto.domainRating,
-            traffic: dto.monthlyTraffic,
+      const result = await this.prisma.$transaction(async (tx: any) => {
+        const w = await tx.website.create({
+          data: {
+            url: dto.url,
+            domain,
+            canonicalDomain,
+            country: dto.country,
+            language: dto.language,
+            category: dto.category,
+            metrics: {
+              dr: dto.domainRating,
+              traffic: dto.monthlyTraffic,
+            },
+            publisherId,
+            verificationStatus: "PENDING_VERIFICATION",
+            verificationMethod: "DNS_TXT",
+            verificationToken,
           },
-          publisherId,
-          verificationStatus: "PENDING_VERIFICATION",
-          verificationMethod: "DNS_TXT",
-          verificationToken,
-        },
+        })
+
+        const slug = dto.url.replace(/^https?:\/\//, "").replace(/[^a-z0-9]+/gi, "-").toLowerCase() + "-" + Date.now()
+
+        await tx.marketplaceListing.create({
+          data: {
+            title: dto.url,
+            slug,
+            description: `Guest posting placement on ${dto.url}`,
+            status: ListingStatus.PENDING_REVIEW,
+            fulfillmentType: ListingFulfillmentType.PUBLISHER,
+            currency: "USD",
+            domainRating: dto.domainRating,
+            traffic: dto.monthlyTraffic,
+            country: dto.country,
+            language: dto.language,
+            websiteUrl: dto.url,
+            publisherId,
+            websiteId: w.id,
+            organizationId,
+            ownerType: "PUBLISHER",
+            services: {
+              create: [{
+                serviceType: "GUEST_POST",
+                price: dto.price ?? 0,
+                currency: "USD",
+                turnaroundDays: dto.turnaroundDays ?? 7,
+                availability: "AVAILABLE",
+              }],
+            },
+          },
+        })
+
+        return w
       })
+      website = result
     } catch (err: any) {
       // Partial unique index is the hard guarantee against a concurrent
       // duplicate-domain race that slips past the findFirst check above.
@@ -131,50 +167,6 @@ export class WebsitesService {
       }
       throw err
     }
-
-    // Create associated MarketplaceListing with PENDING_REVIEW status
-    const slug =
-      dto.url
-        .replace(/^https?:\/\//, "")
-        .replace(/[^a-z0-9]+/gi, "-")
-        .toLowerCase() +
-      "-" +
-      Date.now()
-
-    // Phase 7: the legacy listing-level type/price/turnaroundDays columns
-    // are gone. We materialize a single GUEST_POST ListingService alongside
-    // the listing using the publisher's submitted price/TAT — they can add
-    // more services later via the publisher Services dialog.
-    await this.prisma.marketplaceListing.create({
-      data: {
-        title: dto.url,
-        slug,
-        description: `Guest posting placement on ${dto.url}`,
-        status: ListingStatus.PENDING_REVIEW,
-        fulfillmentType: ListingFulfillmentType.PUBLISHER,
-        currency: "USD",
-        domainRating: dto.domainRating,
-        traffic: dto.monthlyTraffic,
-        country: dto.country,
-        language: dto.language,
-        websiteUrl: dto.url,
-        publisherId,
-        websiteId: website.id,
-        organizationId,
-        ownerType: "PUBLISHER",
-        services: {
-          create: [
-            {
-              serviceType: "GUEST_POST",
-              price: dto.price ?? 0,
-              currency: "USD",
-              turnaroundDays: dto.turnaroundDays ?? 7,
-              availability: "AVAILABLE",
-            },
-          ],
-        },
-      },
-    })
 
     await this.audit.log({
       action: "WEBSITE_CREATED",
@@ -222,12 +214,19 @@ export class WebsitesService {
     }
 
     // ── Rate limiting (anti DNS-abuse / verification spam) ────────────────────
-    const now = Date.now()
     const COOLDOWN_MS = Number(process.env.VERIFY_COOLDOWN_SECONDS ?? 60) * 1000
-    if (
-      website.lastVerificationRequestAt &&
-      now - new Date(website.lastVerificationRequestAt).getTime() < COOLDOWN_MS
-    ) {
+    const cooldownStart = new Date(Date.now() - COOLDOWN_MS)
+    const cooldownOk = await this.prisma.website.updateMany({
+      where: {
+        id: website.id,
+        OR: [
+          { lastVerificationRequestAt: null },
+          { lastVerificationRequestAt: { lte: cooldownStart } },
+        ],
+      },
+      data: { lastVerificationRequestAt: new Date() },
+    })
+    if (cooldownOk.count === 0) {
       throw new BadRequestException({
         code: "VERIFICATION_RATE_LIMITED",
         message: "Please wait before requesting verification again",
@@ -238,8 +237,8 @@ export class WebsitesService {
     const recent = await this.prisma.auditLog.count({
       where: {
         action: "WEBSITE_VERIFICATION_REQUESTED",
-        organizationId,
-        createdAt: { gte: new Date(now - 60 * 60 * 1000) },
+        userId: user.id,
+        createdAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
       },
     })
     if (recent >= HOURLY_CAP) {
@@ -248,11 +247,6 @@ export class WebsitesService {
         message: "Hourly verification request limit reached. Try again later.",
       })
     }
-
-    await this.prisma.website.update({
-      where: { id: website.id },
-      data: { lastVerificationRequestAt: new Date(now) },
-    })
 
     await this.audit.log({
       action: "WEBSITE_VERIFICATION_REQUESTED",

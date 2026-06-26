@@ -185,10 +185,13 @@ export class RefundService {
             })
           }
 
-          await tx.settlement.updateMany({
+          const cancelledReleased = await tx.settlement.updateMany({
             where: { id: activeSettlement.id, status: "RELEASED" },
             data: { status: "CANCELLED" },
           })
+          if (cancelledReleased.count === 0) {
+            throw new ConflictException("Settlement was modified by another request. Retry.")
+          }
         }
         cancelledSettlementId = activeSettlement?.id ?? null
       }

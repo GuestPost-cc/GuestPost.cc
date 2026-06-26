@@ -273,19 +273,19 @@ export class OrderDisputeService {
         : order.status
 
     if (action === "RESTORE") {
-      await this.prisma.orderDispute.update({
-        where: { id: disputeId },
-        data: {
-          status: "RESOLVED_RESTORED",
-          resolvedBy: userId,
-          resolvedAt: new Date(),
-          resolution,
-        },
+      await this.prisma.$transaction(async (tx: any) => {
+        await tx.orderDispute.update({
+          where: { id: disputeId },
+          data: {
+            status: "RESOLVED_RESTORED",
+            resolvedBy: userId,
+            resolvedAt: new Date(),
+            resolution,
+          },
+        })
+        await this.transitionOrder(order.id, order.version, { status: restoreStatus as any })
       })
 
-      await this.transitionOrder(order.id, order.version, {
-        status: restoreStatus as any,
-      })
     } else if (action === "REFUND") {
       // Refund first — if it fails, the dispute stays open instead of being
       // marked resolved with the customer never refunded. If the order was
@@ -300,30 +300,32 @@ export class OrderDisputeService {
         )
       }
 
-      await this.prisma.orderDispute.update({
-        where: { id: disputeId },
-        data: {
-          status: "RESOLVED_REFUNDED",
-          resolvedBy: userId,
-          resolvedAt: new Date(),
-          resolution,
-        },
+      await this.prisma.$transaction(async (tx: any) => {
+        await tx.orderDispute.update({
+          where: { id: disputeId },
+          data: {
+            status: "RESOLVED_REFUNDED",
+            resolvedBy: userId,
+            resolvedAt: new Date(),
+            resolution,
+          },
+        })
       })
     } else if (action === "REJECT") {
-      await this.prisma.orderDispute.update({
-        where: { id: disputeId },
-        data: {
-          status: "RESOLVED_REJECTED",
-          resolvedBy: userId,
-          resolvedAt: new Date(),
-          resolution,
-        },
+      await this.prisma.$transaction(async (tx: any) => {
+        await tx.orderDispute.update({
+          where: { id: disputeId },
+          data: {
+            status: "RESOLVED_REJECTED",
+            resolvedBy: userId,
+            resolvedAt: new Date(),
+            resolution,
+          },
+        })
+        // Restore order to pre-dispute state
+        await this.transitionOrder(order.id, order.version, { status: restoreStatus as any })
       })
 
-      // Restore order to pre-dispute state
-      await this.transitionOrder(order.id, order.version, {
-        status: restoreStatus as any,
-      })
     }
 
     await this.prisma.orderEvent.create({

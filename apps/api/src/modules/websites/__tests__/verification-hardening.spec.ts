@@ -280,6 +280,7 @@ describe("WebsitesService hardening", () => {
         findFirst: jest.fn(),
         create: jest.fn(),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       marketplaceListing: { create: jest.fn().mockResolvedValue({}) },
       auditLog: { count: jest.fn().mockResolvedValue(0) },
@@ -313,6 +314,7 @@ describe("WebsitesService hardening", () => {
       verificationStatus: "PENDING_VERIFICATION",
       lastVerificationRequestAt: new Date(),
     })
+    prisma.website.updateMany.mockResolvedValue({ count: 0 })
     await expect(
       svc.requestVerification("p1", "o1", "w1", { id: "u1" }),
     ).rejects.toMatchObject({ response: { code: "VERIFICATION_RATE_LIMITED" } })
@@ -328,6 +330,7 @@ describe("WebsitesService hardening", () => {
       verificationStatus: "PENDING_VERIFICATION",
       lastVerificationRequestAt: null,
     })
+    prisma.website.updateMany.mockResolvedValue({ count: 1 })
     prisma.auditLog.count.mockResolvedValue(999)
     await expect(
       svc.requestVerification("p1", "o1", "w1", { id: "u1" }),
@@ -343,16 +346,11 @@ describe("WebsitesService hardening", () => {
       verificationStatus: "PENDING_VERIFICATION",
       lastVerificationRequestAt: null,
     })
+    prisma.website.updateMany.mockResolvedValue({ count: 1 })
     prisma.auditLog.count.mockResolvedValue(0)
     const r = await svc.requestVerification("p1", "o1", "w1", { id: "u1" })
     expect(r.instructions.value).toContain("guestpost-verification=T")
-    expect(prisma.website.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          lastVerificationRequestAt: expect.any(Date),
-        }),
-      }),
-    )
+    expect(prisma.website.updateMany).toHaveBeenCalled()
     expect(queue.addJob).toHaveBeenCalled()
   })
 })

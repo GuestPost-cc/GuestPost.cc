@@ -423,12 +423,12 @@ export class PublisherPayoutsService {
       select: { userId: true },
     })
     for (const m of memberships) {
-      await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+      this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
         userId: m.userId,
         organizationId,
         type,
         message,
-      })
+      }).catch(() => {})
     }
   }
 

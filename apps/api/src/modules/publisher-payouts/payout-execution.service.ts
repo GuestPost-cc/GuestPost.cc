@@ -296,6 +296,15 @@ export class PayoutExecutionService {
       }
     }
 
+    // Reset withdrawal to APPROVED so executeWithdrawal can transition it
+    const reset = await this.prisma.withdrawal.updateMany({
+      where: { id: execution.withdrawalId, status: "FAILED" },
+      data: { status: "APPROVED", version: { increment: 1 } },
+    })
+    if (reset.count === 0) {
+      throw new ConflictException("Withdrawal state changed — cannot retry")
+    }
+
     return this.executeWithdrawal(
       execution.withdrawalId,
       execution.provider.name,
@@ -326,13 +335,16 @@ export class PayoutExecutionService {
         )
       }
 
-      await tx.withdrawal.updateMany({
+      const wUpdated = await tx.withdrawal.updateMany({
         where: {
           id: execution.withdrawalId,
           status: { in: ["FAILED", "PROCESSING"] },
         },
         data: { status: "COMPLETED", version: { increment: 1 } },
       })
+      if (wUpdated.count === 0) {
+        throw new ConflictException("Withdrawal state changed during provider recovery")
+      }
 
       const balance = await tx.publisherBalance.findUnique({
         where: { publisherId: execution.withdrawal.publisherId },
@@ -399,10 +411,15 @@ export class PayoutExecutionService {
           "Execution state changed before cancel could complete",
         )
       }
-      await tx.withdrawal.updateMany({
+      const wUpdated = await tx.withdrawal.updateMany({
         where: { id: execution.withdrawalId, status: "PROCESSING" },
         data: { status: "APPROVED", version: { increment: 1 } },
       })
+      if (wUpdated.count === 0) {
+        throw new ConflictException(
+          "Withdrawal state changed before cancel could complete",
+        )
+      }
       await this.audit.log(
         {
           action: "PAYOUT_EXECUTION_CANCELLED",
