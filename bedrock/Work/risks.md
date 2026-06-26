@@ -82,6 +82,37 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 - ~~**Single-column `Settlement_status_idx` redundant with `Settlement_status_reviewEndsAt_idx` composite**~~ — **CLOSED** 2026-06-21 by Phase 7.13.1.1 (commit `9961d52`, PR pending). Single-statement `DROP INDEX CONCURRENTLY IF EXISTS "Settlement_status_idx"` migration + schema.prisma `@@index([status])` line removed. Both items ship together so `prisma migrate diff` stays clean post-deploy. Operator must run prod-side `EXPLAIN ANALYZE SELECT id, status FROM "Settlement" WHERE status = 'PENDING'` BEFORE applying on staging + prod to confirm the planner picks `Settlement_status_reviewEndsAt_idx` (composite leading column) rather than relying exclusively on the soon-dropped single-column index. Two-path migration replay verified locally: PATH A (fresh DB) results in 8 Settlement indexes (was 9); PATH B (drift-repro clone of dev) actually fires the drop.
 - ~~**Two unique indexes on `MarketplaceFavorite (userId, listingId, serviceType)` between Phase 7.13.2A and Phase 7.13.2B**~~ — **CLOSED** 2026-06-20 by Phase 7.13.2B (commit `4e93b6d`). Live DB now has ONE unique index over those columns, named canonically `MarketplaceFavorite_userId_listingId_serviceType_key`, NULLS NOT DISTINCT semantics preserved through the rename.
 
-## Decisions framework
 
+### Data Integrity Gaps (Discovered Post-DX cleanup)
+
+These findings were discovered during a review of DX cleanup, specifically regarding deleted one-time backfill scripts.
+
+**#42. Legacy data consideration: Order snapshot fields on pre-Phase-4 orders**
+- **Status**: **Legacy Data Consideration** (Pre-Production)
+- **Impact**: 7 active orders (5 DRAFT, 1 SUBMITTED, 1 PUBLISHED) in the current `dev` database are missing `listingServiceId`, `listingId`, `fulfillmentChannel`, and `turnaroundDays` snapshots. These orders will **CRASH** in payment and item-addition workflows (`Order has no listingServiceId snapshot — cannot price`).
+- **Quantified (dev DB)**: 7 active orders (5 DRAFT, 1 SUBMITTED, 1 PUBLISHED).
+- **Recommendation**: Affects only databases created before Phase 4. New orders are unaffected. Preferred remediation: **rebuild or reseed development databases**. The historical `backfill-order-listing-snapshot.ts` script is recoverable from Git history (`git checkout <commit-id> -- scripts/backfill-order-listing-snapshot.ts`) if manual repair of specific rows is ever required.
+
+**#43. Legacy data consideration: Users missing ActiveContext rows**
+- **Status**: **Legacy Data Consideration** (Pre-Production)
+- **Impact**: 3 users in the current `dev` database are missing `ActiveContext` records.
+- **Quantified (dev DB)**: 3 users.
+- **Recommendation**: Lazy-created automatically during normal operation. Preferred remediation: **rebuild or reseed development databases**. The historical `backfill-active-context.ts` script is recoverable from Git history if ever required.
+
+---
+
+**Report Back**
+
+```
+ActiveContext gap:              3 users missing a row
+Order snapshot gap (all-time):  7 orders
+Order snapshot gap (still-active): 7 orders
+Fallback behavior for null listingServiceId on active orders: SAFE
+Scripts restored:               NO — deleted per recommendation
+Scripts schema-compatible with current Prisma schema: YES (if recovered)
+Documented in risks.md / backlog.md: YES
+```
+
+## Decisions framework
 When in doubt: closures land via a phase entry in the audit's §11 Remediation Log. This file should stay small — strategic risks only. If a risk decomposes into multiple findings, name them and link to the audit.
+
