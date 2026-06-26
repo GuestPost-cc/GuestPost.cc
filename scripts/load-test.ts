@@ -236,7 +236,7 @@ async function main() {
       order: { title: `load order ${runId}` },
     },
     _sum: { amount: true },
-    _count: true,
+    _count: { _all: true },
   })
   const totalDebited = Math.abs(Number(purchaseAgg._sum.amount ?? 0))
   let pass = true
@@ -252,8 +252,8 @@ async function main() {
   })
   expect(
     "one PURCHASE transaction per paid order",
-    purchaseAgg._count === paidOrders,
-    { purchases: purchaseAgg._count, paidOrders },
+    purchaseAgg._count._all === paidOrders,
+    { purchases: purchaseAgg._count._all, paidOrders },
   )
   expect(
     "total debited equals paidOrders * price",
