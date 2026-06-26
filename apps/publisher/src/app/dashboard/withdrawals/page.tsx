@@ -179,7 +179,10 @@ export default function WithdrawalsPage() {
       <ErrorState
         title="Failed to load withdrawals"
         description={(withdrawError as Error).message}
-        onRetry={() => refetch()}
+        onRetry={() => {
+          refetch()
+          refetchWithdrawals()
+        }}
       />
     )
 

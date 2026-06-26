@@ -66,6 +66,14 @@ describe("BillingService", () => {
 
       expect(Number(result.availableBalance)).toBe(1500)
       expect(result.version).toBe(2)
+      expect(prismaMock.wallet.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "wallet-1", version: 1 },
+          data: expect.objectContaining({
+            version: { increment: 1 },
+          }),
+        }),
+      )
       expect(auditMock.log).toHaveBeenCalledWith(
         expect.objectContaining({
           action: "WALLET_DEPOSIT",

@@ -140,6 +140,7 @@ function LoginContent() {
               <>
                 Don&apos;t have an account?{" "}
                 <button
+                  type="button"
                   onClick={() => setIsSignUp(true)}
                   className="underline underline-offset-4 hover:text-primary"
                 >

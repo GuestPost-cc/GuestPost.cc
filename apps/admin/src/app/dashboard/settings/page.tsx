@@ -45,7 +45,9 @@ export default function SettingsPage() {
     onError: () => toast.error("Failed to update profile"),
   })
 
-  const [maintenanceMode, setMaintenanceMode] = useState(false)
+  // Maintenance mode requires a backend endpoint — currently inactive
+  // until the API route is implemented.
+  const [maintenanceMode] = useState(false)
 
   return (
     <div>
@@ -116,11 +118,7 @@ export default function SettingsPage() {
                 When enabled, only admins can access the platform
               </p>
             </div>
-            <Switch
-              id="maintenance-mode"
-              checked={maintenanceMode}
-              onCheckedChange={setMaintenanceMode}
-            />
+            <Switch id="maintenance-mode" checked={maintenanceMode} disabled />
           </div>
         </div>
       </div>

@@ -348,6 +348,7 @@ describe("WebsitesService.requestVerification", () => {
           lastVerificationRequestAt: null,
         }),
         update: jest.fn().mockResolvedValue({}),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       auditLog: { count: jest.fn().mockResolvedValue(0) },
     }
@@ -357,6 +358,7 @@ describe("WebsitesService.requestVerification", () => {
   })
 
   it("enqueues a signed verify job, audits REQUESTED, returns DNS instructions", async () => {
+    prisma.website.updateMany.mockResolvedValue({ count: 1 })
     const res = await service.requestVerification("pub1", "org1", "w1", user)
 
     expect(queue.addJob).toHaveBeenCalledWith(

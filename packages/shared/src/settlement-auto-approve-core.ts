@@ -153,21 +153,17 @@ export async function runSettlementAutoApprove(
   let skipped = 0
 
   for (const settlement of due) {
-    // Settlement gating: an active dispute blocks auto-approval (the customer
-    // is actively contesting; the review window is paused for resolution).
-    const activeDispute = await prisma.orderDispute.findFirst({
-      where: {
-        orderId: settlement.orderId,
-        status: { in: ["OPEN", "UNDER_REVIEW"] },
-      },
-    })
-    if (activeDispute) {
-      skipped++
-      continue
-    }
-
     try {
       const committed = await prisma.$transaction(async (tx: AutoApproveTx) => {
+        // Re-check dispute inside the transaction (TOCTOU guard)
+        const activeDispute = await tx.orderDispute.findFirst({
+          where: {
+            orderId: settlement.orderId,
+            status: { in: ["OPEN", "UNDER_REVIEW"] },
+          },
+        })
+        if (activeDispute) return false
+
         // Status + version guard — a manual approval racing this sweep wins.
         const updated = await tx.settlement.updateMany({
           where: {

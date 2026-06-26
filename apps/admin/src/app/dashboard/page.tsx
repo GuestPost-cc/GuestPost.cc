@@ -245,7 +245,7 @@ function RecentOrdersTable({
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {order.amount
+                    {order.amount != null
                       ? `${order.currency} ${Number(order.amount).toFixed(2)}`
                       : "—"}
                   </TableCell>

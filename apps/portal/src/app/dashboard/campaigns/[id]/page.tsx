@@ -306,7 +306,7 @@ export default function CampaignDetailPage({
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {order.totalAmount
+                      {order.totalAmount != null
                         ? `$${order.totalAmount.toFixed(2)}`
                         : "—"}
                     </TableCell>

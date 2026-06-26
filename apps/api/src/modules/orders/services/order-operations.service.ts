@@ -262,7 +262,7 @@ export class OrderOperationsService {
     })
 
     // Mark the assignment delivered (version-guarded)
-    await this.prisma.fulfillmentAssignment.updateMany({
+    const delivered = await this.prisma.fulfillmentAssignment.updateMany({
       where: { id: assignment.id, version: assignment.version },
       data: {
         status: "DELIVERED",
@@ -270,6 +270,11 @@ export class OrderOperationsService {
         version: { increment: 1 },
       },
     })
+    if (delivered.count === 0) {
+      throw new ConflictException(
+        "Assignment was modified by another request. Retry.",
+      )
+    }
 
     void version
     return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })

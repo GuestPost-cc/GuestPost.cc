@@ -149,9 +149,11 @@ export default function ListingDetailPage() {
   // to the first AVAILABLE row (cheapest, since the API sorts by price asc).
   useEffect(() => {
     if (!listing || services.length === 0) return
-    if (selectedServiceId && services.some((s) => s.id === selectedServiceId))
-      return
     const requested = searchParams?.get("service")
+    // If a service is already selected and the URL param hasn't changed, keep it
+    if (selectedServiceId && services.some((s) => s.id === selectedServiceId)) {
+      if (!requested || selectedService?.serviceType === requested) return
+    }
     const fromUrl = requested
       ? services.find(
           (s) => s.serviceType === requested && s.availability === "AVAILABLE",
@@ -160,7 +162,14 @@ export default function ListingDetailPage() {
     const fallback = orderableServices[0] ?? null
     const picked = fromUrl ?? fallback
     if (picked) setSelectedServiceId(picked.id)
-  }, [listing, services, orderableServices, searchParams, selectedServiceId])
+  }, [
+    listing,
+    services,
+    orderableServices,
+    searchParams,
+    selectedServiceId,
+    selectedService,
+  ])
 
   const { mutate: toggleFavorite, isPending: favoriting } = useMutation({
     mutationFn: () => {

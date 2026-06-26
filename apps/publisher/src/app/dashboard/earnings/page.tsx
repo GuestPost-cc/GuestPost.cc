@@ -112,6 +112,7 @@ export default function EarningsPage() {
     data: transactions = [],
     isLoading: txnLoading,
     error: txnError,
+    refetch: refetchTxns,
   } = useQuery({
     queryKey: ["publisher-transactions"],
     queryFn: async () => {
@@ -191,7 +192,10 @@ export default function EarningsPage() {
       <ErrorState
         title="Failed to load earnings"
         description={(balanceError as Error).message}
-        onRetry={() => refetch()}
+        onRetry={() => {
+          refetch()
+          refetchTxns()
+        }}
       />
     )
 
