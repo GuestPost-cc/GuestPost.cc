@@ -463,7 +463,9 @@ export class AdminService {
     limit?: number
   }) {
     const page = Number.isFinite(params.page) ? Math.max(1, params.page!) : 1
-    const limit = Number.isFinite(params.limit) ? Math.min(100, Math.max(1, params.limit!)) : 20
+    const limit = Number.isFinite(params.limit)
+      ? Math.min(100, Math.max(1, params.limit!))
+      : 20
     const where: any = {}
     if (params.status) where.status = params.status
     // Phase 7: the listing-level `type` column is gone. The `type` filter
@@ -1100,7 +1102,9 @@ export class AdminService {
     limit?: number
   }) {
     const page = Number.isFinite(params.page) ? Math.max(params.page!, 1) : 1
-    const limit = Number.isFinite(params.limit) ? Math.min(Math.max(params.limit!, 1), 100) : 50
+    const limit = Number.isFinite(params.limit)
+      ? Math.min(Math.max(params.limit!, 1), 100)
+      : 50
     const where: any = {}
     if (params.action)
       where.action = { contains: params.action, mode: "insensitive" }
@@ -1115,14 +1119,18 @@ export class AdminService {
       where.createdAt = {}
       if (params.startDate) {
         const start = new Date(params.startDate)
-        if (isNaN(start.getTime())) throw new BadRequestException("Invalid startDate")
+        if (Number.isNaN(start.getTime()))
+          throw new BadRequestException("Invalid startDate")
         where.createdAt.gte = start
       }
       if (params.endDate) {
         const end = new Date(params.endDate)
-        if (isNaN(end.getTime())) throw new BadRequestException("Invalid endDate")
+        if (Number.isNaN(end.getTime()))
+          throw new BadRequestException("Invalid endDate")
         // Set to end of UTC day for inclusive range
-        where.createdAt.lte = new Date(end.toISOString().slice(0, 10) + "T23:59:59.999Z")
+        where.createdAt.lte = new Date(
+          `${end.toISOString().slice(0, 10)}T23:59:59.999Z`,
+        )
       }
     }
 

@@ -65,7 +65,7 @@ describe("evaluateSettlementEligibility", () => {
         }),
       },
       orderDispute: {
-        findUnique: jest.fn().mockResolvedValue(over.dispute ?? null),
+        findFirst: jest.fn().mockResolvedValue(over.dispute ?? null),
       },
       revision: {
         findFirst: jest.fn().mockResolvedValue(over.revision ?? null),
