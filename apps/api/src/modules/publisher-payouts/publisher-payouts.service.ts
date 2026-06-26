@@ -11,11 +11,11 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
-import type { PrismaService } from "../../common/prisma.service"
-import type { AuditService } from "../audit/audit.service"
-import type { QueueService } from "../queues/queue.service"
-import type { PayoutEncryptionService } from "./payout-encryption.service"
-import type { PayoutExecutionService } from "./payout-execution.service"
+import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
+import { QueueService } from "../queues/queue.service"
+import { PayoutEncryptionService } from "./payout-encryption.service"
+import { PayoutExecutionService } from "./payout-execution.service"
 
 // Phase 7.2 — TIER_WITHDRAWAL_HOLDS lifted to packages/shared/src/publisher-tier-policy.ts
 // (audit #6 sibling rider). Single source of truth across the platform for

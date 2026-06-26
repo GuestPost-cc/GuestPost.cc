@@ -22,9 +22,6 @@ A comprehensive guest post marketplace platform for SEO link building campaigns.
 | `auth` | Better Auth integration for authentication |
 | `database` | Prisma ORM schemas and client |
 | `shared` | Shared types, enums, and constants |
-| `billing` | Billing utilities (placeholder) |
-| `notifications` | Notification utilities (placeholder) |
-| `reporting` | Reporting utilities (placeholder) |
 
 ### Backend Services
 
@@ -101,9 +98,10 @@ pnpm --filter @guestpost/database db:generate
 ### Seed Test Data
 
 ```bash
-pnpm seed:admin   # Create admin user
-pnpm seed:users   # Create test customers and publishers
+pnpm seed   # Create admin user + test customers + publishers + orders
 ```
+
+The seed script requires the API running on `:4000`.
 
 ### Environment Variables
 
@@ -155,9 +153,11 @@ guestpost-platform/
 │   ├── database/         # Prisma schemas
 │   ├── shared/           # Shared types
 │   └── ui/               # Component library
+├── docs/                # Developer documentation (setup, standards, governance, ADRs)
+├── bedrock/             # Engineering knowledge base (architecture, business, audits, history)
 ├── infrastructure/
 │   └── docker/           # Docker Compose configuration
-└── scripts/             # Seed scripts
+└── scripts/             # Development workflow scripts (setup, check, doctor, seed, etc.)
 ```
 
 ## Key Features
@@ -182,6 +182,19 @@ guestpost-platform/
 - Settlement processing
 - Withdrawal approval
 
+## Dev Scripts
+
+| Command | Purpose |
+|---------|---------|
+| `pnpm setup` | One-time dev environment setup (install, build, migrate, typecheck) |
+| `pnpm doctor` | Diagnose environment — system, env vars, services, workspace, repo |
+| `pnpm check` | Full pre-submit gate (Biome + ESLint + TypeScript + dependency graph) |
+| `pnpm clean` | Remove build artifacts |
+| `pnpm reset` | Full clean + reinstall + rebuild + DB reset |
+| `pnpm seed` | Seed test data into a running API |
+
+All scripts live in `scripts/`. See `docs/SETUP.md` and `docs/DEVELOPMENT.md` for details.
+
 ## API Endpoints
 
 All API routes are prefixed with `/api/v1/`:
@@ -196,26 +209,6 @@ All API routes are prefixed with `/api/v1/`:
 - `/support/*` - Support tickets
 - `/admin/*` - Admin operations
 - `/reporting/*` - Analytics and exports
-
-## Recent Fixes
-
-- **API URL Configuration**: Fixed `NEXT_PUBLIC_API_URL` to use `http://localhost:4000` without `/api/v1` suffix; api.ts files now correctly append `/api/v1`
-- **Select Component**: Changed empty string SelectItem values to `"all"` to prevent Radix validation errors
-- **Null Safety**: Added optional chaining and null coalescing for wallet balance and pagination state
-- **Cell Rendering**: Fixed TanStack Table cell rendering with proper type checks
-- **Rate Limiting**: Disabled rate limiters in development mode
-- **Publisher Balance API**: Fixed `getBalance()` to accept `publisherId` parameter
-
-## TODO
-
-- [ ] Database seeding and migrations
-- [ ] Email integration with Mailpit
-- [ ] Stripe payment integration
-- [ ] Real-time notifications
-- [ ] API key management UI
-- [ ] Email verification flow
-- [ ] Password reset flow
-- [ ] Complete test coverage
 
 ## License
 

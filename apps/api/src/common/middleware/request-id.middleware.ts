@@ -27,7 +27,7 @@ import {
   runWithRequestId,
 } from "@guestpost/shared/dist/observability/request-context"
 import { Injectable, type NestMiddleware } from "@nestjs/common"
-import type { NextFunction, Request, Response } from "express"
+import { NextFunction, Request, Response } from "express"
 
 const HEADER_NAME = "x-request-id"
 

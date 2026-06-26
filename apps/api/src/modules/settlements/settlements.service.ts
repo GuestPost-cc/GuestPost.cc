@@ -18,10 +18,10 @@ import {
   resolvePlatformFeeFraction,
   splitPlatformFee,
 } from "../../common/platform-fee"
-import type { PrismaService } from "../../common/prisma.service"
-import type { AuditService } from "../audit/audit.service"
+import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
 import { assertOwnerOrCreator } from "../orders/services/owner-or-creator"
-import type { QueueService } from "../queues/queue.service"
+import { QueueService } from "../queues/queue.service"
 
 @Injectable()
 export class SettlementsService {

@@ -16,6 +16,19 @@
 | **Legacy linter** | ESLint 9 (React Hooks only) |
 | **CI** | GitHub Actions |
 
+## Directory Structure
+
+| Directory | Purpose |
+|-----------|---------|
+| `apps/` | Application packages — NestJS API, Next.js frontends (admin, portal, publisher, website), background worker |
+| `packages/` | Shared libraries — `api-client`, `auth`, `database` (Prisma), `shared`, `ui` |
+| `docs/` | Developer-facing documentation — setup, standards, governance, ADRs. Answers *"how do I work on the project?"* |
+| `bedrock/` | Canonical engineering knowledge base and institutional memory of the project. Preserves architecture rationale, business domain knowledge, audit history, engineering decisions, operational guidance, and historical context that are intentionally not expressed in source code. Complements the codebase by answering *"why is the project built this way?"* |
+| `scripts/` | Development workflow scripts — setup, check, doctor, seed, clean, reset, tests |
+| `infrastructure/` | Docker Compose, deployment configurations |
+| `e2e/` | End-to-end tests (Playwright) |
+| `.github/` | CI/CD workflows, issue/PR templates, CODEOWNERS, Dependabot |
+
 ## Key files
 
 | File | Purpose |

@@ -1,6 +1,6 @@
 import { runReconciliation } from "@guestpost/shared"
 import { Injectable } from "@nestjs/common"
-import type { PrismaService } from "../../common/prisma.service"
+import { PrismaService } from "../../common/prisma.service"
 
 /**
  * Financial drift detector. The check logic lives in

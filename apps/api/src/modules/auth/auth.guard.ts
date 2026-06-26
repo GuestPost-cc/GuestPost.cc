@@ -7,13 +7,13 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common"
-import type { Reflector } from "@nestjs/core"
+import { Reflector } from "@nestjs/core"
 import {
   getCachedAuthContext,
   setCachedAuthContext,
 } from "../../common/auth-context-cache"
 import { IS_PUBLIC_KEY } from "../../common/decorators/public.decorator"
-import type { ActiveContextService } from "../active-context/active-context.service"
+import { ActiveContextService } from "../active-context/active-context.service"
 import { requiresEmailVerification } from "./email-verification-policy"
 
 @Injectable()

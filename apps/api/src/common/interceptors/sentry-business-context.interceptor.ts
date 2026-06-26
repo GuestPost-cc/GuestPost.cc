@@ -25,7 +25,7 @@ import {
   type NestInterceptor,
 } from "@nestjs/common"
 import * as Sentry from "@sentry/node"
-import type { Observable } from "rxjs"
+import { Observable } from "rxjs"
 
 interface ReqWithUser {
   user?: {

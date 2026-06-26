@@ -1,6 +1,5 @@
 import { createHmac, createVerify, timingSafeEqual } from "node:crypto"
 import { normalizeProviderWebhook, QUEUES } from "@guestpost/shared"
-import type { RawBodyRequest } from "@nestjs/common"
 import {
   BadRequestException,
   Controller,
@@ -8,13 +7,14 @@ import {
   Logger,
   Param,
   Post,
+  type RawBodyRequest,
   Req,
   ServiceUnavailableException,
   UnauthorizedException,
 } from "@nestjs/common"
-import type { Request } from "express"
+import { Request } from "express"
 import { Public } from "../../common/decorators/public.decorator"
-import type { QueueService } from "../queues/queue.service"
+import { QueueService } from "../queues/queue.service"
 
 const STRIPE_TIMESTAMP_TOLERANCE_SECONDS = 300
 

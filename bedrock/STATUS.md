@@ -43,3 +43,12 @@ last_system_refresh: 2026-06-11T12:30:00Z
 ## Health Warnings
 
 - None.
+
+## Historical Notes
+
+- **Bedrock → OpenViking migration**: `scripts/migrate-bedrock.sh` existed to import
+  Bedrock content into OpenViking for external knowledge indexing. It was a one-time
+  migration utility and was intentionally removed from the repository after use.
+  If a future migration is required, the script can be recovered from Git history
+  (for example, `git show <commit>:scripts/migrate-bedrock.sh`) or reimplemented against the current
+  OpenViking API.

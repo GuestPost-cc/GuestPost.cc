@@ -4,8 +4,8 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
-import type { PrismaService } from "../../../common/prisma.service"
-import type { AuditService } from "../../audit/audit.service"
+import { PrismaService } from "../../../common/prisma.service"
+import { AuditService } from "../../audit/audit.service"
 
 // Platform fulfillment assignment. Platform-owned orders enter the Operations
 // queue; Operations users claim / assign / reassign before delivering. Finance

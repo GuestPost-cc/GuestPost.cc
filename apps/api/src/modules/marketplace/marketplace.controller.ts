@@ -17,7 +17,7 @@ import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { Public } from "../../common/decorators/public.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import type {
+import {
   AddToSavedListDto,
   CreateFavoriteDto,
   CreateListingDto,
@@ -29,7 +29,7 @@ import type {
   UpdateListingDto,
   UpdateListingServiceInput,
 } from "./dto/marketplace.dto"
-import type { MarketplaceService } from "./marketplace.service"
+import { MarketplaceService } from "./marketplace.service"
 
 @Controller("marketplace")
 export class MarketplaceController {

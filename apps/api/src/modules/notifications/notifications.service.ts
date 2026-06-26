@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common"
-import type { PrismaService } from "../../common/prisma.service"
+import { PrismaService } from "../../common/prisma.service"
 
 // Read surface over Notification rows written by the worker and services.
 // Strictly self-scoped: every query filters by the authenticated userId —

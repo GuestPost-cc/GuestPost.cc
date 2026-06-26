@@ -1,5 +1,5 @@
 import { ListingStatus, ServiceType } from "@guestpost/database"
-import type { WebsiteOwnershipType } from "@guestpost/shared"
+import { WebsiteOwnershipType } from "@guestpost/shared"
 import { Type } from "class-transformer"
 import {
   IsArray,

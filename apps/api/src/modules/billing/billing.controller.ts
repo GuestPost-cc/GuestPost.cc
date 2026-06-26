@@ -11,16 +11,16 @@ import {
   Req,
   UseGuards,
 } from "@nestjs/common"
-import type { Request } from "express"
+import { Request } from "express"
 import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { Public } from "../../common/decorators/public.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import type { BillingService } from "./billing.service"
-import type { DepositDto } from "./dto/deposit.dto"
-import type { WithdrawDto } from "./dto/withdraw.dto"
+import { BillingService } from "./billing.service"
+import { DepositDto } from "./dto/deposit.dto"
+import { WithdrawDto } from "./dto/withdraw.dto"
 
 @Controller("billing")
 export class BillingController {

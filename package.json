@@ -13,7 +13,6 @@
     "format": "biome check --write .",
     "setup": "pnpm tsx scripts/setup.ts",
     "doctor": "pnpm tsx scripts/doctor.ts",
-    "verify": "pnpm tsx scripts/verify.ts",
     "clean": "pnpm tsx scripts/clean.ts",
     "reset": "pnpm tsx scripts/reset.ts",
     "check": "pnpm tsx scripts/check.ts",

@@ -20,9 +20,9 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import type { CampaignsService } from "./campaigns.service"
-import type { CreateCampaignDto } from "./dto/create-campaign.dto"
-import type { CreateOrderDto } from "./dto/create-order.dto"
+import { CampaignsService } from "./campaigns.service"
+import { CreateCampaignDto } from "./dto/create-campaign.dto"
+import { CreateOrderDto } from "./dto/create-order.dto"
 
 @Controller("campaigns")
 export class CampaignsController {

@@ -9,14 +9,14 @@
 //     fallback. Pre-Phase-6 legacy rows fall back to ownership; rows with
 //     both null land in "PUBLISHER" default.
 
-import type { Response } from "express"
+import { Response } from "express"
 import {
   buildRevenueCsvFilename,
   csvCell,
   csvRow,
   streamRevenueCsv,
 } from "../modules/admin/finance/csv-stream"
-import type { RevenueResponse } from "../modules/admin/finance/revenue.service"
+import { RevenueResponse } from "../modules/admin/finance/revenue.service"
 
 describe("Phase 7.1 — csv-stream (RFC 4180)", () => {
   describe("csvCell quoting", () => {

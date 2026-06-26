@@ -1,8 +1,8 @@
 import { computeTrustScore, QUEUES, trustBand } from "@guestpost/shared"
 import { Injectable } from "@nestjs/common"
-import type { PrismaService } from "../../common/prisma.service"
-import type { AuditService } from "../audit/audit.service"
-import type { QueueService } from "../queues/queue.service"
+import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
+import { QueueService } from "../queues/queue.service"
 
 // Verification governance + operations: trust scoring, force-approval oversight,
 // the review center (filter/sections/bulk retry). All staff-only; mounted under

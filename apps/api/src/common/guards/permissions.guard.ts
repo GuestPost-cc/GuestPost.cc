@@ -4,9 +4,9 @@ import {
   ForbiddenException,
   Injectable,
 } from "@nestjs/common"
-import type { Reflector } from "@nestjs/core"
+import { Reflector } from "@nestjs/core"
 import { PERMISSIONS_KEY } from "../decorators/permissions.decorator"
-import type { PrismaService } from "../prisma.service"
+import { PrismaService } from "../prisma.service"
 
 // Permissions that must be explicitly granted on the StaffMembership — never
 // implied by any role, including SUPER_ADMIN. Insider-threat boundary: a

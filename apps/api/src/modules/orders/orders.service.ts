@@ -11,10 +11,10 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { ZodError } from "zod"
-import type { PrismaService } from "../../common/prisma.service"
-import type { AuditService } from "../audit/audit.service"
-import type { QueueService } from "../queues/queue.service"
-import type { RefundService } from "./services/refund.service"
+import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
+import { QueueService } from "../queues/queue.service"
+import { RefundService } from "./services/refund.service"
 
 @Injectable()
 export class OrdersService {

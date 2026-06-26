@@ -5,10 +5,10 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
-import type { PrismaService } from "../../../common/prisma.service"
-import type { AuditService } from "../../audit/audit.service"
-import type { QueueService } from "../../queues/queue.service"
-import type { OrderDeliveryService } from "./order-delivery.service"
+import { PrismaService } from "../../../common/prisma.service"
+import { AuditService } from "../../audit/audit.service"
+import { QueueService } from "../../queues/queue.service"
+import { OrderDeliveryService } from "./order-delivery.service"
 
 @Injectable()
 export class OrderOperationsService {

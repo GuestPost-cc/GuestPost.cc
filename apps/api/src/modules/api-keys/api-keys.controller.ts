@@ -10,8 +10,8 @@ import {
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import type { ApiKeysService } from "./api-keys.service"
-import type { CreateApiKeyDto } from "./dto/create-api-key.dto"
+import { ApiKeysService } from "./api-keys.service"
+import { CreateApiKeyDto } from "./dto/create-api-key.dto"
 
 @Controller("api-keys")
 @UseGuards(MemberRolesGuard)

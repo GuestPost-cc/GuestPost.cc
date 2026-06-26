@@ -1,11 +1,11 @@
-import type { StaffRole } from "@guestpost/shared"
+import { StaffRole } from "@guestpost/shared"
 import {
   type CanActivate,
   type ExecutionContext,
   ForbiddenException,
   Injectable,
 } from "@nestjs/common"
-import type { Reflector } from "@nestjs/core"
+import { Reflector } from "@nestjs/core"
 import { STAFF_ROLES_KEY } from "../decorators/staff-roles.decorator"
 
 // Phase 6.7 — Audit finding #2 remediation.

@@ -9,8 +9,8 @@ import {
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import Stripe from "stripe"
-import type { PrismaService } from "../../common/prisma.service"
-import type { AuditService } from "../audit/audit.service"
+import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
 
 // Thrown inside an interactive transaction to force a ROLLBACK when a
 // concurrent duplicate is detected via P2002. Returning normally from the

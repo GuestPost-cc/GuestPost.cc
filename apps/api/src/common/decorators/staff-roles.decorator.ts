@@ -1,4 +1,4 @@
-import type { StaffRole } from "@guestpost/shared"
+import { StaffRole } from "@guestpost/shared"
 import { SetMetadata } from "@nestjs/common"
 
 export const STAFF_ROLES_KEY = "staffRoles"

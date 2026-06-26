@@ -1,3 +1,36 @@
+/*
+ * ─── Rule Lifecycle Protocol ─────────────────────────────────────────────────
+ *
+ * Every new dependency-cruiser rule follows a staged rollout:
+ *
+ *   Phase 1 – Report-only  ("warn")
+ *     Run locally via `pnpm depcruise ...` to collect violations.
+ *     No CI impact. Duration: ≥1 week or until zero reports.
+ *
+ *   Phase 2 – CI dry-run   ("warn")
+ *     Rule stays "warn" but runs as part of `pnpm check` in CI.
+ *     All violations are surfaced in CI logs. Non-blocking.
+ *     Duration: ≥1 week clean (zero violations across all PRs).
+ *
+ *   Phase 3 – Hard gate    ("error")
+ *     Severity bumped to "error". Blocking in both local and CI.
+ *
+ *   Rollback protocol
+ *     If a Phase-3 rule produces a false-positive or blocks legitimate
+ *     work: revert to Phase 2 (severity "warn"), open a GitHub issue
+ *     documenting the false-positive pattern, and do not re-elevate to
+ *     Phase 3 until the rule is refined and has ≥1 week clean again.
+ *
+ * Current rule lifecycle status:
+ *   - no-circular:          Phase 3 (hard gate since commit 3)
+ *   - no-orphans:           Phase 2 (CI dry-run, non-blocking)
+ *   - no-cross-app-deps:    Phase 3 (hard gate since commit 3)
+ *   - no-app-dep-on-scripts: Phase 3 (hard gate since commit 3)
+ *   - no-app-dep-on-e2e:    Phase 3 (hard gate since commit 3)
+ *   - no-ui-dep-on-database: Phase 3 (hard gate since commit 3)
+ *   - no-package-dep-on-app: Phase 3 (hard gate since commit 3)
+ */
+
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [

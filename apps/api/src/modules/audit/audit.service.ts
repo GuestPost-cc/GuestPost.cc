@@ -2,7 +2,7 @@
 // shared barrel (Next.js client bundles can't tolerate it).
 import { getRequestId } from "@guestpost/shared/dist/observability/request-context"
 import { Injectable, Logger } from "@nestjs/common"
-import type { PrismaService } from "../../common/prisma.service"
+import { PrismaService } from "../../common/prisma.service"
 
 @Injectable()
 export class AuditService {

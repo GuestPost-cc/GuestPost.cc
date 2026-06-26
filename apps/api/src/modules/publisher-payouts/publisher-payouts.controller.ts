@@ -12,7 +12,7 @@ import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
-import type { PublisherPayoutsService } from "./publisher-payouts.service"
+import { PublisherPayoutsService } from "./publisher-payouts.service"
 
 @Controller("publisher-payouts")
 export class PublisherPayoutsController {

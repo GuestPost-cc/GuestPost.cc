@@ -11,10 +11,10 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { normalizeDomain } from "../../common/domain"
-import type { PrismaService } from "../../common/prisma.service"
-import type { AuditService } from "../audit/audit.service"
-import type { QueueService } from "../queues/queue.service"
-import type { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
+import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
+import { QueueService } from "../queues/queue.service"
+import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
 
 @Injectable()
 export class WebsitesService {

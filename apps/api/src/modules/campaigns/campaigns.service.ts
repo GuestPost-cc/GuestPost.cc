@@ -1,13 +1,13 @@
-import type { ServiceType } from "@guestpost/shared"
+import { ServiceType } from "@guestpost/shared"
 import {
   BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
-import type { PrismaService } from "../../common/prisma.service"
-import type { AuditService } from "../audit/audit.service"
-import type { OrdersService } from "../orders/orders.service"
+import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
+import { OrdersService } from "../orders/orders.service"
 
 @Injectable()
 export class CampaignsService {

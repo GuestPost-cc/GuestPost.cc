@@ -5,9 +5,9 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
-import type { Reflector } from "@nestjs/core"
+import { Reflector } from "@nestjs/core"
 import { ORDER_OWNERSHIP_KEY } from "../decorators/order-ownership.decorator"
-import type { PrismaService } from "../prisma.service"
+import { PrismaService } from "../prisma.service"
 
 @Injectable()
 export class OrderOwnershipGuard implements CanActivate {

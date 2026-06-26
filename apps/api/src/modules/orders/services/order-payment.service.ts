@@ -6,9 +6,9 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
-import type { PrismaService } from "../../../common/prisma.service"
-import type { AuditService } from "../../audit/audit.service"
-import type { BillingService } from "../../billing/billing.service"
+import { PrismaService } from "../../../common/prisma.service"
+import { AuditService } from "../../audit/audit.service"
+import { BillingService } from "../../billing/billing.service"
 import { assertOwnerOrCreator } from "./owner-or-creator"
 
 @Injectable()

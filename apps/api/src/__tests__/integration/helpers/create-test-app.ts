@@ -17,7 +17,7 @@
  * as a fast-follow PR.
  */
 
-import type { INestApplication } from "@nestjs/common"
+import { INestApplication } from "@nestjs/common"
 import { Test } from "@nestjs/testing"
 import { createTestDatabase, type TestDatabase } from "./test-db"
 

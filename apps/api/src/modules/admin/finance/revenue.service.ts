@@ -16,10 +16,10 @@
 //     has no currency column; Order does. Mismatch detection lives at the
 //     Order layer.
 
-import type { Prisma } from "@guestpost/database"
+import { Prisma } from "@guestpost/database"
 import { Injectable } from "@nestjs/common"
-import type { PrismaService } from "../../../common/prisma.service"
-import type { RevenueGroupBy } from "../dto/get-revenue-query.dto"
+import { PrismaService } from "../../../common/prisma.service"
+import { RevenueGroupBy } from "../dto/get-revenue-query.dto"
 
 const USD = "USD"
 const UNKNOWN_BUCKET = "(unknown)"

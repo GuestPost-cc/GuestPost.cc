@@ -5,10 +5,10 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common"
-import type { PrismaService } from "../../common/prisma.service"
-import type { AuditService } from "../audit/audit.service"
-import type { PayoutEncryptionService } from "./payout-encryption.service"
-import type { PayoutProviderService } from "./payout-provider.service"
+import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
+import { PayoutEncryptionService } from "./payout-encryption.service"
+import { PayoutProviderService } from "./payout-provider.service"
 
 @Injectable()
 export class PayoutExecutionService {

@@ -15,8 +15,8 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import type { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
-import type { WebsitesService } from "./websites.service"
+import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
+import { WebsitesService } from "./websites.service"
 
 @Controller("publishers/:publisherId/websites")
 @UseGuards(ActorTypeGuard, MemberRolesGuard)

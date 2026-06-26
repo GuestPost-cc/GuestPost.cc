@@ -50,7 +50,8 @@
       },
       "style": {
         "noNonNullAssertion": "off",
-        "noParameterAssign": "off"
+        "noParameterAssign": "off",
+        "useImportType": "off"
       },
       "performance": {
         "noAccumulatingSpread": "off",

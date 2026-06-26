@@ -17,8 +17,8 @@ import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { OrderOwnershipGuard } from "../../common/guards/order-ownership.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
-import type { SettlementReasonDto } from "./dto/settlement-reason.dto"
-import type { SettlementsService } from "./settlements.service"
+import { SettlementReasonDto } from "./dto/settlement-reason.dto"
+import { SettlementsService } from "./settlements.service"
 
 @Controller("settlements")
 export class SettlementsController {

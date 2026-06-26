@@ -21,7 +21,7 @@ updated: 2026-06-14
 
 These are NEVER updated after creation. Historical reports + refund clawback chains read them rather than re-derive from the live (mutable) listing.
 
-Backfill: `scripts/backfill-settlement-snapshots.ts` covered 60/60 historical Settlement rows + 0 PlatformRevenue rows (no platform orders existed yet). Idempotent — only touches rows where `listingServiceId IS NULL`.
+Backfill: `scripts/backfill-settlement-snapshots.ts` covered 60/60 historical Settlement rows + 0 PlatformRevenue rows (no platform orders existed yet). Idempotent — only touches rows where `listingServiceId IS NULL`. Script removed after completion.
 
 ## Dual-Approval System
 

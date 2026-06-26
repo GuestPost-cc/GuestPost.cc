@@ -1,7 +1,7 @@
 import { QUEUES } from "@guestpost/shared"
 import { Injectable, NotFoundException } from "@nestjs/common"
-import type { PrismaService } from "../../common/prisma.service"
-import type { QueueService } from "../queues/queue.service"
+import { PrismaService } from "../../common/prisma.service"
+import { QueueService } from "../queues/queue.service"
 
 @Injectable()
 export class ReportingService {

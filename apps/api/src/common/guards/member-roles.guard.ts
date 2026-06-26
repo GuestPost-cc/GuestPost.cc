@@ -4,7 +4,7 @@ import {
   ForbiddenException,
   Injectable,
 } from "@nestjs/common"
-import type { Reflector } from "@nestjs/core"
+import { Reflector } from "@nestjs/core"
 import { MEMBER_ROLES_KEY } from "../decorators/member-roles.decorator"
 
 @Injectable()

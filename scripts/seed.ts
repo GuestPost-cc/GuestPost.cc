@@ -21,7 +21,7 @@ const USERS = [
   {
     email: "admin@guestpost.local",
     password: "Admin123!",
-    name: "Ava Admin",
+    name: "Admin",
     type: "STAFF",
     role: "SUPER_ADMIN",
   },

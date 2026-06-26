@@ -12,8 +12,8 @@
 // `writeRow` writes one row at a time so callers can stream large exports
 // without buffering the whole CSV in memory.
 
-import type { Response } from "express"
-import type { RevenueResponse } from "./revenue.service"
+import { Response } from "express"
+import { RevenueResponse } from "./revenue.service"
 
 const CRLF = "\r\n"
 const QUOTE_REQUIRED = /[",\r\n]/

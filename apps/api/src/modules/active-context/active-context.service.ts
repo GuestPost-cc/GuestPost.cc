@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
-import type { PrismaService } from "../../common/prisma.service"
+import { PrismaService } from "../../common/prisma.service"
 
 @Injectable()
 export class ActiveContextService {

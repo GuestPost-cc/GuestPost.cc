@@ -10,11 +10,11 @@ import {
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
-import type { PrismaService } from "../../common/prisma.service"
-import type { DeliveryInterventionService } from "./services/delivery-intervention.service"
-import type { OrderDeliveryService } from "./services/order-delivery.service"
-import type { OrderFulfillmentAssignmentService } from "./services/order-fulfillment-assignment.service"
-import type { OrderOperationsService } from "./services/order-operations.service"
+import { PrismaService } from "../../common/prisma.service"
+import { DeliveryInterventionService } from "./services/delivery-intervention.service"
+import { OrderDeliveryService } from "./services/order-delivery.service"
+import { OrderFulfillmentAssignmentService } from "./services/order-fulfillment-assignment.service"
+import { OrderOperationsService } from "./services/order-operations.service"
 
 // Staff-facing delivery operations: read (versions/evidence/snapshots/audit),
 // platform fulfillment assignment, intervention, and dispute evidence package.

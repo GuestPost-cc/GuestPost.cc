@@ -4,7 +4,7 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import type { ReportingService } from "./reporting.service"
+import { ReportingService } from "./reporting.service"
 
 @Controller("reports")
 @UseGuards(ActorTypeGuard, MemberRolesGuard)

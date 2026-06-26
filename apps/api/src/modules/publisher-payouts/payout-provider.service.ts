@@ -1,9 +1,9 @@
 import { Injectable, Logger, type OnModuleInit } from "@nestjs/common"
-import type { ModuleRef } from "@nestjs/core"
-import type { PrismaService } from "../../common/prisma.service"
-import type { PayoutEncryptionService } from "./payout-encryption.service"
+import { ModuleRef } from "@nestjs/core"
+import { PrismaService } from "../../common/prisma.service"
+import { PayoutEncryptionService } from "./payout-encryption.service"
 import { ManualPayoutAdapter } from "./providers/manual-payout.adapter"
-import type { PayoutProviderAdapter } from "./providers/payout-provider.interface"
+import { PayoutProviderAdapter } from "./providers/payout-provider.interface"
 import { StripeConnectPayoutAdapter } from "./providers/stripe-connect-payout.adapter"
 import { WisePayoutAdapter } from "./providers/wise-payout.adapter"
 

@@ -1,11 +1,11 @@
-import type { UserType } from "@guestpost/shared"
+import { UserType } from "@guestpost/shared"
 import {
   type CanActivate,
   type ExecutionContext,
   ForbiddenException,
   Injectable,
 } from "@nestjs/common"
-import type { Reflector } from "@nestjs/core"
+import { Reflector } from "@nestjs/core"
 import { ACTOR_TYPE_KEY } from "../decorators/actor-type.decorator"
 
 @Injectable()

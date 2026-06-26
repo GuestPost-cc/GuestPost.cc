@@ -3,7 +3,7 @@ import {
   WebsiteOwnershipType,
   WebsiteVerificationStatus,
 } from "@guestpost/database"
-import type { StaffRole } from "@guestpost/shared"
+import { StaffRole } from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
@@ -12,10 +12,10 @@ import {
 } from "@nestjs/common"
 import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { normalizeDomain } from "../../common/domain"
-import type { PrismaService } from "../../common/prisma.service"
-import type { AuditService } from "../audit/audit.service"
-import type { RefundService } from "../orders/services/refund.service"
-import type { QueueService } from "../queues/queue.service"
+import { PrismaService } from "../../common/prisma.service"
+import { AuditService } from "../audit/audit.service"
+import { RefundService } from "../orders/services/refund.service"
+import { QueueService } from "../queues/queue.service"
 
 const VALID_STAFF_ROLES: StaffRole[] = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
 

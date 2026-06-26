@@ -15,9 +15,9 @@ import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
-import type { AddTicketMessageDto } from "./dto/add-ticket-message.dto"
-import type { CreateTicketDto } from "./dto/create-ticket.dto"
-import type { SupportService } from "./support.service"
+import { AddTicketMessageDto } from "./dto/add-ticket-message.dto"
+import { CreateTicketDto } from "./dto/create-ticket.dto"
+import { SupportService } from "./support.service"
 
 // The support API is now multi-actor: CUSTOMER, PUBLISHER, and STAFF all
 // read/write the same Ticket rows, but each sees a different slice based on

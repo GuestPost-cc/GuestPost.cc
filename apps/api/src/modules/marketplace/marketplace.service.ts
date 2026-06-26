@@ -11,10 +11,10 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
-import type { PrismaService } from "../../common/prisma.service"
+import { PrismaService } from "../../common/prisma.service"
 import { slugify } from "../../common/utils/slugify"
-import type { QueueService } from "../queues/queue.service"
-import type {
+import { QueueService } from "../queues/queue.service"
+import {
   AddToSavedListDto,
   CreateListingDto,
   CreateReviewDto,
