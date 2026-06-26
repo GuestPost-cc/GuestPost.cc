@@ -46,16 +46,20 @@ ALTER TABLE "TicketMessage"
 -- so the residue is correctly CUSTOMER.
 
 -- STAFF authors: derive from current StaffMembership.role.
+-- DISTINCT ON picks one role per user when a staffer holds multiple
+-- memberships (deterministic — oldest membership wins).
 UPDATE "TicketMessage" m
-SET "participantRole" = CASE sm."role"
+SET "participantRole" = CASE sub."role"
   WHEN 'SUPER_ADMIN' THEN 'ADMIN'::"TicketParticipantRole"
   WHEN 'OPERATIONS'  THEN 'OPS'::"TicketParticipantRole"
   WHEN 'FINANCE'     THEN 'FINANCE'::"TicketParticipantRole"
 END
-FROM "User" u
-JOIN "StaffMembership" sm ON sm."userId" = u."id"
-WHERE m."userId" = u."id"
-  AND u."userType" = 'STAFF'
+FROM (
+  SELECT DISTINCT ON (sm."userId") sm."userId", sm."role"
+  FROM "StaffMembership" sm
+  ORDER BY sm."userId", sm."createdAt" ASC
+) sub
+WHERE m."userId" = sub."userId"
   AND m."participantRole" IS NULL;
 
 -- PUBLISHER authors.

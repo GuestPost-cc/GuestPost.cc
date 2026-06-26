@@ -41,10 +41,15 @@ ALTER TABLE "MarketplaceFavorite"
 -- The old uniqueness was (userId, listingId). The new uniqueness is
 -- (userId, listingId, serviceType) with NULL meaning "whole listing" — so a
 -- user can favorite a listing AND favorite a specific service on it.
--- Postgres treats NULL as distinct in UNIQUE; that's the behavior we want.
+-- Postgres treats NULL as distinct in UNIQUE by default, so we use two
+-- partial indexes to enforce uniqueness for both cases.
 DROP INDEX IF EXISTS "MarketplaceFavorite_userId_listingId_key";
+CREATE UNIQUE INDEX "MarketplaceFavorite_userId_listingId_wholeListing_key"
+  ON "MarketplaceFavorite"("userId", "listingId")
+  WHERE "serviceType" IS NULL;
 CREATE UNIQUE INDEX "MarketplaceFavorite_userId_listingId_serviceType_key"
-  ON "MarketplaceFavorite"("userId", "listingId", "serviceType");
+  ON "MarketplaceFavorite"("userId", "listingId", "serviceType")
+  WHERE "serviceType" IS NOT NULL;
 CREATE INDEX "MarketplaceFavorite_listingId_serviceType_idx"
   ON "MarketplaceFavorite"("listingId", "serviceType");
 

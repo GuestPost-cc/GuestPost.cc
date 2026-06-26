@@ -45,7 +45,8 @@ ALTER TABLE "Withdrawal" ADD COLUMN IF NOT EXISTS "availableAt" TIMESTAMP(3);
 ALTER TABLE "Withdrawal" ADD COLUMN IF NOT EXISTS "idempotencyKey" TEXT;
 ALTER TABLE "Withdrawal" ADD COLUMN IF NOT EXISTS "payoutMethodId" TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS "Withdrawal_publisherId_idempotencyKey_key"
-  ON "Withdrawal"("publisherId", "idempotencyKey");
+  ON "Withdrawal"("publisherId", "idempotencyKey")
+  WHERE "idempotencyKey" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "Withdrawal_payoutMethodId_idx" ON "Withdrawal"("payoutMethodId");
 
 -- ── PayoutMethod ───────────────────────────────────────────────────────────

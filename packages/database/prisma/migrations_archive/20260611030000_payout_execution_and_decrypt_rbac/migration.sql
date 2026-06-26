@@ -76,7 +76,8 @@ CREATE TABLE IF NOT EXISTS "PayoutExecution" (
   CONSTRAINT "PayoutExecution_pkey" PRIMARY KEY ("id")
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "PayoutExecution_withdrawalId_idempotencyKey_key"
-  ON "PayoutExecution"("withdrawalId", "idempotencyKey");
+  ON "PayoutExecution"("withdrawalId", "idempotencyKey")
+  WHERE "idempotencyKey" IS NOT NULL;
 CREATE INDEX IF NOT EXISTS "PayoutExecution_withdrawalId_status_idx" ON "PayoutExecution"("withdrawalId", "status");
 CREATE INDEX IF NOT EXISTS "PayoutExecution_providerId_status_idx" ON "PayoutExecution"("providerId", "status");
 CREATE INDEX IF NOT EXISTS "PayoutExecution_status_createdAt_idx" ON "PayoutExecution"("status", "createdAt");
