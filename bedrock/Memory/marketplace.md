@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: marketplace
 project: guestpost-platform
-updated: 2026-06-14
+updated: 2026-06-28
 ---
 
 # Marketplace
@@ -31,6 +31,7 @@ Customer flow (locked after listing-detail pick):
 
 Publisher lifecycle endpoints (all version-via-status-guarded, audit-logged):
 `POST /marketplace/listings/:id/{submit,pause,unpause,archive}`. `submit` gates on website VERIFIED + ≥1 AVAILABLE service.
+**2026-06-28: `submitListingForReview` now accepts REJECTED → PENDING_REVIEW** (resubmit flow), not just DRAFT.
 
 ## Per-service brief (Phase 6)
 
@@ -55,6 +56,48 @@ For PLATFORM sites, `Website.managedByUserId` points at the OPERATIONS staffer w
 | DELETE | `/marketplace/listings/:id/services/:serviceId` | Soft-disable (sets availability=PAUSED). Hard delete never offered — historical orders would orphan. |
 | POST/PUT/DELETE | `/admin/marketplace/listings/:id/services[/:serviceId]` | Mirror endpoints for staff-managed PLATFORM listings. |
 | GET | `/marketplace/listings/:slug/services` | Lightweight service-picker fetch. |
+
+## Features
+
+- Categories and tags for listing organization
+- Reviews and favorites for social proof (favorites can now be scoped per-serviceType for waitlist notifications)
+- Saved lists for user curation
+- Per-service prices on `ListingService`. Listing-level price/range fields removed in Phase 7
+- SEO metrics: domain rating (DR), traffic, referring domains, spam score
+- AI-powered recommendations (`MarketplaceRecommendation`) — now match on AVAILABLE-service overlap, not the dropped listing-level `type`
+- Fraud detection flags (`MarketplaceFlag`)
+- Marketplace stats include `totalServices`, `activeServices`, `servicesByType` (per-`ServiceType` count + avg price)
+- Analytics: `MarketplaceListingClick.serviceType` + `MarketplaceSearchHistory.serviceType` capture which service the user picked / filtered
+
+## Publisher Portal UX (2026-06-28 — `apps/publisher/src/app/dashboard/listings/page.tsx`)
+
+- **Create dialog**: Legacy `type` dropdown + `price` input removed (Phase 7 no-ops). Added "Add a service now" checkbox with inline service form (type, price, TAT, revisions, warrantyDays, currency). `POST /marketplace/listings` accepts optional `services[]` — listing created with first service in one step.
+- **Edit listing modal** (NEW): Per-row "Edit" button opens modal for title/description via `PUT /marketplace/listings/:id`.
+- **Services dialog redesign**: 
+  - Inline "Edit" mode per service row — edits price, TAT, revisions, warrantyDays, currency (USD/EUR/GBP) with version-guarded PATCH
+  - Removed duplicate "Pause" button (availability dropdown is single source of truth)
+  - Added `warrantyDays` + `currency` columns to add-service form
+  - `revisionRounds` column added to service table
+- **Lifecycle**: REJECTED listings show "Resubmit for review" button (calls `submitListingForReview` which now accepts REJECTED → PENDING_REVIEW)
+
+## Admin Portal UX (2026-06-28 — `apps/admin/src/app/dashboard/marketplace/page.tsx` + `[slug]/page.tsx`)
+
+- **Critical fix**: Force-approve gate now checks `user.staffRole === "SUPER_ADMIN"` (was checking deprecated `user.role` from `UserRole` enum — never matched). Same fix applied to dispute resolution and settlement approval endpoints.
+- **Admin listings endpoint** returns ALL services (AVAILABLE + PAUSED + WAITLIST) for Manage Services dialog; display fields (`priceFrom`, `serviceTypes`, `type`, `price`) computed from AVAILABLE-only subset.
+- **Admin API client** (`packages/api-client/src/services/admin.ts`) added `add/update/pausePlatformListingService` methods; frontend calls `api.admin.*` instead of non-existent `api.marketplace.*`.
+- **Manage Services dialog** reads directly from listing row data (included in listings response) — removed stale `servicesQuery` that read local table state.
+- **Type filter cleanup**: Removed invalid "PUBLISHER_WEBSITE" option (website ownership type, not a ServiceType).
+- **Field name fix**: Backend response uses `revisionRounds` (matches Prisma) — frontend type updated from `revisions`.
+
+## Admin Preview Page (`apps/admin/src/app/dashboard/marketplace/[slug]/page.tsx`)
+
+- Domain verification status badge added (VERIFIED/PENDING/FAILED/REVOKED)
+- Approve action passes `force: true` for SUPER_ADMIN
+- Status mutation signature: `{ status: string; force?: boolean }`
+
+## Marketplace Order Page (Portal)
+
+- Single-page order form at `/dashboard/marketplace/[slug]/order` bypasses 5-step wizard when coming from a listing. Listing summary card + BriefForm + campaign selector + Place Order → `POST /orders` → redirects to `/dashboard/orders/checkout/{id}`.
 
 ## Features
 

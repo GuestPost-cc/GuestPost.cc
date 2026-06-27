@@ -7,17 +7,16 @@ real_knowledge_path: /Users/shohan/Desktop/GuestPost/guestpost-platform/bedrock
 local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
-last_backfill_import: 2026-06-26
+last_backfill_import: 2026-06-28
 last_audit: 2026-06-22 (6/41 closed via Phase 8.7 + 8.4 + 8.9 + 8.1 + 8.2 + 8.3 — 3 Critical + 14 High + 18 Medium open)
 prior_audit: 2026-06-15 (31 findings closed 100% on 2026-06-21)
 last_compaction: 2026-06-11
-last_validation: 2026-06-11
+last_validation: 2026-06-28
 last_validation_result: valid
-last_doctor: 2026-06-11
+last_doctor: 2026-06-28
 last_doctor_result: healthy
 framework_version: 0.4.16
-last_system_refresh: 2026-06-11T12:30:00Z
-
+last_system_refresh: 2026-06-28T18:00:00Z
 ---
 
 # Knowledge Status: guestpost-platform

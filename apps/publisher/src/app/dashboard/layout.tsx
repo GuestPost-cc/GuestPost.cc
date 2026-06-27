@@ -75,7 +75,7 @@ export default function DashboardLayout({
             href="/dashboard"
             className="flex items-center gap-2 text-lg font-bold tracking-tight"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <ArrowUpRight className="h-4 w-4" />
             </div>
             GuestPost
@@ -101,10 +101,10 @@ export default function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-primary/10 text-primary"
+                    : "text-muted-foreground hover:bg-surface-1 hover:text-foreground",
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -160,7 +160,9 @@ export default function DashboardLayout({
           >
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-semibold">GuestPost</span>
+          <Link href="/dashboard" className="font-semibold">
+            GuestPost
+          </Link>
         </header>
         <main className="flex-1 overflow-auto">
           <div className="mx-auto max-w-7xl p-8">{children}</div>
