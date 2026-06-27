@@ -321,7 +321,7 @@ export default function DashboardPage() {
     user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "FINANCE"
 
   const {
-    data: users,
+    data: usersData,
     isLoading: usersLoading,
     error: usersError,
   } = useQuery({
@@ -329,6 +329,7 @@ export default function DashboardPage() {
     queryFn: () => api.admin.listUsers(),
     retry: 1,
   })
+  const users = usersData?.items
 
   const {
     data: orders,

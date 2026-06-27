@@ -28,28 +28,78 @@ export class AdminService {
     private readonly refund: RefundService,
   ) {}
 
-  async listUsers(take = 50, skip = 0, _user?: any) {
-    const users = await this.prisma.user.findMany({
-      orderBy: { createdAt: "desc" },
+  async listUsers(params: {
+    take?: number
+    skip?: number
+    search?: string
+    userType?: string
+    role?: string
+    status?: string
+    _user?: any
+  }) {
+    const { take = 50, skip = 0, search, userType, role, status } = params
+    const where: any = {}
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: "insensitive" } },
+        { email: { contains: search, mode: "insensitive" } },
+        { id: search.length >= 8 ? search : undefined },
+      ].filter(Boolean)
+    }
+
+    if (userType) {
+      where.userType = userType
+    }
+
+    if (role) {
+      const staffRoles = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
+      if (staffRoles.includes(role)) {
+        where.staffMemberships = { some: { role } }
+      } else if (role === "PUBLISHER_OWNER") {
+        where.publisherMemberships = { some: { role } }
+      } else {
+        where.memberships = { some: { role } }
+      }
+    }
+
+    if (status === "active") {
+      where.banned = false
+    } else if (status === "suspended") {
+      where.banned = true
+    }
+
+    const [users, total] = await Promise.all([
+      this.prisma.user.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        take,
+        skip,
+        include: {
+          memberships: true,
+          publisherMemberships: true,
+          staffMemberships: true,
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ])
+
+    return {
+      items: users.map((u) => ({
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        userType: u.userType,
+        customerRole: u.memberships[0]?.role ?? null,
+        publisherRole: u.publisherMemberships[0]?.role ?? null,
+        staffRole: u.staffMemberships?.[0]?.role ?? null,
+        banned: u.banned,
+        createdAt: u.createdAt,
+      })),
+      total,
       take,
       skip,
-      include: {
-        memberships: true,
-        publisherMemberships: true,
-        staffMemberships: true,
-      },
-    })
-    return users.map((u) => ({
-      id: u.id,
-      email: u.email,
-      name: u.name,
-      userType: u.userType,
-      customerRole: u.memberships[0]?.role ?? null,
-      publisherRole: u.publisherMemberships[0]?.role ?? null,
-      staffRole: u.staffMemberships?.[0]?.role ?? null,
-      banned: u.banned,
-      createdAt: u.createdAt,
-    }))
+    }
   }
 
   async getUser(id: string, _user?: any) {
@@ -244,6 +294,26 @@ export class AdminService {
     })
 
     return result
+  }
+
+  async banUser(userId: string, banned: boolean, user?: any) {
+    const target = await this.prisma.user.findUnique({ where: { id: userId } })
+    if (!target) throw new NotFoundException("User not found")
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { banned },
+    })
+    invalidateAuthContext(userId)
+
+    await this.audit.log({
+      action: banned ? "USER_SUSPENDED" : "USER_RESTORED",
+      entityType: "User",
+      entityId: userId,
+      metadata: { userId, byUserId: user?.id },
+      userId: user?.id,
+      organizationId: null,
+    })
   }
 
   async listOrganizations(take = 50, skip = 0, _user?: any) {

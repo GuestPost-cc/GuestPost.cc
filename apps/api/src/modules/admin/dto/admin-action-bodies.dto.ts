@@ -30,14 +30,28 @@ import {
 const CUSTOMER_ROLES = ["OWNER", "MEMBER"] as const
 type CustomerRoleValue = (typeof CUSTOMER_ROLES)[number]
 
-export class UpdateUserRoleDto {
-  @IsString()
-  @IsIn(CUSTOMER_ROLES as unknown as string[])
-  role!: CustomerRoleValue
-}
+const PUBLISHER_ROLES = ["PUBLISHER_OWNER"] as const
+type PublisherRoleValue = (typeof PUBLISHER_ROLES)[number]
 
 const STAFF_ROLES = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"] as const
 type StaffRoleValue = (typeof STAFF_ROLES)[number]
+
+const ALL_USER_ROLES = [
+  ...CUSTOMER_ROLES,
+  ...PUBLISHER_ROLES,
+  ...STAFF_ROLES,
+] as const
+
+export class UpdateUserRoleDto {
+  @IsString()
+  @IsIn(ALL_USER_ROLES as unknown as string[])
+  role!: CustomerRoleValue | PublisherRoleValue | StaffRoleValue
+}
+
+export class BanUserDto {
+  @IsBoolean()
+  banned!: boolean
+}
 
 export class UpdateStaffRoleDto {
   @IsString()

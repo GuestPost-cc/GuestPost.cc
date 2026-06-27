@@ -24,30 +24,20 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
-import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import {
-  type ColumnDef,
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getPaginationRowModel,
-  useReactTable,
-} from "@tanstack/react-table"
 import { format } from "date-fns"
 import {
   AlertCircle,
   Ban,
   CheckCircle,
+  ChevronLeft,
+  ChevronRight,
   Search,
   Shield,
   User,
 } from "lucide-react"
-import { useMemo, useState } from "react"
-import { useForm } from "react-hook-form"
+import { useState } from "react"
 import { toast } from "sonner"
-import { z } from "zod"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 
@@ -63,9 +53,12 @@ interface AdminUser {
   createdAt: string
 }
 
-const roleUpdateSchema = z.object({
-  role: z.string(),
-})
+interface PaginatedResponse<T> {
+  items: T[]
+  total: number
+  take: number
+  skip: number
+}
 
 function RoleUpdateDialog({
   user,
@@ -79,10 +72,7 @@ function RoleUpdateDialog({
   onSuccess: () => void
 }) {
   const queryClient = useQueryClient()
-  const { handleSubmit, register, setValue, watch } = useForm({
-    resolver: zodResolver(roleUpdateSchema),
-    defaultValues: { role: "" },
-  })
+  const [selectedRole, setSelectedRole] = useState("")
 
   const roleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
@@ -101,12 +91,10 @@ function RoleUpdateDialog({
     },
   })
 
-  const onSubmit = (data: z.infer<typeof roleUpdateSchema>) => {
-    if (!user) return
-    roleMutation.mutate({ userId: user.id, role: data.role })
+  const handleSave = () => {
+    if (!user || !selectedRole) return
+    roleMutation.mutate({ userId: user.id, role: selectedRole })
   }
-
-  const selectedRole = watch("role")
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -114,13 +102,10 @@ function RoleUpdateDialog({
         <DialogHeader>
           <DialogTitle>Change Role — {user?.name ?? user?.email}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-4">
           <div>
             <label className="text-sm font-medium">Select Role</label>
-            <Select
-              value={selectedRole}
-              onValueChange={(v) => setValue("role", v)}
-            >
+            <Select value={selectedRole} onValueChange={setSelectedRole}>
               <SelectTrigger className="mt-1">
                 <SelectValue placeholder="Select role" />
               </SelectTrigger>
@@ -154,28 +139,76 @@ function RoleUpdateDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={roleMutation.isPending}>
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={!selectedRole || roleMutation.isPending}
+            >
               {roleMutation.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   )
 }
 
-const columnHelper = createColumnHelper<AdminUser>()
+function UserRoleBadge({ user }: { user: AdminUser }) {
+  const role =
+    user.userType === "STAFF"
+      ? user.staffRole
+      : user.userType === "PUBLISHER"
+        ? user.publisherRole
+        : user.customerRole
+
+  const variant =
+    user.userType === "STAFF"
+      ? "default"
+      : user.userType === "PUBLISHER"
+        ? "secondary"
+        : "outline"
+
+  return (
+    <Badge variant={variant} className="capitalize whitespace-nowrap">
+      {role?.toLowerCase().replace(/_/g, " ") ?? user.userType.toLowerCase()}
+    </Badge>
+  )
+}
+
+function UserTypeBadge({ userType }: { userType: string }) {
+  const styles: Record<string, string> = {
+    STAFF:
+      "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+    PUBLISHER:
+      "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
+    CUSTOMER:
+      "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+  }
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium uppercase tracking-wider ${styles[userType] ?? "bg-muted text-muted-foreground"}`}
+    >
+      {userType === "STAFF"
+        ? "Staff"
+        : userType === "PUBLISHER"
+          ? "Publisher"
+          : "Customer"}
+    </span>
+  )
+}
 
 const RoleGuard = ({ children }: { children: React.ReactNode }) => {
   const { user } = useAuth()
-  if (user?.staffRole !== "SUPER_ADMIN") {
+  if (
+    !["SUPER_ADMIN", "OPERATIONS", "FINANCE"].includes(user?.staffRole ?? "")
+  ) {
     return (
       <div className="flex min-h-[400px] flex-col items-center justify-center gap-4">
         <AlertCircle className="h-12 w-12 text-muted-foreground" />
         <div className="text-center">
           <h2 className="text-lg font-semibold">Access Restricted</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Only Super Admins can access the user management page.
+            Only staff with appropriate permissions can access this page.
           </p>
         </div>
       </div>
@@ -184,52 +217,44 @@ const RoleGuard = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>
 }
 
+const PAGE_SIZE = 20
+
 function UsersPageContent() {
   const { user: currentUser } = useAuth()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
+  const [userTypeFilter, setUserTypeFilter] = useState<string>("all")
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [page, setPage] = useState(1)
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
 
-  const {
-    data: users = [],
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ["admin", "users"],
-    queryFn: () => api.admin.listUsers(),
+  const queryParams = {
+    take: PAGE_SIZE,
+    skip: (page - 1) * PAGE_SIZE,
+    search: search || undefined,
+    userType: userTypeFilter !== "all" ? userTypeFilter : undefined,
+    role: roleFilter !== "all" ? roleFilter : undefined,
+    status: statusFilter !== "all" ? statusFilter : undefined,
+  }
+
+  const { data, isLoading, error, refetch } = useQuery<
+    PaginatedResponse<AdminUser>
+  >({
+    queryKey: ["admin", "users", queryParams],
+    queryFn: () =>
+      api.admin.listUsers(queryParams) as Promise<PaginatedResponse<AdminUser>>,
     retry: 1,
   })
 
+  const isSuperAdmin = currentUser?.staffRole === "SUPER_ADMIN"
+  const users = data?.items ?? []
+  const totalUsers = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalUsers / PAGE_SIZE))
+
   const banMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const { getToken, getApiUrl } = await import("../../../lib/api")
-      const token = getToken()
-      const res = await fetch(`${getApiUrl()}/admin/users/${userId}/ban`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ banned: true }),
-        credentials: "include",
-      })
-      if (!res.ok) {
-        const fallback = await fetch(`${getApiUrl()}/admin/users/${userId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ banned: true }),
-          credentials: "include",
-        })
-        if (!fallback.ok) throw new Error(await fallback.text())
-      }
-    },
+    mutationFn: (userId: string) => api.admin.banUser(userId, true),
     onSuccess: () => {
       toast.success("User suspended")
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
@@ -238,31 +263,7 @@ function UsersPageContent() {
   })
 
   const restoreMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: string }) => {
-      const { getToken, getApiUrl } = await import("../../../lib/api")
-      const token = getToken()
-      const res = await fetch(`${getApiUrl()}/admin/users/${userId}/ban`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ banned: false }),
-        credentials: "include",
-      })
-      if (!res.ok) {
-        const fallback = await fetch(`${getApiUrl()}/admin/users/${userId}`, {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ banned: false }),
-          credentials: "include",
-        })
-        if (!fallback.ok) throw new Error(await fallback.text())
-      }
-    },
+    mutationFn: (userId: string) => api.admin.banUser(userId, false),
     onSuccess: () => {
       toast.success("User restored")
       queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
@@ -270,147 +271,27 @@ function UsersPageContent() {
     onError: () => toast.error("Failed to restore user"),
   })
 
-  const columns = useMemo<ColumnDef<AdminUser, any>[]>(
-    () => [
-      columnHelper.accessor("name", {
-        header: "Name",
-        cell: (info) => (
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-              <User className="h-4 w-4 text-primary" />
-            </div>
-            <span className="font-medium">{info.getValue() ?? "—"}</span>
-          </div>
-        ),
-      }),
-      columnHelper.accessor("email", {
-        header: "Email",
-        cell: (info) => (
-          <span className="text-muted-foreground">{info.getValue()}</span>
-        ),
-      }),
-      columnHelper.accessor("userType", {
-        header: "Role",
-        cell: (info) => {
-          const user = info.row.original
-          const role =
-            user.userType === "STAFF"
-              ? user.staffRole
-              : user.userType === "PUBLISHER"
-                ? user.publisherRole
-                : user.customerRole
-          return (
-            <Badge variant="outline" className="capitalize">
-              {role?.toLowerCase().replace(/_/g, " ") ??
-                user.userType.toLowerCase()}
-            </Badge>
-          )
-        },
-      }),
-      columnHelper.accessor("banned", {
-        header: "Status",
-        cell: (info) =>
-          info.getValue() ? (
-            <Badge variant="destructive">Suspended</Badge>
-          ) : (
-            <Badge variant="default" className="bg-emerald-500">
-              Active
-            </Badge>
-          ),
-      }),
-      columnHelper.accessor("createdAt", {
-        header: "Created",
-        cell: (info) => (
-          <span className="text-muted-foreground">
-            {format(new Date(info.getValue()), "PP")}
-          </span>
-        ),
-      }),
-      columnHelper.display({
-        id: "actions",
-        cell: (info) => {
-          const user = info.row.original
-          return (
-            <div className="flex items-center gap-2">
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setSelectedUser(user)
-                  setRoleDialogOpen(true)
-                }}
-              >
-                <Shield className="mr-1 h-3 w-3" />
-                Role
-              </Button>
-              {user.banned ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() =>
-                    restoreMutation.mutate({
-                      userId: user.id,
-                      role:
-                        user.userType === "CUSTOMER"
-                          ? "OWNER"
-                          : "PUBLISHER_OWNER",
-                    })
-                  }
-                  disabled={restoreMutation.isPending}
-                >
-                  <CheckCircle className="mr-1 h-3 w-3" />
-                  Restore
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => banMutation.mutate(user.id)}
-                  disabled={
-                    user.id === currentUser?.id || banMutation.isPending
-                  }
-                >
-                  <Ban className="mr-1 h-3 w-3" />
-                  Suspend
-                </Button>
-              )}
-            </div>
-          )
-        },
-      }),
-    ],
-    [banMutation, restoreMutation, currentUser?.id],
-  )
+  const handleSearch = (value: string) => {
+    setSearch(value)
+    setPage(1)
+  }
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((u) => {
-      const matchesSearch =
-        search === "" ||
-        u.name?.toLowerCase().includes(search.toLowerCase()) ||
-        u.email.toLowerCase().includes(search.toLowerCase())
-      const matchesRole =
-        roleFilter === "all" ||
-        u.userType === roleFilter ||
-        u.staffRole === roleFilter ||
-        u.customerRole === roleFilter ||
-        u.publisherRole === roleFilter
-      const matchesStatus =
-        statusFilter === "all" ||
-        (statusFilter === "active" && !u.banned) ||
-        (statusFilter === "suspended" && u.banned)
-      return matchesSearch && matchesRole && matchesStatus
-    })
-  }, [users, search, roleFilter, statusFilter])
+  const handleUserTypeChange = (value: string) => {
+    setUserTypeFilter(value)
+    setRoleFilter("all")
+    setPage(1)
+  }
 
-  const table = useReactTable({
-    data: filteredUsers,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    state: { pagination: { pageIndex: 0, pageSize: 20 } },
-  })
+  const handleRoleChange = (value: string) => {
+    setRoleFilter(value)
+    setUserTypeFilter("all")
+    setPage(1)
+  }
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value)
+    setPage(1)
+  }
 
   if (error) {
     return (
@@ -427,7 +308,9 @@ function UsersPageContent() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Users</h1>
         <span className="text-sm text-muted-foreground">
-          {isLoading ? "..." : `${filteredUsers.length} users`}
+          {isLoading
+            ? "..."
+            : `${totalUsers} user${totalUsers === 1 ? "" : "s"}`}
         </span>
       </div>
 
@@ -437,24 +320,36 @@ function UsersPageContent() {
           <Input
             placeholder="Search by name or email..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearch(e.target.value)}
             className="pl-9"
           />
         </div>
-        <Select value={roleFilter} onValueChange={setRoleFilter}>
+        <Select value={userTypeFilter} onValueChange={handleUserTypeChange}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="User type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="CUSTOMER">Customer</SelectItem>
+            <SelectItem value="PUBLISHER">Publisher</SelectItem>
+            <SelectItem value="STAFF">Staff</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={roleFilter} onValueChange={handleRoleChange}>
           <SelectTrigger className="w-[160px]">
             <SelectValue placeholder="Role" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Roles</SelectItem>
-            <SelectItem value="CUSTOMER">Customer</SelectItem>
-            <SelectItem value="PUBLISHER">Publisher</SelectItem>
-            <SelectItem value="STAFF">Staff</SelectItem>
             <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
             <SelectItem value="OPERATIONS">Operations</SelectItem>
+            <SelectItem value="FINANCE">Finance</SelectItem>
+            <SelectItem value="PUBLISHER_OWNER">Publisher Owner</SelectItem>
+            <SelectItem value="OWNER">Customer Owner</SelectItem>
+            <SelectItem value="MEMBER">Customer Member</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-[140px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -474,7 +369,7 @@ function UsersPageContent() {
                 <Skeleton key={i} className="h-14 w-full" />
               ))}
             </div>
-          ) : filteredUsers.length === 0 ? (
+          ) : users.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-3">
               <User className="h-10 w-10 text-muted-foreground" />
               <p className="text-muted-foreground">No users found</p>
@@ -482,31 +377,94 @@ function UsersPageContent() {
           ) : (
             <Table>
               <TableHeader>
-                {table.getHeaderGroups().map((hg) => (
-                  <TableRow key={hg.id}>
-                    {hg.headers.map((h) => (
-                      <TableHead key={h.id}>
-                        {h.isPlaceholder
-                          ? null
-                          : flexRender(
-                              h.column.columnDef.header,
-                              h.getContext(),
-                            )}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                ))}
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  {isSuperAdmin && (
+                    <TableHead className="w-[160px]">Actions</TableHead>
+                  )}
+                </TableRow>
               </TableHeader>
               <TableBody>
-                {table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {typeof cell.column.columnDef.cell === "function"
-                          ? cell.column.columnDef.cell(cell.getContext())
-                          : null}
+                {users.map((u) => (
+                  <TableRow key={u.id}>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                          <User className="h-4 w-4 text-primary" />
+                        </div>
+                        <span className="font-medium">{u.name ?? "—"}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-muted-foreground">{u.email}</span>
+                    </TableCell>
+                    <TableCell>
+                      <UserTypeBadge userType={u.userType} />
+                    </TableCell>
+                    <TableCell>
+                      <UserRoleBadge user={u} />
+                    </TableCell>
+                    <TableCell>
+                      {u.banned ? (
+                        <Badge variant="destructive">Suspended</Badge>
+                      ) : (
+                        <Badge variant="default" className="bg-emerald-500">
+                          Active
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-muted-foreground whitespace-nowrap">
+                        {format(new Date(u.createdAt), "MMM d, yyyy")}
+                      </span>
+                    </TableCell>
+                    {isSuperAdmin && (
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setSelectedUser(u)
+                              setRoleDialogOpen(true)
+                            }}
+                          >
+                            <Shield className="mr-1 h-3 w-3" />
+                            Role
+                          </Button>
+                          {u.banned ? (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => restoreMutation.mutate(u.id)}
+                              disabled={restoreMutation.isPending}
+                            >
+                              <CheckCircle className="mr-1 h-3 w-3" />
+                              Restore
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => banMutation.mutate(u.id)}
+                              disabled={
+                                u.id === currentUser?.id ||
+                                banMutation.isPending
+                              }
+                            >
+                              <Ban className="mr-1 h-3 w-3" />
+                              Suspend
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
-                    ))}
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -515,37 +473,46 @@ function UsersPageContent() {
         </CardContent>
       </Card>
 
-      {filteredUsers.length > 20 && (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.previousPage()}
-            disabled={!table.getCanPreviousPage()}
-          >
-            Previous
-          </Button>
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-4">
           <span className="text-sm text-muted-foreground">
-            Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {table.getPageCount()}
+            Showing {(page - 1) * PAGE_SIZE + 1}–
+            {Math.min(page * PAGE_SIZE, totalUsers)} of {totalUsers}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => table.nextPage()}
-            disabled={!table.getCanNextPage()}
-          >
-            Next
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground min-w-[80px] text-center">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 
-      <RoleUpdateDialog
-        user={selectedUser}
-        open={roleDialogOpen}
-        onOpenChange={setRoleDialogOpen}
-        onSuccess={() => setRoleDialogOpen(false)}
-      />
+      {isSuperAdmin && (
+        <RoleUpdateDialog
+          user={selectedUser}
+          open={roleDialogOpen}
+          onOpenChange={setRoleDialogOpen}
+          onSuccess={() => setRoleDialogOpen(false)}
+        />
+      )}
     </div>
   )
 }

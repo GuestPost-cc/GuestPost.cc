@@ -39,6 +39,7 @@ import { AddTicketMessageDto } from "../support/dto/add-ticket-message.dto"
 import { SupportActor, SupportService } from "../support/support.service"
 import { AdminService } from "./admin.service"
 import {
+  BanUserDto,
   BulkRetryVerificationDto,
   ExecuteWithdrawalDto,
   ManualVerifyDto,
@@ -236,10 +237,22 @@ export class AdminController {
   listUsers(
     @Query("take") take?: string,
     @Query("skip") skip?: string,
+    @Query("search") search?: string,
+    @Query("userType") userType?: string,
+    @Query("role") role?: string,
+    @Query("status") status?: string,
     @CurrentUser() user?: any,
   ) {
     const { take: t, skip: s } = parsePagination(take, skip)
-    return this.admin.listUsers(t, s, user)
+    return this.admin.listUsers({
+      take: t,
+      skip: s,
+      search,
+      userType,
+      role,
+      status,
+      _user: user,
+    })
   }
 
   @Get("users/:id")
@@ -268,6 +281,16 @@ export class AdminController {
   ) {
     const role = body.role
     return this.admin.updateStaffRole(id, role, user)
+  }
+
+  @Patch("users/:id/ban")
+  @StaffRoles("SUPER_ADMIN")
+  banUser(
+    @Param("id") id: string,
+    @Body() body: BanUserDto,
+    @CurrentUser() user?: any,
+  ) {
+    return this.admin.banUser(id, body.banned, user)
   }
 
   @Get("organizations")

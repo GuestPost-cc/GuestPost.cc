@@ -65,8 +65,26 @@ export interface AdminWithdrawalResponse {
 export class AdminService {
   constructor(private client: HttpClient) {}
 
-  listUsers() {
-    return this.client.get<AdminUserResponse[]>("/admin/users")
+  listUsers(params?: {
+    search?: string
+    userType?: string
+    role?: string
+    status?: string
+    take?: number
+    skip?: number
+  }) {
+    return this.client.get<PaginatedResponse<AdminUserResponse>>(
+      "/admin/users",
+      {
+        params: params as Record<string, string | number | undefined>,
+      } as RequestOptions,
+    )
+  }
+
+  banUser(userId: string, banned: boolean) {
+    return this.client.patch(`/admin/users/${userId}/ban`, {
+      json: { banned },
+    })
   }
 
   updateUserRole(userId: string, role: string) {
