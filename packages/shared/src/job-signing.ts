@@ -82,8 +82,13 @@ const ROLLOUT_DEFAULTS: Required<VerifyOptions> = {
 
 export function signJobPayload<T extends Record<string, unknown>>(
   data: T,
+  iatOverride?: number,
 ): T & { signature: string; iat: number; v: typeof SIGNED_PAYLOAD_VERSION } {
-  const enriched = { ...data, iat: Date.now(), v: SIGNED_PAYLOAD_VERSION }
+  const enriched = {
+    ...data,
+    iat: iatOverride ?? Date.now(),
+    v: SIGNED_PAYLOAD_VERSION,
+  }
   const signature = createHmac("sha256", getSecret())
     .update(canonicalize(enriched))
     .digest("hex")

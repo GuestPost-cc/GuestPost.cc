@@ -53,7 +53,13 @@ const logger = createLogger("worker.bootstrap")
 // poll catches transfers whose webhook was lost or never configured.
 async function registerPayoutStatusPoll() {
   const queue = new Queue(QUEUES.PAYOUT, { connection })
-  await queue.add("payout-check-status", signJobPayload({ limit: 50 }), {
+  // Stale repeatable jobs signed with a previous iat (from an old worker boot)
+  // would fail HMAC verification. Remove the old config before registering
+  // with a deterministic iat=0 so the payload is bit-identical across restarts.
+  await queue
+    .removeRepeatable("payout-check-status", { every: 10 * 60 * 1000 })
+    .catch(() => {})
+  await queue.add("payout-check-status", signJobPayload({ limit: 50 }, 0), {
     repeat: { every: 10 * 60 * 1000 },
     jobId: "payout-check-status-poll",
     removeOnComplete: { count: 10 },
@@ -71,7 +77,10 @@ async function registerReconciliationSweep() {
     60 *
     1000
   const queue = new Queue(QUEUES.RECONCILIATION, { connection })
-  await queue.add("reconciliation-run", signJobPayload({}), {
+  await queue
+    .removeRepeatable("reconciliation-run", { every: everyMs })
+    .catch(() => {})
+  await queue.add("reconciliation-run", signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: "reconciliation-sweep",
     removeOnComplete: { count: 24 },
@@ -94,7 +103,10 @@ async function registerWebsiteReverifySweep() {
     60 *
     1000
   const queue = new Queue(QUEUES.WEBSITE_VERIFICATION, { connection })
-  await queue.add("website-reverify-sweep", signJobPayload({}), {
+  await queue
+    .removeRepeatable("website-reverify-sweep", { every: everyMs })
+    .catch(() => {})
+  await queue.add("website-reverify-sweep", signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: "website-reverify-sweep",
     removeOnComplete: { count: 12 },
@@ -117,7 +129,10 @@ async function registerSettlementHoldLinkSweep() {
     60 *
     1000
   const queue = new Queue(QUEUES.DELIVERY_VERIFICATION, { connection })
-  await queue.add("settlement-hold-sweep", signJobPayload({}), {
+  await queue
+    .removeRepeatable("settlement-hold-sweep", { every: everyMs })
+    .catch(() => {})
+  await queue.add("settlement-hold-sweep", signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: "settlement-hold-sweep",
     removeOnComplete: { count: 24 },
@@ -155,7 +170,10 @@ async function registerSettlementAutoApproveSweep() {
     10_000,
   )
   const queue = new Queue(QUEUES.SETTLEMENT, { connection })
-  await queue.add("settlement-auto-approve", signJobPayload({ batchSize }), {
+  await queue
+    .removeRepeatable("settlement-auto-approve", { every: everyMs })
+    .catch(() => {})
+  await queue.add("settlement-auto-approve", signJobPayload({ batchSize }, 0), {
     repeat: { every: everyMs },
     jobId: "settlement-auto-approve",
     removeOnComplete: { count: 24 },
