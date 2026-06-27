@@ -760,7 +760,13 @@ export class PublisherPayoutsService {
       this.prisma.withdrawal.findMany({
         where,
         orderBy: { createdAt: "desc" },
-        include: {
+        select: {
+          id: true,
+          publisherId: true,
+          amount: true,
+          status: true,
+          availableAt: true,
+          createdAt: true,
           publisher: true,
           payoutMethod: { select: { id: true, type: true, label: true } },
         },

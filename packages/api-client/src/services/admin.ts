@@ -57,6 +57,7 @@ export interface AdminWithdrawalResponse {
   amount: number
   currency: string
   status: WithdrawalStatus
+  availableAt: string | null
   note: string | null
   createdAt: string
   publisher: { id: string; name: string | null; email: string }
