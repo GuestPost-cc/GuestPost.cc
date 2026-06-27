@@ -153,7 +153,7 @@ export default function DashboardLayout({
             </button>
           )}
         </div>
-        <nav className="flex flex-1 flex-col gap-2 overflow-y-auto">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
           {navItems
             .filter(
               (item) =>

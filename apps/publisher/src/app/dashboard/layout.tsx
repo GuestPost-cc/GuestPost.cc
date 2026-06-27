@@ -69,11 +69,11 @@ export default function DashboardLayout({
 
   function SidebarContents({ inDrawer = false }: { inDrawer?: boolean }) {
     return (
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b px-6 py-5">
+      <div className="flex h-full flex-col p-6">
+        <div className="mb-8 flex items-center justify-between">
           <Link
             href="/dashboard"
-            className="flex items-center gap-2 font-bold tracking-tight"
+            className="flex items-center gap-2 text-lg font-bold tracking-tight"
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
               <ArrowUpRight className="h-4 w-4" />
@@ -90,7 +90,7 @@ export default function DashboardLayout({
             </button>
           )}
         </div>
-        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive =
@@ -101,10 +101,10 @@ export default function DashboardLayout({
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                   isActive
                     ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -113,22 +113,22 @@ export default function DashboardLayout({
             )
           })}
         </nav>
-        <div className="border-t p-4">
-          <div className="flex items-center gap-2 rounded-lg bg-card p-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium">
-                {u.name ?? u.email}
-              </p>
-              <p className="text-xs text-muted-foreground">Publisher</p>
-            </div>
-            <Notifications />
+        <div className="border-t pt-6">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">{u.name ?? u.email}</span>
+            <span className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium bg-primary/10 text-primary uppercase tracking-wider">
+              Publisher
+            </span>
+            <span className="ml-auto">
+              <Notifications />
+            </span>
           </div>
           <button
             type="button"
             onClick={signOut}
-            className="mt-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="mt-2 flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-3 w-3" />
             Sign out
           </button>
         </div>

@@ -1,19 +1,6 @@
 "use client"
 
-import {
-  Avatar,
-  AvatarFallback,
-  cn,
-  Drawer,
-  DrawerContent,
-  DrawerTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@guestpost/ui"
+import { cn, Drawer, DrawerContent, DrawerTitle } from "@guestpost/ui"
 import {
   BarChart3,
   Bookmark,
@@ -108,19 +95,10 @@ export default function DashboardLayout({
   // Local non-null alias for the nested SidebarContents closure.
   const u = user
 
-  const userInitials = u.name
-    ? u.name
-        .split(" ")
-        .map((n: string) => n[0])
-        .join("")
-        .toUpperCase()
-        .slice(0, 2)
-    : (u.email?.[0]?.toUpperCase() ?? "U")
-
   function SidebarContents({ inDrawer = false }: { inDrawer?: boolean }) {
     return (
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b px-6 py-5">
+      <div className="flex h-full flex-col p-6">
+        <div className="mb-8 flex items-center justify-between">
           <Link
             href="/dashboard"
             className="flex items-center gap-2 text-lg font-bold tracking-tight"
@@ -141,7 +119,7 @@ export default function DashboardLayout({
           )}
         </div>
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-4">
+        <nav className="flex flex-1 flex-col gap-1 overflow-y-auto">
           {(() => {
             const visible = navItems.filter(
               (item) => !item.ownerOnly || u.customerRole === "OWNER",
@@ -164,10 +142,10 @@ export default function DashboardLayout({
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                     isActive
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -178,45 +156,24 @@ export default function DashboardLayout({
           })()}
         </nav>
 
-        <div className="border-t p-4 space-y-2">
+        <div className="border-t pt-6">
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <OrgSwitcher />
             </div>
-            {!inDrawer && <Notifications />}
+            <Notifications />
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm hover:bg-accent">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 text-left">
-                  <p className="font-medium">{u.name ?? "User"}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {u.email}
-                  </p>
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/settings">Settings</Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={signOut}
-                className="text-destructive cursor-pointer"
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Sign out
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-sm font-medium">{u.name ?? u.email}</span>
+            <button
+              type="button"
+              onClick={signOut}
+              className="ml-auto flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <LogOut className="h-3 w-3" />
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     )
@@ -225,13 +182,13 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen">
       {/* Desktop sidebar — static <aside>, lg+ only. */}
-      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 w-64 border-r bg-card">
+      <aside className="hidden lg:flex fixed inset-y-0 left-0 z-50 h-screen w-64 flex-col border-r bg-muted/30">
         <SidebarContents />
       </aside>
 
       {/* Mobile drawer — Phase 7.6.1 a11y from Radix Dialog. */}
       <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
-        <DrawerContent side="left" className="bg-card">
+        <DrawerContent side="left" className="bg-muted/30">
           <DrawerTitle className="sr-only">Navigation</DrawerTitle>
           <SidebarContents inDrawer />
         </DrawerContent>
@@ -243,7 +200,6 @@ export default function DashboardLayout({
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
-            className="lg:hidden"
           >
             <Menu className="h-5 w-5" />
           </button>
