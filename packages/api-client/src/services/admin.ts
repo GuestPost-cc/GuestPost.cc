@@ -231,13 +231,13 @@ export class AdminService {
       activeListings: number
       totalReviews: number
       avgRating: number
-      topCategories: Array<{ category: any; count: number }>
-    }>("/marketplace/stats")
+    }>("/admin/marketplace/stats")
   }
 
   listMarketplaceListings(params?: {
     status?: string
     type?: string
+    search?: string
     page?: number
     limit?: number
   }) {
@@ -249,6 +249,7 @@ export class AdminService {
         type: string
         status: string
         price: number
+        priceFrom: number | null
         currency: string
         domainRating?: number
         traffic?: number
@@ -257,6 +258,24 @@ export class AdminService {
         category?: { name: string }
         organization?: { name: string }
         publisher?: { name: string }
+        serviceTypes: string[]
+        websiteVerificationStatus: string | null
+        websiteVerifiedAt: string | null
+        websiteDomain: string | null
+        services: Array<{
+          id: string
+          serviceType: string
+          name: string | null
+          price: number
+          turnaroundDays: number
+          revisionRounds: number
+          warrantyDays?: number | null
+          availability: string
+          currency: string
+          version: number
+          createdAt: string
+          updatedAt: string
+        }>
         createdAt: string
       }>
       pagination: {
@@ -365,6 +384,49 @@ export class AdminService {
   // Staff listing preview by slug — returns the listing in any status.
   getListingBySlug(slug: string) {
     return this.client.get<any>(`/admin/marketplace/listings/by-slug/${slug}`)
+  }
+
+  // Admin service management (routes through marketplace service with staff flag)
+  addPlatformListingService(
+    listingId: string,
+    data: {
+      serviceType: string
+      price: number
+      turnaroundDays: number
+      revisionRounds?: number
+      warrantyDays?: number
+      currency?: string
+    },
+  ) {
+    return this.client.post(
+      `/admin/marketplace/listings/${listingId}/services`,
+      { json: data },
+    )
+  }
+
+  updatePlatformListingService(
+    listingId: string,
+    serviceId: string,
+    data: {
+      version: number
+      price?: number
+      turnaroundDays?: number
+      revisionRounds?: number
+      availability?: string
+      warrantyDays?: number
+      currency?: string
+    },
+  ) {
+    return this.client.put(
+      `/admin/marketplace/listings/${listingId}/services/${serviceId}`,
+      { json: data },
+    )
+  }
+
+  pausePlatformListingService(listingId: string, serviceId: string) {
+    return this.client.delete(
+      `/admin/marketplace/listings/${listingId}/services/${serviceId}`,
+    )
   }
 
   // -- Website verification governance + review center --

@@ -1028,9 +1028,12 @@ export class MarketplaceService {
   ) {
     const listing = await this.assertPublisherOwnedListing(userId, listingId)
 
-    if (listing.status !== ListingStatus.DRAFT) {
+    if (
+      listing.status !== ListingStatus.DRAFT &&
+      listing.status !== ListingStatus.REJECTED
+    ) {
       throw new BadRequestException(
-        `Listing must be DRAFT to submit (currently ${listing.status})`,
+        `Listing must be DRAFT or REJECTED to submit (currently ${listing.status})`,
       )
     }
     if (listing.website?.verificationStatus !== "VERIFIED") {
@@ -1051,7 +1054,10 @@ export class MarketplaceService {
     }
 
     const res = await this.prisma.marketplaceListing.updateMany({
-      where: { id: listingId, status: ListingStatus.DRAFT },
+      where: {
+        id: listingId,
+        status: { in: [ListingStatus.DRAFT, ListingStatus.REJECTED] },
+      },
       data: { status: ListingStatus.PENDING_REVIEW },
     })
     if (res.count === 0) {
@@ -1561,7 +1567,7 @@ export class MarketplaceService {
       ? await this.verifyPublisherAccess(userId, publisherId)
       : false
 
-    return this.prisma.marketplaceListing.findMany({
+    const listings = await this.prisma.marketplaceListing.findMany({
       where: {
         publisherId,
         status: hasAccess ? undefined : ListingStatus.APPROVED,
@@ -1571,9 +1577,31 @@ export class MarketplaceService {
         images: { where: { isPrimary: true }, take: 1 },
         tags: { include: { tag: true } },
         reviews: { where: { status: "APPROVED" }, select: { rating: true } },
+        publisher: { include: { profile: true } },
+        website: {
+          select: { verificationStatus: true, verifiedAt: true, domain: true },
+        },
+        // Phase 7: service rows needed for lifecyclePhase computation
+        // and the "Services" column in the publisher dashboard table.
+        services: {
+          orderBy: [{ availability: "asc" }, { price: "asc" }],
+        },
       },
       orderBy: { createdAt: "desc" },
     })
+
+    return listings.map((l) =>
+      this.toPublicListing({
+        ...l,
+        tags: l.tags.map((t) => t.tag),
+        image: l.images[0]?.url ?? null,
+        reviewCount: l.reviews.length,
+        avgRating:
+          l.reviews.length > 0
+            ? l.reviews.reduce((sum, r) => sum + r.rating, 0) / l.reviews.length
+            : null,
+      }),
+    )
   }
 
   // =============================================================================

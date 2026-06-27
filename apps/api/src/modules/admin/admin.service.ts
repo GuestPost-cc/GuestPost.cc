@@ -529,6 +529,7 @@ export class AdminService {
   async listMarketplaceListings(params: {
     status?: string
     type?: string
+    search?: string
     page?: number
     limit?: number
   }) {
@@ -545,6 +546,17 @@ export class AdminService {
       where.services = {
         some: { availability: "AVAILABLE", serviceType: params.type as any },
       }
+    if (params.search) {
+      where.OR = [
+        { title: { contains: params.search, mode: "insensitive" } },
+        { description: { contains: params.search, mode: "insensitive" } },
+        {
+          website: {
+            domain: { contains: params.search, mode: "insensitive" },
+          },
+        },
+      ]
+    }
 
     const [listings, total] = await Promise.all([
       this.prisma.marketplaceListing.findMany({
@@ -563,12 +575,11 @@ export class AdminService {
               domain: true,
             },
           },
-          // Phase 7: service rows back the priceFrom + serviceTypes the
-          // admin browse table renders. Only AVAILABLE rows; sorted asc
-          // so services[0] is the cheapest = priceFrom source.
+          // Phase 7: ALL service rows (not just AVAILABLE) so the Manage
+          // Services dialog shows PAUSED/WAITLIST rows too. priceFrom +
+          // serviceTypes are computed from only AVAILABLE rows below.
           services: {
-            where: { availability: "AVAILABLE" },
-            orderBy: { price: "asc" },
+            orderBy: [{ availability: "asc" }, { price: "asc" }],
           },
         },
       }),
@@ -576,34 +587,52 @@ export class AdminService {
     ])
 
     return {
-      listings: listings.map((l) => ({
-        id: l.id,
-        title: l.title,
-        slug: l.slug,
-        // Phase 7: card-shape fields. Type is now the first AVAILABLE
-        // service's serviceType; price is the minimum across AVAILABLE
-        // services. Legacy fields removed; consumers should read priceFrom +
-        // serviceTypes (also surfaced here for the admin browse table).
-        type: l.services[0]?.serviceType ?? null,
-        serviceTypes: Array.from(new Set(l.services.map((s) => s.serviceType))),
-        priceFrom:
-          l.services[0]?.price != null ? Number(l.services[0].price) : null,
-        status: l.status,
-        price: l.services[0]?.price != null ? Number(l.services[0].price) : 0,
-        currency: l.currency,
-        domainRating: l.domainRating,
-        traffic: l.traffic,
-        featured: l.featured,
-        verified: l.verified,
-        category: l.category,
-        organization: l.organization,
-        publisher: l.publisher,
-        // null for platform/service listings with no attached website
-        websiteVerificationStatus: l.website?.verificationStatus ?? null,
-        websiteVerifiedAt: l.website?.verifiedAt?.toISOString() ?? null,
-        websiteDomain: l.website?.domain ?? null,
-        createdAt: l.createdAt.toISOString(),
-      })),
+      listings: listings.map((l) => {
+        // Compute display fields from only AVAILABLE services (PAUSED/WAITLIST
+        // rows still appear in the raw services[] for the Manage dialog).
+        const available = l.services.filter(
+          (s) => s.availability === "AVAILABLE",
+        )
+        return {
+          id: l.id,
+          title: l.title,
+          slug: l.slug,
+          type: available[0]?.serviceType ?? null,
+          serviceTypes: Array.from(
+            new Set(available.map((s) => s.serviceType)),
+          ),
+          priceFrom:
+            available[0]?.price != null ? Number(available[0].price) : null,
+          status: l.status,
+          price: available[0]?.price != null ? Number(available[0].price) : 0,
+          currency: l.currency,
+          domainRating: l.domainRating,
+          traffic: l.traffic,
+          featured: l.featured,
+          verified: l.verified,
+          category: l.category,
+          organization: l.organization,
+          publisher: l.publisher,
+          websiteVerificationStatus: l.website?.verificationStatus ?? null,
+          websiteVerifiedAt: l.website?.verifiedAt?.toISOString() ?? null,
+          websiteDomain: l.website?.domain ?? null,
+          createdAt: l.createdAt.toISOString(),
+          // Phase 7: ALL service rows for the Manage Services dialog
+          services: l.services.map((s) => ({
+            id: s.id,
+            serviceType: s.serviceType,
+            price: Number(s.price),
+            turnaroundDays: s.turnaroundDays,
+            revisionRounds: s.revisionRounds,
+            warrantyDays: s.warrantyDays,
+            availability: s.availability,
+            currency: s.currency,
+            version: s.version,
+            createdAt: s.createdAt,
+            updatedAt: s.updatedAt,
+          })),
+        }
+      }),
       pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
     }
   }
@@ -653,7 +682,7 @@ export class AdminService {
       listing.website &&
       listing.website.verificationStatus !== "VERIFIED"
     ) {
-      if (!(force && user.role === "SUPER_ADMIN")) {
+      if (!(force && user.staffRole === "SUPER_ADMIN")) {
         throw new BadRequestException({
           code: "WEBSITE_NOT_VERIFIED",
           message: `Cannot approve: website ${listing.website.domain ?? ""} is ${listing.website.verificationStatus}, not VERIFIED.`,

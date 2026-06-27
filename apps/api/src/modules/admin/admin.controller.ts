@@ -367,7 +367,7 @@ export class AdminController {
     return this.dispute.resolveDispute(
       id,
       user.id,
-      user.role,
+      user.staffRole,
       body.resolution,
       body.action,
     )
@@ -463,13 +463,13 @@ export class AdminController {
   @Post("settlements/:id/admin-approve")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   adminApproveSettlement(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.settlements.adminApprove(id, user.id, user.role)
+    return this.settlements.adminApprove(id, user.id, user.staffRole)
   }
 
   @Post("settlements/:id/force-approve")
   @StaffRoles("SUPER_ADMIN")
   forceApproveSettlement(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.settlements.forceApprove(id, user.id, user.role)
+    return this.settlements.forceApprove(id, user.id, user.staffRole)
   }
 
   @Post("settlements/:id/cancel")
@@ -705,12 +705,14 @@ export class AdminController {
   listMarketplaceListings(
     @Query("status") status?: string,
     @Query("type") type?: string,
+    @Query("search") search?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
     return this.admin.listMarketplaceListings({
       status,
       type,
+      search,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
     })

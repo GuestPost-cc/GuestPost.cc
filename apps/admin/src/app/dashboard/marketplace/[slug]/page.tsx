@@ -85,8 +85,8 @@ export default function AdminListingPreviewPage({
   }
 
   const statusMutation = useMutation({
-    mutationFn: (status: string) =>
-      api.admin.updateListingStatus(listing?.id, status),
+    mutationFn: (vars: { status: string; force?: boolean }) =>
+      api.admin.updateListingStatus(listing?.id, vars.status, vars.force),
     onSuccess: () => {
       toast.success("Listing status updated")
       invalidate()
@@ -200,6 +200,20 @@ export default function AdminListingPreviewPage({
                 <Star className="h-3.5 w-3.5" /> Featured
               </span>
             )}
+            {listing.websiteVerificationStatus && (
+              <Badge
+                variant={
+                  listing.websiteVerificationStatus === "VERIFIED"
+                    ? "default"
+                    : listing.websiteVerificationStatus ===
+                        "PENDING_VERIFICATION"
+                      ? "secondary"
+                      : "destructive"
+                }
+              >
+                Domain: {listing.websiteVerificationStatus.replace(/_/g, " ")}
+              </Badge>
+            )}
           </div>
           <CardTitle className="text-2xl">{listing.title}</CardTitle>
           {listing.category && (
@@ -274,7 +288,12 @@ export default function AdminListingPreviewPage({
               <Button
                 size="sm"
                 disabled={busy}
-                onClick={() => statusMutation.mutate("APPROVED")}
+                onClick={() =>
+                  statusMutation.mutate({
+                    status: "APPROVED",
+                    force: user?.staffRole === "SUPER_ADMIN",
+                  })
+                }
               >
                 Approve
               </Button>
@@ -284,7 +303,7 @@ export default function AdminListingPreviewPage({
                 size="sm"
                 variant="destructive"
                 disabled={busy}
-                onClick={() => statusMutation.mutate("REJECTED")}
+                onClick={() => statusMutation.mutate({ status: "REJECTED" })}
               >
                 Reject
               </Button>
@@ -294,7 +313,7 @@ export default function AdminListingPreviewPage({
                 size="sm"
                 variant="outline"
                 disabled={busy}
-                onClick={() => statusMutation.mutate("PAUSED")}
+                onClick={() => statusMutation.mutate({ status: "PAUSED" })}
               >
                 Pause
               </Button>
@@ -304,7 +323,7 @@ export default function AdminListingPreviewPage({
                 size="sm"
                 variant="outline"
                 disabled={busy}
-                onClick={() => statusMutation.mutate("APPROVED")}
+                onClick={() => statusMutation.mutate({ status: "APPROVED" })}
               >
                 Unpause
               </Button>
@@ -314,7 +333,7 @@ export default function AdminListingPreviewPage({
                 size="sm"
                 variant="outline"
                 disabled={busy}
-                onClick={() => statusMutation.mutate("ARCHIVED")}
+                onClick={() => statusMutation.mutate({ status: "ARCHIVED" })}
               >
                 Archive
               </Button>

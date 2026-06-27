@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -28,13 +29,13 @@ import {
   Textarea,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { AlertCircle, Plus, RefreshCw, Store } from "lucide-react"
+import { AlertCircle, Edit3, Plus, RefreshCw, Store } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 
-const LISTING_TYPES = [
+const SERVICE_TYPES = [
   "GUEST_POST",
   "NICHE_EDIT",
   "EDITORIAL_LINK",
@@ -82,18 +83,40 @@ export default function PublisherListingsPage() {
     title: string
     services: ServiceRow[]
   } | null>(null)
+  const [editingListing, setEditingListing] = useState<{
+    id: string
+    title: string
+    description: string
+  } | null>(null)
+  const [editingService, setEditingService] = useState<{
+    listingId: string
+    serviceId: string
+    version: number
+    price: string
+    turnaroundDays: string
+    revisionRounds: string
+    warrantyDays: string
+    currency: string
+  } | null>(null)
   const [form, setForm] = useState({
     title: "",
     description: "",
-    type: "GUEST_POST",
-    price: "",
     websiteId: "",
+    addServiceNow: false,
+  })
+  const [initialService, setInitialService] = useState({
+    serviceType: "GUEST_POST",
+    price: "",
+    turnaroundDays: "7",
+    revisionRounds: "2",
   })
   const [newService, setNewService] = useState({
     serviceType: "GUEST_POST",
     price: "",
     turnaroundDays: "7",
     revisionRounds: "2",
+    warrantyDays: "",
+    currency: "USD",
   })
 
   const listingsQ = useQuery({
@@ -114,23 +137,34 @@ export default function PublisherListingsPage() {
       api.marketplace.createListing({
         title: form.title.trim(),
         description: form.description.trim(),
-        type: form.type,
-        price: Number(form.price),
         websiteId: form.websiteId || undefined,
-        // Goes straight to the moderation queue — publishers cannot
-        // self-approve inventory
-        status: "PENDING_REVIEW",
+        // Phase 7: optionally create with the first service inline.
+        services: form.addServiceNow
+          ? [
+              {
+                serviceType: initialService.serviceType,
+                price: Number(initialService.price),
+                turnaroundDays: Number(initialService.turnaroundDays) || 7,
+                revisionRounds: Number(initialService.revisionRounds) || 2,
+              },
+            ]
+          : undefined,
       }),
     onSuccess: () => {
-      toast.success("Listing submitted for review")
+      toast.success("Listing created")
       queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
       setShowCreate(false)
       setForm({
         title: "",
         description: "",
-        type: "GUEST_POST",
-        price: "",
         websiteId: "",
+        addServiceNow: false,
+      })
+      setInitialService({
+        serviceType: "GUEST_POST",
+        price: "",
+        turnaroundDays: "7",
+        revisionRounds: "2",
       })
     },
     onError: (err: Error) =>
@@ -174,6 +208,8 @@ export default function PublisherListingsPage() {
         price: "",
         turnaroundDays: "7",
         revisionRounds: "2",
+        warrantyDays: "",
+        currency: "USD",
       })
       toast.success("Service added")
     },
@@ -234,11 +270,24 @@ export default function PublisherListingsPage() {
     ...lifecycleOpts("Listing archived"),
   })
 
+  // ── Listing metadata edit ─────────────────────────────────────────────
+  const updateListingMut = useMutation({
+    mutationFn: (vars: { id: string; title: string; description: string }) =>
+      api.marketplace.updateListing(vars.id, {
+        title: vars.title.trim(),
+        description: vars.description.trim(),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
+      setEditingListing(null)
+      toast.success("Listing updated")
+    },
+    onError: (e: Error) => toast.error(e.message || "Update failed"),
+  })
+
   const listings = (listingsQ.data ?? []) as any[]
   const canSubmit =
-    form.title.trim().length >= 3 &&
-    form.description.trim().length >= 1 &&
-    Number(form.price) > 0
+    form.title.trim().length >= 3 && form.description.trim().length >= 1
 
   if (listingsQ.error) {
     return (
@@ -364,6 +413,29 @@ export default function PublisherListingsPage() {
                             Unpause
                           </Button>
                         )}
+                        {l.status === "REJECTED" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => submitMut.mutate(l.id)}
+                            disabled={submitMut.isPending}
+                          >
+                            Resubmit for review
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            setEditingListing({
+                              id: l.id,
+                              title: l.title,
+                              description: l.description ?? "",
+                            })
+                          }
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="outline"
                           size="sm"
@@ -409,8 +481,8 @@ export default function PublisherListingsPage() {
           <DialogHeader>
             <DialogTitle>New Listing</DialogTitle>
             <DialogDescription>
-              Submitted listings are reviewed by our team before they appear in
-              the marketplace.
+              Create a listing to offer your services on the marketplace. You
+              can add services after creation.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -436,38 +508,6 @@ export default function PublisherListingsPage() {
                 rows={3}
                 maxLength={1000}
               />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select
-                  value={form.type}
-                  onValueChange={(v) => setForm({ ...form, type: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LISTING_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="l-price">Price (USD)</Label>
-                <Input
-                  id="l-price"
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  placeholder="250"
-                />
-              </div>
             </div>
             <div className="space-y-2">
               <Label>Website</Label>
@@ -495,6 +535,94 @@ export default function PublisherListingsPage() {
                 website.
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="l-add-service"
+                checked={form.addServiceNow}
+                onCheckedChange={(v) =>
+                  setForm({ ...form, addServiceNow: v === true })
+                }
+              />
+              <Label htmlFor="l-add-service" className="text-sm font-normal">
+                Add a service now
+              </Label>
+            </div>
+            {form.addServiceNow && (
+              <div className="border rounded-md p-3 space-y-3">
+                <div className="text-sm font-medium">First Service</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Type</Label>
+                    <Select
+                      value={initialService.serviceType}
+                      onValueChange={(v) =>
+                        setInitialService({ ...initialService, serviceType: v })
+                      }
+                    >
+                      <SelectTrigger className="h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SERVICE_TYPES.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t.replace(/_/g, " ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Price (USD)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      step="0.01"
+                      className="h-8"
+                      value={initialService.price}
+                      onChange={(e) =>
+                        setInitialService({
+                          ...initialService,
+                          price: e.target.value,
+                        })
+                      }
+                      placeholder="250"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">TAT (days)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      className="h-8"
+                      value={initialService.turnaroundDays}
+                      onChange={(e) =>
+                        setInitialService({
+                          ...initialService,
+                          turnaroundDays: e.target.value,
+                        })
+                      }
+                      placeholder="7"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Revisions</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      className="h-8"
+                      value={initialService.revisionRounds}
+                      onChange={(e) =>
+                        setInitialService({
+                          ...initialService,
+                          revisionRounds: e.target.value,
+                        })
+                      }
+                      placeholder="2"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>
@@ -504,7 +632,77 @@ export default function PublisherListingsPage() {
               onClick={() => createMutation.mutate()}
               disabled={!canSubmit || createMutation.isPending}
             >
-              {createMutation.isPending ? "Submitting..." : "Submit for Review"}
+              {createMutation.isPending
+                ? "Creating..."
+                : form.addServiceNow
+                  ? "Create with service"
+                  : "Create listing"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/*
+        Edit listing dialog — title/description edits. Sends a PUT to
+        /marketplace/listings/:id (backend updateListing).
+      */}
+      <Dialog
+        open={!!editingListing}
+        onOpenChange={(v) => {
+          if (!v) setEditingListing(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Listing</DialogTitle>
+          </DialogHeader>
+          {editingListing && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Title</Label>
+                <Input
+                  value={editingListing.title}
+                  onChange={(e) =>
+                    setEditingListing({
+                      ...editingListing,
+                      title: e.target.value,
+                    })
+                  }
+                  maxLength={200}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  value={editingListing.description}
+                  onChange={(e) =>
+                    setEditingListing({
+                      ...editingListing,
+                      description: e.target.value,
+                    })
+                  }
+                  rows={3}
+                  maxLength={1000}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingListing(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                editingListing &&
+                updateListingMut.mutate({
+                  id: editingListing.id,
+                  title: editingListing.title,
+                  description: editingListing.description,
+                })
+              }
+              disabled={updateListingMut.isPending}
+            >
+              {updateListingMut.isPending ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -512,14 +710,16 @@ export default function PublisherListingsPage() {
 
       {/*
         Services dialog — per-row management for a listing's ListingService
-        children. Pause is soft (sets availability=PAUSED) so historical
-        orders that snapshot this serviceId never orphan. Price/TAT edits go
-        through a version-guarded PATCH; concurrent edits get a 409.
+        children. Price/TAT/revisions edits go through a version-guarded
+        PATCH; concurrent edits get a 409. Availability is set via dropdown.
       */}
       <Dialog
         open={!!servicesForListing}
         onOpenChange={(v) => {
-          if (!v) setServicesForListing(null)
+          if (!v) {
+            setServicesForListing(null)
+            setEditingService(null)
+          }
         }}
       >
         <DialogContent className="max-w-2xl">
@@ -537,6 +737,7 @@ export default function PublisherListingsPage() {
                   <TableHead>Service</TableHead>
                   <TableHead>Price</TableHead>
                   <TableHead>TAT</TableHead>
+                  <TableHead>Revisions</TableHead>
                   <TableHead>Availability</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
@@ -545,71 +746,207 @@ export default function PublisherListingsPage() {
                 {servicesForListing?.services.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       className="text-center text-muted-foreground py-6"
                     >
                       No services configured yet. Add the first one below.
                     </TableCell>
                   </TableRow>
                 )}
-                {servicesForListing?.services.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell className="font-medium">
-                      {s.serviceType.replace(/_/g, " ")}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      ${Number(s.price).toFixed(2)}
-                    </TableCell>
-                    <TableCell>{s.turnaroundDays}d</TableCell>
-                    <TableCell>
-                      <Select
-                        value={s.availability}
-                        onValueChange={(v) =>
-                          updateServiceMut.mutate({
-                            listingId: servicesForListing?.id,
-                            serviceId: s.id,
-                            data: {
-                              version: s.version,
-                              availability: v as
-                                | "AVAILABLE"
-                                | "PAUSED"
-                                | "WAITLIST",
-                            },
-                          })
-                        }
-                      >
-                        <SelectTrigger className="h-8 w-[110px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="AVAILABLE">Available</SelectItem>
-                          <SelectItem value="PAUSED">Paused</SelectItem>
-                          <SelectItem value="WAITLIST">Waitlist</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          pauseServiceMut.mutate({
-                            listingId: servicesForListing?.id,
-                            serviceId: s.id,
-                          })
-                        }
-                        disabled={s.availability === "PAUSED"}
-                      >
-                        Pause
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {servicesForListing?.services.map((s) => {
+                  const isEditing =
+                    editingService?.listingId === servicesForListing.id &&
+                    editingService?.serviceId === s.id
+                  return (
+                    <TableRow key={s.id}>
+                      {isEditing ? (
+                        <>
+                          <TableCell className="font-medium">
+                            {s.serviceType.replace(/_/g, " ")}
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              className="h-8 w-24"
+                              value={editingService.price}
+                              onChange={(e) =>
+                                setEditingService({
+                                  ...editingService!,
+                                  price: e.target.value,
+                                })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min={1}
+                              className="h-8 w-16"
+                              value={editingService.turnaroundDays}
+                              onChange={(e) =>
+                                setEditingService({
+                                  ...editingService!,
+                                  turnaroundDays: e.target.value,
+                                })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              min={0}
+                              className="h-8 w-16"
+                              value={editingService.revisionRounds}
+                              onChange={(e) =>
+                                setEditingService({
+                                  ...editingService!,
+                                  revisionRounds: e.target.value,
+                                })
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={s.availability}
+                              onValueChange={(v) =>
+                                updateServiceMut.mutate({
+                                  listingId: servicesForListing?.id,
+                                  serviceId: s.id,
+                                  data: {
+                                    version: s.version,
+                                    availability: v as
+                                      | "AVAILABLE"
+                                      | "PAUSED"
+                                      | "WAITLIST",
+                                  },
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[110px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="AVAILABLE">
+                                  Available
+                                </SelectItem>
+                                <SelectItem value="PAUSED">Paused</SelectItem>
+                                <SelectItem value="WAITLIST">
+                                  Waitlist
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right space-x-1">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => {
+                                const p = editingService!
+                                updateServiceMut.mutate({
+                                  listingId: servicesForListing!.id,
+                                  serviceId: s.id,
+                                  data: {
+                                    version: s.version,
+                                    price: Number(p.price),
+                                    turnaroundDays: Number(p.turnaroundDays),
+                                    revisionRounds: Number(p.revisionRounds),
+                                    warrantyDays: p.warrantyDays
+                                      ? Number(p.warrantyDays)
+                                      : undefined,
+                                    currency: p.currency,
+                                  },
+                                })
+                                setEditingService(null)
+                              }}
+                              disabled={updateServiceMut.isPending}
+                            >
+                              Save
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setEditingService(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </TableCell>
+                        </>
+                      ) : (
+                        <>
+                          <TableCell className="font-medium">
+                            {s.serviceType.replace(/_/g, " ")}
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">
+                            ${Number(s.price).toFixed(2)}
+                          </TableCell>
+                          <TableCell>{s.turnaroundDays}d</TableCell>
+                          <TableCell>{s.revisionRounds}</TableCell>
+                          <TableCell>
+                            <Select
+                              value={s.availability}
+                              onValueChange={(v) =>
+                                updateServiceMut.mutate({
+                                  listingId: servicesForListing?.id,
+                                  serviceId: s.id,
+                                  data: {
+                                    version: s.version,
+                                    availability: v as
+                                      | "AVAILABLE"
+                                      | "PAUSED"
+                                      | "WAITLIST",
+                                  },
+                                })
+                              }
+                            >
+                              <SelectTrigger className="h-8 w-[110px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="AVAILABLE">
+                                  Available
+                                </SelectItem>
+                                <SelectItem value="PAUSED">Paused</SelectItem>
+                                <SelectItem value="WAITLIST">
+                                  Waitlist
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                setEditingService({
+                                  listingId: servicesForListing!.id,
+                                  serviceId: s.id,
+                                  version: s.version,
+                                  price: String(s.price),
+                                  turnaroundDays: String(s.turnaroundDays),
+                                  revisionRounds: String(s.revisionRounds),
+                                  warrantyDays:
+                                    s.warrantyDays != null
+                                      ? String(s.warrantyDays)
+                                      : "",
+                                  currency: s.currency ?? "USD",
+                                })
+                              }
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </>
+                      )}
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
             <div className="border-t pt-4 space-y-3">
               <div className="text-sm font-medium">Add a service</div>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-5 gap-3">
                 <Select
                   value={newService.serviceType}
                   onValueChange={(v) =>
@@ -620,7 +957,7 @@ export default function PublisherListingsPage() {
                     <SelectValue placeholder="Service" />
                   </SelectTrigger>
                   <SelectContent>
-                    {LISTING_TYPES.map((t) => (
+                    {SERVICE_TYPES.map((t) => (
                       <SelectItem key={t} value={t}>
                         {t.replace(/_/g, " ")}
                       </SelectItem>
@@ -661,36 +998,75 @@ export default function PublisherListingsPage() {
                     })
                   }
                 />
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="Warranty (days)"
+                  value={newService.warrantyDays}
+                  onChange={(e) =>
+                    setNewService({
+                      ...newService,
+                      warrantyDays: e.target.value,
+                    })
+                  }
+                />
               </div>
-              <Button
-                size="sm"
-                disabled={
-                  !servicesForListing ||
-                  !newService.price ||
-                  Number(newService.price) <= 0 ||
-                  addServiceMut.isPending
-                }
-                onClick={() => {
-                  if (!servicesForListing) return
-                  addServiceMut.mutate({
-                    listingId: servicesForListing.id,
-                    data: {
-                      serviceType: newService.serviceType,
-                      price: Number(newService.price),
-                      turnaroundDays: Number(newService.turnaroundDays) || 7,
-                      revisionRounds: Number(newService.revisionRounds) || 2,
-                    },
-                  })
-                }}
-              >
-                {addServiceMut.isPending ? "Adding..." : "Add service"}
-              </Button>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs">Currency</Label>
+                  <Select
+                    value={newService.currency}
+                    onValueChange={(v) =>
+                      setNewService({ ...newService, currency: v })
+                    }
+                  >
+                    <SelectTrigger className="h-8 w-20">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="GBP">GBP</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  size="sm"
+                  disabled={
+                    !servicesForListing ||
+                    !newService.price ||
+                    Number(newService.price) <= 0 ||
+                    addServiceMut.isPending
+                  }
+                  onClick={() => {
+                    if (!servicesForListing) return
+                    addServiceMut.mutate({
+                      listingId: servicesForListing.id,
+                      data: {
+                        serviceType: newService.serviceType,
+                        price: Number(newService.price),
+                        turnaroundDays: Number(newService.turnaroundDays) || 7,
+                        revisionRounds: Number(newService.revisionRounds) || 2,
+                        warrantyDays: newService.warrantyDays
+                          ? Number(newService.warrantyDays)
+                          : undefined,
+                        currency: newService.currency,
+                      },
+                    })
+                  }}
+                >
+                  {addServiceMut.isPending ? "Adding..." : "Add service"}
+                </Button>
+              </div>
             </div>
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setServicesForListing(null)}
+              onClick={() => {
+                setServicesForListing(null)
+                setEditingService(null)
+              }}
             >
               Done
             </Button>

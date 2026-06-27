@@ -62,7 +62,7 @@ interface ListingServiceRow {
   turnaroundDays: number
   revisionRounds: number
   warrantyDays?: number | null
-  availability: "AVAILABLE" | "PAUSED" | "WAITLIST"
+  availability: string // backend returns string; restrict in UI via Select
   version: number
 }
 
@@ -303,18 +303,9 @@ export default function AdminMarketplacePage() {
     revisionRounds: "2",
   })
 
-  // Fetch services for the currently open listing to keep dialog in sync
-  const servicesQuery = useQuery<ListingServiceRow[]>({
-    queryKey: ["admin-listing-services", servicesForListing?.id],
-    queryFn: async () => {
-      if (!servicesForListing?.id) return servicesForListing?.services ?? []
-      const listing = listings.find((l) => l.id === servicesForListing.id) as
-        | Listing
-        | undefined
-      return listing?.services ?? []
-    },
-    enabled: !!servicesForListing?.id,
-  })
+  // Services dialog reads directly from the listing row data (included in
+  // the listings response). No separate API query needed.
+  const dialogServices = servicesForListing?.services ?? []
 
   const addAdminServiceMut = useMutation({
     mutationFn: (vars: {
@@ -325,13 +316,10 @@ export default function AdminMarketplacePage() {
         turnaroundDays: number
         revisionRounds?: number
       }
-    }) => api.marketplace.addPlatformListingService(vars.listingId, vars.data),
+    }) => api.admin.addPlatformListingService(vars.listingId, vars.data),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["admin-listing-services", servicesForListing?.id],
       })
       queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       setNewAdminService({
@@ -346,7 +334,7 @@ export default function AdminMarketplacePage() {
   })
   const updateAdminServiceMut = useMutation({
     mutationFn: (vars: AdminService) =>
-      api.marketplace.updatePlatformListingService(
+      api.admin.updatePlatformListingService(
         vars.listingId,
         vars.serviceId,
         vars.data,
@@ -355,25 +343,16 @@ export default function AdminMarketplacePage() {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
       })
-      queryClient.invalidateQueries({
-        queryKey: ["admin-listing-services", servicesForListing?.id],
-      })
       queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
     },
     onError: (e: Error) => toast.error(e.message || "Update failed"),
   })
   const pauseAdminServiceMut = useMutation({
     mutationFn: (vars: { listingId: string; serviceId: string }) =>
-      api.marketplace.pausePlatformListingService(
-        vars.listingId,
-        vars.serviceId,
-      ),
+      api.admin.pausePlatformListingService(vars.listingId, vars.serviceId),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({
-        queryKey: ["admin-listing-services", servicesForListing?.id],
       })
       queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       toast.success("Service paused")
@@ -643,9 +622,11 @@ export default function AdminMarketplacePage() {
               <SelectItem value="GUEST_POST">Guest Post</SelectItem>
               <SelectItem value="NICHE_EDIT">Niche Edit</SelectItem>
               <SelectItem value="EDITORIAL_LINK">Editorial Link</SelectItem>
-              <SelectItem value="PUBLISHER_WEBSITE">
-                Publisher Website
-              </SelectItem>
+              <SelectItem value="OUTREACH_LINK">Outreach Link</SelectItem>
+              <SelectItem value="LOCAL_CITATION">Local Citation</SelectItem>
+              <SelectItem value="FOUNDATION_LINK">Foundation Link</SelectItem>
+              <SelectItem value="BLOG_ARTICLE">Blog Article</SelectItem>
+              <SelectItem value="SEO_CONTENT">SEO Content</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -970,14 +951,8 @@ export default function AdminMarketplacePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {servicesQuery.isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-6">
-                      <Skeleton className="h-4 w-24 mx-auto" />
-                    </TableCell>
-                  </TableRow>
-                ) : servicesQuery.data?.length === 0 &&
-                  !addAdminServiceMut.isPending ? (
+                {dialogServices.length === 0 &&
+                !addAdminServiceMut.isPending ? (
                   <TableRow>
                     <TableCell
                       colSpan={5}
@@ -987,7 +962,7 @@ export default function AdminMarketplacePage() {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  servicesQuery.data?.map((s) => (
+                  dialogServices.map((s) => (
                     <TableRow key={s.id}>
                       <TableCell className="font-medium">
                         {s.serviceType.replace(/_/g, " ")}

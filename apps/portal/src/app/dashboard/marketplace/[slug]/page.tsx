@@ -468,45 +468,19 @@ export default function ListingDetailPage() {
               className="w-full"
               size="lg"
               disabled={services.length > 0 && !selectedService}
-              onClick={() => {
-                if (!listing) return
-                const params = new URLSearchParams({ name: listing.title })
-                // Phase 2 contract: when the listing carries services, the
-                // wizard MUST be locked to (listingServiceId, websiteId).
-                // The service type is carried for display only — server
-                // re-reads it from the snapshot.
-                if (selectedService) {
-                  params.set("listingServiceId", selectedService.id)
-                  params.set("type", selectedService.serviceType)
-                  params.set("price", String(selectedService.price))
-                  params.set("locked", "1")
-                } else {
-                  // No service picked yet — fall through to the first
-                  // AVAILABLE service's type, then the deprecated listing
-                  // column as a last resort.
-                  const fallbackType =
-                    (listing as any).serviceTypes?.[0] ?? listing.type
-                  if (fallbackType) params.set("type", fallbackType)
-                  const fallbackPrice =
-                    (listing as any).priceFrom ?? listing.price
-                  if (fallbackPrice != null)
-                    params.set("price", String(fallbackPrice))
-                }
-                if (listing.websiteId)
-                  params.set("websiteId", listing.websiteId)
-                if (listing.websiteUrl) params.set("url", listing.websiteUrl)
-                const attributionLabel =
-                  listing.attribution?.label ??
-                  (listing.fulfillmentType === "INTERNAL"
-                    ? "Platform"
-                    : (listing.publisher?.name ?? "Publisher"))
-                params.set("fulfilledBy", attributionLabel)
-                router.push(`/dashboard/orders/new?${params.toString()}`)
-              }}
+              asChild
             >
-              {services.length > 0 && !selectedService
-                ? "Pick a service to continue"
-                : "Order Now"}
+              <Link
+                href={
+                  selectedService
+                    ? `/dashboard/marketplace/${listing?.slug}/order?service=${selectedService.id}`
+                    : "#"
+                }
+              >
+                {services.length > 0 && !selectedService
+                  ? "Pick a service to continue"
+                  : "Order Now"}
+              </Link>
             </Button>
             <Button
               variant="outline"
