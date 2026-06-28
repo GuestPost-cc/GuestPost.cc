@@ -81,6 +81,8 @@ export { KpiCard } from "./components/kpi-card"
 export { Label } from "./components/label"
 export { AppShell, DashboardLayout, Header, Sidebar } from "./components/layout"
 export { LoadingState } from "./components/loading-state"
+export type { NavItemProps } from "./components/nav-item"
+export { NavItem } from "./components/nav-item"
 export type {
   NotificationBellItem,
   NotificationBellProps,

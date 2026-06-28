@@ -79,6 +79,35 @@ describe("deliberate cross-family divergence (regression guard)", () => {
   })
 })
 
+describe("fallback for unrecognised status (defence-in-depth)", () => {
+  it("getOrderStatusPresentation falls back to DRAFT", () => {
+    const p = getOrderStatusPresentation("__UNKNOWN__" as never)
+    expect(p).toBeDefined()
+    expect(p.variant).toBe("pending")
+    expect(p.label).toBe("Draft")
+  })
+  it("getTicketStatusPresentation falls back to OPEN", () => {
+    const p = getTicketStatusPresentation("__UNKNOWN__" as never)
+    expect(p).toBeDefined()
+    expect(p.variant).toBe("info")
+  })
+  it("getDisputeStatusPresentation falls back to OPEN", () => {
+    const p = getDisputeStatusPresentation("__UNKNOWN__" as never)
+    expect(p).toBeDefined()
+    expect(p.variant).toBe("destructive")
+  })
+  it("getListingStatusPresentation falls back to DRAFT", () => {
+    const p = getListingStatusPresentation("__UNKNOWN__" as never)
+    expect(p).toBeDefined()
+    expect(p.variant).toBe("pending")
+  })
+  it("getCampaignStatusPresentation falls back to ARCHIVED", () => {
+    const p = getCampaignStatusPresentation("__UNKNOWN__" as never)
+    expect(p).toBeDefined()
+    expect(p.variant).toBe("pending")
+  })
+})
+
 describe("per-family accessors are typed (compile-time documentation)", () => {
   // The whole point of per-family accessors is that cross-family calls
   // FAIL AT COMPILE TIME. We can't directly test "tsc rejects this", but

@@ -50,11 +50,11 @@ export default function DashboardLayout({
     if (!loading && !user) router.push("/")
   }, [user, loading, router])
 
-  // Pathname-auto-close — lives at the layout level so @guestpost/ui
-  // stays framework-agnostic.
+  // Pathname-auto-close — closes mobile drawer on navigation
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run on pathname change to close drawer
   useEffect(() => {
     setMobileOpen(false)
-  }, [])
+  }, [pathname])
 
   if (loading)
     return (
@@ -107,7 +107,7 @@ export default function DashboardLayout({
                     : "text-muted-foreground hover:bg-surface-1 hover:text-foreground",
                 )}
               >
-                <Icon className="h-4 w-4" />
+                <Icon className="h-4 w-4 shrink-0" />
                 {item.label}
               </Link>
             )
@@ -152,7 +152,7 @@ export default function DashboardLayout({
       </Drawer>
 
       <div className="flex-1 flex flex-col min-w-0 lg:pl-64">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60 lg:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b bg-background px-4 lg:hidden">
           <button
             type="button"
             onClick={() => setMobileOpen(true)}

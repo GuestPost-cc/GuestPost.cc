@@ -212,25 +212,27 @@ export const CAMPAIGN_STATUS_PRESENTATION: Record<
 // preventing — it's a compile-time error, not a runtime fallback.
 
 export function getOrderStatusPresentation(s: OrderStatus): StatusPresentation {
-  return ORDER_STATUS_PRESENTATION[s]
+  return ORDER_STATUS_PRESENTATION[s] ?? ORDER_STATUS_PRESENTATION.DRAFT
 }
 export function getTicketStatusPresentation(
   s: TicketStatus,
 ): StatusPresentation {
-  return TICKET_STATUS_PRESENTATION[s]
+  return TICKET_STATUS_PRESENTATION[s] ?? TICKET_STATUS_PRESENTATION.OPEN
 }
 export function getDisputeStatusPresentation(
   s: DisputeStatus,
 ): StatusPresentation {
-  return DISPUTE_STATUS_PRESENTATION[s]
+  return DISPUTE_STATUS_PRESENTATION[s] ?? DISPUTE_STATUS_PRESENTATION.OPEN
 }
 export function getListingStatusPresentation(
   s: ListingStatus,
 ): StatusPresentation {
-  return LISTING_STATUS_PRESENTATION[s]
+  return LISTING_STATUS_PRESENTATION[s] ?? LISTING_STATUS_PRESENTATION.DRAFT
 }
 export function getCampaignStatusPresentation(
   s: CampaignStatus,
 ): StatusPresentation {
-  return CAMPAIGN_STATUS_PRESENTATION[s]
+  return (
+    CAMPAIGN_STATUS_PRESENTATION[s] ?? CAMPAIGN_STATUS_PRESENTATION.ARCHIVED
+  )
 }
