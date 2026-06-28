@@ -145,6 +145,19 @@ export class SettlementsService {
         Date.now() + reviewDays * 24 * 60 * 60 * 1000,
       )
 
+      // Re-check gating inside the transaction to close the TOCTOU window
+      // between the pre-transaction evaluateSettlementEligibility call
+      // (line 52) and this point — a dispute could have been opened, fraud
+      // flag raised, or order cancelled concurrently.
+      const txnEligibility = await evaluateSettlementEligibility(tx, orderId)
+      if (!txnEligibility.eligible) {
+        throw new BadRequestException({
+          code: "SETTLEMENT_BLOCKED",
+          message: `Settlement blocked: ${txnEligibility.reasons.join("; ")}`,
+          reasons: txnEligibility.reasons,
+        })
+      }
+
       let settlement: any
       try {
         settlement = await tx.settlement.create({
@@ -782,17 +795,21 @@ export class SettlementsService {
     // post-release clawback still works (COMPLETED is refundable).
     //
     // Phase 8.2 (audit #2) — version-guarded so a concurrent order mutation
-    // (customer dispute, force-cancel) doesn't get silently overwritten. We
-    // intentionally do NOT add a status predicate: releaseFundsInternal is
-    // called from adminApprove + forceApprove with order in varying legitimate
-    // pre-states (APPROVED / IN_PROGRESS / etc.); version-only is the safer
-    // guard. If a status invariant is later proven, tighten the predicate.
+    // (customer dispute, force-cancel) doesn't get silently overwritten. A
+    // status predicate excludes terminal states (CANCELLED, REFUNDED, DISPUTED)
+    // as defense-in-depth: even if a concurrent mutation doesn't bump the order
+    // version, the status check prevents COMPLETED from overwriting a terminal
+    // state.
     // `order` may be null (the pre-existing null-check on line 517 covers
     // the SoD branch); if null at this point we still need to handle it.
     if (!order)
       throw new NotFoundException("Order not found for settlement release")
     const orderUpdated = await tx.order.updateMany({
-      where: { id: settlement.orderId, version: order.version },
+      where: {
+        id: settlement.orderId,
+        version: order.version,
+        status: { notIn: ["CANCELLED", "REFUNDED", "DISPUTED"] },
+      },
       data: { status: "COMPLETED", version: { increment: 1 } },
     })
     if (orderUpdated.count === 0) {

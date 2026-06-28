@@ -179,7 +179,11 @@ describe("Phase 8.2 (audit #2) — releaseFundsInternal Order.status version gua
     await (service as any).releaseFundsInternal(tx, "s1", settlement, "user-1")
 
     expect(tx.order.updateMany).toHaveBeenCalledWith({
-      where: { id: "ord-1", version: 3 },
+      where: {
+        id: "ord-1",
+        version: 3,
+        status: { notIn: ["CANCELLED", "REFUNDED", "DISPUTED"] },
+      },
       data: { status: "COMPLETED", version: { increment: 1 } },
     })
   })
@@ -205,5 +209,20 @@ describe("Phase 8.2 (audit #2) — releaseFundsInternal Order.status version gua
     await expect(
       (service as any).releaseFundsInternal(tx, "s1", settlement, "user-1"),
     ).rejects.toThrow(NotFoundException)
+  })
+
+  it("throws ConflictException when order is in a terminal state (CANCELLED/REFUNDED/DISPUTED) despite matching version", async () => {
+    const { tx, service, settlement } = setup(3)
+    const audit = (service as any).audit
+    audit.log = jest.fn().mockResolvedValue({})
+    // Even with a matching version, the status predicate excludes terminal states
+    tx.order.updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(
+      (service as any).releaseFundsInternal(tx, "s1", settlement, "user-1"),
+    ).rejects.toThrow(ConflictException)
+    await expect(
+      (service as any).releaseFundsInternal(tx, "s1", settlement, "user-1"),
+    ).rejects.toThrow(/Order state changed/)
   })
 })
