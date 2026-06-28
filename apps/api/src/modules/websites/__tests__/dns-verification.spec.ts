@@ -495,7 +495,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
       admin.updateListingStatus(
         "l1",
         "APPROVED",
-        { id: "admin1", role: "OPERATIONS" },
+        { id: "admin1", staffRole: "OPERATIONS" },
         true,
       ),
     ).rejects.toMatchObject({ response: { code: "WEBSITE_NOT_VERIFIED" } })
@@ -509,7 +509,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
     const res = await admin.updateListingStatus(
       "l1",
       "APPROVED",
-      { id: "super1", role: "SUPER_ADMIN" },
+      { id: "super1", staffRole: "SUPER_ADMIN" },
       true,
     )
     expect(res.status).toBe("APPROVED")
