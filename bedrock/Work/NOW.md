@@ -1,16 +1,14 @@
 # Current Focus
 
-**Status (2026-06-28): Marketplace publisher & admin flow redesign COMPLETED.** All typecheck/lint/build pass.
+**Status (2026-06-28): Reconciliation monitoring dashboard implementation complete.**
 
 ## Completed this session (2026-06-28)
 
 | Area | Changes |
 |---|---|
-| **Publisher Portal** | Create dialog: removed legacy type/price, added inline first-service creation. Edit listing modal (title/description). Services dialog: inline edit for price/TAT/revisions/warrantyDays/currency, removed duplicate Pause button, added warrantyDays+currency fields. REJECTED→resubmit flow (backend + frontend). |
-| **Admin Portal** | Force-approve gate fixed: `user.staffRole` vs deprecated `user.role`. Admin listings return ALL services (not just AVAILABLE). Display fields computed from AVAILABLE subset. Added missing AdminService client methods. Manage Services dialog reads fresh listing data. Removed invalid PUBLISHER_WEBSITE type filter. Field name fix: `revisionRounds`. |
-| **Admin Preview** | Domain verification badge. Force-approve for SUPER_ADMIN. Updated status mutation signature. |
-| **Backend** | `getPublisherListings`: added publisher+website Prisma includes for correct `computeListingPhase`. `submitListingForReview`: accepts REJECTED → PENDING_REVIEW. Admin listings: removed AVAILABLE-only filter, compute display from AVAILABLE subset. |
-| **Portal** | Marketplace order page at `/dashboard/marketplace/[slug]/order` (single-page, bypasses 5-step wizard). |
+| **Shared Package** | `reconciliation-core.ts` — 7-module financial drift detection engine: Wallet Drift, Publisher Balance Drift, Settlement Integrity (3 sub-groups: amount/sync/completeness), Order Payment Reconciliation, Refund Reconciliation, Stuck Financial Orders, Stuck Payouts. Enums: `ReconciliationCode` (24+ codes), `ReconciliationCategory` (7 categories), `SettlementIntegrityGroup` (3 groups). Typed `DriftRow` + `ReconciliationReport` with summary/stats/version/timing. Orchestrator runs all 7 checks in parallel. Added Jest test suite (11 tests covering enums, empty data, wallet drift, settlement amount mismatch, sync, completeness, unmatched payments, refund, summary computation). |
+| **API Client** | `getReconciliation()` return type updated from `{ ranAt, ok, walletDrift: any[], ... }` to `ReconciliationReport`. |
+| **Admin Finance UI** | Full reconciliation tab redesign: status bar with severity counts/version/timing, 7 module cards in responsive grid, Settlement Integrity sub-group group, detail dialog with DriftRow table. Follows Linear design tokens (surface-1 cards, border-border/50 hairline, severity dots). |
 
 ## What's next
 
@@ -48,5 +46,3 @@
 - **Phase 7.10.2.x** — Convert Phase 7.12 favorites manual-smoke race to integration spec. Fast-follow now that the harness exists; same 5-caller shape as PR #18's Spec 1.
 - **Phase 7.10.2.2.2** — Split AppModule into per-feature TestModules once integration suite hits 20+ specs. Deferred until the suite actually justifies the rework (currently 1 spec; ~2s/spec boot cost is fine at small scale).
 - **Phase 7.10.1** — Admin "manually mark customer verified" action. Speculative; defer until real support burden surfaces.
-
-**Strategic items still on risks.md** (long-horizon, not actively planned): no double-entry ledger, item-level settlements (mitigated by one-website-per-order invariant), reconciliation crash recovery (manual via provider idempotency), latent pool-deadlock in cold audit paths (acceptable at current scale), dispute non-idempotency, listing reviews no purchase verification, single-currency only.

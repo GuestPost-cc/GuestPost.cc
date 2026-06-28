@@ -1,5 +1,6 @@
 import type {
   OrderStatus,
+  ReconciliationReport,
   SettlementStatus,
   TicketStatus,
   WithdrawalStatus,
@@ -207,14 +208,7 @@ export class AdminService {
   }
 
   getReconciliation() {
-    return this.client.get<{
-      ranAt: string
-      ok: boolean
-      walletDrift: any[]
-      publisherDrift: any[]
-      stuckOrders: any[]
-      stuckPayouts: any[]
-    }>("/admin/reconciliation")
+    return this.client.get<ReconciliationReport>("/admin/reconciliation")
   }
 
   decryptPayoutMethod(payoutMethodId: string, reason: string) {

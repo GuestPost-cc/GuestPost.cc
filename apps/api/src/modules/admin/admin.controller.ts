@@ -192,8 +192,8 @@ export class AdminController {
   }
 
   // Financial drift detector — balances vs transaction history, stuck orders
-  @Get("reconciliation")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Get("reconciliation")
   runReconciliation() {
     return this.reconciliation.run()
   }

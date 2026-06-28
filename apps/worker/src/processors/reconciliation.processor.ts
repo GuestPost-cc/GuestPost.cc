@@ -30,7 +30,10 @@ async function handleReconciliationRun() {
   const problems = {
     walletDrift: report.walletDrift.length,
     publisherDrift: report.publisherDrift.length,
-    stuckOrders: report.stuckOrders.length,
+    settlementDrift: report.settlementDrift.length,
+    orderPaymentRecon: report.orderPaymentRecon.length,
+    refundRecon: report.refundRecon.length,
+    stuckFinancialOrders: report.stuckFinancialOrders.length,
     stuckPayouts: report.stuckPayouts.length,
   }
   logger.error("DRIFT DETECTED", problems)
@@ -49,7 +52,12 @@ async function handleReconciliationRun() {
   const summary = [
     problems.walletDrift && `${problems.walletDrift} wallet drift`,
     problems.publisherDrift && `${problems.publisherDrift} publisher drift`,
-    problems.stuckOrders && `${problems.stuckOrders} stuck orders`,
+    problems.settlementDrift &&
+      `${problems.settlementDrift} settlement integrity`,
+    problems.orderPaymentRecon && `${problems.orderPaymentRecon} order payment`,
+    problems.refundRecon && `${problems.refundRecon} refund issues`,
+    problems.stuckFinancialOrders &&
+      `${problems.stuckFinancialOrders} stuck orders`,
     problems.stuckPayouts && `${problems.stuckPayouts} stuck/duplicate payouts`,
   ]
     .filter(Boolean)
@@ -67,7 +75,10 @@ async function handleReconciliationRun() {
   const summaryFingerprint = [
     `wallet=${problems.walletDrift}`,
     `pub=${problems.publisherDrift}`,
-    `stuckOrd=${problems.stuckOrders}`,
+    `settle=${problems.settlementDrift}`,
+    `pmt=${problems.orderPaymentRecon}`,
+    `refund=${problems.refundRecon}`,
+    `stuckOrd=${problems.stuckFinancialOrders}`,
     `stuckPay=${problems.stuckPayouts}`,
   ].join(",")
   const dateBucket = notificationDedupKey.utcDateBucket()

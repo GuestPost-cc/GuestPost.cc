@@ -33,10 +33,13 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  CreditCard,
   DollarSign,
   Eye,
   RefreshCw,
+  Scale,
   ShieldAlert,
+  Users,
   XCircle,
 } from "lucide-react"
 import { useState } from "react"
@@ -156,46 +159,377 @@ function PaginationBar({
   )
 }
 
-function DriftSection({
-  title,
-  rows,
-  headers,
-  renderRow,
-}: {
-  title: string
-  rows: any[]
-  headers: string[]
-  renderRow: (row: any) => React.ReactNode
-}) {
+const MODULE_DEFS = [
+  { key: "walletDrift", label: "Wallet Drift", icon: DollarSign },
+  { key: "publisherDrift", label: "Publisher Balance Drift", icon: Users },
+  { key: "settlementDrift", label: "Settlement Integrity", icon: Scale },
+  {
+    key: "orderPaymentRecon",
+    label: "Order Payment Reconciliation",
+    icon: CreditCard,
+  },
+  { key: "refundRecon", label: "Refund Reconciliation", icon: RefreshCw },
+  {
+    key: "stuckFinancialOrders",
+    label: "Stuck Financial Orders",
+    icon: AlertCircle,
+  },
+  { key: "stuckPayouts", label: "Stuck Payouts", icon: XCircle },
+] as const
+
+const SETTLEMENT_GROUPS = [
+  { key: "amount", label: "Amount Integrity" },
+  { key: "sync", label: "Ledger Synchronisation" },
+  { key: "completeness", label: "Completeness" },
+] as const
+
+function SeverityDot({ severity }: { severity: string }) {
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base flex items-center gap-2">
-          {title}
-          <Badge variant={rows.length === 0 ? "success" : "destructive"}>
-            {rows.length}
-          </Badge>
-        </CardTitle>
-      </CardHeader>
-      {rows.length > 0 && (
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {headers.map((h) => (
-                  <TableHead key={h}>{h}</TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r, i) => (
-                <TableRow key={i}>{renderRow(r)}</TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
+    <span
+      className={`inline-block h-2 w-2 rounded-full ${
+        severity === "critical"
+          ? "bg-red-500"
+          : severity === "warning"
+            ? "bg-amber-500"
+            : "bg-blue-500"
+      }`}
+    />
+  )
+}
+
+function ModuleCard({
+  label,
+  icon: Icon,
+  counts,
+  onClick,
+}: {
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  counts: { critical: number; warning: number; info: number }
+  onClick: () => void
+}) {
+  const total = counts.critical + counts.warning + counts.info
+  const topSeverity =
+    total === 0 ? "ok" : counts.critical > 0 ? "critical" : "warning"
+  const borderColor =
+    topSeverity === "ok"
+      ? "border-emerald-500/30"
+      : topSeverity === "critical"
+        ? "border-red-500/30"
+        : "border-amber-500/30"
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex flex-col gap-2 rounded-lg border ${borderColor} bg-surface-1 p-4 text-left transition-all duration-200 hover:bg-card/80`}
+    >
+      <div className="flex items-center gap-2">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm font-medium">{label}</span>
+      </div>
+      {total === 0 ? (
+        <span className="text-xs text-emerald-500">All clear</span>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {counts.critical > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-red-500">
+              <SeverityDot severity="critical" />
+              {counts.critical} critical
+            </span>
+          )}
+          {counts.warning > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-amber-500">
+              <SeverityDot severity="warning" />
+              {counts.warning} warning
+            </span>
+          )}
+          {counts.info > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs text-blue-500">
+              {counts.info} info
+            </span>
+          )}
+        </div>
       )}
-    </Card>
+    </button>
+  )
+}
+
+function ReconciliationDashboard({
+  recon,
+  isLoading,
+  isFetching,
+  error,
+  onRefresh,
+}: {
+  recon: any
+  isLoading: boolean
+  isFetching: boolean
+  error: Error | null
+  onRefresh: () => void
+}) {
+  const [detailModule, setDetailModule] = useState<string | null>(null)
+  const [detailGroup, setDetailGroup] = useState<string | null>(null)
+  const [settlementExpanded, setSettlementExpanded] = useState(false)
+
+  if (isLoading) return <LoadingRows />
+  if (error)
+    return (
+      <ErrorBlock label="Reconciliation failed to run" onRetry={onRefresh} />
+    )
+  if (!recon) return null
+
+  const moduleCounts = MODULE_DEFS.map((def) => {
+    const rows: any[] = recon[def.key] ?? []
+    return {
+      key: def.key,
+      critical: rows.filter((r: any) => r.severity === "critical").length,
+      warning: rows.filter((r: any) => r.severity === "warning").length,
+      info: rows.filter((r: any) => r.severity === "info").length,
+    }
+  })
+
+  const hasIssues = moduleCounts.some(
+    (m) => m.critical + m.warning + m.info > 0,
+  )
+
+  const detailRows: any[] = detailModule
+    ? (recon[detailModule] ?? []).filter(
+        (r: any) =>
+          !detailGroup ||
+          detailModule !== "settlementDrift" ||
+          r.group === detailGroup,
+      )
+    : []
+
+  return (
+    <div className="space-y-6">
+      {/* ── Status bar ── */}
+      <Card className="border-border/50">
+        <CardContent className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-4">
+            {hasIssues ? (
+              <ShieldAlert className="h-8 w-8 shrink-0 text-red-500" />
+            ) : (
+              <CheckCircle2 className="h-8 w-8 shrink-0 text-emerald-500" />
+            )}
+            <div>
+              <p
+                className={`text-sm font-semibold ${
+                  hasIssues ? "text-red-500" : "text-emerald-500"
+                }`}
+              >
+                {hasIssues
+                  ? "Issues detected — review before processing payouts"
+                  : "All checks passed"}
+              </p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {hasIssues && (
+                  <>
+                    {moduleCounts.reduce((s, m) => s + m.critical, 0) > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        <SeverityDot severity="critical" />
+                        {moduleCounts.reduce((s, m) => s + m.critical, 0)}{" "}
+                        critical
+                      </span>
+                    )}
+                    {moduleCounts.reduce((s, m) => s + m.warning, 0) > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        <SeverityDot severity="warning" />
+                        {moduleCounts.reduce((s, m) => s + m.warning, 0)}{" "}
+                        warning
+                      </span>
+                    )}
+                    {moduleCounts.reduce((s, m) => s + m.info, 0) > 0 && (
+                      <span className="inline-flex items-center gap-1">
+                        {moduleCounts.reduce((s, m) => s + m.info, 0)} info
+                      </span>
+                    )}
+                    <span className="text-border/50">|</span>
+                  </>
+                )}
+                <span>v{recon.version}</span>
+                <span className="text-border/50">|</span>
+                <span>{recon.scanDurationMs}ms</span>
+                <span className="text-border/50">|</span>
+                <span>
+                  Ran {format(new Date(recon.ranAt), "MMM d, yyyy h:mm a")}
+                </span>
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={isFetching}
+          >
+            <RefreshCw
+              className={`mr-2 h-3 w-3 ${isFetching ? "animate-spin" : ""}`}
+            />
+            {isFetching ? "Running..." : "Run Now"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── Stats chips ── */}
+      <div className="flex flex-wrap gap-3">
+        {[
+          { label: "Wallets", value: recon.stats?.checkedWallets },
+          { label: "Settlements", value: recon.stats?.checkedSettlements },
+          { label: "Orders", value: recon.stats?.checkedOrders },
+          { label: "Transactions", value: recon.stats?.checkedTransactions },
+          { label: "Publishers", value: recon.stats?.checkedPublishers },
+        ].map(
+          (s) =>
+            s.value !== undefined && (
+              <Badge key={s.label} variant="secondary" className="text-xs">
+                {s.label}: {s.value}
+              </Badge>
+            ),
+        )}
+      </div>
+
+      {/* ── Module cards grid ── */}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {MODULE_DEFS.map((def, i) => {
+          const counts = moduleCounts[i]
+          return (
+            <ModuleCard
+              key={def.key}
+              label={def.label}
+              icon={def.icon}
+              counts={counts}
+              onClick={() => {
+                setDetailModule(def.key)
+                setDetailGroup(null)
+                if (def.key === "settlementDrift") setSettlementExpanded(true)
+              }}
+            />
+          )
+        })}
+      </div>
+
+      {/* ── Settlement Integrity sub-groups ── */}
+      {settlementExpanded && (
+        <div className="space-y-2">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+            Settlement Integrity Groups
+          </p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {SETTLEMENT_GROUPS.map((g) => {
+              const groupRows: any[] =
+                recon.settlementDrift?.filter((r: any) => r.group === g.key) ??
+                []
+              const c = {
+                critical: groupRows.filter(
+                  (r: any) => r.severity === "critical",
+                ).length,
+                warning: groupRows.filter((r: any) => r.severity === "warning")
+                  .length,
+                info: groupRows.filter((r: any) => r.severity === "info")
+                  .length,
+              }
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  onClick={() => {
+                    setDetailModule("settlementDrift")
+                    setDetailGroup(g.key)
+                  }}
+                  className="flex items-center justify-between rounded-lg border border-border/50 bg-surface-1 p-3 text-left transition-all duration-200 hover:bg-card/80"
+                >
+                  <span className="text-sm">{g.label}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {c.critical + c.warning + c.info === 0
+                      ? "OK"
+                      : `${c.critical + c.warning + c.info} issue${c.critical + c.warning + c.info !== 1 ? "s" : ""}`}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Detail dialog ── */}
+      <Dialog
+        open={!!detailModule}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailModule(null)
+            setDetailGroup(null)
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {MODULE_DEFS.find((d) => d.key === detailModule)?.label ??
+                "Details"}
+              {detailGroup && detailModule === "settlementDrift" && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {SETTLEMENT_GROUPS.find((g) => g.key === detailGroup)
+                    ?.label ?? detailGroup}
+                </Badge>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {detailRows.length} issue
+              {detailRows.length !== 1 ? "s" : ""} found
+            </DialogDescription>
+          </DialogHeader>
+          {detailRows.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              No issues
+            </p>
+          ) : (
+            <div className="rounded-lg border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8" />
+                    <TableHead>Entity</TableHead>
+                    <TableHead>Code</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Message</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {detailRows.map((row: any, i: number) => (
+                    <TableRow key={row.id ?? `drift-${detailModule}-${i}`}>
+                      <TableCell>
+                        <SeverityDot severity={row.severity} />
+                      </TableCell>
+                      <TableCell className="font-mono text-xs max-w-[120px] truncate">
+                        {row.entityId?.slice(0, 12)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant="outline"
+                          className="font-mono text-[10px]"
+                        >
+                          {row.code}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="tabular-nums text-xs">
+                        {row.amount
+                          ? `$${Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground max-w-md">
+                        {row.message}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }
 
@@ -742,188 +1076,13 @@ function FinancePageInner() {
       )}
 
       {activeTab === "reconciliation" && (
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="flex items-center justify-between p-4">
-              <p className="text-sm text-muted-foreground">
-                Verifies cached balances match the transaction ledger. Run after
-                any manual data change.
-              </p>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => reconciliationQ.refetch()}
-                disabled={reconciliationQ.isFetching}
-              >
-                <RefreshCw
-                  className={`mr-2 h-4 w-4 ${reconciliationQ.isFetching ? "animate-spin" : ""}`}
-                />
-                {reconciliationQ.isFetching ? "Running..." : "Run Now"}
-              </Button>
-            </CardContent>
-          </Card>
-
-          {reconciliationQ.isLoading ? (
-            <LoadingRows />
-          ) : reconciliationQ.error ? (
-            <ErrorBlock
-              label="Reconciliation failed to run"
-              onRetry={() => reconciliationQ.refetch()}
-            />
-          ) : recon ? (
-            <>
-              <Card>
-                <CardContent className="flex items-center gap-4 p-6">
-                  {recon.ok ? (
-                    <>
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-                        <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-emerald-700 dark:text-emerald-400">
-                          All checks passed
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          No drift detected — balances agree with the ledger.
-                          Ran{" "}
-                          {format(new Date(recon.ranAt), "MMM d, yyyy h:mm a")}
-                        </p>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30">
-                        <ShieldAlert className="h-6 w-6 text-red-600 dark:text-red-400" />
-                      </div>
-                      <div>
-                        <p className="font-semibold text-red-700 dark:text-red-400">
-                          Drift detected — investigate before processing payouts
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          Ran{" "}
-                          {format(new Date(recon.ranAt), "MMM d, yyyy h:mm a")}
-                        </p>
-                      </div>
-                    </>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Wallet Drift */}
-              <DriftSection
-                title="Wallet Drift"
-                rows={recon.walletDrift}
-                headers={[
-                  "Wallet ID",
-                  "Organization ID",
-                  "Expected",
-                  "Actual",
-                  "Delta",
-                ]}
-                renderRow={(r: any) => (
-                  <>
-                    <TableCell className="font-mono text-xs">
-                      {r.walletId?.slice(0, 8)}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {r.organizationId?.slice(0, 8)}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      ${Number(r.expected).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      ${Number(r.actual).toFixed(2)}
-                    </TableCell>
-                    <TableCell
-                      className={`tabular-nums font-medium ${Number(r.delta) < 0 ? "text-destructive" : "text-emerald-600"}`}
-                    >
-                      ${Number(r.delta).toFixed(2)}
-                    </TableCell>
-                  </>
-                )}
-              />
-
-              {/* Publisher Balance Drift */}
-              <DriftSection
-                title="Publisher Balance Drift"
-                rows={recon.publisherDrift}
-                headers={[
-                  "Publisher ID",
-                  "Expected",
-                  "Actual",
-                  "Delta",
-                  "Debt Balance",
-                ]}
-                renderRow={(r: any) => (
-                  <>
-                    <TableCell className="font-mono text-xs">
-                      {r.publisherId?.slice(0, 8)}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      ${Number(r.expected).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      ${Number(r.actual).toFixed(2)}
-                    </TableCell>
-                    <TableCell
-                      className={`tabular-nums font-medium ${Number(r.delta) < 0 ? "text-destructive" : "text-emerald-600"}`}
-                    >
-                      ${Number(r.delta).toFixed(2)}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      ${Number(r.debtBalance ?? 0).toFixed(2)}
-                    </TableCell>
-                  </>
-                )}
-              />
-
-              {/* Stuck Orders */}
-              <DriftSection
-                title="Stuck Orders"
-                rows={recon.stuckOrders}
-                headers={["Order ID", "Amount", "Problem"]}
-                renderRow={(r: any) => (
-                  <>
-                    <TableCell className="font-mono text-xs">
-                      {r.orderId?.slice(0, 8)}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {r.amount ? `$${Number(r.amount).toFixed(2)}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-md">
-                      {r.problem}
-                    </TableCell>
-                  </>
-                )}
-              />
-
-              {/* Stuck Payouts */}
-              <DriftSection
-                title="Stuck Payouts"
-                rows={recon.stuckPayouts}
-                headers={["ID", "Amount", "Problem"]}
-                renderRow={(r: any) => (
-                  <>
-                    <TableCell className="font-mono text-xs">
-                      {(
-                        r.withdrawalId ??
-                        r.executionId ??
-                        r.publisherId ??
-                        ""
-                      )?.slice(0, 8)}
-                    </TableCell>
-                    <TableCell className="tabular-nums">
-                      {r.amount ? `$${Number(r.amount).toFixed(2)}` : "—"}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-md">
-                      {r.problem}
-                    </TableCell>
-                  </>
-                )}
-              />
-            </>
-          ) : null}
-        </div>
+        <ReconciliationDashboard
+          recon={recon}
+          isLoading={reconciliationQ.isLoading}
+          isFetching={reconciliationQ.isFetching}
+          error={reconciliationQ.error}
+          onRefresh={() => reconciliationQ.refetch()}
+        />
       )}
 
       {activeTab === "revenue" && <RevenuePanel />}

@@ -6,11 +6,26 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "test": "jest"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.0",
     "@types/node": "^22.19.19",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.0",
     "typescript": "^5.7.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "testMatch": [
+      "<rootDir>/src/__tests__/**/*.spec.ts"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "js"
+    ]
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1067.0",
