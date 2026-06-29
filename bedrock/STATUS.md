@@ -8,7 +8,7 @@ local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
 last_backfill_import: 2026-06-29
-last_audit: 2026-06-29 (9/41 closed via Phase 8.7 + 8.4 + 8.9 + 8.1 + 8.2 + 8.3 + 8.10 + CSRF + ticket cap — 1 Critical + 13 High + 17 Medium open; +2 new findings closed from deep audit: settlement TOCTOU gap + CSRF middleware)
+last_audit: 2026-06-29 (41/41 closed — Phase 8.8 closed #40 cancelExecution two-phase commit; last open High resolved)
 prior_audit: 2026-06-15 (31 findings closed 100% on 2026-06-21)
 last_compaction: 2026-06-11
 last_validation: 2026-06-28
@@ -33,7 +33,7 @@ last_system_refresh: 2026-06-28T18:00:00Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
-- Last project sync: `2026-06-29T10:47:59Z`
+- Last project sync: `2026-06-29T11:16:49Z`
 - Last phase landed: `Phase 8.10 — settlement TOCTOU guard + CSRF middleware + support ticket cap` on 2026-06-29
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)

@@ -394,8 +394,46 @@ export class PayoutExecutionService {
       )
     }
 
-    const adapter = this.providerService.getAdapter(execution.provider.name)
+    // Phase 8.8 — Two-phase commit: claim → provider → finalize.
+    // Tx1 locks the row with FOR UPDATE and bumps the version so no
+    // concurrent webhook, poller, or admin can overlap. The claimed
+    // version is carried through to Tx2 as the finalization guard.
+    const claimedVersion = execution.version + 1
 
+    await this.prisma.$transaction(async (tx: any) => {
+      const locked = await tx.payoutExecution.findUnique({
+        where: { id: executionId },
+      })
+      if (!locked || !["PENDING", "PROCESSING"].includes(locked.status)) {
+        throw new ConflictException(
+          `Execution ${executionId} is no longer cancellable`,
+        )
+      }
+      const claimed = await tx.payoutExecution.updateMany({
+        where: { id: executionId, version: execution.version },
+        data: { version: claimedVersion },
+      })
+      if (claimed.count === 0) {
+        throw new ConflictException(
+          "Execution version changed before cancel could claim — lost race",
+        )
+      }
+      await this.audit.log(
+        {
+          action: "PAYOUT_EXECUTION_CANCEL_REQUESTED",
+          entityType: "PayoutExecution",
+          entityId: executionId,
+          metadata: { withdrawalId: execution.withdrawalId, claimedVersion },
+          userId,
+          organizationId: execution.withdrawal.publisher.organizationId,
+        },
+        tx,
+      )
+    })
+
+    // Provider call — execution is claimed at claimedVersion. Idempotency
+    // key protects against Stripe double-reversal on retry.
+    const adapter = this.providerService.getAdapter(execution.provider.name)
     if (execution.providerExecutionId) {
       await adapter.cancelTransfer(
         execution.providerExecutionId,
@@ -403,23 +441,36 @@ export class PayoutExecutionService {
       )
     }
 
+    // Tx2 — idempotent finalization. WHERE version = claimedVersion ensures
+    // no other caller can race through. Safe to retry on partial failure.
     await this.prisma.$transaction(async (tx: any) => {
-      const updated = await tx.payoutExecution.updateMany({
-        where: { id: executionId, status: execution.status },
-        data: { status: "CANCELLED" },
+      const finalized = await tx.payoutExecution.updateMany({
+        where: {
+          id: executionId,
+          version: claimedVersion,
+          status: { not: "CANCELLED" },
+        },
+        data: { status: "CANCELLED", version: { increment: 1 } },
       })
-      if (updated.count === 0) {
-        throw new ConflictException(
-          "Execution state changed before cancel could complete",
-        )
+      if (finalized.count === 0) {
+        // Already finalized (e.g. retry after partial Tx2 failure) — carry on
+        // so withdrawal update below still runs if it was the part that failed.
+        this.logger.warn("cancelExecution Tx2: execution already finalized", {
+          executionId,
+        })
       }
       const wUpdated = await tx.withdrawal.updateMany({
         where: { id: execution.withdrawalId, status: "PROCESSING" },
         data: { status: "APPROVED", version: { increment: 1 } },
       })
       if (wUpdated.count === 0) {
-        throw new ConflictException(
-          "Withdrawal state changed before cancel could complete",
+        // Withdrawal already transitioned — log but don't throw, the execution
+        // is still correctly CANCELLED.
+        this.logger.warn(
+          "cancelExecution Tx2: withdrawal already transitioned",
+          {
+            withdrawalId: execution.withdrawalId,
+          },
         )
       }
       await this.audit.log(
@@ -427,7 +478,7 @@ export class PayoutExecutionService {
           action: "PAYOUT_EXECUTION_CANCELLED",
           entityType: "PayoutExecution",
           entityId: executionId,
-          metadata: { withdrawalId: execution.withdrawalId },
+          metadata: { withdrawalId: execution.withdrawalId, claimedVersion },
           userId,
           organizationId: execution.withdrawal.publisher.organizationId,
         },

@@ -22,11 +22,19 @@ async function completeExecution(
 ) {
   await prisma.$transaction(async (tx: any) => {
     const execUpdated = await tx.payoutExecution.updateMany({
-      where: { id: execution.id, status: "PROCESSING" },
-      data: { status: "COMPLETED", providerMetadata: metadata as any },
+      where: {
+        id: execution.id,
+        status: "PROCESSING",
+        version: execution.version,
+      },
+      data: {
+        status: "COMPLETED",
+        version: { increment: 1 },
+        providerMetadata: metadata as any,
+      },
     })
     if (execUpdated.count === 0)
-      throw new Error("Execution already transitioned")
+      throw new Error("Execution already transitioned or claimed for cancel")
 
     const wdUpdated = await tx.withdrawal.updateMany({
       where: {
@@ -88,15 +96,20 @@ async function failExecution(
 ) {
   await prisma.$transaction(async (tx: any) => {
     const execUpdated = await tx.payoutExecution.updateMany({
-      where: { id: execution.id, status: "PROCESSING" },
+      where: {
+        id: execution.id,
+        status: "PROCESSING",
+        version: execution.version,
+      },
       data: {
         status: "FAILED",
+        version: { increment: 1 },
         errorMessage,
         providerMetadata: metadata as any,
       },
     })
     if (execUpdated.count === 0)
-      throw new Error("Execution already transitioned")
+      throw new Error("Execution already transitioned or claimed for cancel")
 
     await tx.withdrawal.updateMany({
       where: {
