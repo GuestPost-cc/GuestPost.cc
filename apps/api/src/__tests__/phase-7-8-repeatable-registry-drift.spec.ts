@@ -50,7 +50,7 @@ function extractRegistryNames(): Set<string> {
     /const\s+JOB_NAMES\s*=\s*\[([\s\S]*?)\]\s*as\s+const/,
   )
   if (!jobNamesBlockMatch)
-    throw new new Error("Could not locate JOB_NAMES array in registry file")()
+    throw new Error("Could not locate JOB_NAMES array in registry file")
   const namesRaw = jobNamesBlockMatch[1]
   const names = [...namesRaw.matchAll(/["']([^"']+)["']/g)].map((m) => m[1])
   return new Set(names)
