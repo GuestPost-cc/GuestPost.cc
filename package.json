@@ -4,7 +4,6 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "prepare": "husky",
     "dev": "turbo dev",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
@@ -54,8 +53,5 @@
     "tsx": "^4.22.4",
     "turbo": "^2.9.16",
     "typescript-eslint": "^8.0.0"
-  },
-  "dependencies": {
-    "next": "^16.2.7"
   }
 }

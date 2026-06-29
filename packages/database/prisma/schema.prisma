@@ -256,6 +256,8 @@ model User {
   activeContext        ActiveContext?
   managedWebsites      Website[]             @relation("WebsiteManager")
   assignedTickets      Ticket[]              @relation("TicketAssignee")
+
+  @@index([userType, banned])
 }
 
 model Session {
@@ -1186,8 +1188,8 @@ model Transaction {
 
   @@unique([reference])
   @@index([walletId])
+  @@index([walletId, type])
   @@index([orderId])
-  @@index([type])
   @@index([createdAt])
   @@index([publisherId])
   @@index([settlementId])
