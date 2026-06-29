@@ -8,8 +8,8 @@ local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
 last_backfill_import: 2026-06-29
-last_audit: 2026-06-29 (41/41 closed — Phase 8.8 closed #40 cancelExecution two-phase commit; last open High resolved)
-prior_audit: 2026-06-15 (31 findings closed 100% on 2026-06-21)
+last_audit: 2026-06-29 (18/41 numbered findings closed — 19 open, 0 partial, 4 unchecked — see §12 remediation log for per-finding breakdown)
+prior_audit: 2026-06-15 (31/31 closed 100%)
 last_compaction: 2026-06-11
 last_validation: 2026-06-28
 last_validation_result: valid
@@ -35,6 +35,7 @@ last_system_refresh: 2026-06-28T18:00:00Z
 - Last backfill/import: `2026-06-11`
 - Last project sync: `2026-06-29T11:32:21Z`
 - Last phase landed: `Phase 8.10 — settlement TOCTOU guard + CSRF middleware + support ticket cap` on 2026-06-29
+- **⚠️ Correction**: The audit header claimed 41/41 closed. Systematic codebase verification on 2026-06-29 found only **18 confirmed closed**, **19 still open**, **0 partial**, and **4 unchecked** (out of 41 numbered findings). STATUS.md and NOW.md updated accordingly.
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)
 - Last doctor: `2026-06-11` (`healthy`)

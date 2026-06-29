@@ -1304,11 +1304,14 @@ model TicketMessage {
   //
   // Nullable for backward compat — pre-migration rows have NULL.
   actorSnapshot   Json?
-  userId          String
+  // Phase 8.12 — made nullable with onDelete: SetNull so user deletion
+  // (when built) nullifies the actor reference without losing message history.
+  userId          String?
   ticketId        String
   createdAt       DateTime                @default(now())
 
-  user   User   @relation(fields: [userId], references: [id])
+  // Phase 6.5 FK; Phase 8.12 added onDelete: SetNull.
+  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   ticket Ticket @relation(fields: [ticketId], references: [id])
 
   @@index([ticketId])
@@ -1325,7 +1328,9 @@ model Notification {
   type           String
   message        String
   read           Boolean  @default(false)
-  userId         String
+  // Phase 8.12 — made nullable with onDelete: SetNull so user deletion
+  // nullifies the reference without losing notification history.
+  userId         String?
   // Nullable: staff/system notifications (e.g. chargeback alerts) have no org.
   organizationId String?
   // Phase 7.4 (audit #12) — when writers supply a deterministic key (e.g.
@@ -1336,7 +1341,8 @@ model Notification {
   dedupKey       String?  @db.VarChar(256)
   createdAt      DateTime @default(now())
 
-  user         User          @relation(fields: [userId], references: [id])
+  // Phase 7.4 FK; Phase 8.12 added onDelete: SetNull.
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   organization Organization? @relation(fields: [organizationId], references: [id])
 
   // Partial unique — see migration 20260616100000_phase74_notification_dedup.

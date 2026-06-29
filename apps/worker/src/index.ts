@@ -36,6 +36,7 @@ import { createSettlementAutoApproveWorker } from "./processors/settlement-auto-
 import { createVerificationWorker } from "./processors/verification.processor"
 import { createWebsiteVerificationWorker } from "./processors/website-verification.processor"
 import { connection } from "./redis"
+import { assertNoRegistryDrift, RegisteredJob } from "./repeatable-job-registry"
 
 const logger = createLogger("worker.bootstrap")
 
@@ -51,7 +52,7 @@ const logger = createLogger("worker.bootstrap")
 
 // Stuck-payout safety net: webhooks are the primary completion signal, this
 // poll catches transfers whose webhook was lost or never configured.
-async function registerPayoutStatusPoll() {
+async function registerPayoutStatusPoll(): Promise<RegisteredJob> {
   const queue = new Queue(QUEUES.PAYOUT, { connection })
   // Stale repeatable jobs signed with a previous iat (from an old worker boot)
   // would fail HMAC verification. Remove the old config before registering
@@ -67,11 +68,12 @@ async function registerPayoutStatusPoll() {
   })
   await queue.close()
   logger.info("registered payout status poll", { intervalMs: 10 * 60 * 1000 })
+  return { name: "payout-check-status", queue: QUEUES.PAYOUT }
 }
 
 // Scheduled drift sweep — alerting must not depend on a human remembering to
 // call GET /admin/reconciliation. Interval configurable for ops tuning.
-async function registerReconciliationSweep() {
+async function registerReconciliationSweep(): Promise<RegisteredJob> {
   const everyMs =
     Math.max(Number(process.env.RECONCILIATION_SWEEP_MINUTES ?? 60), 5) *
     60 *
@@ -91,11 +93,12 @@ async function registerReconciliationSweep() {
     intervalMs: everyMs,
     intervalMin: everyMs / 60000,
   })
+  return { name: "reconciliation-run", queue: QUEUES.RECONCILIATION }
 }
 
 // Domain re-verification sweep — every VERIFIED site is re-checked every 30d
 // and REVOKED if its TXT record vanished. Trust must decay, not persist forever.
-async function registerWebsiteReverifySweep() {
+async function registerWebsiteReverifySweep(): Promise<RegisteredJob> {
   const everyMs =
     Math.max(Number(process.env.WEBSITE_REVERIFY_DAYS ?? 30), 1) *
     24 *
@@ -117,12 +120,13 @@ async function registerWebsiteReverifySweep() {
     intervalMs: everyMs,
     intervalDays: everyMs / 86400000,
   })
+  return { name: "website-reverify-sweep", queue: QUEUES.WEBSITE_VERIFICATION }
 }
 
 // Settlement-hold link monitoring — re-check the live link for every order
 // whose payout is still on hold. If removed, raises a fraud flag that blocks
 // release. Default every 6h.
-async function registerSettlementHoldLinkSweep() {
+async function registerSettlementHoldLinkSweep(): Promise<RegisteredJob> {
   const everyMs =
     Math.max(Number(process.env.SETTLEMENT_LINK_SWEEP_HOURS ?? 6), 1) *
     60 *
@@ -143,6 +147,7 @@ async function registerSettlementHoldLinkSweep() {
     intervalMs: everyMs,
     intervalHours: everyMs / 3600000,
   })
+  return { name: "settlement-hold-sweep", queue: QUEUES.DELIVERY_VERIFICATION }
 }
 
 // Phase 7.3 — settlement review window auto-approval. Replaces the per-API-pod
@@ -151,7 +156,7 @@ async function registerSettlementHoldLinkSweep() {
 // (SETTLEMENT_AUTO_APPROVE_INTERVAL_MS, SETTLEMENT_AUTO_APPROVE_DISABLED) so
 // ops muscle memory keeps working. Adds SETTLEMENT_AUTO_APPROVE_BATCH_SIZE
 // for tuning during backlog recovery.
-async function registerSettlementAutoApproveSweep() {
+async function registerSettlementAutoApproveSweep(): Promise<RegisteredJob> {
   if (process.env.SETTLEMENT_AUTO_APPROVE_DISABLED === "true") {
     logger.info(
       "settlement auto-approve disabled — skipping cron registration",
@@ -159,7 +164,9 @@ async function registerSettlementAutoApproveSweep() {
         env: "SETTLEMENT_AUTO_APPROVE_DISABLED",
       },
     )
-    return
+    // Still return the RegisteredJob for drift-checking purposes.
+    // The job name is valid (processor exists); it's just not scheduled.
+    return { name: "settlement-auto-approve", queue: QUEUES.SETTLEMENT }
   }
   const everyMs = Math.max(
     Number(process.env.SETTLEMENT_AUTO_APPROVE_INTERVAL_MS ?? 15 * 60 * 1000),
@@ -185,6 +192,7 @@ async function registerSettlementAutoApproveSweep() {
     intervalMin: everyMs / 60000,
     batchSize,
   })
+  return { name: "settlement-auto-approve", queue: QUEUES.SETTLEMENT }
 }
 
 async function checkConnections() {
@@ -279,33 +287,18 @@ async function bootstrap() {
     createSettlementAutoApproveWorker(),
   )
   logger.info("workers started", { count: workers.length })
-  await Promise.all([
-    registerPayoutStatusPoll().catch((err) =>
-      logger.error("failed to register payout status poll", {
-        err: err instanceof Error ? err.message : String(err),
-      }),
-    ),
-    registerReconciliationSweep().catch((err) =>
-      logger.error("failed to register reconciliation sweep", {
-        err: err instanceof Error ? err.message : String(err),
-      }),
-    ),
-    registerWebsiteReverifySweep().catch((err) =>
-      logger.error("failed to register website re-verify sweep", {
-        err: err instanceof Error ? err.message : String(err),
-      }),
-    ),
-    registerSettlementHoldLinkSweep().catch((err) =>
-      logger.error("failed to register settlement-hold link sweep", {
-        err: err instanceof Error ? err.message : String(err),
-      }),
-    ),
-    registerSettlementAutoApproveSweep().catch((err) =>
-      logger.error("failed to register settlement auto-approve sweep", {
-        err: err instanceof Error ? err.message : String(err),
-      }),
-    ),
+  // Register all repeatable cron jobs and verify the registry matches expectations.
+  const registeredJobs = await Promise.all([
+    registerPayoutStatusPoll(),
+    registerReconciliationSweep(),
+    registerWebsiteReverifySweep(),
+    registerSettlementHoldLinkSweep(),
+    registerSettlementAutoApproveSweep(),
   ])
+  // Assert that the set of actually-registered jobs matches the canonical registry.
+  // This catches drift between registration functions and REPEATABLE_JOB_NAMES in
+  // repeatable-job-registry.ts at startup (fail-fast).
+  assertNoRegistryDrift(registeredJobs)
 }
 
 bootstrap().catch((err) => {

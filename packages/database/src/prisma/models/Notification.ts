@@ -170,7 +170,7 @@ export type NotificationGroupByOutputType = {
   type: string
   message: string
   read: boolean
-  userId: string
+  userId: string | null
   organizationId: string | null
   dedupKey: string | null
   createdAt: Date
@@ -202,11 +202,11 @@ export type NotificationWhereInput = {
   type?: Prisma.StringFilter<"Notification"> | string
   message?: Prisma.StringFilter<"Notification"> | string
   read?: Prisma.BoolFilter<"Notification"> | boolean
-  userId?: Prisma.StringFilter<"Notification"> | string
+  userId?: Prisma.StringNullableFilter<"Notification"> | string | null
   organizationId?: Prisma.StringNullableFilter<"Notification"> | string | null
   dedupKey?: Prisma.StringNullableFilter<"Notification"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Notification"> | Date | string
-  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   organization?: Prisma.XOR<Prisma.OrganizationNullableScalarRelationFilter, Prisma.OrganizationWhereInput> | null
 }
 
@@ -215,7 +215,7 @@ export type NotificationOrderByWithRelationInput = {
   type?: Prisma.SortOrder
   message?: Prisma.SortOrder
   read?: Prisma.SortOrder
-  userId?: Prisma.SortOrder
+  userId?: Prisma.SortOrderInput | Prisma.SortOrder
   organizationId?: Prisma.SortOrderInput | Prisma.SortOrder
   dedupKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -232,11 +232,11 @@ export type NotificationWhereUniqueInput = Prisma.AtLeast<{
   type?: Prisma.StringFilter<"Notification"> | string
   message?: Prisma.StringFilter<"Notification"> | string
   read?: Prisma.BoolFilter<"Notification"> | boolean
-  userId?: Prisma.StringFilter<"Notification"> | string
+  userId?: Prisma.StringNullableFilter<"Notification"> | string | null
   organizationId?: Prisma.StringNullableFilter<"Notification"> | string | null
   dedupKey?: Prisma.StringNullableFilter<"Notification"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Notification"> | Date | string
-  user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   organization?: Prisma.XOR<Prisma.OrganizationNullableScalarRelationFilter, Prisma.OrganizationWhereInput> | null
 }, "id" | "userId_dedupKey">
 
@@ -245,7 +245,7 @@ export type NotificationOrderByWithAggregationInput = {
   type?: Prisma.SortOrder
   message?: Prisma.SortOrder
   read?: Prisma.SortOrder
-  userId?: Prisma.SortOrder
+  userId?: Prisma.SortOrderInput | Prisma.SortOrder
   organizationId?: Prisma.SortOrderInput | Prisma.SortOrder
   dedupKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -262,7 +262,7 @@ export type NotificationScalarWhereWithAggregatesInput = {
   type?: Prisma.StringWithAggregatesFilter<"Notification"> | string
   message?: Prisma.StringWithAggregatesFilter<"Notification"> | string
   read?: Prisma.BoolWithAggregatesFilter<"Notification"> | boolean
-  userId?: Prisma.StringWithAggregatesFilter<"Notification"> | string
+  userId?: Prisma.StringNullableWithAggregatesFilter<"Notification"> | string | null
   organizationId?: Prisma.StringNullableWithAggregatesFilter<"Notification"> | string | null
   dedupKey?: Prisma.StringNullableWithAggregatesFilter<"Notification"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Notification"> | Date | string
@@ -275,7 +275,7 @@ export type NotificationCreateInput = {
   read?: boolean
   dedupKey?: string | null
   createdAt?: Date | string
-  user: Prisma.UserCreateNestedOneWithoutNotificationsInput
+  user?: Prisma.UserCreateNestedOneWithoutNotificationsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutNotificationsInput
 }
 
@@ -284,7 +284,7 @@ export type NotificationUncheckedCreateInput = {
   type: string
   message: string
   read?: boolean
-  userId: string
+  userId?: string | null
   organizationId?: string | null
   dedupKey?: string | null
   createdAt?: Date | string
@@ -297,7 +297,7 @@ export type NotificationUpdateInput = {
   read?: Prisma.BoolFieldUpdateOperationsInput | boolean
   dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  user?: Prisma.UserUpdateOneRequiredWithoutNotificationsNestedInput
+  user?: Prisma.UserUpdateOneWithoutNotificationsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutNotificationsNestedInput
 }
 
@@ -306,7 +306,7 @@ export type NotificationUncheckedUpdateInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   message?: Prisma.StringFieldUpdateOperationsInput | string
   read?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -317,7 +317,7 @@ export type NotificationCreateManyInput = {
   type: string
   message: string
   read?: boolean
-  userId: string
+  userId?: string | null
   organizationId?: string | null
   dedupKey?: string | null
   createdAt?: Date | string
@@ -337,7 +337,7 @@ export type NotificationUncheckedUpdateManyInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   message?: Prisma.StringFieldUpdateOperationsInput | string
   read?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -529,7 +529,7 @@ export type NotificationScalarWhereInput = {
   type?: Prisma.StringFilter<"Notification"> | string
   message?: Prisma.StringFilter<"Notification"> | string
   read?: Prisma.BoolFilter<"Notification"> | boolean
-  userId?: Prisma.StringFilter<"Notification"> | string
+  userId?: Prisma.StringNullableFilter<"Notification"> | string | null
   organizationId?: Prisma.StringNullableFilter<"Notification"> | string | null
   dedupKey?: Prisma.StringNullableFilter<"Notification"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Notification"> | Date | string
@@ -542,7 +542,7 @@ export type NotificationCreateWithoutOrganizationInput = {
   read?: boolean
   dedupKey?: string | null
   createdAt?: Date | string
-  user: Prisma.UserCreateNestedOneWithoutNotificationsInput
+  user?: Prisma.UserCreateNestedOneWithoutNotificationsInput
 }
 
 export type NotificationUncheckedCreateWithoutOrganizationInput = {
@@ -550,7 +550,7 @@ export type NotificationUncheckedCreateWithoutOrganizationInput = {
   type: string
   message: string
   read?: boolean
-  userId: string
+  userId?: string | null
   dedupKey?: string | null
   createdAt?: Date | string
 }
@@ -626,7 +626,7 @@ export type NotificationCreateManyOrganizationInput = {
   type: string
   message: string
   read?: boolean
-  userId: string
+  userId?: string | null
   dedupKey?: string | null
   createdAt?: Date | string
 }
@@ -638,7 +638,7 @@ export type NotificationUpdateWithoutOrganizationInput = {
   read?: Prisma.BoolFieldUpdateOperationsInput | boolean
   dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  user?: Prisma.UserUpdateOneRequiredWithoutNotificationsNestedInput
+  user?: Prisma.UserUpdateOneWithoutNotificationsNestedInput
 }
 
 export type NotificationUncheckedUpdateWithoutOrganizationInput = {
@@ -646,7 +646,7 @@ export type NotificationUncheckedUpdateWithoutOrganizationInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   message?: Prisma.StringFieldUpdateOperationsInput | string
   read?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -656,7 +656,7 @@ export type NotificationUncheckedUpdateManyWithoutOrganizationInput = {
   type?: Prisma.StringFieldUpdateOperationsInput | string
   message?: Prisma.StringFieldUpdateOperationsInput | string
   read?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   dedupKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -672,7 +672,7 @@ export type NotificationSelect<ExtArgs extends runtime.Types.Extensions.Internal
   organizationId?: boolean
   dedupKey?: boolean
   createdAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.Notification$userArgs<ExtArgs>
   organization?: boolean | Prisma.Notification$organizationArgs<ExtArgs>
 }, ExtArgs["result"]["notification"]>
 
@@ -685,7 +685,7 @@ export type NotificationSelectCreateManyAndReturn<ExtArgs extends runtime.Types.
   organizationId?: boolean
   dedupKey?: boolean
   createdAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.Notification$userArgs<ExtArgs>
   organization?: boolean | Prisma.Notification$organizationArgs<ExtArgs>
 }, ExtArgs["result"]["notification"]>
 
@@ -698,7 +698,7 @@ export type NotificationSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.
   organizationId?: boolean
   dedupKey?: boolean
   createdAt?: boolean
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.Notification$userArgs<ExtArgs>
   organization?: boolean | Prisma.Notification$organizationArgs<ExtArgs>
 }, ExtArgs["result"]["notification"]>
 
@@ -715,22 +715,22 @@ export type NotificationSelectScalar = {
 
 export type NotificationOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "message" | "read" | "userId" | "organizationId" | "dedupKey" | "createdAt", ExtArgs["result"]["notification"]>
 export type NotificationInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.Notification$userArgs<ExtArgs>
   organization?: boolean | Prisma.Notification$organizationArgs<ExtArgs>
 }
 export type NotificationIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.Notification$userArgs<ExtArgs>
   organization?: boolean | Prisma.Notification$organizationArgs<ExtArgs>
 }
 export type NotificationIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  user?: boolean | Prisma.Notification$userArgs<ExtArgs>
   organization?: boolean | Prisma.Notification$organizationArgs<ExtArgs>
 }
 
 export type $NotificationPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   name: "Notification"
   objects: {
-    user: Prisma.$UserPayload<ExtArgs>
+    user: Prisma.$UserPayload<ExtArgs> | null
     organization: Prisma.$OrganizationPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -738,7 +738,7 @@ export type $NotificationPayload<ExtArgs extends runtime.Types.Extensions.Intern
     type: string
     message: string
     read: boolean
-    userId: string
+    userId: string | null
     organizationId: string | null
     dedupKey: string | null
     createdAt: Date
@@ -1136,7 +1136,7 @@ readonly fields: NotificationFieldRefs;
  */
 export interface Prisma__NotificationClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
-  user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  user<T extends Prisma.Notification$userArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Notification$userArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   organization<T extends Prisma.Notification$organizationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Notification$organizationArgs<ExtArgs>>): Prisma.Prisma__OrganizationClient<runtime.Types.Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1573,6 +1573,25 @@ export type NotificationDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.
    * Limit how many Notifications to delete.
    */
   limit?: number
+}
+
+/**
+ * Notification.user
+ */
+export type Notification$userArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the User
+   */
+  select?: Prisma.UserSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the User
+   */
+  omit?: Prisma.UserOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.UserInclude<ExtArgs> | null
+  where?: Prisma.UserWhereInput
 }
 
 /**
