@@ -45,9 +45,9 @@ const REGISTRY_PATH = join(
 
 function extractRegistryNames(): Set<string> {
   const src = readFileSync(REGISTRY_PATH, "utf8")
-  // Match the set literal: new Set([...])
+  // Match the set literal: new Set<RepeatableJobName>(["name1", "name2", ...])
   const setBlockMatch = src.match(
-    /REPEATABLE_JOB_NAMES\s*=\s*new\s+Set\(\[\s*([\s\S]*?)\s*\]\)/,
+    /REPEATABLE_JOB_NAMES\s*=\s*new\s+Set<[^>]+>\(\s*\[([^\]]+?)\]\s*\)/,
   )
   if (!setBlockMatch)
     throw new Error(
