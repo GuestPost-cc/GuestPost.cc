@@ -3,6 +3,7 @@ import {
   Module,
   type NestModule,
 } from "@nestjs/common"
+import { CsrfMiddleware } from "./common/middleware/csrf.middleware"
 import { RequestIdMiddleware } from "./common/middleware/request-id.middleware"
 import { PrismaModule } from "./common/prisma.module"
 import { ActiveContextModule } from "./modules/active-context/active-context.module"
@@ -50,6 +51,10 @@ export class AppModule implements NestModule {
     // RequestIdMiddleware mounts before all routes — establishes the
     // AsyncLocalStorage frame that audit logs / Sentry tags / worker
     // enqueue all read from.
-    consumer.apply(RequestIdMiddleware).forRoutes("*")
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes("*")
+      .apply(CsrfMiddleware)
+      .forRoutes("*")
   }
 }

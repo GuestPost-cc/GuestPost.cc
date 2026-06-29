@@ -196,6 +196,9 @@ export class SupportService {
   // ── listTickets ─────────────────────────────────────────────────────────
   // Role-keyed OR clause. The actor's role decides what `where` they get;
   // there is no client param that widens this (status is the only filter).
+  // Capped at 500 rows to prevent OOM for actors with many tickets (SUPER_ADMIN
+  // sees all orgs). Full pagination (take/skip/page/limit) is available on the
+  // admin variant: listTicketsDetailed.
   async listTickets(actor: SupportActor, opts: { status?: string } = {}) {
     const where = this.scopeWhere(actor, opts.status)
 
@@ -216,6 +219,7 @@ export class SupportService {
         assignedPublisher: { select: { id: true, name: true } },
       },
       orderBy: { updatedAt: "desc" },
+      take: 500,
     })
   }
 
