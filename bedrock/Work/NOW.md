@@ -1,48 +1,25 @@
 # Current Focus
 
-**Status (2026-06-28): Reconciliation monitoring dashboard implementation complete.**
+**Status (2026-06-29): Phase 1 monetary safety + Phase 2 beta blockers complete.**
 
-## Completed this session (2026-06-28)
+Pre-beta audit closed 10 dimensions. Phase 1 fixed the settlement TOCTOU gap and added the status predicate guard on `releaseFundsInternal`. Phase 2 added CSRF middleware (Bearer-presence check) and a 500-row cap on the support ticket query. Guards fail-closed deferred to code review checklist.
+
+## Completed this session (2026-06-28/29)
 
 | Area | Changes |
 |---|---|
-| **Shared Package** | `reconciliation-core.ts` — 7-module financial drift detection engine: Wallet Drift, Publisher Balance Drift, Settlement Integrity (3 sub-groups: amount/sync/completeness), Order Payment Reconciliation, Refund Reconciliation, Stuck Financial Orders, Stuck Payouts. Enums: `ReconciliationCode` (24+ codes), `ReconciliationCategory` (7 categories), `SettlementIntegrityGroup` (3 groups). Typed `DriftRow` + `ReconciliationReport` with summary/stats/version/timing. Orchestrator runs all 7 checks in parallel. Added Jest test suite (11 tests covering enums, empty data, wallet drift, settlement amount mismatch, sync, completeness, unmatched payments, refund, summary computation). |
-| **API Client** | `getReconciliation()` return type updated from `{ ranAt, ok, walletDrift: any[], ... }` to `ReconciliationReport`. |
-| **Admin Finance UI** | Full reconciliation tab redesign: status bar with severity counts/version/timing, 7 module cards in responsive grid, Settlement Integrity sub-group group, detail dialog with DriftRow table. Follows Linear design tokens (surface-1 cards, border-border/50 hairline, severity dots). |
+| **Monetary Safety (Phase 1)** | Two critical fixes in `settlements.service.ts`: (1) `evaluateSettlementEligibility` re-check inside the `$transaction` using `tx` client — closes the TOCTOU window where a concurrent dispute could bypass the gate. (2) `status: { notIn: ["CANCELLED", "REFUNDED", "DISPUTED"] }` predicate on `releaseFundsInternal` order `updateMany` — defense-in-depth against overwriting terminal states. New Phase 8.10 regression spec (happy path + TOCTOU race). |
+| **CSRF Protection (Phase 2 Item 3)** | New `CsrfMiddleware` validates state-changing requests carry a `Bearer` token when a session cookie is present. The API client always sends both channels — a CSRF attack would carry only the cookie without the JS-inaccessible Bearer token. Safe methods and Bearer-present requests bypass. |
+| **Support Ticket Cap (Phase 2 Item 5)** | Added `take: 500` to `listTickets()` — prevents unbounded queries for actors with many tickets. Admin variant already paginated. Portal consumer unaffected at beta scale. |
+| **Pre-Beta Deep Audit** | Full 10-dimension audit: architecture, security, code quality, frontend, monetary safety, performance, DevOps, dependencies, business logic edge cases, compliance. Identified 2 critical fixes (Phase 1) + 3 beta blockers (Phase 2 items 3-5). |
 
 ## What's next
 
-**Operator action items** (need user/operator, not me) before this hits prod:
-
-1. **PR #15 / Phase 7.14** — run Gate 0 dupe sweep on staging + prod:
-   ```sql
-   SELECT "orderId", COUNT(*) FROM "FulfillmentAssignment"
-   WHERE status IN ('ASSIGNED','IN_PROGRESS')
-   GROUP BY "orderId" HAVING COUNT(*) > 1;
-   ```
-   If non-zero on any env, manually collapse dupes (cancel-all-but-newest per orderId) before applying the migration.
-
-2. **PR #16 / Phase 7.13.x** — run cross-env `Escrow` presence/rowcount check on staging + prod:
-   ```sql
-   SELECT EXISTS (SELECT 1 FROM pg_class WHERE relname = 'Escrow' AND relkind = 'r') AS escrow_table_exists,
-          EXISTS (SELECT 1 FROM pg_type WHERE typname = 'EscrowStatus' AND typtype = 'e') AS enum_exists;
-   ```
-   If table present, confirm `SELECT COUNT(*) FROM "Escrow"` is 0 (STOP if >0; investigate FK to Order). If enum present, confirm only `Escrow.status` references it.
-
-3. **PR #17 / Phase 7.13.1.1** — run prod-scale EXPLAIN ANALYZE before applying:
-   ```sql
-   EXPLAIN (ANALYZE, BUFFERS) SELECT id, status FROM "Settlement" WHERE status = 'PENDING';
-   ```
-   Confirm the planner picks `Settlement_status_reviewEndsAt_idx` (composite leading column), NOT the soon-dropped single-column.
-
-4. **PR #18 / Phase 7.10.2** — one-time `guestpost_test_template` setup on CI runner. Add to `.github/workflows/ci.yml` before `pnpm test:integration` (deferred to Phase 7.10.2.1 fast-follow PR).
-
-5. **Phase 7.7 A1 dev DB drift** — pre-existing operator action from Phase 7.7 still owed. Apply migration on staging/prod + record EXPLAIN ANALYZE planner-uses-index proof + before/after counts in audit §11 Phase 7.7 entry. Until prod cutover, requestId column queries seq-scan.
+**No operator action items from this session** — all changes are application-layer (no migrations, no infra changes).
 
 **Named follow-up backlog items** (next session work):
 
-- **Phase 8.X bundle** — close 2026-06-22 audit findings one phase per finding (same pattern as Phase 6.6 → 7.14 closed the prior batch). Remaining Criticals: settlement race windows #1+#2, payout webhook dedup #3, settlement-auto-approve audit log #4, lazy-queueServiceRef race #5, CI template-DB step #6 = Phase 7.10.2.1 already named, adapter-pg pool sizing #7. **#38 closed via Phase 8.7** (PR pending). High items cluster naturally into batches by domain: payout-flow hardening bundle (#39 Stripe reversal Idempotency-Key + #40 cancelExecution two-phase + #41 auto-approve catch fix), database hardening (#11+#12+#13), infra/CI cleanup (#15+#16+#17+#19), delta-edge guards (#8+#9+#10), worker observability (#14+#18).
-- **Phase 7.10.2.1** — Spec 2 (queue GET happy-path) + TestAuthGuard (X-Test-User-Id header) + supertest api-client. HTTP-layer integration capability deferred from PR #18 for shipping velocity. ALSO ships the CI integration step (`prisma migrate deploy` to template DB before `pnpm test:integration`). **This phase closes 2026-06-22 audit Critical #6.**
-- **Phase 7.10.2.x** — Convert Phase 7.12 favorites manual-smoke race to integration spec. Fast-follow now that the harness exists; same 5-caller shape as PR #18's Spec 1.
-- **Phase 7.10.2.2.2** — Split AppModule into per-feature TestModules once integration suite hits 20+ specs. Deferred until the suite actually justifies the rework (currently 1 spec; ~2s/spec boot cost is fine at small scale).
-- **Phase 7.10.1** — Admin "manually mark customer verified" action. Speculative; defer until real support burden surfaces.
+- **Phase 3 — Operational Safety** — Worker process isolation, missing DB indexes (`User(userType)`, `AuditLog(organizationId)`, `Notification(organizationId)`, composite on `Transaction(walletId, type)`), orphaned Next 16 root dependency cleanup, Wallet/Settlement DB `CHECK` constraints.
+- **Phase 7.10.2.1** — CI integration test template-DB step. Closes 2026-06-22 audit Critical #6.
+- **Phase 7.10.2.x** — Convert Phase 7.12 favorites manual-smoke race to integration spec.
+- **Payout-flow hardening** — Stripe reversal Idempotency-Key (Phase 8.x), cancelExecution two-phase commit, auto-approve catch Sentry injection. 3 remaining High findings from the 2026-06-22 audit.
