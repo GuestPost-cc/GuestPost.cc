@@ -45,15 +45,13 @@ const REGISTRY_PATH = join(
 
 function extractRegistryNames(): Set<string> {
   const src = readFileSync(REGISTRY_PATH, "utf8")
-  // Match the set literal: new Set<RepeatableJobName>(["name1", "name2", ...])
-  const setBlockMatch = src.match(
-    /REPEATABLE_JOB_NAMES\s*=\s*new\s+Set<[^>]+>\(\s*\[([^\]]+?)\]\s*\)/,
+  // Match the JOB_NAMES array literal directly.
+  const jobNamesBlockMatch = src.match(
+    /const\s+JOB_NAMES\s*=\s*\[([\s\S]*?)\]\s*as\s+const/,
   )
-  if (!setBlockMatch)
-    throw new Error(
-      "Could not locate REPEATABLE_JOB_NAMES set in registry file",
-    )
-  const namesRaw = setBlockMatch[1]
+  if (!jobNamesBlockMatch)
+    throw new new Error("Could not locate JOB_NAMES array in registry file")()
+  const namesRaw = jobNamesBlockMatch[1]
   const names = [...namesRaw.matchAll(/["']([^"']+)["']/g)].map((m) => m[1])
   return new Set(names)
 }
