@@ -24,12 +24,38 @@ const PG_PASS = "guestpost"
 const TEMPLATE_DB = "guestpost_test_template"
 const ADMIN_DB = "postgres"
 
+function detectPsqlCmd(): string[] {
+  // GitHub Actions — no docker socket in service containers, use psql via TCP
+  if (process.env.GITHUB_ACTIONS === "true") {
+    return ["psql", "-h", "localhost", "-U", PG_USER, "-d", ADMIN_DB, "-c"]
+  }
+  // Local dev — prefer docker exec (no pg client dep needed)
+  try {
+    execFileSync("docker", ["inspect", "gp-postgres"], {
+      encoding: "utf-8",
+      stdio: "ignore",
+    })
+    return [
+      "docker",
+      "exec",
+      "gp-postgres",
+      "psql",
+      "-U",
+      PG_USER,
+      "-d",
+      ADMIN_DB,
+      "-c",
+    ]
+  } catch {
+    // No docker container — fallback to direct psql via TCP
+    return ["psql", "-h", "localhost", "-U", PG_USER, "-d", ADMIN_DB, "-c"]
+  }
+}
+
+const psqlCmd = detectPsqlCmd()
+
 function psqlAdmin(sql: string): void {
-  execFileSync(
-    "docker",
-    ["exec", "gp-postgres", "psql", "-U", PG_USER, "-d", ADMIN_DB, "-c", sql],
-    { encoding: "utf-8" },
-  )
+  execFileSync(psqlCmd[0], [...psqlCmd.slice(1), sql], { encoding: "utf-8" })
 }
 
 export interface TestDatabase {

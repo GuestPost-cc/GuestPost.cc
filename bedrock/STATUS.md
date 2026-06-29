@@ -33,7 +33,7 @@ last_system_refresh: 2026-06-28T18:00:00Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
-- Last project sync: `2026-06-29T10:31:34Z`
+- Last project sync: `2026-06-29T10:47:59Z`
 - Last phase landed: `Phase 8.10 — settlement TOCTOU guard + CSRF middleware + support ticket cap` on 2026-06-29
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)

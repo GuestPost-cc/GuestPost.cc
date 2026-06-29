@@ -66,6 +66,28 @@ jobs:
       - run: pnpm -F @guestpost/database exec prisma migrate deploy
         name: Run DB migrations
 
+      # Phase 7.10.2.1 — Integration test template database (idempotent)
+      - name: Install psql if missing
+        run: command -v psql || sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Create integration test template database (idempotent)
+        env:
+          PGPASSWORD: guestpost
+        run: |
+          psql -h localhost -U guestpost -d postgres -c "DROP DATABASE IF EXISTS guestpost_test_template WITH (FORCE)"
+          psql -h localhost -U guestpost -d postgres -c "CREATE DATABASE guestpost_test_template"
+
+      - name: Apply migrations to template database
+        run: DATABASE_URL=postgresql://guestpost:guestpost@localhost:5432/guestpost_test_template npx prisma migrate deploy
+        working-directory: packages/database
+
+      - name: Verify template database exists
+        env:
+          PGPASSWORD: guestpost
+        run: |
+          EXISTS=$(psql -h localhost -U guestpost -d postgres -t -A -c "SELECT COUNT(*) FROM pg_database WHERE datname='guestpost_test_template'")
+          if [ "$EXISTS" != "1" ]; then echo "template DB missing" && exit 1; fi
+
       - run: pnpm run typecheck
         name: TypeScript check
 
@@ -84,3 +106,8 @@ jobs:
 
       - run: pnpm -F @guestpost/api test
         name: Run tests
+
+      - name: API integration tests (Jest, ephemeral DB per spec)
+        env:
+          PGPASSWORD: guestpost
+        run: pnpm -F @guestpost/api test:integration
