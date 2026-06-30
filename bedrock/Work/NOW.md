@@ -16,31 +16,9 @@ Pre-beta audit closed 10 dimensions. Phase 1 fixed the settlement TOCTOU gap. Ph
 | Track | Changes |
 |---|---|
 | **Phase A1–A3** | Revenue SQL refactor, Redis client split, backend observability |
-| **Dependabot batch (8/10)** | Merged #29 sentry, #31 eslint, #33 nodemailer, #34 recharts, #35 lucide-react, #36 dotenv, #37 zod via CI. #38 tailwindcss v3→v4 required full migration: PostCSS plugin swap (`@tailwindcss/postcss`), CSS-first config (`@theme` block), dropped `tailwind.config.ts`, `@utility container`. |
-| **Tailwind v4 migration** | #39 — 15 files changed. All 4 apps built successfully. 693 unit tests pass. |
-| **Deferred (2/10)** | #30 nextjs 15→16, #32 typescript — real breaking changes, deferred to Phase B. |
+| **Dependabot batch (10/10)** | All resolved. 6 CI-passing deps merged directly. Tailwind v3→v4 migration (PR #39). TypeScript 5.9→6.0 migration (PR #32) — added explicit `types` fields, `ignoreDeprecations`, `strictPropertyInitialization`, `noUncheckedSideEffectImports`. Next.js 15→16 migration (PR #30) — smooth upgrade, codemod applied, `next lint`→`eslint`. |
+| **Phase B complete** | Both deferred framework upgrades (TS 6, Next.js 16) successfully migrated and merged. |
 
 ## What's next
 
-**High-priority open findings — mapped to roadmap phases:**
-
-| Finding | Phase | Gate |
-|---------|-------|------|
-| **#7** — Prisma pool env-var | B1 | Telemetry evidence |
-| **#9** — DNS rebinding pipelining | B2 | Exploit test |
-| **#5** — QueueService init race | B3 | None |
-| **#11** — Enum-drift static specs | C2 | — |
-| **#12** — CASCADE→SetNull | C2 | — |
-| **#13** — Key-rotation runbook | C2 | — |
-| **#14** — Body-cap structured log | C1 | — |
-| **#15** — Healthchecks | C3 | — |
-| **#17** — Postgres:17 workflow | C3 | — |
-| **#18** — Recon dedup per-sweep | C1 | — |
-
-**Medium findings:** Phase C4–C6 bundles. See `backlog.md`.
-
-**Backlog:**
-
-- Phase B — includes deferred framework upgrades (Next.js 16, TypeScript), Prisma pool env-var, DNS rebinding, QueueService init race
-- Phase C1–C6 — Operational tuning bundles
-- Phase D — Post-beta scaling
+**Backlog:** Remaining audit findings (B1–C6) — next: Phase B1 (Prisma pool env-var).
