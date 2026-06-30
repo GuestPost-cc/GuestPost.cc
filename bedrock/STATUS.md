@@ -7,13 +7,13 @@ real_knowledge_path: /Users/shohan/Desktop/GuestPost/guestpost-platform/bedrock
 local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
-last_backfill_import: 2026-06-29
-last_audit: 2026-06-29 (18/41 numbered findings closed — 19 open, 0 partial, 4 unchecked — see §12 remediation log for per-finding breakdown)
-prior_audit: 2026-06-15 (31/31 closed 100%)
+last_backfill_import: 2026-06-30
+last_audit: 2026-06-30 (21/41 numbered findings closed — 20 open, 0 partial — see §12 remediation log for per-finding breakdown)
+prior_audit: 2026-06-22 (41/41 "over-reported"; actual: 18/41 closed, 19 open, 4 unchecked)
 last_compaction: 2026-06-11
-last_validation: 2026-06-28
+last_validation: 2026-06-11
 last_validation_result: valid
-last_doctor: 2026-06-28
+last_doctor: 2026-06-11
 last_doctor_result: healthy
 framework_version: 0.4.16
 last_system_refresh: 2026-06-28T18:00:00Z
@@ -33,9 +33,10 @@ last_system_refresh: 2026-06-28T18:00:00Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
-- Last project sync: `2026-06-29T11:32:21Z`
-- Last phase landed: `Phase 8.10 — settlement TOCTOU guard + CSRF middleware + support ticket cap` on 2026-06-29
-- **⚠️ Correction**: The audit header claimed 41/41 closed. Systematic codebase verification on 2026-06-29 found only **18 confirmed closed**, **19 still open**, **0 partial**, and **4 unchecked** (out of 41 numbered findings). STATUS.md and NOW.md updated accordingly.
+- Last project sync: `2026-06-30T10:42:20Z`
+- Last phase landed: `Phase A — Correctness bundle (A1 Revenue SQL, A2 Redis client, A3 Observability)` on 2026-06-30
+- Current audit state: **21 confirmed closed**, **20 still open** (out of 41 numbered findings). Phase A closed #8 and #10.
+- **⚠️ Correction**: The June-22 audit header claimed 41/41 closed. Systematic codebase verification on 2026-06-29 found only 18 confirmed closed. STATUS.md and NOW.md updated accordingly.
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)
 - Last doctor: `2026-06-11` (`healthy`)

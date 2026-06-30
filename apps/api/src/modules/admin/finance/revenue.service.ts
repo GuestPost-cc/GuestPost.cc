@@ -17,7 +17,7 @@
 //     Order layer.
 
 import { Prisma } from "@guestpost/database"
-import { Injectable } from "@nestjs/common"
+import { Injectable, Logger } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { RevenueGroupBy } from "../dto/get-revenue-query.dto"
 
@@ -152,6 +152,8 @@ function deltaPct(currentStr: string, previousStr: string): number {
 
 @Injectable()
 export class RevenueService {
+  private readonly logger = new Logger(RevenueService.name)
+
   constructor(private readonly prisma: PrismaService) {}
 
   async getRevenue(input: {
@@ -160,6 +162,12 @@ export class RevenueService {
     groupBy: RevenueGroupBy
   }): Promise<RevenueResponse> {
     const range = resolveRange(input.from, input.to)
+
+    this.logger.log("revenue query", {
+      groupBy: input.groupBy,
+      from: range.from?.toISOString() ?? null,
+      to: range.to?.toISOString() ?? null,
+    })
 
     // Run aggregation + current totals + previous totals + currency check in parallel.
     // Each is index-bounded on (recordedAt) or (recordedAt, fulfillmentChannel|serviceType|listingServiceId).
@@ -181,6 +189,14 @@ export class RevenueService {
           : Promise.resolve(null),
         this.detectCurrencyMismatch(range),
       ])
+
+    this.logger.log("revenue result", {
+      groupBy: input.groupBy,
+      bucketCount: buckets.length,
+      currentGross: currentTotals.grossAmount,
+      hasPrevious: previousTotals !== null,
+      currencyMismatch: currencyMismatch?.distinctCurrencies ?? null,
+    })
 
     const totalsSlice: {
       current: RevenueTotalsSlice
@@ -351,14 +367,24 @@ export class RevenueService {
   ): Promise<RevenueBucket[]> {
     // Build a parameterized query that returns sums per UTC month.
     // Using raw SQL because Prisma groupBy doesn't support date_trunc.
-    const fromClause = range.from ? `AND "recordedAt" >= $1::timestamptz` : ""
-    const toClause = range.to
-      ? `AND "recordedAt" <= ${range.from ? "$2" : "$1"}::timestamptz`
-      : ""
-
+    // Uses clauses[] + params[] accumulation pattern (not brittle $1/$2 ternary arithmetic).
+    const clauses: string[] = []
     const params: unknown[] = []
-    if (range.from) params.push(range.from)
-    if (range.to) params.push(range.to)
+    let paramIndex = 0
+
+    if (range.from) {
+      paramIndex++
+      clauses.push(`"recordedAt" >= $${paramIndex}::timestamptz`)
+      params.push(range.from)
+    }
+    if (range.to) {
+      paramIndex++
+      clauses.push(`"recordedAt" <= $${paramIndex}::timestamptz`)
+      params.push(range.to)
+    }
+
+    const whereClause =
+      clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : ""
 
     type MonthRow = {
       month: Date
@@ -377,7 +403,7 @@ export class RevenueService {
         COUNT(*) FILTER (WHERE "reversedAt" IS NULL) AS row_count,
         COUNT(*) FILTER (WHERE "reversedAt" IS NOT NULL) AS reversed_count
       FROM "PlatformRevenue"
-      WHERE 1=1 ${fromClause} ${toClause}
+      ${whereClause}
       GROUP BY date_trunc('month', "recordedAt" AT TIME ZONE 'UTC')
       ORDER BY month ASC
     `
@@ -599,9 +625,14 @@ export class RevenueService {
     if (distinctRows.length === 0) return null
 
     const rowCount = await this.prisma.order.count({ where })
+    const distinctCurrencies = distinctRows.map((r) => r.currency).sort()
+    this.logger.warn("non-USD currency detected in revenue range", {
+      distinctCurrencies,
+      rowCount,
+    })
     return {
       rowCount,
-      distinctCurrencies: distinctRows.map((r) => r.currency).sort(),
+      distinctCurrencies,
     }
   }
 }

@@ -14,10 +14,12 @@ if (process.env.NODE_ENV === "development") {
 // later silently no-ops the wrappers.
 import "./instrument"
 import { createAuth, toNodeHandler } from "@guestpost/auth"
+import { QUEUES } from "@guestpost/shared"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { ValidationPipe } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core"
 import { ExpressAdapter } from "@nestjs/platform-express"
+import { Queue } from "bullmq"
 import cookieParser from "cookie-parser"
 import cors from "cors"
 import express from "express"
@@ -28,7 +30,8 @@ import { invalidateAuthContext } from "./common/auth-context-cache"
 import { SentryExceptionFilter } from "./common/filters/sentry-exception.filter"
 import { hasAuthCredentials } from "./common/has-auth-credentials"
 import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-business-context.interceptor"
-import { getRedisClient } from "./common/redis-client"
+import { PrismaService } from "./common/prisma.service"
+import { getQueueConnection, getRedisClient } from "./common/redis-client"
 import { QueueService } from "./modules/queues/queue.service"
 
 const REQUIRED_ENV_VARS = ["DATABASE_URL", "REDIS_URL", "JWT_SECRET"] as const
@@ -123,7 +126,7 @@ async function bootstrap() {
     }),
   )
 
-  // Health check - before rate limiting
+  // Health check - before rate limiting (liveness only — no dependency checks)
   server.get("/api/v1/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() })
   })
@@ -457,6 +460,100 @@ async function bootstrap() {
   }
   console.log("Nest initialized")
   console.log("QueueService resolved")
+
+  // Phase A3 — dependency-checked readiness endpoint. Runs after Nest init
+  // so PrismaService connection is established. Redis PING uses the HTTP
+  // client (getRedisClient). Returns 503 when any dependency is down.
+  const prismaService: PrismaService = app.get(PrismaService)
+  server.get("/api/v1/health/ready", async (_req, res) => {
+    const checks: { redis: string; database: string } = {
+      redis: "ok",
+      database: "ok",
+    }
+    let allOk = true
+    try {
+      const result = await getRedisClient().ping()
+      if (result !== "PONG") {
+        checks.redis = `unexpected response: ${result}`
+        allOk = false
+      }
+    } catch (err) {
+      checks.redis = err instanceof Error ? err.message : String(err)
+      allOk = false
+    }
+    try {
+      await prismaService.$queryRaw`SELECT 1`
+    } catch (err) {
+      checks.database = err instanceof Error ? err.message : String(err)
+      allOk = false
+    }
+    res.status(allOk ? 200 : 503).json({
+      status: allOk ? "ok" : "degraded",
+      timestamp: new Date().toISOString(),
+      checks,
+    })
+  })
+
+  // Phase A3 — queue depth metrics using the BullMQ connection.
+  // Mirrors the worker's /metrics/queues for API-side queue inspection.
+  const queueConnection = getQueueConnection()
+  server.get("/api/v1/metrics/queues", async (_req, res) => {
+    try {
+      const queueNames = Object.values(QUEUES)
+      const entries = await Promise.all(
+        queueNames.map(async (name) => {
+          const q = new Queue(name, { connection: queueConnection as any })
+          try {
+            const counts = await q.getJobCounts(
+              "waiting",
+              "active",
+              "delayed",
+              "completed",
+              "failed",
+              "paused",
+            )
+            return [
+              name,
+              {
+                waiting: counts.waiting ?? 0,
+                active: counts.active ?? 0,
+                delayed: counts.delayed ?? 0,
+                completed: counts.completed ?? 0,
+                failed: counts.failed ?? 0,
+                paused: counts.paused ?? 0,
+              },
+            ] as const
+          } finally {
+            await q.close().catch(() => {})
+          }
+        }),
+      )
+      const queues: Record<string, unknown> = {}
+      const totals = {
+        waiting: 0,
+        active: 0,
+        delayed: 0,
+        completed: 0,
+        failed: 0,
+        paused: 0,
+      }
+      for (const [name, counts] of entries) {
+        queues[name] = counts
+        totals.waiting += (counts as Record<string, number>).waiting ?? 0
+        totals.active += (counts as Record<string, number>).active ?? 0
+        totals.delayed += (counts as Record<string, number>).delayed ?? 0
+        totals.completed += (counts as Record<string, number>).completed ?? 0
+        totals.failed += (counts as Record<string, number>).failed ?? 0
+        totals.paused += (counts as Record<string, number>).paused ?? 0
+      }
+      res.json({ queues, totals })
+    } catch (err) {
+      res.status(500).json({
+        error: "failed to collect queue metrics",
+        message: err instanceof Error ? err.message : String(err),
+      })
+    }
+  })
 
   const authWithRateLimit = createAuth({
     emailRateLimit: {

@@ -5,9 +5,9 @@ import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { getRequestId } from "@guestpost/shared/dist/observability/request-context"
 import { Injectable, Logger } from "@nestjs/common"
 import { type JobsOptions, Queue, type QueueOptions } from "bullmq"
-import { getRedisClient } from "../../common/redis-client"
+import { getQueueConnection } from "../../common/redis-client"
 
-const getConnection = getRedisClient
+const getConnection = getQueueConnection
 
 const DEFAULT_JOB_OPTIONS: JobsOptions = {
   attempts: 3,

@@ -8,31 +8,46 @@ updated: 2026-06-22
 
 Forward roadmap. Canonical source for per-finding status is now `bedrock/Views/audits/platform-audit-2026-06-22.md` §12 (the 2026-06-15 batch's §11 closed at 31/31 on 2026-06-21).
 
-**2026-06-22 audit dashboard: 41/41 closed** (all findings resolved). Each closes via its own Phase 8.X cycle. Prior-audit Critical-finding status: 11/11 closed (Phase 7.6 closed the last 2026-06-15 Critical, #9 Mobile UX). **Closed**: #1 (Phase 8.1), #2 (Phase 8.2), #3 (Phase 8.3), #4 (Phase 8.4 — invalid finding), #6 (Phase 7.10.2.1), #38 (Phase 8.7 — dead code removed), #39 (Phase 8.x — direct commit `ac56ed0`), #40 (Phase 8.8 — two-phase commit), #41 (Phase 8.9 — Sentry onError). See §12 of the audit doc.
+**2026-06-22 audit dashboard status (current): 18 of 41 findings closed (43.9%)** (not 41/41). **19 open, 4 unchecked**. Each finding (#1-#41) maps to `bedrock/Views/audits/platform-audit-2026-06-22.md` §2. 
 
-## Phase 8.X — Close 2026-06-22 audit findings (new batch, mirrors 6.6→7.14 pattern)
+**Phase 8.X closure progress (completed so far):** #1 (Phase 8.1), #2 (Phase 8.2), #3 (Phase 8.3), #6 (Phase 7.10.2.1), #38 (Phase 8.7), #39 (Phase 8.x), #40 (Phase 8.8), #41 (Phase 8.9). 
 
-Suggested ordering by criticality + dependency. Each finding number maps to `bedrock/Views/audits/platform-audit-2026-06-22.md` §2.
+**Current phase:** Phase A complete (A1 Revenue SQL, A2 Redis client separation, A3 Backend observability).
 
-**Critical (7):**
+**Closure contrast:** The audit dashboard was over-reported as 41/41 closed; the backlog still reflected this inaccurate earlier state for visibility. The canonical source is now the updated audit §12 reflecting 18 closed of 41.
 
-- [x] **Phase 8.1 — Settlement returnToReview race** (#1). ✅ DONE 2026-06-22 (commit `35d0d31` on branch `phase-8.1-8.2-settlement-race-windows`; PR pending). Changed `tx.settlement.update` → `tx.settlement.updateMany` with `where: { id, status: "CUSTOMER_APPROVED", version: settlement.version }` + `data: { ..., version: { increment: 1 } }` + `ConflictException` on `count === 0` + `findUniqueOrThrow` refetch. Matches the 6 sibling-site convention.
-- [x] **Phase 8.2 — releaseFundsInternal Order.status version guard** (#2). ✅ DONE 2026-06-22 (commit `a21de33` on branch `phase-8.1-8.2-settlement-race-windows`; PR pending). Extended `tx.order.findUnique` `select` with `version` (+ all 4 other downstream-consumed fields enumerated by recon); changed `tx.order.update` → `tx.order.updateMany` with version guard + `ConflictException`. Status-only predicate intentionally omitted (callers pass orders in varying legitimate pre-states). Defensive `NotFoundException` added for null-order. 6 new tests in `phase-8-1-8-2-settlement-race-windows.spec.ts`.
-- [x] **Phase 8.3 — Payout webhook idempotency** (#3). ✅ DONE 2026-06-22 (commits `e522daf` + `ddb0e6b` on branch `phase-8.3-payout-webhook-dedup`; PR pending). Used **BullMQ-native jobId** (not app-layer dedupKey — that pattern is for DB rows; queue items use jobId per repo convention at 6+ sites). Reused `normalizeProviderWebhook` from `@guestpost/shared` for payload-shape extraction (single source of truth across worker + controller). `logger.warn` fires when normalizer can't pull a transfer id for a known provider (drift visibility). Dedup window: ~24h / 100 jobs per the PAYOUT queue's default `removeOnComplete: { count: 100, age: 86400 }`. Worker's existing `status !== "PROCESSING"` guard at `payout.processor.ts:161` remains the late-retry safety net. 4 new tests + 2 tightened existing assertions.
-- [x] **Phase 8.4 — Settlement auto-approve audit log per sweep** (#4). ✅ DONE 2026-06-22 (commit `4185cf1` on branch `phase-8.4-8.9-settlement-auto-approve-hardening`; PR pending). **Invalid finding** — recon verified the core at `packages/shared/src/settlement-auto-approve-core.ts:136-149` has written the audit log row since Phase 7.3; the audit reviewed the processor file in isolation and missed the delegation. No production code changed; tightened the existing Phase 7.3 spec at `apps/api/src/__tests__/phase-7-3-auto-approve-worker.spec.ts:104-122` with payload-shape assertions so a future change cannot silently drop the row's load-bearing fields.
-- [ ] **Phase 8.5 — Lazy queueServiceRef race fix** (#5). Move `queueServiceRef = app.get(QueueService)` before Better Auth handler mount OR switch to `OnModuleInit` injection pattern.
-- [x] **Phase 7.10.2.1 — CI integration template-DB step + Spec 2** (#6). Already named in NOW.md. Closes Critical #6.
-- [ ] **Phase 8.6 — Adapter-pg pool sizing** (#7). Document per-replica formula; parameterize `max` via `PRISMA_POOL_MAX` env var; add 80% utilization alert. (Production-blocker only at multi-replica scale-up.)
-- [x] **Phase 8.7 — Payout worker handleExecute disambiguation** (#38). ✅ DONE 2026-06-22 (commits a2f9f73 + b75cf7a + 58b4d0e on branch `phase-8.7-delete-payout-execute-dead-code`; PR pending). Recon (95% confidence) confirmed dead code: 0 enqueuers, 0 tests, 0 runbook refs, 0 registry entries, stub from day one (commit 145bd89). DELETED handler + switch arm + `QUEUE_JOBS.PAYOUT.EXECUTE` constant + stale freshness-window comment reference. Shipped 7-case regression guard at `apps/api/src/__tests__/phase-8-7-payout-execute-dead-code.spec.ts` (negative + positive assertions). apps/api jest: 48 suites / 659 tests all pass.
+## Phased Engineering Roadmap (v1.0) — 2026-06-30
 
-**High (15):** see `bedrock/Views/audits/platform-audit-2026-06-22.md` §2 findings #8 through #19, plus follow-up #39, #40, #41. Likely bundles:
-- [x] **Phase 8.8 — Payout-flow hardening bundle** (#39 Stripe reversal Idempotency-Key, #40 cancelExecution two-phase pattern). ✅ DONE 2026-06-29. #39 closed via direct commit `ac56ed0` (Idempotency-Key header on Stripe reversal). #40 closed via Phase 8.8 (Tx1→provider→Tx2 two-phase commit with version claim chain + worker version guards).
-- [x] **Phase 8.9 — Settlement auto-approve catch fix** (#41). ✅ DONE 2026-06-22 (commits `6208320` + `fd5d8d7` + `e3476bf` on branch `phase-8.4-8.9-settlement-auto-approve-hardening`; PR pending). Added `onError?: (err, settlementId) => void` to `RunSettlementAutoApproveOptions` + new `makeAutoApproveOnError(hooks, jobName, sweepRunId)` factory in `@guestpost/shared`. Processor passes injected hooks so `packages/shared` stays Sentry-free (preserves the established shared-core convention). Sentry call uses `fingerprint: ['settlement-auto-approve', settlementId]` for issue-grouping under burst failures. Defensive inner try/catch around `opts.onError` so a buggy handler can't kill the sweep. 9 new tests (2 in Phase 7.3 spec + 7 in new Phase 8.9 spec — 4 factory contract + 3 adoption guard).
-- **Phase 8.10 — Database hardening bundle** (#11 enum-drift static specs, #12 CASCADE→SetNull, #13 JSON validation + payout key-rotation runbook).
-- **Phase 8.11 — Infra/CI cleanup bundle** (#15 mailpit + worker healthchecks, #16 .env.example DATABASE_URL flag, #17 workflow consolidation, #19 JWT_SECRET hard check).
-- **Phase 8.12 — Operational resilience bundle** (#8 Redis client timeouts, #9 DNS-rebinding pool-reuse guard).
-- **Phase 8.13 — Worker observability gaps** (#14 body-cap structured log, #18 reconciliation dedup metric).
-- **Phase 8.14 — Revenue raw-SQL refactor** (#10) — small standalone or absorb into a Phase 7.1.x.
+Replaces Phase 8.X bundles. Organized into Phase A (correctness), Phase B (reliability), Phases C–D (operational tuning + scaling).
+
+### Phase A — Correctness (DONE 2026-06-30)
+
+- [x] **Phase A1 — Revenue SQL refactor** (#10). Refactored `groupByMonth` in `revenue.service.ts` from brittle ternary-based `$1`/`$2` arithmetic to safe `clauses[] + params[]` accumulation. Eliminates human-reasoning risk when adding future range clauses. Tests unchanged (behavioral identical).
+- [x] **Phase A2 — Redis client separation** (#8). Split `redis-client.ts` into `getRedisClient()` (HTTP context: `maxRetriesPerRequest: 5`, `connectTimeout: 10s`, exponential-backoff `retryStrategy` capped at 30s, give up after 15 attempts) and `getQueueConnection()` (BullMQ context: same timeouts but `maxRetriesPerRequest: null` per BullMQ requirement). Worker `redis.ts` gained same `connectTimeout` + `retryStrategy`. QueueService switched to `getQueueConnection()`.
+- [x] **Phase A3 — Backend observability**. Enhanced API `/api/v1/health/ready` with Redis PING + Prisma `SELECT 1` dependency checks. Added `/api/v1/metrics/queues` endpoint mirroring worker queue depths. Added structured logging to RevenueService (query params + results + currency mismatch warnings).
+
+### Phase B — Reliability (pending Phase A exit review)
+
+- [ ] **Phase B1 — Prisma pool env-var parameterization** (#7). Document per-replica formula; expose `PRISMA_POOL_MAX` env var (default 25); add 80% utilization telemetry. Requires telemetry evidence before implementation per roadmap constraint.
+- [ ] **Phase B2 — DNS rebinding pipelining guard** (#9). Add `pipelining: 0` to the shared safe-fetch Agent. Requires reproducible exploit test before implementation per roadmap constraint.
+- [ ] **Phase B3 — QueueService initialization race** (#5). Move `queueServiceRef = app.get(QueueService)` guard to eager initialization or switch to `OnModuleInit`.
+
+### Phase C — Operational Tuning
+
+- [ ] **Phase C1 — Worker observability gaps** (#14 body-cap structured log `reason: 'body_size_exceeded'`, #18 reconciliation dedup logged as per-sweep not cumulative).
+- [ ] **Phase C2 — Database hardening** (#11 enum-drift static specs for partial-unique WHERE clauses, #12 CASCADE→SetNull on TicketMessage/Notification userId, #13 payout key-rotation runbook).
+- [ ] **Phase C3 — Infra/CI cleanup** (#15 mailpit healthcheck + worker HEALTHCHECK, #17 PR/workflow postgres:17-alpine consolidation, #19 JWT_SECRET hard check).
+- [ ] **Phase C4 — Frontend polish** (#20 raw `<img>` → `Image`, #21 duplicate `statusVariant()`, #22 `publisherAmount` zero-value docs, #31 structured-logger context-size cap).
+- [ ] **Phase C5 — Index + schema maintenance** (#23 `@@index([customerId])` on Order, #24 `@db.Timestamptz` on createdAt columns, #32 turbo.json inline rationale).
+- [ ] **Phase C6 — Logging + runbook hygiene** (#27 `console.warn` → logger in dev job-signing, #36 runbook worker-fleet automation, #37 repeatable-job-registry drift boot-time assertion).
+
+### Phase D — Post-Beta Scaling
+
+- [ ] Double-entry ledger (escrow / revenue accounts)
+- [ ] Item-level settlements
+- [ ] Provider-side payout reconciliation
+- [ ] WebsiteVerification (DNS TXT) gate
+- [ ] Order accept/delivery deadline auto-cancel
 
 **Medium (18):** see `bedrock/Views/audits/platform-audit-2026-06-22.md` §2 findings #20 through #37. Cluster opportunistically; many are 1-commit fixes (status-presentation adoption, env-var docs, console→logger).
 

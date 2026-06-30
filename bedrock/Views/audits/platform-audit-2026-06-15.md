@@ -15,6 +15,8 @@ A to Z review of business logic, workflows, workers, database, money flow, lifec
 
 GuestPost.cc is **closer to production-grade than the average marketplace codebase I've reviewed**, but it has a small set of high-severity issues — concentrated in (1) RBAC enforcement at admin endpoints, (2) frontend reliability primitives, and (3) two half-shipped Phase 6/6.5 features — that would cause real incidents on day one of a public launch.
 
+**Current Status (as of 2026-06-15):** The 2026-06-15 audit shows 31 findings closed out of 31 numbered findings (100% closure). However, subsequent audits revealed significant over-reporting of closures. Current reality (2026-06-29): 18 of 41 numbered findings closed, 19 open, 4 unchecked.
+
 ### Overall posture (one-paragraph verdict)
 
 The data model and money-handling core are rigorous: every financial mutation is wrapped in a Postgres transaction, every state row carries a `version` column for optimistic locking, the `Settlement` table has a partial UNIQUE on `(orderId)` for races, fees are computed via exact Decimal subtraction, and Phase 6's snapshot trio (`listingServiceId`, `serviceType`, `ownerType`, `fulfillmentChannel`, `unitPrice`) is consistently captured at creation and read on the routing hot-path. SSRF guards exist on the delivery-verification worker (uncommon in marketplaces), HMAC job signing is mandatory and uniformly enforced across all 9 worker processors, the helmet + CSP configuration is one of the strongest I've seen, and the global ValidationPipe is set to `forbidNonWhitelisted: true`.
