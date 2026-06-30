@@ -151,6 +151,13 @@ Mission: Frontend consistency / Accessibility / Maintainability / Shared pattern
 - [ ] **WebsiteVerification (DNS TXT)** required before listing approval. Phase 7-ish work touched verification triggers but the gate to require it before approval isn't enforced yet.
 - [ ] **Order accept/delivery deadlines + timeout sweep** — SUBMITTED orders currently wait forever (reconciliation detector flags them but no auto-cancel).
 
+## Constraints (cross-phase policies)
+
+1. Every change must include regression tests.
+2. No infrastructure tuning without measurable justification.
+3. Phase A must complete before Phase B begins.
+4. Phase A exit review required before authorizing Phase B.
+
 ## Acceptance / ops gaps (carried from prior batches, still open)
 
 - [ ] **VPS-or-cloud shared-dev hosting decision.** Batch 24 confirmed dev stack is too heavy for 2GB RAM. Options: bigger VPS (4GB+), cloud sandbox (Railway / Fly / Render), or production-build-only deployment (`next start` not `next dev`). Today: laptop-only.

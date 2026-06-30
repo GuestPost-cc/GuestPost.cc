@@ -1,0 +1,2 @@
+$ pnpm -r --filter @guestpost/portal --filter @guestpost/admin --filter @guestpost/publisher run lint
+$ pnpm -r --filter @guestpost/portal --filter @guestpost/admin --filter @guestpost/publisher run lint

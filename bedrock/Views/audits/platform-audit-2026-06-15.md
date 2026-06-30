@@ -15,7 +15,7 @@ A to Z review of business logic, workflows, workers, database, money flow, lifec
 
 GuestPost.cc is **closer to production-grade than the average marketplace codebase I've reviewed**, but it has a small set of high-severity issues — concentrated in (1) RBAC enforcement at admin endpoints, (2) frontend reliability primitives, and (3) two half-shipped Phase 6/6.5 features — that would cause real incidents on day one of a public launch.
 
-**Current Status (as of 2026-06-15):** The 2026-06-15 audit shows 31 findings closed out of 31 numbered findings (100% closure). However, subsequent audits revealed significant over-reporting of closures. Current reality (2026-06-29): 18 of 41 numbered findings closed, 19 open, 4 unchecked.
+**Current Status (as of 2026-06-15):** The 2026-06-15 audit shows 31 findings closed out of 31 numbered findings (100% closure). However, subsequent audits revealed significant over-reporting of closures. Current reality (2026-06-30): 21 of 41 numbered findings closed, 20 open (Phase A — A1 Revenue SQL, A2 Redis client, A3 Observability — completed).
 
 ### Overall posture (one-paragraph verdict)
 
