@@ -13,11 +13,12 @@ Pre-beta audit closed 10 dimensions. Phase 1 fixed the settlement TOCTOU gap. Ph
 
 ## Completed this session (2026-06-30)
 
-| Phase | Changes |
+| Track | Changes |
 |---|---|
-| **Phase A1 — Revenue SQL refactor** (#10) | `groupByMonth` in `revenue.service.ts` refactored from ternary-based `$1`/`$2` arithmetic to `clauses[] + params[]` accumulation. Behavioral identical. |
-| **Phase A2 — Redis client separation** (#8) | Split `redis-client.ts` into `getRedisClient()` (HTTP: `maxRetriesPerRequest: 5`, `connectTimeout: 10s`, exponential-backoff `retryStrategy`) and `getQueueConnection()` (BullMQ: `maxRetriesPerRequest: null`). Worker `redis.ts` gained `connectTimeout` + `retryStrategy`. |
-| **Phase A3 — Backend observability** | Enhanced `GET /api/v1/health/ready` with Redis PING + Prisma `SELECT 1`. Added `GET /api/v1/metrics/queues`. Added structured logging to RevenueService. |
+| **Phase A1–A3** | Revenue SQL refactor, Redis client split, backend observability |
+| **Dependabot batch (8/10)** | Merged #29 sentry, #31 eslint, #33 nodemailer, #34 recharts, #35 lucide-react, #36 dotenv, #37 zod via CI. #38 tailwindcss v3→v4 required full migration: PostCSS plugin swap (`@tailwindcss/postcss`), CSS-first config (`@theme` block), dropped `tailwind.config.ts`, `@utility container`. |
+| **Tailwind v4 migration** | #39 — 15 files changed. All 4 apps built successfully. 693 unit tests pass. |
+| **Deferred (2/10)** | #30 nextjs 15→16, #32 typescript — real breaking changes, deferred to Phase B. |
 
 ## What's next
 
@@ -36,12 +37,10 @@ Pre-beta audit closed 10 dimensions. Phase 1 fixed the settlement TOCTOU gap. Ph
 | **#17** — Postgres:17 workflow | C3 | — |
 | **#18** — Recon dedup per-sweep | C1 | — |
 
-**Medium findings:** Phase C4–C6 bundles. See `backlog.md` and `docs/ENGINEERING_ROADMAP.md`.
+**Medium findings:** Phase C4–C6 bundles. See `backlog.md`.
 
 **Backlog:**
 
-- Phase B1 — Prisma pool env-var (telemetry-gated)
-- Phase B2 — DNS rebinding pipelining (exploit-test-gated)
-- Phase B3 — QueueService init race
+- Phase B — includes deferred framework upgrades (Next.js 16, TypeScript), Prisma pool env-var, DNS rebinding, QueueService init race
 - Phase C1–C6 — Operational tuning bundles
 - Phase D — Post-beta scaling

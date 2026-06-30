@@ -34,7 +34,7 @@ last_system_refresh: 2026-06-28T18:00:00Z
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
 - Last project sync: `2026-06-30T10:42:20Z`
-- Last phase landed: `Phase A — Correctness bundle (A1 Revenue SQL, A2 Redis client, A3 Observability)` on 2026-06-30
+- Last phase landed: `Phase A — Correctness bundle (A1 Revenue SQL, A2 Redis client, A3 Observability)` + `Dependabot batch merge (8 of 10 PRs)` on 2026-06-30
 - Current audit state: **21 confirmed closed**, **20 still open** (out of 41 numbered findings). Phase A closed #8 and #10.
 - **⚠️ Correction**: The June-22 audit header claimed 41/41 closed. Systematic codebase verification on 2026-06-29 found only 18 confirmed closed. STATUS.md and NOW.md updated accordingly.
 - Last compaction: `2026-06-11`
