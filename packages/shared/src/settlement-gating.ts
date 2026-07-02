@@ -10,7 +10,7 @@ export interface SettlementEligibility {
 
 // Active-revision = a revision the publisher still owes. Terminal revision
 // states do not block.
-const ACTIVE_REVISION_STATUSES = ["REQUESTED", "IN_PROGRESS"]
+const ACTIVE_REVISION_STATUSES = ["REQUESTED", "PENDING"]
 
 export async function evaluateSettlementEligibility(
   prisma: any,

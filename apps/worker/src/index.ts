@@ -311,6 +311,13 @@ bootstrap().catch((err) => {
 
 async function shutdown(signal: string): Promise<void> {
   logger.info("signal received — draining workers", { signal })
+  const SHUTDOWN_TIMEOUT_MS = 30_000
+  const drainTimeout = setTimeout(() => {
+    logger.error("shutdown timeout reached — forcing exit", {
+      timeoutMs: SHUTDOWN_TIMEOUT_MS,
+    })
+    process.exit(1)
+  }, SHUTDOWN_TIMEOUT_MS)
   await Promise.all(
     workers.map((w) =>
       w.close().catch((err) =>
@@ -320,6 +327,13 @@ async function shutdown(signal: string): Promise<void> {
       ),
     ),
   )
+  try {
+    await connection.quit()
+  } catch (err) {
+    logger.error("redis connection close error", {
+      err: err instanceof Error ? err.message : String(err),
+    })
+  }
   if (healthServer) {
     await healthServer.close().catch((err) =>
       logger.error("health server close error", {
@@ -339,6 +353,8 @@ async function shutdown(signal: string): Promise<void> {
   } catch {
     /* best-effort */
   }
+  clearTimeout(drainTimeout)
+  logger.info("shutdown complete", { signal })
   process.exit(0)
 }
 

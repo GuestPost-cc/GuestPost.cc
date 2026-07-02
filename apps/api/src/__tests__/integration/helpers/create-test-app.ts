@@ -34,6 +34,10 @@ export async function createTestApp(): Promise<TestAppContext> {
   const db: TestDatabase = await createTestDatabase()
   const previousDatabaseUrl = process.env.DATABASE_URL
   process.env.DATABASE_URL = db.url
+  const previousJwtSecret = process.env.JWT_SECRET
+  if (!process.env.JWT_SECRET && !process.env.QUEUE_SIGNING_SECRET) {
+    process.env.JWT_SECRET = "test-jwt-secret-integration"
+  }
 
   // 2. Defer the AppModule + PrismaService imports until env is set. Module
   //    caching means subsequent imports reuse the same instances — that's why
@@ -71,6 +75,11 @@ export async function createTestApp(): Promise<TestAppContext> {
       process.env.DATABASE_URL = previousDatabaseUrl
     } else {
       delete process.env.DATABASE_URL
+    }
+    if (previousJwtSecret !== undefined) {
+      process.env.JWT_SECRET = previousJwtSecret
+    } else {
+      delete process.env.JWT_SECRET
     }
   }
 

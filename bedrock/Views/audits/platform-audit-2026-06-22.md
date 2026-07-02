@@ -639,14 +639,16 @@ Phase 7.7 shipped the observability spine end-to-end:
 |---|---|
 | `apps/api/src/__tests__/integration/helpers/test-db.ts` | `createTestDatabase()` → `{ dbName, url, teardown }`. Uses docker exec psql (no `pg` direct dep). DROP DATABASE WITH (FORCE). |
 | `apps/api/src/__tests__/integration/helpers/create-test-app.ts` | `createTestApp()` → `{ app, prisma, dbName, cleanup }`. Sets DATABASE_URL BEFORE `require()` of AppModule (Gate 0.75 verified). `Test.createTestingModule({ imports: [AppModule] })`. |
-| `apps/api/src/__tests__/integration/factories/index.ts` | `makeOrganization`, `makeUser`, `makeWebsite`, `makeOrder` — minimum FK chain. Unique suffix via process.pid + Date.now() + counter. |
+| `apps/api/src/__tests__/integration/factories/index.ts` | `makeOrganization`, `makeUser`, `makeWebsite`, `makeOrder` (+ `paymentStatus` override), `makeOrderItem`, `makeOrderDeliveryVersion`, `makePublisher`, `makeWallet`, `makeTransaction`, `makeSettlement` — 10 factories total. Unique suffix via process.pid + Date.now() + counter. Transaction references use `crypto.randomUUID()` for parallel-worker safety. |
+| `apps/api/src/__tests__/integration/factories/financial-fixture.ts` | `setupFinancialTest()` — builds complete financial baseline (org → customer + publisher + website → order + OrderItem + DeliveryVersion (VERIFIED) → wallet → deposit). `expectFinancialState()` — pure DB assertion layer. Uses Prisma enums for all comparison constants. |
 | `apps/api/src/__tests__/integration/orders/fulfillment-claim-race.integration.spec.ts` | Spec 1 — 5-caller Promise.allSettled race; closes Phase 7.14 #23. |
+| `apps/api/src/__tests__/integration/financial/*.integration.spec.ts` | Specs 2-7 (Sprint 2A) — 6 financial integration specs (happy path, refund, duplicate webhook, concurrent settlement, cancellation-before-settlement, settlement rollback). |
 
 ### 10.3 Counts (today)
 
-- Total suites: 48 (was 33 before Phase 7.0)
-- Total tests: 653 (was 478)
-- Integration specs: 1 (Spec 1 only; Spec 2 deferred to Phase 7.10.2.1)
+- Total suites: 54 (was 33 before Phase 7.0)
+- Total tests: 659 (was 478; +6 Sprint 2A financial integration specs)
+- Integration specs: **7** (Spec 1: fulfillment-claim-race + Specs 2-7: Sprint 2A financial — happy path, refund, duplicate webhook, concurrent settlement, cancellation-before-settlement, settlement rollback)
 - TEMPLATE DB: `guestpost_test_template` — operator-action setup required on each dev machine + CI runner (deferred to Phase 7.10.2.1)
 
 ### 10.4 Coverage assessment
@@ -725,7 +727,7 @@ README mentioned VPS attempt + abandonment. Current deploy story unclear — lap
 
 Findings close phase-by-phase here. Verified status updated 2026-06-29 via systematic codebase check; see `bedrock/Work/NOW.md` for details.
 
-**Summary (numbered findings #1-#41)**: 18 closed (✅), 19 open (❌), 0 partial (⚠️), 4 unchecked (❓). Note: CSRF middleware + support ticket cap were closed but are not numbered findings; #2 has two entries (original + Phase 8.10 follow-up).
+**Summary (numbered findings #1-#41)**: 22 closed (✅), 17 open (❌), 0 partial (⚠️), 3 unchecked (❓), 1 intentional (✅), 1 documented (📝). Note: CSRF middleware + support ticket cap were closed but are not numbered findings; #2 has two entries (original + Phase 8.10 follow-up). #9 and #17 closed via Sprint 1A/1B (2026-07-03): DNS rebinding guard (`pipelining: 0`) + CI postgres consolidation (17-alpine). #25, #26, #30, #33 unchecked — see §12 below.
 
 | Finding | Status | Closed by | Date | Notes |
 |---|---|---|---|---|
@@ -750,14 +752,14 @@ Findings close phase-by-phase here. Verified status updated 2026-06-29 via syste
 | #35 — `.env.example` IP-rate-limit vs email-rate-limit interaction not documented | ✅ Closed | Phase 3 (commit `3313728`) | 2026-06-29 | Lines 54-62 of `.env.example` explain the two-layer model: per-IP limits (line 48-52) + per-email limits as second layer catching credential stuffing across IP pools. Window default 1h documented. |
 | #7 — Prisma adapter-pg pool over-provisioned for multi-replica scale-up | ❌ Open | — | — | `apps/api/src/common/prisma.service.ts` hardcodes `max: 25` with no env-var override (`PRISMA_POOL_MAX` not referenced anywhere). No per-environment config computation exists. Production-blocker only at horizontal scale-up; acceptable at laptop scale. |
 | #8 — Redis client unguarded retries + no connection timeout | ❌ Open | — | — | `apps/api/src/common/redis-client.ts` still has `maxRetriesPerRequest: null` (infinite), no `connectTimeout`, no `retryStrategy` (default retries forever). Cascading hang on Redis outage. Backlogged as Phase 8.12. |
-| #9 — DNS rebinding can bypass safe-fetch on pool-reused connections | ❌ Open | — | — | `packages/shared/src/safe-fetch.ts` uses shared `Agent` (module-scope) with no `pipelining: 0` — connection pool reused by hostname without re-resolving DNS. Comment at line 110 celebrates reuse benefit with no caveat. Backlogged as Phase 8.12. |
+| #9 — DNS rebinding can bypass safe-fetch on pool-reused connections | ✅ Closed | Sprint 1A (commit pending) | 2026-07-03 | Added `pipelining: 0` to `SAFE_LOOKUP_AGENT` at `packages/shared/src/safe-fetch.ts:115`. Disables HTTP pipelining so each request gets its own connection, forcing DNS re-resolution for every fetch — eliminating the pool-reuse attack window. Comment updated to document the trade-off. |
 | #10 — Revenue raw-SQL `$1`/`$2` indices built by string ternary | ❌ Open | — | — | `apps/api/src/modules/admin/finance/revenue.service.ts:354-361` still uses `range.from ? "$2" : "$1"` ternary for param indexing. Not refactored to `params.length`-based or Prisma `where` objects. Brittle if `fromClause`/`toClause` conditionals ever diverge. |
 | #11 — Partial-unique WHERE clauses do not track enum additions | ❌ Open | — | — | No static-source spec exists importing `SettlementStatus` or `FulfillmentAssignmentStatus` to assert active values against migration WHERE clauses. The `phase-7-14-static-source.spec.ts` pattern referenced in the audit was never created. Schema.prisma has human-readable comments only (lines 718-730, 800-808). |
 | #12 — CASCADE deletes on User wipe AuditLog / Notification / TicketMessage | ✅ Closed | Phase 8.12 | 2026-06-29 | `Notification.userId` and `TicketMessage.userId` changed to nullable (`String?`) with `onDelete: SetNull` in `schema.prisma`. A custom migration `phase_812_cascade_setnull` was generated to alter columns and recreate FKs. Preserves audit/message history on user deletion (when implemented). |
 | #13 — JSON column validation gaps — payout key-rotation hazard | ❌ Open | — | — | No key-rotation runbook in `bedrock/Memory/infrastructure.md`. No backfill spec asserting encrypted row `encryptionKeyVersion` matches known key. Multi-version decrypt test exists (`payout-decrypt-security.spec.ts:156`) but is the only addressed item. |
 | #14 — Delivery-verification body-cap silent failure | ❌ Open | — | — | `apps/worker/src/processors/delivery-verification.processor.ts:106-116` uses `logger.warn` (not error), no `reason: 'body_size_exceeded'`, no `contentLength`. The sibling `verification.processor.ts:71-76` has identical gap. |
 | #15 — mailpit + worker have no Docker healthcheck | ❌ Open | — | — | `infrastructure/docker/docker-compose.yml` line 77: mailpit has no `healthcheck` block (unlike postgres, redis, minio). `apps/worker/Dockerfile` has no `HEALTHCHECK` instruction (unlike sibling `apps/api/Dockerfile`). |
-| #17 — CI workflows drifted — pr.yml + main.yml use postgres:16 | ❌ Open | — | — | `pr.yml:21` and `main.yml:20` still reference `postgres:16` while `ci.yml:31` uses `postgres:17-alpine`. Consolidation to a single reusable workflow not done. Only `ci.yml` has postgres:17. |
+| #17 — CI workflows drifted — pr.yml + main.yml use postgres:16 | ✅ Closed | Sprint 1B (commit pending) | 2026-07-03 | Changed both `pr.yml:21` and `main.yml:20` from `postgres:16` to `postgres:17-alpine`. All 3 workflows now use postgres:17-alpine. Consolidated image; reusable workflow refactor deferred to future infra work. |
 | #18 — Reconciliation dedup hitcount logged as cumulative, not per-sweep | ❌ Open | — | — | `packages/shared/src/notification-dedup-keys.ts:140` has module-scoped `dedupHitsTotal` never reset between sweeps. `reconciliation.processor.ts:112` logs `dedup_hits_total: total`. The `__resetDedupHitsTotal()` export exists but is test-only. |
 | #20 — Portal marketplace uses raw `<img>` in 4 files | ❌ Open | — | — | 7 raw `<img>` tags across 4 files in `apps/portal/src/app/dashboard/marketplace/`. No `import Image from "next/image"` anywhere in these files. |
 | #21 — Publisher dashboard + admin orders duplicate STATUS_PRESENTATION | ❌ Open | — | — | Admin dashboard (`apps/admin/src/app/dashboard/page.tsx:54`) and admin orders (`apps/admin/src/app/dashboard/orders/page.tsx:69`) have independent hand-rolled `statusVariant()` functions. Publisher dashboard uses inline ternary (lines 393-400). No shared `STATUS_PRESENTATION` import. |
