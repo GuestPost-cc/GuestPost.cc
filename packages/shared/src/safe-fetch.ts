@@ -112,6 +112,7 @@ export function validateResolvedAddress(
 // The lookup callback is intentionally minimal — all validation logic
 // lives in validateResolvedAddress() above for direct unit-testability.
 const SAFE_LOOKUP_AGENT = new Agent({
+  pipelining: 0,
   connect: {
     // Per-connection DNS resolution. undici binds the connection to
     // the IP this returns — no TOCTOU gap. If the DNS server later

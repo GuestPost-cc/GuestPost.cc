@@ -45,3 +45,7 @@ packages/ui/coverage/
 scripts/.wise-validation-key*
 repomix-output.xml
 test-results/
+
+
+Supporting_Reports_ENG_STATE/
+ENGINEERING_STATE_REPORT.md

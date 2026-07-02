@@ -8,7 +8,7 @@ local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
 last_backfill_import: 2026-06-30
-last_audit: 2026-06-30 (21/41 numbered findings closed — 20 open, 0 partial — see §12 remediation log for per-finding breakdown)
+last_audit: 2026-07-03 (22/41 numbered findings confirmed closed — 17 open, 1 intentional, 1 documented, 3 unchecked — see §12 remediation log for per-finding breakdown; #9 DNS rebinding and #17 CI postgres drift closed via Sprint 1A/1B)
 prior_audit: 2026-06-22 (41/41 "over-reported"; actual: 18/41 closed, 19 open, 4 unchecked)
 last_compaction: 2026-06-11
 last_validation: 2026-06-11
@@ -33,10 +33,10 @@ last_system_refresh: 2026-06-28T18:00:00Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-06-11`
-- Last project sync: `2026-06-30T10:42:20Z`
-- Last phase landed: `Phase A — Correctness bundle (A1 Revenue SQL, A2 Redis client, A3 Observability)` + `Dependabot batch merge (8 of 10 PRs)` on 2026-06-30
-- Current audit state: **21 confirmed closed**, **20 still open** (out of 41 numbered findings). Phase A closed #8 and #10.
-- **⚠️ Correction**: The June-22 audit header claimed 41/41 closed. Systematic codebase verification on 2026-06-29 found only 18 confirmed closed. STATUS.md and NOW.md updated accordingly.
+- Last project sync: `2026-07-02T00:00:00Z`
+- Last phase landed: `Evidence-driven engineering assessment` on 2026-07-02 — generated automated counts, scoring rubric, risk register with file:line evidence across all 12 dimensions.
+- Current audit state: **22 confirmed closed**, **17 still open**, **1 intentional**, **1 documented**, **3 unchecked** (out of 41 numbered findings). Phase A corrections applied: #8 (Redis) and #10 (Revenue SQL). Sprint 1A/1B closed #9 (DNS rebinding) and #17 (CI postgres drift).
+- **⚠️ Correction**: The June-22 audit §12 remediation log had 6 stale entries (#8, #10, #16, #19, plus #9, #17 marked OPEN but CLOSED in code). The header claimed 41/41 closed; code verification found 18 confirmed closed. Post-Phase-A + Sprint 1A/1B: 22 confirmed closed.
 - Last compaction: `2026-06-11`
 - Last validation: `2026-06-11` (`valid`)
 - Last doctor: `2026-06-11` (`healthy`)

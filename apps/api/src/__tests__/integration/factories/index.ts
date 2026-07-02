@@ -116,6 +116,7 @@ export async function makeOrder(
     fulfillmentChannel?: "PUBLISHER" | "PLATFORM"
     amount?: number
     title?: string
+    paymentStatus?: string
   },
 ) {
   const suffix = uniqueSuffix()
@@ -129,6 +130,157 @@ export async function makeOrder(
       fulfillmentChannel: args.fulfillmentChannel ?? "PLATFORM",
       amount: args.amount ?? 100,
       title: args.title ?? `Test order ${suffix}`,
+      paymentStatus: args.paymentStatus ?? "PENDING",
+    },
+  })
+}
+
+// ─── OrderItem ──────────────────────────────────────────────────────────────
+// Required by SettlementService.createSettlement() to resolve the publisher
+// from the order (see settlements.service.ts:78-87).
+export async function makeOrderItem(
+  prisma: AnyPrisma,
+  args: {
+    orderId: string
+    websiteId: string
+    price?: number
+  },
+) {
+  return prisma.orderItem.create({
+    data: {
+      orderId: args.orderId,
+      websiteId: args.websiteId,
+      price: args.price ?? 100,
+      status: "PAID",
+    },
+  })
+}
+
+// ─── OrderDeliveryVersion ──────────────────────────────────────────────────
+// Required by evaluateSettlementEligibility() — settlement gating needs a
+// VERIFIED delivery version linked to the order (see settlement-gating.ts:30-49).
+export async function makeOrderDeliveryVersion(
+  prisma: AnyPrisma,
+  args: {
+    orderId: string
+    submittedByUserId: string
+    publishedUrl?: string
+    verificationStatus?: string
+  },
+) {
+  const suffix = uniqueSuffix()
+  return prisma.orderDeliveryVersion.create({
+    data: {
+      orderId: args.orderId,
+      version: 1,
+      publishedUrl:
+        args.publishedUrl ?? `https://example.com/article-${suffix}`,
+      normalizedUrl:
+        args.publishedUrl ?? `https://example.com/article-${suffix}`,
+      submittedByUserId: args.submittedByUserId,
+      verificationStatus: args.verificationStatus ?? "VERIFIED",
+    },
+  })
+}
+
+// ─── Publisher ─────────────────────────────────────────────────────────────
+// Minimal FK chain to satisfy Settlement: publisher belongs to an org.
+export async function makePublisher(
+  prisma: AnyPrisma,
+  args: {
+    organizationId: string
+    name?: string
+    email?: string
+    tier?: string
+  },
+) {
+  const suffix = uniqueSuffix()
+  return prisma.publisher.create({
+    data: {
+      name: args.name ?? `Publisher ${suffix}`,
+      email: args.email ?? `publisher-${suffix}@test.local`,
+      organizationId: args.organizationId,
+      tier: args.tier ?? "NEW",
+    },
+  })
+}
+
+// ─── Wallet ────────────────────────────────────────────────────────────────
+// One wallet per organization (see @@unique([organizationId]) on the schema).
+// Tests must create at most one wallet per org.
+export async function makeWallet(
+  prisma: AnyPrisma,
+  args: {
+    organizationId: string
+    availableBalance?: number
+  },
+) {
+  return prisma.wallet.create({
+    data: {
+      organizationId: args.organizationId,
+      availableBalance: args.availableBalance ?? 0,
+      reservedBalance: 0,
+      currency: "USD",
+    },
+  })
+}
+
+// ─── Transaction ───────────────────────────────────────────────────────────
+// reference must be globally unique (see @@unique([reference]) on the schema).
+// Use crypto.randomUUID() in tests — Date.now() is not collision-proof across
+// parallel jest workers.
+export async function makeTransaction(
+  prisma: AnyPrisma,
+  args: {
+    walletId: string
+    amount: number
+    type: string
+    reference: string
+    orderId?: string | null
+    settlementId?: string | null
+    publisherId?: string | null
+    description?: string
+    providerRef?: string
+  },
+) {
+  return prisma.transaction.create({
+    data: {
+      walletId: args.walletId,
+      amount: args.amount,
+      type: args.type,
+      reference: args.reference,
+      orderId: args.orderId ?? null,
+      settlementId: args.settlementId ?? null,
+      publisherId: args.publisherId ?? null,
+      description: args.description ?? null,
+      providerRef: args.providerRef ?? null,
+      currency: "USD",
+    },
+  })
+}
+
+// ─── Settlement ────────────────────────────────────────────────────────────
+// FK chain: Settlement → Order + Publisher.
+// Creates a pending settlement. Specs call services to transition status.
+export async function makeSettlement(
+  prisma: AnyPrisma,
+  args: {
+    orderId: string
+    publisherId: string
+    grossAmount: number
+    publisherAmount: number
+    platformFee?: number
+    status?: string
+  },
+) {
+  return prisma.settlement.create({
+    data: {
+      orderId: args.orderId,
+      publisherId: args.publisherId,
+      grossAmount: args.grossAmount,
+      publisherAmount: args.publisherAmount,
+      platformFee: args.platformFee ?? 0,
+      status: args.status ?? "PENDING",
     },
   })
 }
