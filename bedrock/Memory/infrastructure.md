@@ -87,3 +87,55 @@ prisma@7.8.0's migrate runner DOES wrap **multi-statement** migration files in a
 - **`forceExit: true` at root level** — jest's `projects` array doesn't honor per-project `forceExit`. Unit project needs it (grandfathered from Phase 7.8 PR #5 — pre-existing leaks). Integration project inherits as a side effect; future PR can split into separate jest configs if integration leak-detection becomes more important.
 - **Integration helpers** at `apps/api/src/__tests__/integration/helpers/`: `test-db.ts` (`createTestDatabase()` returns `{ dbName, url, teardown }`) + `create-test-app.ts` (`createTestApp()` returns `{ app, prisma, dbName, cleanup }`). DATABASE_URL mutation happens BEFORE first AppModule import; Gate 0.75 confirmed env mutation reaches PrismaService cleanly.
 - **psql multi-statement gotcha**: `psql -c "stmt1; stmt2"` wraps multi-statement input in an implicit transaction — an error rolls back earlier statements. For per-statement auto-commit, use `docker exec -i gp-postgres psql ... <<'SQL'` heredoc form. Discovered Phase 7.14 Gate 0.5.
+
+## Payout Encryption Key Rotation
+
+### Architecture
+- **Algorithm**: AES-256-GCM, random 12-byte IV, 16-byte auth tag.
+- **Key derivation**: `scryptSync(masterKey, "payout-key-v{N}", 32)` per version number.
+- **Master key source**: `PAYOUT_ENCRYPTION_KEY` env var (64+ hex chars).
+- **Encrypted tables**: `PayoutMethod.details`, `PayoutProvider.config`.
+- **Version columns**: `PayoutMethod.encryptionKeyVersion`, `PayoutProvider.configEncryptionKeyVersion`.
+- **Current version**: `CURRENT_PAYOUT_KEY_VERSION` at `apps/api/src/modules/publisher-payouts/payout-encryption.constants.ts` — single source of truth shared by the encryption service and the version verifier script.
+- **Dev fallback**: Version 0 (hardcoded dev key, blocked in production).
+
+### Rotation procedures
+
+#### Soft rotation (version bump, same master key) — RECOMMENDED
+
+New encryptions use a fresh derived key; old rows remain decryptable.
+
+1. In `payout-encryption.constants.ts`, bump `CURRENT_PAYOUT_KEY_VERSION` from `1` to `2`.
+2. Deploy — new rows encrypt with `deriveKey(2)`, old rows (version 1) still decrypt.
+3. Verify via `pnpm test` — the rotation-safety test at `payout-decrypt-security.spec.ts:156` validates multi-version round-trips.
+4. (Optional) Re-encrypt old rows to the latest version (see Backfill below).
+
+No data migration. Zero downtime.
+
+#### Hard rotation (change master key)
+
+Use when the master key is potentially compromised.
+
+1. Generate new master key: `openssl rand -hex 32`.
+2. BEFORE deploying the new key, re-encrypt all existing rows:
+   - For each `PayoutMethod`: decrypt with old key → encrypt with new key → update row.
+   - Same for each `PayoutProvider.config` row.
+3. Update `PAYOUT_ENCRYPTION_KEY` in the deployment environment.
+4. Deploy.
+5. Run `pnpm tsx scripts/verify-encryption-versions.ts --decrypt` to assert all samples decrypt.
+6. Securely erase the old master key after confirming no rollback.
+
+### Verifier
+- `scripts/verify-encryption-versions.ts` — standalone runtime tool.
+- `pnpm tsx scripts/verify-encryption-versions.ts` — version-only audit.
+- `pnpm tsx scripts/verify-encryption-versions.ts --decrypt` — decrypts one sample per (table, version).
+- `pnpm tsx scripts/verify-encryption-versions.ts --json --quiet` — CI-friendly output.
+- Shared constant: `CURRENT_PAYOUT_KEY_VERSION` is imported from `payout-encryption.constants.ts` — no version drift between the service and the verifier.
+
+### Post-rotation checklist
+1. [ ] Run `pnpm tsx scripts/verify-encryption-versions.ts` — all versions in supported set.
+2. [ ] Run `pnpm tsx scripts/verify-encryption-versions.ts --decrypt` — all samples decrypt.
+3. [ ] `pnpm test` passes (55+ suites).
+4. [ ] Manual spot-check: decrypt one old-row and one new-row `PayoutMethod` via the admin API.
+5. [ ] Update `payout-encryption.constants.ts` with the new version.
+6. [ ] Update this runbook with the rotation date and new version.

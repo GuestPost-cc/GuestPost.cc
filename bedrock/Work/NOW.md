@@ -1,7 +1,7 @@
 # Current Focus
 
-**Status (2026-07-05): 27/41 audit findings confirmed closed. Sprint 1A + Sprint 2A + Sprint 2B completed.**
-Next: Sprint 3 (worker tests + documentation) or Sprint 4 (DB CHECK constraints, key rotation runbook).
+**Status (2026-07-05): 28/41 audit findings confirmed closed. Sprint 1A + Sprint 2A + Sprint 2B + Sprint 2C completed.**
+Next: Sprint 3 (worker tests + documentation) or Sprint 4 (DB CHECK constraints).
 
 ## Evidence-Driven Engineering Assessment (2026-07-02)
 
@@ -61,6 +61,7 @@ Each dimension scored 0-100 as weighted composite: Correctness 25%, Completeness
 | **Sprint 1B — CI Postgres consolidation** | Changed `postgres:16` → `postgres:17-alpine` in `pr.yml:21` + `main.yml:20` — closes audit #17 |
 | **Sprint 2A — Financial integration tests** | 6 new integration specs + FinancialFixture builder (6 files, 452 lines). Factories extended with `makePublisher`, `makeWallet`, `makeTransaction`, `makeSettlement`, `makeOrderItem`, `makeOrderDeliveryVersion`. |
 | **Sprint 2B — Worker + mailpit healthchecks** | Added `HEALTHCHECK` to `apps/worker/Dockerfile` (`wget` to configurable `/health` endpoint, matching API pattern). Added `healthcheck` to mailpit in `docker-compose.yml` (`/readyz` endpoint). `wget` confirmed present in `axllent/mailpit:latest`. Dockerfile syntax validated (`docker build --check`). Compose config validated. Unit tests: 55 suites / 699 tests all green. Lint: clean. Closes audit #15. |
+| **Sprint 2C — Payout encryption key rotation runbook** | Created `payout-encryption.constants.ts` with `CURRENT_PAYOUT_KEY_VERSION = 1` (single source of truth for service + verifier). Created `scripts/verify-encryption-versions.ts` — runtime verifier that groups encrypted rows by version, asserts supported set `[0, 1]`, sample-decrypts via real `PayoutEncryptionService`. Added key rotation runbook to `bedrock/Memory/infrastructure.md` (soft/hard rotation, backfill, post-rotation checklist). Added `PAYOUT_ENCRYPTION_KEY` to `.env.example`. Updated `payout-encryption.service.ts` to import constant from module. Verifier validated against local DB. Closes audit #13. |
 
 ## What's next
 

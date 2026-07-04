@@ -1,0 +1,1 @@
+export const CURRENT_PAYOUT_KEY_VERSION = 1

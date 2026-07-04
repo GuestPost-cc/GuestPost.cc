@@ -5,6 +5,7 @@ import {
   scryptSync,
 } from "node:crypto"
 import { Injectable, Logger } from "@nestjs/common"
+import { CURRENT_PAYOUT_KEY_VERSION } from "./payout-encryption.constants"
 
 const ALGORITHM = "aes-256-gcm"
 const IV_LENGTH = 12
@@ -51,7 +52,7 @@ export class PayoutEncryptionService {
       this.currentVersion = 0
     } else {
       this.masterKey = Buffer.from(hexKey.slice(0, 64), "hex")
-      this.currentVersion = 1
+      this.currentVersion = CURRENT_PAYOUT_KEY_VERSION
     }
   }
 
