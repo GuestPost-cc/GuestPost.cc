@@ -83,6 +83,11 @@ services:
       - "8025:8025"
     networks:
       - guestpost
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8025/readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pgdata:

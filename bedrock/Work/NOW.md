@@ -1,7 +1,7 @@
 # Current Focus
 
-**Status (2026-07-03): 22/41 audit findings confirmed closed. Sprint 1A + Sprint 2A completed.**
-Next: Sprint 2B (remaining integration tests + pool env-var) or Sprint 3 (worker tests + documentation).
+**Status (2026-07-05): 27/41 audit findings confirmed closed. Sprint 1A + Sprint 2A + Sprint 2B completed.**
+Next: Sprint 3 (worker tests + documentation) or Sprint 4 (DB CHECK constraints, key rotation runbook).
 
 ## Evidence-Driven Engineering Assessment (2026-07-02)
 
@@ -52,7 +52,7 @@ Each dimension scored 0-100 as weighted composite: Correctness 25%, Completeness
 4. **CRIT-006**: No worker test files (0 worker tests across 10 processors)
 5. **CRIT-007**: Linting checks don't enforce TypeScript `strict` mode
 
-## Completed this session (2026-07-03)
+## Completed this session (2026-07-05)
 
 | Track | Changes |
 |---|---|
@@ -60,6 +60,7 @@ Each dimension scored 0-100 as weighted composite: Correctness 25%, Completeness
 | **Sprint 1A — DNS rebinding guard** | Added `pipelining: 0` to `SAFE_LOOKUP_AGENT` at `packages/shared/src/safe-fetch.ts:115` — closes audit #9 |
 | **Sprint 1B — CI Postgres consolidation** | Changed `postgres:16` → `postgres:17-alpine` in `pr.yml:21` + `main.yml:20` — closes audit #17 |
 | **Sprint 2A — Financial integration tests** | 6 new integration specs + FinancialFixture builder (6 files, 452 lines). Factories extended with `makePublisher`, `makeWallet`, `makeTransaction`, `makeSettlement`, `makeOrderItem`, `makeOrderDeliveryVersion`. |
+| **Sprint 2B — Worker + mailpit healthchecks** | Added `HEALTHCHECK` to `apps/worker/Dockerfile` (`wget` to configurable `/health` endpoint, matching API pattern). Added `healthcheck` to mailpit in `docker-compose.yml` (`/readyz` endpoint). `wget` confirmed present in `axllent/mailpit:latest`. Dockerfile syntax validated (`docker build --check`). Compose config validated. Unit tests: 55 suites / 699 tests all green. Lint: clean. Closes audit #15. |
 
 ## What's next
 

@@ -25,3 +25,5 @@ COPY --from=builder /repo .
 # Exactly ONE worker instance per queue deployment unless every instance runs
 # identical code — stale duplicate consumers swallow jobs (see runbook).
 CMD ["node", "apps/worker/dist/index.js"]
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+  CMD wget -qO- "http://localhost:${WORKER_HEALTH_PORT:-3004}/health" || exit 1

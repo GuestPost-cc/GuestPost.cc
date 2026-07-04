@@ -2,14 +2,14 @@
 title: GuestPost.cc Platform Audit
 date: 2026-06-22
 authors: 8 parallel domain auditors (money, marketplace+orders, security, workers, frontend, delta-lens, infrastructure+deployment, database) + synthesis
-supersedes: bedrock/Views/audits/platform-audit-2026-06-15.md (2026-06-15, 100/100 closed, but over-reported; Phase A completed 2026-06-30 — 26 closed, 1 partial, 14 open, see §12)
+supersedes: bedrock/Views/audits/platform-audit-2026-06-15.md (2026-06-15, 100/100 closed, but over-reported; Phase A completed 2026-06-30 — 27 closed, 1 partial, 13 open, see §12)
 ---
 
 # GuestPost.cc — Full Platform Audit (2026-06-22)
 
 A to Z review of the platform after 14 phases of hardening landed since the 2026-06-15 audit (Phases 7.1 → 7.14, plus 7.13.x cleanup, 7.13.1.1 sibling, and 7.10.2 integration harness). Phase 6 consolidated the 31 findings from the prior audit (100% closure). This audit surfaces 41 new findings to refresh the baseline.
 
-**Current Status (2026-07-03):** 26 of 41 numbered findings closed (✅), 1 partial (⚠️), 14 open (❌). Phase A (A1 Revenue SQL, A2 Redis client, A3 Observability) completed on 2026-06-30, closing #8 (Redis) and #10 (Revenue SQL). Sprint 1A/1B (2026-07-03) closed #9 (DNS rebinding) and #17 (CI postgres drift). Sprint 2A (2026-07-03) closed #14 (body-cap logging) and #11 (enum-drift guard — `phase-7-14-enum-drift-guard.spec.ts` asserts migration WHERE clauses stay consistent with `FulfillmentAssignmentStatus` and `SettlementStatus`). All 4 previously-unchecked findings (#25, #26, #30, #33) codebase-verified: #26 confirmed intentional, #30 confirmed open, #33 confirmed closed, #25 confirmed open (soft-delete inconsistency persists across 3 patterns + hard-deletes). See §12 for full per-finding closure log.
+**Current Status (2026-07-05):** 27 of 41 numbered findings closed (✅), 1 partial (⚠️), 13 open (❌). Phase A (A1 Revenue SQL, A2 Redis client, A3 Observability) completed on 2026-06-30, closing #8 (Redis) and #10 (Revenue SQL). Sprint 1A/1B (2026-07-03) closed #9 (DNS rebinding) and #17 (CI postgres drift). Sprint 2A (2026-07-03) closed #14 (body-cap logging) and #11 (enum-drift guard — `phase-7-14-enum-drift-guard.spec.ts` asserts migration WHERE clauses stay consistent with `FulfillmentAssignmentStatus` and `SettlementStatus`). Sprint 2B (2026-07-05) closed #15 (worker + mailpit Docker healthchecks). All 4 previously-unchecked findings (#25, #26, #30, #33) codebase-verified: #26 confirmed intentional, #30 confirmed open, #33 confirmed closed, #25 confirmed open (soft-delete inconsistency persists across 3 patterns + hard-deletes). See §12 for full per-finding closure log.
 
 ---
 
@@ -39,7 +39,7 @@ The platform is **substantially harder than 2026-06-15**: Critical and High find
 | Reporting + finance visibility | D | A− | ↑↑↑ | Phase 7.1 admin revenue dashboard (4 groupings + CSV + previous-period + currency-mismatch handling). |
 | Documentation + audit trail uniformity | C+ | A− | ↑↑ | Phase 7.7 AuditLog.requestId column + AsyncLocalStorage auto-inject. Gap: settlement-auto-approve processor writes no audit row per sweep (see §2 Critical #4). |
 
-**Direction of travel**: 12 dimensions improved (5 up by ≥ 2 grades), 3 unchanged (+1 since audit as State machine integrity restored to A). All Critical worker findings closed. SSRF gap closed Sprint 1A. Body-cap logging + enum-drift guard closed Sprint 2A. Remaining Critical (#7 pool) + High (#13 key-rotation, #15 healthcheck, #18 cumulative dedup) + Medium cluster (#21 STATUS_PRESENTATION duplication, #20 raw img, #23-25 database, #27 console.warn, #30 pool validation, #31 logger size cap, #32 turbo.json rationale, #36 runbook) comprise the 14 open + 1 partial.
+**Direction of travel**: 12 dimensions improved (5 up by ≥ 2 grades), 3 unchanged (+1 since audit as State machine integrity restored to A). All Critical worker findings closed. SSRF gap closed Sprint 1A. Body-cap logging + enum-drift guard closed Sprint 2A. Worker + mailpit healthchecks closed Sprint 2B. Remaining Critical (#7 pool) + High (#13 key-rotation, #18 cumulative dedup) + Medium cluster (#21 STATUS_PRESENTATION duplication, #20 raw img, #23-25 database, #27 console.warn, #30 pool validation, #31 logger size cap, #32 turbo.json rationale, #36 runbook) comprise the 13 open + 1 partial.
 
 ---
 
@@ -688,7 +688,7 @@ Per `bedrock/Memory/infrastructure.md`: **laptop-only at present.** A 2GB VPS at
 | Postgres | 17 Alpine | :5432 | ✅ | persistent |
 | Redis | 7 Alpine | :6379 | ✅ | persistent |
 | MinIO | latest | :9000 API, :9001 console | ✅ | persistent |
-| Mailpit | latest | :1025 SMTP, :8025 UI | ❌ (§2 High #15) | ephemeral |
+| Mailpit | latest | :1025 SMTP, :8025 UI | ✅ | ephemeral |
 
 Production runs postgres:17 (matches compose). CI workflows consolidated: main.yml + pr.yml now postgres:17-alpine (§2 High #17 closed Sprint 1B).
 
@@ -711,7 +711,7 @@ JWT_SECRET weakness check remains regex-only but `.env.example` default changed 
 
 ### 11.5 Worker deployment
 
-Dockerfile exists at `apps/worker/Dockerfile`. **No HEALTHCHECK directive** (§2 High #15). In K8s, hung worker pods stay "Running" until liveness probe (not configured) trips.
+Dockerfile at `apps/worker/Dockerfile` has HEALTHCHECK directive (§2 High #15 closed Sprint 2B): `wget -qO- "http://localhost:${WORKER_HEALTH_PORT:-3004}/health"` with 30s/5s/3s interval/timeout/retries. In K8s, hung worker pods are detected by the liveness probe.
 
 `PRODUCTION_RUNBOOK.md` documents "exactly one worker fleet" rule but enforcement is manual `pgrep` (§2 Medium #36).
 
@@ -729,7 +729,7 @@ README mentioned VPS attempt + abandonment. Current deploy story unclear — lap
 
 Findings close phase-by-phase here. Verified status updated 2026-06-29 via systematic codebase check; see `bedrock/Work/NOW.md` for details.
 
-**Summary (numbered findings #1-#41)**: 26 closed (✅ incl. 1 intentional), 1 partial (⚠️), 14 open (❌), 0 unchecked. Note: CSRF middleware + support ticket cap were closed but are not numbered findings; #2 has two entries (original + Phase 8.10 follow-up). #8 (Redis) and #10 (Revenue SQL) closed via Phase A (2026-06-30). #9 and #17 closed via Sprint 1A/1B (2026-07-03): DNS rebinding guard (`pipelining: 0`) + CI postgres consolidation (17-alpine). #14 and #11 closed via Sprint 2A (2026-07-03): body-cap structured logging in both worker processors; enum-drift guard (`phase-7-14-enum-drift-guard.spec.ts`) asserts migration WHERE clauses stay consistent with enum additions. #26 verified intentional (defense-in-depth). #33 verified closed (pnpm-workspace.yaml documentation). #30 verified open. #25 verified open (soft-delete inconsistency persists).
+**Summary (numbered findings #1-#41)**: 27 closed (✅ incl. 1 intentional), 1 partial (⚠️), 13 open (❌), 0 unchecked. Note: CSRF middleware + support ticket cap were closed but are not numbered findings; #2 has two entries (original + Phase 8.10 follow-up). #8 (Redis) and #10 (Revenue SQL) closed via Phase A (2026-06-30). #9 and #17 closed via Sprint 1A/1B (2026-07-03): DNS rebinding guard (`pipelining: 0`) + CI postgres consolidation (17-alpine). #14 and #11 closed via Sprint 2A (2026-07-03): body-cap structured logging in both worker processors; enum-drift guard (`phase-7-14-enum-drift-guard.spec.ts`) asserts migration WHERE clauses stay consistent with enum additions. #15 closed via Sprint 2B (2026-07-05): worker HEALTHCHECK (`wget` to configurable `/health` endpoint) + mailpit healthcheck (`/readyz`). #26 verified intentional (defense-in-depth). #33 verified closed (pnpm-workspace.yaml documentation). #30 verified open. #25 verified open (soft-delete inconsistency persists).
 
 | Finding | Status | Closed by | Date | Notes |
 |---|---|---|---|---|
@@ -760,7 +760,7 @@ Findings close phase-by-phase here. Verified status updated 2026-06-29 via syste
 | #12 — CASCADE deletes on User wipe AuditLog / Notification / TicketMessage | ✅ Closed | Phase 8.12 | 2026-06-29 | `Notification.userId` and `TicketMessage.userId` changed to nullable (`String?`) with `onDelete: SetNull` in `schema.prisma`. A custom migration `phase_812_cascade_setnull` was generated to alter columns and recreate FKs. Preserves audit/message history on user deletion (when implemented). |
 | #13 — JSON column validation gaps — payout key-rotation hazard | ❌ Open | — | — | No key-rotation runbook in `bedrock/Memory/infrastructure.md`. No backfill spec asserting encrypted row `encryptionKeyVersion` matches known key. Multi-version decrypt test exists (`payout-decrypt-security.spec.ts:156`) but is the only addressed item. |
 | #14 — Delivery-verification body-cap silent failure | ✅ Closed | Sprint 2A | 2026-07-03 | Both processors (`delivery-verification.processor.ts:106-116`, `verification.processor.ts:68-78`) now emit `logger.warn({ reason: "body_size_exceeded", url, maxBodySize, contentLength })`. `contentLength` parsed to number from header, guarded against NaN. Behavior identical — body cap exceeded still returns `""`/`null` → MANUAL_REVIEW. Regression guard at `phase-7-14-body-cap-logging.spec.ts`. |
-| #15 — mailpit + worker have no Docker healthcheck | ❌ Open | — | — | `infrastructure/docker/docker-compose.yml` line 77: mailpit has no `healthcheck` block (unlike postgres, redis, minio). `apps/worker/Dockerfile` has no `HEALTHCHECK` instruction (unlike sibling `apps/api/Dockerfile`). |
+| #15 — mailpit + worker have no Docker healthcheck | ✅ Closed | Sprint 2B | 2026-07-05 | Worker Dockerfile: `HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- "http://localhost:\${WORKER_HEALTH_PORT:-3004}/health" || exit 1` matching API Dockerfile pattern. Mailpit compose: `["CMD", "wget", "-qO-", "http://localhost:8025/readyz"]` on Mailpit's dedicated `/readyz` endpoint. `wget` verified present in `axllent/mailpit:latest` at `/usr/bin/wget`. Dockerfile syntax confirmed via `docker build --check` (no warnings). `docker compose config` validates YAML. Unit tests: 55 suites / 699 tests all green. Lint: clean. |
 | #17 — CI workflows drifted — pr.yml + main.yml use postgres:16 | ✅ Closed | Sprint 1B (commit pending) | 2026-07-03 | Changed both `pr.yml:21` and `main.yml:20` from `postgres:16` to `postgres:17-alpine`. All 3 workflows now use postgres:17-alpine. Consolidated image; reusable workflow refactor deferred to future infra work. |
 | #18 — Reconciliation dedup hitcount logged as cumulative, not per-sweep | ❌ Open | — | — | `packages/shared/src/notification-dedup-keys.ts:140` has module-scoped `dedupHitsTotal` never reset between sweeps. `reconciliation.processor.ts:112` logs `dedup_hits_total: total`. The `__resetDedupHitsTotal()` export exists but is test-only. |
 | #20 — Portal marketplace uses raw `<img>` in 4 files | ❌ Open | — | — | 7 raw `<img>` tags across 4 files in `apps/portal/src/app/dashboard/marketplace/`. No `import Image from "next/image"` anywhere in these files. |
