@@ -103,12 +103,22 @@ async function fetchWithChain(startUrl: string): Promise<FetchResult> {
     }
 
     // Terminal response. Phase 7.11 (#13): capped read.
+    const contentLengthHeader = res.headers.get("content-length")
+    const parsedLength =
+      contentLengthHeader != null ? Number(contentLengthHeader) : undefined
+    const contentLength =
+      parsedLength !== undefined && Number.isFinite(parsedLength)
+        ? parsedLength
+        : undefined
+
     const html = await readBodyWithCap(res, MAX_HTML_BYTES).catch(
       (err: any) => {
         if (err instanceof SafeFetchError && err.code === "BODY_TOO_LARGE") {
           logger.warn("response body cap exceeded", {
+            reason: "body_size_exceeded",
             url: current,
-            maxBytes: MAX_HTML_BYTES,
+            maxBodySize: MAX_HTML_BYTES,
+            contentLength,
           })
         }
         return ""

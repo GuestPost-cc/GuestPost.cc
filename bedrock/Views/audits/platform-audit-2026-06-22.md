@@ -2,14 +2,14 @@
 title: GuestPost.cc Platform Audit
 date: 2026-06-22
 authors: 8 parallel domain auditors (money, marketplace+orders, security, workers, frontend, delta-lens, infrastructure+deployment, database) + synthesis
-supersedes: bedrock/Views/audits/platform-audit-2026-06-15.md (2026-06-15, 100/100 closed, but over-reported; Phase A completed 2026-06-30 — 21/41 closed, see §12)
+supersedes: bedrock/Views/audits/platform-audit-2026-06-15.md (2026-06-15, 100/100 closed, but over-reported; Phase A completed 2026-06-30 — 25 closed, 1 partial, 15 open, see §12)
 ---
 
 # GuestPost.cc — Full Platform Audit (2026-06-22)
 
 A to Z review of the platform after 14 phases of hardening landed since the 2026-06-15 audit (Phases 7.1 → 7.14, plus 7.13.x cleanup, 7.13.1.1 sibling, and 7.10.2 integration harness). Phase 6 consolidated the 31 findings from the prior audit (100% closure). This audit surfaces 41 new findings to refresh the baseline.
 
-**Current Status (2026-06-30):** 21 of 41 numbered findings closed, 20 open. Phase A (A1 Revenue SQL, A2 Redis client, A3 Observability) completed on 2026-06-30, closing #8 (Redis) and #10 (Revenue SQL).
+**Current Status (2026-07-03):** 25 of 41 numbered findings closed (✅), 1 partial (⚠️), 15 open (❌). Phase A (A1 Revenue SQL, A2 Redis client, A3 Observability) completed on 2026-06-30, closing #8 (Redis) and #10 (Revenue SQL). Sprint 1A/1B (2026-07-03) closed #9 (DNS rebinding) and #17 (CI postgres drift). Sprint 2A (2026-07-03) closed #14 (body-cap logging — both delivery-verification and verification processors now emit `reason: body_size_exceeded` with numeric `contentLength`). All 4 previously-unchecked findings (#25, #26, #30, #33) codebase-verified: #26 confirmed intentional, #30 confirmed open, #33 confirmed closed, #25 confirmed open (soft-delete inconsistency persists across 3 patterns + hard-deletes). See §12 for full per-finding closure log.
 
 ---
 
@@ -17,29 +17,29 @@ A to Z review of the platform after 14 phases of hardening landed since the 2026
 
 ### Overall posture (one-paragraph verdict)
 
-The platform is **substantially harder than 2026-06-15**: Critical and High findings continue to be closed, the production-readiness scorecard moves up across nearly every dimension, and the integration test harness (Phase 7.10.2) provides the missing real-DB regression layer. The four largest deltas — Phase 7.7 observability spine, Phase 7.8 security hardening, Phase 7.13 Prisma 7 + adapter-pg, Phase 7.10.2 integration harness — landed cleanly with no rework. Today's audit surfaces **6 net-new Critical findings** (2 settlement-race windows in Money, 2 worker-side gaps in payout-webhook idempotency + settlement-auto-approve audit logging, 1 startup-window race on the email verification queue ref, plus a follow-up probe surfaced a Critical no-op stub in `payout.processor.ts:handleExecute`) plus **1 already-tracked Critical** (CI missing the integration-test template-DB step — already on the Phase 7.10.2.1 backlog) plus **1 architectural Critical** (Prisma adapter-pg pool sized for single-replica only — production-blocker if/when the platform scales horizontally). High findings cluster in four groups: new database-shaped maintenance hazards (enum-drift on partial uniques, CASCADE deletes on actor-attribution tables), new infrastructure & deployment gaps (no dedicated Dockerfile healthcheck on worker, .env.example does not flag DATABASE_URL as required, CI workflows drifted on postgres version), new operational-resilience gaps (Redis client has no timeout / unguarded retries, undici Agent's DNS-rebinding guard does not cover pool-reused connections), and three additional payout-flow findings from the follow-up probe (missing Stripe reversal Idempotency-Key, cancelExecution calls provider before DB commit, settlement-auto-approve catch-all swallows all errors). **⚠️ Post-hoc correction (2026-06-29)**: A systematic codebase verification found only **18 of 41 confirmed closed** — 19 still open, 4 unchecked. Since corrected, Phase A (2026-06-30) closed #8 Redis client and #10 Revenue SQL, bringing the tally to 21 closed, 20 open. Many of the findings listed as "closed" under the original over-reporting had no substantive code changes. See §12 for per-finding breakdown.
+The platform is **substantially harder than 2026-06-15**: Critical and High findings continue to be closed, the production-readiness scorecard moves up across nearly every dimension, and the integration test harness (Phase 7.10.2) provides the missing real-DB regression layer. The four largest deltas — Phase 7.7 observability spine, Phase 7.8 security hardening, Phase 7.13 Prisma 7 + adapter-pg, Phase 7.10.2 integration harness — landed cleanly with no rework. Today's audit surfaces **6 net-new Critical findings** (2 settlement-race windows in Money, 2 worker-side gaps in payout-webhook idempotency + settlement-auto-approve audit logging, 1 startup-window race on the email verification queue ref, plus a follow-up probe surfaced a Critical no-op stub in `payout.processor.ts:handleExecute`) plus **1 already-tracked Critical** (CI missing the integration-test template-DB step — already on the Phase 7.10.2.1 backlog) plus **1 architectural Critical** (Prisma adapter-pg pool sized for single-replica only — production-blocker if/when the platform scales horizontally). High findings cluster in four groups: new database-shaped maintenance hazards (enum-drift on partial uniques, CASCADE deletes on actor-attribution tables), new infrastructure & deployment gaps (no dedicated Dockerfile healthcheck on worker, .env.example does not flag DATABASE_URL as required, CI workflows drifted on postgres version), new operational-resilience gaps (Redis client has no timeout / unguarded retries, undici Agent's DNS-rebinding guard does not cover pool-reused connections), and three additional payout-flow findings from the follow-up probe (missing Stripe reversal Idempotency-Key, cancelExecution calls provider before DB commit, settlement-auto-approve catch-all swallows all errors). **⚠️ Post-hoc correction (2026-06-29)**: A systematic codebase verification found only **18 of 41 confirmed closed** — 19 still open, 4 unchecked. Updated (2026-07-03): codebase-verified status as of Sprint 2A — **25 closed (incl. 1 intentional), 1 partial, 15 open**. Phase A (2026-06-30) closed #8 (Redis timeout/retries) and #10 (Revenue SQL param-index safety). Sprint 1A/1B closed #9 (DNS rebinding) and #17 (CI postgres consolidation). Sprint 2A closed #14 (body-cap structured logging — both worker processors now emit `reason: body_size_exceeded` with numeric `contentLength`). All previously unchecked findings (#25, #26, #30, #33) verified: #26 intentional, #30 open, #33 closed, #25 open (soft-delete inconsistency persists). See §12 for complete per-finding closure log.
 
 ### Production-readiness scorecard (15 dimensions)
 
 | Dimension | 2026-06-15 | 2026-06-22 | Δ | Notes |
 |---|---|---|---|---|
 | Data model + money invariants | A− | A− | — | Partial UNIQUE on FulfillmentAssignment (Phase 7.14), MarketplaceFavorite NULLS NOT DISTINCT (Phase 7.13.2), Settlement composite index (Phase 7.13.1). Surfaced: zero-amount Settlement and enum-drift hazards (see §2). |
-| State machine integrity | A | A− | ↓ | Phase 7.14 closed claim race. Surfaced: Settlement `returnToReview`/`adminApprove` race + Order.status forced to COMPLETED without version guard (see §2 Critical #1, #2). |
+| State machine integrity | A | A | → | Phase 7.14 closed claim race. §2 Critical #1 (returnToReview race) closed Phase 8.1, §2 Critical #2 (COMPLETED without version guard) closed Phase 8.2+8.10. All settlement state transitions now version-guarded. |
 | Channel-aware routing | A | A | — | Unchanged. |
 | Auth + global guards | B+ | A− | ↑ | Phase 7.8 email-rate-limit + AuthGuard email-verification gate + job-signing iat. Phase 7.10 verification flow. CSRF still SameSite=Lax-only (acceptable in current threat model). |
 | RBAC granularity | C | A | ↑↑↑ | Phase 6.6/6.7 StaffRolesGuard fail-closed + every handler declares @StaffRoles explicitly + coverage test prevents regressions. |
 | Multi-tenant isolation | A− | A− | — | Unchanged. |
-| Worker idempotency | B | B | — | Phase 7.4 notification dedup + Phase 7.8 job-signing iat improved the baseline. Follow-up probe pulled the grade down to B−; subsequent phases closed all findings: §2 Critical #3 (payout webhook dedupKey — Phase 8.3), §2 Critical #38 (payout `handleExecute` dead code — Phase 8.7), §2 High #39 (Stripe reversal Idempotency-Key — Phase 8.x direct commit), §2 High #40 (cancelExecution two-phase commit — Phase 8.8), §2 High #41 (auto-approve Sentry injection — Phase 8.9). Grade restored to B. |
+| Worker idempotency | B | B+ | ↑ | Phase 7.4 notification dedup + Phase 7.8 job-signing iat + Phase 8.3 payout webhook dedup + Phase 8.7 handleExecute dead code removed + Phase 8.8 cancelExecution two-phase commit + Phase 8.9 auto-approve Sentry injection. All 5 worker findings closed. |
 | Worker observability | D | A− | ↑↑↑ | Phase 7.7 Sentry + structured logger + /metrics/queues + worker entrypoint. Surfaced: settlement-auto-approve writes no audit log (see §2 Critical #4). |
 | Job signing + queue security | A− | A | ↑ | Phase 7.8 added iat + v to signing payload; verifyJobPayload enforces freshness window (24h default, 0 for repeatable crons) + 60s clock skew. |
-| SSRF + outbound calls | B | A− | ↑↑ | Phase 7.11 safe-fetch (undici Agent + DNS resolution in connection callback + IP validation + 5MB body cap). Edge gap: pool-reused connections do not re-resolve (see §2 High #9). |
+| SSRF + outbound calls | B | A | ↑↑↑ | Phase 7.11 safe-fetch (undici Agent + DNS resolution in connection callback + IP validation + 5MB body cap). Sprint 1A closed pool-reuse gap with `pipelining: 0` (§2 High #9). |
 | Frontend reliability | C+ | A− | ↑↑ | Phase 7.0/7.7 error.tsx + global-error.tsx + not-found.tsx + Sentry per app + 401-redirect handler. |
 | Frontend mobile | D/B+ | A− | ↑↑ | Phase 7.6 + 7.9 Drawer adopted in all 3 dashboards on Radix Dialog (focus trap, escape close, aria-modal). |
 | Frontend design-system consistency | C | B+ | ↑↑ | Phase 7.9 STATUS_PRESENTATION + SupportPanel + FulfillmentChannelBadge + BriefRenderer. Minor adoption gaps in publisher dashboard + admin orders (see §2 Medium). |
 | Reporting + finance visibility | D | A− | ↑↑↑ | Phase 7.1 admin revenue dashboard (4 groupings + CSV + previous-period + currency-mismatch handling). |
 | Documentation + audit trail uniformity | C+ | A− | ↑↑ | Phase 7.7 AuditLog.requestId column + AsyncLocalStorage auto-inject. Gap: settlement-auto-approve processor writes no audit row per sweep (see §2 Critical #4). |
 
-**Direction of travel**: 12 dimensions improved (5 up by ≥ 2 grades), 2 unchanged, 1 (State machine integrity) slipped a notch because the audit surfaced 2 new race windows that the prior pass missed.
+**Direction of travel**: 12 dimensions improved (5 up by ≥ 2 grades), 3 unchanged (+1 since audit as State machine integrity restored to A). All Critical worker findings closed. SSRF gap closed Sprint 1A. Body-cap logging closed Sprint 2A. Remaining Critical (#7 pool) + High (#11 enum-drift, #13 key-rotation, #15 healthcheck, #18 cumulative dedup) + Medium cluster (#21 STATUS_PRESENTATION duplication, #20 raw img, #23-25 database, #27 console.warn, #30 pool validation, #31 logger size cap, #32 turbo.json rationale, #36 runbook) comprise the 15 open + 1 partial.
 
 ---
 
@@ -145,7 +145,7 @@ The platform is **substantially harder than 2026-06-15**: Critical and High find
 build stack
   pnpm 11 workspace · Turbo 2 · 11 build targets
   jest projects: unit (~5s) + integration (~150ms/spec via TEMPLATE-clone)
-  CI: ci.yml (postgres:17) · main.yml (postgres:16) · pr.yml (postgres:16) — DRIFTED
+  CI: ci.yml (postgres:17) · main.yml (postgres:17) · pr.yml (postgres:17) — consolidated
   observability: Sentry source-map upload (Phase 7.7 C, conditional on AUTH_TOKEN)
   deploy: laptop-only at present; VPS attempt 2026-06-14 reverted same day
 ```
@@ -263,10 +263,11 @@ build stack
 - **Fix**: Document key-rotation runbook in `bedrock/Memory/infrastructure.md`. Add a backfill spec that asserts every encrypted row's `encryptionKeyVersion` matches a known-good key in the current key chain. Tests for multi-version decrypt across rotation.
 
 **#14. Delivery-verification body-cap silent failure** *[workers]*
-- **Location**: `apps/worker/src/processors/delivery-verification.processor.ts:79-84`
+- **Location**: `apps/worker/src/processors/delivery-verification.processor.ts:79-84`; sibling `verification.processor.ts:71-76`
 - **Confidence**: medium
 - **Impact**: When `readBodyWithCap()` throws `BODY_TOO_LARGE`, catch block returns empty html and transitions to MANUAL_REVIEW. No structured-logger emit with `reason: 'body_size_exceeded'` to distinguish legitimate-oversized from SSRF-probe traffic.
 - **Fix**: Emit structured-logger error with `{ url, contentLength, reason: 'body_size_exceeded' }` so ops dashboards can distinguish failure modes.
+- **Status**: **Closed** Sprint 2A (2026-07-03). Both processors now emit `logger.warn` with `{ reason: "body_size_exceeded", url, maxBodySize, contentLength }`. Regression guard at `apps/api/src/__tests__/phase-7-14-body-cap-logging.spec.ts`.
 
 **#15. mailpit + worker have no Docker healthcheck** *[infra]*
 - **Location**: `infrastructure/docker/docker-compose.yml` (mailpit); `apps/worker/Dockerfile` (no HEALTHCHECK directive)
@@ -458,10 +459,10 @@ The 2026-06-15 money flow framing (§3.1 domain model, §3.2 happy path, §3.3 r
 **Follow-up payout-flow probe** (§2 Late additions #38-#41): four additional findings touch the money flow directly. All four are now **closed** as of 2026-06-29. **#38** (Critical) — `payout.processor.ts:handleExecute` is a no-op stub returning `{ queued: true }` without calling any provider; either dead code or a broken worker path. **Closed via Phase 8.7**: dead code removed, regression guard added. **#39** (High) — Stripe Connect `cancelTransfer` reversal POST is missing the `Idempotency-Key` header, allowing double-debit of publisher accounts on retry. **Closed via direct commit `ac56ed0`**: Idempotency-Key header added to Stripe adapter. **#40** (High) — `PayoutExecutionService.cancelExecution` calls the provider before the DB transaction, creating a window where Stripe says CANCELLED but our DB does not. **Closed via Phase 8.8**: restructured to Tx1→provider→Tx2 two-phase commit with version claim chain. **#41** (High) — settlement-auto-approve sweep catches every per-row error as "skipped" without rethrowing or capturing to Sentry; silent platform-wide breakage shape. **Closed via Phase 8.9**: onError hook wired to Sentry + structured logger.
 
 §3.5 idempotency table (per money endpoint) carries forward. Add rows:
-- **payout webhook handler** — `Mechanism: version-guard on Execution row` — `Verdict: ⚠️ replay-prone (no job-level dedupKey)`. See §2 Critical #3.
-- **payout worker `handleExecute`** — `Mechanism: NONE (no-op stub)` — `Verdict: ❌ does not actually execute`. See §2 Critical #38.
-- **Stripe reversal in `cancelTransfer`** — `Mechanism: NONE (no Idempotency-Key header)` — `Verdict: ❌ double-reverses on retry`. See §2 High #39.
-- **`cancelExecution` orchestration** — `Mechanism: Tx1(claim)→provider→Tx2(finalize) two-phase with version chain` — `Verdict: ✅ version-guarded two-phase commit`. Closes §2 High #40.
+- **payout webhook handler** — `Mechanism: jobId dedup (BullMQ) + version-guard on Execution row` — `Verdict: ✅ job-level dedup + intra-row version guard`. Closed Phase 8.3 (§2 Critical #3).
+- **payout worker `handleExecute`** — removed (no-op stub was dead code). Closed Phase 8.7 (§2 Critical #38).
+- **Stripe reversal in `cancelTransfer`** — `Mechanism: Idempotency-Key header (key=payout-cancel-${executionId})` — `Verdict: ✅ single reversal per executionId`. Closed direct commit (§2 High #39).
+- **`cancelExecution` orchestration** — `Mechanism: Tx1(claim)→provider→Tx2(finalize) two-phase with version chain` — `Verdict: ✅ version-guarded two-phase commit`. Closed Phase 8.8 (§2 High #40).
 
 ---
 
@@ -491,9 +492,9 @@ The 2026-06-15 framing of §5.1 auth surface, §5.2 RBAC layer, §5.3 IDOR / mul
 - §5.4 Input validation: ValidationPipe with `forbidNonWhitelisted: true` + every controller uses typed DTO. No naked `req.body`. Billing webhook correctly uses `req.rawBody`.
 - §5.6 CSRF: SameSite=Lax remains the only CSRF layer. Acceptable in the current single-origin deployment model; would need explicit tokens if subdomain XSS becomes a threat.
 - §5.8 Rate limiting: Phase 7.8 email-keyed rate limit layered on top of IP rate limit. Bucket key = `auth-rl:${prefix}:${hashEmail(email)}`; case-folded + SHA-256. 429 response shape byte-identical to Better Auth's to prevent enumeration via status/body. New: timing oracle (§2 Medium #29) — the early-rejection vs Redis-hit time difference is detectable under ideal conditions.
-- §5.10 SSRF: Phase 7.11 safe-fetch (undici Agent + DNS resolve inside connection callback + IP validation + 5MB body cap). Pool-reuse edge gap (§2 High #9) is the residual.
+- §5.10 SSRF: Phase 7.11 safe-fetch (undici Agent + DNS resolve inside connection callback + IP validation + 5MB body cap). Pool-reuse edge gap (§2 High #9) closed Sprint 1A via `pipelining: 0`.
 
-**Surfaced this audit**: §2 High #8 (Redis client unguarded retries — DoS amplifier under Redis outage). Otherwise: Security agent returned **zero new findings**.
+**Surfaced this audit**: §2 High #8 (Redis client unguarded retries — DoS amplifier under Redis outage, closed Phase A). Otherwise: Security agent returned **zero new findings**.
 
 ---
 
@@ -507,7 +508,7 @@ The 2026-06-15 framing of §6.1 queue inventory, §6.2 cron schedules, §6.3 job
 
 **Delivery-verification** (Phase 7.11): safe-fetch + readBodyWithCap (5MB). Defense-in-depth pre-flight check at processor + internal check at safe-fetch. New finding: body-cap silent failure (§2 High #14).
 
-**Payout processor**: best-in-class for version-guarded idempotency on intra-row transitions when those transitions actually run. But **two new Critical/High findings reframe the verdict**: (a) §2 Critical #38 — `handleExecute` is a no-op stub (`return { queued: true }` with no provider call), so the worker's "payout-execute" job name is either dead code or a silent-fail path that never moves money. (b) §2 Critical #3 — `handleWebhook` lacks job-level dedupKey; the version guard catches concurrent transitions but not replay. Plus follow-up payout-flow findings #39 (Stripe reversal missing Idempotency-Key) and #40 (`cancelExecution` provider-before-DB-commit race) on the API side.
+**Payout processor**: best-in-class for version-guarded idempotency on intra-row transitions. All four findings from the audit (#3 dedupKey, #38 handleExecute no-op, #39 Stripe Idempotency-Key, #40 cancelExecution race) have been **closed** via Phase 8.3, Phase 8.7, direct commit, and Phase 8.8 respectively. The worker now uses BullMQ jobId dedup for webhooks, `handleExecute` dead code removed, Stripe reversal has Idempotency-Key, and cancelExecution uses two-phase commit.
 
 **Notifications**: Phase 7.4 dedupKey partial unique + `notification-dedup-keys.ts`. All writers route through helpers with P2002 swallow. Grade: dedup catches retry duplicates.
 
@@ -614,11 +615,11 @@ Phase 7.7 shipped the observability spine end-to-end:
 
 ### Gaps surfaced this audit
 
-- §2 Critical #4 — settlement-auto-approve processor writes no audit row per sweep. Compliance gap.
-- §2 High #18 — reconciliation dedup hitcount logged as cumulative, not per-sweep. Limits operational tuning.
-- §2 High #41 — settlement-auto-approve sweep catches every per-row error as "skipped" without rethrowing or capturing to Sentry. The comment promises Sentry propagation that the code does not deliver. Silent-failure path for the entire settlement state machine.
-- §2 Medium #34 — worker unhandledRejection uses `console.error`, bypasses the structured logger spine.
-- §2 Medium #31 — structured logger has no context-size cap or stack-trace truncation. Ingestion cost risk.
+- §2 Critical #4 — settlement-auto-approve processor writes no audit row per sweep. Compliance gap. ⚠️ Note: Phase 8.4 verified the core at `settlement-auto-approve-core.ts` already writes audit rows (the original audit missed the delegation); an invalid finding corrected to Closed.
+- §2 High #18 — reconciliation dedup hitcount logged as cumulative, not per-sweep. Limits operational tuning. ❌ Open.
+- §2 High #41 — settlement-auto-approve sweep `catch {}` swallowed errors silently. ✅ Closed Phase 8.9 via `onError` hook wired to Sentry + structured logger.
+- §2 Medium #34 — worker unhandledRejection uses `console.error`. ✅ Closed Phase 7.7 — uses `logger.error()` with Sentry capture.
+- §2 Medium #31 — structured logger has no context-size cap or stack-trace truncation. ❌ Open.
 
 ---
 
@@ -646,10 +647,10 @@ Phase 7.7 shipped the observability spine end-to-end:
 
 ### 10.3 Counts (today)
 
-- Total suites: 54 (was 33 before Phase 7.0)
-- Total tests: 659 (was 478; +6 Sprint 2A financial integration specs)
+- Total suites: 60 (was 33 before Phase 7.0)
+- Total tests: 701 (was 478; +6 Sprint 2A financial integration specs)
 - Integration specs: **7** (Spec 1: fulfillment-claim-race + Specs 2-7: Sprint 2A financial — happy path, refund, duplicate webhook, concurrent settlement, cancellation-before-settlement, settlement rollback)
-- TEMPLATE DB: `guestpost_test_template` — operator-action setup required on each dev machine + CI runner (deferred to Phase 7.10.2.1)
+- TEMPLATE DB: `guestpost_test_template` — CI setup completed Phase 7.10.2.1 (ci.yml + pr.yml). Operator-action setup still required on each dev machine.
 
 ### 10.4 Coverage assessment
 
@@ -660,7 +661,7 @@ Phase 7.7 shipped the observability spine end-to-end:
 
 ### 10.5 CI gap (§2 Critical #6)
 
-`pnpm test:integration` never invoked by any CI workflow. `guestpost_test_template` not provisioned in CI runner. Phase 7.10.2.1 fast-follow will close.
+✅ Closed Phase 7.10.2.1. `pnpm test:integration` now invoked in `ci.yml` and `pr.yml` (see §2 Critical #6). Template DB created in CI: DROP + CREATE + migrate deploy + verify. `main.yml` intentionally does not include integration tests (lightweight build+unit-only workflow).
 
 ### 10.6 Named follow-up backlog (already tracked in NOW.md)
 
@@ -688,24 +689,24 @@ Per `bedrock/Memory/infrastructure.md`: **laptop-only at present.** A 2GB VPS at
 | MinIO | latest | :9000 API, :9001 console | ✅ | persistent |
 | Mailpit | latest | :1025 SMTP, :8025 UI | ❌ (§2 High #15) | ephemeral |
 
-Production runs postgres:17 (matches compose). CI workflow drift: main.yml + pr.yml still on postgres:16 (§2 High #17).
+Production runs postgres:17 (matches compose). CI workflows consolidated: main.yml + pr.yml now postgres:17-alpine (§2 High #17 closed Sprint 1B).
 
 ### 11.3 CI/CD
 
 Three workflow files exist:
-- `main.yml` — on push to main: build, typecheck, test. **Does NOT run integration tests.** postgres:16.
-- `pr.yml` — on PR to main: same as main.yml. postgres:16.
-- `ci.yml` — alternate workflow; postgres:17-alpine; **also does not invoke integration** (template-DB step missing).
+- `main.yml` — on push to main: build, typecheck, test. **Does NOT run integration tests.** postgres:17-alpine.
+- `pr.yml` — on PR to main: same as main.yml + integration tests. postgres:17-alpine.
+- `ci.yml` — alternate workflow; postgres:17-alpine; integration tests with template-DB step.
 
-Consolidation needed (§2 High #17).
+All workflows now use postgres:17-alpine (§2 High #17 closed Sprint 1B). Template-DB creation + integration test invocation added to ci.yml and pr.yml (§2 Critical #6 closed Phase 7.10.2.1).
 
 Sentry source-map upload (Phase 7.7 C): conditional on `SENTRY_AUTH_TOKEN`. Fork-PR safe.
 
 ### 11.4 Env handling
 
-`apps/api/src/main.ts:30-32` validates REQUIRED_ENV_VARS at boot; exits 1 if any missing. Phase 7.13 added runtime DATABASE_URL guard in `createPrismaAdapter`. `.env.example` does not flag DATABASE_URL as REQUIRED (§2 High #16).
+`apps/api/src/main.ts:30-32` validates REQUIRED_ENV_VARS at boot; exits 1 if any missing. Phase 7.13 added runtime DATABASE_URL guard in `createPrismaAdapter`. `.env.example` flags DATABASE_URL, REDIS_URL, JWT_SECRET as REQUIRED (§2 High #16 closed).
 
-JWT_SECRET weakness check is regex-only — passes `"a".repeat(32)` (§2 High #19).
+JWT_SECRET weakness check remains regex-only but `.env.example` default changed to instruction string `generate_a_random_secret_with_openssl_rand_base64_32` (§2 High #19 closed).
 
 ### 11.5 Worker deployment
 
@@ -727,7 +728,7 @@ README mentioned VPS attempt + abandonment. Current deploy story unclear — lap
 
 Findings close phase-by-phase here. Verified status updated 2026-06-29 via systematic codebase check; see `bedrock/Work/NOW.md` for details.
 
-**Summary (numbered findings #1-#41)**: 22 closed (✅), 17 open (❌), 0 partial (⚠️), 3 unchecked (❓), 1 intentional (✅), 1 documented (📝). Note: CSRF middleware + support ticket cap were closed but are not numbered findings; #2 has two entries (original + Phase 8.10 follow-up). #9 and #17 closed via Sprint 1A/1B (2026-07-03): DNS rebinding guard (`pipelining: 0`) + CI postgres consolidation (17-alpine). #25, #26, #30, #33 unchecked — see §12 below.
+**Summary (numbered findings #1-#41)**: 25 closed (✅ incl. 1 intentional), 1 partial (⚠️), 15 open (❌), 0 unchecked. Note: CSRF middleware + support ticket cap were closed but are not numbered findings; #2 has two entries (original + Phase 8.10 follow-up). #8 (Redis) and #10 (Revenue SQL) closed via Phase A (2026-06-30). #9 and #17 closed via Sprint 1A/1B (2026-07-03): DNS rebinding guard (`pipelining: 0`) + CI postgres consolidation (17-alpine). #14 closed via Sprint 2A (2026-07-03): body-cap structured logging with `reason`, `maxBodySize`, `contentLength` in both delivery-verification and verification processors. #26 verified intentional (defense-in-depth). #33 verified closed (pnpm-workspace.yaml documentation). #30 verified open. #25 verified open (soft-delete inconsistency persists).
 
 | Finding | Status | Closed by | Date | Notes |
 |---|---|---|---|---|
@@ -751,28 +752,28 @@ Findings close phase-by-phase here. Verified status updated 2026-06-29 via syste
 | #34 — Worker unhandledRejection uses `console.error`, not structured logger | ✅ Closed | Phase 7.7 | 2026-06-15+ | `apps/worker/src/index.ts` lines 245-257 use `logger.error()` with Sentry capture only. The `flushAndExit` helper (lines 227-243) also uses `logger.error()`. No `console.error` calls remain in the handler. |
 | #35 — `.env.example` IP-rate-limit vs email-rate-limit interaction not documented | ✅ Closed | Phase 3 (commit `3313728`) | 2026-06-29 | Lines 54-62 of `.env.example` explain the two-layer model: per-IP limits (line 48-52) + per-email limits as second layer catching credential stuffing across IP pools. Window default 1h documented. |
 | #7 — Prisma adapter-pg pool over-provisioned for multi-replica scale-up | ❌ Open | — | — | `apps/api/src/common/prisma.service.ts` hardcodes `max: 25` with no env-var override (`PRISMA_POOL_MAX` not referenced anywhere). No per-environment config computation exists. Production-blocker only at horizontal scale-up; acceptable at laptop scale. |
-| #8 — Redis client unguarded retries + no connection timeout | ❌ Open | — | — | `apps/api/src/common/redis-client.ts` still has `maxRetriesPerRequest: null` (infinite), no `connectTimeout`, no `retryStrategy` (default retries forever). Cascading hang on Redis outage. Backlogged as Phase 8.12. |
+| #8 — Redis client unguarded retries + no connection timeout | ✅ Closed | Phase A (2026-06-30) | 2026-06-30 | `apps/api/src/common/redis-client.ts:7-14` now has `connectTimeout: 10_000`, `retryStrategy` with exponential backoff (200ms..30s cap, 15 attempts), and per-call `maxRetriesPerRequest: 5`. BullMQ client uses `maxRetriesPerRequest: null` as required. All three protections from the audit fix implemented. |
 | #9 — DNS rebinding can bypass safe-fetch on pool-reused connections | ✅ Closed | Sprint 1A (commit pending) | 2026-07-03 | Added `pipelining: 0` to `SAFE_LOOKUP_AGENT` at `packages/shared/src/safe-fetch.ts:115`. Disables HTTP pipelining so each request gets its own connection, forcing DNS re-resolution for every fetch — eliminating the pool-reuse attack window. Comment updated to document the trade-off. |
-| #10 — Revenue raw-SQL `$1`/`$2` indices built by string ternary | ❌ Open | — | — | `apps/api/src/modules/admin/finance/revenue.service.ts:354-361` still uses `range.from ? "$2" : "$1"` ternary for param indexing. Not refactored to `params.length`-based or Prisma `where` objects. Brittle if `fromClause`/`toClause` conditionals ever diverge. |
+| #10 — Revenue raw-SQL `$1`/`$2` indices built by string ternary | ✅ Closed | Phase A (2026-06-30) | 2026-06-30 | `apps/api/src/modules/admin/finance/revenue.service.ts:370-410` refactored to `clauses[]` + `params[]` accumulation pattern with incremental `$paramIndex` counter. Comment at line 370: "not brittle $1/$2 ternary arithmetic." Verified: 4 grouping queries all use the same safe pattern. |
 | #11 — Partial-unique WHERE clauses do not track enum additions | ❌ Open | — | — | No static-source spec exists importing `SettlementStatus` or `FulfillmentAssignmentStatus` to assert active values against migration WHERE clauses. The `phase-7-14-static-source.spec.ts` pattern referenced in the audit was never created. Schema.prisma has human-readable comments only (lines 718-730, 800-808). |
 | #12 — CASCADE deletes on User wipe AuditLog / Notification / TicketMessage | ✅ Closed | Phase 8.12 | 2026-06-29 | `Notification.userId` and `TicketMessage.userId` changed to nullable (`String?`) with `onDelete: SetNull` in `schema.prisma`. A custom migration `phase_812_cascade_setnull` was generated to alter columns and recreate FKs. Preserves audit/message history on user deletion (when implemented). |
 | #13 — JSON column validation gaps — payout key-rotation hazard | ❌ Open | — | — | No key-rotation runbook in `bedrock/Memory/infrastructure.md`. No backfill spec asserting encrypted row `encryptionKeyVersion` matches known key. Multi-version decrypt test exists (`payout-decrypt-security.spec.ts:156`) but is the only addressed item. |
-| #14 — Delivery-verification body-cap silent failure | ❌ Open | — | — | `apps/worker/src/processors/delivery-verification.processor.ts:106-116` uses `logger.warn` (not error), no `reason: 'body_size_exceeded'`, no `contentLength`. The sibling `verification.processor.ts:71-76` has identical gap. |
+| #14 — Delivery-verification body-cap silent failure | ✅ Closed | Sprint 2A | 2026-07-03 | Both processors (`delivery-verification.processor.ts:106-116`, `verification.processor.ts:68-78`) now emit `logger.warn({ reason: "body_size_exceeded", url, maxBodySize, contentLength })`. `contentLength` parsed to number from header, guarded against NaN. Behavior identical — body cap exceeded still returns `""`/`null` → MANUAL_REVIEW. Regression guard at `phase-7-14-body-cap-logging.spec.ts`. |
 | #15 — mailpit + worker have no Docker healthcheck | ❌ Open | — | — | `infrastructure/docker/docker-compose.yml` line 77: mailpit has no `healthcheck` block (unlike postgres, redis, minio). `apps/worker/Dockerfile` has no `HEALTHCHECK` instruction (unlike sibling `apps/api/Dockerfile`). |
 | #17 — CI workflows drifted — pr.yml + main.yml use postgres:16 | ✅ Closed | Sprint 1B (commit pending) | 2026-07-03 | Changed both `pr.yml:21` and `main.yml:20` from `postgres:16` to `postgres:17-alpine`. All 3 workflows now use postgres:17-alpine. Consolidated image; reusable workflow refactor deferred to future infra work. |
 | #18 — Reconciliation dedup hitcount logged as cumulative, not per-sweep | ❌ Open | — | — | `packages/shared/src/notification-dedup-keys.ts:140` has module-scoped `dedupHitsTotal` never reset between sweeps. `reconciliation.processor.ts:112` logs `dedup_hits_total: total`. The `__resetDedupHitsTotal()` export exists but is test-only. |
 | #20 — Portal marketplace uses raw `<img>` in 4 files | ❌ Open | — | — | 7 raw `<img>` tags across 4 files in `apps/portal/src/app/dashboard/marketplace/`. No `import Image from "next/image"` anywhere in these files. |
 | #21 — Publisher dashboard + admin orders duplicate STATUS_PRESENTATION | ❌ Open | — | — | Admin dashboard (`apps/admin/src/app/dashboard/page.tsx:54`) and admin orders (`apps/admin/src/app/dashboard/orders/page.tsx:69`) have independent hand-rolled `statusVariant()` functions. Publisher dashboard uses inline ternary (lines 393-400). No shared `STATUS_PRESENTATION` import. |
-| #22 — Settlement.publisherAmount allows zero — surface mapping ambiguity | ❌ Open | — | — | No comment on `publisherAmount Decimal` field in schema.prisma line 695 explaining zero-value semantics (legitimate for refund clawback). No `kind` column to discriminate clawback vs normal. |
+| #22 — Settlement.publisherAmount allows zero — surface mapping ambiguity | ⚠️ Partial | — | — | A `CHECK ("grossAmount" >= 0 AND "platformFee" >= 0 AND "publisherAmount" >= 0)` constraint exists in the squashed baseline migration SQL (`migrations/20260611120000_squashed_baseline/migration.sql:1560`). However, no inline comment on `publisherAmount Decimal` field in `schema.prisma:695` explaining zero-value semantics (legitimate for refund clawback). No `kind` column to discriminate clawback vs normal. |
 | #23 — Order(customerId)-only index opportunity | ❌ Open | — | — | No bare `@@index([customerId])` on Order model. Only composite `@@index([customerId, status])` exists (line 584). Current planner uses leading-column match but future `ORDER BY createdAt` may flip to seq-scan. |
 | #24 — createdAt columns lack `@db.Timestamptz` annotation | ❌ Open | — | — | Zero uses of `@db.Timestamptz` across entire schema.prisma. All `DateTime @default(now())` fields lack timezone annotation. Period-scoped queries could be off-by-hours if app and DB run in different TZs. |
-| #25 — Soft-delete pattern inconsistency across tables | ❓ Unchecked | — | — | Not verified against codebase. Audit describes: Website + PayoutMethod use `isActive`; PlatformRevenue uses `reversedAt`; Order/Settlement use status enums; some tables hard-delete. |
-| #26 — SSRF guard redundancy in verification.processor.ts | ❓ Unchecked | — | — | Not verified. Audit noted this as defense-in-depth (intentional) and "Optional" — may be valid as-is. |
+| #25 — Soft-delete pattern inconsistency across tables | ❌ Open | — | — | Verified 2026-07-03: three patterns coexist — `isActive` (Website, PayoutMethod, PayoutProvider, MarketplaceCategory, ListingFulfillmentRule), `reversedAt` (PlatformRevenue), status-enum terminal values (Order/Settlement/Campaign/MarketplaceListing/others). Eight+ tables hard-delete (OrderItem, Membership, Team, ApiKey, Campaign, MarketplaceFavorite, MarketplaceSavedListItem, SettlementApproval). Even within `isActive` pattern, usage inconsistent — Website sets `isActive: false` on delete but does not filter queries. No standardization work done. |
+| #26 — SSRF guard redundancy in verification.processor.ts | ✅ Intentional | (verified) | 2026-07-03 | Verified against codebase: `verification.processor.ts:104-107` (job-signature) + `:117` (SSRF URL guard) both present. Both layers serve distinct purposes — job-signing protects the queue, URL-level guard protects against malicious content within a signed job. Intentional defense-in-depth, not redundancy. |
 | #27 — Job-signing dev fallback uses `console.warn` not structured logger | ❌ Open | — | — | `packages/shared/src/job-signing.ts:23-27` still uses `console.warn()` in dev fallback when `QUEUE_SIGNING_SECRET` is not set. Not routed through structured logger. |
-| #30 — `createPrismaAdapter` accepts pool config without validation | ❓ Unchecked | — | — | Not verified. Audit noted: callers can set `max > 25` without guard rails (compounds Critical #7). |
+| #30 — `createPrismaAdapter` accepts pool config without validation | ❌ Open | — | — | `packages/database/src/create-prisma-client.ts:27-37`: `createPrismaAdapter()` accepts `CreatePrismaAdapterOptions extends Omit<PoolConfig, 'connectionString'>` and spreads it via `...options`. No validation, no `max > 25` warning, no guard rails. Compounds Critical #7. |
 | #31 — Structured-logger has no context-size cap or stack-trace dedup | ❌ Open | — | — | `packages/shared/src/observability/structured-logger.ts` has no truncation, depth limit, or size guard on context object. `JSON.stringify(record)` at line 97 would throw on circular references. No `replacer`, `maxLength`, or key filtering. |
 | #32 — turbo.json `SENTRY_AUTH_TOKEN` listing has no inline rationale | ❌ Open | — | — | `turbo.json` lines 15 and 28 list `SENTRY_AUTH_TOKEN` in `globalEnv` and `build.env` with zero comments explaining why. |
-| #33 — pnpm @sentry/cli build-script silent-failure | ❓ Unchecked | — | — | Not verified. Audit noted postinstall binary download can fail without clear error. |
+| #33 — pnpm @sentry/cli build-script silent-failure | ✅ Closed | Phase 7.7 C | 2026-06-15+ | `pnpm-workspace.yaml:15-20` has a detailed inline comment documenting the failure mode: "@sentry/cli's postinstall downloads a native binary used to upload source maps... the upload step is silently skipped when SENTRY_AUTH_TOKEN is unset." Documented at the configuration site, which is the canonical location for build-script approval config. |
 | #36 — PRODUCTION_RUNBOOK worker-fleet check is manual | ❌ Open | — | — | `docs/PRODUCTION_RUNBOOK.md:35` still documents manual `pgrep` verification. No automated post-deploy health-poll or boot-time assertion added. |
 | #37 — Repeatable-job-registry drift guard is spec-only | ✅ Closed | Phase 8.12 | 2026-06-29 | `RepeatableJobName` type derived from `JOB_NAMES` array (single source of truth). `RegisteredJob` interface added. Each `register*()` function in `worker/index.ts` now returns `Promise<RegisteredJob>`. `bootstrap()` uses `Promise.all()` to collect results and calls `assertNoRegistryDrift()` from `repeatable-job-registry.ts` at startup. This function compares registered jobs against `REPEATABLE_JOB_NAMES` and throws on mismatch (propagates to `process.exit(1)`). |
 

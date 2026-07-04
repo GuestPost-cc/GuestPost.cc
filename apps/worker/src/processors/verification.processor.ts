@@ -65,13 +65,23 @@ async function verifyLinkOnPage(
   // malicious oversized response. Cap exceeded → null (caller treats
   // as "not found", same as any other failure path).
   let html: string
+  const contentLengthHeader = response.headers.get("content-length")
+  const parsedLength =
+    contentLengthHeader != null ? Number(contentLengthHeader) : undefined
+  const contentLength =
+    parsedLength !== undefined && Number.isFinite(parsedLength)
+      ? parsedLength
+      : undefined
+
   try {
     html = await readBodyWithCap(response, MAX_HTML_BYTES)
   } catch (err: any) {
     if (err instanceof SafeFetchError && err.code === "BODY_TOO_LARGE") {
       logger.warn("response body cap exceeded", {
+        reason: "body_size_exceeded",
         url: targetUrl,
-        maxBytes: MAX_HTML_BYTES,
+        maxBodySize: MAX_HTML_BYTES,
+        contentLength,
       })
     }
     return null
