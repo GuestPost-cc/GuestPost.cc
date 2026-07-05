@@ -46,6 +46,7 @@ function makeTxMock() {
     },
     // Transaction ledger entries after the order.updateMany (1-2 calls per release).
     transaction: { create: jest.fn().mockResolvedValue({}) },
+    $queryRaw: jest.fn().mockResolvedValue([]),
   }
 }
 

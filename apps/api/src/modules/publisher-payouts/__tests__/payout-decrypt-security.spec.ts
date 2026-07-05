@@ -340,6 +340,7 @@ describe("PayoutExecutionService — provider error redaction", () => {
         create: jest.fn().mockResolvedValue({ id: "exec-1" }),
         update: jest.fn().mockResolvedValue({}),
       },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest
         .fn()
         .mockImplementation(async (cb: any) => cb(prismaMock)),

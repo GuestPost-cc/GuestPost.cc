@@ -9,10 +9,10 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
     try {
       const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
       const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
+        require("../modules/settlements/settlements.service") as any
       const settlements: any = app.get(SettlementsService)
       const { RefundService } =
-        require("../../modules/orders/services/refund.service") as any
+        require("../modules/orders/services/refund.service") as any
       const refunds: any = app.get(RefundService)
 
       // Create settlement + customer-approve it
@@ -76,8 +76,17 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
     try {
       const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
       const { PublisherPayoutsService } =
-        require("../../modules/publisher-payouts/publisher-payouts.service") as any
+        require("../modules/publisher-payouts/publisher-payouts.service") as any
       const payouts: any = app.get(PublisherPayoutsService)
+
+      // Add user as a publisher member so assertPublisherMember passes
+      await prisma.publisherMembership.create({
+        data: {
+          userId: ctx.customer.user.id,
+          publisherId: ctx.publisher.publisher.id,
+          role: "PUBLISHER_OWNER",
+        },
+      })
 
       // Seed debtBalance directly
       await prisma.publisherBalance.upsert({
@@ -112,10 +121,10 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
     try {
       const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
       const { PublisherPayoutsService } =
-        require("../../modules/publisher-payouts/publisher-payouts.service") as any
+        require("../modules/publisher-payouts/publisher-payouts.service") as any
       const payouts: any = app.get(PublisherPayoutsService)
       const { PayoutExecutionService } =
-        require("../../modules/publisher-payouts/payout-execution.service") as any
+        require("../modules/publisher-payouts/payout-execution.service") as any
       const executions: any = app.get(PayoutExecutionService)
 
       // Seed balance + create an APPROVED withdrawal
@@ -130,6 +139,18 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
           withdrawableBalance: 100,
           debtBalance: 50,
         },
+      })
+
+      // Create an active "manual" payout provider so getActiveProvider doesn't throw
+      await prisma.payoutProvider.upsert({
+        where: { name: "manual" },
+        create: {
+          name: "manual",
+          displayName: "Manual Transfer",
+          config: {},
+          isActive: true,
+        },
+        update: { isActive: true },
       })
 
       // Create an APPROVED withdrawal directly (can't use payouts service
@@ -164,7 +185,7 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
     try {
       const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
       const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
+        require("../modules/settlements/settlements.service") as any
       const settlements: any = app.get(SettlementsService)
 
       // Create settlement + customer-approve it
@@ -213,7 +234,7 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
     try {
       const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
       const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
+        require("../modules/settlements/settlements.service") as any
       const settlements: any = app.get(SettlementsService)
 
       const settlement = await settlements.createSettlement(
@@ -261,7 +282,7 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
     try {
       const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
       const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
+        require("../modules/settlements/settlements.service") as any
       const settlements: any = app.get(SettlementsService)
 
       const settlement = await settlements.createSettlement(
@@ -298,7 +319,7 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
     try {
       const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
       const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
+        require("../modules/settlements/settlements.service") as any
       const settlements: any = app.get(SettlementsService)
 
       const settlement = await settlements.createSettlement(
@@ -361,7 +382,7 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
     try {
       const ctx = await setupFinancialTest(prisma, { orderAmount: 100 })
       const { SettlementsService } =
-        require("../../modules/settlements/settlements.service") as any
+        require("../modules/settlements/settlements.service") as any
       const settlements: any = app.get(SettlementsService)
 
       const settlement = await settlements.createSettlement(

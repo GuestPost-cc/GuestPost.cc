@@ -8,6 +8,7 @@ import {
   checkSeparationOfDuties,
   evaluateSettlementEligibility,
   normalizeUrl,
+  type SettlementEligibilitySnapshot,
   sameDomain,
   urlsMatch,
 } from "@guestpost/shared"
@@ -46,88 +47,69 @@ describe("normalizeUrl / urlsMatch", () => {
 
 // ── Settlement gating ──────────────────────────────────────────────────────
 describe("evaluateSettlementEligibility", () => {
-  function prismaFor(over: any = {}) {
+  function snapshotFor(
+    over: {
+      orderStatus?: string
+      activeDeliveryVersionId?: string | null
+      activeDeliveryVerificationStatus?: string | null
+      activeDeliveryInterventionStatus?: string | null
+      hasActiveDispute?: boolean
+      hasActiveRevision?: boolean
+      fraudFlagCount?: number
+    } = {},
+  ): SettlementEligibilitySnapshot {
     return {
-      order: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: "o1",
-          status: "DELIVERED",
-          activeDeliveryVersionId: "v1",
-          ...over.order,
-        }),
-      },
-      orderDeliveryVersion: {
-        findUnique: jest.fn().mockResolvedValue({
-          id: "v1",
-          verificationStatus: "VERIFIED",
-          interventionStatus: "NONE",
-          ...over.version,
-        }),
-      },
-      orderDispute: {
-        findFirst: jest.fn().mockResolvedValue(over.dispute ?? null),
-      },
-      revision: {
-        findFirst: jest.fn().mockResolvedValue(over.revision ?? null),
-      },
-      deliveryFraudFlag: {
-        count: jest.fn().mockResolvedValue(over.fraud ?? 0),
-      },
+      orderStatus: "DELIVERED",
+      activeDeliveryVersionId: "v1",
+      activeDeliveryVerificationStatus: "VERIFIED",
+      activeDeliveryInterventionStatus: "NONE",
+      hasActiveDispute: false,
+      hasActiveRevision: false,
+      fraudFlagCount: 0,
+      ...over,
     }
   }
 
-  it("eligible: delivered + verified active + no dispute/revision/fraud", async () => {
-    const r = await evaluateSettlementEligibility(prismaFor(), "o1")
+  it("eligible: delivered + verified active + no dispute/revision/fraud", () => {
+    const r = evaluateSettlementEligibility(snapshotFor())
     expect(r).toEqual({ eligible: true, reasons: [] })
   })
-  it("blocks when order not DELIVERED", async () => {
-    const r = await evaluateSettlementEligibility(
-      prismaFor({ order: { status: "PUBLISHED" } }),
-      "o1",
+  it("blocks when order not DELIVERED", () => {
+    const r = evaluateSettlementEligibility(
+      snapshotFor({ orderStatus: "PUBLISHED" }),
     )
     expect(r.eligible).toBe(false)
     expect(r.reasons.join()).toMatch(/DELIVERED/)
   })
-  it("blocks when active delivery not verified nor manually approved", async () => {
-    const r = await evaluateSettlementEligibility(
-      prismaFor({
-        version: { verificationStatus: "FAILED", interventionStatus: "NONE" },
+  it("blocks when active delivery not verified nor manually approved", () => {
+    const r = evaluateSettlementEligibility(
+      snapshotFor({
+        activeDeliveryVerificationStatus: "FAILED",
+        activeDeliveryInterventionStatus: "NONE",
       }),
-      "o1",
     )
     expect(r.eligible).toBe(false)
   })
-  it("allows manual-approved delivery even if auto FAILED", async () => {
-    const r = await evaluateSettlementEligibility(
-      prismaFor({
-        version: {
-          verificationStatus: "FAILED",
-          interventionStatus: "APPROVED",
-        },
+  it("allows manual-approved delivery even if auto FAILED", () => {
+    const r = evaluateSettlementEligibility(
+      snapshotFor({
+        activeDeliveryVerificationStatus: "FAILED",
+        activeDeliveryInterventionStatus: "APPROVED",
       }),
-      "o1",
     )
     expect(r.eligible).toBe(true)
   })
-  it("blocks on open dispute, active revision, fraud flags", async () => {
+  it("blocks on open dispute, active revision, fraud flags", () => {
     expect(
-      (
-        await evaluateSettlementEligibility(
-          prismaFor({ dispute: { status: "OPEN" } }),
-          "o1",
-        )
-      ).eligible,
+      evaluateSettlementEligibility(snapshotFor({ hasActiveDispute: true }))
+        .eligible,
     ).toBe(false)
     expect(
-      (
-        await evaluateSettlementEligibility(
-          prismaFor({ revision: { id: "r1", status: "REQUESTED" } }),
-          "o1",
-        )
-      ).eligible,
+      evaluateSettlementEligibility(snapshotFor({ hasActiveRevision: true }))
+        .eligible,
     ).toBe(false)
     expect(
-      (await evaluateSettlementEligibility(prismaFor({ fraud: 2 }), "o1"))
+      evaluateSettlementEligibility(snapshotFor({ fraudFlagCount: 2 }))
         .eligible,
     ).toBe(false)
   })

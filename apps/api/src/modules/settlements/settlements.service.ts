@@ -487,6 +487,7 @@ export class SettlementsService {
           entityId: id,
           metadata: {
             orderId: settlement.orderId,
+            ...orderEventMetadata(settlement.order),
             reason,
             actorRole: staffRole,
             previousStatus,
@@ -586,6 +587,7 @@ export class SettlementsService {
           entityId: id,
           metadata: {
             orderId: settlement.orderId,
+            ...orderEventMetadata(settlement.order),
             reason,
             actorRole: staffRole,
             previousStatus,
@@ -951,6 +953,7 @@ export class SettlementsService {
         entityId: settlementId,
         metadata: {
           orderId: settlement.orderId,
+          ...orderEventMetadata(order),
           publisherAmount: publisherAmount.toNumber(),
           debtApplied: debtApplied.toNumber(),
           previousStatus: "ADMIN_APPROVED",

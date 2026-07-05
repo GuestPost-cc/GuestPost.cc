@@ -53,6 +53,7 @@ describe("RefundService", () => {
       },
       orderEvent: { create: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest
         .fn()
         .mockImplementation(async (cb: any) => cb(prismaMock)),
@@ -128,11 +129,13 @@ describe("RefundService", () => {
       publisherId: "pub-1",
       publisherAmount: new Decimal(80),
     })
-    prismaMock.publisherBalance.findUnique.mockResolvedValue({
-      publisherId: "pub-1",
-      withdrawableBalance: new Decimal(200),
-      version: 5,
-    })
+    prismaMock.$queryRaw.mockResolvedValue([
+      {
+        publisherId: "pub-1",
+        withdrawableBalance: new Decimal(200),
+        version: 5,
+      },
+    ])
 
     await service.refundOrder("order-1", "dispute", "admin-1")
 
@@ -162,11 +165,13 @@ describe("RefundService", () => {
       publisherAmount: new Decimal(80),
     })
     // Only 30 left withdrawable — 50 must become debt, not a failed decrement
-    prismaMock.publisherBalance.findUnique.mockResolvedValue({
-      publisherId: "pub-1",
-      withdrawableBalance: new Decimal(30),
-      version: 5,
-    })
+    prismaMock.$queryRaw.mockResolvedValue([
+      {
+        publisherId: "pub-1",
+        withdrawableBalance: new Decimal(30),
+        version: 5,
+      },
+    ])
 
     await service.refundOrder("order-1", "dispute", "admin-1")
 
