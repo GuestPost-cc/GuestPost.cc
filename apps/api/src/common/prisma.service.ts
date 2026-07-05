@@ -13,10 +13,11 @@ export class PrismaService
   constructor() {
     super({
       adapter: createPrismaAdapter({
-        // Burst capacity for concurrent money operations (payment capture,
-        // settlement release, payout). The default ~num_cpus*2+1 starves the
-        // pool under bursts of interactive transactions.
-        max: 25,
+        // Pool max is resolved by the factory from PRISMA_POOL_MAX env var
+        // (default 10). The env var is the single control point — see
+        // create-prisma-client.ts for the precedence chain and sizing formula.
+        // keep idle timeout explicit; the 20s ceiling prevents stale
+        // connections from lingering during a database restart.
         idleTimeoutMillis: 20_000,
       }),
       // Interactive transactions wait for a pooled connection; give bursts room

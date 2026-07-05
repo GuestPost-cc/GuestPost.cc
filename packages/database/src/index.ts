@@ -5,7 +5,13 @@ export type {
   CreatePrismaAdapterOptions,
   CreatePrismaClientOptions,
 } from "./create-prisma-client"
-export { createPrismaAdapter, createPrismaClient } from "./create-prisma-client"
+export {
+  createPrismaAdapter,
+  createPrismaClient,
+  PRISMA_POOL_MAX_DEFAULT,
+  PRISMA_POOL_MAX_RECOMMENDED,
+  parsePoolMax,
+} from "./create-prisma-client"
 export * from "./prisma/client"
 export { PrismaClient }
 

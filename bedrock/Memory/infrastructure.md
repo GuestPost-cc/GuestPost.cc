@@ -88,6 +88,40 @@ prisma@7.8.0's migrate runner DOES wrap **multi-statement** migration files in a
 - **Integration helpers** at `apps/api/src/__tests__/integration/helpers/`: `test-db.ts` (`createTestDatabase()` returns `{ dbName, url, teardown }`) + `create-test-app.ts` (`createTestApp()` returns `{ app, prisma, dbName, cleanup }`). DATABASE_URL mutation happens BEFORE first AppModule import; Gate 0.75 confirmed env mutation reaches PrismaService cleanly.
 - **psql multi-statement gotcha**: `psql -c "stmt1; stmt2"` wraps multi-statement input in an implicit transaction — an error rolls back earlier statements. For per-statement auto-commit, use `docker exec -i gp-postgres psql ... <<'SQL'` heredoc form. Discovered Phase 7.14 Gate 0.5.
 
+## Prisma Connection Pool Sizing
+
+### Architecture
+- Two independent pools exist per deployment: NestJS API (`PrismaService`, resolves `PRISMA_POOL_MAX` env var) and global singleton (used by worker, pg default `max: 10`).
+- The env var `PRISMA_POOL_MAX` controls the API pool. The worker pool is not configurable via env var (separate override if needed).
+- Precedence: `options.max` > `PRISMA_POOL_MAX` env var > `PRISMA_POOL_MAX_DEFAULT` (10).
+- Validation: non-integer, zero, or negative env var values throw at startup with a clear error. Values exceeding `PRISMA_POOL_MAX_RECOMMENDED` (25) emit a `console.warn`.
+
+### Sizing formula (multi-replica)
+
+```
+per_process_max = (max_connections - superuser_reserved - worker_connections) / replica_count
+```
+
+Typical Postgres SaaS plan: `max_connections = 100`, `superuser_reserved = 3`, worker pool = ~10.
+
+| Replicas | Recommended `PRISMA_POOL_MAX` |
+|----------|-------------------------------|
+| 1        | 10 (safe for laptop dev)      |
+| ≤ 3      | 10–15                         |
+| ≤ 5      | 10                            |
+| > 5      | Recompute formula; consider raising `max_connections` |
+
+The default of 10 is conservative — suitable for up to ~5 API replicas sharing 100 Postgres connections with 3 reserved for superuser access.
+
+### Per-environment config
+- **Laptop dev**: unset (defaults to 10) — both API and worker run locally, total 20 connections.
+- **Staging**: `PRISMA_POOL_MAX=10` — matches production without driving up the staging Postgres plan.
+- **Production**: Set based on the formula above. Monitor pool utilization via `SELECT count(*) FROM pg_stat_activity WHERE state = 'active'` and alert at 80% of the budget.
+
+### Related findings
+- #7 (Critical): pool was hardcoded to `max: 25` with no env-var override → closed by adding `PRISMA_POOL_MAX` + default 10.
+- #30 (Medium): pool config had no validation → closed by adding `parsePoolMax()` + `console.warn` on excess.
+
 ## Payout Encryption Key Rotation
 
 ### Architecture
