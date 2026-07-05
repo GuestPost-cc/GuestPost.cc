@@ -32,6 +32,7 @@
     "test:integration": "pnpm tsx scripts/integration-test.ts",
     "test:concurrency": "pnpm tsx scripts/concurrency-test.ts",
     "test:load": "pnpm tsx scripts/load-test.ts",
+    "setup:integration-test-db": "bash scripts/setup-integration-test-db.sh",
     "prepare": "husky"
   },
   "keywords": [],
