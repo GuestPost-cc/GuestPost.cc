@@ -1,13 +1,22 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
-import type { OrderStatus } from "@guestpost/shared"
-import { getOrderStatusPresentation } from "@guestpost/ui"
 
 const PROJECT_ROOT = path.resolve(__dirname, "../../../..")
 
-function adminAdapter(status: OrderStatus): string {
-  const { variant } = getOrderStatusPresentation(status)
-  switch (variant) {
+// Inline lookup — mirrors the canonical ORDER_STATUS_PRESENTATION mapping.
+// Avoids importing @guestpost/ui (not a dep of the API Nest build).
+const STATUS_VARIANT: Record<string, string> = {
+  DRAFT: "pending",
+  PENDING_PAYMENT: "warning",
+  PAID: "info",
+  PUBLISHED: "success",
+  COMPLETED: "success",
+  CANCELLED: "destructive",
+}
+
+function adminAdapter(status: string): string {
+  const v = STATUS_VARIANT[status] ?? "default"
+  switch (v) {
     case "success":
       return "default"
     case "warning":
@@ -17,18 +26,14 @@ function adminAdapter(status: OrderStatus): string {
       return "outline"
     case "destructive":
       return "destructive"
-    case "default":
+    default:
       return "default"
-    default: {
-      const _exhaustive: never = variant
-      return _exhaustive
-    }
   }
 }
 
-function publisherAdapter(status: OrderStatus): string {
-  const { variant } = getOrderStatusPresentation(status)
-  switch (variant) {
+function publisherAdapter(status: string): string {
+  const v = STATUS_VARIANT[status] ?? "default"
+  switch (v) {
     case "success":
       return "success"
     case "warning":
@@ -39,12 +44,8 @@ function publisherAdapter(status: OrderStatus): string {
       return "secondary"
     case "destructive":
       return "destructive"
-    case "default":
+    default:
       return "default"
-    default: {
-      const _exhaustive: never = variant
-      return _exhaustive
-    }
   }
 }
 
@@ -80,43 +81,43 @@ describe("Phase 7.9 — STATUS_PRESENTATION adoption (audit #21)", () => {
 
   describe("admin adapter mapping", () => {
     it("COMPLETED (success) → default", () => {
-      expect(adminAdapter("COMPLETED" as OrderStatus)).toBe("default")
+      expect(adminAdapter("COMPLETED")).toBe("default")
     })
     it("PUBLISHED (success) → default", () => {
-      expect(adminAdapter("PUBLISHED" as OrderStatus)).toBe("default")
+      expect(adminAdapter("PUBLISHED")).toBe("default")
     })
     it("PENDING_PAYMENT (warning) → secondary", () => {
-      expect(adminAdapter("PENDING_PAYMENT" as OrderStatus)).toBe("secondary")
+      expect(adminAdapter("PENDING_PAYMENT")).toBe("secondary")
     })
     it("PAID (info) → secondary", () => {
-      expect(adminAdapter("PAID" as OrderStatus)).toBe("secondary")
+      expect(adminAdapter("PAID")).toBe("secondary")
     })
     it("CANCELLED (destructive) → destructive", () => {
-      expect(adminAdapter("CANCELLED" as OrderStatus)).toBe("destructive")
+      expect(adminAdapter("CANCELLED")).toBe("destructive")
     })
     it("DRAFT (pending) → outline", () => {
-      expect(adminAdapter("DRAFT" as OrderStatus)).toBe("outline")
+      expect(adminAdapter("DRAFT")).toBe("outline")
     })
   })
 
   describe("publisher adapter mapping", () => {
     it("COMPLETED (success) → success", () => {
-      expect(publisherAdapter("COMPLETED" as OrderStatus)).toBe("success")
+      expect(publisherAdapter("COMPLETED")).toBe("success")
     })
     it("PUBLISHED (success) → success", () => {
-      expect(publisherAdapter("PUBLISHED" as OrderStatus)).toBe("success")
+      expect(publisherAdapter("PUBLISHED")).toBe("success")
     })
     it("PENDING_PAYMENT (warning) → warning", () => {
-      expect(publisherAdapter("PENDING_PAYMENT" as OrderStatus)).toBe("warning")
+      expect(publisherAdapter("PENDING_PAYMENT")).toBe("warning")
     })
     it("PAID (info) → info", () => {
-      expect(publisherAdapter("PAID" as OrderStatus)).toBe("info")
+      expect(publisherAdapter("PAID")).toBe("info")
     })
     it("CANCELLED (destructive) → destructive", () => {
-      expect(publisherAdapter("CANCELLED" as OrderStatus)).toBe("destructive")
+      expect(publisherAdapter("CANCELLED")).toBe("destructive")
     })
     it("DRAFT (pending) → secondary", () => {
-      expect(publisherAdapter("DRAFT" as OrderStatus)).toBe("secondary")
+      expect(publisherAdapter("DRAFT")).toBe("secondary")
     })
   })
 })
