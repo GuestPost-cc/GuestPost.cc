@@ -44,16 +44,24 @@ export class SettlementsController {
   @Post(":id/admin-approve")
   @UseGuards(StaffRolesGuard)
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  adminApprove(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.settlements.adminApprove(id, user.id, user.role)
+  adminApprove(
+    @Param("id") id: string,
+    @Body() body: SettlementReasonDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.settlements.adminApprove(id, body.reason, user.id, user.role)
   }
 
   // SUPER_ADMIN can force-approve both sides
   @Post(":id/force-approve")
   @UseGuards(StaffRolesGuard)
   @StaffRoles("SUPER_ADMIN")
-  forceApprove(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.settlements.forceApprove(id, user.id, user.role)
+  forceApprove(
+    @Param("id") id: string,
+    @Body() body: SettlementReasonDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.settlements.forceApprove(id, body.reason, user.id, user.role)
   }
 
   @Post(":id/cancel")

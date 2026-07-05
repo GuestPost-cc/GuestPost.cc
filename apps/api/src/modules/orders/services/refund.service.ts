@@ -3,10 +3,13 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { PrismaService } from "../../../common/prisma.service"
+import { checkPublisherBalanceInvariant } from "../../../common/publisher-balance-invariants"
+import { lockPublisherBalanceForUpdate } from "../../../common/publisher-balance-lock"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
 
@@ -38,6 +41,8 @@ const REFUNDABLE_STATUSES = [
  */
 @Injectable()
 export class RefundService {
+  private readonly logger = new Logger(RefundService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -131,9 +136,10 @@ export class RefundService {
         // (A blind decrement would hit the >= 0 CHECK constraint and make the
         // customer's refund impossible.)
         if (activeSettlement && activeSettlement.status === "RELEASED") {
-          const balance = await tx.publisherBalance.findUnique({
-            where: { publisherId: activeSettlement.publisherId },
-          })
+          const balance = await lockPublisherBalanceForUpdate(
+            tx,
+            activeSettlement.publisherId,
+          )
           const owed = new Decimal(activeSettlement.publisherAmount)
           if (balance) {
             const withdrawable = new Decimal(balance.withdrawableBalance)
@@ -157,6 +163,19 @@ export class RefundService {
                 "Publisher balance was modified by another request",
               )
             }
+
+            checkPublisherBalanceInvariant(
+              {
+                ...balance,
+                withdrawableBalance:
+                  Number(balance.withdrawableBalance) - Number(clawedNow),
+                debtBalance: Number(balance.debtBalance ?? 0) + Number(newDebt),
+                lifetimeEarnings:
+                  Number(balance.lifetimeEarnings) - Number(owed),
+              },
+              this.logger,
+              "refundOrder/clawback",
+            )
 
             if (clawedNow.greaterThan(0)) {
               await tx.transaction.create({

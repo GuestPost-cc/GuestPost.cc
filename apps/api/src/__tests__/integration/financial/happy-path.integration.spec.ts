@@ -39,6 +39,7 @@ describe("[INTEGRATION] Financial — deposit → settle → release happy path"
       // Act 3: admin approve → releaseFundsInternal
       const released = await settlements.adminApprove(
         settlement.id,
+        "Happy path test approval",
         ctx.customer.user.id,
         "SUPER_ADMIN",
       )

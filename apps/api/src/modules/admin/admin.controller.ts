@@ -462,14 +462,32 @@ export class AdminController {
 
   @Post("settlements/:id/admin-approve")
   @StaffRoles("SUPER_ADMIN", "FINANCE")
-  adminApproveSettlement(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.settlements.adminApprove(id, user.id, user.staffRole)
+  adminApproveSettlement(
+    @Param("id") id: string,
+    @Body() body: SettlementReasonDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.settlements.adminApprove(
+      id,
+      body.reason,
+      user.id,
+      user.staffRole,
+    )
   }
 
   @Post("settlements/:id/force-approve")
   @StaffRoles("SUPER_ADMIN")
-  forceApproveSettlement(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.settlements.forceApprove(id, user.id, user.staffRole)
+  forceApproveSettlement(
+    @Param("id") id: string,
+    @Body() body: SettlementReasonDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.settlements.forceApprove(
+      id,
+      body.reason,
+      user.id,
+      user.staffRole,
+    )
   }
 
   @Post("settlements/:id/cancel")

@@ -8,10 +8,12 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { PrismaService } from "../../common/prisma.service"
+import { checkPublisherBalanceInvariant } from "../../common/publisher-balance-invariants"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
@@ -24,6 +26,8 @@ import { PayoutExecutionService } from "./payout-execution.service"
 
 @Injectable()
 export class PublisherPayoutsService {
+  private readonly logger = new Logger(PublisherPayoutsService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -275,6 +279,16 @@ export class PublisherPayoutsService {
         )
       }
 
+      // Debt gate: outstanding clawback debt must be repaid through settlement
+      // before the publisher may withdraw. This prevents money extraction
+      // after a refund clawback created a debtBalance.
+      const debt = new Decimal(balance.debtBalance ?? 0)
+      if (debt.greaterThan(0)) {
+        throw new BadRequestException(
+          `Cannot withdraw while outstanding debt of ${debt.toFixed(2)} exists. Repay through future settlements.`,
+        )
+      }
+
       let created: any
       try {
         created = await tx.withdrawal.create({
@@ -311,6 +325,15 @@ export class PublisherPayoutsService {
           "Publisher balance was modified by another request. Retry.",
         )
       }
+
+      checkPublisherBalanceInvariant(
+        {
+          ...balance,
+          withdrawableBalance: Number(balance.withdrawableBalance) - amount,
+        },
+        this.logger,
+        "requestWithdrawal",
+      )
 
       // Ledger row at REQUEST time — this is when the balance moves. A
       // rejection writes the offsetting WITHDRAWAL_REVERSAL.

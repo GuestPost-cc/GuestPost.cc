@@ -5,7 +5,10 @@ import {
   Logger,
   NotFoundException,
 } from "@nestjs/common"
+import { Decimal } from "@prisma/client/runtime/client"
 import { PrismaService } from "../../common/prisma.service"
+import { checkPublisherBalanceInvariant } from "../../common/publisher-balance-invariants"
+import { lockPublisherBalanceForUpdate } from "../../common/publisher-balance-lock"
 import { AuditService } from "../audit/audit.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
 import { PayoutProviderService } from "./payout-provider.service"
@@ -71,6 +74,20 @@ export class PayoutExecutionService {
         where: { id: withdrawalId },
       })
       versionSnapshot = updatedWithdrawal.version
+
+      // Lock publisher balance and check for outstanding debt before
+      // moving money. This serializes with concurrent refund clawbacks:
+      // the lock guarantees no debt appears between our check and commit.
+      const payoutBalance = await lockPublisherBalanceForUpdate(
+        tx,
+        withdrawal.publisherId,
+      )
+      const currentDebt = new Decimal(payoutBalance?.debtBalance ?? 0)
+      if (currentDebt.greaterThan(0)) {
+        throw new BadRequestException(
+          `Publisher has outstanding debt of ${currentDebt.toFixed(2)} — resolve before executing payout`,
+        )
+      }
 
       execution = await tx.payoutExecution.create({
         data: {
@@ -147,7 +164,7 @@ export class PayoutExecutionService {
             where: { publisherId: withdrawal.publisherId },
           })
           if (balance) {
-            await tx.publisherBalance.updateMany({
+            const updated = await tx.publisherBalance.updateMany({
               where: {
                 publisherId: withdrawal.publisherId,
                 version: balance.version,
@@ -157,6 +174,18 @@ export class PayoutExecutionService {
                 version: { increment: 1 },
               },
             })
+            if (updated.count > 0) {
+              checkPublisherBalanceInvariant(
+                {
+                  ...balance,
+                  lifetimeEarnings:
+                    Number(balance.lifetimeEarnings) +
+                    Number(withdrawal.amount),
+                },
+                this.logger,
+                "executeWithdrawal/completed",
+              )
+            }
           }
         }
 

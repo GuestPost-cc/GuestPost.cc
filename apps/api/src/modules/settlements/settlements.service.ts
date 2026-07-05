@@ -1,4 +1,5 @@
 import {
+  buildSettlementEligibilitySnapshot,
   checkSeparationOfDuties,
   evaluateSettlementEligibility,
   getSettlementReviewDays,
@@ -11,6 +12,7 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
@@ -19,12 +21,17 @@ import {
   splitPlatformFee,
 } from "../../common/platform-fee"
 import { PrismaService } from "../../common/prisma.service"
+import { checkPublisherBalanceInvariant } from "../../common/publisher-balance-invariants"
+import { lockPublisherBalanceForUpdate } from "../../common/publisher-balance-lock"
 import { AuditService } from "../audit/audit.service"
 import { assertOwnerOrCreator } from "../orders/services/owner-or-creator"
 import { QueueService } from "../queues/queue.service"
+import { evaluateSettlementEligibilityTx } from "./settlement-eligibility"
 
 @Injectable()
 export class SettlementsService {
+  private readonly logger = new Logger(SettlementsService.name)
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -49,10 +56,11 @@ export class SettlementsService {
     // Independent-verification gate: no settlement on a human claim alone.
     // Requires an active VERIFIED (or manually-approved) delivery, no open
     // dispute, no active revision, no fraud flags, status DELIVERED.
-    const eligibility = await evaluateSettlementEligibility(
+    const preSnapshot = await buildSettlementEligibilitySnapshot(
       this.prisma,
       orderId,
     )
+    const eligibility = evaluateSettlementEligibility(preSnapshot)
     if (!eligibility.eligible) {
       await this.audit.log({
         action: "ORDER_DELIVERY_SETTLEMENT_BLOCKED",
@@ -149,7 +157,7 @@ export class SettlementsService {
       // between the pre-transaction evaluateSettlementEligibility call
       // (line 52) and this point — a dispute could have been opened, fraud
       // flag raised, or order cancelled concurrently.
-      const txnEligibility = await evaluateSettlementEligibility(tx, orderId)
+      const txnEligibility = await evaluateSettlementEligibilityTx(tx, orderId)
       if (!txnEligibility.eligible) {
         throw new BadRequestException({
           code: "SETTLEMENT_BLOCKED",
@@ -407,7 +415,12 @@ export class SettlementsService {
   }
 
   // Staff approves settlement (admin side)
-  async adminApprove(id: string, userId: string, staffRole: string) {
+  async adminApprove(
+    id: string,
+    reason: string,
+    userId: string,
+    staffRole: string,
+  ) {
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -419,19 +432,22 @@ export class SettlementsService {
       )
     }
 
-    // Check for active dispute
-    const activeDispute = await this.prisma.orderDispute.findFirst({
-      where: {
-        orderId: settlement.orderId,
-        status: { in: ["OPEN", "UNDER_REVIEW"] },
-      },
-    })
-    if (activeDispute)
-      throw new BadRequestException(
-        "Cannot approve settlement while dispute is active",
-      )
+    const previousStatus = settlement.status
 
     const result = await this.prisma.$transaction(async (tx: any) => {
+      // Re-check with fresh transactional snapshot — closes TOCTOU window
+      const eligibility = await evaluateSettlementEligibilityTx(
+        tx,
+        settlement.orderId,
+      )
+      if (!eligibility.eligible) {
+        throw new BadRequestException({
+          code: "SETTLEMENT_BLOCKED",
+          message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+          reasons: eligibility.reasons,
+        })
+      }
+
       const adminUpdated = await tx.settlement.updateMany({
         where: { id, status: "CUSTOMER_APPROVED", version: settlement.version },
         data: {
@@ -464,6 +480,27 @@ export class SettlementsService {
         userId,
       )
 
+      await this.audit.log(
+        {
+          action: "SETTLEMENT_ADMIN_APPROVED",
+          entityType: "Settlement",
+          entityId: id,
+          metadata: {
+            orderId: settlement.orderId,
+            reason,
+            actorRole: staffRole,
+            previousStatus,
+            newStatus: "ADMIN_APPROVED",
+            publisherAmount:
+              settlement.publisherAmount?.toNumber?.() ??
+              Number(settlement.publisherAmount),
+          },
+          userId,
+          organizationId: settlement.order.organizationId,
+        },
+        tx,
+      )
+
       // Row is now RELEASED — return the final state, not the snapshot
       return tx.settlement.findUniqueOrThrow({ where: { id } })
     })
@@ -474,7 +511,12 @@ export class SettlementsService {
   }
 
   // Combined approval for dual-role staff (SUPER_ADMIN)
-  async forceApprove(id: string, userId: string, staffRole: string) {
+  async forceApprove(
+    id: string,
+    reason: string,
+    userId: string,
+    staffRole: string,
+  ) {
     const settlement = await this.prisma.settlement.findUnique({
       where: { id },
       include: { order: true },
@@ -483,16 +525,7 @@ export class SettlementsService {
     if (settlement.status === "RELEASED")
       throw new BadRequestException("Settlement already released")
 
-    const activeDispute = await this.prisma.orderDispute.findFirst({
-      where: {
-        orderId: settlement.orderId,
-        status: { in: ["OPEN", "UNDER_REVIEW"] },
-      },
-    })
-    if (activeDispute)
-      throw new BadRequestException(
-        "Cannot approve settlement while dispute is active",
-      )
+    const previousStatus = settlement.status
 
     const targetStatus =
       settlement.status === "CUSTOMER_APPROVED"
@@ -500,6 +533,19 @@ export class SettlementsService {
         : "CUSTOMER_APPROVED"
 
     const result = await this.prisma.$transaction(async (tx: any) => {
+      // Fresh eligibility check with locked snapshot — closes TOCTOU window
+      const eligibility = await evaluateSettlementEligibilityTx(
+        tx,
+        settlement.orderId,
+      )
+      if (!eligibility.eligible) {
+        throw new BadRequestException({
+          code: "SETTLEMENT_BLOCKED",
+          message: `Settlement blocked: ${eligibility.reasons.join("; ")}`,
+          reasons: eligibility.reasons,
+        })
+      }
+
       const updated = await tx.settlement.updateMany({
         where: { id, version: settlement.version },
         data: {
@@ -531,12 +577,34 @@ export class SettlementsService {
           { ...settlement, version: fresh.version },
           userId,
         )
-        // releaseFundsInternal moved the row to RELEASED — return the final
-        // state, not the pre-release snapshot
-        return tx.settlement.findUnique({ where: { id } })
       }
 
-      return fresh
+      await this.audit.log(
+        {
+          action: "SETTLEMENT_FORCE_APPROVED",
+          entityType: "Settlement",
+          entityId: id,
+          metadata: {
+            orderId: settlement.orderId,
+            reason,
+            actorRole: staffRole,
+            previousStatus,
+            newStatus: targetStatus,
+            publisherAmount:
+              settlement.publisherAmount?.toNumber?.() ??
+              Number(settlement.publisherAmount),
+          },
+          userId,
+          organizationId: settlement.order.organizationId,
+        },
+        tx,
+      )
+
+      // releaseFundsInternal moved the row to RELEASED — return the final
+      // state, not the pre-release snapshot
+      return targetStatus === "ADMIN_APPROVED"
+        ? tx.settlement.findUnique({ where: { id } })
+        : fresh
     })
 
     if (targetStatus === "ADMIN_APPROVED") {
@@ -554,6 +622,8 @@ export class SettlementsService {
     if (!settlement) throw new NotFoundException("Settlement not found")
     if (settlement.status === "RELEASED")
       throw new BadRequestException("Cannot cancel released settlement")
+
+    const previousStatus = settlement.status
 
     return this.prisma.$transaction(async (tx: any) => {
       const updated = await tx.settlement.updateMany({
@@ -577,6 +647,7 @@ export class SettlementsService {
           metadata: {
             ...orderEventMetadata(settlement.order),
             orderId: settlement.orderId,
+            previousStatus,
             reason,
           },
           userId,
@@ -750,9 +821,10 @@ export class SettlementsService {
       )
     }
 
-    const balance = await tx.publisherBalance.findUnique({
-      where: { publisherId: settlement.publisherId },
-    })
+    const balance = await lockPublisherBalanceForUpdate(
+      tx,
+      settlement.publisherId,
+    )
 
     const publisherAmount = new Decimal(settlement.publisherAmount)
     // Outstanding clawback debt is repaid before anything reaches
@@ -781,6 +853,16 @@ export class SettlementsService {
           "Publisher balance was modified by another request. Retry.",
         )
       }
+      checkPublisherBalanceInvariant(
+        {
+          ...balance,
+          withdrawableBalance:
+            Number(balance.withdrawableBalance) + Number(credited),
+          debtBalance: Number(balance.debtBalance ?? 0) - Number(debtApplied),
+        },
+        this.logger,
+        "releaseFundsInternal",
+      )
     } else {
       await tx.publisherBalance.create({
         data: {
@@ -861,5 +943,22 @@ export class SettlementsService {
         },
       },
     })
+
+    await this.audit.log(
+      {
+        action: "SETTLEMENT_FUNDS_RELEASED",
+        entityType: "Settlement",
+        entityId: settlementId,
+        metadata: {
+          orderId: settlement.orderId,
+          publisherAmount: publisherAmount.toNumber(),
+          debtApplied: debtApplied.toNumber(),
+          previousStatus: "ADMIN_APPROVED",
+        },
+        userId,
+        organizationId: order?.organizationId ?? null,
+      },
+      tx,
+    )
   }
 }

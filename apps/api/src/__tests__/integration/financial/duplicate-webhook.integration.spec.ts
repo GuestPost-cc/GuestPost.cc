@@ -31,6 +31,7 @@ describe("[INTEGRATION] Financial — duplicate webhook idempotency", () => {
       )
       await settlements.adminApprove(
         settlement.id,
+        "Duplicate webhook test approval",
         ctx.customer.user.id,
         "SUPER_ADMIN",
       )

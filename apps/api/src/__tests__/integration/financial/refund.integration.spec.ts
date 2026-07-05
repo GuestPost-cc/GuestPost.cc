@@ -35,6 +35,7 @@ describe("[INTEGRATION] Financial — full refund after settlement release", () 
       )
       const released = await settlements.adminApprove(
         settlement.id,
+        "Refund test approval",
         ctx.customer.user.id,
         "SUPER_ADMIN",
       )
