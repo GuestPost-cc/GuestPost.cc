@@ -55,7 +55,10 @@ function detectPsqlCmd(): string[] {
 const psqlCmd = detectPsqlCmd()
 
 function psqlAdmin(sql: string): void {
-  execFileSync(psqlCmd[0], [...psqlCmd.slice(1), sql], { encoding: "utf-8" })
+  execFileSync(psqlCmd[0], [...psqlCmd.slice(1), sql], {
+    encoding: "utf-8",
+    env: { ...process.env, PGPASSWORD: PG_PASS },
+  })
 }
 
 export interface TestDatabase {
