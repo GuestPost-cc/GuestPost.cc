@@ -1,10 +1,52 @@
 import * as fs from "node:fs"
 import * as path from "node:path"
 import type { OrderStatus } from "@guestpost/shared"
-import { getOrderBadgeVariant } from "../../../admin/src/lib/order-status-badge-variant"
-import { getPublisherOrderBadgeVariant } from "../../../publisher/src/lib/order-status-badge-variant"
+import { getOrderStatusPresentation } from "@guestpost/ui"
 
 const PROJECT_ROOT = path.resolve(__dirname, "../../../..")
+
+function adminAdapter(status: OrderStatus): string {
+  const { variant } = getOrderStatusPresentation(status)
+  switch (variant) {
+    case "success":
+      return "default"
+    case "warning":
+    case "info":
+      return "secondary"
+    case "pending":
+      return "outline"
+    case "destructive":
+      return "destructive"
+    case "default":
+      return "default"
+    default: {
+      const _exhaustive: never = variant
+      return _exhaustive
+    }
+  }
+}
+
+function publisherAdapter(status: OrderStatus): string {
+  const { variant } = getOrderStatusPresentation(status)
+  switch (variant) {
+    case "success":
+      return "success"
+    case "warning":
+      return "warning"
+    case "info":
+      return "info"
+    case "pending":
+      return "secondary"
+    case "destructive":
+      return "destructive"
+    case "default":
+      return "default"
+    default: {
+      const _exhaustive: never = variant
+      return _exhaustive
+    }
+  }
+}
 
 describe("Phase 7.9 — STATUS_PRESENTATION adoption (audit #21)", () => {
   describe("architecture regression guards", () => {
@@ -38,57 +80,43 @@ describe("Phase 7.9 — STATUS_PRESENTATION adoption (audit #21)", () => {
 
   describe("admin adapter mapping", () => {
     it("COMPLETED (success) → default", () => {
-      expect(getOrderBadgeVariant("COMPLETED" as OrderStatus)).toBe("default")
+      expect(adminAdapter("COMPLETED" as OrderStatus)).toBe("default")
     })
     it("PUBLISHED (success) → default", () => {
-      expect(getOrderBadgeVariant("PUBLISHED" as OrderStatus)).toBe("default")
+      expect(adminAdapter("PUBLISHED" as OrderStatus)).toBe("default")
     })
     it("PENDING_PAYMENT (warning) → secondary", () => {
-      expect(getOrderBadgeVariant("PENDING_PAYMENT" as OrderStatus)).toBe(
-        "secondary",
-      )
+      expect(adminAdapter("PENDING_PAYMENT" as OrderStatus)).toBe("secondary")
     })
     it("PAID (info) → secondary", () => {
-      expect(getOrderBadgeVariant("PAID" as OrderStatus)).toBe("secondary")
+      expect(adminAdapter("PAID" as OrderStatus)).toBe("secondary")
     })
     it("CANCELLED (destructive) → destructive", () => {
-      expect(getOrderBadgeVariant("CANCELLED" as OrderStatus)).toBe(
-        "destructive",
-      )
+      expect(adminAdapter("CANCELLED" as OrderStatus)).toBe("destructive")
     })
     it("DRAFT (pending) → outline", () => {
-      expect(getOrderBadgeVariant("DRAFT" as OrderStatus)).toBe("outline")
+      expect(adminAdapter("DRAFT" as OrderStatus)).toBe("outline")
     })
   })
 
   describe("publisher adapter mapping", () => {
     it("COMPLETED (success) → success", () => {
-      expect(getPublisherOrderBadgeVariant("COMPLETED" as OrderStatus)).toBe(
-        "success",
-      )
+      expect(publisherAdapter("COMPLETED" as OrderStatus)).toBe("success")
     })
     it("PUBLISHED (success) → success", () => {
-      expect(getPublisherOrderBadgeVariant("PUBLISHED" as OrderStatus)).toBe(
-        "success",
-      )
+      expect(publisherAdapter("PUBLISHED" as OrderStatus)).toBe("success")
     })
     it("PENDING_PAYMENT (warning) → warning", () => {
-      expect(
-        getPublisherOrderBadgeVariant("PENDING_PAYMENT" as OrderStatus),
-      ).toBe("warning")
+      expect(publisherAdapter("PENDING_PAYMENT" as OrderStatus)).toBe("warning")
     })
     it("PAID (info) → info", () => {
-      expect(getPublisherOrderBadgeVariant("PAID" as OrderStatus)).toBe("info")
+      expect(publisherAdapter("PAID" as OrderStatus)).toBe("info")
     })
     it("CANCELLED (destructive) → destructive", () => {
-      expect(getPublisherOrderBadgeVariant("CANCELLED" as OrderStatus)).toBe(
-        "destructive",
-      )
+      expect(publisherAdapter("CANCELLED" as OrderStatus)).toBe("destructive")
     })
     it("DRAFT (pending) → secondary", () => {
-      expect(getPublisherOrderBadgeVariant("DRAFT" as OrderStatus)).toBe(
-        "secondary",
-      )
+      expect(publisherAdapter("DRAFT" as OrderStatus)).toBe("secondary")
     })
   })
 })
