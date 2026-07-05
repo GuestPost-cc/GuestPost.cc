@@ -32,6 +32,115 @@ export interface Logger {
   child: (extra: LogContext) => Logger
 }
 
+// Phase 7.7 B — Context sanitization constants (audit #31).
+// Applied in makeReplacer + truncateContext to bound log-line size and
+// prevent crashes on circular object graphs.
+const MAX_CONTEXT_SERIALIZED_LENGTH = 8192
+const MAX_STACK_LENGTH = 2048
+const MAX_STRING_VALUE_LENGTH = 4096
+const TRUNCATED_SUFFIX = "... [truncated]"
+
+function truncate(value: string, max: number): string {
+  return value.length > max
+    ? `${value.slice(0, max)}${TRUNCATED_SUFFIX}`
+    : value
+}
+
+/**
+ * Build a replacer for `JSON.stringify` that:
+ *   - Detects genuine reference cycles via ancestor-stack tracking
+ *     (shared references are NOT treated as cycles)
+ *   - Serializes Error instances into plain { name, message, stack, code?, cause? }
+ *   - Truncates long string values
+ *
+ * Uses `parentMap` (WeakMap) to track each visited object's parent. When
+ * the replacer visits an object, it walks up the parent chain — if the
+ * same object appears as an ancestor, the graph has a true cycle and we
+ * return "[Circular]". Repeated references through different ancestor
+ * paths serialize normally (no false positives).
+ *
+ * `this` is the parent container (set by JSON.stringify). We guard against
+ * the root wrapper where `this` is not an object.
+ */
+function makeReplacer() {
+  const parentMap = new WeakMap<object, object>()
+
+  return function (this: unknown, _key: string, value: unknown): unknown {
+    if (value instanceof Error) {
+      return {
+        name: value.name,
+        message: value.message,
+        stack: truncate(value.stack ?? "", MAX_STACK_LENGTH),
+        ...((value as any).code !== undefined
+          ? { code: (value as any).code }
+          : {}),
+        cause: value.cause instanceof Error ? value.cause.message : value.cause,
+      }
+    }
+
+    if (typeof value === "object" && value !== null) {
+      const parent =
+        typeof this === "object" && this !== null ? (this as object) : undefined
+      if (parent) {
+        let ancestor: object | undefined = parent
+        while (ancestor) {
+          if (ancestor === value) return "[Circular]"
+          ancestor = parentMap.get(ancestor)
+        }
+        parentMap.set(value, parent)
+      }
+    }
+
+    if (typeof value === "string" && value.length > MAX_STRING_VALUE_LENGTH) {
+      return truncate(value, MAX_STRING_VALUE_LENGTH)
+    }
+
+    return value
+  }
+}
+
+/**
+ * Size-bounded context serialization with field-level preservation.
+ *
+ * Truncates oversized string values first, then iterates entries and
+ * drops any field whose serialized form exceeds the remaining budget.
+ * Reports the count of dropped fields via `__logTruncated` metadata.
+ *
+ * Compared to a "stop at first oversized entry" approach, this preserves
+ * more diagnostic information when context has one large + many small keys.
+ */
+function truncateContext(
+  ctx: LogContext,
+  budget = MAX_CONTEXT_SERIALIZED_LENGTH,
+): LogContext {
+  const result: LogContext = {}
+  let droppedFields = 0
+
+  for (const [key, value] of Object.entries(ctx)) {
+    let safe = value
+    if (typeof safe === "string" && safe.length > MAX_STRING_VALUE_LENGTH) {
+      safe = truncate(safe, MAX_STRING_VALUE_LENGTH)
+    }
+
+    const entry = JSON.stringify({ [key]: safe }, makeReplacer())
+    if (budget - entry.length < 0) {
+      droppedFields++
+      continue
+    }
+    budget -= entry.length
+    result[key] = safe
+  }
+
+  if (droppedFields > 0) {
+    result.__logTruncated = {
+      droppedFields,
+      maxBytes: MAX_CONTEXT_SERIALIZED_LENGTH,
+    }
+  }
+
+  return result
+}
+
 // Resolved once at module init — these are runtime-stable per Phase 7.0's
 // Sentry runtime/release tagging conventions. environment falls back to
 // SENTRY_ENVIRONMENT → NODE_ENV → "development"; release falls back to
@@ -65,23 +174,13 @@ function emit(
   ctx?: LogContext,
 ) {
   const requestId = getRequestId() ?? undefined
-  const record = {
-    ts: new Date().toISOString(),
-    level,
-    service,
-    environment: ENVIRONMENT,
-    release: RELEASE,
-    requestId,
-    msg,
-    ...baseCtx,
-    ...ctx,
-  }
 
   if (USE_PRETTY) {
     const ridSuffix = requestId ? ` rid=${requestId.slice(0, 8)}` : ""
     const merged = { ...baseCtx, ...ctx }
-    const ctxStr = Object.keys(merged).length
-      ? ` ${JSON.stringify(merged)}`
+    const safeMerged = truncateContext(merged)
+    const ctxStr = Object.keys(safeMerged).length
+      ? ` ${JSON.stringify(safeMerged, makeReplacer())}`
       : ""
     // env + release intentionally omitted from pretty output (dev noise
     // reduction); always present in JSON mode for prod log aggregation.
@@ -91,10 +190,25 @@ function emit(
     return
   }
 
+  // Sanitize context before building the record so circular refs, long
+  // strings, and Error objects are handled before serialization.
+  const safeBaseCtx = baseCtx ? truncateContext(baseCtx) : baseCtx
+  const safeCtx = ctx ? truncateContext(ctx) : ctx
+  const record = {
+    ts: new Date().toISOString(),
+    level,
+    service,
+    environment: ENVIRONMENT,
+    release: RELEASE,
+    requestId,
+    msg,
+    ...safeBaseCtx,
+    ...safeCtx,
+  }
   // JSON.stringify natively omits keys whose value is `undefined` — this
   // keeps the requestId field absent (rather than `null`) when no ALS frame
   // is active, matching log-aggregator expectations.
-  streamFor(level).write(`${JSON.stringify(record)}\n`)
+  streamFor(level).write(`${JSON.stringify(record, makeReplacer())}\n`)
 }
 
 /**
