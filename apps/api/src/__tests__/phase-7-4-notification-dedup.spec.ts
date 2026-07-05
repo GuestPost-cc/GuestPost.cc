@@ -158,6 +158,24 @@ describe("Phase 7.4 — dedup_hits_total counter", () => {
     __resetDedupHitsTotal()
     expect(getDedupHitsTotal()).toBe(0)
   })
+
+  it("captures snapshot before loop and computes delta correctly (audit #18 pattern)", () => {
+    const snapshot = getDedupHitsTotal()
+    incrementDedupHits()
+    incrementDedupHits()
+    incrementDedupHits()
+    const delta = getDedupHitsTotal() - snapshot
+    expect(delta).toBe(3)
+    // total still reflects cumulative from previous tests + 3
+    expect(getDedupHitsTotal()).toBe(3)
+  })
+
+  it("delta is 0 when no dedup hits occur between snapshot and final", () => {
+    const snapshot = getDedupHitsTotal()
+    // no increments
+    const delta = getDedupHitsTotal() - snapshot
+    expect(delta).toBe(0)
+  })
 })
 
 describe("Phase 7.4 — migration + schema regression guards", () => {

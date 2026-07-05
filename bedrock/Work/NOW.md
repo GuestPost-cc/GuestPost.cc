@@ -1,6 +1,6 @@
 # Current Focus
 
-**Status (2026-07-05): 31/41 audit findings confirmed closed. Sprint 1A + Sprint 2A + Sprint 2B + Sprint 2C + Sprint 2D + Sprint 2E completed.**
+**Status (2026-07-05): 32/41 audit findings confirmed closed. Sprint 1A + Sprint 2A + Sprint 2B + Sprint 2C + Sprint 2D + Sprint 2E + Sprint 2F completed.**
 Next: Sprint 3 (worker tests + documentation) or Sprint 4 (DB CHECK constraints).
 
 ## Evidence-Driven Engineering Assessment (2026-07-02)
@@ -64,6 +64,7 @@ Each dimension scored 0-100 as weighted composite: Correctness 25%, Completeness
 | **Sprint 2C — Payout encryption key rotation runbook** | Created `payout-encryption.constants.ts` with `CURRENT_PAYOUT_KEY_VERSION = 1` (single source of truth for service + verifier). Created `scripts/verify-encryption-versions.ts` — runtime verifier that groups encrypted rows by version, asserts supported set `[0, 1]`, sample-decrypts via real `PayoutEncryptionService`. Added key rotation runbook to `bedrock/Memory/infrastructure.md` (soft/hard rotation, backfill, post-rotation checklist). Added `PAYOUT_ENCRYPTION_KEY` to `.env.example`. Updated `payout-encryption.service.ts` to import constant from module. Verifier validated against local DB. Closes audit #13. |
 | **Sprint 2D — Prisma pool env var + validation** | Added `PRISMA_POOL_MAX` env var controlled via `parsePoolMax()` in `createPrismaClient.ts` — validates non-integer/zero/negative at call time, `console.warn` on > 25. `prisma.service.ts` no longer hardcodes `max: 25`. Pool sizing section + formula in `bedrock/Memory/infrastructure.md`. `PRISMA_POOL_MAX` in `.env.example` with formula comment. 7 new tests in `phase-13-pool-config-validation.spec.ts`. Closes audit #7 (Critical) + #30 (Medium). |
 | **Sprint 2E — Structured logger context sanitization** | Added `makeReplacer()` with ancestor-stack `WeakMap` — detects true cycles without false positives on shared refs. Error instances serialize as `{ name, message, stack, code?, cause? }` with stack ≤ 2048 chars. Long strings (>4KB) truncated. `truncateContext()` enforces 8KB budget via per-field accounting; drops excess fields + reports `__logTruncated: { droppedFields, maxBytes }`. Both JSON + pretty mode protected. 13-test regression suite. Closes audit #31 (Medium). |
+| **Sprint 2F — Reconciliation dedup per-sweep delta logging** | Added `dedupSnapshot = getDedupHitsTotal()` before the staff loop in `reconciliation.processor.ts`. On each P2002 dedup: computes `dedupHitsInSweep = total - dedupSnapshot` and logs both `dedup_hits_in_sweep` + `dedup_hits_total`. Return value includes both. No module API changes. 2 new tests in `phase-7-4-notification-dedup.spec.ts`. Closes audit #18 (High). |
 
 ## What's next
 

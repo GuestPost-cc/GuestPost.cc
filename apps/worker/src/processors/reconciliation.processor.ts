@@ -83,6 +83,8 @@ async function handleReconciliationRun() {
   ].join(",")
   const dateBucket = notificationDedupKey.utcDateBucket()
 
+  const dedupSnapshot = getDedupHitsTotal()
+
   const staff = await prisma.staffMembership.findMany({
     select: { userId: true },
   })
@@ -106,9 +108,11 @@ async function handleReconciliationRun() {
     } catch (err) {
       if (isUniqueViolation(err)) {
         const total = incrementDedupHits()
+        const dedupHitsInSweep = total - dedupSnapshot
         logger.info("notification deduped (P2002)", {
           dedupKey,
           userId: s.userId,
+          dedup_hits_in_sweep: dedupHitsInSweep,
           dedup_hits_total: total,
         })
         continue
@@ -120,7 +124,13 @@ async function handleReconciliationRun() {
     }
   }
 
-  return { ok: false, dedupHitsTotal: getDedupHitsTotal(), ...problems }
+  const total = getDedupHitsTotal()
+  return {
+    ok: false,
+    dedupHitsInSweep: total - dedupSnapshot,
+    dedupHitsTotal: total,
+    ...problems,
+  }
 }
 
 export function createReconciliationWorker() {
