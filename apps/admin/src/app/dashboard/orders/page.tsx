@@ -1,5 +1,6 @@
 "use client"
 
+import type { OrderStatus } from "@guestpost/shared"
 import { ORDER_STATUS_LABELS, sortOrdersByPriority } from "@guestpost/shared"
 import {
   Badge,
@@ -53,6 +54,7 @@ import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
+import { getOrderBadgeVariant } from "../../../lib/order-status-badge-variant"
 
 interface Order {
   id: string
@@ -64,31 +66,6 @@ interface Order {
   customer: { id: string; name: string | null; email: string } | null
   website?: { id: string; url: string } | null
   items?: Array<{ website: { id: string; url: string } | null }>
-}
-
-const statusVariant = (status: string) => {
-  switch (status) {
-    case "COMPLETED":
-    case "SETTLED":
-    case "VERIFIED":
-      return "default"
-    case "PENDING_PAYMENT":
-    case "PENDING":
-      return "secondary"
-    case "PUBLISHED":
-      return "default"
-    case "REJECTED":
-    case "CANCELLED":
-    case "REFUNDED":
-      return "destructive"
-    case "UNDER_REVIEW":
-      return "secondary"
-    case "PAID":
-    case "ASSIGNED":
-      return "outline"
-    default:
-      return "outline"
-  }
 }
 
 // Lifecycle is automated: customer pays -> publisher/ops fulfill -> the system
@@ -310,7 +287,11 @@ function OrderActions({ order }: { order: Order }) {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Status</p>
-                  <Badge variant={statusVariant(selectedOrder.status) as any}>
+                  <Badge
+                    variant={getOrderBadgeVariant(
+                      selectedOrder.status as OrderStatus,
+                    )}
+                  >
                     {selectedOrder.status.replace(/_/g, " ")}
                   </Badge>
                 </div>
@@ -409,7 +390,7 @@ export default function OrdersPage() {
       columnHelper.accessor("status", {
         header: "Status",
         cell: (info) => (
-          <Badge variant={statusVariant(info.getValue()) as any}>
+          <Badge variant={getOrderBadgeVariant(info.getValue() as OrderStatus)}>
             {info.getValue().replace(/_/g, " ")}
           </Badge>
         ),

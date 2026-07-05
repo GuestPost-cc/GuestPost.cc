@@ -1,5 +1,6 @@
 "use client"
 
+import type { OrderStatus } from "@guestpost/shared"
 import {
   Badge,
   Card,
@@ -29,6 +30,7 @@ import {
 } from "recharts"
 import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
+import { getPublisherOrderBadgeVariant } from "../../lib/order-status-badge-variant"
 
 const _kpiConfig = [
   {
@@ -391,13 +393,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="text-right">
                     <Badge
-                      variant={
-                        order.status === "PUBLISHED"
-                          ? "success"
-                          : order.status === "CONTENT_CREATION"
-                            ? "info"
-                            : "secondary"
-                      }
+                      variant={getPublisherOrderBadgeVariant(
+                        order.status as OrderStatus,
+                      )}
                     >
                       {order.status.replace(/_/g, " ")}
                     </Badge>

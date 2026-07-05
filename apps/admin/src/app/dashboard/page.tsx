@@ -1,5 +1,6 @@
 "use client"
 
+import type { OrderStatus } from "@guestpost/shared"
 import {
   Badge,
   Card,
@@ -30,6 +31,7 @@ import {
 } from "lucide-react"
 import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
+import { getOrderBadgeVariant } from "../../lib/order-status-badge-variant"
 
 interface Stats {
   revenue: number
@@ -49,26 +51,6 @@ interface RecentOrder {
   amount: number | null
   currency: string
   createdAt: string
-}
-
-const statusVariant = (status: string) => {
-  switch (status) {
-    case "COMPLETED":
-    case "SETTLED":
-    case "VERIFIED":
-      return "default"
-    case "PENDING_PAYMENT":
-    case "PENDING":
-      return "secondary"
-    case "PUBLISHED":
-      return "default"
-    case "REJECTED":
-    case "CANCELLED":
-    case "REFUNDED":
-      return "destructive"
-    default:
-      return "outline"
-  }
 }
 
 function TrendIndicator({
@@ -240,7 +222,11 @@ function RecentOrdersTable({
                     {(order.type ?? "").replace(/_/g, " ").toLowerCase() || "—"}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={statusVariant(order.status) as any}>
+                    <Badge
+                      variant={getOrderBadgeVariant(
+                        order.status as OrderStatus,
+                      )}
+                    >
                       {(order.status ?? "").replace(/_/g, " ") || "—"}
                     </Badge>
                   </TableCell>

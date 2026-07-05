@@ -139,7 +139,8 @@ describe("Phase 7.7 B — structured logger context sanitization (audit #31)", (
       "@guestpost/shared/dist/observability/structured-logger"
     )
     const inner = new Error("inner failure")
-    const outer = new Error("outer failure", { cause: inner })
+    const outer = new Error("outer failure")
+    ;(outer as any).cause = inner
 
     createLogger("api.test").info("wrapped", { err: outer })
     const record = jsonRecord()

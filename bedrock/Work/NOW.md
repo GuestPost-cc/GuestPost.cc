@@ -1,6 +1,6 @@
 # Current Focus
 
-**Status (2026-07-05): 32/41 audit findings confirmed closed. Sprint 1A + Sprint 2A + Sprint 2B + Sprint 2C + Sprint 2D + Sprint 2E + Sprint 2F completed.**
+**Status (2026-07-05): 33/41 audit findings confirmed closed. Sprint 1A + Sprint 2A + Sprint 2B + Sprint 2C + Sprint 2D + Sprint 2E + Sprint 2F + Sprint 2G completed.**
 Next: Sprint 3 (worker tests + documentation) or Sprint 4 (DB CHECK constraints).
 
 ## Evidence-Driven Engineering Assessment (2026-07-02)
@@ -65,10 +65,11 @@ Each dimension scored 0-100 as weighted composite: Correctness 25%, Completeness
 | **Sprint 2D — Prisma pool env var + validation** | Added `PRISMA_POOL_MAX` env var controlled via `parsePoolMax()` in `createPrismaClient.ts` — validates non-integer/zero/negative at call time, `console.warn` on > 25. `prisma.service.ts` no longer hardcodes `max: 25`. Pool sizing section + formula in `bedrock/Memory/infrastructure.md`. `PRISMA_POOL_MAX` in `.env.example` with formula comment. 7 new tests in `phase-13-pool-config-validation.spec.ts`. Closes audit #7 (Critical) + #30 (Medium). |
 | **Sprint 2E — Structured logger context sanitization** | Added `makeReplacer()` with ancestor-stack `WeakMap` — detects true cycles without false positives on shared refs. Error instances serialize as `{ name, message, stack, code?, cause? }` with stack ≤ 2048 chars. Long strings (>4KB) truncated. `truncateContext()` enforces 8KB budget via per-field accounting; drops excess fields + reports `__logTruncated: { droppedFields, maxBytes }`. Both JSON + pretty mode protected. 13-test regression suite. Closes audit #31 (Medium). |
 | **Sprint 2F — Reconciliation dedup per-sweep delta logging** | Added `dedupSnapshot = getDedupHitsTotal()` before the staff loop in `reconciliation.processor.ts`. On each P2002 dedup: computes `dedupHitsInSweep = total - dedupSnapshot` and logs both `dedup_hits_in_sweep` + `dedup_hits_total`. Return value includes both. No module API changes. 2 new tests in `phase-7-4-notification-dedup.spec.ts`. Closes audit #18 (High). |
+| **Sprint 2G — STATUS_PRESENTATION adoption (audit #21)** | Created `apps/admin/src/lib/order-status-badge-variant.ts` (`getOrderBadgeVariant`) and `apps/publisher/src/lib/order-status-badge-variant.ts` (`getPublisherOrderBadgeVariant`) — both derive from `getOrderStatusPresentation()` with exhaustive switches and `never` exhaustiveness checks. Removed `statusVariant()` from admin dashboard (54-72) and admin orders (69-92). Removed inline ternary from publisher dashboard (393-400). All `as any` casts eliminated. Added `phase-7-9-status-presentation-adoption.spec.ts` — architecture regression + 12 adapter mapping assertions. Everything builds and passes. Closes audit #21 (Medium). |
 
 ## What's next
 
 **Candidate sprints (unordered):**
-- **Sprint 2B**: Remaining 6 integration tests (deposit→pay→settle→release edge cases, Marketplace order settlement) + pool env-var (`PRISMA_POOL_MAX`)
+- **Sprint 3**: Worker test infrastructure + 10 processor unit tests + OpenAPI doc generation
 - **Sprint 3**: Worker test infrastructure + 10 processor unit tests + OpenAPI doc generation
 - **Sprint 4**: DB CHECK constraints on money columns, key rotation runbook, testing dimension (aim for 70+)
