@@ -36,8 +36,7 @@ PGPASSWORD="${PG_PASS}" ${PSQL} "CREATE DATABASE \"${TEMPLATE_DB}\""
 TEMPLATE_URL="postgresql://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${TEMPLATE_DB}"
 
 echo "==> Running prisma migrate deploy on ${TEMPLATE_DB}"
-DATABASE_URL="${TEMPLATE_URL}" npx prisma migrate deploy \
-  --schema=packages/database/prisma/schema.prisma \
-  --schema=packages/database/prisma/schema.prisma
+cd packages/database
+DATABASE_URL="${TEMPLATE_URL}" npx prisma migrate deploy
 
 echo "==> Done. Integration test template '${TEMPLATE_DB}' is ready."
