@@ -84,6 +84,7 @@ describe("Phase 8.3 — payout-webhook BullMQ jobId dedup (audit #3)", () => {
       .toString()
     const payload = JSON.stringify({
       event_type: "transfers#state-change",
+      occurred_at: new Date().toISOString(),
       data: {
         resource: { id: "wise_xyz789" },
         current_state: "outgoing_payment_sent",

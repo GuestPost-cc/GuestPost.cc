@@ -28,7 +28,9 @@ describe("PayoutWebhookController — signature verification", () => {
   // normalizeProviderWebhook's envelope-or-inner tolerance. The Stripe-specific
   // "queues a correctly signed Stripe webhook" test overrides with the real
   // Stripe envelope shape so the Phase 8.3 jobId dedup path is exercised.
+  // occurred_at is required for Wise replay protection (M-2 pen test fix).
   const payload = JSON.stringify({
+    occurred_at: new Date().toISOString(),
     data: { id: "transfer-1", status: "COMPLETED" },
     event: "transfer.state-change",
   })

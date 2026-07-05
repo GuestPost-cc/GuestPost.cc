@@ -84,7 +84,10 @@ export async function recomputePublisherTrustCore(
       },
     }),
     prisma.orderDispute.count({
-      where: { order: { website: { publisherId } } },
+      where: {
+        order: { website: { publisherId } },
+        status: { notIn: ["RESOLVED_REJECTED", "RESOLVED_RESTORED"] },
+      },
     }),
     prisma.order.count({
       where: { website: { publisherId }, status: "REFUNDED" },

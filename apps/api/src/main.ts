@@ -26,7 +26,10 @@ import express from "express"
 import rateLimit from "express-rate-limit"
 import helmet from "helmet"
 import { AppModule } from "./app.module"
-import { invalidateAuthContext } from "./common/auth-context-cache"
+import {
+  initAuthContextSubscriber,
+  invalidateAuthContext,
+} from "./common/auth-context-cache"
 import { SentryExceptionFilter } from "./common/filters/sentry-exception.filter"
 import { hasAuthCredentials } from "./common/has-auth-credentials"
 import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-business-context.interceptor"
@@ -460,6 +463,13 @@ async function bootstrap() {
   }
   console.log("Nest initialized")
   console.log("QueueService resolved")
+
+  // M-1 — cross-pod auth-context invalidation subscriber (Redis pub/sub).
+  // Must be called after Redis connection is available but before any
+  // auth-dependent requests arrive. Subscription is fire-and-forget;
+  // Redis unavailability is logged but does not block startup.
+  initAuthContextSubscriber()
+  console.log("Auth context cache subscriber initialized")
 
   // Phase A3 — dependency-checked readiness endpoint. Runs after Nest init
   // so PrismaService connection is established. Redis PING uses the HTTP

@@ -163,6 +163,17 @@ describe("recomputePublisherTrustCore", () => {
     expect(prisma._notifs.length).toBe(0)
   })
 
+  it("excludes RESOLVED_REJECTED and RESOLVED_RESTORED disputes from count", async () => {
+    const prisma = trustPrisma({ disputes: 0 })
+    const r = await recomputePublisherTrustCore(prisma as any, "pub1", {
+      sourceEvent: "DISPUTE_RESOLVED",
+    })
+    const callArgs = prisma.orderDispute.count.mock.calls[0][0]
+    expect(callArgs.where.status).toEqual({
+      notIn: ["RESOLVED_REJECTED", "RESOLVED_RESTORED"],
+    })
+  })
+
   it("returns null for an unknown publisher", async () => {
     const prisma = trustPrisma()
     prisma.publisher.findUnique.mockResolvedValue(null)

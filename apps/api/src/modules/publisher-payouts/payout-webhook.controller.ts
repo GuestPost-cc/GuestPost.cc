@@ -1,5 +1,10 @@
 import { createHmac, createVerify, timingSafeEqual } from "node:crypto"
-import { normalizeProviderWebhook, QUEUES } from "@guestpost/shared"
+import {
+  assertWebhookTimestampFresh,
+  normalizeProviderWebhook,
+  QUEUES,
+  WebhookTimestampError,
+} from "@guestpost/shared"
 import {
   BadRequestException,
   Controller,
@@ -61,6 +66,22 @@ export class PayoutWebhookController {
 
     const eventType = body.type ?? body.event ?? "unknown"
     const data = body.data ?? body
+
+    // Wise webhook timestamp replay protection — mirrors Stripe's 5-minute
+    // tolerance, checked after body parse because Wise puts the timestamp
+    // in the body (occurred_at) rather than a header.
+    if (provider === "wise") {
+      const ts = body.occurred_at ?? body.timestamp ?? body.event_time
+      try {
+        assertWebhookTimestampFresh(ts, STRIPE_TIMESTAMP_TOLERANCE_SECONDS)
+      } catch (err) {
+        const msg =
+          err instanceof WebhookTimestampError
+            ? err.message
+            : "Wise webhook timestamp outside tolerance"
+        throw new UnauthorizedException(msg)
+      }
+    }
 
     // Phase 8.3 (audit #3) — BullMQ-native dedup. Replay protection: two
     // identical webhook payloads (provider retry, ops re-trigger, network
@@ -140,14 +161,14 @@ export class PayoutWebhookController {
       throw new UnauthorizedException("Malformed stripe-signature header")
     }
 
-    const ageSeconds = Math.abs(Date.now() / 1000 - Number(timestamp))
-    if (
-      !Number.isFinite(ageSeconds) ||
-      ageSeconds > STRIPE_TIMESTAMP_TOLERANCE_SECONDS
-    ) {
-      throw new UnauthorizedException(
-        "Stripe webhook timestamp outside tolerance",
-      )
+    try {
+      assertWebhookTimestampFresh(timestamp, STRIPE_TIMESTAMP_TOLERANCE_SECONDS)
+    } catch (err) {
+      const msg =
+        err instanceof WebhookTimestampError
+          ? err.message
+          : "Stripe webhook timestamp outside tolerance"
+      throw new UnauthorizedException(msg)
     }
 
     const expected = createHmac("sha256", secret)

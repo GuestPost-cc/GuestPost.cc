@@ -41,7 +41,7 @@ const repoRoot = path.resolve(__dirname, "..", "..", "..", "..")
 // from @guestpost/shared/dist/observability/structured-logger (preferred) or
 // add to this map with a comment justifying why it's exempt.
 const CURRENTLY_ALLOWED_WITH_CONSOLE: Record<string, number> = {
-  "apps/api/src/main.ts": 10, // boot/startup last-resort; +4 for post-DX-resolve startup logging (Nest initialized, QueueService resolved, Better Auth mounted, fatal abort)
+  "apps/api/src/main.ts": 11, // boot/startup last-resort; +4 for post-DX-resolve startup logging (Nest initialized, QueueService resolved, Better Auth mounted, fatal abort, auth-context subscriber init)
   "apps/admin/src/lib/auth.tsx": 1, // browser-side session-refresh error
   "apps/portal/src/lib/auth.tsx": 1, // browser-side session-refresh error
   "apps/publisher/src/lib/auth.tsx": 1, // browser-side session-refresh error

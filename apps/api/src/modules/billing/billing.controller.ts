@@ -2,9 +2,9 @@ import {
   BadRequestException,
   Body,
   Controller,
-  ForbiddenException,
   Get,
   Headers,
+  NotFoundException,
   Param,
   Post,
   type RawBodyRequest,
@@ -44,8 +44,10 @@ export class BillingController {
   ) {
     // Direct balance manipulation — dev/test convenience only.
     // Production deposits must go through Stripe checkout + webhook.
-    if (process.env.NODE_ENV === "production") {
-      throw new ForbiddenException(
+    // Controlled by explicit feature flag, not NODE_ENV, so staging or
+    // misconfigured envs cannot accidentally expose it.
+    if (!process.env.ENABLE_DIRECT_DEPOSIT) {
+      throw new NotFoundException(
         "Direct deposits are disabled — use the checkout flow",
       )
     }

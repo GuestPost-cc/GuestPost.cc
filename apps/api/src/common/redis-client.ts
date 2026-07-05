@@ -2,6 +2,7 @@ import IORedis, { type RedisOptions } from "ioredis"
 
 let httpClient: IORedis | null = null
 let queueClient: IORedis | null = null
+let subscriberClient: IORedis | null = null
 
 const BASE_OPTS: RedisOptions = {
   connectTimeout: 10_000,
@@ -48,4 +49,23 @@ export function getQueueConnection(): IORedis {
     queueClient = createQueueClient()
   }
   return queueClient
+}
+
+// Dedicated pub/sub subscriber — must be a separate connection from the
+// HTTP and queue clients because ioredis enters subscriber mode after
+// subscribe()/psubscribe() and cannot run regular commands.
+function createSubscriberClient(): IORedis {
+  return new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
+    ...BASE_OPTS,
+    // Subscriber must not have maxRetriesPerRequest limit — it needs to
+    // stay connected indefinitely and reconnect on failure.
+    maxRetriesPerRequest: null,
+  })
+}
+
+export function getRedisSubscriber(): IORedis {
+  if (!subscriberClient) {
+    subscriberClient = createSubscriberClient()
+  }
+  return subscriberClient
 }

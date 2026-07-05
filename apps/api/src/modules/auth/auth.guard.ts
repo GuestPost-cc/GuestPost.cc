@@ -1,5 +1,4 @@
 import { auth } from "@guestpost/auth"
-import { prisma } from "@guestpost/database"
 import {
   type CanActivate,
   type ExecutionContext,
@@ -13,6 +12,7 @@ import {
   setCachedAuthContext,
 } from "../../common/auth-context-cache"
 import { IS_PUBLIC_KEY } from "../../common/decorators/public.decorator"
+import { PrismaService } from "../../common/prisma.service"
 import { ActiveContextService } from "../active-context/active-context.service"
 import { requiresEmailVerification } from "./email-verification-policy"
 
@@ -20,6 +20,7 @@ import { requiresEmailVerification } from "./email-verification-policy"
 export class AuthGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
+    private readonly prisma: PrismaService,
     private readonly activeContext: ActiveContextService,
   ) {}
 
@@ -57,7 +58,7 @@ export class AuthGuard implements CanActivate {
       return true
     }
 
-    const user = await prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: session.user.id },
     })
     if (!user) throw new UnauthorizedException("User not found")
@@ -87,7 +88,7 @@ export class AuthGuard implements CanActivate {
       if (activeOrganizationId) {
         // Only ACTIVE memberships grant access — a PENDING (unaccepted) invite
         // must not let the user act in that org
-        const membership = await prisma.membership.findUnique({
+        const membership = await this.prisma.membership.findUnique({
           where: {
             userId_organizationId: {
               userId: user.id,
@@ -102,7 +103,7 @@ export class AuthGuard implements CanActivate {
       }
 
       if (!activeOrganizationId) {
-        const fallback = await prisma.membership.findFirst({
+        const fallback = await this.prisma.membership.findFirst({
           where: { userId: user.id, status: "ACTIVE" },
           orderBy: { createdAt: "asc" },
         })
@@ -119,7 +120,7 @@ export class AuthGuard implements CanActivate {
       activePublisherId = ctx.activePublisherId
 
       if (activePublisherId) {
-        const membership = await prisma.publisherMembership.findFirst({
+        const membership = await this.prisma.publisherMembership.findFirst({
           where: { userId: user.id, publisherId: activePublisherId },
         })
         if (!membership) {
@@ -129,7 +130,7 @@ export class AuthGuard implements CanActivate {
       }
 
       if (!activePublisherId) {
-        const fallback = await prisma.publisherMembership.findFirst({
+        const fallback = await this.prisma.publisherMembership.findFirst({
           where: { userId: user.id },
           orderBy: { createdAt: "asc" },
         })
@@ -143,7 +144,7 @@ export class AuthGuard implements CanActivate {
       }
 
       if (activePublisherId) {
-        const publisher = await prisma.publisher.findUnique({
+        const publisher = await this.prisma.publisher.findUnique({
           where: { id: activePublisherId },
         })
         publisherOrgId = publisher?.organizationId ?? null
