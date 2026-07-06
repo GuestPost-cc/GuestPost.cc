@@ -43,8 +43,8 @@
     "@biomejs/biome": "2.5.1",
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.60.0",
-    "@typescript-eslint/eslint-plugin": "^8.0.0",
-    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.1",
+    "@typescript-eslint/parser": "^8.62.1",
     "concurrently": "^10.0.3",
     "dependency-cruiser": "^17.4.3",
     "eslint": "^10.6.0",
@@ -53,6 +53,6 @@
     "lint-staged": "^17.0.8",
     "tsx": "^4.22.4",
     "turbo": "^2.9.16",
-    "typescript-eslint": "^8.0.0"
+    "typescript-eslint": "^8.62.1"
   }
 }
