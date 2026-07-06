@@ -1,6 +1,7 @@
-import { QUEUE_JOBS, QUEUES, trustRecomputeJobOptions } from "@guestpost/shared"
+import { QUEUE_JOBS, QUEUES } from "@guestpost/shared"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { trustRecomputeJobOptions } from "@guestpost/shared/dist/publisher-trust-core"
 import { Queue } from "bullmq"
 import { connection } from "./redis"
 

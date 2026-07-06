@@ -1,8 +1,9 @@
-import { QUEUE_JOBS, QUEUES, trustRecomputeJobOptions } from "@guestpost/shared"
+import { QUEUE_JOBS, QUEUES } from "@guestpost/shared"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 // Deep import: request-context uses node:async_hooks and is not in the
 // shared barrel.
 import { getRequestId } from "@guestpost/shared/dist/observability/request-context"
+import { trustRecomputeJobOptions } from "@guestpost/shared/dist/publisher-trust-core"
 import { Injectable, Logger } from "@nestjs/common"
 import { type JobsOptions, Queue, type QueueOptions } from "bullmq"
 import { getQueueConnection } from "../../common/redis-client"

@@ -3,8 +3,8 @@ import {
   orderEventMetadata,
   type PublisherTier,
   QUEUES,
-  recomputePublisherTrustCore,
 } from "@guestpost/shared"
+import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
 import {
   BadRequestException,
   ConflictException,

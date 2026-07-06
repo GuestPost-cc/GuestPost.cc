@@ -11,7 +11,9 @@ export * from "./order-priority"
 export * from "./payout-status"
 export * from "./payout-webhook"
 export * from "./publisher-tier-policy"
-export * from "./publisher-trust-core"
+// NOT re-exported: publisher-trust-core struggles structured-logger → request-context
+// (node:async_hooks). Browser consumers that barrel-import @guestpost/shared would
+// crash. Consumers deep-import via @guestpost/shared/dist/publisher-trust-core.
 export * from "./queues"
 export * from "./reconciliation-core"
 export * from "./settlement-auto-approve-core"

@@ -38,6 +38,8 @@ const baseModuleNameMapperFromSrc = {
     "<rootDir>/../../../packages/shared/src/observability/request-context",
   "^@guestpost/shared/dist/observability/structured-logger$":
     "<rootDir>/../../../packages/shared/src/observability/structured-logger",
+  "^@guestpost/shared/dist/publisher-trust-core$":
+    "<rootDir>/../../../packages/shared/src/publisher-trust-core",
   "^@guestpost/shared$": "<rootDir>/../../../packages/shared/src",
   "^@guestpost/auth$": "<rootDir>/../../../packages/auth/src",
   "^better-auth$": "<rootDir>/__mocks__/better-auth",
@@ -90,6 +92,8 @@ module.exports = {
           "<rootDir>/../../../../../packages/shared/src/observability/request-context",
         "^@guestpost/shared/dist/observability/structured-logger$":
           "<rootDir>/../../../../../packages/shared/src/observability/structured-logger",
+        "^@guestpost/shared/dist/publisher-trust-core$":
+          "<rootDir>/../../../../../packages/shared/src/publisher-trust-core",
         "^@guestpost/shared$": "<rootDir>/../../../../../packages/shared/src",
         "^@guestpost/auth$": "<rootDir>/../../../../../packages/auth/src",
         "^better-auth$": "<rootDir>/../../__mocks__/better-auth",

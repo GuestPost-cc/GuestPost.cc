@@ -3,15 +3,16 @@
  * notify), debounce/dedup job options, and the worker cores emitting trust
  * events on link removal/restoration.
  */
-import {
-  recomputePublisherTrustCore,
-  TRUST_RECOMPUTE_DEBOUNCE_MS,
-  trustRecomputeJobOptions,
-} from "@guestpost/shared"
+
 import {
   type FetchResult,
   runDeliveryLinkRecheck,
 } from "@guestpost/shared/dist/delivery-verification-core"
+import {
+  recomputePublisherTrustCore,
+  TRUST_RECOMPUTE_DEBOUNCE_MS,
+  trustRecomputeJobOptions,
+} from "@guestpost/shared/dist/publisher-trust-core"
 
 function trustPrisma(
   over: {
