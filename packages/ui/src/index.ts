@@ -75,6 +75,8 @@ export type { EmailVerificationBannerProps } from "./components/email-verificati
 export { EmailVerificationBanner } from "./components/email-verification-banner"
 export { EmptyState } from "./components/empty-state"
 export { ErrorState } from "./components/error-state"
+export type { ForgotPasswordFormProps } from "./components/forgot-password-form"
+export { ForgotPasswordForm } from "./components/forgot-password-form"
 export type {
   FulfillmentChannelBadgeProps,
   FulfillmentChannelValue,
@@ -90,6 +92,8 @@ export {
   Sidebar,
 } from "./components/layout"
 export { LoadingState } from "./components/loading-state"
+export type { LoginFormProps } from "./components/login-form"
+export { LoginForm } from "./components/login-form"
 export type { NavItemProps } from "./components/nav-item"
 export { NavItem } from "./components/nav-item"
 export type {
@@ -108,6 +112,8 @@ export {
   PopoverTrigger,
 } from "./components/popover"
 export { ProtectedRoute } from "./components/protected-route"
+export type { ResetPasswordFormProps } from "./components/reset-password-form"
+export { ResetPasswordForm } from "./components/reset-password-form"
 export { RoleGuard } from "./components/role-guard"
 export {
   Select,
@@ -122,6 +128,8 @@ export {
   SelectValue,
 } from "./components/select"
 export { Separator } from "./components/separator"
+export type { SignupFormProps } from "./components/signup-form"
+export { SignupForm } from "./components/signup-form"
 export { Skeleton } from "./components/skeleton"
 export type { SpinnerButtonProps } from "./components/spinner-button"
 export { SpinnerButton } from "./components/spinner-button"

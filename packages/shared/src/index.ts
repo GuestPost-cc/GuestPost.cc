@@ -16,6 +16,7 @@ export * from "./publisher-tier-policy"
 // crash. Consumers deep-import via @guestpost/shared/dist/publisher-trust-core.
 export * from "./queues"
 export * from "./reconciliation-core"
+export * from "./schemas"
 export * from "./settlement-auto-approve-core"
 export * from "./settlement-gating"
 export * from "./trust-score"
