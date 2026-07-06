@@ -74,9 +74,8 @@ function templateExists(): boolean {
 function ensureTemplate(): void {
   if (templateExists()) return
   throw new Error(
-    `Template database "${TEMPLATE_DB}" does not exist.\n` +
-      `Run: cd packages/database && createdb "${TEMPLATE_DB}" && DATABASE_URL="postgresql://${PG_USER}:${PG_PASS}@${PG_HOST}:${PG_PORT}/${TEMPLATE_DB}" npx prisma migrate deploy\n` +
-      `Or: pnpm run setup:integration-test-db`,
+    `Template database "${TEMPLATE_DB}" does not exist. ` +
+      `Run: pnpm run setup:integration-test-db`,
   )
 }
 
