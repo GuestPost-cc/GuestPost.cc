@@ -1,165 +1,182 @@
 "use client"
 
-import { sanitizeReturnTo } from "@guestpost/api-client"
-import { Button } from "@guestpost/ui"
+import type { AuthError } from "@guestpost/auth"
+import {
+  getErrorMessage,
+  isAuthError,
+  signIn as signInTransport,
+  signUp as signUpTransport,
+} from "@guestpost/auth/client"
+import { useSignIn, useSignUp } from "@guestpost/auth/react"
+import {
+  AuthCard,
+  AuthLayout,
+  LoginForm,
+  SignupForm,
+  useSessionExpired,
+} from "@guestpost/ui"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
-import { useAuth } from "../lib/auth"
 
 function LoginContent() {
-  const { signIn, signUp } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isSignUp, setIsSignUp] = useState(false)
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [name, setName] = useState("")
-  const [error, setError] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  // Phase 6.8 — surface "Your session expired" copy when the 401-redirect
-  // handler bounced the user here. The handler stashes the reason in
-  // sessionStorage so it survives the page reload.
-  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<
-    string | null
-  >(null)
+  const [error, setError] = useState<string | null>(null)
+  const { expired, reason, dismiss } = useSessionExpired()
+  const { signIn: hookSignIn, loading: signInLoading } = useSignIn()
+  const { signUp: hookSignUp, loading: signUpLoading } = useSignUp()
+
+  const loading = isSignUp ? signUpLoading : signInLoading
 
   useEffect(() => {
     if (searchParams.get("signup") === "true") {
       setIsSignUp(true)
     }
-    // Read + clear the reason in one tick so a refresh doesn't keep showing it.
-    try {
-      const reason = sessionStorage.getItem("guestpost:auth-redirect-reason")
-      if (reason) {
-        setSessionExpiredBanner(reason)
-        sessionStorage.removeItem("guestpost:auth-redirect-reason")
-      }
-    } catch {
-      /* private mode */
-    }
   }, [searchParams])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setSubmitting(true)
+  const handleSignIn = async (data: { email: string; password: string }) => {
+    setError(null)
     try {
-      if (isSignUp) {
-        await signUp(email, password, name)
-      } else {
-        await signIn(email, password)
+      const result = await signInTransport(data)
+      if (result.status === "mfa_required") {
+        throw {
+          code: "MFA_REQUIRED",
+          message:
+            "Multi-factor authentication is required. Please complete verification.",
+          recoverable: true,
+        } as AuthError
       }
-      // Phase 6.8 — honor sanitized returnTo so the user lands back at the
-      // page that bounced them. The helper rejects cross-origin paths and
-      // protocol handlers so an attacker can't craft a poisoned link.
-      const safeReturnTo = sanitizeReturnTo(searchParams.get("returnTo"))
-      router.push(
-        safeReturnTo && safeReturnTo !== "/" ? safeReturnTo : "/dashboard",
-      )
+      if (result.user.userType !== "CUSTOMER") {
+        throw {
+          code: "WRONG_AUDIENCE",
+          message:
+            "This portal is for customers only. Please sign in at the correct portal.",
+          recoverable: true,
+        } as AuthError
+      }
+      const returnTo = searchParams.get("returnTo")
+      const safeReturnTo =
+        returnTo && returnTo !== "/" ? returnTo : "/dashboard"
+      router.push(safeReturnTo)
     } catch (err: any) {
-      setError(err.message ?? "Something went wrong")
-    } finally {
-      setSubmitting(false)
+      setError(
+        isAuthError(err)
+          ? getErrorMessage(err)
+          : (err.message ?? "Something went wrong"),
+      )
+    }
+  }
+
+  const handleSignUp = async (data: {
+    name: string
+    email: string
+    password: string
+  }) => {
+    setError(null)
+    try {
+      const result = await signUpTransport(data)
+      if (result.status === "mfa_required") {
+        throw {
+          code: "MFA_REQUIRED",
+          message:
+            "Multi-factor authentication is required. Please complete verification.",
+          recoverable: true,
+        } as AuthError
+      }
+      if (result.user.userType !== "CUSTOMER") {
+        throw {
+          code: "WRONG_AUDIENCE",
+          message:
+            "This portal is for customers only. Please use the publisher portal to sign up.",
+          recoverable: true,
+        } as AuthError
+      }
+      const returnTo = searchParams.get("returnTo")
+      const safeReturnTo =
+        returnTo && returnTo !== "/" ? returnTo : "/dashboard"
+      router.push(safeReturnTo)
+    } catch (err: any) {
+      setError(
+        isAuthError(err)
+          ? getErrorMessage(err)
+          : (err.message ?? "Something went wrong"),
+      )
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[400px]">
-        <div className="flex flex-col space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {isSignUp ? "SEO Expert Sign Up" : "SEO Expert Sign In"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {isSignUp
-              ? "Create an account to manage your campaigns"
-              : "Sign in to your GuestPost account"}
-          </p>
-        </div>
-
-        {sessionExpiredBanner && !isSignUp && (
+    <AuthLayout>
+      <AuthCard
+        title={isSignUp ? "SEO Expert Sign Up" : "SEO Expert Sign In"}
+        description={
+          isSignUp
+            ? "Create an account to manage your campaigns"
+            : "Sign in to your GuestPost account"
+        }
+        footer={
+          <div className="space-y-2">
+            <p className="text-center text-sm text-muted-foreground">
+              {isSignUp ? (
+                <>
+                  Already have an account?{" "}
+                  <button
+                    onClick={() => setIsSignUp(false)}
+                    className="underline underline-offset-4 hover:text-primary"
+                  >
+                    Sign in
+                  </button>
+                </>
+              ) : (
+                <>
+                  Don&apos;t have an account?{" "}
+                  <button
+                    onClick={() => setIsSignUp(true)}
+                    className="underline underline-offset-4 hover:text-primary"
+                  >
+                    Sign up
+                  </button>
+                </>
+              )}
+            </p>
+            <p className="text-center text-sm text-muted-foreground">
+              <a
+                href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"}
+                className="underline underline-offset-4 hover:text-primary"
+              >
+                Back to homepage
+              </a>
+            </p>
+          </div>
+        }
+      >
+        {expired && !isSignUp && (
           <div
             role="status"
             aria-live="polite"
-            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
           >
-            {sessionExpiredBanner}
+            {reason}
           </div>
         )}
-
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          {isSignUp && (
-            <input
-              type="text"
-              placeholder="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              required
-            />
-          )}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            required
+        {isSignUp ? (
+          <SignupForm
+            onSubmit={handleSignUp}
+            loading={loading}
+            error={error ?? undefined}
+            onToggleMode={() => setIsSignUp(false)}
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            required
+        ) : (
+          <LoginForm
+            onSubmit={handleSignIn}
+            loading={loading}
+            error={error ?? undefined}
+            onToggleMode={() => setIsSignUp(true)}
+            forgotPasswordHref="/forgot-password"
           />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting
-              ? "Loading..."
-              : isSignUp
-                ? "Create Account"
-                : "Sign In"}
-          </Button>
-        </form>
-
-        <div className="space-y-4">
-          <p className="text-center text-sm text-muted-foreground">
-            {isSignUp ? (
-              <>
-                Already have an account?{" "}
-                <button
-                  onClick={() => setIsSignUp(false)}
-                  className="underline underline-offset-4 hover:text-primary"
-                >
-                  Sign in
-                </button>
-              </>
-            ) : (
-              <>
-                Don&apos;t have an account?{" "}
-                <button
-                  type="button"
-                  onClick={() => setIsSignUp(true)}
-                  className="underline underline-offset-4 hover:text-primary"
-                >
-                  Sign up
-                </button>
-              </>
-            )}
-          </p>
-          <p className="text-center text-sm text-muted-foreground">
-            <a
-              href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"}
-              className="underline underline-offset-4 hover:text-primary"
-            >
-              Back to homepage
-            </a>
-          </p>
-        </div>
-      </div>
-    </div>
+        )}
+      </AuthCard>
+    </AuthLayout>
   )
 }
 
@@ -168,7 +185,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center">
-          Loading...
+          <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
       }
     >
