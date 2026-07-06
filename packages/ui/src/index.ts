@@ -1,3 +1,7 @@
+export type { AuthCardProps } from "./components/auth-card"
+export { AuthCard } from "./components/auth-card"
+export type { AuthLayoutProps } from "./components/auth-layout"
+export { AuthLayout } from "./components/auth-layout"
 export { Avatar, AvatarFallback, AvatarImage } from "./components/avatar"
 export type { BadgeProps } from "./components/badge"
 export { Badge, badgeVariants } from "./components/badge"
@@ -79,7 +83,12 @@ export { FulfillmentChannelBadge } from "./components/fulfillment-channel-badge"
 export { Input } from "./components/input"
 export { KpiCard } from "./components/kpi-card"
 export { Label } from "./components/label"
-export { AppShell, DashboardLayout, Header, Sidebar } from "./components/layout"
+export {
+  AppShell,
+  DashboardLayout,
+  Header,
+  Sidebar,
+} from "./components/layout"
 export { LoadingState } from "./components/loading-state"
 export type { NavItemProps } from "./components/nav-item"
 export { NavItem } from "./components/nav-item"
@@ -89,6 +98,8 @@ export type {
 } from "./components/notification-bell"
 export { NotificationBell } from "./components/notification-bell"
 export { PageHeader } from "./components/page-header"
+export type { PasswordInputProps } from "./components/password-input"
+export { PasswordInput } from "./components/password-input"
 export { PermissionGate } from "./components/permission-gate"
 export {
   Popover,
@@ -112,6 +123,8 @@ export {
 } from "./components/select"
 export { Separator } from "./components/separator"
 export { Skeleton } from "./components/skeleton"
+export type { SpinnerButtonProps } from "./components/spinner-button"
+export { SpinnerButton } from "./components/spinner-button"
 export { StatusBadge, statusBadgeVariants } from "./components/status-badge"
 export type {
   SupportPanelActorScope,
