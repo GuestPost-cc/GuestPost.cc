@@ -6,21 +6,6 @@ export type PublisherRole = "PUBLISHER_OWNER" | "PUBLISHER_MEMBER"
 
 export type StaffRole = "SUPER_ADMIN" | "OPERATIONS" | "FINANCE"
 
-// Deprecated: kept for migration compatibility
-export type UserRole =
-  | "OWNER"
-  | "MANAGER"
-  | "SEO_SPECIALIST"
-  | "CLIENT_VIEWER"
-  | "PUBLISHER"
-  | "ADMIN"
-// Deprecated: kept for migration compatibility
-export type MemberRole =
-  | "OWNER"
-  | "MANAGER"
-  | "SEO_SPECIALIST"
-  | "CLIENT_VIEWER"
-
 export type OrderStatus =
   | "DRAFT"
   | "PENDING_PAYMENT"
@@ -51,8 +36,6 @@ export type ServiceType =
   | "BLOG_ARTICLE"
   | "SEO_CONTENT"
 
-export type PaymentStatus = "PENDING" | "PAID" | "REFUNDED" | "FAILED"
-
 export type TicketStatus =
   | "OPEN"
   | "IN_PROGRESS"
@@ -61,18 +44,6 @@ export type TicketStatus =
   | "CLOSED"
 
 export type CampaignStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED"
-export type ContentOrderStatus =
-  | "PENDING"
-  | "IN_PROGRESS"
-  | "COMPLETED"
-  | "CANCELLED"
-export type RevisionStatus =
-  | "REQUESTED"
-  | "PENDING"
-  | "APPROVED"
-  | "REJECTED"
-  | "CHANGES_REQUESTED"
-  | "DRAFT"
 export type WebsiteOwnershipType = "PUBLISHER" | "PLATFORM"
 
 export type OrderEventType =

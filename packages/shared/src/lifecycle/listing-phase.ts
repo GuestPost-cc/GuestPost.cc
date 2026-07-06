@@ -82,25 +82,25 @@ export function computeListingPhase(
 // Phases that MEAN the listing is currently buyable from the marketplace.
 // Settlement / search / customer flows treat PUBLISHED as the only “live”
 // state; the rest are internal.
-export function isListingLive(phase: ListingLifecyclePhase): boolean {
+function isListingLive(phase: ListingLifecyclePhase): boolean {
   return phase === "PUBLISHED"
 }
 
 // Phases from which a publisher can submit for review. Used as the gate
 // for POST /marketplace/listings/:id/submit and as the UI "Submit" enable
 // condition. Strict subset of DRAFT-side phases.
-export function canSubmitForReview(phase: ListingLifecyclePhase): boolean {
+function canSubmitForReview(phase: ListingLifecyclePhase): boolean {
   return phase === "READY_FOR_REVIEW"
 }
 
 // Phases from which a publisher can pause / unpause / archive. The current
 // status drives the actual transition; the phase is used for UI affordance.
-export function canPause(phase: ListingLifecyclePhase): boolean {
+function canPause(phase: ListingLifecyclePhase): boolean {
   return phase === "PUBLISHED"
 }
-export function canUnpause(phase: ListingLifecyclePhase): boolean {
+function canUnpause(phase: ListingLifecyclePhase): boolean {
   return phase === "PAUSED"
 }
-export function canArchive(phase: ListingLifecyclePhase): boolean {
+function canArchive(phase: ListingLifecyclePhase): boolean {
   return phase !== "ARCHIVED"
 }

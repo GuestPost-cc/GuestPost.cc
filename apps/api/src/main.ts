@@ -461,15 +461,17 @@ async function bootstrap() {
     )
     process.exit(1)
   }
-  console.log("Nest initialized")
-  console.log("QueueService resolved")
+  authLogger.info("Nest initialized")
+  authLogger.info("QueueService resolved", {
+    queueService: queueServiceRef.constructor.name,
+  })
 
   // M-1 — cross-pod auth-context invalidation subscriber (Redis pub/sub).
   // Must be called after Redis connection is available but before any
   // auth-dependent requests arrive. Subscription is fire-and-forget;
   // Redis unavailability is logged but does not block startup.
   initAuthContextSubscriber()
-  console.log("Auth context cache subscriber initialized")
+  authLogger.info("Auth context cache subscriber initialized")
 
   // Phase A3 — dependency-checked readiness endpoint. Runs after Nest init
   // so PrismaService connection is established. Redis PING uses the HTTP
@@ -600,7 +602,7 @@ async function bootstrap() {
   })
   // Better Auth handler must be before body parsers so it can read raw bodies
   server.use("/api/v1/auth", toNodeHandler(authWithRateLimit))
-  console.log("Better Auth mounted")
+  authLogger.info("Better Auth mounted")
 
   server.use(
     express.json({
@@ -615,6 +617,6 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 4000
   await app.listen(port)
-  console.log(`API running on http://localhost:${port}`)
+  authLogger.info("API running", { port })
 }
 bootstrap()

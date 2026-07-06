@@ -3,7 +3,10 @@
 // share one implementation. Gathers the publisher's full track record, scores
 // it via computePublisherTrust, persists score + tier, and emits audit +
 // ops-notification when the tier changes.
+import { createLogger } from "./observability/structured-logger"
 import { computePublisherTrust } from "./trust-score"
+
+const trustLogger = createLogger("shared.trust")
 
 // Debounce window: rapid trust-affecting events for one publisher collapse into
 // a single recompute. Enqueue with this jobId + delay; BullMQ drops duplicate
@@ -181,10 +184,14 @@ export async function recomputePublisherTrustCore(
     )
   }
 
-  // Observability — single structured line carries the "metrics" fields.
-  console.log(
-    `[TRUST] recompute publisher=${publisherId} source=${opts.sourceEvent} score=${oldScore}->${score} tier=${oldTier}->${tier} changed=${changed} durationMs=${durationMs}`,
-  )
+  trustLogger.info("recompute", {
+    publisherId,
+    sourceEvent: opts.sourceEvent,
+    score: { from: oldScore, to: score },
+    tier: { from: oldTier, to: tier },
+    changed,
+    durationMs,
+  })
 
   return {
     publisherId,

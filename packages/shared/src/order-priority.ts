@@ -17,19 +17,23 @@ export const ATTENTION_ORDER_STATUSES = ["DISPUTED", "PENDING_PAYMENT"]
 //   0 = needs attention (disputed / awaiting payment)
 //   1 = in-flight / unsettled (default working set)
 //   2 = terminal (done)
-export function orderPriorityTier(status: string): number {
+export function isActiveOrder(status: string): boolean {
+  return !TERMINAL_ORDER_STATUSES.includes(status)
+}
+
+// Tier: lower = higher in the list.
+//   0 = needs attention (disputed / awaiting payment)
+//   1 = in-flight / unsettled (default working set)
+//   2 = terminal (done)
+function orderPriorityTier(status: string): number {
   if (ATTENTION_ORDER_STATUSES.includes(status)) return 0
   if (TERMINAL_ORDER_STATUSES.includes(status)) return 2
   return 1
 }
 
-export function isActiveOrder(status: string): boolean {
-  return !TERMINAL_ORDER_STATUSES.includes(status)
-}
-
 // Comparator: tier asc, then most-recently-touched first. Pass the field that
 // best reflects "last activity" (updatedAt, else createdAt).
-export function compareOrdersByPriority<
+function compareOrdersByPriority<
   T extends {
     status: string
     updatedAt?: string | Date | null

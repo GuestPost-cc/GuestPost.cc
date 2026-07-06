@@ -387,15 +387,6 @@ export class AdminService {
     return { orders, pagination: { take, skip, total } }
   }
 
-  async getStats(_user?: any) {
-    const [users, organizations, orders] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.organization.count(),
-      this.prisma.order.count(),
-    ])
-    return { users, organizations, orders }
-  }
-
   async manualVerify(orderId: string, method: string, userId: string) {
     const order = await this.prisma.order.findUnique({ where: { id: orderId } })
     if (!order) throw new NotFoundException("Order not found")
