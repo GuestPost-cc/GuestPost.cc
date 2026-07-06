@@ -2,6 +2,11 @@ export type { AuthCardProps } from "./components/auth-card"
 export { AuthCard } from "./components/auth-card"
 export type { AuthLayoutProps } from "./components/auth-layout"
 export { AuthLayout } from "./components/auth-layout"
+export type {
+  AuthProvidersProps,
+  ProviderConfig,
+} from "./components/auth-providers"
+export { AuthProviders } from "./components/auth-providers"
 export { Avatar, AvatarFallback, AvatarImage } from "./components/avatar"
 export type { BadgeProps } from "./components/badge"
 export { Badge, badgeVariants } from "./components/badge"
@@ -112,6 +117,8 @@ export {
   PopoverTrigger,
 } from "./components/popover"
 export { ProtectedRoute } from "./components/protected-route"
+export type { ProviderButtonProps } from "./components/provider-button"
+export { ProviderButton } from "./components/provider-button"
 export type { ResetPasswordFormProps } from "./components/reset-password-form"
 export { ResetPasswordForm } from "./components/reset-password-form"
 export { RoleGuard } from "./components/role-guard"
@@ -159,6 +166,8 @@ export {
   TooltipProvider,
   TooltipTrigger,
 } from "./components/tooltip"
+export type { UseSessionExpiredReturn } from "./components/use-session-expired"
+export { useSessionExpired } from "./components/use-session-expired"
 export { downloadCsv } from "./lib/csv"
 export type {
   StatusPresentation,
