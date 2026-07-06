@@ -75,6 +75,11 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
     database: prismaAdapter(prisma, {
       provider: "postgresql",
     }),
+    session: {
+      expiresIn: 8 * 60 * 60, // 8 hours — stolen cookie window bounded
+      updateAge: 30 * 60, // 30 min — active users extend expiry; keeps
+      // thieves' window from being infinite
+    },
     emailAndPassword: {
       enabled: true,
     },

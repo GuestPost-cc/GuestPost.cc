@@ -1,3 +1,13 @@
+/**
+ * The single source of truth for the session cookie name.
+ *
+ * Better Auth sets `{cookiePrefix}.session_token` = `guestpost.session_token`.
+ * All middlewares and server-side credential-checkers MUST use this constant
+ * rather than hard-coding the string, otherwise login redirects loop.
+ * @see https://github.com/anomalyco/GuestPost.cc-work/blob/main/bedrock/Memory/SECURITY.md
+ */
+export const SESSION_COOKIE_NAME = "guestpost.session_token"
+
 export interface MiddlewareAuthConfig {
   signInPath: string
   protectedPaths: string[]
