@@ -4,6 +4,13 @@
   "private": true,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client/index.js",
+    "./react": "./dist/react/index.js",
+    "./middleware": "./dist/middleware/index.js",
+    "./server": "./dist/server/index.js"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
