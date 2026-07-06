@@ -178,6 +178,119 @@ describe("PayoutWebhookController — signature verification", () => {
       { jobId: "payout-webhook:wise:transfer-1" },
     )
   })
+
+  // ─── M-2: Wise stale-timestamp boundary tests ─────────────────────
+  // Mirrors the Stripe replay-protection test above. Tolerance is 300s;
+  // ageSeconds > 300 is rejected, ≤ 300 is accepted (past and future are
+  // symmetric via Math.abs).
+
+  it("accepts Wise webhook with timestamp just inside the 300s tolerance (299s past)", async () => {
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    })
+    process.env.WISE_WEBHOOK_PUBLIC_KEY = publicKey
+      .export({ type: "spki", format: "pem" })
+      .toString()
+
+    const body = JSON.stringify({
+      occurred_at: new Date(Date.now() - 299_000).toISOString(),
+      data: { id: "transfer-299", status: "COMPLETED" },
+      event: "transfer.state-change",
+    })
+    const raw = Buffer.from(body, "utf8")
+    const signer = createSign("RSA-SHA256")
+    signer.update(raw)
+    const signature = signer.sign(privateKey, "base64")
+
+    const result = await controller.handleWebhook(
+      "wise",
+      { "x-signature-sha256": signature },
+      { rawBody: raw } as any,
+    )
+    expect(result).toEqual({ received: true, jobId: "job-1" })
+    expect(queueMock.addJob).toHaveBeenCalled()
+  })
+
+  // Precise ±300s boundary tested in webhook-timestamp.spec.ts (shared helper
+  // with deterministic fake timers). Controller test uses a safe 10ms buffer
+  // to avoid sub-ms timing drift between timestamp creation and execution.
+  it("accepts Wise webhook with timestamp at the 300s tolerance boundary (with 10ms buffer)", async () => {
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    })
+    process.env.WISE_WEBHOOK_PUBLIC_KEY = publicKey
+      .export({ type: "spki", format: "pem" })
+      .toString()
+
+    const body = JSON.stringify({
+      occurred_at: new Date(Date.now() - 299_990).toISOString(),
+      data: { id: "transfer-300", status: "COMPLETED" },
+      event: "transfer.state-change",
+    })
+    const raw = Buffer.from(body, "utf8")
+    const signer = createSign("RSA-SHA256")
+    signer.update(raw)
+    const signature = signer.sign(privateKey, "base64")
+
+    const result = await controller.handleWebhook(
+      "wise",
+      { "x-signature-sha256": signature },
+      { rawBody: raw } as any,
+    )
+    expect(result).toEqual({ received: true, jobId: "job-1" })
+  })
+
+  it("rejects Wise webhook with timestamp just outside the 300s tolerance (301s past)", async () => {
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    })
+    process.env.WISE_WEBHOOK_PUBLIC_KEY = publicKey
+      .export({ type: "spki", format: "pem" })
+      .toString()
+
+    const body = JSON.stringify({
+      occurred_at: new Date(Date.now() - 301_000).toISOString(),
+      data: { id: "transfer-301", status: "COMPLETED" },
+      event: "transfer.state-change",
+    })
+    const raw = Buffer.from(body, "utf8")
+    const signer = createSign("RSA-SHA256")
+    signer.update(raw)
+    const signature = signer.sign(privateKey, "base64")
+
+    await expect(
+      controller.handleWebhook("wise", { "x-signature-sha256": signature }, {
+        rawBody: raw,
+      } as any),
+    ).rejects.toThrow(UnauthorizedException)
+    expect(queueMock.addJob).not.toHaveBeenCalled()
+  })
+
+  it("rejects Wise webhook with a future timestamp outside tolerance (+301s)", async () => {
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    })
+    process.env.WISE_WEBHOOK_PUBLIC_KEY = publicKey
+      .export({ type: "spki", format: "pem" })
+      .toString()
+
+    const body = JSON.stringify({
+      occurred_at: new Date(Date.now() + 301_000).toISOString(),
+      data: { id: "transfer-future", status: "COMPLETED" },
+      event: "transfer.state-change",
+    })
+    const raw = Buffer.from(body, "utf8")
+    const signer = createSign("RSA-SHA256")
+    signer.update(raw)
+    const signature = signer.sign(privateKey, "base64")
+
+    await expect(
+      controller.handleWebhook("wise", { "x-signature-sha256": signature }, {
+        rawBody: raw,
+      } as any),
+    ).rejects.toThrow(UnauthorizedException)
+    expect(queueMock.addJob).not.toHaveBeenCalled()
+  })
 })
 
 describe("Provider adapters — idempotency and production safety", () => {
