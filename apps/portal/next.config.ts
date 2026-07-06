@@ -7,6 +7,12 @@ const nextConfig: NextConfig = {
     "@guestpost/shared",
     "@guestpost/api-client",
   ],
+  // TODO(beta): Marketplace images currently originate from arbitrary
+  // publisher-hosted URLs. Centralize uploads (MinIO/S3/CDN) before
+  // production and remove the wildcard remotePatterns configuration.
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "**" }],
+  },
 }
 
 // Phase 7.0 — Sentry plugin. Safe to call unconditionally; without SENTRY_DSN

@@ -26,6 +26,7 @@ import {
   Star,
   TrendingUp,
 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
@@ -268,10 +269,14 @@ export default function ListingDetailPage() {
         <div className="space-y-4">
           <div className="relative aspect-[4/3] bg-muted rounded-lg overflow-hidden">
             {images[activeImage]?.url ? (
-              <img
+              <Image
+                fill
+                unoptimized
+                priority
                 src={images[activeImage].url}
                 alt={listing.title}
-                className="w-full h-full object-cover"
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -296,10 +301,13 @@ export default function ListingDetailPage() {
                     i === activeImage ? "border-primary" : "border-transparent"
                   }`}
                 >
-                  <img
+                  <Image
+                    fill
+                    unoptimized
                     src={img.url}
                     alt=""
-                    className="w-full h-full object-cover"
+                    className="object-cover"
+                    sizes="80px"
                   />
                 </button>
               ))}

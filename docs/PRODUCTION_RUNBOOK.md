@@ -32,7 +32,45 @@ Companion to `docs/OPERATIONS.md` (backups, supervision, monitoring basics). Thi
 Container path: `docker build -f apps/api/Dockerfile .` / `apps/worker/Dockerfile` from repo root; same env contract; compose healthcheck hits `/api/v1/health`.
 
 ### CRITICAL: exactly one worker fleet, one code version
-Multiple worker processes are safe ONLY when all run identical code — a stale worker consumes queue jobs with old logic and silently swallows them (this exact failure was reproduced during provider validation). pm2/containers must replace, never accumulate, worker processes. Verify after every deploy: `pgrep -f 'worker/dist' | wc -l` matches your intended replica count.
+Multiple worker processes are safe ONLY when all run identical code — a stale worker consumes queue jobs with old logic and silently swallows them (this exact failure was reproduced during provider validation). pm2/containers must replace, never accumulate, worker processes.
+
+Deployment verification:
+
+1. **Replica count** — Verify exactly one worker fleet:
+   - K8s/Swarm/Nomad: check desired vs. actual replica count via orchestrator
+   - Laptop/bare-metal: `pgrep -f 'worker/dist' | wc -l` matches expected count
+
+2. **Health** — Each replica must pass:
+   - `curl -f http://worker:3004/health` → 200 (process alive)
+   - `curl -f http://worker:3004/ready`  → 200 (Redis + Postgres connected)
+
+3. **Queue metrics** — Verify no signals of trouble:
+   - `curl -s http://worker:3004/metrics/queues` → `stalledHitsTotal` === 0
+   - Active/waiting/failed counts are within expected range
+
+4. **Smoke tests** — Exercise the financial flow end-to-end:
+   - Settlement sweep completes successfully (check `GET /admin/reconciliation` → `ok: true`)
+   - No new failed jobs appear (check `/metrics/queues` before and after)
+   - Queue metrics remain healthy
+   - Test payout reaches expected state or is correctly blocked by policy
+   - No WARN/ERROR entries related to settlements or payouts in structured logs
+
+### Post-deploy checklist
+
+```
+After every deployment:
+
+□ API healthy       (curl -f http://api:3000/api/v1/health)
+□ Worker healthy    (curl -f http://worker:3004/health)
+□ Worker ready      (curl -f http://worker:3004/ready)
+□ Queue metrics     (curl -s http://worker:3004/metrics/queues → stalledHitsTotal === 0)
+□ No stalled jobs
+□ Redis connected   (covered by /ready)
+□ Database connected (covered by /ready)
+□ One worker version deployed (orchestrator or pgrep)
+□ Smoke: settlement sweep completes (GET /admin/reconciliation → ok: true)
+□ Smoke: payout request reaches expected state or is correctly blocked
+```
 
 ## 2. Rollback
 

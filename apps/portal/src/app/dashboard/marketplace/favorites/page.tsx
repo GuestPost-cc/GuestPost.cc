@@ -3,6 +3,7 @@
 import { Button, EmptyState, ErrorState, Skeleton } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { ExternalLink, Heart, Star } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { api } from "../../../../lib/api"
@@ -132,12 +133,15 @@ export default function FavoritesPage() {
               href={`/dashboard/marketplace/${fav.listing.slug}`}
               className="flex-shrink-0"
             >
-              <div className="w-32 h-24 bg-muted rounded-lg overflow-hidden">
+              <div className="relative w-32 h-24 bg-muted rounded-lg overflow-hidden">
                 {fav.listing.image ? (
-                  <img
+                  <Image
+                    fill
+                    unoptimized
                     src={fav.listing.image}
                     alt={fav.listing.title}
-                    className="w-full h-full object-cover"
+                    className="object-cover"
+                    sizes="128px"
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-primary/5">

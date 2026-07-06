@@ -14,6 +14,7 @@ import {
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { Bookmark, ExternalLink, Plus, Trash2 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { api } from "../../../../lib/api"
@@ -274,12 +275,15 @@ export default function SavedListsPage() {
                       href={`/dashboard/marketplace/${item.listing.slug}`}
                       className="flex-shrink-0"
                     >
-                      <div className="w-32 h-24 bg-muted rounded-lg overflow-hidden">
+                      <div className="relative w-32 h-24 bg-muted rounded-lg overflow-hidden">
                         {item.listing.image ? (
-                          <img
+                          <Image
+                            fill
+                            unoptimized
                             src={item.listing.image}
                             alt={item.listing.title}
-                            className="w-full h-full object-cover"
+                            className="object-cover"
+                            sizes="128px"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-primary/5">

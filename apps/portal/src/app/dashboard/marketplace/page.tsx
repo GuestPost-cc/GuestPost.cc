@@ -21,6 +21,7 @@ import {
   SlidersHorizontal,
   Star,
 } from "lucide-react"
+import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { api } from "../../../lib/api"
@@ -420,10 +421,13 @@ export default function MarketplacePage() {
               >
                 <div className="relative aspect-[4/3] bg-muted overflow-hidden">
                   {listing.image ? (
-                    <img
+                    <Image
+                      fill
+                      unoptimized
                       src={listing.image}
                       alt={listing.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                      className="object-cover group-hover:scale-105 transition-transform"
+                      sizes="(max-width: 768px) 50vw, 33vw"
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-primary/5">

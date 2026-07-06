@@ -1,4 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto"
+import { createLogger } from "./observability/structured-logger"
+
+const logger = createLogger("shared.job-signing")
 
 let warnedFallback = false
 
@@ -22,9 +25,10 @@ function getSecret(): string {
   }
   if (!warnedFallback) {
     warnedFallback = true
-    console.warn(
-      "[job-signing] QUEUE_SIGNING_SECRET not set — falling back to JWT_SECRET (development only)",
-    )
+    logger.warn("QUEUE_SIGNING_SECRET not set; falling back to JWT_SECRET", {
+      environment: process.env.NODE_ENV,
+      fallbackKey: "JWT_SECRET",
+    })
   }
   return fallback
 }
