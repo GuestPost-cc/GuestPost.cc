@@ -1,46 +1,174 @@
 "use client"
 
-import { sanitizeReturnTo } from "@guestpost/api-client"
-import { Button } from "@guestpost/ui"
-import { zodResolver } from "@hookform/resolvers/zod"
+import { setToken } from "@guestpost/api-client"
+import type { AuthError } from "@guestpost/auth"
+import {
+  getErrorMessage,
+  getSession,
+  isAuthError,
+  signIn as signInTransport,
+  signInWithProvider,
+  signUp as signUpTransport,
+} from "@guestpost/auth/client"
+import { useSession } from "@guestpost/auth/react"
+import {
+  AuthCard,
+  AuthLayout,
+  AuthProviders,
+  LoginForm,
+  SignupForm,
+  useSessionExpired,
+} from "@guestpost/ui"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
-import { useForm } from "react-hook-form"
-import { z } from "zod"
-import { useAuth } from "../lib/auth"
+
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+    >
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        fill="#EA4335"
+      />
+    </svg>
+  )
+}
+
+function getBaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_API_URL
+  if (envUrl) return envUrl
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname
+    if (host !== "localhost" && host !== "127.0.0.1")
+      return `http://${host}:4000`
+  }
+  return "http://localhost:4000"
+}
 
 function LoginContent() {
-  const { signIn, signUp } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isSignUp, setIsSignUp] = useState(false)
-  const [name, setName] = useState("")
-  const [error, setError] = useState("")
-  // Phase 6.8 — banner copy stashed by the 401-redirect handler.
-  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<
-    string | null
-  >(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const { expired, reason } = useSessionExpired()
+  const { session: _session, user } = useSession()
 
-  const loginSchema = z.object({
-    email: z.string().email("Valid email required"),
-    password: z.string().min(6, "At least 6 characters"),
-  })
+  useEffect(() => {
+    if (user?.userType === "PUBLISHER") {
+      sessionStorage.removeItem("gp:oauth-pending")
+      const returnTo = searchParams.get("returnTo")
+      const safeReturnTo =
+        returnTo && returnTo !== "/" ? returnTo : "/dashboard"
+      router.push(safeReturnTo)
+      return
+    }
 
-  type LoginFormData = z.infer<typeof loginSchema>
+    if (user?.userType === "CUSTOMER") {
+      const oauthPending =
+        typeof window !== "undefined"
+          ? sessionStorage.getItem("gp:oauth-pending")
+          : null
+      if (oauthPending) {
+        sessionStorage.removeItem("gp:oauth-pending")
+        getSession().then((sessionResult) => {
+          const token = sessionResult?.token
+          fetch(`${getBaseUrl()}/api/v1/identity/become-publisher`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            credentials: "include",
+            body: JSON.stringify({}),
+          })
+            .then((res) => {
+              if (res.ok) {
+                if (token) setToken(token)
+                const returnTo = searchParams.get("returnTo")
+                const safeReturnTo =
+                  returnTo && returnTo !== "/" ? returnTo : "/dashboard"
+                router.push(safeReturnTo)
+              } else {
+                setError(
+                  "This portal is for publishers only. Please sign in at the correct portal.",
+                )
+              }
+            })
+            .catch(() => {})
+        })
+      }
+      return
+    }
 
-  const {
-    register,
-    handleSubmit: handleFormSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-  })
+    if (user === null) {
+      getSession().then((sessionResult) => {
+        if (!sessionResult?.user) return
+        if (sessionResult.user.userType === "PUBLISHER") {
+          const returnTo = searchParams.get("returnTo")
+          const safeReturnTo =
+            returnTo && returnTo !== "/" ? returnTo : "/dashboard"
+          router.push(safeReturnTo)
+          return
+        }
+        // After OAuth redirect, useSession may be null initially
+        // but getSession finds the session — check for OAuth pending
+        const oauthPending =
+          typeof window !== "undefined"
+            ? sessionStorage.getItem("gp:oauth-pending")
+            : null
+        if (sessionResult.user.userType === "CUSTOMER" && oauthPending) {
+          sessionStorage.removeItem("gp:oauth-pending")
+          const token = sessionResult.token
+          fetch(`${getBaseUrl()}/api/v1/identity/become-publisher`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            credentials: "include",
+            body: JSON.stringify({}),
+          })
+            .then((res) => {
+              if (res.ok) {
+                if (token) setToken(token)
+                const returnTo = searchParams.get("returnTo")
+                const safeReturnTo =
+                  returnTo && returnTo !== "/" ? returnTo : "/dashboard"
+                router.push(safeReturnTo)
+              } else {
+                setError(
+                  "This portal is for publishers only. Please sign in at the correct portal.",
+                )
+              }
+            })
+            .catch(() => {})
+        }
+      })
+    }
+  }, [user, router, searchParams])
 
   useEffect(() => {
     try {
-      const reason = sessionStorage.getItem("guestpost:auth-redirect-reason")
-      if (reason) {
-        setSessionExpiredBanner(reason)
+      const r = sessionStorage.getItem("guestpost:auth-redirect-reason")
+      if (r) {
+        setError(r)
         sessionStorage.removeItem("guestpost:auth-redirect-reason")
       }
     } catch {
@@ -48,93 +176,125 @@ function LoginContent() {
     }
   }, [])
 
-  const onSubmit = async (data: LoginFormData) => {
-    setError("")
+  const handleGoogleSignIn = async () => {
+    setError(null)
     try {
-      if (isSignUp) {
-        await signUp(data.email, data.password, name)
-      } else {
-        await signIn(data.email, data.password)
-      }
-      // Phase 6.8 — honor sanitized returnTo so the user lands back where
-      // the 401 bounced them. The sanitizer rejects cross-origin paths.
-      const safeReturnTo = sanitizeReturnTo(searchParams.get("returnTo"))
-      router.push(
-        safeReturnTo && safeReturnTo !== "/" ? safeReturnTo : "/dashboard",
-      )
+      sessionStorage.setItem("gp:oauth-pending", "true")
+      await signInWithProvider("google", window.location.origin)
     } catch (err: any) {
-      setError(err.message ?? "Something went wrong")
+      sessionStorage.removeItem("gp:oauth-pending")
+      setError(
+        isAuthError(err)
+          ? getErrorMessage(err)
+          : (err.message ?? "Something went wrong"),
+      )
+    }
+  }
+
+  const handleSignIn = async (data: { email: string; password: string }) => {
+    setError(null)
+    setLoading(true)
+    try {
+      const result = await signInTransport(data)
+      if (result.status === "mfa_required") {
+        throw {
+          code: "MFA_REQUIRED",
+          message: "Multi-factor authentication is required.",
+          recoverable: true,
+        } as AuthError
+      }
+      if (result.token) setToken(result.token)
+      const session = await getSession()
+      if (session.user?.userType !== "PUBLISHER") {
+        throw {
+          code: "WRONG_AUDIENCE",
+          message:
+            "This portal is for publishers only. Please sign in at the correct portal.",
+          recoverable: true,
+        } as AuthError
+      }
+      const returnTo = searchParams.get("returnTo")
+      const safeReturnTo =
+        returnTo && returnTo !== "/" ? returnTo : "/dashboard"
+      router.push(safeReturnTo)
+    } catch (err: any) {
+      setError(
+        isAuthError(err)
+          ? getErrorMessage(err)
+          : (err.message ?? "Something went wrong"),
+      )
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSignUp = async (data: {
+    name: string
+    email: string
+    password: string
+  }) => {
+    setError(null)
+    setLoading(true)
+    try {
+      const result = await signUpTransport(data)
+      if (result.status === "mfa_required") {
+        throw {
+          code: "MFA_REQUIRED",
+          message: "Multi-factor authentication is required.",
+          recoverable: true,
+        } as AuthError
+      }
+
+      if (result.token) setToken(result.token)
+      const convertRes = await fetch(
+        `${getBaseUrl()}/api/v1/identity/become-publisher`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(result.token
+              ? { Authorization: `Bearer ${result.token}` }
+              : {}),
+          },
+          credentials: "include",
+          body: JSON.stringify({ publisherName: data.name }),
+        },
+      )
+      if (!convertRes.ok) {
+        const errData = await convertRes.json().catch(() => ({}))
+        throw {
+          code: "CONVERSION_FAILED",
+          message:
+            errData.message ?? "Could not set up your publisher account.",
+          recoverable: true,
+        } as AuthError
+      }
+
+      const returnTo = searchParams.get("returnTo")
+      const safeReturnTo =
+        returnTo && returnTo !== "/" ? returnTo : "/dashboard"
+      router.push(safeReturnTo)
+    } catch (err: any) {
+      setError(
+        isAuthError(err)
+          ? getErrorMessage(err)
+          : (err.message ?? "Something went wrong"),
+      )
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="mx-auto flex w-full flex-col justify-center space-y-6 sm:w-[400px]">
-        <div className="flex flex-col space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {isSignUp ? "Publisher Sign Up" : "Publisher Sign In"}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {isSignUp
-              ? "Create an account to start publishing"
-              : "Sign in to manage your orders and content"}
-          </p>
-        </div>
-
-        {sessionExpiredBanner && !isSignUp && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
-          >
-            {sessionExpiredBanner}
-          </div>
-        )}
-
-        <form onSubmit={handleFormSubmit(onSubmit)} className="grid gap-4">
-          {isSignUp && (
-            <input
-              type="text"
-              placeholder="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              required
-            />
-          )}
-          <input
-            type="email"
-            placeholder="Email"
-            {...register("email")}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            required
-          />
-          {errors.email && (
-            <p className="text-sm text-destructive">{errors.email.message}</p>
-          )}
-          <input
-            type="password"
-            placeholder="Password"
-            {...register("password")}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            required
-          />
-          {errors.password && (
-            <p className="text-sm text-destructive">
-              {errors.password.message}
-            </p>
-          )}
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={isSubmitting}>
-            {isSubmitting
-              ? "Loading..."
-              : isSignUp
-                ? "Create Account"
-                : "Sign In"}
-          </Button>
-        </form>
-
-        <div className="space-y-4">
+    <AuthLayout>
+      <AuthCard
+        title={isSignUp ? "Publisher Sign Up" : "Publisher Sign In"}
+        description={
+          isSignUp
+            ? "Create an account to start publishing"
+            : "Sign in to manage your orders and content"
+        }
+        footer={
           <p className="text-center text-sm text-muted-foreground">
             {isSignUp ? (
               <>
@@ -158,17 +318,45 @@ function LoginContent() {
               </>
             )}
           </p>
-          <p className="text-center text-sm text-muted-foreground">
-            <a
-              href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"}
-              className="underline underline-offset-4 hover:text-primary"
-            >
-              Back to homepage
-            </a>
-          </p>
-        </div>
-      </div>
-    </div>
+        }
+      >
+        {expired && !isSignUp && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+          >
+            {reason}
+          </div>
+        )}
+        <AuthProviders
+          providers={[
+            {
+              id: "google",
+              label: "Continue with Google",
+              icon: GoogleIcon,
+              onClick: handleGoogleSignIn,
+            },
+          ]}
+        />
+        {isSignUp ? (
+          <SignupForm
+            onSubmit={handleSignUp}
+            loading={loading}
+            error={error ?? undefined}
+            onToggleMode={() => setIsSignUp(false)}
+          />
+        ) : (
+          <LoginForm
+            onSubmit={handleSignIn}
+            loading={loading}
+            error={error ?? undefined}
+            onToggleMode={() => setIsSignUp(true)}
+            forgotPasswordHref="/forgot-password"
+          />
+        )}
+      </AuthCard>
+    </AuthLayout>
   )
 }
 
@@ -177,7 +365,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center">
-          Loading...
+          <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
       }
     >

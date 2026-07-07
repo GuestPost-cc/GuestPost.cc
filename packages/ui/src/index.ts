@@ -1,3 +1,12 @@
+export type { AuthCardProps } from "./components/auth-card"
+export { AuthCard } from "./components/auth-card"
+export type { AuthLayoutProps } from "./components/auth-layout"
+export { AuthLayout } from "./components/auth-layout"
+export type {
+  AuthProvidersProps,
+  ProviderConfig,
+} from "./components/auth-providers"
+export { AuthProviders } from "./components/auth-providers"
 export { Avatar, AvatarFallback, AvatarImage } from "./components/avatar"
 export type { BadgeProps } from "./components/badge"
 export { Badge, badgeVariants } from "./components/badge"
@@ -71,6 +80,8 @@ export type { EmailVerificationBannerProps } from "./components/email-verificati
 export { EmailVerificationBanner } from "./components/email-verification-banner"
 export { EmptyState } from "./components/empty-state"
 export { ErrorState } from "./components/error-state"
+export type { ForgotPasswordFormProps } from "./components/forgot-password-form"
+export { ForgotPasswordForm } from "./components/forgot-password-form"
 export type {
   FulfillmentChannelBadgeProps,
   FulfillmentChannelValue,
@@ -79,8 +90,15 @@ export { FulfillmentChannelBadge } from "./components/fulfillment-channel-badge"
 export { Input } from "./components/input"
 export { KpiCard } from "./components/kpi-card"
 export { Label } from "./components/label"
-export { AppShell, DashboardLayout, Header, Sidebar } from "./components/layout"
+export {
+  AppShell,
+  DashboardLayout,
+  Header,
+  Sidebar,
+} from "./components/layout"
 export { LoadingState } from "./components/loading-state"
+export type { LoginFormProps } from "./components/login-form"
+export { LoginForm } from "./components/login-form"
 export type { NavItemProps } from "./components/nav-item"
 export { NavItem } from "./components/nav-item"
 export type {
@@ -89,6 +107,8 @@ export type {
 } from "./components/notification-bell"
 export { NotificationBell } from "./components/notification-bell"
 export { PageHeader } from "./components/page-header"
+export type { PasswordInputProps } from "./components/password-input"
+export { PasswordInput } from "./components/password-input"
 export { PermissionGate } from "./components/permission-gate"
 export {
   Popover,
@@ -97,6 +117,10 @@ export {
   PopoverTrigger,
 } from "./components/popover"
 export { ProtectedRoute } from "./components/protected-route"
+export type { ProviderButtonProps } from "./components/provider-button"
+export { ProviderButton } from "./components/provider-button"
+export type { ResetPasswordFormProps } from "./components/reset-password-form"
+export { ResetPasswordForm } from "./components/reset-password-form"
 export { RoleGuard } from "./components/role-guard"
 export {
   Select,
@@ -111,7 +135,11 @@ export {
   SelectValue,
 } from "./components/select"
 export { Separator } from "./components/separator"
+export type { SignupFormProps } from "./components/signup-form"
+export { SignupForm } from "./components/signup-form"
 export { Skeleton } from "./components/skeleton"
+export type { SpinnerButtonProps } from "./components/spinner-button"
+export { SpinnerButton } from "./components/spinner-button"
 export { StatusBadge, statusBadgeVariants } from "./components/status-badge"
 export type {
   SupportPanelActorScope,
@@ -138,6 +166,8 @@ export {
   TooltipProvider,
   TooltipTrigger,
 } from "./components/tooltip"
+export type { UseSessionExpiredReturn } from "./components/use-session-expired"
+export { useSessionExpired } from "./components/use-session-expired"
 export { downloadCsv } from "./lib/csv"
 export type {
   StatusPresentation,

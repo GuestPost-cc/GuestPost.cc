@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.1/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.5.2/schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -11,6 +11,8 @@
       "apps/**/*.{js,jsx,ts,tsx,mjs,cjs}",
       "packages/*/src/**/*.{js,jsx,ts,tsx,mjs,cjs}",
       "!packages/database/src/prisma",
+      "!apps/**/next-env.d.ts",
+      "!apps/**/.next/types/**",
       "scripts/**/*.{ts,js,mjs}",
       "e2e/**/*.{ts,tsx}",
       "*.config.{ts,js,mjs}",

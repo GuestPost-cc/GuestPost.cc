@@ -13,6 +13,8 @@ env:
   QUEUE_SIGNING_SECRET: ci-only-queue-secret-not-used-in-prod-012345
   BETTER_AUTH_URL: http://localhost:3000
   CORS_ORIGIN: http://localhost:3000
+  OAUTH_STATE_COOKIE_SAMESITE: none
+  OAUTH_STATE_COOKIE_SECURE: "false"
   # Phase 7.7 C — Sentry source-map upload. When SENTRY_AUTH_TOKEN is
   # configured as a repo secret, `pnpm build` uploads source maps for
   # each Next.js app's bundle so production Sentry traces show source-
@@ -64,7 +66,7 @@ jobs:
       # Without ui + api-client built, tsc --noEmit on the apps fails with
       # "Cannot find module '@guestpost/ui'" because the dist/ outputs don't
       # exist yet for TypeScript path resolution.
-      - run: pnpm run build --filter=@guestpost/shared --filter=@guestpost/database --filter=@guestpost/auth --filter=@guestpost/ui --filter=@guestpost/api-client
+      - run: pnpm run build
         name: Build dependencies
 
       - name: Apply migrations

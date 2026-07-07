@@ -75,6 +75,16 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
     database: prismaAdapter(prisma, {
       provider: "postgresql",
     }),
+    user: {
+      additionalFields: {
+        userType: {
+          type: "string",
+          required: true,
+          defaultValue: "CUSTOMER",
+          input: false,
+        },
+      },
+    },
     session: {
       expiresIn: 8 * 60 * 60, // 8 hours — stolen cookie window bounded
       updateAge: 30 * 60, // 30 min — active users extend expiry; keeps
@@ -158,6 +168,48 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
     advanced: {
       cookiePrefix: "guestpost",
       useSecureCookies: process.env.NODE_ENV === "production",
+      cookies: {
+        oauth_state: {
+          attributes: {
+            sameSite:
+              (process.env.OAUTH_STATE_COOKIE_SAMESITE as
+                | "Strict"
+                | "Lax"
+                | "None") ||
+              (() => {
+                throw new Error("OAUTH_STATE_COOKIE_SAMESITE must be set")
+              })(),
+            secure:
+              process.env.OAUTH_STATE_COOKIE_SECURE === "true"
+                ? true
+                : process.env.OAUTH_STATE_COOKIE_SECURE === "false"
+                  ? false
+                  : (() => {
+                      throw new Error("OAUTH_STATE_COOKIE_SECURE must be set")
+                    })(),
+          },
+        },
+        state: {
+          attributes: {
+            sameSite:
+              (process.env.OAUTH_STATE_COOKIE_SAMESITE as
+                | "Strict"
+                | "Lax"
+                | "None") ||
+              (() => {
+                throw new Error("OAUTH_STATE_COOKIE_SAMESITE must be set")
+              })(),
+            secure:
+              process.env.OAUTH_STATE_COOKIE_SECURE === "true"
+                ? true
+                : process.env.OAUTH_STATE_COOKIE_SECURE === "false"
+                  ? false
+                  : (() => {
+                      throw new Error("OAUTH_STATE_COOKIE_SECURE must be set")
+                    })(),
+          },
+        },
+      },
     },
     plugins: [
       bearer(),
@@ -180,3 +232,12 @@ export function createAuth(opts: AuthFactoryOptions = {}) {
 // through the createAuth({sendEmail, onEmailVerified}) instance bound in
 // apps/api/src/main.ts.
 export const auth = createAuth()
+
+// Re-export types for consumers
+export type {
+  AuthError,
+  AuthenticatedUser,
+  AuthProvider,
+  AuthSession,
+  SignInResult,
+} from "./types"

@@ -1,15 +1,21 @@
 "use client"
 
-import { sanitizeReturnTo } from "@guestpost/api-client"
-import { Button } from "@guestpost/ui"
+import type { AuthError } from "@guestpost/auth"
+import {
+  getErrorMessage,
+  isAuthError,
+  getSession as serverGetSession,
+  signIn as signInTransport,
+} from "@guestpost/auth/client"
+import {
+  AuthCard,
+  AuthLayout,
+  LoginForm,
+  useSessionExpired,
+} from "@guestpost/ui"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
-import { useAuth } from "../lib/auth"
 
-// Phase 7.1 sibling fix — Next 15 strict mode requires useSearchParams() to be
-// wrapped in <Suspense> so the page can be prerendered. Without this, the
-// admin/portal/publisher builds fail at "Generating static pages" with a
-// "missing-suspense-with-csr-bailout" error. Pre-existing Phase 6.8 leftover.
 export default function LoginPage() {
   return (
     <Suspense fallback={null}>
@@ -19,103 +25,98 @@ export default function LoginPage() {
 }
 
 function LoginPageInner() {
-  const { signIn, user, loading: authLoading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
-  const [submitting, setSubmitting] = useState(false)
-  // Phase 6.8 — sessionStorage-stashed reason from the 401-redirect handler.
-  const [sessionExpiredBanner, setSessionExpiredBanner] = useState<
-    string | null
-  >(null)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [initialCheck, setInitialCheck] = useState(true)
+  const { expired, reason, dismiss } = useSessionExpired()
 
-  // Phase 6.8 — sanitize returnTo once + reuse for both the auto-redirect
-  // (already-signed-in user lands on this page with returnTo) and post-submit.
   const safeReturnTo = (() => {
     const raw = searchParams.get("returnTo")
-    const sanitized = sanitizeReturnTo(raw)
-    return sanitized && sanitized !== "/" ? sanitized : "/dashboard"
+    if (raw && raw !== "/" && raw.startsWith("/")) return raw
+    return "/dashboard"
   })()
 
   useEffect(() => {
-    if (!authLoading && user?.userType === "STAFF") {
-      router.push(safeReturnTo)
-    }
-  }, [user, authLoading, router, safeReturnTo])
-
-  useEffect(() => {
-    try {
-      const reason = sessionStorage.getItem("guestpost:auth-redirect-reason")
-      if (reason) {
-        setSessionExpiredBanner(reason)
-        sessionStorage.removeItem("guestpost:auth-redirect-reason")
+    // Check if already signed in as staff
+    async function checkSession() {
+      try {
+        const sessionResult = await serverGetSession()
+        if (sessionResult?.user?.userType === "STAFF") {
+          router.push(safeReturnTo)
+          return
+        }
+      } catch {
+        // ignore
       }
-    } catch {
-      /* private mode */
+      setInitialCheck(false)
     }
-  }, [])
+    checkSession()
+  }, [router, safeReturnTo])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
-    setSubmitting(true)
+  const handleSignIn = async (data: { email: string; password: string }) => {
+    setError(null)
+    setLoading(true)
     try {
-      await signIn(email, password)
+      const result = await signInTransport(data)
+      if (result.status === "mfa_required") {
+        throw {
+          code: "MFA_REQUIRED",
+          message: "Multi-factor authentication is required.",
+          recoverable: true,
+        } as AuthError
+      }
+      const session = await serverGetSession()
+      if (session.user?.userType !== "STAFF") {
+        throw {
+          code: "WRONG_AUDIENCE",
+          message:
+            "This portal is for staff only. Please sign in at the correct portal.",
+          recoverable: true,
+        } as AuthError
+      }
       router.push(safeReturnTo)
     } catch (err: any) {
-      setError(err.message ?? "Authentication failed")
+      setError(
+        isAuthError(err)
+          ? getErrorMessage(err)
+          : (err.message ?? "Something went wrong"),
+      )
     } finally {
-      setSubmitting(false)
+      setLoading(false)
     }
   }
 
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <div className="mx-auto flex w-full max-w-md flex-col justify-center space-y-6 p-8">
-        <div className="flex flex-col space-y-2 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Admin Sign In
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to manage the platform
-          </p>
-        </div>
+  if (initialCheck) {
+    return (
+      <AuthLayout>
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </AuthLayout>
+    )
+  }
 
-        {sessionExpiredBanner && (
+  return (
+    <AuthLayout>
+      <AuthCard
+        title="Admin Sign In"
+        description="Sign in to manage the platform"
+      >
+        {expired && (
           <div
             role="status"
             aria-live="polite"
-            className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
           >
-            {sessionExpiredBanner}
+            {reason}
           </div>
         )}
-
-        <form onSubmit={handleSubmit} className="grid gap-4">
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            required
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            required
-          />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? "Loading..." : "Sign In"}
-          </Button>
-        </form>
-      </div>
-    </div>
+        <LoginForm
+          onSubmit={handleSignIn}
+          loading={loading}
+          error={error ?? undefined}
+        />
+      </AuthCard>
+    </AuthLayout>
   )
 }
