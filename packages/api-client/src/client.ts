@@ -48,13 +48,41 @@ function generateRequestId(): string {
   return `${out.slice(0, 8)}-${out.slice(8, 12)}-4${out.slice(13, 16)}-${out.slice(16, 20)}-${out.slice(20, 32)}`
 }
 
+const STORAGE_KEY = "gp:api-token"
+
 let _token: string | null = null
+
+function initToken() {
+  if (typeof sessionStorage !== "undefined") {
+    try {
+      const stored = sessionStorage.getItem(STORAGE_KEY)
+      if (stored) _token = stored
+    } catch {
+      /* noop */
+    }
+  }
+}
+initToken()
 
 export function setToken(token: string) {
   _token = token
+  if (typeof sessionStorage !== "undefined") {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, token)
+    } catch {
+      /* noop */
+    }
+  }
 }
 export function clearToken() {
   _token = null
+  if (typeof sessionStorage !== "undefined") {
+    try {
+      sessionStorage.removeItem(STORAGE_KEY)
+    } catch {
+      /* noop */
+    }
+  }
 }
 export function getToken() {
   return _token

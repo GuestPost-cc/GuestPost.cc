@@ -72,13 +72,20 @@ function LoginContent() {
   // Must also hydrate the Bearer token (setToken) for the HttpClient-based
   // dashboard — otherwise POST requests (create org, etc.) are blocked by
   // the CSRF middleware.
+  //
+  // Only redirect when user is confirmed CUSTOMER (not when user is null,
+  // which would mean the session hasn't loaded yet). The old `user === null`
+  // branch caused a redirect loop: login page could redirect before the
+  // dashboard layout had its token, dashboard would see no user and bounce
+  // back to /, restarting the cycle.
   useEffect(() => {
+    if (user?.userType !== "CUSTOMER") return
+
     const redirectWithToken = async () => {
       const sessionResult = await getSession()
-      if (!sessionResult?.user || sessionResult.user.userType !== "CUSTOMER")
-        return
+      if (!sessionResult?.token) return
 
-      if (sessionResult.token) setToken(sessionResult.token)
+      setToken(sessionResult.token)
 
       const returnTo = searchParams.get("returnTo")
       const safeReturnTo =
@@ -86,10 +93,8 @@ function LoginContent() {
       router.push(safeReturnTo)
     }
 
-    if (user?.userType === "CUSTOMER" || user === null) {
-      redirectWithToken()
-    }
-  }, [user, router, searchParams])
+    redirectWithToken()
+  }, [user, searchParams, router])
 
   const handleGoogleSignIn = async () => {
     try {
