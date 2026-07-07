@@ -36,8 +36,11 @@ export function LoginForm({
   return (
     <div className="grid gap-5">
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
-        <div className="grid gap-2">
-          <label htmlFor="login-email" className="text-sm text-foreground">
+        <div className="grid gap-1.5">
+          <label
+            htmlFor="login-email"
+            className="text-sm font-medium text-[#f7f8f8]"
+          >
             Email
           </label>
           <Input
@@ -50,7 +53,7 @@ export function LoginForm({
             {...register("email")}
           />
           {errors.email && (
-            <p id="login-email-error" className="text-sm text-destructive">
+            <p id="login-email-error" className="text-sm text-[#e5484d]">
               {errors.email.message}
             </p>
           )}
@@ -63,31 +66,25 @@ export function LoginForm({
           error={errors.password?.message}
           {...register("password")}
         />
-        {error && <p className="text-sm text-destructive">{error}</p>}
-        <SpinnerButton type="submit" className="w-full" loading={busy}>
+        {error && (
+          <p className="text-sm text-[#e5484d] bg-[#e5484d]/10 border border-[#e5484d]/20 rounded-md px-3 py-2">
+            {error}
+          </p>
+        )}
+        <SpinnerButton type="submit" className="w-full h-10" loading={busy}>
           Sign In
         </SpinnerButton>
-      </form>
-
-      <div className="flex flex-col items-center gap-2 text-sm">
         {forgotPasswordHref && (
-          <a
-            href={forgotPasswordHref}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Forgot your password?
-          </a>
+          <div className="text-center">
+            <a
+              href={forgotPasswordHref}
+              className="text-sm text-[#8a8f98] hover:text-[#d0d6e0] transition-colors"
+            >
+              Forgot your password?
+            </a>
+          </div>
         )}
-        {onToggleMode && (
-          <button
-            type="button"
-            onClick={onToggleMode}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Don&apos;t have an account? Sign up
-          </button>
-        )}
-      </div>
+      </form>
     </div>
   )
 }

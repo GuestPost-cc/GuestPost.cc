@@ -32,12 +32,12 @@ export function AuthProviders({
         </ProviderButton>
       ))}
       {separator && (
-        <div className="relative flex items-center py-1">
-          <div className="flex-grow border-t border-border" />
-          <span className="flex-shrink px-3 text-xs text-muted-foreground">
+        <div className="relative flex items-center py-2">
+          <div className="flex-grow border-t border-[#23252a]" />
+          <span className="flex-shrink px-4 text-xs text-[#62666d] tracking-wider">
             {separator}
           </span>
-          <div className="flex-grow border-t border-border" />
+          <div className="flex-grow border-t border-[#23252a]" />
         </div>
       )}
     </div>

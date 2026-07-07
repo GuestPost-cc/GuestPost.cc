@@ -179,13 +179,13 @@ function LoginContent() {
         }
         footer={
           <div className="space-y-2">
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-center text-sm text-[#8a8f98]">
               {isSignUp ? (
                 <>
                   Already have an account?{" "}
                   <button
                     onClick={() => setIsSignUp(false)}
-                    className="underline underline-offset-4 hover:text-primary"
+                    className="text-[#5e6ad2] hover:text-[#828fff] transition-colors"
                   >
                     Sign in
                   </button>
@@ -195,17 +195,17 @@ function LoginContent() {
                   Don&apos;t have an account?{" "}
                   <button
                     onClick={() => setIsSignUp(true)}
-                    className="underline underline-offset-4 hover:text-primary"
+                    className="text-[#5e6ad2] hover:text-[#828fff] transition-colors"
                   >
                     Sign up
                   </button>
                 </>
               )}
             </p>
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-center text-sm text-[#62666d]">
               <a
                 href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"}
-                className="underline underline-offset-4 hover:text-primary"
+                className="text-[#8a8f98] hover:text-[#d0d6e0] transition-colors"
               >
                 Back to homepage
               </a>

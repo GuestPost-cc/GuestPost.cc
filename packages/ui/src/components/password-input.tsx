@@ -18,9 +18,9 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
     const [visible, setVisible] = React.useState(false)
 
     return (
-      <div className="grid gap-1">
+      <div className="grid gap-1.5">
         {label && (
-          <label htmlFor={id} className="text-sm text-foreground">
+          <label htmlFor={id} className="text-sm font-medium text-[#f7f8f8]">
             {label}
           </label>
         )}
@@ -29,7 +29,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
             ref={ref}
             id={id}
             type={visible ? "text" : "password"}
-            className={cn("pr-12", error && "border-destructive", className)}
+            className={cn("pr-10", error && "border-[#e5484d]", className)}
             aria-invalid={!!error}
             aria-describedby={error ? `${id}-error` : undefined}
             {...props}
@@ -37,7 +37,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#62666d] hover:text-[#8a8f98] transition-colors"
             aria-label={visible ? "Hide password" : "Show password"}
             tabIndex={-1}
           >
@@ -49,10 +49,10 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
           </button>
         </div>
         {description && !error && (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-sm text-[#62666d]">{description}</p>
         )}
         {error && (
-          <p id={`${id}-error`} className="text-sm text-destructive">
+          <p id={`${id}-error`} className="text-sm text-[#e5484d]">
             {error}
           </p>
         )}
