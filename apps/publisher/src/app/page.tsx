@@ -205,7 +205,7 @@ function LoginContent() {
       }
       if (result.token) setToken(result.token)
       const session = await getSession()
-      if (!session?.user || session.user.userType !== "PUBLISHER") {
+      if (session.user?.userType !== "PUBLISHER") {
         throw {
           code: "WRONG_AUDIENCE",
           message:

@@ -35,10 +35,7 @@ export function SignupForm({
     <div className="grid gap-5">
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
         <div className="grid gap-2">
-          <label
-            htmlFor="signup-name"
-            className="text-sm text-foreground"
-          >
+          <label htmlFor="signup-name" className="text-sm text-foreground">
             Full name
           </label>
           <Input
@@ -57,10 +54,7 @@ export function SignupForm({
           )}
         </div>
         <div className="grid gap-2">
-          <label
-            htmlFor="signup-email"
-            className="text-sm text-foreground"
-          >
+          <label htmlFor="signup-email" className="text-sm text-foreground">
             Email
           </label>
           <Input

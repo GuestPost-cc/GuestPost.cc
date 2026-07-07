@@ -41,10 +41,7 @@ export function ForgotPasswordForm({
             your password.
           </p>
           <div className="grid gap-2">
-            <label
-              htmlFor="forgot-email"
-              className="text-sm text-foreground"
-            >
+            <label htmlFor="forgot-email" className="text-sm text-foreground">
               Email
             </label>
             <Input

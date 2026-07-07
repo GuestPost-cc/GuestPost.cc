@@ -68,7 +68,7 @@ function LoginPageInner() {
         } as AuthError
       }
       const session = await serverGetSession()
-      if (!session?.user || session.user.userType !== "STAFF") {
+      if (session.user?.userType !== "STAFF") {
         throw {
           code: "WRONG_AUDIENCE",
           message:

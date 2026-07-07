@@ -1,5 +1,5 @@
 jest.mock("ioredis", () => {
-  const { EventEmitter } = require("events")
+  const { EventEmitter } = require("node:events")
   const mockRedis = new EventEmitter()
   mockRedis.psubscribe = jest.fn()
   mockRedis.publish = jest.fn().mockResolvedValue(1)

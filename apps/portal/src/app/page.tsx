@@ -124,7 +124,7 @@ function LoginContent() {
         } as AuthError
       }
       const session = await getSession()
-      if (!session?.user || session.user.userType !== "CUSTOMER") {
+      if (session.user?.userType !== "CUSTOMER") {
         throw {
           code: "WRONG_AUDIENCE",
           message:
@@ -165,7 +165,7 @@ function LoginContent() {
         } as AuthError
       }
       const session = await getSession()
-      if (!session?.user || session.user.userType !== "CUSTOMER") {
+      if (session.user?.userType !== "CUSTOMER") {
         throw {
           code: "WRONG_AUDIENCE",
           message:
