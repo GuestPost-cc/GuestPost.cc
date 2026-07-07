@@ -64,7 +64,7 @@ jobs:
       # Without ui + api-client built, tsc --noEmit on the apps fails with
       # "Cannot find module '@guestpost/ui'" because the dist/ outputs don't
       # exist yet for TypeScript path resolution.
-      - run: pnpm run build --filter=@guestpost/shared --filter=@guestpost/database --filter=@guestpost/auth --filter=@guestpost/ui --filter=@guestpost/api-client
+      - run: pnpm run build
         name: Build dependencies
 
       - name: Apply migrations
