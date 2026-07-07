@@ -126,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         )
       }
       setUser(me)
+      window.location.reload()
     } finally {
       setLoading(false)
     }

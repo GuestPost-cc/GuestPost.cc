@@ -76,7 +76,7 @@ function LoginPageInner() {
           recoverable: true,
         } as AuthError
       }
-      router.push(safeReturnTo)
+      window.location.href = safeReturnTo
     } catch (err: any) {
       setError(
         isAuthError(err)

@@ -14,6 +14,7 @@ import { AuthModule } from "./modules/auth/auth.module"
 import { BillingModule } from "./modules/billing/billing.module"
 import { CampaignsModule } from "./modules/campaigns/campaigns.module"
 import { IdentityModule } from "./modules/identity/identity.module"
+import { IntegrationsModule } from "./modules/integrations/integrations.module"
 import { MarketplaceModule } from "./modules/marketplace/marketplace.module"
 import { NotificationsModule } from "./modules/notifications/notifications.module"
 import { OrdersModule } from "./modules/orders/orders.module"
@@ -44,6 +45,7 @@ import { WebsitesModule } from "./modules/websites/websites.module"
     ApiKeysModule,
     WebsitesModule,
     NotificationsModule,
+    IntegrationsModule,
   ],
 })
 export class AppModule implements NestModule {

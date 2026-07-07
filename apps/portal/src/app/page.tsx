@@ -10,7 +10,7 @@ import {
   signInWithProvider,
   signUp as signUpTransport,
 } from "@guestpost/auth/client"
-import { useSession, useSignIn, useSignUp } from "@guestpost/auth/react"
+import { useSession } from "@guestpost/auth/react"
 import {
   AuthCard,
   AuthLayout,
@@ -55,12 +55,9 @@ function LoginContent() {
   const searchParams = useSearchParams()
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { expired, reason, dismiss } = useSessionExpired()
-  const { signIn: hookSignIn, loading: signInLoading } = useSignIn()
-  const { signUp: hookSignUp, loading: signUpLoading } = useSignUp()
-  const { session: _session, user } = useSession()
-
-  const loading = isSignUp ? signUpLoading : signInLoading
+  const [loading, setLoading] = useState(false)
+  const { expired, reason } = useSessionExpired()
+  const { user } = useSession()
 
   useEffect(() => {
     if (searchParams.get("signup") === "true") {
@@ -92,6 +89,7 @@ function LoginContent() {
 
   const handleSignIn = async (data: { email: string; password: string }) => {
     setError(null)
+    setLoading(true)
     try {
       const result = await signInTransport(data)
       if (result.status === "authenticated" && result.token) {
@@ -117,13 +115,15 @@ function LoginContent() {
       const returnTo = searchParams.get("returnTo")
       const safeReturnTo =
         returnTo && returnTo !== "/" ? returnTo : "/dashboard"
-      router.push(safeReturnTo)
+      window.location.href = safeReturnTo
     } catch (err: any) {
       setError(
         isAuthError(err)
           ? getErrorMessage(err)
           : (err.message ?? "Something went wrong"),
       )
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -133,6 +133,7 @@ function LoginContent() {
     password: string
   }) => {
     setError(null)
+    setLoading(true)
     try {
       const result = await signUpTransport(data)
       if (result.status === "authenticated" && result.token) {
@@ -158,59 +159,51 @@ function LoginContent() {
       const returnTo = searchParams.get("returnTo")
       const safeReturnTo =
         returnTo && returnTo !== "/" ? returnTo : "/dashboard"
-      router.push(safeReturnTo)
+      window.location.href = safeReturnTo
     } catch (err: any) {
       setError(
         isAuthError(err)
           ? getErrorMessage(err)
           : (err.message ?? "Something went wrong"),
       )
+    } finally {
+      setLoading(false)
     }
   }
 
   return (
     <AuthLayout>
       <AuthCard
-        title={isSignUp ? "SEO Expert Sign Up" : "SEO Expert Sign In"}
+        title={isSignUp ? "Create Account" : "Sign In"}
         description={
           isSignUp
-            ? "Create an account to manage your campaigns"
-            : "Sign in to your GuestPost account"
+            ? "Create an account to get started"
+            : "Sign in to your account"
         }
         footer={
-          <div className="space-y-2">
-            <p className="text-center text-sm text-[#8a8f98]">
-              {isSignUp ? (
-                <>
-                  Already have an account?{" "}
-                  <button
-                    onClick={() => setIsSignUp(false)}
-                    className="text-[#5e6ad2] hover:text-[#828fff] transition-colors"
-                  >
-                    Sign in
-                  </button>
-                </>
-              ) : (
-                <>
-                  Don&apos;t have an account?{" "}
-                  <button
-                    onClick={() => setIsSignUp(true)}
-                    className="text-[#5e6ad2] hover:text-[#828fff] transition-colors"
-                  >
-                    Sign up
-                  </button>
-                </>
-              )}
-            </p>
-            <p className="text-center text-sm text-[#62666d]">
-              <a
-                href={process.env.NEXT_PUBLIC_WEBSITE_URL || "/"}
-                className="text-[#8a8f98] hover:text-[#d0d6e0] transition-colors"
-              >
-                Back to homepage
-              </a>
-            </p>
-          </div>
+          <p className="text-center text-sm text-[#8a8f98]">
+            {isSignUp ? (
+              <>
+                Already have an account?{" "}
+                <button
+                  onClick={() => setIsSignUp(false)}
+                  className="text-[#5e6ad2] hover:text-[#828fff] transition-colors"
+                >
+                  Sign in
+                </button>
+              </>
+            ) : (
+              <>
+                Don&apos;t have an account?{" "}
+                <button
+                  onClick={() => setIsSignUp(true)}
+                  className="text-[#5e6ad2] hover:text-[#828fff] transition-colors"
+                >
+                  Sign up
+                </button>
+              </>
+            )}
+          </p>
         }
       >
         {expired && !isSignUp && (

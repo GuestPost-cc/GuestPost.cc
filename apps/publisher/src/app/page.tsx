@@ -216,7 +216,7 @@ function LoginContent() {
       const returnTo = searchParams.get("returnTo")
       const safeReturnTo =
         returnTo && returnTo !== "/" ? returnTo : "/dashboard"
-      router.push(safeReturnTo)
+      window.location.href = safeReturnTo
     } catch (err: any) {
       setError(
         isAuthError(err)
@@ -273,7 +273,7 @@ function LoginContent() {
       const returnTo = searchParams.get("returnTo")
       const safeReturnTo =
         returnTo && returnTo !== "/" ? returnTo : "/dashboard"
-      router.push(safeReturnTo)
+      window.location.href = safeReturnTo
     } catch (err: any) {
       setError(
         isAuthError(err)
