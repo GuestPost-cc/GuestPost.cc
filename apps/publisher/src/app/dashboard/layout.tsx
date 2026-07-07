@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Notifications } from "../../components/notifications"
 import { useAuth } from "../../lib/auth"
 
@@ -46,8 +46,15 @@ export default function DashboardLayout({
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  const hasSeenLoadingFalse = useRef(false)
+
   useEffect(() => {
-    if (!loading && !user) router.push("/")
+    if (loading) return
+    if (!hasSeenLoadingFalse.current) {
+      hasSeenLoadingFalse.current = true
+      return
+    }
+    if (!user) router.push("/")
   }, [user, loading, router])
 
   // Pathname-auto-close — closes mobile drawer on navigation

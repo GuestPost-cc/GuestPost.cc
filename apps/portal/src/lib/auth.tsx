@@ -59,22 +59,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       })
       if (res.ok) {
         const me = await res.json()
-        // Guard: if the token changed during this request (e.g. a newer
-        // signIn/signUp happened), discard the stale result.
         if (getToken() !== token) return
-        // Same gate as signIn: a restored PUBLISHER/STAFF session must not
-        // land in the customer portal.
         if (me.userType === "CUSTOMER") {
           setUser(me)
           return
         }
-        // Wrong-audience token must not linger in this app's storage
         clearToken()
       }
     } catch (e) {
       console.error("Session refresh failed:", e)
     }
-    // Only clear user if token is still what we started with
     if (getToken() === token) setUser(null)
   }, [])
 
