@@ -81,7 +81,7 @@ export async function presignGet(
 ): Promise<string> {
   const { client, bucket } = getClient()
   return getSignedUrl(
-    client,
+    client as any,
     new GetObjectCommand({ Bucket: bucket, Key: objectKey }),
     {
       expiresIn: expiresInSeconds,
