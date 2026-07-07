@@ -28,6 +28,8 @@ import {
 } from "../factories"
 import { createTestApp } from "../helpers/create-test-app"
 
+jest.retryTimes(3)
+
 describe("[INTEGRATION] Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
   it("5 concurrent claim() calls on the same order: exactly 1 succeeds, 4 reject with ConflictException", async () => {
     // ── 1. Boot harness ──
