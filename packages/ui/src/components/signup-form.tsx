@@ -32,12 +32,12 @@ export function SignupForm({
   const busy = loading || isSubmitting
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
-        <div className="grid gap-1">
+        <div className="grid gap-2">
           <label
             htmlFor="signup-name"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            className="text-sm text-foreground"
           >
             Full name
           </label>
@@ -56,10 +56,10 @@ export function SignupForm({
             </p>
           )}
         </div>
-        <div className="grid gap-1">
+        <div className="grid gap-2">
           <label
             htmlFor="signup-email"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            className="text-sm text-foreground"
           >
             Email
           </label>
@@ -99,7 +99,7 @@ export function SignupForm({
           <button
             type="button"
             onClick={onToggleMode}
-            className="underline underline-offset-4 hover:text-primary"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             Sign in
           </button>

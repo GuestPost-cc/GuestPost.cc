@@ -40,10 +40,10 @@ export function ForgotPasswordForm({
             Enter your email address and we&apos;ll send you a link to reset
             your password.
           </p>
-          <div className="grid gap-1">
+          <div className="grid gap-2">
             <label
               htmlFor="forgot-email"
-              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              className="text-sm text-foreground"
             >
               Email
             </label>

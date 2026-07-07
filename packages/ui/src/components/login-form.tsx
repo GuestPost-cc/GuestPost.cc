@@ -34,12 +34,12 @@ export function LoginForm({
   const busy = loading || isSubmitting
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-5">
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
-        <div className="grid gap-1">
+        <div className="grid gap-2">
           <label
             htmlFor="login-email"
-            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            className="text-sm text-foreground"
           >
             Email
           </label>
@@ -72,11 +72,11 @@ export function LoginForm({
         </SpinnerButton>
       </form>
 
-      <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex flex-col items-center gap-2 text-sm">
         {forgotPasswordHref && (
           <a
             href={forgotPasswordHref}
-            className="underline underline-offset-4 hover:text-primary"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             Forgot your password?
           </a>
@@ -85,7 +85,7 @@ export function LoginForm({
           <button
             type="button"
             onClick={onToggleMode}
-            className="underline underline-offset-4 hover:text-primary"
+            className="text-muted-foreground hover:text-foreground transition-colors"
           >
             Don&apos;t have an account? Sign up
           </button>

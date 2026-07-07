@@ -1,21 +1,13 @@
 import type * as React from "react"
-import { cn } from "../lib/utils"
 
 export interface AuthLayoutProps {
   children: React.ReactNode
-  logo?: React.ReactNode
 }
 
-export function AuthLayout({ children, logo }: AuthLayoutProps) {
+export function AuthLayout({ children }: AuthLayoutProps) {
   return (
-    <div
-      className={cn(
-        "flex min-h-screen flex-col items-center justify-center",
-        "bg-background",
-      )}
-    >
-      {logo && <div className="mb-8">{logo}</div>}
-      {children}
+    <div className="flex min-h-screen flex-col items-center justify-center bg-background">
+      <div className="mx-auto w-full max-w-sm px-4">{children}</div>
     </div>
   )
 }

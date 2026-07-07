@@ -1,11 +1,4 @@
 import type * as React from "react"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "./card"
 
 export interface AuthCardProps {
   title: string
@@ -21,17 +14,21 @@ export function AuthCard({
   children,
 }: AuthCardProps) {
   return (
-    <Card className="mx-auto w-full sm:w-[400px]">
-      <CardHeader className="text-center">
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent>{children}</CardContent>
+    <div className="rounded-lg border border-border bg-card p-6">
+      <div className="mb-6 text-center">
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          {title}
+        </h1>
+        {description && (
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        )}
+      </div>
+      {children}
       {footer && (
-        <div className="pb-6 text-center text-sm text-muted-foreground">
+        <div className="mt-6 border-t border-border pt-4 text-center text-sm text-muted-foreground">
           {footer}
         </div>
       )}
-    </Card>
+    </div>
   )
 }
