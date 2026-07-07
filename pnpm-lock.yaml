@@ -56,6 +56,9 @@ importers:
       '@guestpost/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@guestpost/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@guestpost/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -259,6 +262,9 @@ importers:
       '@guestpost/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@guestpost/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@guestpost/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -347,6 +353,9 @@ importers:
       '@guestpost/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@guestpost/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@guestpost/database':
         specifier: workspace:*
         version: link:../../packages/database
