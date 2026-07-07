@@ -3,8 +3,8 @@
 import type { AuthError } from "@guestpost/auth"
 import {
   getErrorMessage,
-  getSession,
   isAuthError,
+  getSession as serverGetSession,
   signIn as signInTransport,
 } from "@guestpost/auth/client"
 import {
@@ -42,7 +42,7 @@ function LoginPageInner() {
     // Check if already signed in as staff
     async function checkSession() {
       try {
-        const sessionResult = await getSession()
+        const sessionResult = await serverGetSession()
         if (sessionResult?.user?.userType === "STAFF") {
           router.push(safeReturnTo)
           return
@@ -67,7 +67,8 @@ function LoginPageInner() {
           recoverable: true,
         } as AuthError
       }
-      if (result.user.userType !== "STAFF") {
+      const session = await serverGetSession()
+      if (!session?.user || session.user.userType !== "STAFF") {
         throw {
           code: "WRONG_AUDIENCE",
           message:

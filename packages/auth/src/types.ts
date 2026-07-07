@@ -10,7 +10,7 @@ export interface AuthenticatedUser {
   emailVerified: boolean
   name: string | null
   image: string | null
-  userType: "CUSTOMER" | "PUBLISHER" | "STAFF"
+  userType: "CUSTOMER" | "PUBLISHER" | "STAFF" | undefined
   banned: boolean
 }
 
@@ -21,6 +21,7 @@ export type SignInResult =
       status: "authenticated"
       session: AuthSession
       user: AuthenticatedUser
+      token?: string
     }
   | {
       status: "mfa_required"

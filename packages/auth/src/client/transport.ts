@@ -1,6 +1,7 @@
 import type { AuthError, AuthenticatedUser, SignInResult } from "../types"
 import { authClient } from "./auth-client"
 import { mapBetterAuthError } from "./errors"
+import { getSession as serverGetSession } from "./session"
 
 export async function signIn(input: {
   email: string
@@ -21,19 +22,29 @@ export async function signIn(input: {
     } as AuthError
   }
 
-  const user = data.user as unknown as AuthenticatedUser
-  const session = await authClient.getSession()
+  const session = await serverGetSession()
+
+  const user: AuthenticatedUser = {
+    id: data.user.id,
+    email: data.user.email as string,
+    emailVerified: data.user.emailVerified ?? false,
+    name: data.user.name ?? null,
+    image: null,
+    userType: session.user?.userType,
+    banned: (data.user as any).banned ?? false,
+  }
 
   return {
     status: "authenticated",
-    session: session.data?.session
+    session: session.session
       ? {
-          id: session.data.session.id,
-          userId: session.data.session.userId,
-          expiresAt: new Date(session.data.session.expiresAt),
+          id: session.session.id,
+          userId: session.session.userId,
+          expiresAt: session.session.expiresAt,
         }
       : { id: "", userId: user.id, expiresAt: new Date() },
     user,
+    token: data.token ?? undefined,
   }
 }
 
@@ -58,19 +69,29 @@ export async function signUp(input: {
     } as AuthError
   }
 
-  const user = data.user as unknown as AuthenticatedUser
-  const session = await authClient.getSession()
+  const session = await serverGetSession()
+
+  const user: AuthenticatedUser = {
+    id: data.user.id,
+    email: data.user.email as string,
+    emailVerified: data.user.emailVerified ?? false,
+    name: data.user.name ?? null,
+    image: null,
+    userType: session.user?.userType,
+    banned: (data.user as any).banned ?? false,
+  }
 
   return {
     status: "authenticated",
-    session: session.data?.session
+    session: session.session
       ? {
-          id: session.data.session.id,
-          userId: session.data.session.userId,
-          expiresAt: new Date(session.data.session.expiresAt),
+          id: session.session.id,
+          userId: session.session.userId,
+          expiresAt: session.session.expiresAt,
         }
       : { id: "", userId: user.id, expiresAt: new Date() },
     user,
+    token: data.token ?? undefined,
   }
 }
 

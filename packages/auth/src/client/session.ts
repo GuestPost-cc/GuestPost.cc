@@ -4,12 +4,14 @@ import { authClient } from "./auth-client"
 export async function getSession(): Promise<{
   session: { id: string; userId: string; expiresAt: Date } | null
   user: AuthenticatedUser | null
+  token?: string
 }> {
   const { data, error } = await authClient.getSession()
   if (error || !data) {
     return { session: null, user: null }
   }
 
+  const user = data.user as unknown as AuthenticatedUser
   return {
     session: data.session
       ? {
@@ -18,6 +20,11 @@ export async function getSession(): Promise<{
           expiresAt: new Date(data.session.expiresAt),
         }
       : null,
-    user: data.user ? (data.user as unknown as AuthenticatedUser) : null,
+    user: {
+      ...user,
+      userType: user.userType,
+      banned: user.banned ?? false,
+    },
+    token: data.session?.token,
   }
 }

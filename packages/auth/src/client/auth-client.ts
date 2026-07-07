@@ -1,4 +1,4 @@
-import { createAuthClient } from "better-auth/client"
+import { createAuthClient } from "better-auth/react"
 
 function getBaseUrl(): string {
   const envUrl =
@@ -17,4 +17,5 @@ function getBaseUrl(): string {
 export const authClient = createAuthClient({
   baseURL: getBaseUrl(),
   basePath: "/api/v1/auth",
+  appURL: typeof window !== "undefined" ? window.location.origin : undefined,
 })
