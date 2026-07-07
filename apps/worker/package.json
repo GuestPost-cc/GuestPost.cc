@@ -10,7 +10,7 @@
   "dependencies": {
     "@guestpost/database": "workspace:*",
     "@guestpost/shared": "workspace:*",
-    "@sentry/node": "10.62.0",
+    "@sentry/node": "10.63.0",
     "bullmq": "^5.0.0",
     "dotenv": "^17.4.2",
     "ioredis": "^5.4.0",

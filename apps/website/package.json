@@ -13,7 +13,7 @@
     "@guestpost/api-client": "workspace:*",
     "@guestpost/shared": "workspace:*",
     "@guestpost/ui": "workspace:*",
-    "@sentry/nextjs": "10.62.0",
+    "@sentry/nextjs": "10.63.0",
     "lucide-react": "^1.22.0",
     "next": "^16.2.10",
     "react": "^19.0.0",
