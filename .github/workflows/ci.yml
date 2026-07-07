@@ -13,6 +13,8 @@ env:
   QUEUE_SIGNING_SECRET: ci-only-queue-secret-not-used-in-prod-012345
   BETTER_AUTH_URL: http://localhost:3000
   CORS_ORIGIN: http://localhost:3000
+  OAUTH_STATE_COOKIE_SAMESITE: none
+  OAUTH_STATE_COOKIE_SECURE: "false"
   # Phase 7.7 C — Sentry source-map upload. When SENTRY_AUTH_TOKEN is
   # configured as a repo secret, `pnpm build` uploads source maps for
   # each Next.js app's bundle so production Sentry traces show source-
