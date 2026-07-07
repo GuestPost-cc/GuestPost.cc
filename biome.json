@@ -15,9 +15,6 @@
       "e2e/**/*.{ts,tsx}",
       "*.config.{ts,js,mjs}",
       "*.{ts,js,mjs}"
-    ],
-    "ignore": [
-      "**/next-env.d.ts"
     ]
   },
   "formatter": {
