@@ -89,7 +89,7 @@ export {
   IntegrationSyncStatus,
   IntegrationSyncTrigger,
   POLL_CONFIG,
-} from "@guestpost/integrations"
+} from "@guestpost/integrations/client"
 export type { AuthErrorHandlerConfig } from "./auth-redirect"
 // Phase 6.8 — re-export the shared 401-redirect helpers so apps can build
 // the onAuthError callback without importing from a deep path. See

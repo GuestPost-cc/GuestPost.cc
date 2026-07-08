@@ -1,4 +1,4 @@
-import { IntegrationSyncStatus } from "@guestpost/integrations"
+import { IntegrationSyncStatus } from "@guestpost/integrations/client"
 import { cn } from "../../../lib/utils"
 
 interface SyncProgressProps {

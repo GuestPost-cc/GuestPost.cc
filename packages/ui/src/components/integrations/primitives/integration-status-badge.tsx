@@ -1,4 +1,4 @@
-import { IntegrationStatus } from "@guestpost/integrations"
+import { IntegrationStatus } from "@guestpost/integrations/client"
 import { cn } from "../../../lib/utils"
 import type { BadgeProps } from "../../badge"
 import { Badge } from "../../badge"

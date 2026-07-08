@@ -1,4 +1,4 @@
-import { IntegrationProvider } from "@guestpost/integrations"
+import { IntegrationProvider } from "@guestpost/integrations/client"
 import type { LucideIcon } from "lucide-react"
 import { BarChart3, Globe, Search } from "lucide-react"
 import { cn } from "../../../lib/utils"
