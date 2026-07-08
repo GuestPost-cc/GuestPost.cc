@@ -54,6 +54,21 @@ export class WebsitesController {
   }
 
   @MemberRoles("PUBLISHER_OWNER")
+  @Get(":id")
+  async getWebsite(
+    @Param("publisherId") publisherId: string,
+    @Param("id") id: string,
+    @CurrentUser() user: any,
+  ) {
+    const resolvedPublisherId = this.resolvePublisherId(publisherId, user)
+    return this.websitesService.getWebsiteById(
+      resolvedPublisherId,
+      user.publisherOrganizationId,
+      id,
+    )
+  }
+
+  @MemberRoles("PUBLISHER_OWNER")
   @Post()
   async createWebsite(
     @Param("publisherId") publisherId: string,

@@ -12,7 +12,7 @@
       "packages/*/src/**/*.{js,jsx,ts,tsx,mjs,cjs}",
       "!packages/database/src/prisma",
       "!apps/**/next-env.d.ts",
-      "!apps/**/.next/types/**",
+      "!apps/**/.next/types",
       "scripts/**/*.{ts,js,mjs}",
       "e2e/**/*.{ts,tsx}",
       "*.config.{ts,js,mjs}",

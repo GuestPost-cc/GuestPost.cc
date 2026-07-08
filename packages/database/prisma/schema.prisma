@@ -223,6 +223,56 @@ enum VerificationStatus {
   DISPUTED
 }
 
+enum IntegrationOwnerType {
+  PUBLISHER
+  PLATFORM
+}
+
+enum IntegrationProvider {
+  GOOGLE_SEARCH_CONSOLE
+  GOOGLE_ANALYTICS
+  BING_WEBMASTER
+}
+
+enum IntegrationStatus {
+  PENDING
+  DISCOVERING
+  ACTIVE
+  TOKEN_EXPIRED
+  REAUTH_REQUIRED
+  DISCONNECTED
+  ERROR
+}
+
+enum WebsiteIntegrationStatus {
+  CONNECTED
+  SYNCING
+  OUT_OF_SYNC
+  REMOVED
+  DISABLED
+}
+
+enum IntegrationSyncStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum IntegrationSyncTrigger {
+  MANUAL
+  SCHEDULED
+  OAUTH
+}
+
+enum GooglePermissionLevel {
+  siteOwner
+  siteFullUser
+  siteLimitedUser
+  siteAssociate
+  none
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -498,6 +548,7 @@ model Website {
   orders              Order[]
   orderItems          OrderItem[]
   marketplaceListings MarketplaceListing[]
+  websiteIntegrations    WebsiteIntegration[]
 
   @@index([publisherId])
   @@index([isActive])
@@ -1811,4 +1862,112 @@ model PlatformSettings {
   platformFeePct Decimal  @default(20)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+}
+
+// ─── Integration Domain ─────────────────────────────────────────────────────
+
+model PublisherIntegration {
+  id                  String               @id @default(cuid())
+  ownerType           IntegrationOwnerType @default(PUBLISHER)
+  ownerId             String
+  provider            IntegrationProvider
+  providerAccountId   String
+  status              IntegrationStatus    @default(PENDING)
+  lastSyncAt          DateTime?
+  discoveredAt        DateTime?
+  discoveredResources Json?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  credentials         IntegrationCredential?
+  websiteIntegrations WebsiteIntegration[]
+  syncs               IntegrationSync[]
+
+  @@unique([provider, providerAccountId])
+  @@index([ownerType, ownerId])
+  @@index([status])
+}
+
+model IntegrationCredential {
+  id                String   @id @default(cuid())
+  integrationId     String   @unique
+  encryptedAccessToken  String
+  encryptedRefreshToken String
+  encryptedTokensVersion Int    @default(1)
+  tokenExpiresAt    DateTime
+  scopes            String[] // array of granted scopes
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  integration PublisherIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+}
+
+model WebsiteIntegration {
+  id            String                   @id @default(cuid())
+  integrationId String
+  websiteId     String
+  propertyUrl   String                   // GSC property URL
+  permissionLevel GooglePermissionLevel  @default(none)
+  status        WebsiteIntegrationStatus @default(CONNECTED)
+  syncedAt      DateTime?
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  integration PublisherIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  website                  Website           @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+
+  @@unique([integrationId, propertyUrl])
+  @@index([websiteId])
+  @@index([status])
+}
+
+model IntegrationSync {
+  id                String              @id @default(cuid())
+  integrationId     String
+  status            IntegrationSyncStatus @default(PENDING)
+  trigger           IntegrationSyncTrigger @default(MANUAL)
+  recordsProcessed  Int                  @default(0)
+  recordsExpected   Int                  @default(0)
+  itemsCompleted    Int                  @default(0)
+  itemsTotal        Int                  @default(0)
+  errorMessage      String?
+  startedAt         DateTime             @default(now())
+  completedAt       DateTime?
+
+  integration PublisherIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model WebsiteSearchDaily {
+  id          String   @id @default(cuid())
+  websiteId   String
+  date        DateTime @db.Date
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  ctr         Float    @default(0)
+  position    Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([websiteId, date])
+  @@index([websiteId, date])
+}
+
+model WebsitePageSearchDaily {
+  id          String   @id @default(cuid())
+  websiteId   String
+  pageUrl     String
+  date        DateTime @db.Date
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  ctr         Float    @default(0)
+  position    Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([websiteId, pageUrl, date])
+  @@index([websiteId, date])
 }

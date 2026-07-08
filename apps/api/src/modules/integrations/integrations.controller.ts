@@ -1,4 +1,11 @@
-import { IntegrationError } from "@guestpost/integrations"
+import {
+  connectCallbackRequestSchema,
+  connectRequestSchema,
+  IntegrationError,
+  linkPropertyRequestSchema,
+  triggerDiscoveryRequestSchema,
+  triggerSyncRequestSchema,
+} from "@guestpost/integrations"
 import {
   Body,
   Controller,
@@ -13,25 +20,15 @@ import {
 } from "@nestjs/common"
 import { Request } from "express"
 import { Public } from "../../common/decorators/public.decorator"
-import type {
-  ConnectCallbackRequest,
-  ConnectRequest,
-  DisconnectRequest,
-  LinkPropertyRequest,
-  TriggerSyncRequest,
-} from "./dto/integrations.dto"
-import {
-  ConnectCallbackRequestSchema,
-  ConnectRequestSchema,
-  DisconnectRequestSchema,
-  LinkPropertyRequestSchema,
-  TriggerSyncRequestSchema,
-} from "./dto/integrations.dto"
 import { IntegrationsService } from "./integrations.service"
+import { OwnerResolver } from "./owner-resolver.service"
 
 @Controller("integrations")
 export class IntegrationsController {
-  constructor(private readonly service: IntegrationsService) {}
+  constructor(
+    private readonly service: IntegrationsService,
+    private readonly ownerResolver: OwnerResolver,
+  ) {}
 
   @Post(":provider/connect")
   async initiateConnect(
@@ -39,16 +36,16 @@ export class IntegrationsController {
     @Body() body: unknown,
     @Req() req: Request,
   ) {
-    const parsed = ConnectRequestSchema.safeParse(body)
+    const parsed = connectRequestSchema.safeParse(body)
     if (!parsed.success) {
       throw new IntegrationError("INVALID_REQUEST", "Invalid request body")
     }
-    const data = parsed.data as ConnectRequest
-    const publisherId = (req as any).user?.publisherId ?? (req as any).user?.sub
-    if (!publisherId) {
-      throw new IntegrationError("UNAUTHORIZED", "Publisher not found")
-    }
-    return this.service.initiateConnect(publisherId, provider, data.returnUrl)
+    const { returnUrl } = parsed.data
+    return this.service.initiateConnect(
+      this.ownerResolver.resolve(req),
+      provider,
+      returnUrl ?? "/dashboard",
+    )
   }
 
   @Public()
@@ -57,15 +54,15 @@ export class IntegrationsController {
     @Param("provider") provider: string,
     @Query() query: unknown,
   ) {
-    const parsed = ConnectCallbackRequestSchema.safeParse(query)
+    const parsed = connectCallbackRequestSchema.safeParse(query)
     if (!parsed.success) {
       throw new IntegrationError("INVALID_REQUEST", "Invalid callback params")
     }
-    const data = parsed.data as ConnectCallbackRequest
-    if (data.error) {
-      throw new IntegrationError("OAUTH_ERROR", data.error)
+    const { code, state, error } = parsed.data
+    if (error) {
+      throw new IntegrationError("OAUTH_ERROR", error)
     }
-    return this.service.handleCallback(provider, data.code, data.state)
+    return this.service.handleCallback(provider, code!, state!)
   }
 
   @Get()
@@ -76,26 +73,11 @@ export class IntegrationsController {
     @Query("provider") provider?: string,
     @Req() req?: Request,
   ) {
-    const publisherId =
-      (req as any)?.user?.publisherId ?? (req as any)?.user?.sub
-    if (!publisherId)
-      throw new IntegrationError("UNAUTHORIZED", "Publisher not found")
     return this.service.listIntegrations(
-      publisherId,
+      this.ownerResolver.resolve(req!),
       page ? Number(page) : 1,
       pageSize ? Number(pageSize) : 20,
     )
-  }
-
-  @Get("available")
-  async discoverAvailableProperties(
-    @Query("integrationId") integrationId: string,
-    @Req() req: Request,
-  ) {
-    const publisherId = (req as any).user?.publisherId ?? (req as any).user?.sub
-    if (!publisherId)
-      throw new IntegrationError("UNAUTHORIZED", "Publisher not found")
-    return this.service.discoverAvailableProperties(publisherId, integrationId)
   }
 
   @Get(":integrationId")
@@ -103,10 +85,37 @@ export class IntegrationsController {
     @Param("integrationId") integrationId: string,
     @Req() req: Request,
   ) {
-    const publisherId = (req as any).user?.publisherId ?? (req as any).user?.sub
-    if (!publisherId)
-      throw new IntegrationError("UNAUTHORIZED", "Publisher not found")
-    return this.service.getIntegration(publisherId, integrationId)
+    return this.service.getIntegration(
+      this.ownerResolver.resolve(req),
+      integrationId,
+    )
+  }
+
+  @Post(":integrationId/discover")
+  async triggerDiscovery(
+    @Param("integrationId") integrationId: string,
+    @Body() body: unknown,
+    @Req() req: Request,
+  ) {
+    const parsed = triggerDiscoveryRequestSchema.safeParse(body)
+    if (!parsed.success) {
+      throw new IntegrationError("INVALID_REQUEST", "Invalid request body")
+    }
+    return this.service.enqueueDiscovery(
+      this.ownerResolver.resolve(req),
+      integrationId,
+    )
+  }
+
+  @Get(":integrationId/resources")
+  async getCachedResources(
+    @Param("integrationId") integrationId: string,
+    @Req() req: Request,
+  ) {
+    return this.service.getCachedResources(
+      this.ownerResolver.resolve(req),
+      integrationId,
+    )
   }
 
   @Post(":integrationId/link")
@@ -115,19 +124,30 @@ export class IntegrationsController {
     @Body() body: unknown,
     @Req() req: Request,
   ) {
-    const parsed = LinkPropertyRequestSchema.safeParse(body)
+    const parsed = linkPropertyRequestSchema.safeParse(body)
     if (!parsed.success) {
       throw new IntegrationError("INVALID_REQUEST", "Invalid request body")
     }
-    const data = parsed.data as LinkPropertyRequest
-    const publisherId = (req as any).user?.publisherId ?? (req as any).user?.sub
-    if (!publisherId)
-      throw new IntegrationError("UNAUTHORIZED", "Publisher not found")
+    const { externalId, websiteId } = parsed.data
     return this.service.linkProperty(
-      publisherId,
+      this.ownerResolver.resolve(req),
       integrationId,
-      data.websiteId,
-      data.propertyUrl,
+      websiteId!,
+      externalId!,
+    )
+  }
+
+  @Delete(":integrationId/link/:websiteIntegrationId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async unlinkProperty(
+    @Param("integrationId") integrationId: string,
+    @Param("websiteIntegrationId") websiteIntegrationId: string,
+    @Req() req: Request,
+  ) {
+    await this.service.unlinkProperty(
+      this.ownerResolver.resolve(req),
+      integrationId,
+      websiteIntegrationId,
     )
   }
 
@@ -138,15 +158,21 @@ export class IntegrationsController {
     @Body() body: unknown,
     @Req() req: Request,
   ) {
-    const parsed = TriggerSyncRequestSchema.safeParse(body)
+    const parsed = triggerSyncRequestSchema.safeParse(body)
     if (!parsed.success) {
       throw new IntegrationError("INVALID_REQUEST", "Invalid request body")
     }
-    const data = parsed.data as TriggerSyncRequest
-    const publisherId = (req as any).user?.publisherId ?? (req as any).user?.sub
-    if (!publisherId)
-      throw new IntegrationError("UNAUTHORIZED", "Publisher not found")
-    return this.service.triggerSync(publisherId, integrationId, data)
+    const { trigger, propertyUrl, startDate, endDate } = parsed.data
+    return this.service.triggerSync(
+      this.ownerResolver.resolve(req),
+      integrationId,
+      {
+        trigger: trigger!,
+        propertyUrl,
+        startDate,
+        endDate,
+      },
+    )
   }
 
   @Get(":integrationId/sync/history")
@@ -160,33 +186,31 @@ export class IntegrationsController {
     @Query("dateTo") dateTo?: string,
     @Req() req?: Request,
   ) {
-    const publisherId =
-      (req as any)?.user?.publisherId ?? (req as any)?.user?.sub
-    if (!publisherId)
-      throw new IntegrationError("UNAUTHORIZED", "Publisher not found")
-    return this.service.getSyncHistory(publisherId, integrationId, {
-      page: page ? Number(page) : 1,
-      pageSize: pageSize ? Number(pageSize) : 20,
-      filters: { status, trigger, dateFrom, dateTo },
-    })
+    return this.service.getSyncHistory(
+      this.ownerResolver.resolve(req!),
+      integrationId,
+      {
+        page: page ? Number(page) : 1,
+        pageSize: pageSize ? Number(pageSize) : 20,
+        filters: { status, trigger, dateFrom, dateTo },
+      },
+    )
   }
 
-  @Get("sync/:syncId")
+  @Get("syncs/:syncId")
   async getSyncStatus(@Param("syncId") syncId: string) {
     return this.service.getSyncStatus(syncId)
   }
 
-  @Delete()
+  @Delete(":integrationId")
   @HttpCode(HttpStatus.NO_CONTENT)
-  async disconnect(@Body() body: unknown, @Req() req: Request) {
-    const parsed = DisconnectRequestSchema.safeParse(body)
-    if (!parsed.success) {
-      throw new IntegrationError("INVALID_REQUEST", "Invalid request body")
-    }
-    const data = parsed.data as DisconnectRequest
-    const publisherId = (req as any).user?.publisherId ?? (req as any).user?.sub
-    if (!publisherId)
-      throw new IntegrationError("UNAUTHORIZED", "Publisher not found")
-    await this.service.disconnect(publisherId, data.integrationId)
+  async disconnect(
+    @Param("integrationId") integrationId: string,
+    @Req() req: Request,
+  ) {
+    await this.service.disconnect(
+      this.ownerResolver.resolve(req),
+      integrationId,
+    )
   }
 }

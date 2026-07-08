@@ -385,6 +385,127 @@ export class WebsitesService {
     return updated
   }
 
+  async getWebsiteById(
+    publisherId: string,
+    organizationId: string,
+    websiteId: string,
+  ) {
+    const publisher = await this.prisma.publisher.findUnique({
+      where: { id: publisherId },
+    })
+    if (!publisher || publisher.organizationId !== organizationId) {
+      throw new NotFoundException("Publisher not found")
+    }
+
+    const website = await this.prisma.website.findFirst({
+      where: { id: websiteId, publisherId },
+      include: {
+        websiteIntegrations: {
+          include: {
+            integration: true,
+          },
+        },
+      },
+    })
+
+    if (!website) {
+      throw new NotFoundException("Website not found")
+    }
+
+    const gscIntegrationRecord =
+      await this.prisma.publisherIntegration.findFirst({
+        where: {
+          ownerType: "PUBLISHER",
+          ownerId: publisherId,
+          provider: "GOOGLE_SEARCH_CONSOLE",
+        },
+      })
+    const gscAccountExists = !!gscIntegrationRecord
+
+    const gscIntegration = website.websiteIntegrations.find(
+      (wi) => wi.integration.provider === "GOOGLE_SEARCH_CONSOLE",
+    )
+
+    let lastSuccessfulSyncAt: string | null = null
+    let lastSyncAttemptAt: string | null = null
+    let lastSyncAttemptStatus: string | null = null
+    let lastSyncError: string | null = null
+
+    if (gscIntegration) {
+      const syncs = await this.prisma.integrationSync.findMany({
+        where: { integrationId: gscIntegration.integrationId },
+        orderBy: { startedAt: "desc" },
+        take: 10,
+      })
+      lastSyncAttemptAt = syncs[0]?.startedAt.toISOString() ?? null
+      lastSyncAttemptStatus = syncs[0]?.status ?? null
+      lastSyncError = syncs[0]?.errorMessage ?? null
+
+      const successful = syncs.find((s) => s.status === "COMPLETED")
+      lastSuccessfulSyncAt = successful?.completedAt?.toISOString() ?? null
+    }
+
+    const seoIntegration = gscIntegration
+      ? {
+          linked: true,
+          integrationId: gscIntegration.integration.id,
+          provider: gscIntegration.integration.provider,
+          integrationStatus: gscIntegration.integration.status,
+          propertyUrl: gscIntegration.propertyUrl,
+          permissionLevel: gscIntegration.permissionLevel,
+          websiteIntegrationId: gscIntegration.id,
+          websiteIntegrationStatus: gscIntegration.status,
+          lastSyncedAt: gscIntegration.syncedAt?.toISOString() ?? null,
+          lastSuccessfulSyncAt,
+          lastSyncAttemptAt,
+          lastSyncAttemptStatus,
+          lastSyncError,
+          syncInProgress: gscIntegration.status === "SYNCING",
+          needsReauth:
+            gscIntegration.integration.status === "TOKEN_EXPIRED" ||
+            gscIntegration.integration.status === "REAUTH_REQUIRED",
+        }
+      : null
+
+    const { websiteIntegrations, ...rest } = website
+
+    return {
+      ...rest,
+      verifiedAt: rest.verifiedAt?.toISOString() ?? null,
+      lastVerificationCheckAt:
+        rest.lastVerificationCheckAt?.toISOString() ?? null,
+      lastSuccessfulVerificationAt:
+        rest.lastSuccessfulVerificationAt?.toISOString() ?? null,
+      createdAt: rest.createdAt.toISOString(),
+      updatedAt: rest.updatedAt.toISOString(),
+      websiteIntegrations: websiteIntegrations.map((wi) => ({
+        id: wi.id,
+        integrationId: wi.integrationId,
+        websiteId: wi.websiteId,
+        propertyUrl: wi.propertyUrl,
+        permissionLevel: wi.permissionLevel,
+        status: wi.status,
+        syncedAt: wi.syncedAt?.toISOString() ?? null,
+        integration: {
+          id: wi.integration.id,
+          provider: wi.integration.provider,
+          status: wi.integration.status,
+          lastSyncAt: wi.integration.lastSyncAt?.toISOString() ?? null,
+        },
+      })),
+      seoIntegration,
+      gscAccountExists,
+      gscIntegration: gscIntegrationRecord
+        ? {
+            id: gscIntegrationRecord.id,
+            provider: gscIntegrationRecord.provider,
+            status: gscIntegrationRecord.status,
+            lastSyncAt: gscIntegrationRecord.lastSyncAt?.toISOString() ?? null,
+          }
+        : null,
+    }
+  }
+
   async getWebsites(publisherId: string, organizationId: string) {
     const publisher = await this.prisma.publisher.findUnique({
       where: { id: publisherId },

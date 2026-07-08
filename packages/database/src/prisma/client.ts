@@ -344,3 +344,33 @@ export type ListingFulfillmentRule = Prisma.ListingFulfillmentRuleModel
  * 
  */
 export type PlatformSettings = Prisma.PlatformSettingsModel
+/**
+ * Model PublisherIntegration
+ * 
+ */
+export type PublisherIntegration = Prisma.PublisherIntegrationModel
+/**
+ * Model IntegrationCredential
+ * 
+ */
+export type IntegrationCredential = Prisma.IntegrationCredentialModel
+/**
+ * Model WebsiteIntegration
+ * 
+ */
+export type WebsiteIntegration = Prisma.WebsiteIntegrationModel
+/**
+ * Model IntegrationSync
+ * 
+ */
+export type IntegrationSync = Prisma.IntegrationSyncModel
+/**
+ * Model WebsiteSearchDaily
+ * 
+ */
+export type WebsiteSearchDaily = Prisma.WebsiteSearchDailyModel
+/**
+ * Model WebsitePageSearchDaily
+ * 
+ */
+export type WebsitePageSearchDaily = Prisma.WebsitePageSearchDailyModel

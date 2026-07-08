@@ -35,6 +35,7 @@ import {
   ShieldX,
   Star,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
@@ -243,6 +244,7 @@ function WebsiteDialog({
 }
 
 export default function WebsitesPage() {
+  const router = useRouter()
   const [search, setSearch] = useState("")
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [editingWebsite, setEditingWebsite] = useState<Website | null>(null)
@@ -480,7 +482,18 @@ export default function WebsitesPage() {
             </TableHeader>
             <TableBody>
               {filteredWebsites.map((site) => (
-                <TableRow key={site.id}>
+                <TableRow
+                  key={site.id}
+                  className="cursor-pointer"
+                  onClick={() => router.push(`/dashboard/websites/${site.id}`)}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault()
+                      router.push(`/dashboard/websites/${site.id}`)
+                    }
+                  }}
+                >
                   <TableCell>
                     <div className="flex flex-col">
                       <a
@@ -554,7 +567,10 @@ export default function WebsitesPage() {
                           size="icon"
                           title="Verify domain ownership (DNS TXT)"
                           disabled={verifyMutation.isPending}
-                          onClick={() => verifyMutation.mutate(site)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            verifyMutation.mutate(site)
+                          }}
                         >
                           <ShieldCheck className="h-4 w-4" />
                         </Button>
@@ -564,7 +580,10 @@ export default function WebsitesPage() {
                           variant="ghost"
                           size="icon"
                           title="Submit for Review"
-                          onClick={() => submitMutation.mutate(site.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            submitMutation.mutate(site.id)
+                          }}
                         >
                           <CheckCircle className="h-4 w-4" />
                         </Button>
@@ -572,14 +591,20 @@ export default function WebsitesPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setEditingWebsite(site)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setEditingWebsite(site)
+                        }}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => archiveMutation.mutate(site.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          archiveMutation.mutate(site.id)
+                        }}
                       >
                         <Archive className="h-4 w-4" />
                       </Button>

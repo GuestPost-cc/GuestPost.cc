@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@guestpost/integrations": "workspace:*",
     "@guestpost/shared": "workspace:*"
   },
   "devDependencies": {

@@ -60,3 +60,49 @@ Plus a separate dedicated template DB (NOT `guestpost`) decouples integration te
 **Impact:** Phase 7.10.2 ships the harness with TEMPLATE-clone. Gate 0.5 verified 8 parallel clones succeed in 1139ms wall time, so the integration jest project can use default `--maxWorkers`. Operator action: one-time `guestpost_test_template` setup on CI runner (deferred to Phase 7.10.2.1 fast-follow). All future integration specs use `createTestDatabase()` helper.
 
 **Related files:** [[infrastructure]] "Test DB management" section; `apps/api/src/__tests__/integration/helpers/test-db.ts`; `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 (Phase 7.10.2 entry).
+
+### 2026-07-08, Generalized Integration Ownership Model
+
+**Decision:** Replace `publisherId` on `PublisherIntegration` with a generic `OwnerContext { ownerType, ownerId }` interface.
+
+**Why:** The platform needs to support both publisher-owned and platform-owned (GuestPost Operations) websites with GSC integrations. Overloading `publisherId` with nullable semantics was fragile. A generalized owner model (PUBLISHER / PLATFORM, with room for ORGANIZATION / TEAM / AGENCY later) keeps all OAuth, discovery, sync, and provider code unchanged while cleanly supporting admin-managed integrations.
+
+**Impact:**
+- `PublisherIntegration.ownerType` + `ownerId` replace `publisherId` + Publisher relation
+- All core services accept `OwnerContext` instead of `publisherId`
+- `OwnerResolver` NestJS service extracts `OwnerContext` from JWT (currently always PUBLISHER; future admin routes resolve PLATFORM)
+- OAuth flow, BullMQ workers, provider implementations, api-client, hooks — unchanged
+- Prisma migration needed: `pnpm db:migrate` when database is available
+
+**Related files:**
+- `packages/integrations/src/types.ts` — `IntegrationOwnerType` enum, `OwnerContext` interface
+- `packages/integrations/src/services/*.service.ts` — all methods accept `owner: OwnerContext`
+- `apps/api/src/modules/integrations/owner-resolver.service.ts` — central owner resolution
+- `apps/api/src/modules/integrations/integrations.controller.ts` — uses `OwnerResolver`
+- `packages/database/prisma/schema.prisma` — `IntegrationOwnerType` enum, updated `PublisherIntegration` model
+
+---
+
+### 2026-07-08, Phase 5C / 5D Boundary — Integration Management vs SEO Reporting
+
+**Decision:** Split the website detail page work into two distinct phases. Phase 5C covers the integration management workflow only (connect, link, unlink, sync, disconnect, integration health). Phase 5D covers the SEO reporting pipeline (GSC Search Analytics API ingestion, `WebsiteSearchDaily` population, reporting endpoints, KPI cards, trend charts).
+
+**Why:** The two deliverables have different bounded contexts and testability requirements. Integration management is primarily a UI/UX concern with backend orchestration. SEO reporting requires implementing real Google Search Analytics API calls, pagination, date windows, UPSERT logic, deduplication, retries, and historical imports — a substantial backend feature. Mixing them would increase scope and delay both.
+
+**Impact:**
+- Phase 5C delivers: website detail page, integration health summary, link/unlink/sync/disconnect, sync history, SEO metrics placeholder with intentional onboarding copy (no placeholder KPI cards)
+- Phase 5D deliverable: real GSC Search Analytics API in provider, `WebsiteSearchDaily` writes, reporting API, SEO metric KPI cards, trend charts
+- `seoIntegration` returns `lastSyncAttemptAt` vs `lastSuccessfulSyncAt` distinction
+- Disconnect disabled while discovery/sync running
+- Link Property dialog has a confirm step (select → confirm → link)
+- Website list rows navigable to detail page (clickable rows, keyboard accessible)
+- Post-disconnect invalidates website list
+
+**Related files:**
+- `apps/api/src/modules/websites/websites.service.ts` — `getWebsiteById()` with `seoIntegration` + `gscIntegration`
+- `apps/api/src/modules/websites/websites.controller.ts` — `@Get(":id")` handler
+- `packages/api-client/src/services/publishers.ts` — `getWebsite()` method
+- `apps/publisher/src/lib/hooks/websites.ts` — `useWebsite()` hook
+- `apps/publisher/src/app/dashboard/websites/[id]/page.tsx` — website detail page
+- `apps/publisher/src/app/dashboard/websites/page.tsx` — clickable rows
+- `bedrock/Work/NOW.md` — phase boundaries documented

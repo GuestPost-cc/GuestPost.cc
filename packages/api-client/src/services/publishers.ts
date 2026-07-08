@@ -7,6 +7,10 @@ export class PublishersService {
     return this.client.get(`/publishers/${publisherId}/websites`)
   }
 
+  getWebsite(publisherId: string, websiteId: string): Promise<any> {
+    return this.client.get(`/publishers/${publisherId}/websites/${websiteId}`)
+  }
+
   addWebsite(publisherId: string, data: any): Promise<any> {
     return this.client.post(`/publishers/${publisherId}/websites`, {
       json: data,

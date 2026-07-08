@@ -33,6 +33,11 @@ const navItems = [
     label: "Payout Methods",
     icon: CreditCard,
   },
+  {
+    href: "/dashboard/settings/integrations",
+    label: "Integrations",
+    icon: Globe,
+  },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
 

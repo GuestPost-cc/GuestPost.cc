@@ -288,6 +288,77 @@ export const VerificationStatus = {
 export type VerificationStatus = (typeof VerificationStatus)[keyof typeof VerificationStatus]
 
 
+export const IntegrationOwnerType = {
+  PUBLISHER: 'PUBLISHER',
+  PLATFORM: 'PLATFORM'
+} as const
+
+export type IntegrationOwnerType = (typeof IntegrationOwnerType)[keyof typeof IntegrationOwnerType]
+
+
+export const IntegrationProvider = {
+  GOOGLE_SEARCH_CONSOLE: 'GOOGLE_SEARCH_CONSOLE',
+  GOOGLE_ANALYTICS: 'GOOGLE_ANALYTICS',
+  BING_WEBMASTER: 'BING_WEBMASTER'
+} as const
+
+export type IntegrationProvider = (typeof IntegrationProvider)[keyof typeof IntegrationProvider]
+
+
+export const IntegrationStatus = {
+  PENDING: 'PENDING',
+  DISCOVERING: 'DISCOVERING',
+  ACTIVE: 'ACTIVE',
+  TOKEN_EXPIRED: 'TOKEN_EXPIRED',
+  REAUTH_REQUIRED: 'REAUTH_REQUIRED',
+  DISCONNECTED: 'DISCONNECTED',
+  ERROR: 'ERROR'
+} as const
+
+export type IntegrationStatus = (typeof IntegrationStatus)[keyof typeof IntegrationStatus]
+
+
+export const WebsiteIntegrationStatus = {
+  CONNECTED: 'CONNECTED',
+  SYNCING: 'SYNCING',
+  OUT_OF_SYNC: 'OUT_OF_SYNC',
+  REMOVED: 'REMOVED',
+  DISABLED: 'DISABLED'
+} as const
+
+export type WebsiteIntegrationStatus = (typeof WebsiteIntegrationStatus)[keyof typeof WebsiteIntegrationStatus]
+
+
+export const IntegrationSyncStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  COMPLETED: 'COMPLETED',
+  FAILED: 'FAILED'
+} as const
+
+export type IntegrationSyncStatus = (typeof IntegrationSyncStatus)[keyof typeof IntegrationSyncStatus]
+
+
+export const IntegrationSyncTrigger = {
+  MANUAL: 'MANUAL',
+  SCHEDULED: 'SCHEDULED',
+  OAUTH: 'OAUTH'
+} as const
+
+export type IntegrationSyncTrigger = (typeof IntegrationSyncTrigger)[keyof typeof IntegrationSyncTrigger]
+
+
+export const GooglePermissionLevel = {
+  siteOwner: 'siteOwner',
+  siteFullUser: 'siteFullUser',
+  siteLimitedUser: 'siteLimitedUser',
+  siteAssociate: 'siteAssociate',
+  none: 'none'
+} as const
+
+export type GooglePermissionLevel = (typeof GooglePermissionLevel)[keyof typeof GooglePermissionLevel]
+
+
 export const MembershipStatus = {
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE'

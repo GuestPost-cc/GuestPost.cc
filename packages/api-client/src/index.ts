@@ -1,3 +1,14 @@
+export type {
+  ConnectResponse,
+  DiscoverResourcesResponse,
+  EnqueueDiscoveryResponse,
+  IntegrationListResponse,
+  IntegrationSummary,
+  LinkPropertyResponse,
+  SyncHistoryResponse,
+  SyncJob,
+  TriggerSyncResponse,
+} from "@guestpost/integrations"
 export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, clearToken, getToken, HttpClient, setToken } from "./client"
 export type {
@@ -12,6 +23,8 @@ export { ApiKeysService } from "./services/api-keys"
 export { BillingService } from "./services/billing"
 export { CampaignsService } from "./services/campaigns"
 export { IdentityService } from "./services/identity"
+export { IntegrationsService } from "./services/integrations"
+export { integrationKeys } from "./services/integrations/keys"
 export { MarketplaceService } from "./services/marketplace"
 export type {
   NotificationItem,
@@ -41,6 +54,7 @@ import { ApiKeysService } from "./services/api-keys"
 import { BillingService } from "./services/billing"
 import { CampaignsService } from "./services/campaigns"
 import { IdentityService } from "./services/identity"
+import { IntegrationsService } from "./services/integrations"
 import { MarketplaceService } from "./services/marketplace"
 import { NotificationsService } from "./services/notifications"
 import { OrdersService } from "./services/orders"
@@ -65,8 +79,17 @@ export interface GuestPostApi {
   support: SupportService
   publishers: PublishersService
   notifications: NotificationsService
+  integrations: IntegrationsService
 }
 
+export {
+  IntegrationOwnerType,
+  IntegrationProvider,
+  IntegrationStatus,
+  IntegrationSyncStatus,
+  IntegrationSyncTrigger,
+  POLL_CONFIG,
+} from "@guestpost/integrations"
 export type { AuthErrorHandlerConfig } from "./auth-redirect"
 // Phase 6.8 — re-export the shared 401-redirect helpers so apps can build
 // the onAuthError callback without importing from a deep path. See
@@ -95,5 +118,6 @@ export function createApiClient(config: ApiClientConfig): GuestPostApi {
     support: new SupportService(client),
     publishers: new PublishersService(client),
     notifications: new NotificationsService(client),
+    integrations: new IntegrationsService(client),
   }
 }

@@ -88,6 +88,30 @@ export type {
 } from "./components/fulfillment-channel-badge"
 export { FulfillmentChannelBadge } from "./components/fulfillment-channel-badge"
 export { Input } from "./components/input"
+export type {
+  ConnectButtonProps,
+  IntegrationCardProps,
+  IntegrationStatusBadgeProps,
+  ProviderBadgeProps,
+  ReconnectBannerProps,
+  ResourceTableProps,
+  SyncHistoryTableProps,
+  SyncProgressProps,
+  WebsiteIntegrationListProps,
+} from "./components/integrations"
+// ─── Integration Components ──────────────────────────────────────
+export {
+  ConnectButton,
+  IntegrationCard,
+  IntegrationStatusBadge,
+  PROVIDER_METADATA,
+  ProviderBadge,
+  ReconnectBanner,
+  ResourceTable,
+  SyncHistoryTable,
+  SyncProgress,
+  WebsiteIntegrationList,
+} from "./components/integrations"
 export { KpiCard } from "./components/kpi-card"
 export { Label } from "./components/label"
 export {
