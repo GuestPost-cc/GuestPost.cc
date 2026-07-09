@@ -1,6 +1,10 @@
 export type { AuthCardProps } from "./components/auth-card"
 export { AuthCard } from "./components/auth-card"
-export type { AuthLayoutProps } from "./components/auth-layout"
+export type {
+  AuthLayoutFeature,
+  AuthLayoutProps,
+  AuthLayoutStat,
+} from "./components/auth-layout"
 export { AuthLayout } from "./components/auth-layout"
 export type {
   AuthProvidersProps,

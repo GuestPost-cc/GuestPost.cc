@@ -20,7 +20,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
     return (
       <div className="grid gap-1.5">
         {label && (
-          <label htmlFor={id} className="text-sm font-medium text-[#f7f8f8]">
+          <label htmlFor={id} className="text-sm font-medium text-[#d7dce7]">
             {label}
           </label>
         )}
@@ -37,7 +37,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
           <button
             type="button"
             onClick={() => setVisible((v) => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#62666d] hover:text-[#8a8f98] transition-colors"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#7b8494] transition-colors hover:text-[#d7dce7]"
             aria-label={visible ? "Hide password" : "Show password"}
             tabIndex={-1}
           >
@@ -49,10 +49,10 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
           </button>
         </div>
         {description && !error && (
-          <p className="text-sm text-[#62666d]">{description}</p>
+          <p className="text-sm text-[#8f9aab]">{description}</p>
         )}
         {error && (
-          <p id={`${id}-error`} className="text-sm text-[#e5484d]">
+          <p id={`${id}-error`} className="text-sm text-[#ff7a7f]">
             {error}
           </p>
         )}

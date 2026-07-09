@@ -9,7 +9,12 @@
  *
  * Usage: pnpm tsx scripts/seed.ts   (API must be running on :4000)
  */
-import { prisma } from "../packages/database/src"
+import { loadRootEnv } from "./env"
+
+loadRootEnv({
+  createDevelopmentFromExample: true,
+  required: ["DATABASE_URL"],
+})
 
 const API = process.env.SEED_API_URL ?? "http://localhost:4000"
 const headers: Record<string, string> = {
@@ -92,6 +97,8 @@ async function signIn(email: string, password: string): Promise<string> {
 }
 
 async function main() {
+  const { prisma } = await import("../packages/database/src")
+
   console.log("── Phase 1: users via API (real password hashing)")
   for (const u of USERS) {
     const res = await api("/auth/sign-up/email", {
@@ -108,6 +115,15 @@ async function main() {
         : `  ${u.email}: ${JSON.stringify(res.body).slice(0, 80)}`,
     )
   }
+
+  console.log("── Phase 1b: verify all user emails (bypass API restriction)")
+  for (const u of USERS) {
+    await prisma.user.update({
+      where: { email: u.email },
+      data: { emailVerified: true },
+    })
+  }
+  console.log("  verified 6 users")
 
   console.log(
     "── Phase 2: staff bootstrap via DB (no self-promotion API exists, by design)",
@@ -136,7 +152,7 @@ async function main() {
   console.log("── Phase 3: customer/publisher roles via admin API")
   const adminToken = await signIn("admin@guestpost.local", "Admin123!")
   const usersRes = await api("/admin/users", {}, adminToken)
-  const allUsers: any[] = usersRes.body
+  const allUsers: any[] = usersRes.body.items ?? usersRes.body
   for (const u of USERS.filter((x) => x.type !== "STAFF")) {
     const target = allUsers.find((x) => x.email === u.email)
     if (!target) throw new Error(`User not in admin list: ${u.email}`)
@@ -185,22 +201,43 @@ async function main() {
       : `  invite: ${JSON.stringify(inviteRes.body).slice(0, 100)}`,
   )
 
-  console.log("── Phase 5: fund customer wallet via dev deposit")
-  const walletRes = await api("/billing/wallet", {}, clientToken)
-  const walletId = walletRes.body.id
-  const depositRes = await api(
-    `/billing/wallet/${walletId}/deposit`,
-    {
-      method: "POST",
-      body: JSON.stringify({ amount: 5000, reference: "seed-initial-funding" }),
-    },
-    clientToken,
-  )
   console.log(
-    depositRes.ok
-      ? `  wallet funded: $5000`
-      : `  deposit failed: ${JSON.stringify(depositRes.body).slice(0, 120)}`,
+    "── Phase 5: fund customer wallet via DB (no API deposit endpoint available by default)",
   )
+  const custUser = await prisma.user.findUnique({
+    where: { email: "client@guestpost.local" },
+  })
+  let wallet = await prisma.wallet.findUnique({
+    where: { organizationId: clientOrgId },
+  })
+  if (!wallet) {
+    wallet = await prisma.wallet.create({
+      data: {
+        organizationId: clientOrgId,
+        userId: custUser!.id,
+        availableBalance: 5000,
+        currency: "USD",
+      },
+    })
+  } else {
+    wallet = await prisma.wallet.update({
+      where: { id: wallet.id },
+      data: { availableBalance: { increment: 5000 } },
+    })
+  }
+  await prisma.transaction.upsert({
+    where: { reference: "seed-initial-funding" },
+    create: {
+      walletId: wallet.id,
+      type: "DEPOSIT",
+      amount: 5000,
+      currency: "USD",
+      description: "Seed initial funding",
+      reference: "seed-initial-funding",
+    },
+    update: {},
+  })
+  console.log(`  wallet funded: $5000`)
 
   console.log("── Phase 6: publisher inventory + marketplace content via DB")
   const pubUser = await prisma.user.findUnique({
@@ -295,13 +332,13 @@ async function main() {
       description:
         "High-authority technology publication accepting in-depth guest posts. Dofollow link included, permanent placement.",
       shortDescription: "DR72 tech site, dofollow, permanent",
-      type: "GUEST_POST",
-      price: 250,
+      services: [
+        { serviceType: "GUEST_POST" as const, price: 250, turnaroundDays: 7 },
+      ],
       domainRating: 72,
       traffic: 145000,
       country: "US",
       language: "en",
-      turnaroundDays: 7,
       categoryId: catIds.technology,
       websiteId: siteIds[0],
     },
@@ -311,13 +348,13 @@ async function main() {
       description:
         "Contextual link inserted into existing aged article on Tech Insider.",
       shortDescription: "Link insert in aged content",
-      type: "NICHE_EDIT",
-      price: 180,
+      services: [
+        { serviceType: "NICHE_EDIT" as const, price: 180, turnaroundDays: 5 },
+      ],
       domainRating: 72,
       traffic: 145000,
       country: "US",
       language: "en",
-      turnaroundDays: 5,
       categoryId: catIds.technology,
       websiteId: siteIds[0],
     },
@@ -327,13 +364,13 @@ async function main() {
       description:
         "UK health publication with engaged readership. Editorial review, dofollow link.",
       shortDescription: "DR64 health site, UK audience",
-      type: "GUEST_POST",
-      price: 195,
+      services: [
+        { serviceType: "GUEST_POST" as const, price: 195, turnaroundDays: 10 },
+      ],
       domainRating: 64,
       traffic: 89000,
       country: "UK",
       language: "en",
-      turnaroundDays: 10,
       categoryId: catIds["health-wellness"],
       websiteId: siteIds[1],
     },
@@ -343,27 +380,36 @@ async function main() {
       description:
         "Premium finance publication. Strict editorial standards, high-value placement.",
       shortDescription: "DR78 finance site, premium",
-      type: "GUEST_POST",
-      price: 420,
+      services: [
+        { serviceType: "GUEST_POST" as const, price: 420, turnaroundDays: 14 },
+      ],
       domainRating: 78,
       traffic: 210000,
       country: "US",
       language: "en",
-      turnaroundDays: 14,
       categoryId: catIds.finance,
       websiteId: siteIds[2],
     },
   ]
   for (const l of listings) {
+    const { services, ...listingFields } = l
     await prisma.marketplaceListing.upsert({
       where: { slug: l.slug },
       create: {
-        ...l,
-        type: l.type as any,
+        ...listingFields,
         status: "APPROVED",
         fulfillmentType: "PUBLISHER",
         publisherId,
         publishedAt: new Date(),
+        services: {
+          create: services.map((s) => ({
+            serviceType: s.serviceType,
+            price: s.price,
+            turnaroundDays: s.turnaroundDays,
+            currency: "USD",
+            revisionRounds: 2,
+          })),
+        },
       },
       update: { status: "APPROVED", publisherId, websiteId: l.websiteId },
     })

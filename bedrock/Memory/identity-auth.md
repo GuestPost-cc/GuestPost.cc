@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: identity-auth
 project: guestpost-platform
-updated: 2026-06-11
+updated: 2026-07-10
 ---
 
 # Identity & Auth
@@ -42,6 +42,12 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 - `StaffMembership` — STAFF membership with explicit `permissions` JSON field for sensitive permissions (e.g., `FINANCIAL_DATA_DECRYPT`)
 - `ApiKey`, `Team`
 
+## Frontend Auth Entry Points
+
+- `apps/portal/src/app/page.tsx` is the CUSTOMER portal login/signup route. It keeps the existing auth flow through `@guestpost/auth/client`, hydrates the API bearer token with `setToken`, validates `session.user.userType === "CUSTOMER"`, and redirects to the safe `returnTo` or `/dashboard`.
+- `apps/publisher/src/app/page.tsx` is the PUBLISHER portal login/signup route. It preserves the publisher conversion flow through `/api/v1/identity/become-publisher`, validates `session.user.userType === "PUBLISHER"`, and redirects to the safe `returnTo` or `/dashboard`.
+- Both routes use shared `@guestpost/ui` auth presentation primitives (`AuthLayout`, `AuthCard`, `AuthProviders`, `LoginForm`, `SignupForm`) with app-specific marketing copy and submit labels.
+
 ## Key Files
 
 - `apps/api/src/modules/active-context/`
@@ -51,3 +57,6 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 - `apps/api/src/common/decorators/`
 - `apps/api/src/common/auth-context-cache.ts`
 - `packages/auth/` — Better-Auth config
+- `packages/ui/src/components/auth-layout.tsx` — shared split-screen auth layout used by app login/reset flows
+- `packages/ui/src/components/auth-card.tsx` — shared auth card shell
+- `packages/ui/src/components/login-form.tsx` and `packages/ui/src/components/signup-form.tsx` — shared email/password auth forms

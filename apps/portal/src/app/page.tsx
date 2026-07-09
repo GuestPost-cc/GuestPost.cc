@@ -50,6 +50,34 @@ function GoogleIcon({ className }: { className?: string }) {
   )
 }
 
+const customerLayoutFeatures = [
+  {
+    title: "Discover publishers",
+    description:
+      "Browse marketplace opportunities and shortlist placements faster.",
+  },
+  {
+    title: "Manage campaigns",
+    description:
+      "Keep briefs, orders, billing, and status updates in one workspace.",
+  },
+  {
+    title: "Track delivery",
+    description: "Follow each guest post from checkout through publication.",
+  },
+  {
+    title: "Work securely",
+    description:
+      "Sign in with email or Google while the platform handles access checks.",
+  },
+]
+
+const customerLayoutStats = [
+  { value: "Discover", label: "find relevant publisher inventory" },
+  { value: "Order", label: "launch guest post placements" },
+  { value: "Track", label: "monitor campaign progress" },
+]
+
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -76,6 +104,7 @@ function LoginContent() {
   }, [user, router])
 
   const handleGoogleSignIn = async () => {
+    setError(null)
     try {
       await signInWithProvider("google", window.location.origin)
     } catch (err: any) {
@@ -172,22 +201,30 @@ function LoginContent() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout
+      eyebrow="Customer portal"
+      title="Launch better guest post campaigns with confidence."
+      description="Plan, order, and track guest post placements from a focused workspace built for buyers."
+      features={customerLayoutFeatures}
+      stats={customerLayoutStats}
+    >
       <AuthCard
-        title={isSignUp ? "Create Account" : "Sign In"}
+        eyebrow={isSignUp ? "New customer" : "Customer login"}
+        title={isSignUp ? "Create your customer workspace" : "Welcome back"}
         description={
           isSignUp
-            ? "Create an account to get started"
-            : "Sign in to your account"
+            ? "Start a buyer account to discover publishers and manage campaigns."
+            : "Sign in to manage campaigns, orders, billing, and marketplace discovery."
         }
         footer={
-          <p className="text-center text-sm text-[#8a8f98]">
+          <p className="text-center text-sm text-[#8f9aab]">
             {isSignUp ? (
               <>
                 Already have an account?{" "}
                 <button
+                  type="button"
                   onClick={() => setIsSignUp(false)}
-                  className="text-[#5e6ad2] hover:text-[#828fff] transition-colors"
+                  className="font-semibold text-[#aeb7ff] transition-colors hover:text-white"
                 >
                   Sign in
                 </button>
@@ -196,8 +233,9 @@ function LoginContent() {
               <>
                 Don&apos;t have an account?{" "}
                 <button
+                  type="button"
                   onClick={() => setIsSignUp(true)}
-                  className="text-[#5e6ad2] hover:text-[#828fff] transition-colors"
+                  className="font-semibold text-[#aeb7ff] transition-colors hover:text-white"
                 >
                   Sign up
                 </button>
@@ -210,12 +248,13 @@ function LoginContent() {
           <div
             role="status"
             aria-live="polite"
-            className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            className="mb-4 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2.5 text-sm leading-6 text-amber-100"
           >
             {reason}
           </div>
         )}
         <AuthProviders
+          separator="or continue with email"
           providers={[
             {
               id: "google",
@@ -231,6 +270,7 @@ function LoginContent() {
             loading={loading}
             error={error ?? undefined}
             onToggleMode={() => setIsSignUp(false)}
+            submitLabel="Create customer account"
           />
         ) : (
           <LoginForm
@@ -239,6 +279,7 @@ function LoginContent() {
             error={error ?? undefined}
             onToggleMode={() => setIsSignUp(true)}
             forgotPasswordHref="/forgot-password"
+            submitLabel="Open customer dashboard"
           />
         )}
       </AuthCard>

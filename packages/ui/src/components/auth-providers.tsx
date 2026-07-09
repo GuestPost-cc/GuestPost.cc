@@ -21,23 +21,25 @@ export function AuthProviders({
   if (providers.length === 0) return null
 
   return (
-    <div className="grid gap-3">
-      {providers.map((provider) => (
-        <ProviderButton
-          key={provider.id}
-          icon={provider.icon}
-          onClick={provider.onClick}
-        >
-          {provider.label}
-        </ProviderButton>
-      ))}
+    <div className="grid gap-4">
+      <div className="grid gap-3">
+        {providers.map((provider) => (
+          <ProviderButton
+            key={provider.id}
+            icon={provider.icon}
+            onClick={provider.onClick}
+          >
+            {provider.label}
+          </ProviderButton>
+        ))}
+      </div>
       {separator && (
-        <div className="relative flex items-center py-2">
-          <div className="flex-grow border-t border-[#23252a]" />
-          <span className="flex-shrink px-4 text-xs text-[#62666d] tracking-wider">
+        <div className="relative flex items-center py-1">
+          <div className="flex-grow border-t border-white/10" />
+          <span className="flex-shrink px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#697386]">
             {separator}
           </span>
-          <div className="flex-grow border-t border-[#23252a]" />
+          <div className="flex-grow border-t border-white/10" />
         </div>
       )}
     </div>

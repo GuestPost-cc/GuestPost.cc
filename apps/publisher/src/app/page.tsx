@@ -61,6 +61,35 @@ function getBaseUrl(): string {
   return "http://localhost:4000"
 }
 
+const publisherLayoutFeatures = [
+  {
+    title: "Manage websites",
+    description:
+      "Keep publisher properties, listings, and verification in one place.",
+  },
+  {
+    title: "Run orders smoothly",
+    description:
+      "Review guest post work, coordinate content, and monitor status updates.",
+  },
+  {
+    title: "Connect integrations",
+    description:
+      "Link search console data and keep website signals ready for review.",
+  },
+  {
+    title: "Track earnings",
+    description:
+      "Stay close to payouts, withdrawals, and account settings from the dashboard.",
+  },
+]
+
+const publisherLayoutStats = [
+  { value: "Websites", label: "manage publisher properties" },
+  { value: "Orders", label: "coordinate guest post work" },
+  { value: "Payouts", label: "monitor earnings and withdrawals" },
+]
+
 function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -286,22 +315,30 @@ function LoginContent() {
   }
 
   return (
-    <AuthLayout>
+    <AuthLayout
+      eyebrow="Publisher portal"
+      title="Turn your websites into an organized publishing channel."
+      description="Manage listings, orders, integrations, earnings, and payouts from a focused publisher workspace."
+      features={publisherLayoutFeatures}
+      stats={publisherLayoutStats}
+    >
       <AuthCard
-        title={isSignUp ? "Publisher Sign Up" : "Publisher Sign In"}
+        eyebrow={isSignUp ? "New publisher" : "Publisher login"}
+        title={isSignUp ? "Create your publisher workspace" : "Welcome back"}
         description={
           isSignUp
-            ? "Create an account to start publishing"
-            : "Sign in to manage your orders and content"
+            ? "Start publishing opportunities and manage guest post work from one dashboard."
+            : "Sign in to manage websites, orders, integrations, earnings, and payouts."
         }
         footer={
-          <p className="text-center text-sm text-muted-foreground">
+          <p className="text-center text-sm text-[#8f9aab]">
             {isSignUp ? (
               <>
                 Already have an account?{" "}
                 <button
+                  type="button"
                   onClick={() => setIsSignUp(false)}
-                  className="underline underline-offset-4 hover:text-primary"
+                  className="font-semibold text-[#aeb7ff] transition-colors hover:text-white"
                 >
                   Sign in
                 </button>
@@ -310,8 +347,9 @@ function LoginContent() {
               <>
                 Don&apos;t have an account?{" "}
                 <button
+                  type="button"
                   onClick={() => setIsSignUp(true)}
-                  className="underline underline-offset-4 hover:text-primary"
+                  className="font-semibold text-[#aeb7ff] transition-colors hover:text-white"
                 >
                   Sign up
                 </button>
@@ -324,12 +362,13 @@ function LoginContent() {
           <div
             role="status"
             aria-live="polite"
-            className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            className="mb-4 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2.5 text-sm leading-6 text-amber-100"
           >
             {reason}
           </div>
         )}
         <AuthProviders
+          separator="or continue with email"
           providers={[
             {
               id: "google",
@@ -345,6 +384,7 @@ function LoginContent() {
             loading={loading}
             error={error ?? undefined}
             onToggleMode={() => setIsSignUp(false)}
+            submitLabel="Create publisher account"
           />
         ) : (
           <LoginForm
@@ -353,6 +393,7 @@ function LoginContent() {
             error={error ?? undefined}
             onToggleMode={() => setIsSignUp(true)}
             forgotPasswordHref="/forgot-password"
+            submitLabel="Open publisher dashboard"
           />
         )}
       </AuthCard>

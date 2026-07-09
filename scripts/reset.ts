@@ -1,11 +1,16 @@
 import { existsSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { $ } from "./_utils"
+import { loadRootEnv } from "./env"
 
 const ROOT = join(__dirname, "..")
 
 async function main() {
   console.log("Resetting GuestPost development environment...\n")
+  loadRootEnv({
+    createDevelopmentFromExample: true,
+    required: ["DATABASE_URL"],
+  })
 
   // Step 1: Clean node_modules
   console.log("1. Removing node_modules...")

@@ -1,7 +1,12 @@
 import { $ } from "./_utils"
+import { loadRootEnv } from "./env"
 
 async function main() {
   console.log("Setting up GuestPost development environment...")
+  loadRootEnv({
+    createDevelopmentFromExample: true,
+    required: ["DATABASE_URL"],
+  })
 
   console.log("\n1. Installing dependencies...")
   await $("pnpm", ["install"])

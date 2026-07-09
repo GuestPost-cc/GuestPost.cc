@@ -49,3 +49,12 @@ Open/partial items require architectural design discussion.
 - Feature flags via `ENABLE_DIRECT_DEPOSIT` env var
 - Worker deliveries verified via shared `delivery-verification` module (24 tests)
 - Job signing with configurable secret (QUEUE_SIGNING_SECRET / JWT_SECRET fallback)
+
+## Seed Script (`scripts/seed.ts`)
+
+- Creates 6 dev users via the API (real password hashing), then bootstraps staff roles via DB
+- Expects `.env.development` with `DATABASE_URL` (creates from `.env.example` if missing)
+- Uses `scripts/env.ts` `loadRootEnv()` to load `.env.development`, stripping inline `#` comments (dotenv-compatible)
+- API must be running on `:4000`
+- Phases: (1) sign-up users via API, (1b) verify emails via DB, (2) staff bootstrap, (3) roles via admin API, (4) orgs + invites, (5) fund wallet via DB, (6) publisher inventory + marketplace listings (with `ListingService` rows), (7) payout providers
+- Wallet funding bypasses API deposit endpoint (gated behind `ENABLE_DIRECT_DEPOSIT`) and writes directly via Prisma
