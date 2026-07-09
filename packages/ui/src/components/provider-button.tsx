@@ -14,7 +14,7 @@ const ProviderButton = React.forwardRef<HTMLButtonElement, ProviderButtonProps>(
       ref={ref}
       type="button"
       className={cn(
-        "inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-[#f7f8f8] shadow-sm shadow-black/10 transition-all hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.07] hover:shadow-lg hover:shadow-black/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5e69d1]/60 disabled:pointer-events-none disabled:opacity-50",
+        "inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 text-sm font-semibold text-zinc-100 transition-colors hover:bg-zinc-800/50 hover:border-zinc-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-50",
         className,
       )}
       {...props}

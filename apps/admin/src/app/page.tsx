@@ -91,7 +91,7 @@ function LoginPageInner() {
   if (initialCheck) {
     return (
       <AuthLayout>
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
+        <div className="animate-pulse text-zinc-500">Loading...</div>
       </AuthLayout>
     )
   }
@@ -99,14 +99,15 @@ function LoginPageInner() {
   return (
     <AuthLayout>
       <AuthCard
-        title="Admin Sign In"
-        description="Sign in to manage the platform"
+        eyebrow="Admin login"
+        title="Welcome back"
+        description="Sign in to manage platform operations, users, and moderation."
       >
         {expired && (
           <div
             role="status"
             aria-live="polite"
-            className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+            className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2.5 text-sm leading-6 text-amber-300"
           >
             {reason}
           </div>
@@ -115,6 +116,8 @@ function LoginPageInner() {
           onSubmit={handleSignIn}
           loading={loading}
           error={error ?? undefined}
+          forgotPasswordHref="/forgot-password"
+          submitLabel="Open admin dashboard"
         />
       </AuthCard>
     </AuthLayout>

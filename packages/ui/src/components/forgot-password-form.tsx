@@ -33,17 +33,14 @@ export function ForgotPasswordForm({
   return (
     <div className="grid gap-6">
       {successMessage ? (
-        <p className="text-center text-sm text-green-600">{successMessage}</p>
+        <p className="text-center text-sm text-emerald-400">{successMessage}</p>
       ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
           <p className="text-sm text-muted-foreground">
             Enter your email address and we&apos;ll send you a link to reset
             your password.
           </p>
-          <div className="grid gap-2">
-            <label htmlFor="forgot-email" className="text-sm text-foreground">
-              Email
-            </label>
+          <div className="grid">
             <Input
               id="forgot-email"
               type="email"
@@ -54,7 +51,10 @@ export function ForgotPasswordForm({
               {...register("email")}
             />
             {errors.email && (
-              <p id="forgot-email-error" className="text-sm text-destructive">
+              <p
+                id="forgot-email-error"
+                className="mt-1.5 text-sm text-destructive"
+              >
                 {errors.email.message}
               </p>
             )}

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@source "../src";
+@source "../../../apps/portal/src";
+@source "../../../apps/publisher/src";
+@source "../../../apps/admin/src";
+
 @theme {
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
@@ -60,27 +65,27 @@
   }
 
   .dark {
-    --background: 240 50% 0.6%;
-    --foreground: 180 6% 97%;
-    --card: 210 6% 6%;
-    --card-foreground: 180 6% 97%;
-    --popover: 210 6% 6%;
-    --popover-foreground: 180 6% 97%;
-    --primary: 234 56% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 210 6% 6%;
-    --secondary-foreground: 180 6% 97%;
-    --muted: 210 5% 8%;
-    --muted-foreground: 220 7% 57%;
-    --accent: 210 5% 8%;
-    --accent-foreground: 180 6% 97%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 0 0% 11%;
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 60.2%;
     --destructive-foreground: 0 0% 100%;
-    --border: 225 9% 15%;
-    --input: 225 9% 15%;
-    --ring: 234 56% 60%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 0 0% 40%;
     --radius: 0.5rem;
-    --surface-1: 210 6% 6%;
+    --surface-1: 0 0% 9%;
   }
 
   * {

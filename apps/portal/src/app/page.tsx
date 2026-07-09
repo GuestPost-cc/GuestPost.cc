@@ -217,14 +217,14 @@ function LoginContent() {
             : "Sign in to manage campaigns, orders, billing, and marketplace discovery."
         }
         footer={
-          <p className="text-center text-sm text-[#8f9aab]">
+          <p className="text-center text-sm text-muted-foreground">
             {isSignUp ? (
               <>
                 Already have an account?{" "}
                 <button
                   type="button"
                   onClick={() => setIsSignUp(false)}
-                  className="font-semibold text-[#aeb7ff] transition-colors hover:text-white"
+                  className="font-semibold text-primary transition-colors hover:text-foreground"
                 >
                   Sign in
                 </button>
@@ -235,7 +235,7 @@ function LoginContent() {
                 <button
                   type="button"
                   onClick={() => setIsSignUp(true)}
-                  className="font-semibold text-[#aeb7ff] transition-colors hover:text-white"
+                  className="font-semibold text-primary transition-colors hover:text-foreground"
                 >
                   Sign up
                 </button>
@@ -248,7 +248,7 @@ function LoginContent() {
           <div
             role="status"
             aria-live="polite"
-            className="mb-4 rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2.5 text-sm leading-6 text-amber-100"
+            className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2.5 text-sm leading-6 text-amber-300"
           >
             {reason}
           </div>
@@ -292,7 +292,7 @@ export default function LoginPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center">
-          <div className="animate-pulse text-muted-foreground">Loading...</div>
+          <div className="animate-pulse text-zinc-500">Loading...</div>
         </div>
       }
     >

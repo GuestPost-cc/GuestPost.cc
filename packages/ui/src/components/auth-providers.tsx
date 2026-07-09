@@ -35,11 +35,11 @@ export function AuthProviders({
       </div>
       {separator && (
         <div className="relative flex items-center py-1">
-          <div className="flex-grow border-t border-white/10" />
-          <span className="flex-shrink px-3 text-[11px] font-semibold uppercase tracking-[0.22em] text-[#697386]">
+          <div className="flex-grow border-t border-zinc-800" />
+          <span className="flex-shrink px-4 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
             {separator}
           </span>
-          <div className="flex-grow border-t border-white/10" />
+          <div className="flex-grow border-t border-zinc-800" />
         </div>
       )}
     </div>

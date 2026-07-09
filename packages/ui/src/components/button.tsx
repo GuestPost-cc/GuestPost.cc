@@ -4,18 +4,19 @@ import * as React from "react"
 import { cn } from "../lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5e69d1]/50 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400 disabled:pointer-events-none disabled:opacity-50 active:scale-[0.98]",
   {
     variants: {
       variant: {
-        default: "bg-[#5e6ad2] text-white hover:bg-[#828fff]",
-        destructive: "bg-[#e5484d] text-white hover:bg-[#e5484d]/80",
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline:
-          "border border-[#23252a] bg-[#0f1011] text-[#f7f8f8] hover:bg-[#141516] hover:border-[#34343a]",
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
         secondary:
-          "border border-[#23252a] bg-[#0f1011] text-[#f7f8f8] hover:bg-[#141516]",
-        ghost: "text-[#8a8f98] hover:text-[#d0d6e0] hover:bg-[#0f1011]",
-        link: "text-[#5e6ad2] underline-offset-4 hover:underline",
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "h-10 px-4 py-2",

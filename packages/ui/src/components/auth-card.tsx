@@ -21,31 +21,22 @@ export function AuthCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[1.75rem] border border-white/10 bg-[#070b14]/85 p-6 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-8",
+        "w-full max-w-[400px] mx-auto bg-zinc-900/40 border border-zinc-800 rounded-xl p-6 sm:p-8",
         className,
       )}
     >
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#5e6ad2]/20 blur-3xl"
-      />
-
-      <div className="relative">
-        <div className="mb-7 text-center">
+      <div className="space-y-6">
+        <div className="text-center">
           {eyebrow && (
-            <div className="mb-3 inline-flex rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#aeb7c8]">
+            <div className="mb-4 inline-flex rounded-full border border-zinc-800 bg-zinc-900/50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-zinc-400">
               {eyebrow}
             </div>
           )}
-          <h1 className="text-2xl font-semibold tracking-tight text-[#f7f8f8] sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             {title}
           </h1>
           {description && (
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#8f9aab]">
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
               {description}
             </p>
           )}
@@ -54,7 +45,7 @@ export function AuthCard({
         {children}
 
         {footer && (
-          <div className="mt-8 border-t border-white/10 pt-6 text-center text-sm text-[#8f9aab]">
+          <div className="border-t border-zinc-800 pt-6 text-center text-sm text-muted-foreground">
             {footer}
           </div>
         )}
