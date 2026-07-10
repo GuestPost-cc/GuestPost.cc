@@ -49,7 +49,7 @@ import {
   useSyncHistory,
   useTriggerSync,
   useUnlinkProperty,
-} from "../../../../../lib/hooks/integrations"
+} from "../../../../lib/hooks/integrations"
 
 export default function IntegrationDetailPage() {
   const params = useParams()
@@ -110,11 +110,11 @@ export default function IntegrationDetailPage() {
     try {
       const result = await connectMutation.mutateAsync({
         provider,
-        returnUrl: `/dashboard/settings/integrations/${integrationId}`,
+        returnUrl: `/dashboard/integrations/${integrationId}`,
       })
       window.location.assign(result.authorizationUrl!)
-    } catch {
-      toast.error("Failed to initiate reconnection")
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to initiate reconnection")
     }
   }
 
@@ -172,7 +172,7 @@ export default function IntegrationDetailPage() {
     try {
       await disconnectMutation.mutateAsync(integrationId)
       toast.success("Integration disconnected")
-      router.push("/dashboard/settings/integrations")
+      router.push("/dashboard/integrations")
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to disconnect")
     }
@@ -199,7 +199,7 @@ export default function IntegrationDetailPage() {
       {/* Back link + header */}
       <div className="space-y-4">
         <Link
-          href="/dashboard/settings/integrations"
+          href="/dashboard/integrations"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />

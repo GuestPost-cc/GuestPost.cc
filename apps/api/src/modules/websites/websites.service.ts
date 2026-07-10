@@ -119,7 +119,7 @@ export class WebsitesService {
             title: dto.url,
             slug,
             description: `Guest posting placement on ${dto.url}`,
-            status: ListingStatus.PENDING_REVIEW,
+            status: ListingStatus.DRAFT,
             fulfillmentType: ListingFulfillmentType.PUBLISHER,
             currency: "USD",
             domainRating: dto.domainRating,
@@ -217,8 +217,18 @@ export class WebsitesService {
     if (website.verificationStatus === "VERIFIED") {
       throw new BadRequestException("Website is already verified")
     }
-    if (!website.verificationToken) {
-      throw new BadRequestException("This website has no verification token")
+    let verificationToken = website.verificationToken
+    if (!verificationToken) {
+      verificationToken = generateVerificationToken()
+      await this.prisma.website.update({
+        where: { id: website.id },
+        data: {
+          verificationMethod: "DNS_TXT",
+          verificationToken,
+          verificationStatus: "PENDING_VERIFICATION",
+          verificationFailureReason: null,
+        },
+      })
     }
 
     // ── Rate limiting (anti DNS-abuse / verification spam) ────────────────────
@@ -284,7 +294,7 @@ export class WebsitesService {
       instructions: {
         type: "DNS_TXT",
         host: "@",
-        value: verificationTxtValue(website.verificationToken),
+        value: verificationTxtValue(verificationToken),
         note: "Add this as a TXT record on your root domain (and optionally www). DNS changes can take up to 48 hours to propagate. Click Verify after adding it.",
       },
     }
@@ -341,7 +351,10 @@ export class WebsitesService {
 
     // Also update the pending listing if exists
     const listing = await this.prisma.marketplaceListing.findFirst({
-      where: { websiteId: id, status: ListingStatus.PENDING_REVIEW },
+      where: {
+        websiteId: id,
+        status: { in: [ListingStatus.DRAFT, ListingStatus.PENDING_REVIEW] },
+      },
     })
 
     if (listing) {
@@ -472,10 +485,21 @@ export class WebsitesService {
     return {
       ...rest,
       verifiedAt: rest.verifiedAt?.toISOString() ?? null,
+      lastVerificationRequestAt:
+        rest.lastVerificationRequestAt?.toISOString() ?? null,
       lastVerificationCheckAt:
         rest.lastVerificationCheckAt?.toISOString() ?? null,
       lastSuccessfulVerificationAt:
         rest.lastSuccessfulVerificationAt?.toISOString() ?? null,
+      verificationInstructions:
+        rest.verificationStatus !== "VERIFIED" && rest.verificationToken
+          ? {
+              type: "DNS_TXT",
+              host: "@",
+              value: verificationTxtValue(rest.verificationToken),
+              note: "Add this TXT record on your root domain. DNS changes can take up to 48 hours to propagate; use Re-check DNS after publishing it.",
+            }
+          : null,
       createdAt: rest.createdAt.toISOString(),
       updatedAt: rest.updatedAt.toISOString(),
       websiteIntegrations: websiteIntegrations.map((wi) => ({
@@ -594,6 +618,14 @@ export class WebsitesService {
 
     if (!website) {
       throw new NotFoundException("Website not found")
+    }
+
+    if (website.verificationStatus !== "VERIFIED") {
+      throw new BadRequestException({
+        code: "WEBSITE_NOT_VERIFIED",
+        message:
+          "Verify domain ownership before submitting this website for review",
+      })
     }
 
     const listing = await this.prisma.marketplaceListing.findFirst({

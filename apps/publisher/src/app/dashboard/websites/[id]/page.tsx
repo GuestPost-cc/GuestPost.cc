@@ -26,9 +26,10 @@ import {
   ResourceTable,
   SyncHistoryTable,
 } from "@guestpost/ui"
-import { useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   ArrowLeft,
+  Copy,
   ExternalLink,
   Globe,
   Loader2,
@@ -43,6 +44,8 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import { api } from "../../../../lib/api"
+import { useAuth } from "../../../../lib/auth"
 import {
   useConnectIntegration,
   useDisconnectIntegration,
@@ -54,6 +57,13 @@ import {
   useUnlinkProperty,
 } from "../../../../lib/hooks/integrations"
 import { useWebsite } from "../../../../lib/hooks/websites"
+
+interface VerifyInstructions {
+  type: string
+  host: string
+  value: string
+  note?: string
+}
 
 const VERIFY_BADGE: Record<
   string,
@@ -78,10 +88,14 @@ export default function WebsiteDetailPage() {
   const router = useRouter()
   const queryClient = useQueryClient()
   const websiteId = params.id as string
+  const { user } = useAuth()
+  const publisherId = user?.publisherId
 
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [selectedResource, setSelectedResource] = useState<string | null>(null)
   const [showDisconnect, setShowDisconnect] = useState(false)
+  const [verifyInstructions, setVerifyInstructions] =
+    useState<VerifyInstructions | null>(null)
 
   const { data: website, isLoading, error, refetch } = useWebsite(websiteId)
 
@@ -111,6 +125,23 @@ export default function WebsiteDetailPage() {
   const triggerSyncMutation = useTriggerSync(integrationId ?? "")
   const disconnectMutation = useDisconnectIntegration()
   const connectMutation = useConnectIntegration()
+  const verifyMutation = useMutation({
+    mutationFn: async () => {
+      if (!publisherId) throw new Error("Not authenticated")
+      return api.publishers.verifyWebsite(publisherId, websiteId) as Promise<{
+        instructions: VerifyInstructions
+      }>
+    },
+    onSuccess: (res) => {
+      setVerifyInstructions(res.instructions)
+      queryClient.invalidateQueries({ queryKey: ["website", websiteId] })
+      queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
+      toast.success("DNS verification queued")
+    },
+    onError: (err: any) => {
+      toast.error(err?.message ?? "Failed to request DNS verification")
+    },
+  })
 
   const resources = (resourcesData?.resources ?? []) as {
     externalId: string
@@ -139,7 +170,7 @@ export default function WebsiteDetailPage() {
 
   const handleConnect = async () => {
     if (!gscIntegration) {
-      router.push("/dashboard/settings/integrations")
+      router.push("/dashboard/integrations")
       return
     }
     try {
@@ -148,8 +179,8 @@ export default function WebsiteDetailPage() {
         returnUrl: `/dashboard/websites/${websiteId}`,
       })
       window.location.assign(result.authorizationUrl!)
-    } catch {
-      toast.error("Failed to initiate connection")
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to initiate connection")
     }
   }
 
@@ -209,8 +240,8 @@ export default function WebsiteDetailPage() {
         returnUrl: `/dashboard/websites/${websiteId}`,
       })
       window.location.assign(result.authorizationUrl!)
-    } catch {
-      toast.error("Failed to initiate reconnection")
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to initiate reconnection")
     }
   }
 
@@ -247,6 +278,9 @@ export default function WebsiteDetailPage() {
   const verificationBadge =
     VERIFY_BADGE[website.verificationStatus ?? "PENDING_VERIFICATION"] ??
     VERIFY_BADGE.PENDING_VERIFICATION
+  const isDomainVerified = website.verificationStatus === "VERIFIED"
+  const domainInstructions =
+    verifyInstructions ?? website.verificationInstructions ?? null
 
   return (
     <div className="space-y-8">
@@ -291,6 +325,148 @@ export default function WebsiteDetailPage() {
         </div>
       </div>
 
+      {/* Domain ownership section */}
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Domain Ownership</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <verificationBadge.Icon className="h-4 w-4" aria-hidden="true" />
+              DNS TXT verification
+            </CardTitle>
+            <CardDescription>
+              Prove ownership of this domain before submitting it for
+              marketplace review. Google Search Console is managed separately
+              for search performance data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 text-sm sm:grid-cols-3">
+              <div>
+                <span className="text-muted-foreground">Status</span>
+                <div className="mt-1">
+                  <Badge variant={verificationBadge.variant} className="gap-1">
+                    <verificationBadge.Icon className="h-3 w-3" />
+                    {verificationBadge.label}
+                  </Badge>
+                </div>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Last requested</span>
+                <p className="mt-1 font-medium">
+                  {website.lastVerificationRequestAt
+                    ? new Date(
+                        website.lastVerificationRequestAt,
+                      ).toLocaleString()
+                    : "Never"}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Last checked</span>
+                <p className="mt-1 font-medium">
+                  {website.lastVerificationCheckAt
+                    ? new Date(website.lastVerificationCheckAt).toLocaleString()
+                    : "Never"}
+                </p>
+              </div>
+            </div>
+
+            {website.verificationFailureReason && !isDomainVerified && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                <p className="font-medium text-destructive">
+                  Verification issue
+                </p>
+                <p className="mt-1 text-muted-foreground">
+                  {website.verificationFailureReason}
+                </p>
+              </div>
+            )}
+
+            {!isDomainVerified && domainInstructions && (
+              <div className="space-y-3 rounded-lg border bg-muted/40 p-4 text-sm">
+                <p className="text-muted-foreground">
+                  Add this DNS TXT record at your domain registrar, then use
+                  Re-check DNS. The worker processes verification
+                  asynchronously.
+                </p>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Type
+                  </span>
+                  <code className="font-mono">{domainInstructions.type}</code>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Host / Name
+                  </span>
+                  <code className="font-mono">{domainInstructions.host}</code>
+                </div>
+                <div className="flex items-start justify-between gap-3">
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Value
+                  </span>
+                  <div className="flex items-center gap-2 text-right">
+                    <code className="break-all font-mono">
+                      {domainInstructions.value}
+                    </code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Copy TXT value"
+                      onClick={() => {
+                        navigator.clipboard.writeText(domainInstructions.value)
+                        toast.success("Copied TXT value")
+                      }}
+                    >
+                      <Copy className="h-4 w-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </div>
+                {domainInstructions.note && (
+                  <p className="text-xs text-muted-foreground">
+                    {domainInstructions.note}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {!isDomainVerified && !domainInstructions && (
+              <p className="text-sm text-muted-foreground">
+                Request verification to generate DNS TXT instructions for this
+                domain.
+              </p>
+            )}
+
+            {isDomainVerified && website.verifiedAt && (
+              <p className="text-sm text-muted-foreground">
+                Verified on {new Date(website.verifiedAt).toLocaleString()}.
+              </p>
+            )}
+
+            {!isDomainVerified && (
+              <Button
+                variant="outline"
+                onClick={() => verifyMutation.mutate()}
+                disabled={verifyMutation.isPending}
+                className="gap-1.5"
+              >
+                {verifyMutation.isPending ? (
+                  <Loader2
+                    className="h-4 w-4 animate-spin"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                )}
+                {domainInstructions
+                  ? "Re-check DNS"
+                  : "Request DNS verification"}
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
       {/* Reconnect banner */}
       {needsReauth && (
         <ReconnectBanner
@@ -311,8 +487,7 @@ export default function WebsiteDetailPage() {
                 No integration connected
               </CardTitle>
               <CardDescription>
-                Connect Google Search Console to verify website ownership and
-                track search performance.
+                Connect Google Search Console to link search performance data.
               </CardDescription>
             </CardHeader>
             <CardContent>

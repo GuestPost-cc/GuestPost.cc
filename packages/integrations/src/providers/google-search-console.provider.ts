@@ -92,14 +92,15 @@ export class GoogleSearchConsoleProvider implements IntegrationProviderBase {
   }
 
   async refreshTokens(refreshToken: string): Promise<CredentialTokens> {
+    const { clientId, clientSecret } = this.getOAuthConfig()
     const response = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "refresh_token",
         refresh_token: refreshToken,
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        client_id: clientId,
+        client_secret: clientSecret,
       }),
     })
 
@@ -147,8 +148,9 @@ export class GoogleSearchConsoleProvider implements IntegrationProviderBase {
     state: string,
     redirectUri: string,
   ): Promise<string> {
+    const clientId = this.getRequiredEnv("GOOGLE_CLIENT_ID")
     const params = new URLSearchParams({
-      client_id: process.env.GOOGLE_CLIENT_ID!,
+      client_id: clientId,
       redirect_uri: redirectUri,
       response_type: "code",
       scope: this.scopes.join(" "),
@@ -163,6 +165,7 @@ export class GoogleSearchConsoleProvider implements IntegrationProviderBase {
     code: string,
     redirectUri: string,
   ): Promise<CredentialTokens> {
+    const { clientId, clientSecret } = this.getOAuthConfig()
     const response = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -170,8 +173,8 @@ export class GoogleSearchConsoleProvider implements IntegrationProviderBase {
         grant_type: "authorization_code",
         code,
         redirect_uri: redirectUri,
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        client_id: clientId,
+        client_secret: clientSecret,
       }),
     })
 
@@ -213,6 +216,24 @@ export class GoogleSearchConsoleProvider implements IntegrationProviderBase {
       url: s.siteUrl,
       permissionLevel: s.permissionLevel,
     }))
+  }
+
+  private getOAuthConfig(): { clientId: string; clientSecret: string } {
+    return {
+      clientId: this.getRequiredEnv("GOOGLE_CLIENT_ID"),
+      clientSecret: this.getRequiredEnv("GOOGLE_CLIENT_SECRET"),
+    }
+  }
+
+  private getRequiredEnv(name: "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET") {
+    const value = process.env[name]?.trim()
+    if (!value) {
+      throw new ProviderError(
+        `Google Search Console OAuth is not configured. Set ${name} in the API/worker environment before connecting Google Search Console.`,
+        "GOOGLE_OAUTH_CONFIG_MISSING",
+      )
+    }
+    return value
   }
 
   private normalizeUrl(url: string): string {

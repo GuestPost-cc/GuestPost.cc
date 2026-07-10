@@ -382,6 +382,40 @@ describe("WebsitesService.requestVerification", () => {
     )
   })
 
+  it("mints a DNS token for legacy pending websites that do not have one", async () => {
+    prisma.website.findFirst.mockResolvedValue({
+      id: "w1",
+      domain: "example.com",
+      publisherId: "pub1",
+      verificationToken: null,
+      verificationStatus: "PENDING_VERIFICATION",
+      lastVerificationRequestAt: null,
+    })
+    prisma.website.updateMany.mockResolvedValue({ count: 1 })
+
+    const res = await service.requestVerification("pub1", "org1", "w1", user)
+    const mintedToken =
+      prisma.website.update.mock.calls[0][0].data.verificationToken
+
+    expect(mintedToken).toEqual(expect.any(String))
+    expect(prisma.website.update).toHaveBeenCalledWith({
+      where: { id: "w1" },
+      data: expect.objectContaining({
+        verificationMethod: "DNS_TXT",
+        verificationToken: mintedToken,
+        verificationStatus: "PENDING_VERIFICATION",
+        verificationFailureReason: null,
+      }),
+    })
+    expect(res.instructions.value).toBe(`guestpost-verification=${mintedToken}`)
+    expect(queue.addJob).toHaveBeenCalledWith(
+      "website-verification",
+      "website-verify",
+      { websiteId: "w1", actorUserId: "u1" },
+      expect.objectContaining({ jobId: "website-verify-w1" }),
+    )
+  })
+
   it("rejects when already VERIFIED (no enqueue)", async () => {
     prisma.website.findFirst.mockResolvedValue({
       id: "w1",
@@ -413,6 +447,67 @@ describe("WebsitesService.requestVerification", () => {
       service.requestVerification("pub1", "org1", "w1", user),
     ).rejects.toThrow(NotFoundException)
     expect(queue.addJob).not.toHaveBeenCalled()
+  })
+})
+
+// ── Publisher submit endpoint ──────────────────────────────────────────────
+describe("WebsitesService.submitForReview verification gate", () => {
+  let service: WebsitesService
+  let prisma: any
+  let audit: any
+  let queue: any
+  const user = { id: "u1" }
+
+  beforeEach(() => {
+    prisma = {
+      publisher: {
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ id: "pub1", organizationId: "org1" }),
+      },
+      website: {
+        findFirst: jest.fn().mockResolvedValue({
+          id: "w1",
+          domain: "example.com",
+          publisherId: "pub1",
+          verificationStatus: "VERIFIED",
+        }),
+      },
+      marketplaceListing: {
+        findFirst: jest.fn().mockResolvedValue({ id: "l1" }),
+        update: jest.fn().mockResolvedValue({ id: "l1" }),
+      },
+    }
+    audit = { log: jest.fn().mockResolvedValue(undefined) }
+    queue = { addJob: jest.fn().mockResolvedValue({ id: "job1" }) }
+    service = new WebsitesService(prisma, audit, queue)
+  })
+
+  it("blocks submission until DNS ownership is verified", async () => {
+    prisma.website.findFirst.mockResolvedValue({
+      id: "w1",
+      domain: "example.com",
+      publisherId: "pub1",
+      verificationStatus: "PENDING_VERIFICATION",
+    })
+
+    await expect(
+      service.submitForReview("pub1", "org1", "w1", user),
+    ).rejects.toMatchObject({ response: { code: "WEBSITE_NOT_VERIFIED" } })
+    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
+  })
+
+  it("submits a draft listing after DNS ownership is verified", async () => {
+    await expect(
+      service.submitForReview("pub1", "org1", "w1", user),
+    ).resolves.toEqual({ success: true })
+    expect(prisma.marketplaceListing.update).toHaveBeenCalledWith({
+      where: { id: "l1" },
+      data: { status: "PENDING_REVIEW" },
+    })
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "WEBSITE_SUBMITTED_FOR_REVIEW" }),
+    )
   })
 })
 

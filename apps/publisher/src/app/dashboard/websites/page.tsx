@@ -579,7 +579,15 @@ export default function WebsitesPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          title="Submit for Review"
+                          title={
+                            site.verificationStatus === "VERIFIED"
+                              ? "Submit for Review"
+                              : "Verify domain ownership before submitting"
+                          }
+                          disabled={
+                            submitMutation.isPending ||
+                            site.verificationStatus !== "VERIFIED"
+                          }
                           onClick={(e) => {
                             e.stopPropagation()
                             submitMutation.mutate(site.id)

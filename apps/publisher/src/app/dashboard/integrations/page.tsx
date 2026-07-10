@@ -24,7 +24,7 @@ import { toast } from "sonner"
 import {
   useConnectIntegration,
   useIntegrations,
-} from "../../../../lib/hooks/integrations"
+} from "../../../lib/hooks/integrations"
 
 const REAUTH_STATUSES = new Set([
   IntegrationStatus.TOKEN_EXPIRED,
@@ -56,11 +56,11 @@ export default function IntegrationsPage() {
     try {
       const result = await connectMutation.mutateAsync({
         provider,
-        returnUrl: "/dashboard/settings/integrations",
+        returnUrl: "/dashboard/integrations",
       })
       window.location.assign(result.authorizationUrl!)
-    } catch {
-      toast.error("Failed to initiate connection")
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to initiate connection")
     }
   }
 
@@ -107,7 +107,7 @@ export default function IntegrationsPage() {
         <EmptyState
           icon={Plug}
           title="No integrations connected"
-          description="Connect your Google Search Console account to verify website ownership and sync SEO metrics."
+          description="Connect your Google Search Console account to link search performance data and sync SEO metrics."
         />
       )}
 
@@ -119,9 +119,7 @@ export default function IntegrationsPage() {
               <IntegrationCard
                 key={i.id}
                 integration={i}
-                onClick={() =>
-                  router.push(`/dashboard/settings/integrations/${i.id}`)
-                }
+                onClick={() => router.push(`/dashboard/integrations/${i.id}`)}
               />
             ))}
           </div>

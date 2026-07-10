@@ -30,7 +30,12 @@ export class IntegrationsService {
   connect(provider: string, returnUrl: string): Promise<ConnectResponse> {
     return this.client.post<ConnectResponse>(
       `/integrations/${provider}/connect`,
-      { json: { returnUrl } satisfies ConnectRequest },
+      {
+        json: {
+          provider: provider as ConnectRequest["provider"],
+          returnUrl,
+        } satisfies ConnectRequest,
+      },
     )
   }
 

@@ -49,6 +49,8 @@ Open/partial items require architectural design discussion.
 - Feature flags via `ENABLE_DIRECT_DEPOSIT` env var
 - Worker deliveries verified via shared `delivery-verification` module (24 tests)
 - Job signing with configurable secret (QUEUE_SIGNING_SECRET / JWT_SECRET fallback)
+- Publisher integrations are a top-level dashboard area at `/dashboard/integrations`, separate from Settings; sidebar active-state matching uses path-segment boundaries to avoid selecting Settings for integration pages.
+- Publisher website ownership is proven via DNS TXT verification, not Google Search Console. GSC links search performance data after OAuth. DNS verification jobs require the worker queue process, and GSC OAuth requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, plus an authorized redirect URI matching `${API_BASE_URL}/integrations/GOOGLE_SEARCH_CONSOLE/callback`.
 
 ## Seed Script (`scripts/seed.ts`)
 

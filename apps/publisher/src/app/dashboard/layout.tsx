@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Plug,
   Settings,
   ShoppingCart,
   Store,
@@ -34,9 +35,9 @@ const navItems = [
     icon: CreditCard,
   },
   {
-    href: "/dashboard/settings/integrations",
+    href: "/dashboard/integrations",
     label: "Integrations",
-    icon: Globe,
+    icon: Plug,
   },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ]
@@ -107,7 +108,8 @@ export default function DashboardLayout({
             const Icon = item.icon
             const isActive =
               pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href))
+              (item.href !== "/dashboard" &&
+                pathname.startsWith(`${item.href}/`))
             return (
               <Link
                 key={item.href}

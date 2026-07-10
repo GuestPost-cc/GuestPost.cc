@@ -1,6 +1,6 @@
 # Current Status
 
-**Phase**: 5C — Website Integration Panel
+**Phase**: 5C — Website Integration + DNS Ownership Hardening
 
 ## Recently Completed
 
@@ -54,7 +54,7 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
-**Phase 5C is complete.** Next milestone is Phase 5D (SEO Reporting).
+**Phase 5C is functionally complete with DNS/GSC lifecycle hardening in progress.** DNS TXT verification is the website ownership gate; Google Search Console is a separate integration for search performance data. Next milestone remains Phase 5D (SEO Reporting) after local OAuth redirect configuration is authorized in Google Cloud.
 
 ## Explicit Phase Boundaries
 
@@ -64,7 +64,9 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Next Actions
 
-1. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
+1. **Local OAuth configuration** — authorize the exact Google redirect URI used by the API, e.g. `http://localhost:4000/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback`, or set `API_BASE_URL` to the deployed API base and authorize that callback.
+2. **Worker operations** — ensure the worker queue process is running in local/dev when testing DNS TXT verification, otherwise jobs remain queued.
+3. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
    - Implement real GSC Search Analytics API calls in provider
    - Pagination, date windows, UPSERT logic, deduplication, retries
    - Historical data imports

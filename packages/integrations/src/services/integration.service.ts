@@ -5,6 +5,7 @@ import {
   NoActiveCredentialError,
   PropertyAlreadyLinkedError,
   PropertyNotFoundError,
+  ProviderError,
   ReauthRequiredError,
   TokenExpiredError,
   WebsiteAlreadyLinkedError,
@@ -27,6 +28,22 @@ const db = createPrismaClient()
 const encryption = new IntegrationEncryptionService()
 
 export class IntegrationService {
+  private getRedirectUri(provider: IntegrationProvider): string {
+    const configuredBaseUrl = process.env.API_BASE_URL?.trim()
+    const apiBaseUrl = configuredBaseUrl || this.localApiBaseUrl()
+    return `${apiBaseUrl.replace(/\/$/, "")}/integrations/${provider}/callback`
+  }
+
+  private localApiBaseUrl(): string {
+    if (process.env.NODE_ENV === "production") {
+      throw new ProviderError(
+        "API_BASE_URL is required to build Google Search Console OAuth redirect URIs.",
+        "API_BASE_URL_MISSING",
+      )
+    }
+    return "http://localhost:4000/api/v1"
+  }
+
   async initiateOAuth(
     _owner: OwnerContext,
     provider: IntegrationProvider,
@@ -34,7 +51,7 @@ export class IntegrationService {
     stateNonce: string,
   ): Promise<string> {
     const providerImpl = getProvider(provider)
-    const redirectUri = `${process.env.API_BASE_URL}/integrations/${provider}/callback`
+    const redirectUri = this.getRedirectUri(provider)
     return providerImpl.getAuthorizationUrl(stateNonce, redirectUri)
   }
 
@@ -44,7 +61,7 @@ export class IntegrationService {
     code: string,
   ): Promise<{ integrationId: string; providerAccountId: string }> {
     const providerImpl = getProvider(provider)
-    const redirectUri = `${process.env.API_BASE_URL}/integrations/${provider}/callback`
+    const redirectUri = this.getRedirectUri(provider)
 
     const tokens = await providerImpl.exchangeCodeForTokens(code, redirectUri)
 

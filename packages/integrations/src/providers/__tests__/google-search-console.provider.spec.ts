@@ -32,6 +32,8 @@ describe("GoogleSearchConsoleProvider", () => {
 
   beforeEach(() => {
     provider = new GoogleSearchConsoleProvider()
+    process.env.GOOGLE_CLIENT_ID = "test-client-id"
+    process.env.GOOGLE_CLIENT_SECRET = "test-client-secret"
     jest.clearAllMocks()
   })
 
@@ -258,7 +260,6 @@ describe("GoogleSearchConsoleProvider", () => {
 
   describe("getAuthorizationUrl", () => {
     it("returns a valid Google OAuth URL", async () => {
-      process.env.GOOGLE_CLIENT_ID = "test-client-id"
       const url = await provider.getAuthorizationUrl(
         "test-state",
         "https://api.example.com/integrations/GOOGLE_SEARCH_CONSOLE/callback",
@@ -271,6 +272,19 @@ describe("GoogleSearchConsoleProvider", () => {
       )
       expect(url).toContain("access_type=offline")
       expect(url).toContain("prompt=consent")
+    })
+
+    it("throws an actionable error when Google client ID is missing", async () => {
+      delete process.env.GOOGLE_CLIENT_ID
+      await expect(
+        provider.getAuthorizationUrl(
+          "test-state",
+          "https://callback.example.com",
+        ),
+      ).rejects.toMatchObject({
+        code: "PROVIDER_ERROR",
+        details: { providerCode: "GOOGLE_OAUTH_CONFIG_MISSING" },
+      })
     })
   })
 
