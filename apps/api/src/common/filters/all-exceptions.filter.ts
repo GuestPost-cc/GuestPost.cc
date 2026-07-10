@@ -37,7 +37,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
       this.logger.error(
         exception instanceof Error ? exception.stack : exception,
       )
-      message = "Internal server error"
+      if (!this.canExposeServerError(exception)) {
+        message = "Internal server error"
+      }
     } else if (status === 429) {
       message = "Too many requests, try again later"
     } else {
@@ -47,6 +49,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     response
       .status(status)
       .json({ statusCode: status, message, ...(code && { code }) })
+  }
+
+  private canExposeServerError(exception: unknown): boolean {
+    return (
+      exception instanceof IntegrationError &&
+      exception.code === "PROVIDER_ERROR" &&
+      (exception.details?.providerCode === "GOOGLE_OAUTH_CONFIG_MISSING" ||
+        exception.details?.providerCode === "API_BASE_URL_MISSING")
+    )
   }
 
   private statusForIntegrationError(error: IntegrationError): number {

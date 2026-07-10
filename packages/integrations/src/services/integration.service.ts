@@ -29,14 +29,28 @@ const encryption = new IntegrationEncryptionService()
 
 export class IntegrationService {
   private getRedirectUri(provider: IntegrationProvider): string {
-    const apiBaseUrl = process.env.API_BASE_URL?.trim()
-    if (!apiBaseUrl) {
-      throw new ProviderError(
-        "API_BASE_URL is required to build Google Search Console OAuth redirect URIs. Set it in .env.development for local dev, for example http://localhost:4000/api/v1.",
-        "API_BASE_URL_MISSING",
-      )
+    const apiBaseUrl = this.getApiBaseUrl()
+    return `${apiBaseUrl}/integrations/${provider}/callback`
+  }
+
+  private getApiBaseUrl(): string {
+    const explicitApiBaseUrl = process.env.API_BASE_URL?.trim()
+    if (explicitApiBaseUrl) {
+      return explicitApiBaseUrl.replace(/\/$/, "")
     }
-    return `${apiBaseUrl.replace(/\/$/, "")}/integrations/${provider}/callback`
+
+    const publicApiOrigin = process.env.NEXT_PUBLIC_API_URL?.trim()
+    if (publicApiOrigin) {
+      const normalized = publicApiOrigin.replace(/\/$/, "")
+      return normalized.endsWith("/api/v1")
+        ? normalized
+        : `${normalized}/api/v1`
+    }
+
+    throw new ProviderError(
+      "API_BASE_URL or NEXT_PUBLIC_API_URL is required to build Google Search Console OAuth redirect URIs. Set API_BASE_URL in .env.development, for example http://localhost:4000/api/v1.",
+      "API_BASE_URL_MISSING",
+    )
   }
 
   async initiateOAuth(
