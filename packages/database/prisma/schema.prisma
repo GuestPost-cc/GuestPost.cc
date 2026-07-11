@@ -155,6 +155,9 @@ enum OrderEventType {
   SETTLEMENT_CREATED
   SETTLED
   REFUNDED
+  VERIFICATION_ESCALATED
+  AUTO_ACCEPTED
+  REVIEW_REMINDER
 }
 
 enum SettlementStatus {
@@ -221,6 +224,31 @@ enum VerificationStatus {
   VERIFIED
   FAILED
   DISPUTED
+}
+
+enum DeliveryVerificationMethod {
+  AUTO
+  MANUAL_ADMIN
+  CUSTOMER_MANUAL
+}
+
+enum DeliveryAcceptedMethod {
+  CUSTOMER
+  AUTO_TIMEOUT
+}
+
+enum VerificationOverrideReason {
+  CRAWLER_BLOCKED
+  ROBOTS_TXT
+  LOGIN_REQUIRED
+  JS_RENDERING
+  TEMPORARY_FAILURE
+  OTHER
+}
+
+enum SettlementReleasePolicy {
+  AUTO
+  MANUAL
 }
 
 enum IntegrationOwnerType {
@@ -293,8 +321,9 @@ model User {
   ownedOrders          Order[]               @relation("OrderCustomer")
   assignedOrders       Order[]               @relation("OrderAssignee")
   orderEvents          OrderEvent[]
-  publications         Publication[]         @relation("PublicationVerifier")
-  approvedWithdrawals  Withdrawal[]          @relation("WithdrawalApprover")
+  publications                Publication[]              @relation("PublicationVerifier")
+  approvedWithdrawals         Withdrawal[]               @relation("WithdrawalApprover")
+  adminVerifiedDeliveryVersions OrderDeliveryVersion[]    @relation("AdminVerifiedVersion")
   tickets              Ticket[]
   messages             TicketMessage[]
   notifications        Notification[]
@@ -576,7 +605,9 @@ model Order {
   publishedAt             DateTime?
   verifiedAt              DateTime?
   verifiedBy              String?
-  verifyMethod            String?
+  verifyMethod            DeliveryVerificationMethod?
+  autoAcceptAt            DateTime?
+  deliveryAcceptedMethod  DeliveryAcceptedMethod?
   deliveredAt             DateTime?
   revisionCount           Int                 @default(0)
   customerId              String
@@ -746,6 +777,7 @@ model Settlement {
   publisherAmount    Decimal
   status             SettlementStatus      @default(PENDING)
   reviewEndsAt       DateTime?
+  releasePolicy      SettlementReleasePolicy @default(AUTO)
   settledAt          DateTime?
   version            Int                   @default(0)
   // ── Phase 6 reporting snapshots (additive; NULL on legacy rows) ──
@@ -881,12 +913,16 @@ model OrderDeliveryVersion {
   supersededByVersion       Int?
   // Optimistic-lock guard for worker/intervention transitions
   verificationVersion       Int                        @default(0)
+  adminVerifiedById         String?
+  adminOverrideReason       VerificationOverrideReason?
+  adminVerifiedNotes        String?
   createdAt                 DateTime                   @default(now())
 
-  order      Order                          @relation(fields: [orderId], references: [id])
-  evidence   DeliveryVerificationEvidence[]
-  snapshots  DeliverySnapshot[]
-  fraudFlags DeliveryFraudFlag[]
+  order             Order                          @relation(fields: [orderId], references: [id])
+  evidence          DeliveryVerificationEvidence[]
+  snapshots         DeliverySnapshot[]
+  fraudFlags        DeliveryFraudFlag[]
+  adminVerifiedBy   User?                          @relation("AdminVerifiedVersion", fields: [adminVerifiedById], references: [id])
 
   @@unique([orderId, version])
   @@index([orderId])

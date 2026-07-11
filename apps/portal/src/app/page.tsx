@@ -19,7 +19,7 @@ import {
   SignupForm,
   useSessionExpired,
 } from "@guestpost/ui"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -79,7 +79,6 @@ const customerLayoutStats = [
 ]
 
 function LoginContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,14 +98,14 @@ function LoginContent() {
   // the CSRF middleware.
   useEffect(() => {
     if (user?.userType === "CUSTOMER") {
-      router.push("/dashboard")
+      window.location.href = "/dashboard"
     }
-  }, [user, router])
+  }, [user])
 
   const handleGoogleSignIn = async () => {
     setError(null)
     try {
-      await signInWithProvider("google", window.location.origin)
+      await signInWithProvider("google", window.location.origin, "customer")
     } catch (err: any) {
       setError(
         isAuthError(err)
@@ -120,7 +119,7 @@ function LoginContent() {
     setError(null)
     setLoading(true)
     try {
-      const result = await signInTransport(data)
+      const result = await signInTransport({ ...data, portal: "customer" })
       if (result.status === "authenticated" && result.token) {
         setToken(result.token)
       }
@@ -164,7 +163,7 @@ function LoginContent() {
     setError(null)
     setLoading(true)
     try {
-      const result = await signUpTransport(data)
+      const result = await signUpTransport({ ...data, portal: "customer" })
       if (result.status === "authenticated" && result.token) {
         setToken(result.token)
       }

@@ -22,3 +22,19 @@ if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL =
     "postgresql://test:test@localhost:5432/test_jest_default"
 }
+
+// Phase 7.11 — OAuth state cookie attributes.
+//
+// buildAuthOptions() (packages/auth/src/index.ts) enforces these at build
+// time — it throws if either is unset, converting silent misconfiguration
+// into a clear startup error. The back-compat `auth` singleton at the bottom
+// of that file calls buildAuthOptions() unconditionally on import, so any spec
+// that transitively imports @guestpost/auth needs these set before Jest
+// evaluates the import. Mirrors the production contract: Lax + non-secure in
+// dev/test (no HTTPS), None + Secure in prod (set via real .env in CI).
+if (!process.env.OAUTH_STATE_COOKIE_SAMESITE) {
+  process.env.OAUTH_STATE_COOKIE_SAMESITE = "Lax"
+}
+if (!process.env.OAUTH_STATE_COOKIE_SECURE) {
+  process.env.OAUTH_STATE_COOKIE_SECURE = "false"
+}

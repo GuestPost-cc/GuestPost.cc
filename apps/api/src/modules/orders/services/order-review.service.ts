@@ -3,6 +3,7 @@ import {
   orderEventMetadata,
   type PublisherTier,
   QUEUES,
+  WorkflowDecisionService,
 } from "@guestpost/shared"
 import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
 import {
@@ -22,6 +23,8 @@ import { QueueService } from "../../queues/queue.service"
 
 @Injectable()
 export class OrderReviewService {
+  private readonly decision = new WorkflowDecisionService()
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -455,6 +458,17 @@ export class OrderReviewService {
     )
     const reviewEndsAt = new Date(Date.now() + reviewDays * 24 * 60 * 60 * 1000)
 
+    const fraudFlags = await tx.deliveryFraudFlag.findMany({
+      where: { orderId },
+      select: { type: true },
+    })
+    const releasePolicy = this.decision.computeSettlementReleasePolicy(
+      { verifyMethod: order.verifyMethod, amount: Number(order.amount) },
+      { tier: publisher.tier },
+      fraudFlags,
+      null,
+    )
+
     await tx.settlement.create({
       data: {
         orderId,
@@ -464,6 +478,7 @@ export class OrderReviewService {
         publisherAmount,
         status: "PENDING",
         reviewEndsAt,
+        releasePolicy,
         // Phase 6 snapshots — same shape as createSettlement() in
         // SettlementsService for parity.
         listingServiceId: snapshotLsId,

@@ -1,6 +1,5 @@
 "use client"
 
-import { useRouter } from "next/navigation"
 import { useCallback, useState } from "react"
 import { getErrorMessage, isAuthError } from "../client/errors"
 import { signUp as signUpTransport } from "../client/transport"
@@ -12,6 +11,7 @@ export interface UseSignUpReturn {
     email: string
     password: string
     returnTo?: string
+    portal?: "customer" | "publisher"
   }) => Promise<void>
   loading: boolean
   error: AuthError | null
@@ -20,7 +20,6 @@ export interface UseSignUpReturn {
 export function useSignUp(): UseSignUpReturn {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<AuthError | null>(null)
-  const router = useRouter()
 
   const signUp = useCallback(
     async (input: {
@@ -28,19 +27,24 @@ export function useSignUp(): UseSignUpReturn {
       email: string
       password: string
       returnTo?: string
+      portal?: "customer" | "publisher"
     }) => {
       setLoading(true)
       setError(null)
       try {
-        const result = await signUpTransport({
+        await signUpTransport({
           name: input.name,
           email: input.email,
           password: input.password,
+          portal: input.portal,
         })
-        const redirectTo =
-          input.returnTo ||
-          (result.status === "authenticated" ? "/dashboard" : null)
-        if (redirectTo) router.push(redirectTo)
+        // Hard navigation — forces the dashboard middleware to re-evaluate
+        // the freshly-rotated session cookie after birth-time provisioning.
+        // router.push() leaves the Next.js layout with stale session state.
+        const redirectTo = input.returnTo || "/dashboard"
+        if (typeof window !== "undefined") {
+          window.location.href = redirectTo
+        }
       } catch (err) {
         if (isAuthError(err)) {
           setError(err)
@@ -55,7 +59,7 @@ export function useSignUp(): UseSignUpReturn {
         setLoading(false)
       }
     },
-    [router],
+    [],
   )
 
   return { signUp, loading, error }

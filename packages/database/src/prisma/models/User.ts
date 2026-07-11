@@ -246,6 +246,7 @@ export type UserWhereInput = {
   orderEvents?: Prisma.OrderEventListRelationFilter
   publications?: Prisma.PublicationListRelationFilter
   approvedWithdrawals?: Prisma.WithdrawalListRelationFilter
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
   messages?: Prisma.TicketMessageListRelationFilter
   notifications?: Prisma.NotificationListRelationFilter
@@ -280,6 +281,7 @@ export type UserOrderByWithRelationInput = {
   orderEvents?: Prisma.OrderEventOrderByRelationAggregateInput
   publications?: Prisma.PublicationOrderByRelationAggregateInput
   approvedWithdrawals?: Prisma.WithdrawalOrderByRelationAggregateInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionOrderByRelationAggregateInput
   tickets?: Prisma.TicketOrderByRelationAggregateInput
   messages?: Prisma.TicketMessageOrderByRelationAggregateInput
   notifications?: Prisma.NotificationOrderByRelationAggregateInput
@@ -317,6 +319,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   orderEvents?: Prisma.OrderEventListRelationFilter
   publications?: Prisma.PublicationListRelationFilter
   approvedWithdrawals?: Prisma.WithdrawalListRelationFilter
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
   messages?: Prisma.TicketMessageListRelationFilter
   notifications?: Prisma.NotificationListRelationFilter
@@ -387,6 +390,7 @@ export type UserCreateInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -421,6 +425,7 @@ export type UserUncheckedCreateInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -455,6 +460,7 @@ export type UserUpdateInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -489,6 +495,7 @@ export type UserUncheckedUpdateInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -792,6 +799,22 @@ export type UserUpdateOneWithoutPublicationsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutPublicationsInput, Prisma.UserUpdateWithoutPublicationsInput>, Prisma.UserUncheckedUpdateWithoutPublicationsInput>
 }
 
+export type UserCreateNestedOneWithoutAdminVerifiedDeliveryVersionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAdminVerifiedDeliveryVersionsInput, Prisma.UserUncheckedCreateWithoutAdminVerifiedDeliveryVersionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAdminVerifiedDeliveryVersionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutAdminVerifiedDeliveryVersionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAdminVerifiedDeliveryVersionsInput, Prisma.UserUncheckedCreateWithoutAdminVerifiedDeliveryVersionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAdminVerifiedDeliveryVersionsInput
+  upsert?: Prisma.UserUpsertWithoutAdminVerifiedDeliveryVersionsInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAdminVerifiedDeliveryVersionsInput, Prisma.UserUpdateWithoutAdminVerifiedDeliveryVersionsInput>, Prisma.UserUncheckedUpdateWithoutAdminVerifiedDeliveryVersionsInput>
+}
+
 export type UserCreateNestedOneWithoutApprovedWithdrawalsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutApprovedWithdrawalsInput, Prisma.UserUncheckedCreateWithoutApprovedWithdrawalsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutApprovedWithdrawalsInput
@@ -935,6 +958,7 @@ export type UserCreateWithoutSessionsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -968,6 +992,7 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1017,6 +1042,7 @@ export type UserUpdateWithoutSessionsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -1050,6 +1076,7 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1083,6 +1110,7 @@ export type UserCreateWithoutAccountsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1116,6 +1144,7 @@ export type UserUncheckedCreateWithoutAccountsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1165,6 +1194,7 @@ export type UserUpdateWithoutAccountsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -1198,6 +1228,7 @@ export type UserUncheckedUpdateWithoutAccountsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1231,6 +1262,7 @@ export type UserCreateWithoutActiveContextInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1264,6 +1296,7 @@ export type UserUncheckedCreateWithoutActiveContextInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1313,6 +1346,7 @@ export type UserUpdateWithoutActiveContextInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -1346,6 +1380,7 @@ export type UserUncheckedUpdateWithoutActiveContextInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1378,6 +1413,7 @@ export type UserCreateWithoutMembershipsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1411,6 +1447,7 @@ export type UserUncheckedCreateWithoutMembershipsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1460,6 +1497,7 @@ export type UserUpdateWithoutMembershipsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -1493,6 +1531,7 @@ export type UserUncheckedUpdateWithoutMembershipsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1526,6 +1565,7 @@ export type UserCreateWithoutPublisherMembershipsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1559,6 +1599,7 @@ export type UserUncheckedCreateWithoutPublisherMembershipsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1608,6 +1649,7 @@ export type UserUpdateWithoutPublisherMembershipsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -1641,6 +1683,7 @@ export type UserUncheckedUpdateWithoutPublisherMembershipsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1674,6 +1717,7 @@ export type UserCreateWithoutStaffMembershipsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1707,6 +1751,7 @@ export type UserUncheckedCreateWithoutStaffMembershipsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1756,6 +1801,7 @@ export type UserUpdateWithoutStaffMembershipsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -1789,6 +1835,7 @@ export type UserUncheckedUpdateWithoutStaffMembershipsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1823,6 +1870,7 @@ export type UserCreateWithoutManagedWebsitesInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -1856,6 +1904,7 @@ export type UserUncheckedCreateWithoutManagedWebsitesInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1905,6 +1954,7 @@ export type UserUpdateWithoutManagedWebsitesInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -1938,6 +1988,7 @@ export type UserUncheckedUpdateWithoutManagedWebsitesInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1970,6 +2021,7 @@ export type UserCreateWithoutOwnedOrdersInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2003,6 +2055,7 @@ export type UserUncheckedCreateWithoutOwnedOrdersInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2041,6 +2094,7 @@ export type UserCreateWithoutAssignedOrdersInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2074,6 +2128,7 @@ export type UserUncheckedCreateWithoutAssignedOrdersInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2123,6 +2178,7 @@ export type UserUpdateWithoutOwnedOrdersInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2156,6 +2212,7 @@ export type UserUncheckedUpdateWithoutOwnedOrdersInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2200,6 +2257,7 @@ export type UserUpdateWithoutAssignedOrdersInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2233,6 +2291,7 @@ export type UserUncheckedUpdateWithoutAssignedOrdersInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2266,6 +2325,7 @@ export type UserCreateWithoutOrderEventsInput = {
   assignedOrders?: Prisma.OrderCreateNestedManyWithoutAssigneeInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2299,6 +2359,7 @@ export type UserUncheckedCreateWithoutOrderEventsInput = {
   assignedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssigneeInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2348,6 +2409,7 @@ export type UserUpdateWithoutOrderEventsInput = {
   assignedOrders?: Prisma.OrderUpdateManyWithoutAssigneeNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2381,6 +2443,7 @@ export type UserUncheckedUpdateWithoutOrderEventsInput = {
   assignedOrders?: Prisma.OrderUncheckedUpdateManyWithoutAssigneeNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2414,6 +2477,7 @@ export type UserCreateWithoutPublicationsInput = {
   assignedOrders?: Prisma.OrderCreateNestedManyWithoutAssigneeInput
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2447,6 +2511,7 @@ export type UserUncheckedCreateWithoutPublicationsInput = {
   assignedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssigneeInput
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2496,6 +2561,7 @@ export type UserUpdateWithoutPublicationsInput = {
   assignedOrders?: Prisma.OrderUpdateManyWithoutAssigneeNestedInput
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2528,6 +2594,159 @@ export type UserUncheckedUpdateWithoutPublicationsInput = {
   ownedOrders?: Prisma.OrderUncheckedUpdateManyWithoutCustomerNestedInput
   assignedOrders?: Prisma.OrderUncheckedUpdateManyWithoutAssigneeNestedInput
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
+  approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
+  messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
+  notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
+  auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
+  managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
+  assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+}
+
+export type UserCreateWithoutAdminVerifiedDeliveryVersionsInput = {
+  id?: string
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  userType?: $Enums.UserType
+  role?: $Enums.UserRole
+  banned?: boolean
+  banReason?: string | null
+  banExpires?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutUserInput
+  staffMemberships?: Prisma.StaffMembershipCreateNestedManyWithoutUserInput
+  ownedOrders?: Prisma.OrderCreateNestedManyWithoutCustomerInput
+  assignedOrders?: Prisma.OrderCreateNestedManyWithoutAssigneeInput
+  orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
+  publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
+  approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
+  messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
+  notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
+  auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
+  managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
+  assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+}
+
+export type UserUncheckedCreateWithoutAdminVerifiedDeliveryVersionsInput = {
+  id?: string
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  userType?: $Enums.UserType
+  role?: $Enums.UserRole
+  banned?: boolean
+  banReason?: string | null
+  banExpires?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutUserInput
+  staffMemberships?: Prisma.StaffMembershipUncheckedCreateNestedManyWithoutUserInput
+  ownedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutCustomerInput
+  assignedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssigneeInput
+  orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
+  publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
+  approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
+  messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
+  notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
+  auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
+  managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
+  assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+}
+
+export type UserCreateOrConnectWithoutAdminVerifiedDeliveryVersionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutAdminVerifiedDeliveryVersionsInput, Prisma.UserUncheckedCreateWithoutAdminVerifiedDeliveryVersionsInput>
+}
+
+export type UserUpsertWithoutAdminVerifiedDeliveryVersionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutAdminVerifiedDeliveryVersionsInput, Prisma.UserUncheckedUpdateWithoutAdminVerifiedDeliveryVersionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutAdminVerifiedDeliveryVersionsInput, Prisma.UserUncheckedCreateWithoutAdminVerifiedDeliveryVersionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutAdminVerifiedDeliveryVersionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutAdminVerifiedDeliveryVersionsInput, Prisma.UserUncheckedUpdateWithoutAdminVerifiedDeliveryVersionsInput>
+}
+
+export type UserUpdateWithoutAdminVerifiedDeliveryVersionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userType?: Prisma.EnumUserTypeFieldUpdateOperationsInput | $Enums.UserType
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  banned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  banReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  banExpires?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutUserNestedInput
+  staffMemberships?: Prisma.StaffMembershipUpdateManyWithoutUserNestedInput
+  ownedOrders?: Prisma.OrderUpdateManyWithoutCustomerNestedInput
+  assignedOrders?: Prisma.OrderUpdateManyWithoutAssigneeNestedInput
+  orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
+  publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
+  approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
+  messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
+  notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
+  auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
+  managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
+  assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+}
+
+export type UserUncheckedUpdateWithoutAdminVerifiedDeliveryVersionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userType?: Prisma.EnumUserTypeFieldUpdateOperationsInput | $Enums.UserType
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  banned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  banReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  banExpires?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutUserNestedInput
+  staffMemberships?: Prisma.StaffMembershipUncheckedUpdateManyWithoutUserNestedInput
+  ownedOrders?: Prisma.OrderUncheckedUpdateManyWithoutCustomerNestedInput
+  assignedOrders?: Prisma.OrderUncheckedUpdateManyWithoutAssigneeNestedInput
+  orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
+  publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
@@ -2562,6 +2781,7 @@ export type UserCreateWithoutApprovedWithdrawalsInput = {
   assignedOrders?: Prisma.OrderCreateNestedManyWithoutAssigneeInput
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2595,6 +2815,7 @@ export type UserUncheckedCreateWithoutApprovedWithdrawalsInput = {
   assignedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssigneeInput
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2644,6 +2865,7 @@ export type UserUpdateWithoutApprovedWithdrawalsInput = {
   assignedOrders?: Prisma.OrderUpdateManyWithoutAssigneeNestedInput
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2677,6 +2899,7 @@ export type UserUncheckedUpdateWithoutApprovedWithdrawalsInput = {
   assignedOrders?: Prisma.OrderUncheckedUpdateManyWithoutAssigneeNestedInput
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2711,6 +2934,7 @@ export type UserCreateWithoutTicketsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
@@ -2744,6 +2968,7 @@ export type UserUncheckedCreateWithoutTicketsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
@@ -2782,6 +3007,7 @@ export type UserCreateWithoutAssignedTicketsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -2815,6 +3041,7 @@ export type UserUncheckedCreateWithoutAssignedTicketsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2864,6 +3091,7 @@ export type UserUpdateWithoutTicketsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
@@ -2897,6 +3125,7 @@ export type UserUncheckedUpdateWithoutTicketsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
@@ -2941,6 +3170,7 @@ export type UserUpdateWithoutAssignedTicketsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -2974,6 +3204,7 @@ export type UserUncheckedUpdateWithoutAssignedTicketsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3007,6 +3238,7 @@ export type UserCreateWithoutMessagesInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
@@ -3040,6 +3272,7 @@ export type UserUncheckedCreateWithoutMessagesInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
@@ -3089,6 +3322,7 @@ export type UserUpdateWithoutMessagesInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
@@ -3122,6 +3356,7 @@ export type UserUncheckedUpdateWithoutMessagesInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
@@ -3155,6 +3390,7 @@ export type UserCreateWithoutNotificationsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
@@ -3188,6 +3424,7 @@ export type UserUncheckedCreateWithoutNotificationsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
@@ -3237,6 +3474,7 @@ export type UserUpdateWithoutNotificationsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
@@ -3270,6 +3508,7 @@ export type UserUncheckedUpdateWithoutNotificationsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
@@ -3303,6 +3542,7 @@ export type UserCreateWithoutAuditLogsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -3336,6 +3576,7 @@ export type UserUncheckedCreateWithoutAuditLogsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -3385,6 +3626,7 @@ export type UserUpdateWithoutAuditLogsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -3418,6 +3660,7 @@ export type UserUncheckedUpdateWithoutAuditLogsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3451,6 +3694,7 @@ export type UserCreateWithoutMarketplaceReviewsInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -3484,6 +3728,7 @@ export type UserUncheckedCreateWithoutMarketplaceReviewsInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -3533,6 +3778,7 @@ export type UserUpdateWithoutMarketplaceReviewsInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -3566,6 +3812,7 @@ export type UserUncheckedUpdateWithoutMarketplaceReviewsInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3599,6 +3846,7 @@ export type UserCreateWithoutMarketplaceFavoritesInput = {
   orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
@@ -3632,6 +3880,7 @@ export type UserUncheckedCreateWithoutMarketplaceFavoritesInput = {
   orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
   publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
   messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
   notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
@@ -3681,6 +3930,7 @@ export type UserUpdateWithoutMarketplaceFavoritesInput = {
   orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
@@ -3714,6 +3964,7 @@ export type UserUncheckedUpdateWithoutMarketplaceFavoritesInput = {
   orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
   publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
   approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
   messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
   notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3740,6 +3991,7 @@ export type UserCountOutputType = {
   orderEvents: number
   publications: number
   approvedWithdrawals: number
+  adminVerifiedDeliveryVersions: number
   tickets: number
   messages: number
   notifications: number
@@ -3761,6 +4013,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   orderEvents?: boolean | UserCountOutputTypeCountOrderEventsArgs
   publications?: boolean | UserCountOutputTypeCountPublicationsArgs
   approvedWithdrawals?: boolean | UserCountOutputTypeCountApprovedWithdrawalsArgs
+  adminVerifiedDeliveryVersions?: boolean | UserCountOutputTypeCountAdminVerifiedDeliveryVersionsArgs
   tickets?: boolean | UserCountOutputTypeCountTicketsArgs
   messages?: boolean | UserCountOutputTypeCountMessagesArgs
   notifications?: boolean | UserCountOutputTypeCountNotificationsArgs
@@ -3837,6 +4090,13 @@ export type UserCountOutputTypeCountPublicationsArgs<ExtArgs extends runtime.Typ
  */
 export type UserCountOutputTypeCountApprovedWithdrawalsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.WithdrawalWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountAdminVerifiedDeliveryVersionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OrderDeliveryVersionWhereInput
 }
 
 /**
@@ -3931,6 +4191,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   orderEvents?: boolean | Prisma.User$orderEventsArgs<ExtArgs>
   publications?: boolean | Prisma.User$publicationsArgs<ExtArgs>
   approvedWithdrawals?: boolean | Prisma.User$approvedWithdrawalsArgs<ExtArgs>
+  adminVerifiedDeliveryVersions?: boolean | Prisma.User$adminVerifiedDeliveryVersionsArgs<ExtArgs>
   tickets?: boolean | Prisma.User$ticketsArgs<ExtArgs>
   messages?: boolean | Prisma.User$messagesArgs<ExtArgs>
   notifications?: boolean | Prisma.User$notificationsArgs<ExtArgs>
@@ -4000,6 +4261,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   orderEvents?: boolean | Prisma.User$orderEventsArgs<ExtArgs>
   publications?: boolean | Prisma.User$publicationsArgs<ExtArgs>
   approvedWithdrawals?: boolean | Prisma.User$approvedWithdrawalsArgs<ExtArgs>
+  adminVerifiedDeliveryVersions?: boolean | Prisma.User$adminVerifiedDeliveryVersionsArgs<ExtArgs>
   tickets?: boolean | Prisma.User$ticketsArgs<ExtArgs>
   messages?: boolean | Prisma.User$messagesArgs<ExtArgs>
   notifications?: boolean | Prisma.User$notificationsArgs<ExtArgs>
@@ -4027,6 +4289,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     orderEvents: Prisma.$OrderEventPayload<ExtArgs>[]
     publications: Prisma.$PublicationPayload<ExtArgs>[]
     approvedWithdrawals: Prisma.$WithdrawalPayload<ExtArgs>[]
+    adminVerifiedDeliveryVersions: Prisma.$OrderDeliveryVersionPayload<ExtArgs>[]
     tickets: Prisma.$TicketPayload<ExtArgs>[]
     messages: Prisma.$TicketMessagePayload<ExtArgs>[]
     notifications: Prisma.$NotificationPayload<ExtArgs>[]
@@ -4454,6 +4717,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   orderEvents<T extends Prisma.User$orderEventsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$orderEventsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   publications<T extends Prisma.User$publicationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$publicationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PublicationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   approvedWithdrawals<T extends Prisma.User$approvedWithdrawalsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$approvedWithdrawalsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WithdrawalPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  adminVerifiedDeliveryVersions<T extends Prisma.User$adminVerifiedDeliveryVersionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$adminVerifiedDeliveryVersionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderDeliveryVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tickets<T extends Prisma.User$ticketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$ticketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   messages<T extends Prisma.User$messagesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$messagesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketMessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   notifications<T extends Prisma.User$notificationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$notificationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$NotificationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -5088,6 +5352,30 @@ export type User$approvedWithdrawalsArgs<ExtArgs extends runtime.Types.Extension
   take?: number
   skip?: number
   distinct?: Prisma.WithdrawalScalarFieldEnum | Prisma.WithdrawalScalarFieldEnum[]
+}
+
+/**
+ * User.adminVerifiedDeliveryVersions
+ */
+export type User$adminVerifiedDeliveryVersionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OrderDeliveryVersion
+   */
+  select?: Prisma.OrderDeliveryVersionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OrderDeliveryVersion
+   */
+  omit?: Prisma.OrderDeliveryVersionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrderDeliveryVersionInclude<ExtArgs> | null
+  where?: Prisma.OrderDeliveryVersionWhereInput
+  orderBy?: Prisma.OrderDeliveryVersionOrderByWithRelationInput | Prisma.OrderDeliveryVersionOrderByWithRelationInput[]
+  cursor?: Prisma.OrderDeliveryVersionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.OrderDeliveryVersionScalarFieldEnum | Prisma.OrderDeliveryVersionScalarFieldEnum[]
 }
 
 /**

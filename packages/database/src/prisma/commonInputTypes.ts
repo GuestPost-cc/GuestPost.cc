@@ -506,6 +506,20 @@ export type EnumPaymentStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumPaymentStatusFilter<$PrismaModel> | $Enums.PaymentStatus
 }
 
+export type EnumDeliveryVerificationMethodNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryVerificationMethod | Prisma.EnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DeliveryVerificationMethod[] | Prisma.ListEnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DeliveryVerificationMethod[] | Prisma.ListEnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDeliveryVerificationMethodNullableFilter<$PrismaModel> | $Enums.DeliveryVerificationMethod | null
+}
+
+export type EnumDeliveryAcceptedMethodNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryAcceptedMethod | Prisma.EnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DeliveryAcceptedMethod[] | Prisma.ListEnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DeliveryAcceptedMethod[] | Prisma.ListEnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDeliveryAcceptedMethodNullableFilter<$PrismaModel> | $Enums.DeliveryAcceptedMethod | null
+}
+
 export type EnumFulfillmentChannelNullableFilter<$PrismaModel = never> = {
   equals?: $Enums.FulfillmentChannel | Prisma.EnumFulfillmentChannelFieldRefInput<$PrismaModel> | null
   in?: $Enums.FulfillmentChannel[] | Prisma.ListEnumFulfillmentChannelFieldRefInput<$PrismaModel> | null
@@ -557,6 +571,26 @@ export type EnumPaymentStatusWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumPaymentStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumPaymentStatusFilter<$PrismaModel>
+}
+
+export type EnumDeliveryVerificationMethodNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryVerificationMethod | Prisma.EnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DeliveryVerificationMethod[] | Prisma.ListEnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DeliveryVerificationMethod[] | Prisma.ListEnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDeliveryVerificationMethodNullableWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryVerificationMethod | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryVerificationMethodNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryVerificationMethodNullableFilter<$PrismaModel>
+}
+
+export type EnumDeliveryAcceptedMethodNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryAcceptedMethod | Prisma.EnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DeliveryAcceptedMethod[] | Prisma.ListEnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DeliveryAcceptedMethod[] | Prisma.ListEnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDeliveryAcceptedMethodNullableWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryAcceptedMethod | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryAcceptedMethodNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryAcceptedMethodNullableFilter<$PrismaModel>
 }
 
 export type EnumFulfillmentChannelNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -672,6 +706,13 @@ export type EnumSettlementStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumSettlementStatusFilter<$PrismaModel> | $Enums.SettlementStatus
 }
 
+export type EnumSettlementReleasePolicyFilter<$PrismaModel = never> = {
+  equals?: $Enums.SettlementReleasePolicy | Prisma.EnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.SettlementReleasePolicy[] | Prisma.ListEnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SettlementReleasePolicy[] | Prisma.ListEnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSettlementReleasePolicyFilter<$PrismaModel> | $Enums.SettlementReleasePolicy
+}
+
 export type EnumServiceTypeNullableFilter<$PrismaModel = never> = {
   equals?: $Enums.ServiceType | Prisma.EnumServiceTypeFieldRefInput<$PrismaModel> | null
   in?: $Enums.ServiceType[] | Prisma.ListEnumServiceTypeFieldRefInput<$PrismaModel> | null
@@ -710,6 +751,16 @@ export type EnumSettlementStatusWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumSettlementStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumSettlementStatusFilter<$PrismaModel>
+}
+
+export type EnumSettlementReleasePolicyWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SettlementReleasePolicy | Prisma.EnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.SettlementReleasePolicy[] | Prisma.ListEnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SettlementReleasePolicy[] | Prisma.ListEnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSettlementReleasePolicyWithAggregatesFilter<$PrismaModel> | $Enums.SettlementReleasePolicy
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSettlementReleasePolicyFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSettlementReleasePolicyFilter<$PrismaModel>
 }
 
 export type EnumServiceTypeNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -780,6 +831,13 @@ export type EnumDeliveryInterventionStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumDeliveryInterventionStatusFilter<$PrismaModel> | $Enums.DeliveryInterventionStatus
 }
 
+export type EnumVerificationOverrideReasonNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.VerificationOverrideReason | Prisma.EnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  in?: $Enums.VerificationOverrideReason[] | Prisma.ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.VerificationOverrideReason[] | Prisma.ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel> | $Enums.VerificationOverrideReason | null
+}
+
 export type EnumDeliveryVerificationStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.DeliveryVerificationStatus | Prisma.EnumDeliveryVerificationStatusFieldRefInput<$PrismaModel>
   in?: $Enums.DeliveryVerificationStatus[] | Prisma.ListEnumDeliveryVerificationStatusFieldRefInput<$PrismaModel>
@@ -798,6 +856,16 @@ export type EnumDeliveryInterventionStatusWithAggregatesFilter<$PrismaModel = ne
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumDeliveryInterventionStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumDeliveryInterventionStatusFilter<$PrismaModel>
+}
+
+export type EnumVerificationOverrideReasonNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VerificationOverrideReason | Prisma.EnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  in?: $Enums.VerificationOverrideReason[] | Prisma.ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.VerificationOverrideReason[] | Prisma.ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumVerificationOverrideReasonNullableWithAggregatesFilter<$PrismaModel> | $Enums.VerificationOverrideReason | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel>
 }
 
 export type EnumWithdrawalStatusFilter<$PrismaModel = never> = {
@@ -1645,6 +1713,20 @@ export type NestedEnumPaymentStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumPaymentStatusFilter<$PrismaModel> | $Enums.PaymentStatus
 }
 
+export type NestedEnumDeliveryVerificationMethodNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryVerificationMethod | Prisma.EnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DeliveryVerificationMethod[] | Prisma.ListEnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DeliveryVerificationMethod[] | Prisma.ListEnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDeliveryVerificationMethodNullableFilter<$PrismaModel> | $Enums.DeliveryVerificationMethod | null
+}
+
+export type NestedEnumDeliveryAcceptedMethodNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryAcceptedMethod | Prisma.EnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DeliveryAcceptedMethod[] | Prisma.ListEnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DeliveryAcceptedMethod[] | Prisma.ListEnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDeliveryAcceptedMethodNullableFilter<$PrismaModel> | $Enums.DeliveryAcceptedMethod | null
+}
+
 export type NestedEnumFulfillmentChannelNullableFilter<$PrismaModel = never> = {
   equals?: $Enums.FulfillmentChannel | Prisma.EnumFulfillmentChannelFieldRefInput<$PrismaModel> | null
   in?: $Enums.FulfillmentChannel[] | Prisma.ListEnumFulfillmentChannelFieldRefInput<$PrismaModel> | null
@@ -1696,6 +1778,26 @@ export type NestedEnumPaymentStatusWithAggregatesFilter<$PrismaModel = never> = 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumPaymentStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumPaymentStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumDeliveryVerificationMethodNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryVerificationMethod | Prisma.EnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DeliveryVerificationMethod[] | Prisma.ListEnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DeliveryVerificationMethod[] | Prisma.ListEnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDeliveryVerificationMethodNullableWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryVerificationMethod | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryVerificationMethodNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryVerificationMethodNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumDeliveryAcceptedMethodNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DeliveryAcceptedMethod | Prisma.EnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  in?: $Enums.DeliveryAcceptedMethod[] | Prisma.ListEnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.DeliveryAcceptedMethod[] | Prisma.ListEnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumDeliveryAcceptedMethodNullableWithAggregatesFilter<$PrismaModel> | $Enums.DeliveryAcceptedMethod | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDeliveryAcceptedMethodNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDeliveryAcceptedMethodNullableFilter<$PrismaModel>
 }
 
 export type NestedEnumFulfillmentChannelNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -1811,6 +1913,13 @@ export type NestedEnumSettlementStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumSettlementStatusFilter<$PrismaModel> | $Enums.SettlementStatus
 }
 
+export type NestedEnumSettlementReleasePolicyFilter<$PrismaModel = never> = {
+  equals?: $Enums.SettlementReleasePolicy | Prisma.EnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.SettlementReleasePolicy[] | Prisma.ListEnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SettlementReleasePolicy[] | Prisma.ListEnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSettlementReleasePolicyFilter<$PrismaModel> | $Enums.SettlementReleasePolicy
+}
+
 export type NestedEnumServiceTypeNullableFilter<$PrismaModel = never> = {
   equals?: $Enums.ServiceType | Prisma.EnumServiceTypeFieldRefInput<$PrismaModel> | null
   in?: $Enums.ServiceType[] | Prisma.ListEnumServiceTypeFieldRefInput<$PrismaModel> | null
@@ -1849,6 +1958,16 @@ export type NestedEnumSettlementStatusWithAggregatesFilter<$PrismaModel = never>
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumSettlementStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumSettlementStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumSettlementReleasePolicyWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SettlementReleasePolicy | Prisma.EnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  in?: $Enums.SettlementReleasePolicy[] | Prisma.ListEnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SettlementReleasePolicy[] | Prisma.ListEnumSettlementReleasePolicyFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSettlementReleasePolicyWithAggregatesFilter<$PrismaModel> | $Enums.SettlementReleasePolicy
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSettlementReleasePolicyFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSettlementReleasePolicyFilter<$PrismaModel>
 }
 
 export type NestedEnumServiceTypeNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -1919,6 +2038,13 @@ export type NestedEnumDeliveryInterventionStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumDeliveryInterventionStatusFilter<$PrismaModel> | $Enums.DeliveryInterventionStatus
 }
 
+export type NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.VerificationOverrideReason | Prisma.EnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  in?: $Enums.VerificationOverrideReason[] | Prisma.ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.VerificationOverrideReason[] | Prisma.ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel> | $Enums.VerificationOverrideReason | null
+}
+
 export type NestedEnumDeliveryVerificationStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.DeliveryVerificationStatus | Prisma.EnumDeliveryVerificationStatusFieldRefInput<$PrismaModel>
   in?: $Enums.DeliveryVerificationStatus[] | Prisma.ListEnumDeliveryVerificationStatusFieldRefInput<$PrismaModel>
@@ -1937,6 +2063,16 @@ export type NestedEnumDeliveryInterventionStatusWithAggregatesFilter<$PrismaMode
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumDeliveryInterventionStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumDeliveryInterventionStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumVerificationOverrideReasonNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VerificationOverrideReason | Prisma.EnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  in?: $Enums.VerificationOverrideReason[] | Prisma.ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.VerificationOverrideReason[] | Prisma.ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumVerificationOverrideReasonNullableWithAggregatesFilter<$PrismaModel> | $Enums.VerificationOverrideReason | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVerificationOverrideReasonNullableFilter<$PrismaModel>
 }
 
 export type NestedEnumWithdrawalStatusFilter<$PrismaModel = never> = {

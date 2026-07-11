@@ -9,6 +9,7 @@ import { AdminController } from "./admin.controller"
 import { AdminService } from "./admin.service"
 import { RevenueService } from "./finance/revenue.service"
 import { ReconciliationService } from "./reconciliation.service"
+import { AdminVerificationQueueService } from "./verification-queue.service"
 import { WebsiteVerificationService } from "./website-verification.service"
 
 @Module({
@@ -22,6 +23,7 @@ import { WebsiteVerificationService } from "./website-verification.service"
   controllers: [AdminController],
   providers: [
     AdminService,
+    AdminVerificationQueueService,
     ReconciliationService,
     RevenueService,
     WebsiteVerificationService,

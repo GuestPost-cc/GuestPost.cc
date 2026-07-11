@@ -44,9 +44,12 @@ import {
   ExecuteWithdrawalDto,
   ManualVerifyDto,
   MarkPlatformPublishedDto,
+  MarkVerifiedDto,
   PauseWebsiteDto,
   ReasonRequiredDto,
   ReassignWebsiteDto,
+  RejectVerificationDto,
+  RequestReverifyDto,
   ResolveDisputeDto,
   ReverseWithdrawalDto,
   SubmitPlatformContentDto,
@@ -66,6 +69,7 @@ import { GetRevenueQueryDto } from "./dto/get-revenue-query.dto"
 import { buildRevenueCsvFilename, streamRevenueCsv } from "./finance/csv-stream"
 import { RevenueService } from "./finance/revenue.service"
 import { ReconciliationService } from "./reconciliation.service"
+import { AdminVerificationQueueService } from "./verification-queue.service"
 import { WebsiteVerificationService } from "./website-verification.service"
 
 // Build the staff actor from the authenticated user. The matrix lives in
@@ -142,6 +146,7 @@ export class AdminController {
     private readonly orderReview: OrderReviewService,
     private readonly support: SupportService,
     private readonly revenue: RevenueService,
+    private readonly verificationQueue: AdminVerificationQueueService,
   ) {}
 
   // Recompute a publisher's trust score + tier from their full track record.
@@ -324,6 +329,65 @@ export class AdminController {
   ) {
     const method = body.method
     return this.admin.manualVerify(id, method, user.id)
+  }
+
+  // ── Verification queue ────────────────────────────────────────────────────
+  @Get("verification-queue")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  listVerificationQueue() {
+    return this.verificationQueue.listQueue()
+  }
+
+  @Post("verification-queue/:id/retry")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  retryVerification(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.verificationQueue.retry(id, user.id)
+  }
+
+  @Post("verification-queue/:id/mark-verified")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  markVerified(
+    @Param("id") id: string,
+    @Body() body: MarkVerifiedDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.verificationQueue.markVerified(
+      id,
+      user.id,
+      user.staffRole,
+      body.reason,
+      body.notes,
+    )
+  }
+
+  @Post("verification-queue/:id/reject")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  rejectVerification(
+    @Param("id") id: string,
+    @Body() body: RejectVerificationDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.verificationQueue.reject(
+      id,
+      user.id,
+      user.staffRole,
+      body.reason,
+    )
+  }
+
+  @Post("verification-queue/:id/request-reverify")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  requestReverify(
+    @Param("id") id: string,
+    @Body() body: RequestReverifyDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.verificationQueue.requestReverify(
+      id,
+      user.id,
+      user.staffRole,
+      body.ticketId,
+    )
   }
 
   @Post("orders/:id/refund")

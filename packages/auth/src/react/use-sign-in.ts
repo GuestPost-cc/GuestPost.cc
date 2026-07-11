@@ -1,6 +1,5 @@
 "use client"
 
-import { useRouter } from "next/navigation"
 import { useCallback, useState } from "react"
 import { getErrorMessage, isAuthError } from "../client/errors"
 import { signIn as signInTransport } from "../client/transport"
@@ -11,6 +10,7 @@ export interface UseSignInReturn {
     email: string
     password: string
     returnTo?: string
+    portal?: "customer" | "publisher"
   }) => Promise<void>
   loading: boolean
   error: AuthError | null
@@ -19,21 +19,31 @@ export interface UseSignInReturn {
 export function useSignIn(): UseSignInReturn {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<AuthError | null>(null)
-  const router = useRouter()
 
   const signIn = useCallback(
-    async (input: { email: string; password: string; returnTo?: string }) => {
+    async (input: {
+      email: string
+      password: string
+      returnTo?: string
+      portal?: "customer" | "publisher"
+    }) => {
       setLoading(true)
       setError(null)
       try {
-        const result = await signInTransport({
+        await signInTransport({
           email: input.email,
           password: input.password,
+          portal: input.portal,
         })
+        // Hard navigation — forces the dashboard middleware to re-evaluate
+        // the freshly-rotated session cookie. router.push() leaves the
+        // Next.js layout with stale session state and bounces the user back.
         const redirectTo =
           input.returnTo ||
-          (result.status === "authenticated" ? "/dashboard" : null)
-        if (redirectTo) router.push(redirectTo)
+          (input.portal === "publisher" ? "/dashboard" : "/dashboard")
+        if (redirectTo && typeof window !== "undefined") {
+          window.location.href = redirectTo
+        }
       } catch (err) {
         if (isAuthError(err)) {
           setError(err)
@@ -48,7 +58,7 @@ export function useSignIn(): UseSignInReturn {
         setLoading(false)
       }
     },
-    [router],
+    [],
   )
 
   return { signIn, loading, error }

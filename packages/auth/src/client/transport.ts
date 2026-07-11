@@ -6,11 +6,21 @@ import { getSession as serverGetSession } from "./session"
 export async function signIn(input: {
   email: string
   password: string
+  portal?: "customer" | "publisher"
 }): Promise<SignInResult> {
-  const { data, error } = await authClient.signIn.email({
-    email: input.email,
-    password: input.password,
-  })
+  const { data, error } = await authClient.signIn.email(
+    {
+      email: input.email,
+      password: input.password,
+    },
+    input.portal
+      ? {
+          headers: {
+            "x-portal-type": input.portal,
+          },
+        }
+      : undefined,
+  )
 
   if (error) throw mapBetterAuthError(error)
 
@@ -52,12 +62,22 @@ export async function signUp(input: {
   name: string
   email: string
   password: string
+  portal?: "customer" | "publisher"
 }): Promise<SignInResult> {
-  const { data, error } = await authClient.signUp.email({
-    name: input.name,
-    email: input.email,
-    password: input.password,
-  })
+  const { data, error } = await authClient.signUp.email(
+    {
+      name: input.name,
+      email: input.email,
+      password: input.password,
+    },
+    input.portal
+      ? {
+          headers: {
+            "x-portal-type": input.portal,
+          },
+        }
+      : undefined,
+  )
 
   if (error) throw mapBetterAuthError(error)
 

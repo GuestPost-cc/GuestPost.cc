@@ -742,6 +742,7 @@ function FinancePageInner() {
                     "orderId",
                     "publisher",
                     "grossAmount",
+                    "releasePolicy",
                     "status",
                     "createdAt",
                   ],
@@ -750,6 +751,7 @@ function FinancePageInner() {
                     s.orderId,
                     s.publisher?.name ?? s.publisherId,
                     Number(s.grossAmount ?? s.amount ?? 0).toFixed(2),
+                    s.releasePolicy ?? "",
                     s.status,
                     s.createdAt,
                   ]),
@@ -776,6 +778,7 @@ function FinancePageInner() {
                     <TableHead>Order</TableHead>
                     <TableHead>Publisher</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Release</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -792,6 +795,15 @@ function FinancePageInner() {
                       </TableCell>
                       <TableCell className="tabular-nums">
                         ${Number(s.grossAmount || s.amount || 0).toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            s.releasePolicy === "AUTO" ? "success" : "warning"
+                          }
+                        >
+                          {s.releasePolicy ?? "—"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={s.status} />

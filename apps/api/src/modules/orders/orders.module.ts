@@ -38,6 +38,7 @@ import { RefundService } from "./services/refund.service"
     OrderDeliveryService,
     OrderFulfillmentAssignmentService,
     OrderReviewService,
+    DeliveryInterventionService,
   ],
 })
 export class OrdersModule {}

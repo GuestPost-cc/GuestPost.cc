@@ -11,6 +11,7 @@ export const QUEUES = {
   PAYOUT: "payout",
   RECONCILIATION: "reconciliation",
   SETTLEMENT: "settlement",
+  AUTO_ACCEPT: "auto-accept",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
@@ -21,6 +22,7 @@ export const QUEUE_JOBS = {
     SEND_INVOICE: "send-invoice",
     SEND_NOTIFICATION: "send-notification",
     SEND_MAGIC_LINK: "send-magic-link",
+    SEND_REMINDER_EMAIL: "send-reminder-email",
   },
   [QUEUES.REPORT]: {
     GENERATE_PDF: "generate-pdf",
@@ -66,5 +68,12 @@ export const QUEUE_JOBS = {
     // "settlement-auto-approve" dedups cluster-wide so only one instance
     // runs per cadence regardless of pod count.
     AUTO_APPROVE: "settlement-auto-approve",
+    // Phase 6 — auto-release sweep. Finds CUSTOMER_APPROVED settlements
+    // with releasePolicy=AUTO and releases them (balance + order complete).
+    AUTO_RELEASE: "settlement-auto-release",
+  },
+  [QUEUES.AUTO_ACCEPT]: {
+    SWEEP: "auto-accept-sweep",
+    REMINDER_SWEEP: "review-reminder-sweep",
   },
 } as const

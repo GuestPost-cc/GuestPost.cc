@@ -1,12 +1,7 @@
-import { config } from "dotenv"
-
-// Dev env file loads ONLY under explicit NODE_ENV=development — unset NODE_ENV
-// (staging, CI) fails closed instead of silently using dev secrets
-if (process.env.NODE_ENV === "development") {
-  config({
-    path: require("node:path").resolve(__dirname, "../../../.env.development"),
-  })
-}
+// Worker environment prelude — MUST be the first import.
+// dotenv config() must run before any module that reads process.env at
+// load-time (e.g. @guestpost/database). See load-env.ts for rationale.
+import "./load-env"
 
 import { initSentry } from "@guestpost/shared"
 // Sentry must initialize BEFORE any other module so its auto-instrumentation
@@ -25,6 +20,7 @@ import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { Queue } from "bullmq"
 import { type HealthServerHandle, startHealthServer } from "./lib/health-server"
+import { createAutoAcceptWorker } from "./processors/auto-accept.processor"
 import { createDeliveryVerificationWorker } from "./processors/delivery-verification.processor"
 import { createEmailWorker } from "./processors/email.processor"
 import { createNotificationWorker } from "./processors/notification.processor"
@@ -33,6 +29,7 @@ import { createPublisherTrustWorker } from "./processors/publisher-trust.process
 import { createReconciliationWorker } from "./processors/reconciliation.processor"
 import { createReportWorker } from "./processors/report.processor"
 import { createSettlementAutoApproveWorker } from "./processors/settlement-auto-approve.processor"
+import { createSettlementReleaseWorker } from "./processors/settlement-release.processor"
 import { createVerificationWorker } from "./processors/verification.processor"
 import { createWebsiteVerificationWorker } from "./processors/website-verification.processor"
 import { connection } from "./redis"
@@ -195,6 +192,89 @@ async function registerSettlementAutoApproveSweep(): Promise<RegisteredJob> {
   return { name: "settlement-auto-approve", queue: QUEUES.SETTLEMENT }
 }
 
+// Phase 6 — settlement auto-release sweep. Finds CUSTOMER_APPROVED
+// settlements with releasePolicy=AUTO and releases them (balance update,
+// order complete, transactions). Default every 15 min, tunable via env.
+async function registerSettlementAutoReleaseSweep(): Promise<RegisteredJob> {
+  if (process.env.SETTLEMENT_AUTO_RELEASE_DISABLED === "true") {
+    logger.info(
+      "settlement auto-release disabled — skipping cron registration",
+      { env: "SETTLEMENT_AUTO_RELEASE_DISABLED" },
+    )
+    return { name: "settlement-auto-release", queue: QUEUES.SETTLEMENT }
+  }
+  const everyMs = Math.max(
+    Number(process.env.SETTLEMENT_AUTO_RELEASE_INTERVAL_MS ?? 15 * 60 * 1000),
+    60_000,
+  )
+  const batchSize = Math.min(
+    Math.max(Number(process.env.SETTLEMENT_AUTO_RELEASE_BATCH_SIZE) || 100, 1),
+    10_000,
+  )
+  const queue = new Queue(QUEUES.SETTLEMENT, { connection })
+  await queue
+    .removeRepeatable("settlement-auto-release", { every: everyMs })
+    .catch(() => {})
+  await queue.add("settlement-auto-release", signJobPayload({ batchSize }, 0), {
+    repeat: { every: everyMs },
+    jobId: "settlement-auto-release",
+    removeOnComplete: { count: 24 },
+    removeOnFail: { count: 24 },
+  })
+  await queue.close()
+  logger.info("registered settlement auto-release sweep", {
+    intervalMs: everyMs,
+    intervalMin: everyMs / 60000,
+    batchSize,
+  })
+  return { name: "settlement-auto-release", queue: QUEUES.SETTLEMENT }
+}
+
+// Phase 1 — auto-accept sweep: processes orders past their review window.
+async function registerAutoAcceptSweep(): Promise<RegisteredJob> {
+  const everyMs =
+    Math.max(Number(process.env.AUTO_ACCEPT_SWEEP_MINUTES ?? 60), 1) * 60 * 1000
+  const queue = new Queue(QUEUES.AUTO_ACCEPT, { connection })
+  await queue
+    .removeRepeatable("auto-accept-sweep", { every: everyMs })
+    .catch(() => {})
+  await queue.add("auto-accept-sweep", signJobPayload({}, 0), {
+    repeat: { every: everyMs },
+    jobId: "auto-accept-sweep",
+    removeOnComplete: { count: 24 },
+    removeOnFail: { count: 24 },
+  })
+  await queue.close()
+  logger.info("registered auto-accept sweep", {
+    intervalMs: everyMs,
+    intervalMin: everyMs / 60000,
+  })
+  return { name: "auto-accept-sweep", queue: QUEUES.AUTO_ACCEPT }
+}
+
+// Phase 1 — review reminder sweep: sends reminders for orders nearing
+// auto-accept. Shares the same cadence as the auto-accept sweep.
+async function registerReviewReminderSweep(): Promise<RegisteredJob> {
+  const everyMs =
+    Math.max(Number(process.env.AUTO_ACCEPT_SWEEP_MINUTES ?? 60), 1) * 60 * 1000
+  const queue = new Queue(QUEUES.AUTO_ACCEPT, { connection })
+  await queue
+    .removeRepeatable("review-reminder-sweep", { every: everyMs })
+    .catch(() => {})
+  await queue.add("review-reminder-sweep", signJobPayload({}, 0), {
+    repeat: { every: everyMs },
+    jobId: "review-reminder-sweep",
+    removeOnComplete: { count: 24 },
+    removeOnFail: { count: 24 },
+  })
+  await queue.close()
+  logger.info("registered review reminder sweep", {
+    intervalMs: everyMs,
+    intervalMin: everyMs / 60000,
+  })
+  return { name: "review-reminder-sweep", queue: QUEUES.AUTO_ACCEPT }
+}
+
 async function checkConnections() {
   try {
     await connection.ping()
@@ -285,6 +365,8 @@ async function bootstrap() {
     createDeliveryVerificationWorker(),
     createPublisherTrustWorker(),
     createSettlementAutoApproveWorker(),
+    createSettlementReleaseWorker(),
+    createAutoAcceptWorker(),
   )
   logger.info("workers started", { count: workers.length })
   // Register all repeatable cron jobs and verify the registry matches expectations.
@@ -294,6 +376,9 @@ async function bootstrap() {
     registerWebsiteReverifySweep(),
     registerSettlementHoldLinkSweep(),
     registerSettlementAutoApproveSweep(),
+    registerSettlementAutoReleaseSweep(),
+    registerAutoAcceptSweep(),
+    registerReviewReminderSweep(),
   ])
   // Assert that the set of actually-registered jobs matches the canonical registry.
   // This catches drift between registration functions and REPEATABLE_JOB_NAMES in

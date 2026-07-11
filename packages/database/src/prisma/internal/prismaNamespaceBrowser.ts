@@ -333,6 +333,8 @@ export const OrderScalarFieldEnum = {
   verifiedAt: 'verifiedAt',
   verifiedBy: 'verifiedBy',
   verifyMethod: 'verifyMethod',
+  autoAcceptAt: 'autoAcceptAt',
+  deliveryAcceptedMethod: 'deliveryAcceptedMethod',
   deliveredAt: 'deliveredAt',
   revisionCount: 'revisionCount',
   customerId: 'customerId',
@@ -441,6 +443,7 @@ export const SettlementScalarFieldEnum = {
   publisherAmount: 'publisherAmount',
   status: 'status',
   reviewEndsAt: 'reviewEndsAt',
+  releasePolicy: 'releasePolicy',
   settledAt: 'settledAt',
   version: 'version',
   listingServiceId: 'listingServiceId',
@@ -499,6 +502,9 @@ export const OrderDeliveryVersionScalarFieldEnum = {
   interventionStatus: 'interventionStatus',
   supersededByVersion: 'supersededByVersion',
   verificationVersion: 'verificationVersion',
+  adminVerifiedById: 'adminVerifiedById',
+  adminOverrideReason: 'adminOverrideReason',
+  adminVerifiedNotes: 'adminVerifiedNotes',
   createdAt: 'createdAt'
 } as const
 

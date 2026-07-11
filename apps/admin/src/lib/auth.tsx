@@ -1,5 +1,6 @@
 "use client"
 
+import { getSession } from "@guestpost/auth/client"
 import { setBusinessContext } from "@guestpost/shared"
 import * as Sentry from "@sentry/nextjs"
 import {
@@ -49,13 +50,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const token = getToken()
+      let token = getToken()
+      if (!token) {
+        const session = await getSession()
+        if (session?.token) {
+          token = session.token
+          setToken(session.token)
+        }
+      }
       const res = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
         headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         credentials: "include",
       })
       if (res.ok) {
-        setUser(await res.json())
+        const me = await res.json()
+        if (getToken() !== token) return
+        if (me.userType !== "STAFF") {
+          clearToken()
+          setUser(null)
+          return
+        }
+        setUser(me)
         return
       }
     } catch (e) {

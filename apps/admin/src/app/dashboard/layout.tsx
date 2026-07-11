@@ -74,6 +74,12 @@ const navItems: Array<{
     roles: ["SUPER_ADMIN", "OPERATIONS"],
   },
   {
+    href: "/dashboard/verification/delivery",
+    label: "Delivery Verification",
+    icon: ClipboardList,
+    roles: ["SUPER_ADMIN", "OPERATIONS"],
+  },
+  {
     href: "/dashboard/finance",
     label: "Finance",
     icon: Landmark,

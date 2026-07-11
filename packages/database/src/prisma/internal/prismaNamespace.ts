@@ -5664,6 +5664,8 @@ export const OrderScalarFieldEnum = {
   verifiedAt: 'verifiedAt',
   verifiedBy: 'verifiedBy',
   verifyMethod: 'verifyMethod',
+  autoAcceptAt: 'autoAcceptAt',
+  deliveryAcceptedMethod: 'deliveryAcceptedMethod',
   deliveredAt: 'deliveredAt',
   revisionCount: 'revisionCount',
   customerId: 'customerId',
@@ -5772,6 +5774,7 @@ export const SettlementScalarFieldEnum = {
   publisherAmount: 'publisherAmount',
   status: 'status',
   reviewEndsAt: 'reviewEndsAt',
+  releasePolicy: 'releasePolicy',
   settledAt: 'settledAt',
   version: 'version',
   listingServiceId: 'listingServiceId',
@@ -5830,6 +5833,9 @@ export const OrderDeliveryVersionScalarFieldEnum = {
   interventionStatus: 'interventionStatus',
   supersededByVersion: 'supersededByVersion',
   verificationVersion: 'verificationVersion',
+  adminVerifiedById: 'adminVerifiedById',
+  adminOverrideReason: 'adminOverrideReason',
+  adminVerifiedNotes: 'adminVerifiedNotes',
   createdAt: 'createdAt'
 } as const
 
@@ -6859,6 +6865,34 @@ export type ListEnumPaymentStatusFieldRefInput<$PrismaModel> = FieldRefInputType
 
 
 /**
+ * Reference to a field of type 'DeliveryVerificationMethod'
+ */
+export type EnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryVerificationMethod'>
+    
+
+
+/**
+ * Reference to a field of type 'DeliveryVerificationMethod[]'
+ */
+export type ListEnumDeliveryVerificationMethodFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryVerificationMethod[]'>
+    
+
+
+/**
+ * Reference to a field of type 'DeliveryAcceptedMethod'
+ */
+export type EnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryAcceptedMethod'>
+    
+
+
+/**
+ * Reference to a field of type 'DeliveryAcceptedMethod[]'
+ */
+export type ListEnumDeliveryAcceptedMethodFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryAcceptedMethod[]'>
+    
+
+
+/**
  * Reference to a field of type 'FulfillmentChannel'
  */
 export type EnumFulfillmentChannelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FulfillmentChannel'>
@@ -6943,6 +6977,20 @@ export type ListEnumSettlementStatusFieldRefInput<$PrismaModel> = FieldRefInputT
 
 
 /**
+ * Reference to a field of type 'SettlementReleasePolicy'
+ */
+export type EnumSettlementReleasePolicyFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SettlementReleasePolicy'>
+    
+
+
+/**
+ * Reference to a field of type 'SettlementReleasePolicy[]'
+ */
+export type ListEnumSettlementReleasePolicyFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SettlementReleasePolicy[]'>
+    
+
+
+/**
  * Reference to a field of type 'SettlementApprovalType'
  */
 export type EnumSettlementApprovalTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SettlementApprovalType'>
@@ -6995,6 +7043,20 @@ export type EnumDeliveryInterventionStatusFieldRefInput<$PrismaModel> = FieldRef
  * Reference to a field of type 'DeliveryInterventionStatus[]'
  */
 export type ListEnumDeliveryInterventionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DeliveryInterventionStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'VerificationOverrideReason'
+ */
+export type EnumVerificationOverrideReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VerificationOverrideReason'>
+    
+
+
+/**
+ * Reference to a field of type 'VerificationOverrideReason[]'
+ */
+export type ListEnumVerificationOverrideReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VerificationOverrideReason[]'>
     
 
 

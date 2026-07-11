@@ -108,6 +108,9 @@ export function createEmailWorker() {
           // template-named job kinds.
           logger.info("sending verification email", { to })
           break
+        case "send-reminder-email":
+          logger.info("sending review reminder email", { to, subject })
+          break
         default:
           logger.info("sending email", { to, subject, jobName: job.name })
           break

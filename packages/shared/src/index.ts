@@ -18,12 +18,15 @@ export * from "./queues"
 export * from "./reconciliation-core"
 export * from "./schemas"
 export * from "./settlement-auto-approve-core"
+export * from "./settlement-auto-release-core"
 export * from "./settlement-gating"
 export * from "./trust-score"
 export * from "./types"
 export * from "./url-normalize"
 export * from "./webhook-timestamp"
 export * from "./website-verification-core"
+export * from "./workflow/decision-service"
+export * from "./workflow/workflow-config"
 
 // IMPORTANT: do NOT re-export Node-only modules here.
 // - safe-fetch (Phase 7.11) imports node:dns + undici → can't be bundled by

@@ -599,6 +599,9 @@ async function bootstrap() {
     onEmailVerified: (userId) => {
       invalidateAuthContext(userId)
     },
+    invalidateAuthContext: (userId) => {
+      invalidateAuthContext(userId)
+    },
   })
   // Better Auth handler must be before body parsers so it can read raw bodies
   server.use("/api/v1/auth", toNodeHandler(authWithRateLimit))

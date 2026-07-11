@@ -747,6 +747,36 @@ export class AdminService {
     })
   }
 
+  // ── Phase 8 — Delivery verification queue (admin) ──
+
+  listVerificationQueue() {
+    return this.client.get<any[]>("/admin/verification-queue")
+  }
+
+  retryVerification(id: string) {
+    return this.client.post<any>(`/admin/verification-queue/${id}/retry`)
+  }
+
+  markVerified(id: string, body: { reason: string; notes?: string }) {
+    return this.client.post<any>(
+      `/admin/verification-queue/${id}/mark-verified`,
+      { json: body },
+    )
+  }
+
+  rejectVerification(id: string, body: { reason: string }) {
+    return this.client.post<any>(`/admin/verification-queue/${id}/reject`, {
+      json: body,
+    })
+  }
+
+  requestReverify(id: string, body: { ticketId: string }) {
+    return this.client.post<any>(
+      `/admin/verification-queue/${id}/request-reverify`,
+      { json: body },
+    )
+  }
+
   // ── Phase 7.1 — PlatformRevenue dashboard (GET /admin/finance/revenue) ──
 
   /**

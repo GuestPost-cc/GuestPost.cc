@@ -1,6 +1,11 @@
 "use client"
 
-import { getSession } from "@guestpost/auth/client"
+import {
+  getSession,
+  signIn as signInTransport,
+  signOut as signOutTransport,
+  signUp as signUpTransport,
+} from "@guestpost/auth/client"
 import { setBusinessContext } from "@guestpost/shared"
 import * as Sentry from "@sentry/nextjs"
 import {
@@ -12,17 +17,6 @@ import {
   useState,
 } from "react"
 import { clearToken, getToken, setToken } from "./api"
-
-const getBaseUrl = () => {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL
-  if (envUrl) return envUrl
-  if (typeof window !== "undefined") {
-    const host = window.location.hostname
-    if (host !== "localhost" && host !== "127.0.0.1")
-      return `http://${host}:4000`
-  }
-  return "http://localhost:4000"
-}
 
 type User = {
   id: string
@@ -46,9 +40,34 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+/**
+ * Auth provider for the publisher app (used by dashboard pages).
+ *
+ * The login page (`apps/publisher/src/app/page.tsx`) handles its own auth
+ * flow and hard-redirects to /dashboard on success — it does NOT use this
+ * provider. This provider's `signIn`/`signUp` are convenience wrappers for
+ * any consumer that wants the AuthProvider-shaped API (e.g. programmatic
+ * sign-in from a settings page).
+ *
+ * After birth-time provisioning (Phase 7.11), signup on the publisher portal
+ * creates a PUBLISHER user directly — no `become-publisher` conversion step.
+ * The `session.create.before` hook in packages/auth handles any existing
+ * CUSTOMER collision.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const getBaseUrl = useCallback(() => {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL
+    if (envUrl) return envUrl
+    if (typeof window !== "undefined") {
+      const host = window.location.hostname
+      if (host !== "localhost" && host !== "127.0.0.1")
+        return `http://${host}:4000`
+    }
+    return "http://localhost:4000"
+  }, [])
 
   const refresh = useCallback(async () => {
     try {
@@ -78,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("Session refresh failed:", e)
     }
     setUser(null)
-  }, [])
+  }, [getBaseUrl])
 
   useEffect(() => {
     refresh().finally(() => setLoading(false))
@@ -105,23 +124,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`${getBaseUrl()}/api/v1/auth/sign-in/email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        credentials: "include",
+      const result = await signInTransport({
+        email,
+        password,
+        portal: "publisher",
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message ?? "Invalid credentials")
-      }
-      const data = await res.json()
-      if (data.token) setToken(data.token)
+      const token = result.status === "authenticated" ? result.token : undefined
+      if (token) setToken(token)
 
       const meRes = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
-        headers: data.token
-          ? { Authorization: `Bearer ${data.token}` }
-          : undefined,
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         credentials: "include",
       })
       const me = await meRes.json()
@@ -141,42 +153,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = async (email: string, password: string, name: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`${getBaseUrl()}/api/v1/auth/sign-up/email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name }),
-        credentials: "include",
+      // Birth-time provisioning: the databaseHooks in packages/auth set
+      // userType=PUBLISHER and provision the publisher entity automatically.
+      // No become-publisher call needed.
+      const result = await signUpTransport({
+        email,
+        password,
+        name,
+        portal: "publisher",
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message ?? "Sign up failed")
-      }
-      const data = await res.json()
-      if (data.token) setToken(data.token)
-
-      // Accounts register as CUSTOMER by default — convert this fresh account
-      // into a publisher (backend refuses staff/existing-membership accounts;
-      // new publishers start at NEW tier with the full withdrawal hold).
-      const convertRes = await fetch(
-        `${getBaseUrl()}/api/v1/identity/become-publisher`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(data.token ? { Authorization: `Bearer ${data.token}` } : {}),
-          },
-          credentials: "include",
-          body: JSON.stringify({ publisherName: name }),
-        },
-      )
-      if (!convertRes.ok) {
-        const err = await convertRes.json().catch(() => ({}))
-        clearToken()
-        throw new Error(
-          err.message ?? "Could not set up your publisher account",
-        )
-      }
-
+      const token = result.status === "authenticated" ? result.token : undefined
+      if (token) setToken(token)
       await refresh()
     } finally {
       setLoading(false)
@@ -184,12 +171,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    const token = getToken()
-    await fetch(`${getBaseUrl()}/api/v1/auth/sign-out`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-      credentials: "include",
-    })
+    await signOutTransport()
     clearToken()
     setUser(null)
   }

@@ -6,6 +6,7 @@ import {
   orderEventMetadata,
   type PublisherTier,
   QUEUES,
+  WorkflowDecisionService,
 } from "@guestpost/shared"
 import {
   BadRequestException,
@@ -31,6 +32,7 @@ import { evaluateSettlementEligibilityTx } from "./settlement-eligibility"
 @Injectable()
 export class SettlementsService {
   private readonly logger = new Logger(SettlementsService.name)
+  private readonly decision = new WorkflowDecisionService()
 
   constructor(
     private readonly prisma: PrismaService,
@@ -153,6 +155,18 @@ export class SettlementsService {
         Date.now() + reviewDays * 24 * 60 * 60 * 1000,
       )
 
+      // Compute release policy using the centralized decision service
+      const fraudFlags = await tx.deliveryFraudFlag.findMany({
+        where: { orderId },
+        select: { type: true },
+      })
+      const releasePolicy = this.decision.computeSettlementReleasePolicy(
+        { verifyMethod: order.verifyMethod, amount: Number(order.amount) },
+        publisherTierRow ? { tier: publisherTierRow.tier } : null,
+        fraudFlags,
+        null,
+      )
+
       // Re-check gating inside the transaction to close the TOCTOU window
       // between the pre-transaction evaluateSettlementEligibility call
       // (line 52) and this point — a dispute could have been opened, fraud
@@ -177,6 +191,7 @@ export class SettlementsService {
             publisherAmount,
             status: "PENDING",
             reviewEndsAt,
+            releasePolicy,
             // Phase 6 snapshots (read-only after creation).
             listingServiceId,
             serviceType,
@@ -205,6 +220,7 @@ export class SettlementsService {
           message: `Settlement created — customer amount: ${order.amount}, publisher amount: ${publisherAmount}`,
           metadata: {
             settlementId: settlement.id,
+            releasePolicy,
             publisherAmount: publisherAmount.toNumber(),
             platformFee: platformFee.toNumber(),
           },

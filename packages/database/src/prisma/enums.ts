@@ -199,7 +199,10 @@ export const OrderEventType = {
   REFUND_ISSUED: 'REFUND_ISSUED',
   SETTLEMENT_CREATED: 'SETTLEMENT_CREATED',
   SETTLED: 'SETTLED',
-  REFUNDED: 'REFUNDED'
+  REFUNDED: 'REFUNDED',
+  VERIFICATION_ESCALATED: 'VERIFICATION_ESCALATED',
+  AUTO_ACCEPTED: 'AUTO_ACCEPTED',
+  REVIEW_REMINDER: 'REVIEW_REMINDER'
 } as const
 
 export type OrderEventType = (typeof OrderEventType)[keyof typeof OrderEventType]
@@ -286,6 +289,43 @@ export const VerificationStatus = {
 } as const
 
 export type VerificationStatus = (typeof VerificationStatus)[keyof typeof VerificationStatus]
+
+
+export const DeliveryVerificationMethod = {
+  AUTO: 'AUTO',
+  MANUAL_ADMIN: 'MANUAL_ADMIN',
+  CUSTOMER_MANUAL: 'CUSTOMER_MANUAL'
+} as const
+
+export type DeliveryVerificationMethod = (typeof DeliveryVerificationMethod)[keyof typeof DeliveryVerificationMethod]
+
+
+export const DeliveryAcceptedMethod = {
+  CUSTOMER: 'CUSTOMER',
+  AUTO_TIMEOUT: 'AUTO_TIMEOUT'
+} as const
+
+export type DeliveryAcceptedMethod = (typeof DeliveryAcceptedMethod)[keyof typeof DeliveryAcceptedMethod]
+
+
+export const VerificationOverrideReason = {
+  CRAWLER_BLOCKED: 'CRAWLER_BLOCKED',
+  ROBOTS_TXT: 'ROBOTS_TXT',
+  LOGIN_REQUIRED: 'LOGIN_REQUIRED',
+  JS_RENDERING: 'JS_RENDERING',
+  TEMPORARY_FAILURE: 'TEMPORARY_FAILURE',
+  OTHER: 'OTHER'
+} as const
+
+export type VerificationOverrideReason = (typeof VerificationOverrideReason)[keyof typeof VerificationOverrideReason]
+
+
+export const SettlementReleasePolicy = {
+  AUTO: 'AUTO',
+  MANUAL: 'MANUAL'
+} as const
+
+export type SettlementReleasePolicy = (typeof SettlementReleasePolicy)[keyof typeof SettlementReleasePolicy]
 
 
 export const IntegrationOwnerType = {

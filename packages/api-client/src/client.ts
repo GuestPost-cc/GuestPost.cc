@@ -159,6 +159,13 @@ export class HttpClient {
     }
 
     const res = await fetch(this.buildUrl(path, params), init)
+
+    // If the server rotated our session token, update the in-memory
+    // store so subsequent state-changing requests don't lose the Bearer
+    // header and trigger the CSRF guard.
+    const rotatedToken = res.headers.get("X-Session-Token")
+    if (rotatedToken) setToken(rotatedToken)
+
     const responseRequestId = res.headers.get("X-Request-ID") ?? requestId
     if (!res.ok) {
       // Phase 6.8 — Audit finding #7 closure.

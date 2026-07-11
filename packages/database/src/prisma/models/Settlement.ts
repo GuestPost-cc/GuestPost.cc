@@ -51,6 +51,7 @@ export type SettlementMinAggregateOutputType = {
   publisherAmount: runtime.Decimal | null
   status: $Enums.SettlementStatus | null
   reviewEndsAt: Date | null
+  releasePolicy: $Enums.SettlementReleasePolicy | null
   settledAt: Date | null
   version: number | null
   listingServiceId: string | null
@@ -71,6 +72,7 @@ export type SettlementMaxAggregateOutputType = {
   publisherAmount: runtime.Decimal | null
   status: $Enums.SettlementStatus | null
   reviewEndsAt: Date | null
+  releasePolicy: $Enums.SettlementReleasePolicy | null
   settledAt: Date | null
   version: number | null
   listingServiceId: string | null
@@ -91,6 +93,7 @@ export type SettlementCountAggregateOutputType = {
   publisherAmount: number
   status: number
   reviewEndsAt: number
+  releasePolicy: number
   settledAt: number
   version: number
   listingServiceId: number
@@ -129,6 +132,7 @@ export type SettlementMinAggregateInputType = {
   publisherAmount?: true
   status?: true
   reviewEndsAt?: true
+  releasePolicy?: true
   settledAt?: true
   version?: true
   listingServiceId?: true
@@ -149,6 +153,7 @@ export type SettlementMaxAggregateInputType = {
   publisherAmount?: true
   status?: true
   reviewEndsAt?: true
+  releasePolicy?: true
   settledAt?: true
   version?: true
   listingServiceId?: true
@@ -169,6 +174,7 @@ export type SettlementCountAggregateInputType = {
   publisherAmount?: true
   status?: true
   reviewEndsAt?: true
+  releasePolicy?: true
   settledAt?: true
   version?: true
   listingServiceId?: true
@@ -276,6 +282,7 @@ export type SettlementGroupByOutputType = {
   publisherAmount: runtime.Decimal
   status: $Enums.SettlementStatus
   reviewEndsAt: Date | null
+  releasePolicy: $Enums.SettlementReleasePolicy
   settledAt: Date | null
   version: number
   listingServiceId: string | null
@@ -319,6 +326,7 @@ export type SettlementWhereInput = {
   publisherAmount?: Prisma.DecimalFilter<"Settlement"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFilter<"Settlement"> | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.DateTimeNullableFilter<"Settlement"> | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFilter<"Settlement"> | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.DateTimeNullableFilter<"Settlement"> | Date | string | null
   version?: Prisma.IntFilter<"Settlement"> | number
   listingServiceId?: Prisma.StringNullableFilter<"Settlement"> | string | null
@@ -344,6 +352,7 @@ export type SettlementOrderByWithRelationInput = {
   publisherAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   reviewEndsAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  releasePolicy?: Prisma.SortOrder
   settledAt?: Prisma.SortOrderInput | Prisma.SortOrder
   version?: Prisma.SortOrder
   listingServiceId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -372,6 +381,7 @@ export type SettlementWhereUniqueInput = Prisma.AtLeast<{
   publisherAmount?: Prisma.DecimalFilter<"Settlement"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFilter<"Settlement"> | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.DateTimeNullableFilter<"Settlement"> | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFilter<"Settlement"> | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.DateTimeNullableFilter<"Settlement"> | Date | string | null
   version?: Prisma.IntFilter<"Settlement"> | number
   listingServiceId?: Prisma.StringNullableFilter<"Settlement"> | string | null
@@ -397,6 +407,7 @@ export type SettlementOrderByWithAggregationInput = {
   publisherAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   reviewEndsAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  releasePolicy?: Prisma.SortOrder
   settledAt?: Prisma.SortOrderInput | Prisma.SortOrder
   version?: Prisma.SortOrder
   listingServiceId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -425,6 +436,7 @@ export type SettlementScalarWhereWithAggregatesInput = {
   publisherAmount?: Prisma.DecimalWithAggregatesFilter<"Settlement"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusWithAggregatesFilter<"Settlement"> | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Settlement"> | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyWithAggregatesFilter<"Settlement"> | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Settlement"> | Date | string | null
   version?: Prisma.IntWithAggregatesFilter<"Settlement"> | number
   listingServiceId?: Prisma.StringNullableWithAggregatesFilter<"Settlement"> | string | null
@@ -443,6 +455,7 @@ export type SettlementCreateInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   serviceType?: $Enums.ServiceType | null
@@ -467,6 +480,7 @@ export type SettlementUncheckedCreateInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   listingServiceId?: string | null
@@ -487,6 +501,7 @@ export type SettlementUpdateInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
@@ -511,6 +526,7 @@ export type SettlementUncheckedUpdateInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -533,6 +549,7 @@ export type SettlementCreateManyInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   listingServiceId?: string | null
@@ -551,6 +568,7 @@ export type SettlementUpdateManyMutationInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
@@ -570,6 +588,7 @@ export type SettlementUncheckedUpdateManyInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -600,6 +619,7 @@ export type SettlementCountOrderByAggregateInput = {
   publisherAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   reviewEndsAt?: Prisma.SortOrder
+  releasePolicy?: Prisma.SortOrder
   settledAt?: Prisma.SortOrder
   version?: Prisma.SortOrder
   listingServiceId?: Prisma.SortOrder
@@ -628,6 +648,7 @@ export type SettlementMaxOrderByAggregateInput = {
   publisherAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   reviewEndsAt?: Prisma.SortOrder
+  releasePolicy?: Prisma.SortOrder
   settledAt?: Prisma.SortOrder
   version?: Prisma.SortOrder
   listingServiceId?: Prisma.SortOrder
@@ -648,6 +669,7 @@ export type SettlementMinOrderByAggregateInput = {
   publisherAmount?: Prisma.SortOrder
   status?: Prisma.SortOrder
   reviewEndsAt?: Prisma.SortOrder
+  releasePolicy?: Prisma.SortOrder
   settledAt?: Prisma.SortOrder
   version?: Prisma.SortOrder
   listingServiceId?: Prisma.SortOrder
@@ -773,6 +795,10 @@ export type EnumSettlementStatusFieldUpdateOperationsInput = {
   set?: $Enums.SettlementStatus
 }
 
+export type EnumSettlementReleasePolicyFieldUpdateOperationsInput = {
+  set?: $Enums.SettlementReleasePolicy
+}
+
 export type NullableEnumServiceTypeFieldUpdateOperationsInput = {
   set?: $Enums.ServiceType | null
 }
@@ -860,6 +886,7 @@ export type SettlementCreateWithoutPublisherInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   serviceType?: $Enums.ServiceType | null
@@ -882,6 +909,7 @@ export type SettlementUncheckedCreateWithoutPublisherInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   listingServiceId?: string | null
@@ -933,6 +961,7 @@ export type SettlementScalarWhereInput = {
   publisherAmount?: Prisma.DecimalFilter<"Settlement"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFilter<"Settlement"> | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.DateTimeNullableFilter<"Settlement"> | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFilter<"Settlement"> | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.DateTimeNullableFilter<"Settlement"> | Date | string | null
   version?: Prisma.IntFilter<"Settlement"> | number
   listingServiceId?: Prisma.StringNullableFilter<"Settlement"> | string | null
@@ -951,6 +980,7 @@ export type SettlementCreateWithoutOrderInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   serviceType?: $Enums.ServiceType | null
@@ -973,6 +1003,7 @@ export type SettlementUncheckedCreateWithoutOrderInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   listingServiceId?: string | null
@@ -1019,6 +1050,7 @@ export type SettlementCreateWithoutApprovalsInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   serviceType?: $Enums.ServiceType | null
@@ -1042,6 +1074,7 @@ export type SettlementUncheckedCreateWithoutApprovalsInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   listingServiceId?: string | null
@@ -1077,6 +1110,7 @@ export type SettlementUpdateWithoutApprovalsInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
@@ -1100,6 +1134,7 @@ export type SettlementUncheckedUpdateWithoutApprovalsInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1119,6 +1154,7 @@ export type SettlementCreateWithoutTransactionsInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   serviceType?: $Enums.ServiceType | null
@@ -1142,6 +1178,7 @@ export type SettlementUncheckedCreateWithoutTransactionsInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   listingServiceId?: string | null
@@ -1177,6 +1214,7 @@ export type SettlementUpdateWithoutTransactionsInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
@@ -1200,6 +1238,7 @@ export type SettlementUncheckedUpdateWithoutTransactionsInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1219,6 +1258,7 @@ export type SettlementCreateWithoutListingServiceInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   serviceType?: $Enums.ServiceType | null
@@ -1242,6 +1282,7 @@ export type SettlementUncheckedCreateWithoutListingServiceInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   serviceType?: $Enums.ServiceType | null
@@ -1288,6 +1329,7 @@ export type SettlementCreateManyPublisherInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   listingServiceId?: string | null
@@ -1306,6 +1348,7 @@ export type SettlementUpdateWithoutPublisherInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
@@ -1328,6 +1371,7 @@ export type SettlementUncheckedUpdateWithoutPublisherInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1349,6 +1393,7 @@ export type SettlementUncheckedUpdateManyWithoutPublisherInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1368,6 +1413,7 @@ export type SettlementCreateManyOrderInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   listingServiceId?: string | null
@@ -1386,6 +1432,7 @@ export type SettlementUpdateWithoutOrderInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
@@ -1408,6 +1455,7 @@ export type SettlementUncheckedUpdateWithoutOrderInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1429,6 +1477,7 @@ export type SettlementUncheckedUpdateManyWithoutOrderInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1449,6 +1498,7 @@ export type SettlementCreateManyListingServiceInput = {
   publisherAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: $Enums.SettlementStatus
   reviewEndsAt?: Date | string | null
+  releasePolicy?: $Enums.SettlementReleasePolicy
   settledAt?: Date | string | null
   version?: number
   serviceType?: $Enums.ServiceType | null
@@ -1466,6 +1516,7 @@ export type SettlementUpdateWithoutListingServiceInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
@@ -1489,6 +1540,7 @@ export type SettlementUncheckedUpdateWithoutListingServiceInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
@@ -1510,6 +1562,7 @@ export type SettlementUncheckedUpdateManyWithoutListingServiceInput = {
   publisherAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   status?: Prisma.EnumSettlementStatusFieldUpdateOperationsInput | $Enums.SettlementStatus
   reviewEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  releasePolicy?: Prisma.EnumSettlementReleasePolicyFieldUpdateOperationsInput | $Enums.SettlementReleasePolicy
   settledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
   serviceType?: Prisma.NullableEnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType | null
@@ -1569,6 +1622,7 @@ export type SettlementSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   publisherAmount?: boolean
   status?: boolean
   reviewEndsAt?: boolean
+  releasePolicy?: boolean
   settledAt?: boolean
   version?: boolean
   listingServiceId?: boolean
@@ -1595,6 +1649,7 @@ export type SettlementSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ex
   publisherAmount?: boolean
   status?: boolean
   reviewEndsAt?: boolean
+  releasePolicy?: boolean
   settledAt?: boolean
   version?: boolean
   listingServiceId?: boolean
@@ -1618,6 +1673,7 @@ export type SettlementSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ex
   publisherAmount?: boolean
   status?: boolean
   reviewEndsAt?: boolean
+  releasePolicy?: boolean
   settledAt?: boolean
   version?: boolean
   listingServiceId?: boolean
@@ -1641,6 +1697,7 @@ export type SettlementSelectScalar = {
   publisherAmount?: boolean
   status?: boolean
   reviewEndsAt?: boolean
+  releasePolicy?: boolean
   settledAt?: boolean
   version?: boolean
   listingServiceId?: boolean
@@ -1652,7 +1709,7 @@ export type SettlementSelectScalar = {
   updatedAt?: boolean
 }
 
-export type SettlementOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "publisherId" | "grossAmount" | "platformFee" | "publisherAmount" | "status" | "reviewEndsAt" | "settledAt" | "version" | "listingServiceId" | "serviceType" | "ownerType" | "fulfillmentChannel" | "unitPrice" | "createdAt" | "updatedAt", ExtArgs["result"]["settlement"]>
+export type SettlementOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "publisherId" | "grossAmount" | "platformFee" | "publisherAmount" | "status" | "reviewEndsAt" | "releasePolicy" | "settledAt" | "version" | "listingServiceId" | "serviceType" | "ownerType" | "fulfillmentChannel" | "unitPrice" | "createdAt" | "updatedAt", ExtArgs["result"]["settlement"]>
 export type SettlementInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
   publisher?: boolean | Prisma.PublisherDefaultArgs<ExtArgs>
@@ -1690,6 +1747,7 @@ export type $SettlementPayload<ExtArgs extends runtime.Types.Extensions.Internal
     publisherAmount: runtime.Decimal
     status: $Enums.SettlementStatus
     reviewEndsAt: Date | null
+    releasePolicy: $Enums.SettlementReleasePolicy
     settledAt: Date | null
     version: number
     listingServiceId: string | null
@@ -2135,6 +2193,7 @@ export interface SettlementFieldRefs {
   readonly publisherAmount: Prisma.FieldRef<"Settlement", 'Decimal'>
   readonly status: Prisma.FieldRef<"Settlement", 'SettlementStatus'>
   readonly reviewEndsAt: Prisma.FieldRef<"Settlement", 'DateTime'>
+  readonly releasePolicy: Prisma.FieldRef<"Settlement", 'SettlementReleasePolicy'>
   readonly settledAt: Prisma.FieldRef<"Settlement", 'DateTime'>
   readonly version: Prisma.FieldRef<"Settlement", 'Int'>
   readonly listingServiceId: Prisma.FieldRef<"Settlement", 'String'>

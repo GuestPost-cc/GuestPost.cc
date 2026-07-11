@@ -155,7 +155,7 @@ export class DeliveryInterventionService {
         status: "VERIFIED",
         verifiedAt: new Date(),
         verifiedBy: userId,
-        verifyMethod: "manual",
+        verifyMethod: "MANUAL_ADMIN",
       },
     })
 
@@ -266,7 +266,7 @@ export class DeliveryInterventionService {
           status: "VERIFIED",
           verifiedAt: new Date(),
           verifiedBy: userId,
-          verifyMethod: "override",
+          verifyMethod: "MANUAL_ADMIN",
         },
       })
     }

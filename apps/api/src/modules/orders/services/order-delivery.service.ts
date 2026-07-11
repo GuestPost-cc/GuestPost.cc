@@ -308,7 +308,8 @@ export class OrderDeliveryService {
           deliveredAt: new Date(),
           verifiedAt: new Date(),
           verifiedBy: userId,
-          verifyMethod: "customer_manual",
+          verifyMethod: "CUSTOMER_MANUAL",
+          deliveryAcceptedMethod: "CUSTOMER",
           version: { increment: 1 },
         },
       })

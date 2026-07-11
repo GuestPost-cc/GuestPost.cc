@@ -1,6 +1,10 @@
 /**
- * Publisher journey: signup → automatic become-publisher conversion →
+ * Publisher journey: signup → birth-time PUBLISHER provisioning →
  * publisher dashboard with listings/withdrawals nav.
+ *
+ * Phase 7.11 — userType is now set at signup time via the databaseHooks in
+ * packages/auth (x-portal-type=publisher). The old become-publisher
+ * conversion step is no longer part of the signup flow.
  */
 import { expect, test } from "@playwright/test"
 

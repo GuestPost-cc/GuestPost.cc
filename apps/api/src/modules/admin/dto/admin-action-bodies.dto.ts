@@ -68,6 +68,44 @@ export class UpdatePublisherTierDto {
   tier!: PublisherTierValue
 }
 
+// ── Verification queue ──────────────────────────────────────────────────────
+
+const VERIFICATION_OVERRIDE_REASONS = [
+  "CRAWLER_BLOCKED",
+  "ROBOTS_TXT",
+  "LOGIN_REQUIRED",
+  "JS_RENDERING",
+  "TEMPORARY_FAILURE",
+  "OTHER",
+] as const
+
+export class MarkVerifiedDto {
+  @IsString()
+  @IsIn(VERIFICATION_OVERRIDE_REASONS as unknown as string[])
+  reason!: (typeof VERIFICATION_OVERRIDE_REASONS)[number]
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2_000)
+  notes?: string
+}
+
+export class RejectVerificationDto {
+  @IsString()
+  @MinLength(10, {
+    message: "Reason must be at least 10 characters for audit clarity",
+  })
+  @MaxLength(2_000)
+  reason!: string
+}
+
+export class RequestReverifyDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  ticketId?: string
+}
+
 // ── Verification / fulfillment ─────────────────────────────────────────────
 
 export class BulkRetryVerificationDto {

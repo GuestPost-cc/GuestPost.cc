@@ -12,6 +12,7 @@
 import { createHash } from "node:crypto"
 import * as cheerio from "cheerio"
 import { normalizeUrl, sameDomain, urlsMatch } from "./url-normalize"
+import { defaultWorkflowConfig } from "./workflow/workflow-config"
 
 export interface FetchResult {
   finalUrl: string
@@ -376,9 +377,27 @@ export async function runDeliveryVerification(
       },
     })
     if (upd.count === 0) return { skipped: "version_conflict" }
-    await audit(prisma, "ORDER_DELIVERY_AUTO_FAILED", order, version, null, {
+    await audit(prisma, "ORDER_DELIVERY_ESCALATED", order, version, null, {
       reason,
       manualReview: true,
+      httpStatus: fetched.status,
+      error: fetched.error ?? null,
+      redirectChain: fetched.redirectChain,
+    })
+    await prisma.orderEvent.create({
+      data: {
+        orderId: order.id,
+        eventType: "VERIFICATION_ESCALATED",
+        actorId: null,
+        message: `Verification escalated to manual review: ${reason}`,
+        metadata: {
+          deliveryVersionId: version.id,
+          reason,
+          httpStatus: fetched.status,
+          error: fetched.error ?? null,
+          redirectChain: fetched.redirectChain,
+        },
+      },
     })
     const ids = await staffIds(prisma)
     await notifyUsers(
@@ -487,21 +506,43 @@ export async function runDeliveryVerification(
   })
   if (upd.count === 0) return { skipped: "version_conflict" }
 
+  // Fraud detection runs on every checked delivery (runs before the
+  // order status flip so events can reference fraud outcomes).
+  const fraudTypes = await runFraudDetection(deps, order, version, analysis)
+
   // Mirror onto the order (denormalized) when verified + currently published.
   if (pass) {
+    const reviewWindowMs =
+      defaultWorkflowConfig.reviewWindowDays * 24 * 60 * 60 * 1000
+    const autoAcceptAt = new Date(now.getTime() + reviewWindowMs)
     await prisma.order.updateMany({
       where: { id: order.id, status: "PUBLISHED" },
       data: {
         status: "VERIFIED",
         verifiedAt: now,
         verifiedBy: "system",
-        verifyMethod: "auto",
+        verifyMethod: "AUTO",
+        autoAcceptAt,
+      },
+    })
+    await prisma.orderEvent.create({
+      data: {
+        orderId: order.id,
+        eventType: "VERIFIED_AUTO",
+        actorId: "system",
+        message: `Delivery auto-verified — review window expires ${autoAcceptAt.toISOString()}`,
+        metadata: {
+          httpStatus: fetched.status,
+          resolvedUrl: fetched.finalUrl,
+          targetUrlMatched: analysis.targetUrlMatched,
+          anchorFound: analysis.anchorFound,
+          htmlHash,
+          snapshotStored,
+          fraudTypes,
+        },
       },
     })
   }
-
-  // Fraud detection runs on every checked delivery.
-  const fraudTypes = await runFraudDetection(deps, order, version, analysis)
 
   // Audit + notify
   await audit(

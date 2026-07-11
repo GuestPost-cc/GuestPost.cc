@@ -13,7 +13,7 @@ import {
   LoginForm,
   useSessionExpired,
 } from "@guestpost/ui"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
 
 export default function LoginPage() {
@@ -25,7 +25,6 @@ export default function LoginPage() {
 }
 
 function LoginPageInner() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -44,7 +43,9 @@ function LoginPageInner() {
       try {
         const sessionResult = await serverGetSession()
         if (sessionResult?.user?.userType === "STAFF") {
-          router.push(safeReturnTo)
+          // Hard navigation — router.push() leaves the Next.js layout with
+          // stale session state and can bounce back to the login page.
+          window.location.href = safeReturnTo
           return
         }
       } catch {
@@ -53,7 +54,7 @@ function LoginPageInner() {
       setInitialCheck(false)
     }
     checkSession()
-  }, [router, safeReturnTo])
+  }, [safeReturnTo])
 
   const handleSignIn = async (data: { email: string; password: string }) => {
     setError(null)

@@ -717,7 +717,9 @@ async function checkOrderPaymentReconciliation(
       const order = paidOrders.find((o: any) => o.id === orderId)
       if (order) {
         const orderAmount = toScaled(order.amount ?? 0)
-        if (entry.sum !== orderAmount) {
+        // PURCHASE transactions are stored as negative amounts (debits).
+        const txnSum = entry.sum < 0n ? -entry.sum : entry.sum
+        if (txnSum !== orderAmount) {
           drift.push(
             makeRow({
               severity: "critical",
@@ -725,11 +727,11 @@ async function checkOrderPaymentReconciliation(
               code: ReconciliationCode.PAYMENT_AMOUNT_MISMATCH,
               entityId: orderId,
               entityType: "Order",
-              amount: fromScaled(entry.sum - orderAmount),
-              message: `Order ${orderId.slice(0, 8)} amount (${fromScaled(orderAmount)}) ≠ sum of PURCHASE transactions (${fromScaled(entry.sum)})`,
+              amount: fromScaled(txnSum - orderAmount),
+              message: `Order ${orderId.slice(0, 8)} amount (${fromScaled(orderAmount)}) ≠ sum of PURCHASE transactions (${fromScaled(txnSum)})`,
               metadata: {
                 expectedAmount: fromScaled(orderAmount),
-                actualAmount: fromScaled(entry.sum),
+                actualAmount: fromScaled(txnSum),
                 orderId,
               },
               action: { type: "order", id: orderId },

@@ -19,7 +19,7 @@ import {
   SignupForm,
   useSessionExpired,
 } from "@guestpost/ui"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
 
 function GoogleIcon({ className }: { className?: string }) {
@@ -48,17 +48,6 @@ function GoogleIcon({ className }: { className?: string }) {
       />
     </svg>
   )
-}
-
-function getBaseUrl(): string {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL
-  if (envUrl) return envUrl
-  if (typeof window !== "undefined") {
-    const host = window.location.hostname
-    if (host !== "localhost" && host !== "127.0.0.1")
-      return `http://${host}:4000`
-  }
-  return "http://localhost:4000"
 }
 
 const publisherLayoutFeatures = [
@@ -91,7 +80,6 @@ const publisherLayoutStats = [
 ]
 
 function LoginContent() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const [isSignUp, setIsSignUp] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -105,44 +93,15 @@ function LoginContent() {
       const returnTo = searchParams.get("returnTo")
       const safeReturnTo =
         returnTo && returnTo !== "/" ? returnTo : "/dashboard"
-      router.push(safeReturnTo)
+      window.location.href = safeReturnTo
       return
     }
 
     if (user?.userType === "CUSTOMER") {
-      const oauthPending =
-        typeof window !== "undefined"
-          ? sessionStorage.getItem("gp:oauth-pending")
-          : null
-      if (oauthPending) {
-        sessionStorage.removeItem("gp:oauth-pending")
-        getSession().then((sessionResult) => {
-          const token = sessionResult?.token
-          fetch(`${getBaseUrl()}/api/v1/identity/become-publisher`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            credentials: "include",
-            body: JSON.stringify({}),
-          })
-            .then((res) => {
-              if (res.ok) {
-                if (token) setToken(token)
-                const returnTo = searchParams.get("returnTo")
-                const safeReturnTo =
-                  returnTo && returnTo !== "/" ? returnTo : "/dashboard"
-                router.push(safeReturnTo)
-              } else {
-                setError(
-                  "This portal is for publishers only. Please sign in at the correct portal.",
-                )
-              }
-            })
-            .catch(() => {})
-        })
-      }
+      sessionStorage.removeItem("gp:oauth-pending")
+      setError(
+        "This portal is for publishers only. Please sign in at the correct portal.",
+      )
       return
     }
 
@@ -150,48 +109,22 @@ function LoginContent() {
       getSession().then((sessionResult) => {
         if (!sessionResult?.user) return
         if (sessionResult.user.userType === "PUBLISHER") {
+          sessionStorage.removeItem("gp:oauth-pending")
           const returnTo = searchParams.get("returnTo")
           const safeReturnTo =
             returnTo && returnTo !== "/" ? returnTo : "/dashboard"
-          router.push(safeReturnTo)
+          window.location.href = safeReturnTo
           return
         }
-        // After OAuth redirect, useSession may be null initially
-        // but getSession finds the session — check for OAuth pending
-        const oauthPending =
-          typeof window !== "undefined"
-            ? sessionStorage.getItem("gp:oauth-pending")
-            : null
-        if (sessionResult.user.userType === "CUSTOMER" && oauthPending) {
+        if (sessionResult.user.userType === "CUSTOMER") {
           sessionStorage.removeItem("gp:oauth-pending")
-          const token = sessionResult.token
-          fetch(`${getBaseUrl()}/api/v1/identity/become-publisher`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            credentials: "include",
-            body: JSON.stringify({}),
-          })
-            .then((res) => {
-              if (res.ok) {
-                if (token) setToken(token)
-                const returnTo = searchParams.get("returnTo")
-                const safeReturnTo =
-                  returnTo && returnTo !== "/" ? returnTo : "/dashboard"
-                router.push(safeReturnTo)
-              } else {
-                setError(
-                  "This portal is for publishers only. Please sign in at the correct portal.",
-                )
-              }
-            })
-            .catch(() => {})
+          setError(
+            "This portal is for publishers only. Please sign in at the correct portal.",
+          )
         }
       })
     }
-  }, [user, router, searchParams])
+  }, [user, searchParams])
 
   useEffect(() => {
     try {
@@ -209,7 +142,7 @@ function LoginContent() {
     setError(null)
     try {
       sessionStorage.setItem("gp:oauth-pending", "true")
-      await signInWithProvider("google", window.location.origin)
+      await signInWithProvider("google", window.location.origin, "publisher")
     } catch (err: any) {
       sessionStorage.removeItem("gp:oauth-pending")
       setError(
@@ -224,7 +157,7 @@ function LoginContent() {
     setError(null)
     setLoading(true)
     try {
-      const result = await signInTransport(data)
+      const result = await signInTransport({ ...data, portal: "publisher" })
       if (result.status === "mfa_required") {
         throw {
           code: "MFA_REQUIRED",
@@ -265,7 +198,7 @@ function LoginContent() {
     setError(null)
     setLoading(true)
     try {
-      const result = await signUpTransport(data)
+      const result = await signUpTransport({ ...data, portal: "publisher" })
       if (result.status === "mfa_required") {
         throw {
           code: "MFA_REQUIRED",
@@ -275,26 +208,12 @@ function LoginContent() {
       }
 
       if (result.token) setToken(result.token)
-      const convertRes = await fetch(
-        `${getBaseUrl()}/api/v1/identity/become-publisher`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(result.token
-              ? { Authorization: `Bearer ${result.token}` }
-              : {}),
-          },
-          credentials: "include",
-          body: JSON.stringify({ publisherName: data.name }),
-        },
-      )
-      if (!convertRes.ok) {
-        const errData = await convertRes.json().catch(() => ({}))
+      const session = await getSession()
+      if (session.user?.userType !== "PUBLISHER") {
         throw {
-          code: "CONVERSION_FAILED",
+          code: "WRONG_AUDIENCE",
           message:
-            errData.message ?? "Could not set up your publisher account.",
+            "This portal is for publishers only. Please sign in at the correct portal.",
           recoverable: true,
         } as AuthError
       }

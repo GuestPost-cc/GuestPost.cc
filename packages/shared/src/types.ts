@@ -63,6 +63,9 @@ export type OrderEventType =
   | "VERIFIED_AUTO"
   | "VERIFIED_MANUAL"
   | "DELIVERY_CONFIRMED"
+  | "VERIFICATION_ESCALATED"
+  | "AUTO_ACCEPTED"
+  | "REVIEW_REMINDER"
   | "DISPUTE_OPENED"
   | "DISPUTE_RESOLVED"
   | "ORDER_CANCELLED"
@@ -96,6 +99,23 @@ export type WithdrawalStatus =
 export type PublisherTier = "NEW" | "TRUSTED" | "VERIFIED"
 
 export type VerificationStatus = "PENDING" | "VERIFIED" | "FAILED" | "DISPUTED"
+
+export type DeliveryVerificationMethod =
+  | "AUTO"
+  | "MANUAL_ADMIN"
+  | "CUSTOMER_MANUAL"
+
+export type DeliveryAcceptedMethod = "CUSTOMER" | "AUTO_TIMEOUT"
+
+export type VerificationOverrideReason =
+  | "CRAWLER_BLOCKED"
+  | "ROBOTS_TXT"
+  | "LOGIN_REQUIRED"
+  | "JS_RENDERING"
+  | "TEMPORARY_FAILURE"
+  | "OTHER"
+
+export type SettlementReleasePolicy = "AUTO" | "MANUAL"
 
 export type TransactionType =
   | "DEPOSIT"

@@ -55,7 +55,9 @@ export type OrderMinAggregateOutputType = {
   publishedAt: Date | null
   verifiedAt: Date | null
   verifiedBy: string | null
-  verifyMethod: string | null
+  verifyMethod: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt: Date | null
+  deliveryAcceptedMethod: $Enums.DeliveryAcceptedMethod | null
   deliveredAt: Date | null
   revisionCount: number | null
   customerId: string | null
@@ -89,7 +91,9 @@ export type OrderMaxAggregateOutputType = {
   publishedAt: Date | null
   verifiedAt: Date | null
   verifiedBy: string | null
-  verifyMethod: string | null
+  verifyMethod: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt: Date | null
+  deliveryAcceptedMethod: $Enums.DeliveryAcceptedMethod | null
   deliveredAt: Date | null
   revisionCount: number | null
   customerId: string | null
@@ -124,6 +128,8 @@ export type OrderCountAggregateOutputType = {
   verifiedAt: number
   verifiedBy: number
   verifyMethod: number
+  autoAcceptAt: number
+  deliveryAcceptedMethod: number
   deliveredAt: number
   revisionCount: number
   customerId: number
@@ -175,6 +181,8 @@ export type OrderMinAggregateInputType = {
   verifiedAt?: true
   verifiedBy?: true
   verifyMethod?: true
+  autoAcceptAt?: true
+  deliveryAcceptedMethod?: true
   deliveredAt?: true
   revisionCount?: true
   customerId?: true
@@ -209,6 +217,8 @@ export type OrderMaxAggregateInputType = {
   verifiedAt?: true
   verifiedBy?: true
   verifyMethod?: true
+  autoAcceptAt?: true
+  deliveryAcceptedMethod?: true
   deliveredAt?: true
   revisionCount?: true
   customerId?: true
@@ -243,6 +253,8 @@ export type OrderCountAggregateInputType = {
   verifiedAt?: true
   verifiedBy?: true
   verifyMethod?: true
+  autoAcceptAt?: true
+  deliveryAcceptedMethod?: true
   deliveredAt?: true
   revisionCount?: true
   customerId?: true
@@ -364,7 +376,9 @@ export type OrderGroupByOutputType = {
   publishedAt: Date | null
   verifiedAt: Date | null
   verifiedBy: string | null
-  verifyMethod: string | null
+  verifyMethod: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt: Date | null
+  deliveryAcceptedMethod: $Enums.DeliveryAcceptedMethod | null
   deliveredAt: Date | null
   revisionCount: number
   customerId: string
@@ -422,7 +436,9 @@ export type OrderWhereInput = {
   publishedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   verifiedBy?: Prisma.StringNullableFilter<"Order"> | string | null
-  verifyMethod?: Prisma.StringNullableFilter<"Order"> | string | null
+  verifyMethod?: Prisma.EnumDeliveryVerificationMethodNullableFilter<"Order"> | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  deliveryAcceptedMethod?: Prisma.EnumDeliveryAcceptedMethodNullableFilter<"Order"> | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   revisionCount?: Prisma.IntFilter<"Order"> | number
   customerId?: Prisma.StringFilter<"Order"> | string
@@ -479,6 +495,8 @@ export type OrderOrderByWithRelationInput = {
   verifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   verifiedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   verifyMethod?: Prisma.SortOrderInput | Prisma.SortOrder
+  autoAcceptAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  deliveryAcceptedMethod?: Prisma.SortOrderInput | Prisma.SortOrder
   deliveredAt?: Prisma.SortOrderInput | Prisma.SortOrder
   revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
@@ -538,7 +556,9 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   publishedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   verifiedBy?: Prisma.StringNullableFilter<"Order"> | string | null
-  verifyMethod?: Prisma.StringNullableFilter<"Order"> | string | null
+  verifyMethod?: Prisma.EnumDeliveryVerificationMethodNullableFilter<"Order"> | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  deliveryAcceptedMethod?: Prisma.EnumDeliveryAcceptedMethodNullableFilter<"Order"> | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   revisionCount?: Prisma.IntFilter<"Order"> | number
   customerId?: Prisma.StringFilter<"Order"> | string
@@ -595,6 +615,8 @@ export type OrderOrderByWithAggregationInput = {
   verifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   verifiedBy?: Prisma.SortOrderInput | Prisma.SortOrder
   verifyMethod?: Prisma.SortOrderInput | Prisma.SortOrder
+  autoAcceptAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  deliveryAcceptedMethod?: Prisma.SortOrderInput | Prisma.SortOrder
   deliveredAt?: Prisma.SortOrderInput | Prisma.SortOrder
   revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
@@ -637,7 +659,9 @@ export type OrderScalarWhereWithAggregatesInput = {
   publishedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   verifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   verifiedBy?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
-  verifyMethod?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
+  verifyMethod?: Prisma.EnumDeliveryVerificationMethodNullableWithAggregatesFilter<"Order"> | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  deliveryAcceptedMethod?: Prisma.EnumDeliveryAcceptedMethodNullableWithAggregatesFilter<"Order"> | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
   revisionCount?: Prisma.IntWithAggregatesFilter<"Order"> | number
   customerId?: Prisma.StringWithAggregatesFilter<"Order"> | string
@@ -672,7 +696,9 @@ export type OrderCreateInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -721,7 +747,9 @@ export type OrderUncheckedCreateInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -770,7 +798,9 @@ export type OrderUpdateInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -819,7 +849,9 @@ export type OrderUncheckedUpdateInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -868,7 +900,9 @@ export type OrderCreateManyInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -903,7 +937,9 @@ export type OrderUpdateManyMutationInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -931,7 +967,9 @@ export type OrderUncheckedUpdateManyInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -982,6 +1020,8 @@ export type OrderCountOrderByAggregateInput = {
   verifiedAt?: Prisma.SortOrder
   verifiedBy?: Prisma.SortOrder
   verifyMethod?: Prisma.SortOrder
+  autoAcceptAt?: Prisma.SortOrder
+  deliveryAcceptedMethod?: Prisma.SortOrder
   deliveredAt?: Prisma.SortOrder
   revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
@@ -1024,6 +1064,8 @@ export type OrderMaxOrderByAggregateInput = {
   verifiedAt?: Prisma.SortOrder
   verifiedBy?: Prisma.SortOrder
   verifyMethod?: Prisma.SortOrder
+  autoAcceptAt?: Prisma.SortOrder
+  deliveryAcceptedMethod?: Prisma.SortOrder
   deliveredAt?: Prisma.SortOrder
   revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
@@ -1058,6 +1100,8 @@ export type OrderMinOrderByAggregateInput = {
   verifiedAt?: Prisma.SortOrder
   verifiedBy?: Prisma.SortOrder
   verifyMethod?: Prisma.SortOrder
+  autoAcceptAt?: Prisma.SortOrder
+  deliveryAcceptedMethod?: Prisma.SortOrder
   deliveredAt?: Prisma.SortOrder
   revisionCount?: Prisma.SortOrder
   customerId?: Prisma.SortOrder
@@ -1279,6 +1323,14 @@ export type NullableDecimalFieldUpdateOperationsInput = {
 
 export type EnumPaymentStatusFieldUpdateOperationsInput = {
   set?: $Enums.PaymentStatus
+}
+
+export type NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput = {
+  set?: $Enums.DeliveryVerificationMethod | null
+}
+
+export type NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput = {
+  set?: $Enums.DeliveryAcceptedMethod | null
 }
 
 export type NullableEnumFulfillmentChannelFieldUpdateOperationsInput = {
@@ -1626,7 +1678,9 @@ export type OrderCreateWithoutCustomerInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -1674,7 +1728,9 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   assigneeId?: string | null
@@ -1732,7 +1788,9 @@ export type OrderCreateWithoutAssigneeInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -1780,7 +1838,9 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -1857,7 +1917,9 @@ export type OrderScalarWhereInput = {
   publishedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   verifiedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   verifiedBy?: Prisma.StringNullableFilter<"Order"> | string | null
-  verifyMethod?: Prisma.StringNullableFilter<"Order"> | string | null
+  verifyMethod?: Prisma.EnumDeliveryVerificationMethodNullableFilter<"Order"> | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  deliveryAcceptedMethod?: Prisma.EnumDeliveryAcceptedMethodNullableFilter<"Order"> | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
   revisionCount?: Prisma.IntFilter<"Order"> | number
   customerId?: Prisma.StringFilter<"Order"> | string
@@ -1908,7 +1970,9 @@ export type OrderCreateWithoutOrganizationInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -1956,7 +2020,9 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -2030,7 +2096,9 @@ export type OrderCreateWithoutWebsiteInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -2078,7 +2146,9 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -2152,7 +2222,9 @@ export type OrderCreateWithoutCampaignInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -2200,7 +2272,9 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -2274,7 +2348,9 @@ export type OrderCreateWithoutItemsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -2322,7 +2398,9 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -2386,7 +2464,9 @@ export type OrderUpdateWithoutItemsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2434,7 +2514,9 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2482,7 +2564,9 @@ export type OrderCreateWithoutEventsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -2530,7 +2614,9 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -2594,7 +2680,9 @@ export type OrderUpdateWithoutEventsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2642,7 +2730,9 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2690,7 +2780,9 @@ export type OrderCreateWithoutDisputeInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -2738,7 +2830,9 @@ export type OrderUncheckedCreateWithoutDisputeInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -2802,7 +2896,9 @@ export type OrderUpdateWithoutDisputeInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2850,7 +2946,9 @@ export type OrderUncheckedUpdateWithoutDisputeInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -2898,7 +2996,9 @@ export type OrderCreateWithoutSettlementsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -2946,7 +3046,9 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -3010,7 +3112,9 @@ export type OrderUpdateWithoutSettlementsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3058,7 +3162,9 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3106,7 +3212,9 @@ export type OrderCreateWithoutFulfillmentAssignmentsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -3154,7 +3262,9 @@ export type OrderUncheckedCreateWithoutFulfillmentAssignmentsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -3218,7 +3328,9 @@ export type OrderUpdateWithoutFulfillmentAssignmentsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3266,7 +3378,9 @@ export type OrderUncheckedUpdateWithoutFulfillmentAssignmentsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3314,7 +3428,9 @@ export type OrderCreateWithoutDeliveryVersionsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -3362,7 +3478,9 @@ export type OrderUncheckedCreateWithoutDeliveryVersionsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -3426,7 +3544,9 @@ export type OrderUpdateWithoutDeliveryVersionsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3474,7 +3594,9 @@ export type OrderUncheckedUpdateWithoutDeliveryVersionsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3522,7 +3644,9 @@ export type OrderCreateWithoutFraudFlagsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -3570,7 +3694,9 @@ export type OrderUncheckedCreateWithoutFraudFlagsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -3634,7 +3760,9 @@ export type OrderUpdateWithoutFraudFlagsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3682,7 +3810,9 @@ export type OrderUncheckedUpdateWithoutFraudFlagsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3730,7 +3860,9 @@ export type OrderCreateWithoutReviewInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -3778,7 +3910,9 @@ export type OrderUncheckedCreateWithoutReviewInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -3842,7 +3976,9 @@ export type OrderUpdateWithoutReviewInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3890,7 +4026,9 @@ export type OrderUncheckedUpdateWithoutReviewInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -3938,7 +4076,9 @@ export type OrderCreateWithoutContentOrderInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -3986,7 +4126,9 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -4050,7 +4192,9 @@ export type OrderUpdateWithoutContentOrderInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4098,7 +4242,9 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4146,7 +4292,9 @@ export type OrderCreateWithoutRevisionsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -4194,7 +4342,9 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -4258,7 +4408,9 @@ export type OrderUpdateWithoutRevisionsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4306,7 +4458,9 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4354,7 +4508,9 @@ export type OrderCreateWithoutReportsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -4402,7 +4558,9 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -4466,7 +4624,9 @@ export type OrderUpdateWithoutReportsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4514,7 +4674,9 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4562,7 +4724,9 @@ export type OrderCreateWithoutPlatformRevenueInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -4610,7 +4774,9 @@ export type OrderUncheckedCreateWithoutPlatformRevenueInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -4674,7 +4840,9 @@ export type OrderUpdateWithoutPlatformRevenueInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4722,7 +4890,9 @@ export type OrderUncheckedUpdateWithoutPlatformRevenueInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4770,7 +4940,9 @@ export type OrderCreateWithoutTransactionsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -4818,7 +4990,9 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -4882,7 +5056,9 @@ export type OrderUpdateWithoutTransactionsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4930,7 +5106,9 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -4978,7 +5156,9 @@ export type OrderCreateWithoutTicketsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -5026,7 +5206,9 @@ export type OrderUncheckedCreateWithoutTicketsInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -5090,7 +5272,9 @@ export type OrderUpdateWithoutTicketsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5138,7 +5322,9 @@ export type OrderUncheckedUpdateWithoutTicketsInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5186,7 +5372,9 @@ export type OrderCreateWithoutListingInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -5234,7 +5422,9 @@ export type OrderUncheckedCreateWithoutListingInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -5308,7 +5498,9 @@ export type OrderCreateWithoutListingServiceInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   idempotencyKey?: string | null
@@ -5356,7 +5548,9 @@ export type OrderUncheckedCreateWithoutListingServiceInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -5430,7 +5624,9 @@ export type OrderCreateManyCustomerInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   assigneeId?: string | null
@@ -5464,7 +5660,9 @@ export type OrderCreateManyAssigneeInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -5498,7 +5696,9 @@ export type OrderUpdateWithoutCustomerInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5546,7 +5746,9 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5594,7 +5796,9 @@ export type OrderUncheckedUpdateManyWithoutCustomerInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5628,7 +5832,9 @@ export type OrderUpdateWithoutAssigneeInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5676,7 +5882,9 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5724,7 +5932,9 @@ export type OrderUncheckedUpdateManyWithoutAssigneeInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5758,7 +5968,9 @@ export type OrderCreateManyOrganizationInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -5792,7 +6004,9 @@ export type OrderUpdateWithoutOrganizationInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -5840,7 +6054,9 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5888,7 +6104,9 @@ export type OrderUncheckedUpdateManyWithoutOrganizationInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -5922,7 +6140,9 @@ export type OrderCreateManyWebsiteInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -5956,7 +6176,9 @@ export type OrderUpdateWithoutWebsiteInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -6004,7 +6226,9 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -6052,7 +6276,9 @@ export type OrderUncheckedUpdateManyWithoutWebsiteInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -6086,7 +6312,9 @@ export type OrderCreateManyCampaignInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -6120,7 +6348,9 @@ export type OrderUpdateWithoutCampaignInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -6168,7 +6398,9 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -6216,7 +6448,9 @@ export type OrderUncheckedUpdateManyWithoutCampaignInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -6250,7 +6484,9 @@ export type OrderCreateManyListingInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -6284,7 +6520,9 @@ export type OrderUpdateWithoutListingInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -6332,7 +6570,9 @@ export type OrderUncheckedUpdateWithoutListingInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -6380,7 +6620,9 @@ export type OrderUncheckedUpdateManyWithoutListingInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -6414,7 +6656,9 @@ export type OrderCreateManyListingServiceInput = {
   publishedAt?: Date | string | null
   verifiedAt?: Date | string | null
   verifiedBy?: string | null
-  verifyMethod?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Date | string | null
   revisionCount?: number
   customerId: string
@@ -6448,7 +6692,9 @@ export type OrderUpdateWithoutListingServiceInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -6496,7 +6742,9 @@ export type OrderUncheckedUpdateWithoutListingServiceInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -6544,7 +6792,9 @@ export type OrderUncheckedUpdateManyWithoutListingServiceInput = {
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  verifyMethod?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
   deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   customerId?: Prisma.StringFieldUpdateOperationsInput | string
@@ -6691,6 +6941,8 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   verifiedAt?: boolean
   verifiedBy?: boolean
   verifyMethod?: boolean
+  autoAcceptAt?: boolean
+  deliveryAcceptedMethod?: boolean
   deliveredAt?: boolean
   revisionCount?: boolean
   customerId?: boolean
@@ -6748,6 +7000,8 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   verifiedAt?: boolean
   verifiedBy?: boolean
   verifyMethod?: boolean
+  autoAcceptAt?: boolean
+  deliveryAcceptedMethod?: boolean
   deliveredAt?: boolean
   revisionCount?: boolean
   customerId?: boolean
@@ -6790,6 +7044,8 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   verifiedAt?: boolean
   verifiedBy?: boolean
   verifyMethod?: boolean
+  autoAcceptAt?: boolean
+  deliveryAcceptedMethod?: boolean
   deliveredAt?: boolean
   revisionCount?: boolean
   customerId?: boolean
@@ -6832,6 +7088,8 @@ export type OrderSelectScalar = {
   verifiedAt?: boolean
   verifiedBy?: boolean
   verifyMethod?: boolean
+  autoAcceptAt?: boolean
+  deliveryAcceptedMethod?: boolean
   deliveredAt?: boolean
   revisionCount?: boolean
   customerId?: boolean
@@ -6851,7 +7109,7 @@ export type OrderSelectScalar = {
   updatedAt?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "status" | "amount" | "currency" | "paymentStatus" | "title" | "instructions" | "targetUrl" | "anchorText" | "publishedUrl" | "publishedAt" | "verifiedAt" | "verifiedBy" | "verifyMethod" | "deliveredAt" | "revisionCount" | "customerId" | "assigneeId" | "websiteId" | "organizationId" | "campaignId" | "idempotencyKey" | "version" | "activeDeliveryVersionId" | "listingId" | "listingServiceId" | "fulfillmentChannel" | "turnaroundDays" | "briefData" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "status" | "amount" | "currency" | "paymentStatus" | "title" | "instructions" | "targetUrl" | "anchorText" | "publishedUrl" | "publishedAt" | "verifiedAt" | "verifiedBy" | "verifyMethod" | "autoAcceptAt" | "deliveryAcceptedMethod" | "deliveredAt" | "revisionCount" | "customerId" | "assigneeId" | "websiteId" | "organizationId" | "campaignId" | "idempotencyKey" | "version" | "activeDeliveryVersionId" | "listingId" | "listingServiceId" | "fulfillmentChannel" | "turnaroundDays" | "briefData" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
@@ -6935,7 +7193,9 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     publishedAt: Date | null
     verifiedAt: Date | null
     verifiedBy: string | null
-    verifyMethod: string | null
+    verifyMethod: $Enums.DeliveryVerificationMethod | null
+    autoAcceptAt: Date | null
+    deliveryAcceptedMethod: $Enums.DeliveryAcceptedMethod | null
     deliveredAt: Date | null
     revisionCount: number
     customerId: string
@@ -7411,7 +7671,9 @@ export interface OrderFieldRefs {
   readonly publishedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly verifiedAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly verifiedBy: Prisma.FieldRef<"Order", 'String'>
-  readonly verifyMethod: Prisma.FieldRef<"Order", 'String'>
+  readonly verifyMethod: Prisma.FieldRef<"Order", 'DeliveryVerificationMethod'>
+  readonly autoAcceptAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly deliveryAcceptedMethod: Prisma.FieldRef<"Order", 'DeliveryAcceptedMethod'>
   readonly deliveredAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly revisionCount: Prisma.FieldRef<"Order", 'Int'>
   readonly customerId: Prisma.FieldRef<"Order", 'String'>

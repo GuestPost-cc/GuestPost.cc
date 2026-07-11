@@ -46,6 +46,14 @@ export function mapBetterAuthError(
         recoverable: true,
         httpStatus: error.status ?? 409,
       }
+    case "ACCOUNT_COLLISION_USE_SEPARATE_PROFILE":
+      return {
+        code: "ACCOUNT_COLLISION_USE_SEPARATE_PROFILE",
+        message:
+          "This email already belongs to a customer workspace. Please use a separate account for publishing, or contact support.",
+        recoverable: true,
+        httpStatus: error.status ?? 409,
+      }
     case "RATE_LIMITED":
       return {
         code: "RATE_LIMITED",

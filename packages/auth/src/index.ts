@@ -1,6 +1,7 @@
 import { prisma } from "@guestpost/database"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
+import { getOAuthState } from "better-auth/api"
 import { toNodeHandler } from "better-auth/node"
 import { bearer } from "better-auth/plugins/bearer"
 import { renderVerificationEmail } from "./email-templates/verification.js"
@@ -31,6 +32,8 @@ export interface SendEmailArgs {
   jobName?: string
 }
 
+export type PortalIntent = "customer" | "publisher"
+
 export interface AuthFactoryOptions {
   /**
    * When supplied, registers the Phase 7.8 email-keyed rate limiter on
@@ -59,6 +62,190 @@ export interface AuthFactoryOptions {
    * (instead of waiting up to 30 s for the cache TTL to expire).
    */
   onEmailVerified?: (userId: string) => void
+  /**
+   * Called after birth-time signup provisioning changes the derived auth
+   * context (memberships, publisher memberships, active org/publisher).
+   * Passed by the API app to avoid importing Nest internals here.
+   */
+  invalidateAuthContext?: (userId: string) => void
+}
+
+function normalizePortalIntent(value: unknown): PortalIntent | null {
+  if (value === "publisher") return "publisher"
+  if (value === "customer") return "customer"
+  return null
+}
+
+function portalIntentFromUrl(
+  rawUrl: string | null | undefined,
+): PortalIntent | null {
+  if (!rawUrl) return null
+  try {
+    const url = new URL(
+      rawUrl,
+      process.env.BETTER_AUTH_URL ?? "http://localhost:4000",
+    )
+    const direct = normalizePortalIntent(url.searchParams.get("portal"))
+    if (direct) return direct
+
+    const callbackURL = url.searchParams.get("callbackURL")
+    if (callbackURL) return portalIntentFromUrl(callbackURL)
+  } catch {
+    return null
+  }
+  return null
+}
+
+function portalIntentFromOrigin(
+  rawOrigin: string | null | undefined,
+): PortalIntent | null {
+  if (!rawOrigin) return null
+  try {
+    const origin = new URL(rawOrigin)
+    if (origin.port === "3002") return "publisher"
+    if (origin.port === "3001") return "customer"
+  } catch {
+    return null
+  }
+  return null
+}
+
+async function resolvePortalIntent(ctx: any): Promise<PortalIntent> {
+  const oauthState = await getOAuthState().catch(() => null)
+  const fromOAuthState = portalIntentFromUrl(oauthState?.callbackURL)
+  if (fromOAuthState) return fromOAuthState
+
+  const request = ctx?.request
+  const headers = request?.headers
+  const headerValue =
+    headers?.get?.("x-portal-type") ?? headers?.["x-portal-type"]
+  const fromHeader = normalizePortalIntent(headerValue)
+  if (fromHeader) return fromHeader
+
+  const fromUrl = portalIntentFromUrl(request?.url)
+  if (fromUrl) return fromUrl
+
+  const body = ctx?.body ?? request?.body
+  const fromBody = normalizePortalIntent(body?.portal)
+  if (fromBody) return fromBody
+
+  const callbackURL = body?.callbackURL ?? body?.callbackUrl ?? body?.redirectTo
+  const fromCallback = portalIntentFromUrl(callbackURL)
+  if (fromCallback) return fromCallback
+
+  const origin = headers?.get?.("origin") ?? headers?.origin
+  const fromOrigin = portalIntentFromOrigin(origin)
+  if (fromOrigin) return fromOrigin
+
+  const referer = headers?.get?.("referer") ?? headers?.referer
+  const fromReferer = portalIntentFromOrigin(referer)
+  if (fromReferer) return fromReferer
+
+  return "customer"
+}
+
+function displayName(
+  value: string | null | undefined,
+  fallback: string,
+): string {
+  const trimmed = value?.trim()
+  return (trimmed || fallback).slice(0, 120)
+}
+
+async function provisionCustomerAccount(user: {
+  id: string
+  email: string
+  name?: string | null
+}) {
+  const hasMembership = await prisma.membership.count({
+    where: { userId: user.id },
+  })
+  if (hasMembership > 0) return
+
+  const orgName = `${displayName(user.name, "Client")}'s Workspace`
+  await prisma.$transaction(async (tx) => {
+    const org = await tx.organization.create({
+      data: {
+        name: orgName,
+        slug: `cust-${user.id.slice(0, 12)}`,
+      },
+    })
+    await tx.membership.create({
+      data: {
+        userId: user.id,
+        organizationId: org.id,
+        role: "OWNER",
+        status: "ACTIVE",
+      },
+    })
+  })
+}
+
+async function provisionPublisherAccount(user: {
+  id: string
+  email: string
+  name?: string | null
+}) {
+  const hasPublisherMembership = await prisma.publisherMembership.count({
+    where: { userId: user.id },
+  })
+  if (hasPublisherMembership > 0) return
+
+  const name = displayName(user.name, user.email)
+  await prisma.$transaction(async (tx) => {
+    const org = await tx.organization.create({
+      data: {
+        name: `Publisher org for ${user.email}`,
+        slug: `pub-${user.id.slice(0, 12)}`,
+      },
+    })
+    const publisher = await tx.publisher.create({
+      data: {
+        name,
+        email: user.email,
+        organizationId: org.id,
+        tier: "NEW",
+      },
+    })
+    await tx.publisherMembership.create({
+      data: {
+        userId: user.id,
+        publisherId: publisher.id,
+        role: "PUBLISHER_OWNER",
+      },
+    })
+  })
+}
+
+async function convertFreshCustomerToPublisher(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user) throw new Error("USER_NOT_FOUND")
+  if (user.userType === "PUBLISHER") {
+    await provisionPublisherAccount(user)
+    return
+  }
+  if (user.userType !== "CUSTOMER") return
+
+  const [customerMemberships, publisherMemberships] = await Promise.all([
+    prisma.membership.count({ where: { userId, status: "ACTIVE" } }),
+    prisma.publisherMembership.count({ where: { userId } }),
+  ])
+  if (publisherMemberships > 0) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { userType: "PUBLISHER" },
+    })
+    return
+  }
+  if (customerMemberships > 0) {
+    throw new Error("ACCOUNT_COLLISION_USE_SEPARATE_PROFILE")
+  }
+
+  await provisionPublisherAccount(user)
+  await prisma.user.update({
+    where: { id: userId },
+    data: { userType: "PUBLISHER" },
+  })
 }
 
 /**
@@ -92,6 +279,42 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
     },
     emailAndPassword: {
       enabled: true,
+    },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user: any, ctx: any) => {
+            const portalIntent = await resolvePortalIntent(ctx)
+            return {
+              data: {
+                ...user,
+                userType:
+                  portalIntent === "publisher" ? "PUBLISHER" : "CUSTOMER",
+              },
+            }
+          },
+          after: async (user: any) => {
+            if (user.userType === "PUBLISHER") {
+              await provisionPublisherAccount(user)
+            } else if (user.userType === "CUSTOMER") {
+              await provisionCustomerAccount(user)
+            }
+            opts.invalidateAuthContext?.(user.id)
+          },
+        },
+      },
+      session: {
+        create: {
+          before: async (session: any, ctx: any) => {
+            const portalIntent = await resolvePortalIntent(ctx)
+            if (portalIntent === "publisher") {
+              await convertFreshCustomerToPublisher(session.userId)
+              opts.invalidateAuthContext?.(session.userId)
+            }
+            return { data: session }
+          },
+        },
+      },
     },
     // Phase 7.10 — Verification flow. Only registered when the caller
     // supplied `sendEmail`. Without it, signup completes silently with

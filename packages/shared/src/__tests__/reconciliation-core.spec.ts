@@ -108,7 +108,7 @@ describe("runReconciliation with mock prisma", () => {
       },
     ])
     prisma.transaction.groupBy.mockResolvedValue([
-      { walletId: "wallet-1", type: "PURCHASE", _sum: { amount: 100.0 } },
+      { walletId: "wallet-1", type: "PURCHASE", _sum: { amount: -100.0 } },
     ])
 
     const report = await runReconciliation(prisma as any)
@@ -187,7 +187,7 @@ describe("runReconciliation with mock prisma", () => {
   it("detects unmatched PURCHASE transactions", async () => {
     const prisma = mockPrisma()
     prisma.transaction.findMany.mockResolvedValue([
-      { id: "tx-orphan", amount: 50.0, walletId: "w-1", orderId: null },
+      { id: "tx-orphan", amount: -50.0, walletId: "w-1", orderId: null },
     ])
 
     const report = await runReconciliation(prisma as any)
@@ -196,6 +196,28 @@ describe("runReconciliation with mock prisma", () => {
     )
     expect(unmatched.length).toBe(1)
     expect(unmatched[0].severity).toBe("critical")
+  })
+
+  it("handles negative PURCHASE convention (no false PAYMENT_AMOUNT_MISMATCH)", async () => {
+    const prisma = mockPrisma()
+    prisma.transaction.findMany.mockResolvedValue([
+      { id: "tx-p1", amount: -250.0, walletId: "w-1", orderId: "order-paid-1" },
+    ])
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: "order-paid-1",
+        amount: 250.0,
+        settlements: [],
+        platformRevenue: null,
+        status: "PAID",
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+    const mismatch = report.orderPaymentRecon.filter(
+      (r) => r.code === "PAYMENT_AMOUNT_MISMATCH",
+    )
+    expect(mismatch.length).toBe(0)
   })
 
   it("detects refunded order with no REFUND transaction", async () => {
@@ -228,7 +250,7 @@ describe("runReconciliation with mock prisma", () => {
       },
     ])
     prisma.transaction.groupBy.mockResolvedValue([
-      { walletId: "w-1", type: "PURCHASE", _sum: { amount: 20.0 } },
+      { walletId: "w-1", type: "PURCHASE", _sum: { amount: -20.0 } },
     ])
 
     const report = await runReconciliation(prisma as any)

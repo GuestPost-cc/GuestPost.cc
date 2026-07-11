@@ -223,6 +223,7 @@ export class AuthGuard implements CanActivate {
         path: "/",
         maxAge: SESSION_EXPIRES_IN_SEC * 1000,
       })
+      response.setHeader("X-Session-Token", newToken)
 
       context.switchToHttp().getRequest().session = {
         ...sessionRecord,

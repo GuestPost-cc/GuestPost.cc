@@ -1,5 +1,5 @@
 import { prisma } from "@guestpost/database"
-import { QUEUES } from "@guestpost/shared"
+import { defaultWorkflowConfig, QUEUES } from "@guestpost/shared"
 import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 // Node-only deep import — undici + dns must stay out of the shared
@@ -188,13 +188,17 @@ export function createVerificationWorker() {
 
           if (evidence) {
             const now = new Date()
+            const reviewWindowMs =
+              defaultWorkflowConfig.reviewWindowDays * 24 * 60 * 60 * 1000
+            const autoAcceptAt = new Date(now.getTime() + reviewWindowMs)
             await prisma.order.update({
               where: { id: orderId },
               data: {
                 status: "VERIFIED",
                 verifiedAt: now,
                 verifiedBy: "system",
-                verifyMethod: "auto",
+                verifyMethod: "AUTO",
+                autoAcceptAt,
               },
             })
 
@@ -203,7 +207,7 @@ export function createVerificationWorker() {
                 orderId,
                 eventType: "VERIFIED_AUTO",
                 actorId: "system",
-                message: `Link verified automatically on ${targetUrl}`,
+                message: `Link verified automatically — review window expires ${autoAcceptAt.toISOString()}`,
                 metadata: {
                   targetUrl,
                   evidence,

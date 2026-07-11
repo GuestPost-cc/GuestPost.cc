@@ -169,7 +169,7 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     }
   })
 
-  it("every operational-write route includes OPERATIONS (manual verify, accept, content lifecycle, listing moderation, dispute review/resolve, website management)", () => {
+  it("every operational-write route includes OPERATIONS (manual verify, accept, content lifecycle, listing moderation, dispute review/resolve, website management, verification queue)", () => {
     const opsWrites = [
       "manualVerify",
       "acceptPlatformOrder",
@@ -189,6 +189,11 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       "recomputePublisherTrust",
       "recomputeTrust",
       "bulkRetryVerification",
+      "listVerificationQueue",
+      "retryVerification",
+      "markVerified",
+      "rejectVerification",
+      "requestReverify",
     ]
 
     for (const method of opsWrites) {
