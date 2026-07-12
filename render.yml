@@ -21,7 +21,7 @@ services:
     startCommand: cd apps/worker && node dist/index.js
     envVars:
       - key: NODE_ENV
-        value: production
+        value: development
       - key: DATABASE_URL
         sync: false
         value: postgresql://neondb_owner:npg_iPQ4u9csUmAV@ep-jolly-bonus-aoh6som9-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
@@ -45,7 +45,7 @@ services:
     healthCheckPath: /api/v1/health
     envVars:
       - key: NODE_ENV
-        value: production
+        value: development
       - key: DATABASE_URL
         sync: false
         value: postgresql://neondb_owner:npg_iPQ4u9csUmAV@ep-jolly-bonus-aoh6som9-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
@@ -74,7 +74,7 @@ services:
     startCommand: cd apps/portal && npx next start --port $PORT
     envVars:
       - key: NODE_ENV
-        value: production
+        value: development
       - key: NEXT_PUBLIC_API_URL
         value: https://api.guestpost.cc
 
@@ -91,7 +91,7 @@ services:
     startCommand: cd apps/publisher && npx next start --port $PORT
     envVars:
       - key: NODE_ENV
-        value: production
+        value: development
       - key: NEXT_PUBLIC_API_URL
         value: https://api.guestpost.cc
 
@@ -108,7 +108,7 @@ services:
     startCommand: cd apps/admin && npx next start --port $PORT
     envVars:
       - key: NODE_ENV
-        value: production
+        value: development
       - key: NEXT_PUBLIC_API_URL
         value: https://api.guestpost.cc
 
@@ -125,11 +125,5 @@ services:
     startCommand: cd apps/website && npx next start --port $PORT
     envVars:
       - key: NODE_ENV
-        value: production
+        value: development
 
-  # ────────────────────────────────────────────────────────
-  # 7. REDIS (BullMQ backing)
-  # ────────────────────────────────────────────────────────
-  - type: kv
-    name: guestpost-redis
-    plan: free
