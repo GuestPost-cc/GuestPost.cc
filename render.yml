@@ -13,7 +13,7 @@ services:
   # ────────────────────────────────────────────────────────
   - type: worker
     name: guestpost-worker
-    env: node
+    runtime: node
     plan: free
     region: singapore
     rootDir: .
@@ -28,7 +28,7 @@ services:
       - key: REDIS_URL
         fromService:
           name: guestpost-redis
-          type: kv
+          type: keyvalue
           property: connectionString
 
   # ────────────────────────────────────────────────────────
@@ -36,7 +36,7 @@ services:
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-api
-    env: node
+    runtime: node
     plan: free
     region: singapore
     rootDir: .
@@ -52,7 +52,7 @@ services:
       - key: REDIS_URL
         fromService:
           name: guestpost-redis
-          type: kv
+          type: keyvalue
           property: connectionString
       - key: BETTER_AUTH_URL
         value: https://api.guestpost.cc
@@ -66,7 +66,7 @@ services:
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-portal
-    env: node
+    runtime: node
     plan: free
     region: singapore
     rootDir: .
@@ -83,7 +83,7 @@ services:
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-publisher
-    env: node
+    runtime: node
     plan: free
     region: singapore
     rootDir: .
@@ -100,7 +100,7 @@ services:
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-admin
-    env: node
+    runtime: node
     plan: free
     region: singapore
     rootDir: .
@@ -117,7 +117,7 @@ services:
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-website
-    env: node
+    runtime: node
     plan: free
     region: singapore
     rootDir: .
