@@ -5,7 +5,7 @@
 #
 # NOTE: Secrets (JWT_SECRET, QUEUE_SIGNING_SECRET, R2 credentials, etc.) are
 # NOT stored in this file. Set them in each service's Render dashboard under
-# Environment → Environment Variables after the initial deploy.
+# Environment -> Environment Variables after the initial deploy.
 
 services:
   # ────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ services:
           property: connectionString
 
   # ────────────────────────────────────────────────────────
-  # 2. CENTRAL BACKEND API (apps/api) — NestJS
+  # 2. CENTRAL BACKEND API (apps/api) -- NestJS
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-api
@@ -62,7 +62,7 @@ services:
         value: https://guestpost.cc,https://app.guestpost.cc,https://publisher.guestpost.cc,https://admin.guestpost.cc
 
   # ────────────────────────────────────────────────────────
-  # 3. ADVERTISER / BUYER PORTAL (apps/portal) — Next.js
+  # 3. ADVERTISER / BUYER PORTAL (apps/portal) -- Next.js
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-portal
@@ -79,7 +79,7 @@ services:
         value: https://api.guestpost.cc
 
   # ────────────────────────────────────────────────────────
-  # 4. PUBLISHER PORTAL (apps/publisher) — Next.js
+  # 4. PUBLISHER PORTAL (apps/publisher) -- Next.js
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-publisher
@@ -96,7 +96,7 @@ services:
         value: https://api.guestpost.cc
 
   # ────────────────────────────────────────────────────────
-  # 5. STAFF ADMIN SUITE (apps/admin) — Next.js
+  # 5. STAFF ADMIN SUITE (apps/admin) -- Next.js
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-admin
@@ -113,7 +113,7 @@ services:
         value: https://api.guestpost.cc
 
   # ────────────────────────────────────────────────────────
-  # 6. PUBLIC MARKETING WEBSITE (apps/website) — Next.js
+  # 6. PUBLIC MARKETING WEBSITE (apps/website) -- Next.js
   # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-website
@@ -127,10 +127,9 @@ services:
       - key: NODE_ENV
         value: production
 
-# ────────────────────────────────────────────────────────
-# REDIS (BullMQ backing)
-# ────────────────────────────────────────────────────────
-kvResources:
-  - type: redis
+  # ────────────────────────────────────────────────────────
+  # 7. REDIS (BullMQ backing)
+  # ────────────────────────────────────────────────────────
+  - type: kv
     name: guestpost-redis
     plan: free
