@@ -4,6 +4,15 @@
 
 ## Recently Completed
 
+### Portal Marketplace Redesign
+
+- Redesigned marketplace browsing page with cleaner cards (rounded corners, subtle shadows, better typography, reduced visual noise).
+- Simplified filter/search bar: removed redundant type filter and view-mode toggle, consolidated into a cleaner layout.
+- Improved pagination with page number buttons.
+- Redesigned listing detail page with deposit-gated URL visibility: customers who have never deposited see a blurred/blocker overlay on "Visit Website" with a "Deposit to reveal" tooltip.
+- Added wallet/deposit check hook to determine URL visibility.
+- Build verified: portal passes with no TS errors.
+
 ### Publisher Listings UI Modernization
 
 - Replaced dense table-based listing view with modern cards showing site, service summary, lifecycle guidance, and contextual primary action buttons (submit/pause/unpause/archive).

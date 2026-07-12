@@ -21,6 +21,7 @@ import {
   Globe,
   Heart,
   Languages,
+  Lock,
   Share2,
   ShieldCheck,
   Star,
@@ -113,9 +114,6 @@ export default function ListingDetailPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const [activeImage, setActiveImage] = useState(0)
-  // The customer's locked pick. URL-bound (?service=GUEST_POST) so deep
-  // links carry the choice; defaults to the first AVAILABLE row when the
-  // listing loads.
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
     null,
   )
@@ -133,6 +131,22 @@ export default function ListingDetailPage() {
         .then((r) => r as unknown as Listing),
     enabled: !!params.slug,
   })
+
+  // ── Wallet: check if customer has deposited at least once ────────────
+  // Customers who have never deposited cannot see the publisher's website
+  // URL. Other details (title, description, price, DR, etc.) remain visible.
+  const { data: walletData } = useQuery({
+    queryKey: ["wallet"],
+    queryFn: () => api.billing.getWallet(),
+  })
+  const hasDeposited = useMemo(() => {
+    if (!walletData) return false
+    // User has deposited if they have a positive balance or any deposit
+    // transaction on record.
+    if (Number(walletData.availableBalance) > 0) return true
+    if (walletData.transactions?.some((t) => t.type === "DEPOSIT")) return true
+    return false
+  }, [walletData])
 
   // ── Service-picker state, URL-synced ──────────────────────────────────
   const searchParams = useSearchParams()
@@ -545,7 +559,7 @@ export default function ListingDetailPage() {
                 </div>
               ) : null
             })()}
-            {listing.websiteUrl && (
+            {listing.websiteUrl && hasDeposited ? (
               <a
                 href={listing.websiteUrl}
                 target="_blank"
@@ -555,7 +569,20 @@ export default function ListingDetailPage() {
                 <ExternalLink className="h-4 w-4" />
                 <span>Visit Website</span>
               </a>
-            )}
+            ) : listing.websiteUrl ? (
+              <div className="group relative">
+                <div className="flex items-center gap-3 text-sm text-muted-foreground/50 blur-sm select-none pointer-events-none">
+                  <ExternalLink className="h-4 w-4" />
+                  <span>Visit Website</span>
+                </div>
+                <div className="absolute inset-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">
+                    Deposit to reveal site URL
+                  </span>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {listing.publisher && (
