@@ -26,6 +26,8 @@ function createDiscoveryQueue(): Queue {
 
 export interface DiscoveryJobPayload {
   externalAccountId: string
+  ownerType: string
+  ownerId: string
 }
 
 export class DiscoveryService {
@@ -40,13 +42,11 @@ export class DiscoveryService {
     externalAccountId: string,
   ): Promise<{ enqueued: boolean }> {
     const account = await (db as any).externalAccount.findFirst({
-      where: {
-        id: externalAccountId,
-      },
+      where: { id: externalAccountId },
     })
     if (!account) throw new IntegrationNotFoundError()
 
-    return await this.rediscoverForAccount(account, owner)
+    return await this.enqueueJob(account.id, owner)
   }
 
   async rediscover(
@@ -54,13 +54,17 @@ export class DiscoveryService {
     externalAccountId: string,
   ): Promise<{ enqueued: boolean }> {
     const account = await (db as any).externalAccount.findFirst({
-      where: {
-        id: externalAccountId,
-      },
+      where: { id: externalAccountId },
     })
     if (!account) throw new IntegrationNotFoundError()
 
-    // Enqueue discovery in the background — runs as a BullMQ job
+    return await this.enqueueJob(account.id, owner)
+  }
+
+  private async enqueueJob(
+    externalAccountId: string,
+    owner: OwnerContext,
+  ): Promise<{ enqueued: boolean }> {
     const jobId = `discover-${externalAccountId}`
     const existing = await this.discoveryQueue.getJob(jobId)
     if (
@@ -74,6 +78,8 @@ export class DiscoveryService {
       "discover",
       {
         externalAccountId,
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
       } satisfies DiscoveryJobPayload,
       {
         jobId,
@@ -91,7 +97,7 @@ export class DiscoveryService {
     analytics?: { found: number; created: number }
     error?: string
   }> {
-    const { externalAccountId } = payload
+    const { externalAccountId, ownerType, ownerId } = payload
 
     try {
       const account = await (db as any).externalAccount.findUnique({
@@ -107,22 +113,21 @@ export class DiscoveryService {
         }
       ).value
 
-      const grantedScopes = account.grantedScopes ?? []
+      const grantedScopes: string[] = account.grantedScopes ?? []
       const results: Record<string, { found: number; created: number }> = {}
 
-      // Determine which Google services have been granted access via scopes
-      const serviceMap: Record<string, string> = {
-        GOOGLE_SEARCH_CONSOLE:
-          "https://www.googleapis.com/auth/webmasters.readonly",
-        GOOGLE_ANALYTICS: "https://www.googleapis.com/auth/analytics.readonly",
-      }
+      // The scope strings used to check which services the user granted
+      const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly"
+      const GA_SCOPE = "https://www.googleapis.com/auth/analytics.readonly"
 
-      for (const [provider, scope] of Object.entries(serviceMap)) {
-        if (
-          !grantedScopes.some(
-            (s: string) => scope.startsWith(s.split(".")[0]) || s === scope,
-          )
-        ) {
+      const serviceMap: Array<{ provider: string; scope: string }> = [
+        { provider: "GOOGLE_SEARCH_CONSOLE", scope: GSC_SCOPE },
+        { provider: "GOOGLE_ANALYTICS", scope: GA_SCOPE },
+      ]
+
+      for (const { provider, scope } of serviceMap) {
+        // Check if the user granted this specific scope
+        if (!grantedScopes.includes(scope)) {
           continue
         }
 
@@ -145,8 +150,8 @@ export class DiscoveryService {
           if (!integration) {
             integration = await (db as any).publisherIntegration.create({
               data: {
-                ownerType: account.ownerType ?? "PUBLISHER",
-                ownerId: account.ownerId ?? "",
+                ownerType,
+                ownerId,
                 provider,
                 connectionId: externalAccountId,
                 status: "ACTIVE",
@@ -233,7 +238,7 @@ export class DiscoveryService {
             const syncService = new SyncService()
             await syncService
               .triggerSync(
-                { ownerType: account.ownerType, ownerId: account.ownerId },
+                { ownerType: ownerType as any, ownerId },
                 integration.id,
                 "SCHEDULED",
               )
@@ -257,33 +262,5 @@ export class DiscoveryService {
       const errorMessage = err instanceof Error ? err.message : String(err)
       return { success: false, error: errorMessage }
     }
-  }
-
-  private async rediscoverForAccount(
-    account: any,
-    owner: OwnerContext,
-  ): Promise<{ enqueued: boolean }> {
-    const jobId = `discover-${account.id}`
-    const existing = await this.discoveryQueue.getJob(jobId)
-    if (
-      existing &&
-      ["active", "waiting", "delayed"].includes((existing as any).status ?? "")
-    ) {
-      throw new DiscoveryInProgressError()
-    }
-
-    await this.discoveryQueue.add(
-      "discover",
-      {
-        externalAccountId: account.id,
-      } satisfies DiscoveryJobPayload,
-      {
-        jobId,
-        removeOnComplete: { count: 5 },
-        removeOnFail: { count: 5 },
-      },
-    )
-
-    return { enqueued: true }
   }
 }

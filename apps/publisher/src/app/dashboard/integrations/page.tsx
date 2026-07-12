@@ -26,8 +26,8 @@ import {
   RefreshCw,
   Trash2,
 } from "lucide-react"
-import { useRouter } from "next/navigation"
-import { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import {
@@ -280,6 +280,22 @@ export default function IntegrationsPage() {
   const connectMutation = useConnectIntegration()
   const disconnectMutation = useDisconnectIntegration()
   const [rediscoverId, setRediscoverId] = useState<string | null>(null)
+  const searchParams = useSearchParams()
+
+  // Show toast when redirected back from OAuth callback
+  useEffect(() => {
+    const connected = searchParams.get("connected")
+    const error = searchParams.get("error")
+    if (connected) {
+      toast.success("Google account connected. Discovering services...")
+      // Refetch after a short delay so discovery results appear
+      setTimeout(() => refetch(), 3000)
+      setTimeout(() => refetch(), 8000)
+    }
+    if (error) {
+      toast.error(error)
+    }
+  }, [searchParams, refetch])
 
   const integrations = data?.data ?? []
 
