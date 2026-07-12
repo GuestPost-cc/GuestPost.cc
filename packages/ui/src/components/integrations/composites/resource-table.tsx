@@ -1,4 +1,4 @@
-import type { DiscoveredResource } from "@guestpost/integrations"
+import type { DiscoveredResource } from "@guestpost/integrations/client"
 import { Globe, RefreshCw } from "lucide-react"
 import { cn } from "../../../lib/utils"
 import { Button } from "../../button"
@@ -15,7 +15,7 @@ import {
 interface ResourceTableProps {
   resources: DiscoveredResource[]
   selectedResource?: string
-  onSelect: (externalId: string) => void
+  onSelect: (externalResourceId: string) => void
   onRefresh: () => void
   loading?: boolean
   className?: string
@@ -97,18 +97,18 @@ function ResourceTable({
           </TableHeader>
           <TableBody>
             {resources.map((r) => {
-              const isSelected = r.externalId === selectedResource
+              const isSelected = r.externalResourceId === selectedResource
               return (
                 <TableRow
-                  key={r.externalId}
+                  key={r.externalResourceId}
                   className={cn("cursor-pointer", isSelected && "bg-muted/50")}
-                  onClick={() => onSelect(r.externalId)}
+                  onClick={() => onSelect(r.externalResourceId)}
                   aria-selected={isSelected}
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault()
-                      onSelect(r.externalId)
+                      onSelect(r.externalResourceId)
                     }
                   }}
                 >
@@ -125,17 +125,17 @@ function ResourceTable({
                   </TableCell>
                   <TableCell className="font-medium">
                     <a
-                      href={r.url}
+                      href={r.externalResourceName ?? "#"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="hover:underline"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {r.url}
+                      {r.externalResourceName ?? r.externalResourceId}
                     </a>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {r.permissionLevel}
+                    {(r.metadata as any)?.permissionLevel ?? "\u2014"}
                   </TableCell>
                 </TableRow>
               )

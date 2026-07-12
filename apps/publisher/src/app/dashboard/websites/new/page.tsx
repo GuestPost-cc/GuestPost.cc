@@ -9,13 +9,19 @@ import {
   CardTitle,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
 } from "@guestpost/ui"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { ArrowLeft, Globe } from "lucide-react"
+import { ArrowLeft, Globe2 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { api } from "../../../../lib/api"
@@ -79,12 +85,14 @@ export default function NewWebsitePage() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<WebsiteFormData>({
     resolver: zodResolver(websiteSchema),
     defaultValues: {
       country: "US",
       language: "English",
+      niche: "",
     },
   })
 
@@ -132,12 +140,12 @@ export default function NewWebsitePage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Globe className="h-5 w-5" />
+            <Globe2 className="h-5 w-5" />
             Website Details
           </CardTitle>
           <CardDescription>
-            Provide information about the website you want to add to your
-            inventory
+            Add a site to your publisher inventory. You can price and list it on
+            the marketplace after adding.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -196,17 +204,24 @@ export default function NewWebsitePage() {
                 <Label htmlFor="country">
                   Country <span className="text-destructive">*</span>
                 </Label>
-                <select
-                  id="country"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  {...register("country")}
-                >
-                  {countries.map((c) => (
-                    <option key={c.value} value={c.value}>
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  name="country"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {countries.map((c) => (
+                          <SelectItem key={c.value} value={c.value}>
+                            {c.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {errors.country && (
                   <p className="text-xs text-destructive">
                     {errors.country.message}
@@ -218,17 +233,24 @@ export default function NewWebsitePage() {
                 <Label htmlFor="language">
                   Language <span className="text-destructive">*</span>
                 </Label>
-                <select
-                  id="language"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  {...register("language")}
-                >
-                  {languages.map((l) => (
-                    <option key={l.value} value={l.value}>
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  name="language"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select language" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {languages.map((l) => (
+                          <SelectItem key={l.value} value={l.value}>
+                            {l.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {errors.language && (
                   <p className="text-xs text-destructive">
                     {errors.language.message}
@@ -256,28 +278,33 @@ export default function NewWebsitePage() {
 
               <div className="space-y-2">
                 <Label htmlFor="niche">Niche</Label>
-                <select
-                  id="niche"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  {...register("niche")}
-                >
-                  <option value="">Select a niche</option>
-                  {niches.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
+                <Controller
+                  name="niche"
+                  control={control}
+                  render={({ field }) => (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a niche" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {niches.map((n) => (
+                          <SelectItem key={n} value={n}>
+                            {n}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="description">Description (Optional)</Label>
-              <textarea
+              <Textarea
                 id="description"
                 rows={3}
                 placeholder="Tell us more about your website..."
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 {...register("description")}
               />
             </div>

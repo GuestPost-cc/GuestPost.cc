@@ -1,4 +1,4 @@
-import type { IntegrationSummary } from "@guestpost/integrations"
+import type { IntegrationSummary } from "@guestpost/integrations/client"
 import { ChevronRight } from "lucide-react"
 import { cn } from "../../../lib/utils"
 import { Card, CardContent, CardHeader, CardTitle } from "../../card"
@@ -56,9 +56,9 @@ function IntegrationCard({
           <p>
             {linkedCount} linked website{linkedCount !== 1 ? "s" : ""}
           </p>
-          {integration.lastSyncAt && (
+          {integration.updatedAt && (
             <p>
-              Last sync: {new Date(integration.lastSyncAt).toLocaleDateString()}
+              Updated: {new Date(integration.updatedAt).toLocaleDateString()}
             </p>
           )}
         </div>

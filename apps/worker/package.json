@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@guestpost/database": "workspace:*",
+    "@guestpost/integrations": "workspace:*",
     "@guestpost/shared": "workspace:*",
     "@sentry/node": "10.63.0",
     "bullmq": "^5.0.0",

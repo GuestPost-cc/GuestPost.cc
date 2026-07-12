@@ -201,7 +201,7 @@ export class AuthGuard implements CanActivate {
         },
       })
 
-      await this.prisma.session.delete({
+      await this.prisma.session.deleteMany({
         where: { token: sessionRecord.token },
       })
 

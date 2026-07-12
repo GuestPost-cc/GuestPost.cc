@@ -14,14 +14,33 @@ import {
   Switch,
 } from "@guestpost/ui"
 import { useMutation, useQuery } from "@tanstack/react-query"
-import { Bell, CreditCard, RefreshCw, Save, Shield, User } from "lucide-react"
+import {
+  Bell,
+  CreditCard,
+  Monitor,
+  Moon,
+  Palette,
+  RefreshCw,
+  Save,
+  Shield,
+  Sun,
+  User,
+} from "lucide-react"
+import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 
+const themeOptions = [
+  { value: "system", label: "System", icon: Monitor },
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+]
+
 export default function SettingsPage() {
   const { user } = useAuth()
+  const { theme, setTheme } = useTheme()
 
   const [profile, setProfile] = useState({
     name: user?.name ?? "",
@@ -407,6 +426,47 @@ export default function SettingsPage() {
                 </>
               )}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="h-5 w-5" />
+            Appearance
+          </CardTitle>
+          <CardDescription>
+            Choose between light, dark, or system theme
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex gap-3">
+            {themeOptions.map((option) => {
+              const Icon = option.icon
+              const isActive = theme === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setTheme(option.value)}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-lg border-2 p-4 transition-all ${
+                    isActive
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <Icon
+                    className={`h-5 w-5 ${isActive ? "text-primary" : "text-muted-foreground"}`}
+                  />
+                  <span
+                    className={`text-sm font-medium ${isActive ? "text-primary" : ""}`}
+                  >
+                    {option.label}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </CardContent>
       </Card>

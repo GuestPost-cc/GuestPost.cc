@@ -1,3 +1,4 @@
+import { createPrismaClient } from "@guestpost/database"
 import {
   ProviderError,
   ReauthRequiredError,
@@ -10,6 +11,8 @@ const GA4_SCOPES = ["https://www.googleapis.com/auth/analytics.readonly"]
 
 const ADMIN_API = "https://analyticsadmin.googleapis.com/v1beta"
 const DATA_API = "https://analyticsdata.googleapis.com/v1beta"
+
+const db = createPrismaClient()
 
 export class GoogleAnalyticsProvider
   implements DiscoveryProvider, SyncProvider
@@ -85,11 +88,132 @@ export class GoogleAnalyticsProvider
 
       const data: any = await response.json()
       const rows = data.rows ?? []
-      const recordsProcessed = rows.length
+
+      // Find all website integrations linked to this GA4 property
+      const websiteIntegrations = await (db.websiteIntegration as any).findMany(
+        {
+          where: { externalResourceId },
+        },
+      )
+
+      if (websiteIntegrations.length === 0) {
+        return {
+          success: true,
+          recordsProcessed: 0,
+          syncedAt: new Date(),
+          durationMs: Date.now() - startedAt.getTime(),
+        }
+      }
+
+      // Aggregate rows by date. Metric order matches the request body:
+      // sessions, totalUsers, newUsers, screenPageViews, bounceRate, averageSessionDuration
+      const byDate = new Map<
+        string,
+        {
+          sessions: number
+          users: number
+          newUsers: number
+          pageviews: number
+          bounceRate: number
+          avgSessionDuration: number
+          count: number
+        }
+      >()
+      for (const row of rows) {
+        const dateStr = row.dimensionValues[0].value
+        const mv = row.metricValues
+        const sessions = Number(mv[0].value)
+        const users = Number(mv[1].value)
+        const newUsers = Number(mv[2].value)
+        const pageviews = Number(mv[3].value)
+        const bounceRate = Number(mv[4].value)
+        const avgSessionDuration = Number(mv[5].value)
+
+        const existing = byDate.get(dateStr) ?? {
+          sessions: 0,
+          users: 0,
+          newUsers: 0,
+          pageviews: 0,
+          bounceRate: 0,
+          avgSessionDuration: 0,
+          count: 0,
+        }
+        // GA4 date dimension already groups by day, so each dateStr appears once.
+        // Accumulate defensively in case of duplicate rows.
+        existing.sessions += sessions
+        existing.users += users
+        existing.newUsers += newUsers
+        existing.pageviews += pageviews
+        // bounceRate / avgSessionDuration are averages, so take the mean across rows.
+        const prevCount = existing.count
+        existing.bounceRate =
+          (existing.bounceRate * prevCount + bounceRate) / (prevCount + 1)
+        existing.avgSessionDuration =
+          (existing.avgSessionDuration * prevCount + avgSessionDuration) /
+          (prevCount + 1)
+        existing.count += 1
+        byDate.set(dateStr, existing)
+      }
+
+      let totalRecordsProcessed = 0
+
+      for (const wi of websiteIntegrations) {
+        try {
+          for (const [dateStr, agg] of byDate) {
+            const date = new Date(
+              Date.UTC(
+                Number(dateStr.slice(0, 4)),
+                Number(dateStr.slice(4, 6)) - 1,
+                Number(dateStr.slice(6, 8)),
+              ),
+            )
+
+            await (db.websiteAnalyticsDaily as any).upsert({
+              where: {
+                websiteId_sourceIntegrationId_date: {
+                  websiteId: wi.websiteId,
+                  sourceIntegrationId: wi.id,
+                  date,
+                },
+              },
+              update: {
+                sessions: agg.sessions,
+                users: agg.users,
+                newUsers: agg.newUsers,
+                pageviews: agg.pageviews,
+                bounceRate: agg.bounceRate,
+                avgSessionDuration: agg.avgSessionDuration,
+              },
+              create: {
+                websiteId: wi.websiteId,
+                sourceIntegrationId: wi.id,
+                date,
+                sessions: agg.sessions,
+                users: agg.users,
+                newUsers: agg.newUsers,
+                pageviews: agg.pageviews,
+                bounceRate: agg.bounceRate,
+                avgSessionDuration: agg.avgSessionDuration,
+              },
+            })
+
+            totalRecordsProcessed++
+          }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : String(err)
+          return {
+            success: false,
+            recordsProcessed: totalRecordsProcessed,
+            syncedAt: new Date(),
+            error: errorMessage,
+            durationMs: Date.now() - startedAt.getTime(),
+          }
+        }
+      }
 
       return {
         success: true,
-        recordsProcessed,
+        recordsProcessed: totalRecordsProcessed,
         syncedAt: new Date(),
         durationMs: Date.now() - startedAt.getTime(),
       }

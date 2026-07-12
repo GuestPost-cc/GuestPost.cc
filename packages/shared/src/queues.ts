@@ -12,6 +12,8 @@ export const QUEUES = {
   RECONCILIATION: "reconciliation",
   SETTLEMENT: "settlement",
   AUTO_ACCEPT: "auto-accept",
+  INTEGRATION_SYNC: "integration-sync",
+  INTEGRATION_DISCOVERY: "integration-discovery",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
@@ -75,5 +77,11 @@ export const QUEUE_JOBS = {
   [QUEUES.AUTO_ACCEPT]: {
     SWEEP: "auto-accept-sweep",
     REMINDER_SWEEP: "review-reminder-sweep",
+  },
+  [QUEUES.INTEGRATION_SYNC]: {
+    SYNC: "sync",
+  },
+  [QUEUES.INTEGRATION_DISCOVERY]: {
+    DISCOVER: "discover",
   },
 } as const

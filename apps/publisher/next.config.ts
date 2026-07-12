@@ -1,7 +1,11 @@
+import path from "node:path"
 import { withSentryConfig } from "@sentry/nextjs"
 import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: path.resolve(__dirname, "../../"),
+  },
   transpilePackages: [
     "@guestpost/ui",
     "@guestpost/shared",

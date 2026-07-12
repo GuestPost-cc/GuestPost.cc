@@ -10,7 +10,7 @@ import type {
   SyncHistoryResponse,
   SyncJob,
   TriggerSyncResponse,
-} from "@guestpost/integrations"
+} from "@guestpost/integrations/client"
 import type { HttpClient } from "../../client"
 
 /**

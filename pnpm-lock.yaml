@@ -496,6 +496,9 @@ importers:
       '@guestpost/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@guestpost/integrations':
+        specifier: workspace:*
+        version: link:../../packages/integrations
       '@guestpost/shared':
         specifier: workspace:*
         version: link:../../packages/shared

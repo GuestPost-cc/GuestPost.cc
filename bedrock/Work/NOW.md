@@ -4,6 +4,26 @@
 
 ## Recently Completed
 
+### Publisher Listings UI Modernization
+
+- Replaced dense table-based listing view with modern cards showing site, service summary, lifecycle guidance, and contextual primary action buttons (submit/pause/unpause/archive).
+- Redesigned create-listing dialog with a two-column layout: listing basics + optional first service, plus a checklist sidebar.
+- Modernized edit-listing dialog with a bordered form panel and char-count hints.
+- Replaced the services table with card-based service management: each service is a compact card with inline editing, availability dropdown, and a dedicated add-service form below.
+- Kept service-dialog state fresh after add/update mutations by updating the open dialog directly (no reopen or full-page refresh required).
+- Added presentation helpers (`serviceLabel`, `formatMoney`, `phaseCopy`) for consistent UI copy and reduced duplication.
+- Added lifecycle phase copy map with user-facing guidance for every listing state.
+- Upgraded new-website form (`/dashboard/websites/new`) to use shared `Select`/`Textarea` UI primitives via react-hook-form `Controller`.
+- Removed unused `Clock` import.
+
+### Integration UI Build Stabilization
+
+- Fixed Next.js/Turbopack workspace-root resolution for all four Next apps by setting each app's `turbopack.root` to the monorepo root.
+- Kept browser-facing integration imports on `@guestpost/integrations/client` so UI/API-client bundles do not pull worker/server dependencies transitively.
+- Restored `SyncHistoryTable` compatibility with publisher page usage (`rows`, pagination, `onPageChange`) while preserving the richer progress/error UI.
+- Made auth session rotation idempotent with `deleteMany()` to avoid noisy Prisma "record not found" warnings under concurrent/duplicate requests.
+- Validation: `pnpm build` passes for all 12 workspace packages/apps.
+
 ### Phase 5C — Website Integration Panel
 
 Built the website detail `/dashboard/websites/[id]` page that completes the integration management workflow for publishers:

@@ -5,6 +5,9 @@ import {
   Button,
   Card,
   CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Checkbox,
   Dialog,
   DialogContent,
@@ -20,16 +23,22 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   Textarea,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { AlertCircle, Edit3, Plus, RefreshCw, Store } from "lucide-react"
+import {
+  AlertCircle,
+  Archive,
+  DollarSign,
+  Edit3,
+  Globe2,
+  Layers3,
+  Plus,
+  RefreshCw,
+  Send,
+  Settings2,
+  Store,
+} from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
@@ -56,6 +65,77 @@ const STATUS_VARIANTS: Record<
   REJECTED: "destructive",
   PAUSED: "secondary",
   ARCHIVED: "outline",
+  READY_FOR_REVIEW: "secondary",
+  PUBLISHED: "default",
+  NEEDS_SERVICES: "outline",
+  WEBSITE_NOT_VERIFIED: "secondary",
+}
+
+const SERVICE_LABELS: Record<string, string> = {
+  GUEST_POST: "Guest post",
+  NICHE_EDIT: "Niche edit",
+  EDITORIAL_LINK: "Editorial link",
+  OUTREACH_LINK: "Outreach link",
+  LOCAL_CITATION: "Local citation",
+  FOUNDATION_LINK: "Foundation link",
+  BLOG_ARTICLE: "Blog article",
+  SEO_CONTENT: "SEO content",
+}
+
+const PHASE_COPY: Record<string, { title: string; description: string }> = {
+  NEEDS_SERVICES: {
+    title: "Add services",
+    description: "Create at least one purchasable service before review.",
+  },
+  WEBSITE_NOT_VERIFIED: {
+    title: "Verify website",
+    description: "Website ownership must be verified before this can go live.",
+  },
+  READY_FOR_REVIEW: {
+    title: "Ready for review",
+    description: "Submit this listing for marketplace approval.",
+  },
+  PENDING_REVIEW: {
+    title: "In review",
+    description: "Our team is checking the listing before publishing.",
+  },
+  PUBLISHED: {
+    title: "Live",
+    description: "Buyers can find and order this listing.",
+  },
+  PAUSED: {
+    title: "Paused",
+    description: "Hidden from new orders until you unpause it.",
+  },
+  REJECTED: {
+    title: "Needs changes",
+    description: "Update the listing and resubmit for review.",
+  },
+  ARCHIVED: {
+    title: "Archived",
+    description: "No longer available for new marketplace orders.",
+  },
+}
+
+function serviceLabel(type: string) {
+  return SERVICE_LABELS[type] ?? type.replace(/_/g, " ").toLowerCase()
+}
+
+function formatMoney(value: number | string, currency = "USD") {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(Number(value) || 0)
+}
+
+function phaseCopy(phase: string) {
+  return (
+    PHASE_COPY[phase] ?? {
+      title: phase.replace(/_/g, " ").toLowerCase(),
+      description: "Manage this listing from the actions below.",
+    }
+  )
 }
 
 // Services-tab state. A listing's services live on the listing row itself
@@ -201,8 +281,16 @@ export default function PublisherListingsPage() {
   const addServiceMut = useMutation({
     mutationFn: (vars: AddServiceVars) =>
       api.marketplace.addListingService(vars.listingId, vars.data),
-    onSuccess: () => {
+    onSuccess: (service) => {
       queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
+      setServicesForListing((current) =>
+        current
+          ? {
+              ...current,
+              services: [...current.services, service as ServiceRow],
+            }
+          : current,
+      )
       setNewService({
         serviceType: "GUEST_POST",
         price: "",
@@ -222,15 +310,36 @@ export default function PublisherListingsPage() {
         vars.serviceId,
         vars.data,
       ),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["publisher-listings"] }),
+    onSuccess: (service, vars) => {
+      queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
+      setServicesForListing((current) =>
+        current?.id === vars.listingId
+          ? {
+              ...current,
+              services: current.services.map((s) =>
+                s.id === vars.serviceId ? (service as ServiceRow) : s,
+              ),
+            }
+          : current,
+      )
+    },
     onError: (e: Error) => toast.error(e.message || "Update failed"),
   })
   const pauseServiceMut = useMutation({
     mutationFn: (vars: { listingId: string; serviceId: string }) =>
       api.marketplace.pauseListingService(vars.listingId, vars.serviceId),
-    onSuccess: () => {
+    onSuccess: (service, vars) => {
       queryClient.invalidateQueries({ queryKey: ["publisher-listings"] })
+      setServicesForListing((current) =>
+        current?.id === vars.listingId
+          ? {
+              ...current,
+              services: current.services.map((s) =>
+                s.id === vars.serviceId ? (service as ServiceRow) : s,
+              ),
+            }
+          : current,
+      )
       toast.success("Service paused")
     },
     onError: (e: Error) => toast.error(e.message || "Pause failed"),
@@ -286,8 +395,13 @@ export default function PublisherListingsPage() {
   })
 
   const listings = (listingsQ.data ?? []) as any[]
+  const initialServiceIsValid =
+    !form.addServiceNow ||
+    (initialService.price.trim().length > 0 && Number(initialService.price) > 0)
   const canSubmit =
-    form.title.trim().length >= 3 && form.description.trim().length >= 1
+    form.title.trim().length >= 3 &&
+    form.description.trim().length >= 1 &&
+    initialServiceIsValid
 
   if (listingsQ.error) {
     return (
@@ -307,323 +421,523 @@ export default function PublisherListingsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <Store className="h-4 w-4" />
+            Publisher inventory
+          </div>
           <h1 className="text-3xl font-bold tracking-tight">
             Marketplace Listings
           </h1>
-          <p className="text-muted-foreground">
-            Your inventory on the marketplace. New listings are reviewed by
-            staff before going live.
+          <p className="max-w-2xl text-muted-foreground">
+            Package each verified site into simple services buyers can order.
+            Draft, price, review, and manage availability from one place.
           </p>
         </div>
-        <Button onClick={() => setShowCreate(true)}>
-          <Plus className="mr-2 h-4 w-4" />
+        <Button onClick={() => setShowCreate(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
           New Listing
         </Button>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {listingsQ.isLoading ? (
-            <div className="p-4 space-y-3">
-              {[...Array(4)].map((_, i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
+      {listingsQ.isLoading ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-5 w-2/3" />
+                <Skeleton className="h-4 w-1/2" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-10 w-full" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : listings.length === 0 ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="rounded-full bg-muted p-4">
+              <Store className="h-10 w-10 text-muted-foreground" />
             </div>
-          ) : listings.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Store className="h-12 w-12 text-muted-foreground/50" />
-              <h3 className="mt-4 text-lg font-medium">No listings yet</h3>
-              <p className="text-sm text-muted-foreground">
-                Create your first listing to start receiving orders
-              </p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Title</TableHead>
-                  <TableHead>Services</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {listings.map((l: any) => {
-                  const services: ServiceRow[] =
-                    (l.services as ServiceRow[] | undefined) ?? []
-                  // Phase 6: lifecyclePhase comes from the server (computed
-                  // from status + ownerType + website verification + service
-                  // count). The phase decides which lifecycle CTAs render —
-                  // the raw status badge below is kept for staff-visible
-                  // back-compat but not the primary UI signal.
-                  const phase: string = l.lifecyclePhase ?? l.status
-                  return (
-                    <TableRow key={l.id}>
-                      <TableCell className="font-medium max-w-[320px] truncate">
+            <h3 className="mt-5 text-xl font-semibold">No listings yet</h3>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground">
+              Create your first listing, connect it to a site, and add a service
+              such as guest posts or niche edits.
+            </p>
+            <Button className="mt-5 gap-2" onClick={() => setShowCreate(true)}>
+              <Plus className="h-4 w-4" />
+              Create listing
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {listings.map((l: any) => {
+            const services: ServiceRow[] =
+              (l.services as ServiceRow[] | undefined) ?? []
+            const phase: string = l.lifecyclePhase ?? l.status
+            const copy = phaseCopy(phase)
+            const lowestService = services
+              .filter((s) => s.availability !== "PAUSED")
+              .sort((a, b) => Number(a.price) - Number(b.price))[0]
+            const websiteLabel =
+              l.website?.url ?? l.websiteUrl ?? "Site not selected"
+
+            return (
+              <Card key={l.id} className="overflow-hidden">
+                <CardHeader className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <CardTitle className="truncate text-xl">
                         {l.title}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-xs">
-                        {services.length === 0 ? (
-                          <span className="italic">No services yet</span>
-                        ) : (
-                          services
-                            .map(
-                              (s) =>
-                                `${s.serviceType.replace(/_/g, " ")} · $${Number(s.price).toFixed(0)} · ${s.turnaroundDays}d`,
-                            )
-                            .join(" • ")
+                      </CardTitle>
+                      <CardDescription className="line-clamp-2">
+                        {l.description ||
+                          "Add a short buyer-facing description."}
+                      </CardDescription>
+                    </div>
+                    <Badge variant={STATUS_VARIANTS[phase] ?? "secondary"}>
+                      {copy.title}
+                    </Badge>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                      <Globe2 className="h-3.5 w-3.5" />
+                      {websiteLabel}
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                      <Layers3 className="h-3.5 w-3.5" />
+                      {services.length} service
+                      {services.length === 1 ? "" : "s"}
+                    </span>
+                    {lowestService && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                        <DollarSign className="h-3.5 w-3.5" />
+                        From{" "}
+                        {formatMoney(
+                          lowestService.price,
+                          lowestService.currency,
                         )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={STATUS_VARIANTS[l.status] ?? "secondary"}
+                      </span>
+                    )}
+                  </div>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  <div className="rounded-lg border bg-muted/30 p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 rounded-full bg-background p-2 text-muted-foreground">
+                        <Settings2 className="h-4 w-4" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium">{copy.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {copy.description}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    {services.length === 0 ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setServicesForListing({
+                            id: l.id,
+                            title: l.title,
+                            services,
+                          })
+                        }
+                        className="flex w-full items-center justify-between rounded-lg border border-dashed p-4 text-left transition hover:bg-muted/50"
+                      >
+                        <span>
+                          <span className="block text-sm font-medium">
+                            Add your first service
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            Buyers need a service and price before review.
+                          </span>
+                        </span>
+                        <Plus className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    ) : (
+                      services.slice(0, 3).map((s) => (
+                        <div
+                          key={s.id}
+                          className="flex items-center justify-between rounded-lg border p-3"
                         >
-                          {phase.replace(/_/g, " ")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-1">
-                        {phase === "READY_FOR_REVIEW" && (
-                          <Button
-                            size="sm"
-                            onClick={() => submitMut.mutate(l.id)}
-                            disabled={submitMut.isPending}
-                          >
-                            Submit for review
-                          </Button>
-                        )}
-                        {phase === "PUBLISHED" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => pauseMut.mutate(l.id)}
-                            disabled={pauseMut.isPending}
-                          >
-                            Pause
-                          </Button>
-                        )}
-                        {phase === "PAUSED" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => unpauseMut.mutate(l.id)}
-                            disabled={unpauseMut.isPending}
-                          >
-                            Unpause
-                          </Button>
-                        )}
-                        {l.status === "REJECTED" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => submitMut.mutate(l.id)}
-                            disabled={submitMut.isPending}
-                          >
-                            Resubmit for review
-                          </Button>
-                        )}
+                          <div>
+                            <p className="text-sm font-medium">
+                              {serviceLabel(s.serviceType)}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {s.turnaroundDays} days · {s.revisionRounds}{" "}
+                              revisions
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold">
+                              {formatMoney(s.price, s.currency)}
+                            </p>
+                            <Badge variant="outline" className="mt-1">
+                              {s.availability.toLowerCase()}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+                    <div className="flex flex-wrap gap-2">
+                      {phase === "READY_FOR_REVIEW" && (
                         <Button
-                          variant="ghost"
                           size="sm"
-                          onClick={() =>
-                            setEditingListing({
-                              id: l.id,
-                              title: l.title,
-                              description: l.description ?? "",
-                            })
-                          }
+                          onClick={() => submitMut.mutate(l.id)}
+                          disabled={submitMut.isPending}
+                          className="gap-2"
                         >
-                          <Edit3 className="h-4 w-4" />
+                          <Send className="h-3.5 w-3.5" />
+                          Submit for review
                         </Button>
+                      )}
+                      {phase === "PUBLISHED" && (
                         <Button
+                          size="sm"
                           variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setServicesForListing({
-                              id: l.id,
-                              title: l.title,
-                              services,
-                            })
-                          }
+                          onClick={() => pauseMut.mutate(l.id)}
+                          disabled={pauseMut.isPending}
                         >
-                          Services
+                          Pause
                         </Button>
-                        {phase !== "ARCHIVED" && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              if (
-                                confirm(
-                                  "Archive this listing? Existing orders are untouched.",
-                                )
+                      )}
+                      {phase === "PAUSED" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => unpauseMut.mutate(l.id)}
+                          disabled={unpauseMut.isPending}
+                        >
+                          Unpause
+                        </Button>
+                      )}
+                      {l.status === "REJECTED" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => submitMut.mutate(l.id)}
+                          disabled={submitMut.isPending}
+                        >
+                          Resubmit
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setServicesForListing({
+                            id: l.id,
+                            title: l.title,
+                            services,
+                          })
+                        }
+                        className="gap-2"
+                      >
+                        <Layers3 className="h-3.5 w-3.5" />
+                        Services
+                      </Button>
+                    </div>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setEditingListing({
+                            id: l.id,
+                            title: l.title,
+                            description: l.description ?? "",
+                          })
+                        }
+                        className="gap-2"
+                      >
+                        <Edit3 className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      {phase !== "ARCHIVED" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            if (
+                              confirm(
+                                "Archive this listing? Existing orders are untouched.",
                               )
-                                archiveMut.mutate(l.id)
-                            }}
-                            disabled={archiveMut.isPending}
-                          >
-                            Archive
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                            )
+                              archiveMut.mutate(l.id)
+                          }}
+                          disabled={archiveMut.isPending}
+                          className="gap-2 text-muted-foreground"
+                        >
+                          <Archive className="h-3.5 w-3.5" />
+                          Archive
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>New Listing</DialogTitle>
+            <DialogTitle>Create marketplace listing</DialogTitle>
             <DialogDescription>
-              Create a listing to offer your services on the marketplace. You
-              can add services after creation.
+              Start with the site and buyer-facing offer. You can publish after
+              services are priced and the listing is reviewed.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="l-title">Title</Label>
-              <Input
-                id="l-title"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="e.g. Guest post on example.com (DR 60)"
-                maxLength={200}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="l-desc">Description</Label>
-              <Textarea
-                id="l-desc"
-                value={form.description}
-                onChange={(e) =>
-                  setForm({ ...form, description: e.target.value })
-                }
-                placeholder="What the buyer gets, niche, link policy..."
-                rows={3}
-                maxLength={1000}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Website</Label>
-              <Select
-                value={form.websiteId}
-                onValueChange={(v) => setForm({ ...form, websiteId: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      websitesQ.isLoading ? "Loading..." : "Select website"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {(websitesQ.data ?? []).map((w: any) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.url}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Orders for this listing will be fulfilled on the selected
-                website.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="l-add-service"
-                checked={form.addServiceNow}
-                onCheckedChange={(v) =>
-                  setForm({ ...form, addServiceNow: v === true })
-                }
-              />
-              <Label htmlFor="l-add-service" className="text-sm font-normal">
-                Add a service now
-              </Label>
-            </div>
-            {form.addServiceNow && (
-              <div className="border rounded-md p-3 space-y-3">
-                <div className="text-sm font-medium">First Service</div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label className="text-xs">Type</Label>
-                    <Select
-                      value={initialService.serviceType}
-                      onValueChange={(v) =>
-                        setInitialService({ ...initialService, serviceType: v })
+
+          <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
+            <div className="space-y-5">
+              <div className="rounded-xl border p-4">
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="rounded-full bg-muted p-2">
+                    <Globe2 className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold">Listing basics</h3>
+                    <p className="text-xs text-muted-foreground">
+                      This is what buyers see in the marketplace.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="l-title">Listing title</Label>
+                    <Input
+                      id="l-title"
+                      value={form.title}
+                      onChange={(e) =>
+                        setForm({ ...form, title: e.target.value })
                       }
+                      placeholder="Guest post on example.com"
+                      maxLength={200}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="l-desc">Description</Label>
+                    <Textarea
+                      id="l-desc"
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm({ ...form, description: e.target.value })
+                      }
+                      placeholder="Describe the placement, accepted niches, content policy, and what is included."
+                      rows={4}
+                      maxLength={1000}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {form.description.length}/1000 characters
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Website</Label>
+                    <Select
+                      value={form.websiteId}
+                      onValueChange={(v) => setForm({ ...form, websiteId: v })}
                     >
-                      <SelectTrigger className="h-8">
-                        <SelectValue />
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={
+                            websitesQ.isLoading
+                              ? "Loading sites..."
+                              : "Select a site"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        {SERVICE_TYPES.map((t) => (
-                          <SelectItem key={t} value={t}>
-                            {t.replace(/_/g, " ")}
+                        {(websitesQ.data ?? []).map((w: any) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.url}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Price (USD)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      step="0.01"
-                      className="h-8"
-                      value={initialService.price}
-                      onChange={(e) =>
-                        setInitialService({
-                          ...initialService,
-                          price: e.target.value,
-                        })
-                      }
-                      placeholder="250"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">TAT (days)</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      className="h-8"
-                      value={initialService.turnaroundDays}
-                      onChange={(e) =>
-                        setInitialService({
-                          ...initialService,
-                          turnaroundDays: e.target.value,
-                        })
-                      }
-                      placeholder="7"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs">Revisions</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      className="h-8"
-                      value={initialService.revisionRounds}
-                      onChange={(e) =>
-                        setInitialService({
-                          ...initialService,
-                          revisionRounds: e.target.value,
-                        })
-                      }
-                      placeholder="2"
-                    />
+                    <p className="text-xs text-muted-foreground">
+                      Use the website where this service will be fulfilled.
+                    </p>
                   </div>
                 </div>
               </div>
-            )}
+
+              <div className="rounded-xl border p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex gap-2">
+                    <div className="rounded-full bg-muted p-2">
+                      <Layers3 className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold">First service</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Optional, but required before review.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="l-add-service"
+                      checked={form.addServiceNow}
+                      onCheckedChange={(v) =>
+                        setForm({ ...form, addServiceNow: v === true })
+                      }
+                    />
+                    <Label
+                      htmlFor="l-add-service"
+                      className="text-sm font-normal"
+                    >
+                      Add now
+                    </Label>
+                  </div>
+                </div>
+
+                {form.addServiceNow && (
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>Service type</Label>
+                      <Select
+                        value={initialService.serviceType}
+                        onValueChange={(v) =>
+                          setInitialService({
+                            ...initialService,
+                            serviceType: v,
+                          })
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SERVICE_TYPES.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {serviceLabel(t)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Price (USD)</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        step="0.01"
+                        value={initialService.price}
+                        onChange={(e) =>
+                          setInitialService({
+                            ...initialService,
+                            price: e.target.value,
+                          })
+                        }
+                        placeholder="250"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Turnaround</Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={initialService.turnaroundDays}
+                        onChange={(e) =>
+                          setInitialService({
+                            ...initialService,
+                            turnaroundDays: e.target.value,
+                          })
+                        }
+                        placeholder="7"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Revision rounds</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={initialService.revisionRounds}
+                        onChange={(e) =>
+                          setInitialService({
+                            ...initialService,
+                            revisionRounds: e.target.value,
+                          })
+                        }
+                        placeholder="2"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-xl border bg-muted/30 p-4">
+              <h3 className="text-sm font-semibold">Listing checklist</h3>
+              <div className="mt-4 space-y-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <Badge
+                    variant={
+                      form.title.trim().length >= 3 ? "default" : "outline"
+                    }
+                  >
+                    1
+                  </Badge>
+                  <div>
+                    <p className="font-medium">Clear title</p>
+                    <p className="text-xs text-muted-foreground">
+                      Name the site or service clearly.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Badge
+                    variant={form.description.trim() ? "default" : "outline"}
+                  >
+                    2
+                  </Badge>
+                  <div>
+                    <p className="font-medium">Buyer description</p>
+                    <p className="text-xs text-muted-foreground">
+                      Explain deliverables and requirements.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Badge
+                    variant={
+                      form.addServiceNow && initialServiceIsValid
+                        ? "default"
+                        : "outline"
+                    }
+                  >
+                    3
+                  </Badge>
+                  <div>
+                    <p className="font-medium">Priced service</p>
+                    <p className="text-xs text-muted-foreground">
+                      Add now or manage services after creation.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
+
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>
               Cancel
@@ -652,14 +966,18 @@ export default function PublisherListingsPage() {
           if (!v) setEditingListing(null)
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Listing</DialogTitle>
+            <DialogTitle>Edit listing details</DialogTitle>
+            <DialogDescription>
+              Update the buyer-facing title and description. Services and prices
+              are managed separately.
+            </DialogDescription>
           </DialogHeader>
           {editingListing && (
-            <div className="space-y-4">
+            <div className="space-y-4 rounded-xl border p-4">
               <div className="space-y-2">
-                <Label>Title</Label>
+                <Label>Listing title</Label>
                 <Input
                   value={editingListing.title}
                   onChange={(e) =>
@@ -681,9 +999,12 @@ export default function PublisherListingsPage() {
                       description: e.target.value,
                     })
                   }
-                  rows={3}
+                  rows={5}
                   maxLength={1000}
                 />
+                <p className="text-xs text-muted-foreground">
+                  {editingListing.description.length}/1000 characters
+                </p>
               </div>
             </div>
           )}
@@ -700,18 +1021,22 @@ export default function PublisherListingsPage() {
                   description: editingListing.description,
                 })
               }
-              disabled={updateListingMut.isPending}
+              disabled={
+                updateListingMut.isPending ||
+                !editingListing?.title.trim() ||
+                !editingListing?.description.trim()
+              }
             >
-              {updateListingMut.isPending ? "Saving..." : "Save"}
+              {updateListingMut.isPending ? "Saving..." : "Save changes"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/*
-        Services dialog — per-row management for a listing's ListingService
-        children. Price/TAT/revisions edits go through a version-guarded
-        PATCH; concurrent edits get a 409. Availability is set via dropdown.
+        Services dialog — card-based service management. Each service is a
+        compact card with inline editing. A footer section handles adding new
+        services. Version-guarded PATCH; concurrent edits get a 409.
       */}
       <Dialog
         open={!!servicesForListing}
@@ -722,176 +1047,189 @@ export default function PublisherListingsPage() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Services on “{servicesForListing?.title}”</DialogTitle>
+            <DialogTitle>Services</DialogTitle>
             <DialogDescription>
-              Each row is a separately purchasable offering. Buyers pick one at
-              checkout — your edits here never affect in-flight orders.
+              Manage services on “{servicesForListing?.title}”. Each service is
+              a separate offering — buyers pick one at checkout. Edits never
+              affect in-flight orders.
             </DialogDescription>
           </DialogHeader>
+
           <div className="space-y-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>TAT</TableHead>
-                  <TableHead>Revisions</TableHead>
-                  <TableHead>Availability</TableHead>
-                  <TableHead className="text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {servicesForListing?.services.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="text-center text-muted-foreground py-6"
-                    >
-                      No services configured yet. Add the first one below.
-                    </TableCell>
-                  </TableRow>
-                )}
+            {servicesForListing?.services.length === 0 ? (
+              <div className="rounded-xl border border-dashed p-10 text-center">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                  <Layers3 className="h-6 w-6 text-muted-foreground" />
+                </div>
+                <p className="text-sm font-medium">No services yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Add your first service below. At least one is needed before
+                  the listing can be reviewed.
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3">
                 {servicesForListing?.services.map((s) => {
                   const isEditing =
                     editingService?.listingId === servicesForListing.id &&
                     editingService?.serviceId === s.id
                   return (
-                    <TableRow key={s.id}>
+                    <div key={s.id} className="rounded-xl border p-4">
                       {isEditing ? (
-                        <>
-                          <TableCell className="font-medium">
-                            {s.serviceType.replace(/_/g, " ")}
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              className="h-8 w-24"
-                              value={editingService.price}
-                              onChange={(e) =>
-                                setEditingService({
-                                  ...editingService!,
-                                  price: e.target.value,
-                                })
-                              }
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min={1}
-                              className="h-8 w-16"
-                              value={editingService.turnaroundDays}
-                              onChange={(e) =>
-                                setEditingService({
-                                  ...editingService!,
-                                  turnaroundDays: e.target.value,
-                                })
-                              }
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min={0}
-                              className="h-8 w-16"
-                              value={editingService.revisionRounds}
-                              onChange={(e) =>
-                                setEditingService({
-                                  ...editingService!,
-                                  revisionRounds: e.target.value,
-                                })
-                              }
-                            />
-                          </TableCell>
-                          <TableCell>
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-semibold">
+                              {serviceLabel(s.serviceType)}
+                            </h4>
+                            <Badge variant="outline">v{s.version}</Badge>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-4">
+                            <div className="space-y-1">
+                              <Label className="text-xs">
+                                Price ({editingService?.currency ?? "USD"})
+                              </Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={editingService!.price}
+                                onChange={(e) =>
+                                  setEditingService({
+                                    ...editingService!,
+                                    price: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">
+                                Turnaround (days)
+                              </Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={editingService!.turnaroundDays}
+                                onChange={(e) =>
+                                  setEditingService({
+                                    ...editingService!,
+                                    turnaroundDays: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Revisions</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={editingService!.revisionRounds}
+                                onChange={(e) =>
+                                  setEditingService({
+                                    ...editingService!,
+                                    revisionRounds: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Warranty (days)</Label>
+                              <Input
+                                type="number"
+                                min={0}
+                                value={editingService!.warrantyDays}
+                                onChange={(e) =>
+                                  setEditingService({
+                                    ...editingService!,
+                                    warrantyDays: e.target.value,
+                                  })
+                                }
+                              />
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
                             <Select
-                              value={s.availability}
+                              value={editingService!.currency}
                               onValueChange={(v) =>
-                                updateServiceMut.mutate({
-                                  listingId: servicesForListing?.id,
-                                  serviceId: s.id,
-                                  data: {
-                                    version: s.version,
-                                    availability: v as
-                                      | "AVAILABLE"
-                                      | "PAUSED"
-                                      | "WAITLIST",
-                                  },
+                                setEditingService({
+                                  ...editingService!,
+                                  currency: v,
                                 })
                               }
                             >
-                              <SelectTrigger className="h-8 w-[110px]">
+                              <SelectTrigger className="h-8 w-20">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="AVAILABLE">
-                                  Available
-                                </SelectItem>
-                                <SelectItem value="PAUSED">Paused</SelectItem>
-                                <SelectItem value="WAITLIST">
-                                  Waitlist
-                                </SelectItem>
+                                <SelectItem value="USD">USD</SelectItem>
+                                <SelectItem value="EUR">EUR</SelectItem>
+                                <SelectItem value="GBP">GBP</SelectItem>
                               </SelectContent>
                             </Select>
-                          </TableCell>
-                          <TableCell className="text-right space-x-1">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              onClick={() => {
-                                const p = editingService!
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  const p = editingService!
+                                  updateServiceMut.mutate({
+                                    listingId: servicesForListing!.id,
+                                    serviceId: s.id,
+                                    data: {
+                                      version: s.version,
+                                      price: Number(p.price),
+                                      turnaroundDays: Number(p.turnaroundDays),
+                                      revisionRounds: Number(p.revisionRounds),
+                                      warrantyDays: p.warrantyDays
+                                        ? Number(p.warrantyDays)
+                                        : undefined,
+                                      currency: p.currency,
+                                    },
+                                  })
+                                  setEditingService(null)
+                                }}
+                                disabled={updateServiceMut.isPending}
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setEditingService(null)}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className="rounded-full bg-muted p-2">
+                              <Layers3 className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium">
+                                {serviceLabel(s.serviceType)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {s.turnaroundDays}d · {s.revisionRounds}{" "}
+                                revisions
+                                {s.warrantyDays
+                                  ? ` · ${s.warrantyDays}d warranty`
+                                  : ""}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <Select
+                              value={s.availability}
+                              onValueChange={(v) =>
                                 updateServiceMut.mutate({
                                   listingId: servicesForListing!.id,
                                   serviceId: s.id,
                                   data: {
                                     version: s.version,
-                                    price: Number(p.price),
-                                    turnaroundDays: Number(p.turnaroundDays),
-                                    revisionRounds: Number(p.revisionRounds),
-                                    warrantyDays: p.warrantyDays
-                                      ? Number(p.warrantyDays)
-                                      : undefined,
-                                    currency: p.currency,
-                                  },
-                                })
-                                setEditingService(null)
-                              }}
-                              disabled={updateServiceMut.isPending}
-                            >
-                              Save
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setEditingService(null)}
-                            >
-                              Cancel
-                            </Button>
-                          </TableCell>
-                        </>
-                      ) : (
-                        <>
-                          <TableCell className="font-medium">
-                            {s.serviceType.replace(/_/g, " ")}
-                          </TableCell>
-                          <TableCell className="font-mono text-sm">
-                            ${Number(s.price).toFixed(2)}
-                          </TableCell>
-                          <TableCell>{s.turnaroundDays}d</TableCell>
-                          <TableCell>{s.revisionRounds}</TableCell>
-                          <TableCell>
-                            <Select
-                              value={s.availability}
-                              onValueChange={(v) =>
-                                updateServiceMut.mutate({
-                                  listingId: servicesForListing?.id,
-                                  serviceId: s.id,
-                                  data: {
-                                    version: s.version,
                                     availability: v as
                                       | "AVAILABLE"
                                       | "PAUSED"
@@ -913,8 +1251,9 @@ export default function PublisherListingsPage() {
                                 </SelectItem>
                               </SelectContent>
                             </Select>
-                          </TableCell>
-                          <TableCell className="text-right">
+                            <p className="min-w-[72px] text-right text-sm font-semibold">
+                              {formatMoney(s.price, s.currency)}
+                            </p>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -936,82 +1275,86 @@ export default function PublisherListingsPage() {
                             >
                               <Edit3 className="h-4 w-4" />
                             </Button>
-                          </TableCell>
-                        </>
+                          </div>
+                        </div>
                       )}
-                    </TableRow>
+                    </div>
                   )
                 })}
-              </TableBody>
-            </Table>
-            <div className="border-t pt-4 space-y-3">
-              <div className="text-sm font-medium">Add a service</div>
-              <div className="grid grid-cols-5 gap-3">
-                <Select
-                  value={newService.serviceType}
-                  onValueChange={(v) =>
-                    setNewService({ ...newService, serviceType: v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SERVICE_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  placeholder="Price"
-                  value={newService.price}
-                  onChange={(e) =>
-                    setNewService({ ...newService, price: e.target.value })
-                  }
-                />
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="TAT (days)"
-                  value={newService.turnaroundDays}
-                  onChange={(e) =>
-                    setNewService({
-                      ...newService,
-                      turnaroundDays: e.target.value,
-                    })
-                  }
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="Revisions"
-                  value={newService.revisionRounds}
-                  onChange={(e) =>
-                    setNewService({
-                      ...newService,
-                      revisionRounds: e.target.value,
-                    })
-                  }
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="Warranty (days)"
-                  value={newService.warrantyDays}
-                  onChange={(e) =>
-                    setNewService({
-                      ...newService,
-                      warrantyDays: e.target.value,
-                    })
-                  }
-                />
               </div>
-              <div className="flex items-center justify-between">
+            )}
+
+            <div className="rounded-xl border border-dashed p-4">
+              <div className="flex items-center gap-2">
+                <Layers3 className="h-4 w-4 text-muted-foreground" />
+                <p className="text-sm font-medium">Add a service</p>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Type</Label>
+                  <Select
+                    value={newService.serviceType}
+                    onValueChange={(v) =>
+                      setNewService({ ...newService, serviceType: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SERVICE_TYPES.map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {serviceLabel(t)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Price</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    step="0.01"
+                    placeholder="250"
+                    value={newService.price}
+                    onChange={(e) =>
+                      setNewService({ ...newService, price: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Turnaround (days)</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="7"
+                    value={newService.turnaroundDays}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        turnaroundDays: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Revisions</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="2"
+                    value={newService.revisionRounds}
+                    onChange={(e) =>
+                      setNewService({
+                        ...newService,
+                        revisionRounds: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Label className="text-xs">Currency</Label>
                   <Select
@@ -1060,6 +1403,7 @@ export default function PublisherListingsPage() {
               </div>
             </div>
           </div>
+
           <DialogFooter>
             <Button
               variant="outline"

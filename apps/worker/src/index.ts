@@ -15,6 +15,10 @@ import { validateEnv } from "./lib/env"
 validateEnv()
 
 import { prisma } from "@guestpost/database"
+import {
+  createDiscoveryWorker,
+  createSyncWorker,
+} from "@guestpost/integrations/workers"
 import { QUEUES } from "@guestpost/shared"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
@@ -367,6 +371,8 @@ async function bootstrap() {
     createSettlementAutoApproveWorker(),
     createSettlementReleaseWorker(),
     createAutoAcceptWorker(),
+    createDiscoveryWorker(connection as any) as { close: () => Promise<void> },
+    createSyncWorker(connection as any) as { close: () => Promise<void> },
   )
   logger.info("workers started", { count: workers.length })
   // Register all repeatable cron jobs and verify the registry matches expectations.

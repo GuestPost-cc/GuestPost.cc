@@ -1,4 +1,4 @@
-import type { LinkedWebsite } from "@guestpost/integrations"
+import type { LinkedWebsite } from "@guestpost/integrations/client"
 import { Globe, Trash2 } from "lucide-react"
 import type { ReactNode } from "react"
 import { cn } from "../../../lib/utils"
@@ -56,7 +56,9 @@ function WebsiteIntegrationList({
         <TableBody>
           {websites.map((w) => (
             <TableRow key={w.id}>
-              <TableCell className="font-medium">{w.propertyUrl}</TableCell>
+              <TableCell className="font-medium">
+                {w.externalResourceName ?? w.externalResourceId}
+              </TableCell>
               <TableCell>
                 {w.status === "SYNCING" ? (
                   <span className="text-blue-500">Syncing</span>
@@ -76,7 +78,7 @@ function WebsiteIntegrationList({
                     variant="ghost"
                     size="icon"
                     onClick={() => onUnlink(w.id!)}
-                    aria-label={`Unlink ${w.propertyUrl}`}
+                    aria-label={`Unlink ${w.externalResourceName ?? w.externalResourceId}`}
                   >
                     <Trash2 className="h-4 w-4" aria-hidden="true" />
                   </Button>

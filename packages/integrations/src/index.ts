@@ -13,4 +13,6 @@ export * from "./schemas/integration.schemas"
 export * from "./services"
 export * from "./types"
 export * from "./utils"
-export * from "./workers"
+// Workers are exported via the "./workers" subpath export (see package.json
+// exports map). Keeping them in the main entry point would transitively pull
+// bullmq + @sentry/node into UI bundles that only need types/enums.

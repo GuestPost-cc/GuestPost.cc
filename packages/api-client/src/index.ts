@@ -8,7 +8,7 @@ export type {
   SyncHistoryResponse,
   SyncJob,
   TriggerSyncResponse,
-} from "@guestpost/integrations"
+} from "@guestpost/integrations/client"
 export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, clearToken, getToken, HttpClient, setToken } from "./client"
 export type {

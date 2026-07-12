@@ -1,8 +1,7 @@
-import type { IntegrationProvider } from "@guestpost/integrations"
-import { Loader2, Plus } from "lucide-react"
+import type { IntegrationProvider } from "@guestpost/integrations/client"
+import { Loader2, Plug } from "lucide-react"
 import { cn } from "../../../lib/utils"
 import { Button } from "../../button"
-import { ProviderBadge } from "../primitives/provider-badge"
 
 interface ConnectButtonProps {
   provider: IntegrationProvider
@@ -21,18 +20,19 @@ function ConnectButton({
 }: ConnectButtonProps) {
   return (
     <Button
-      variant="outline"
+      variant="default"
       onClick={onClick}
       disabled={disabled || loading}
       className={cn("gap-2", className)}
-      aria-label={`Connect ${provider}`}
     >
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
       ) : (
-        <Plus className="h-4 w-4" aria-hidden="true" />
+        <Plug className="h-4 w-4" aria-hidden="true" />
       )}
-      <ProviderBadge provider={provider} />
+      {loading
+        ? `Connecting ${String(provider)}`
+        : `Connect ${String(provider)}`}
     </Button>
   )
 }

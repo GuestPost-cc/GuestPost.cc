@@ -1,4 +1,8 @@
-import type { SyncJob } from "@guestpost/integrations"
+import {
+  IntegrationSyncStatus,
+  type Pagination,
+  type SyncJob,
+} from "@guestpost/integrations/client"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import type { ReactNode } from "react"
 import { cn } from "../../../lib/utils"
@@ -14,29 +18,32 @@ import {
 } from "../../table"
 import { SyncProgress } from "../primitives/sync-progress"
 
+type SyncHistoryRow = Partial<SyncJob>
+
 interface SyncHistoryTableProps {
-  rows: SyncJob[]
+  rows?: SyncHistoryRow[]
+  syncs?: SyncHistoryRow[]
   loading?: boolean
   emptyState?: ReactNode
-  pagination: {
-    page: number
-    pageSize: number
-    total: number
-    hasNext: boolean
-  }
-  onPageChange: (page: number) => void
+  pagination?: Pagination
+  onPageChange?: (page: number) => void
   className?: string
 }
 
 function SyncHistoryTable({
   rows,
+  syncs,
   loading = false,
   emptyState,
   pagination,
   onPageChange,
   className,
 }: SyncHistoryTableProps) {
-  const pageCount = Math.ceil(pagination.total / pagination.pageSize)
+  const items = rows ?? syncs ?? []
+  const currentPage = pagination?.page ?? 1
+  const pageSize = pagination?.pageSize ?? items.length
+  const total = pagination?.total ?? items.length
+  const pageCount = Math.max(1, Math.ceil(total / Math.max(1, pageSize)))
 
   if (loading) {
     return (
@@ -52,7 +59,7 @@ function SyncHistoryTable({
     )
   }
 
-  if (rows.length === 0) {
+  if (items.length === 0) {
     return (
       <div className={cn(className)}>
         {emptyState ?? (
@@ -78,12 +85,12 @@ function SyncHistoryTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((sync) => {
+            {items.map((sync, index) => {
               const startedAt = sync.startedAt ? new Date(sync.startedAt) : null
               const trigger = sync.trigger ?? "manual"
               const progress = sync.progress ?? { completed: 0, total: 0 }
               return (
-                <TableRow key={sync.id}>
+                <TableRow key={sync.id ?? index}>
                   <TableCell className="text-sm">
                     {startedAt?.toLocaleDateString() ?? "—"}
                     <br />
@@ -100,7 +107,7 @@ function SyncHistoryTable({
                     <SyncProgress
                       completed={progress.completed ?? 0}
                       total={progress.total ?? 0}
-                      status={sync.status!}
+                      status={sync.status ?? IntegrationSyncStatus.PENDING}
                     />
                   </TableCell>
                   <TableCell className="text-sm">
@@ -109,7 +116,7 @@ function SyncHistoryTable({
                   <TableCell className="max-w-[200px] text-sm text-destructive">
                     {sync.errorMessage && (
                       <span
-                        className="truncate block"
+                        className="block truncate"
                         title={sync.errorMessage}
                       >
                         {sync.errorMessage}
@@ -123,34 +130,36 @@ function SyncHistoryTable({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {pagination.total} sync{pagination.total !== 1 ? "s" : ""}
-        </p>
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onPageChange(pagination.page - 1)}
-            disabled={pagination.page <= 1}
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <span className="px-2 text-sm">
-            Page {pagination.page} of {pageCount || 1}
-          </span>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => onPageChange(pagination.page + 1)}
-            disabled={!pagination.hasNext}
-            aria-label="Next page"
-          >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </Button>
+      {pagination && onPageChange ? (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            {total} sync{total !== 1 ? "s" : ""}
+          </p>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage <= 1}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            </Button>
+            <span className="px-2 text-sm">
+              Page {currentPage} of {pageCount}
+            </span>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={!pagination.hasNext}
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }
