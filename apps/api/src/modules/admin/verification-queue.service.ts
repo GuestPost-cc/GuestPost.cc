@@ -35,7 +35,7 @@ export class AdminVerificationQueueService {
             url: true,
             publisherId: true,
             publisher: {
-              select: { tier: true, trustScore: true },
+              select: { tier: true },
             },
           },
         },

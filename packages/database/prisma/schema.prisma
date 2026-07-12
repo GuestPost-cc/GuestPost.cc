@@ -619,7 +619,7 @@ model Order {
   version                 Int                 @default(0)
   // Points at the current OrderDeliveryVersion (source of truth for delivery).
   // Legacy publishedUrl/verifiedAt/deliveredAt are denormalized mirrors of it.
-  activeDeliveryVersionId String?
+  activeDeliveryVersionId String? @unique
   // ── Listing-service snapshot (Phase 1 additive; required in Phase 4) ──
   // Captured at order creation from the chosen MarketplaceListing →
   // ListingService row so that subsequent price/TAT/availability edits on
@@ -640,6 +640,7 @@ model Order {
   customer               User                    @relation("OrderCustomer", fields: [customerId], references: [id])
   assignee               User?                   @relation("OrderAssignee", fields: [assigneeId], references: [id])
   website                Website?                @relation(fields: [websiteId], references: [id])
+  activeDeliveryVersion  OrderDeliveryVersion?   @relation("ActiveOrderDeliveryVersion", fields: [activeDeliveryVersionId], references: [id])
   organization           Organization            @relation(fields: [organizationId], references: [id])
   campaign               Campaign?               @relation(fields: [campaignId], references: [id])
   listing                MarketplaceListing?     @relation(fields: [listingId], references: [id])
@@ -653,7 +654,7 @@ model Order {
   settlements            Settlement[]
   dispute                OrderDispute?
   platformRevenue        PlatformRevenue?
-  deliveryVersions       OrderDeliveryVersion[]
+  deliveryVersions       OrderDeliveryVersion[] @relation("OrderDeliveryVersions")
   fulfillmentAssignments FulfillmentAssignment[]
   fraudFlags             DeliveryFraudFlag[]
   tickets                Ticket[]
@@ -918,7 +919,8 @@ model OrderDeliveryVersion {
   adminVerifiedNotes        String?
   createdAt                 DateTime                   @default(now())
 
-  order             Order                          @relation(fields: [orderId], references: [id])
+  order             Order                          @relation("OrderDeliveryVersions", fields: [orderId], references: [id])
+  activeOrder       Order?                         @relation("ActiveOrderDeliveryVersion")
   evidence          DeliveryVerificationEvidence[]
   snapshots         DeliverySnapshot[]
   fraudFlags        DeliveryFraudFlag[]

@@ -337,6 +337,7 @@ export type OrderDeliveryVersionWhereInput = {
   adminVerifiedNotes?: Prisma.StringNullableFilter<"OrderDeliveryVersion"> | string | null
   createdAt?: Prisma.DateTimeFilter<"OrderDeliveryVersion"> | Date | string
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
+  activeOrder?: Prisma.XOR<Prisma.OrderNullableScalarRelationFilter, Prisma.OrderWhereInput> | null
   evidence?: Prisma.DeliveryVerificationEvidenceListRelationFilter
   snapshots?: Prisma.DeliverySnapshotListRelationFilter
   fraudFlags?: Prisma.DeliveryFraudFlagListRelationFilter
@@ -364,6 +365,7 @@ export type OrderDeliveryVersionOrderByWithRelationInput = {
   adminVerifiedNotes?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   order?: Prisma.OrderOrderByWithRelationInput
+  activeOrder?: Prisma.OrderOrderByWithRelationInput
   evidence?: Prisma.DeliveryVerificationEvidenceOrderByRelationAggregateInput
   snapshots?: Prisma.DeliverySnapshotOrderByRelationAggregateInput
   fraudFlags?: Prisma.DeliveryFraudFlagOrderByRelationAggregateInput
@@ -395,6 +397,7 @@ export type OrderDeliveryVersionWhereUniqueInput = Prisma.AtLeast<{
   adminVerifiedNotes?: Prisma.StringNullableFilter<"OrderDeliveryVersion"> | string | null
   createdAt?: Prisma.DateTimeFilter<"OrderDeliveryVersion"> | Date | string
   order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
+  activeOrder?: Prisma.XOR<Prisma.OrderNullableScalarRelationFilter, Prisma.OrderWhereInput> | null
   evidence?: Prisma.DeliveryVerificationEvidenceListRelationFilter
   snapshots?: Prisma.DeliverySnapshotListRelationFilter
   fraudFlags?: Prisma.DeliveryFraudFlagListRelationFilter
@@ -472,6 +475,7 @@ export type OrderDeliveryVersionCreateInput = {
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutDeliveryVersionsInput
+  activeOrder?: Prisma.OrderCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceCreateNestedManyWithoutDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutDeliveryVersionInput
@@ -498,6 +502,7 @@ export type OrderDeliveryVersionUncheckedCreateInput = {
   adminOverrideReason?: $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
+  activeOrder?: Prisma.OrderUncheckedCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedCreateNestedManyWithoutDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotUncheckedCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutDeliveryVersionInput
@@ -522,6 +527,7 @@ export type OrderDeliveryVersionUpdateInput = {
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutDeliveryVersionsNestedInput
+  activeOrder?: Prisma.OrderUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUpdateManyWithoutDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutDeliveryVersionNestedInput
@@ -548,6 +554,7 @@ export type OrderDeliveryVersionUncheckedUpdateInput = {
   adminOverrideReason?: Prisma.NullableEnumVerificationOverrideReasonFieldUpdateOperationsInput | $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  activeOrder?: Prisma.OrderUncheckedUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedUpdateManyWithoutDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUncheckedUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutDeliveryVersionNestedInput
@@ -625,6 +632,11 @@ export type OrderDeliveryVersionListRelationFilter = {
 
 export type OrderDeliveryVersionOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
+}
+
+export type OrderDeliveryVersionNullableScalarRelationFilter = {
+  is?: Prisma.OrderDeliveryVersionWhereInput | null
+  isNot?: Prisma.OrderDeliveryVersionWhereInput | null
 }
 
 export type OrderDeliveryVersionOrderIdVersionCompoundUniqueInput = {
@@ -757,6 +769,12 @@ export type OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedI
   deleteMany?: Prisma.OrderDeliveryVersionScalarWhereInput | Prisma.OrderDeliveryVersionScalarWhereInput[]
 }
 
+export type OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput = {
+  create?: Prisma.XOR<Prisma.OrderDeliveryVersionCreateWithoutActiveOrderInput, Prisma.OrderDeliveryVersionUncheckedCreateWithoutActiveOrderInput>
+  connectOrCreate?: Prisma.OrderDeliveryVersionCreateOrConnectWithoutActiveOrderInput
+  connect?: Prisma.OrderDeliveryVersionWhereUniqueInput
+}
+
 export type OrderDeliveryVersionCreateNestedManyWithoutOrderInput = {
   create?: Prisma.XOR<Prisma.OrderDeliveryVersionCreateWithoutOrderInput, Prisma.OrderDeliveryVersionUncheckedCreateWithoutOrderInput> | Prisma.OrderDeliveryVersionCreateWithoutOrderInput[] | Prisma.OrderDeliveryVersionUncheckedCreateWithoutOrderInput[]
   connectOrCreate?: Prisma.OrderDeliveryVersionCreateOrConnectWithoutOrderInput | Prisma.OrderDeliveryVersionCreateOrConnectWithoutOrderInput[]
@@ -769,6 +787,16 @@ export type OrderDeliveryVersionUncheckedCreateNestedManyWithoutOrderInput = {
   connectOrCreate?: Prisma.OrderDeliveryVersionCreateOrConnectWithoutOrderInput | Prisma.OrderDeliveryVersionCreateOrConnectWithoutOrderInput[]
   createMany?: Prisma.OrderDeliveryVersionCreateManyOrderInputEnvelope
   connect?: Prisma.OrderDeliveryVersionWhereUniqueInput | Prisma.OrderDeliveryVersionWhereUniqueInput[]
+}
+
+export type OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderDeliveryVersionCreateWithoutActiveOrderInput, Prisma.OrderDeliveryVersionUncheckedCreateWithoutActiveOrderInput>
+  connectOrCreate?: Prisma.OrderDeliveryVersionCreateOrConnectWithoutActiveOrderInput
+  upsert?: Prisma.OrderDeliveryVersionUpsertWithoutActiveOrderInput
+  disconnect?: Prisma.OrderDeliveryVersionWhereInput | boolean
+  delete?: Prisma.OrderDeliveryVersionWhereInput | boolean
+  connect?: Prisma.OrderDeliveryVersionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderDeliveryVersionUpdateToOneWithWhereWithoutActiveOrderInput, Prisma.OrderDeliveryVersionUpdateWithoutActiveOrderInput>, Prisma.OrderDeliveryVersionUncheckedUpdateWithoutActiveOrderInput>
 }
 
 export type OrderDeliveryVersionUpdateManyWithoutOrderNestedInput = {
@@ -872,6 +900,7 @@ export type OrderDeliveryVersionCreateWithoutAdminVerifiedByInput = {
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutDeliveryVersionsInput
+  activeOrder?: Prisma.OrderCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceCreateNestedManyWithoutDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutDeliveryVersionInput
@@ -896,6 +925,7 @@ export type OrderDeliveryVersionUncheckedCreateWithoutAdminVerifiedByInput = {
   adminOverrideReason?: $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
+  activeOrder?: Prisma.OrderUncheckedCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedCreateNestedManyWithoutDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotUncheckedCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutDeliveryVersionInput
@@ -952,6 +982,61 @@ export type OrderDeliveryVersionScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"OrderDeliveryVersion"> | Date | string
 }
 
+export type OrderDeliveryVersionCreateWithoutActiveOrderInput = {
+  id?: string
+  version: number
+  publishedUrl: string
+  normalizedUrl: string
+  articleTitle?: string | null
+  notes?: string | null
+  screenshotUrl?: string | null
+  submittedByUserId: string
+  submittedAt?: Date | string
+  verificationStatus?: $Enums.DeliveryVerificationStatus
+  verificationFailureReason?: string | null
+  interventionStatus?: $Enums.DeliveryInterventionStatus
+  supersededByVersion?: number | null
+  verificationVersion?: number
+  adminOverrideReason?: $Enums.VerificationOverrideReason | null
+  adminVerifiedNotes?: string | null
+  createdAt?: Date | string
+  order: Prisma.OrderCreateNestedOneWithoutDeliveryVersionsInput
+  evidence?: Prisma.DeliveryVerificationEvidenceCreateNestedManyWithoutDeliveryVersionInput
+  snapshots?: Prisma.DeliverySnapshotCreateNestedManyWithoutDeliveryVersionInput
+  fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutDeliveryVersionInput
+  adminVerifiedBy?: Prisma.UserCreateNestedOneWithoutAdminVerifiedDeliveryVersionsInput
+}
+
+export type OrderDeliveryVersionUncheckedCreateWithoutActiveOrderInput = {
+  id?: string
+  orderId: string
+  version: number
+  publishedUrl: string
+  normalizedUrl: string
+  articleTitle?: string | null
+  notes?: string | null
+  screenshotUrl?: string | null
+  submittedByUserId: string
+  submittedAt?: Date | string
+  verificationStatus?: $Enums.DeliveryVerificationStatus
+  verificationFailureReason?: string | null
+  interventionStatus?: $Enums.DeliveryInterventionStatus
+  supersededByVersion?: number | null
+  verificationVersion?: number
+  adminVerifiedById?: string | null
+  adminOverrideReason?: $Enums.VerificationOverrideReason | null
+  adminVerifiedNotes?: string | null
+  createdAt?: Date | string
+  evidence?: Prisma.DeliveryVerificationEvidenceUncheckedCreateNestedManyWithoutDeliveryVersionInput
+  snapshots?: Prisma.DeliverySnapshotUncheckedCreateNestedManyWithoutDeliveryVersionInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutDeliveryVersionInput
+}
+
+export type OrderDeliveryVersionCreateOrConnectWithoutActiveOrderInput = {
+  where: Prisma.OrderDeliveryVersionWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderDeliveryVersionCreateWithoutActiveOrderInput, Prisma.OrderDeliveryVersionUncheckedCreateWithoutActiveOrderInput>
+}
+
 export type OrderDeliveryVersionCreateWithoutOrderInput = {
   id?: string
   version: number
@@ -970,6 +1055,7 @@ export type OrderDeliveryVersionCreateWithoutOrderInput = {
   adminOverrideReason?: $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
+  activeOrder?: Prisma.OrderCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceCreateNestedManyWithoutDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutDeliveryVersionInput
@@ -995,6 +1081,7 @@ export type OrderDeliveryVersionUncheckedCreateWithoutOrderInput = {
   adminOverrideReason?: $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
+  activeOrder?: Prisma.OrderUncheckedCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedCreateNestedManyWithoutDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotUncheckedCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutDeliveryVersionInput
@@ -1008,6 +1095,67 @@ export type OrderDeliveryVersionCreateOrConnectWithoutOrderInput = {
 export type OrderDeliveryVersionCreateManyOrderInputEnvelope = {
   data: Prisma.OrderDeliveryVersionCreateManyOrderInput | Prisma.OrderDeliveryVersionCreateManyOrderInput[]
   skipDuplicates?: boolean
+}
+
+export type OrderDeliveryVersionUpsertWithoutActiveOrderInput = {
+  update: Prisma.XOR<Prisma.OrderDeliveryVersionUpdateWithoutActiveOrderInput, Prisma.OrderDeliveryVersionUncheckedUpdateWithoutActiveOrderInput>
+  create: Prisma.XOR<Prisma.OrderDeliveryVersionCreateWithoutActiveOrderInput, Prisma.OrderDeliveryVersionUncheckedCreateWithoutActiveOrderInput>
+  where?: Prisma.OrderDeliveryVersionWhereInput
+}
+
+export type OrderDeliveryVersionUpdateToOneWithWhereWithoutActiveOrderInput = {
+  where?: Prisma.OrderDeliveryVersionWhereInput
+  data: Prisma.XOR<Prisma.OrderDeliveryVersionUpdateWithoutActiveOrderInput, Prisma.OrderDeliveryVersionUncheckedUpdateWithoutActiveOrderInput>
+}
+
+export type OrderDeliveryVersionUpdateWithoutActiveOrderInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  publishedUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  normalizedUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  articleTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  screenshotUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedByUserId?: Prisma.StringFieldUpdateOperationsInput | string
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  verificationStatus?: Prisma.EnumDeliveryVerificationStatusFieldUpdateOperationsInput | $Enums.DeliveryVerificationStatus
+  verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  interventionStatus?: Prisma.EnumDeliveryInterventionStatusFieldUpdateOperationsInput | $Enums.DeliveryInterventionStatus
+  supersededByVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  adminOverrideReason?: Prisma.NullableEnumVerificationOverrideReasonFieldUpdateOperationsInput | $Enums.VerificationOverrideReason | null
+  adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  order?: Prisma.OrderUpdateOneRequiredWithoutDeliveryVersionsNestedInput
+  evidence?: Prisma.DeliveryVerificationEvidenceUpdateManyWithoutDeliveryVersionNestedInput
+  snapshots?: Prisma.DeliverySnapshotUpdateManyWithoutDeliveryVersionNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutDeliveryVersionNestedInput
+  adminVerifiedBy?: Prisma.UserUpdateOneWithoutAdminVerifiedDeliveryVersionsNestedInput
+}
+
+export type OrderDeliveryVersionUncheckedUpdateWithoutActiveOrderInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  orderId?: Prisma.StringFieldUpdateOperationsInput | string
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  publishedUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  normalizedUrl?: Prisma.StringFieldUpdateOperationsInput | string
+  articleTitle?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  notes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  screenshotUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedByUserId?: Prisma.StringFieldUpdateOperationsInput | string
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  verificationStatus?: Prisma.EnumDeliveryVerificationStatusFieldUpdateOperationsInput | $Enums.DeliveryVerificationStatus
+  verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  interventionStatus?: Prisma.EnumDeliveryInterventionStatusFieldUpdateOperationsInput | $Enums.DeliveryInterventionStatus
+  supersededByVersion?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  adminVerifiedById?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  adminOverrideReason?: Prisma.NullableEnumVerificationOverrideReasonFieldUpdateOperationsInput | $Enums.VerificationOverrideReason | null
+  adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  evidence?: Prisma.DeliveryVerificationEvidenceUncheckedUpdateManyWithoutDeliveryVersionNestedInput
+  snapshots?: Prisma.DeliverySnapshotUncheckedUpdateManyWithoutDeliveryVersionNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutDeliveryVersionNestedInput
 }
 
 export type OrderDeliveryVersionUpsertWithWhereUniqueWithoutOrderInput = {
@@ -1045,6 +1193,7 @@ export type OrderDeliveryVersionCreateWithoutEvidenceInput = {
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutDeliveryVersionsInput
+  activeOrder?: Prisma.OrderCreateNestedOneWithoutActiveDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutDeliveryVersionInput
   adminVerifiedBy?: Prisma.UserCreateNestedOneWithoutAdminVerifiedDeliveryVersionsInput
@@ -1070,6 +1219,7 @@ export type OrderDeliveryVersionUncheckedCreateWithoutEvidenceInput = {
   adminOverrideReason?: $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
+  activeOrder?: Prisma.OrderUncheckedCreateNestedOneWithoutActiveDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotUncheckedCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutDeliveryVersionInput
 }
@@ -1109,6 +1259,7 @@ export type OrderDeliveryVersionUpdateWithoutEvidenceInput = {
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutDeliveryVersionsNestedInput
+  activeOrder?: Prisma.OrderUpdateOneWithoutActiveDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutDeliveryVersionNestedInput
   adminVerifiedBy?: Prisma.UserUpdateOneWithoutAdminVerifiedDeliveryVersionsNestedInput
@@ -1134,6 +1285,7 @@ export type OrderDeliveryVersionUncheckedUpdateWithoutEvidenceInput = {
   adminOverrideReason?: Prisma.NullableEnumVerificationOverrideReasonFieldUpdateOperationsInput | $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  activeOrder?: Prisma.OrderUncheckedUpdateOneWithoutActiveDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUncheckedUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutDeliveryVersionNestedInput
 }
@@ -1157,6 +1309,7 @@ export type OrderDeliveryVersionCreateWithoutSnapshotsInput = {
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutDeliveryVersionsInput
+  activeOrder?: Prisma.OrderCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutDeliveryVersionInput
   adminVerifiedBy?: Prisma.UserCreateNestedOneWithoutAdminVerifiedDeliveryVersionsInput
@@ -1182,6 +1335,7 @@ export type OrderDeliveryVersionUncheckedCreateWithoutSnapshotsInput = {
   adminOverrideReason?: $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
+  activeOrder?: Prisma.OrderUncheckedCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedCreateNestedManyWithoutDeliveryVersionInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutDeliveryVersionInput
 }
@@ -1221,6 +1375,7 @@ export type OrderDeliveryVersionUpdateWithoutSnapshotsInput = {
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutDeliveryVersionsNestedInput
+  activeOrder?: Prisma.OrderUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutDeliveryVersionNestedInput
   adminVerifiedBy?: Prisma.UserUpdateOneWithoutAdminVerifiedDeliveryVersionsNestedInput
@@ -1246,6 +1401,7 @@ export type OrderDeliveryVersionUncheckedUpdateWithoutSnapshotsInput = {
   adminOverrideReason?: Prisma.NullableEnumVerificationOverrideReasonFieldUpdateOperationsInput | $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  activeOrder?: Prisma.OrderUncheckedUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutDeliveryVersionNestedInput
 }
@@ -1269,6 +1425,7 @@ export type OrderDeliveryVersionCreateWithoutFraudFlagsInput = {
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
   order: Prisma.OrderCreateNestedOneWithoutDeliveryVersionsInput
+  activeOrder?: Prisma.OrderCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceCreateNestedManyWithoutDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotCreateNestedManyWithoutDeliveryVersionInput
   adminVerifiedBy?: Prisma.UserCreateNestedOneWithoutAdminVerifiedDeliveryVersionsInput
@@ -1294,6 +1451,7 @@ export type OrderDeliveryVersionUncheckedCreateWithoutFraudFlagsInput = {
   adminOverrideReason?: $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: string | null
   createdAt?: Date | string
+  activeOrder?: Prisma.OrderUncheckedCreateNestedOneWithoutActiveDeliveryVersionInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedCreateNestedManyWithoutDeliveryVersionInput
   snapshots?: Prisma.DeliverySnapshotUncheckedCreateNestedManyWithoutDeliveryVersionInput
 }
@@ -1333,6 +1491,7 @@ export type OrderDeliveryVersionUpdateWithoutFraudFlagsInput = {
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutDeliveryVersionsNestedInput
+  activeOrder?: Prisma.OrderUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUpdateManyWithoutDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUpdateManyWithoutDeliveryVersionNestedInput
   adminVerifiedBy?: Prisma.UserUpdateOneWithoutAdminVerifiedDeliveryVersionsNestedInput
@@ -1358,6 +1517,7 @@ export type OrderDeliveryVersionUncheckedUpdateWithoutFraudFlagsInput = {
   adminOverrideReason?: Prisma.NullableEnumVerificationOverrideReasonFieldUpdateOperationsInput | $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  activeOrder?: Prisma.OrderUncheckedUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedUpdateManyWithoutDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUncheckedUpdateManyWithoutDeliveryVersionNestedInput
 }
@@ -1402,6 +1562,7 @@ export type OrderDeliveryVersionUpdateWithoutAdminVerifiedByInput = {
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneRequiredWithoutDeliveryVersionsNestedInput
+  activeOrder?: Prisma.OrderUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUpdateManyWithoutDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutDeliveryVersionNestedInput
@@ -1426,6 +1587,7 @@ export type OrderDeliveryVersionUncheckedUpdateWithoutAdminVerifiedByInput = {
   adminOverrideReason?: Prisma.NullableEnumVerificationOverrideReasonFieldUpdateOperationsInput | $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  activeOrder?: Prisma.OrderUncheckedUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedUpdateManyWithoutDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUncheckedUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutDeliveryVersionNestedInput
@@ -1491,6 +1653,7 @@ export type OrderDeliveryVersionUpdateWithoutOrderInput = {
   adminOverrideReason?: Prisma.NullableEnumVerificationOverrideReasonFieldUpdateOperationsInput | $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  activeOrder?: Prisma.OrderUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUpdateManyWithoutDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutDeliveryVersionNestedInput
@@ -1516,6 +1679,7 @@ export type OrderDeliveryVersionUncheckedUpdateWithoutOrderInput = {
   adminOverrideReason?: Prisma.NullableEnumVerificationOverrideReasonFieldUpdateOperationsInput | $Enums.VerificationOverrideReason | null
   adminVerifiedNotes?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  activeOrder?: Prisma.OrderUncheckedUpdateOneWithoutActiveDeliveryVersionNestedInput
   evidence?: Prisma.DeliveryVerificationEvidenceUncheckedUpdateManyWithoutDeliveryVersionNestedInput
   snapshots?: Prisma.DeliverySnapshotUncheckedUpdateManyWithoutDeliveryVersionNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutDeliveryVersionNestedInput
@@ -1612,6 +1776,7 @@ export type OrderDeliveryVersionSelect<ExtArgs extends runtime.Types.Extensions.
   adminVerifiedNotes?: boolean
   createdAt?: boolean
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  activeOrder?: boolean | Prisma.OrderDeliveryVersion$activeOrderArgs<ExtArgs>
   evidence?: boolean | Prisma.OrderDeliveryVersion$evidenceArgs<ExtArgs>
   snapshots?: boolean | Prisma.OrderDeliveryVersion$snapshotsArgs<ExtArgs>
   fraudFlags?: boolean | Prisma.OrderDeliveryVersion$fraudFlagsArgs<ExtArgs>
@@ -1692,6 +1857,7 @@ export type OrderDeliveryVersionSelectScalar = {
 export type OrderDeliveryVersionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "orderId" | "version" | "publishedUrl" | "normalizedUrl" | "articleTitle" | "notes" | "screenshotUrl" | "submittedByUserId" | "submittedAt" | "verificationStatus" | "verificationFailureReason" | "interventionStatus" | "supersededByVersion" | "verificationVersion" | "adminVerifiedById" | "adminOverrideReason" | "adminVerifiedNotes" | "createdAt", ExtArgs["result"]["orderDeliveryVersion"]>
 export type OrderDeliveryVersionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
+  activeOrder?: boolean | Prisma.OrderDeliveryVersion$activeOrderArgs<ExtArgs>
   evidence?: boolean | Prisma.OrderDeliveryVersion$evidenceArgs<ExtArgs>
   snapshots?: boolean | Prisma.OrderDeliveryVersion$snapshotsArgs<ExtArgs>
   fraudFlags?: boolean | Prisma.OrderDeliveryVersion$fraudFlagsArgs<ExtArgs>
@@ -1711,6 +1877,7 @@ export type $OrderDeliveryVersionPayload<ExtArgs extends runtime.Types.Extension
   name: "OrderDeliveryVersion"
   objects: {
     order: Prisma.$OrderPayload<ExtArgs>
+    activeOrder: Prisma.$OrderPayload<ExtArgs> | null
     evidence: Prisma.$DeliveryVerificationEvidencePayload<ExtArgs>[]
     snapshots: Prisma.$DeliverySnapshotPayload<ExtArgs>[]
     fraudFlags: Prisma.$DeliveryFraudFlagPayload<ExtArgs>[]
@@ -2131,6 +2298,7 @@ readonly fields: OrderDeliveryVersionFieldRefs;
 export interface Prisma__OrderDeliveryVersionClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   order<T extends Prisma.OrderDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDefaultArgs<ExtArgs>>): Prisma.Prisma__OrderClient<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  activeOrder<T extends Prisma.OrderDeliveryVersion$activeOrderArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDeliveryVersion$activeOrderArgs<ExtArgs>>): Prisma.Prisma__OrderClient<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   evidence<T extends Prisma.OrderDeliveryVersion$evidenceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDeliveryVersion$evidenceArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryVerificationEvidencePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   snapshots<T extends Prisma.OrderDeliveryVersion$snapshotsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDeliveryVersion$snapshotsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliverySnapshotPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   fraudFlags<T extends Prisma.OrderDeliveryVersion$fraudFlagsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDeliveryVersion$fraudFlagsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudFlagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2581,6 +2749,25 @@ export type OrderDeliveryVersionDeleteManyArgs<ExtArgs extends runtime.Types.Ext
    * Limit how many OrderDeliveryVersions to delete.
    */
   limit?: number
+}
+
+/**
+ * OrderDeliveryVersion.activeOrder
+ */
+export type OrderDeliveryVersion$activeOrderArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Order
+   */
+  select?: Prisma.OrderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Order
+   */
+  omit?: Prisma.OrderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrderInclude<ExtArgs> | null
+  where?: Prisma.OrderWhereInput
 }
 
 /**

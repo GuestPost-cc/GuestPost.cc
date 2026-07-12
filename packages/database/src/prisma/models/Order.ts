@@ -459,6 +459,7 @@ export type OrderWhereInput = {
   customer?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   assignee?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   website?: Prisma.XOR<Prisma.WebsiteNullableScalarRelationFilter, Prisma.WebsiteWhereInput> | null
+  activeDeliveryVersion?: Prisma.XOR<Prisma.OrderDeliveryVersionNullableScalarRelationFilter, Prisma.OrderDeliveryVersionWhereInput> | null
   organization?: Prisma.XOR<Prisma.OrganizationScalarRelationFilter, Prisma.OrganizationWhereInput>
   campaign?: Prisma.XOR<Prisma.CampaignNullableScalarRelationFilter, Prisma.CampaignWhereInput> | null
   listing?: Prisma.XOR<Prisma.MarketplaceListingNullableScalarRelationFilter, Prisma.MarketplaceListingWhereInput> | null
@@ -517,6 +518,7 @@ export type OrderOrderByWithRelationInput = {
   customer?: Prisma.UserOrderByWithRelationInput
   assignee?: Prisma.UserOrderByWithRelationInput
   website?: Prisma.WebsiteOrderByWithRelationInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionOrderByWithRelationInput
   organization?: Prisma.OrganizationOrderByWithRelationInput
   campaign?: Prisma.CampaignOrderByWithRelationInput
   listing?: Prisma.MarketplaceListingOrderByWithRelationInput
@@ -539,6 +541,7 @@ export type OrderOrderByWithRelationInput = {
 
 export type OrderWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  activeDeliveryVersionId?: string
   organizationId_idempotencyKey?: Prisma.OrderOrganizationIdIdempotencyKeyCompoundUniqueInput
   AND?: Prisma.OrderWhereInput | Prisma.OrderWhereInput[]
   OR?: Prisma.OrderWhereInput[]
@@ -568,7 +571,6 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   campaignId?: Prisma.StringNullableFilter<"Order"> | string | null
   idempotencyKey?: Prisma.StringNullableFilter<"Order"> | string | null
   version?: Prisma.IntFilter<"Order"> | number
-  activeDeliveryVersionId?: Prisma.StringNullableFilter<"Order"> | string | null
   listingId?: Prisma.StringNullableFilter<"Order"> | string | null
   listingServiceId?: Prisma.StringNullableFilter<"Order"> | string | null
   fulfillmentChannel?: Prisma.EnumFulfillmentChannelNullableFilter<"Order"> | $Enums.FulfillmentChannel | null
@@ -579,6 +581,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   customer?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   assignee?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
   website?: Prisma.XOR<Prisma.WebsiteNullableScalarRelationFilter, Prisma.WebsiteWhereInput> | null
+  activeDeliveryVersion?: Prisma.XOR<Prisma.OrderDeliveryVersionNullableScalarRelationFilter, Prisma.OrderDeliveryVersionWhereInput> | null
   organization?: Prisma.XOR<Prisma.OrganizationScalarRelationFilter, Prisma.OrganizationWhereInput>
   campaign?: Prisma.XOR<Prisma.CampaignNullableScalarRelationFilter, Prisma.CampaignWhereInput> | null
   listing?: Prisma.XOR<Prisma.MarketplaceListingNullableScalarRelationFilter, Prisma.MarketplaceListingWhereInput> | null
@@ -597,7 +600,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   fraudFlags?: Prisma.DeliveryFraudFlagListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
   review?: Prisma.XOR<Prisma.OrderReviewNullableScalarRelationFilter, Prisma.OrderReviewWhereInput> | null
-}, "id" | "organizationId_idempotencyKey">
+}, "id" | "activeDeliveryVersionId" | "organizationId_idempotencyKey">
 
 export type OrderOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -703,7 +706,6 @@ export type OrderCreateInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -712,6 +714,7 @@ export type OrderCreateInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -805,7 +808,6 @@ export type OrderUpdateInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -814,6 +816,7 @@ export type OrderUpdateInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -944,7 +947,6 @@ export type OrderUpdateManyMutationInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1455,12 +1457,44 @@ export type OrderCreateNestedOneWithoutDeliveryVersionsInput = {
   connect?: Prisma.OrderWhereUniqueInput
 }
 
+export type OrderCreateNestedOneWithoutActiveDeliveryVersionInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutActiveDeliveryVersionInput, Prisma.OrderUncheckedCreateWithoutActiveDeliveryVersionInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutActiveDeliveryVersionInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
+export type OrderUncheckedCreateNestedOneWithoutActiveDeliveryVersionInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutActiveDeliveryVersionInput, Prisma.OrderUncheckedCreateWithoutActiveDeliveryVersionInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutActiveDeliveryVersionInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
 export type OrderUpdateOneRequiredWithoutDeliveryVersionsNestedInput = {
   create?: Prisma.XOR<Prisma.OrderCreateWithoutDeliveryVersionsInput, Prisma.OrderUncheckedCreateWithoutDeliveryVersionsInput>
   connectOrCreate?: Prisma.OrderCreateOrConnectWithoutDeliveryVersionsInput
   upsert?: Prisma.OrderUpsertWithoutDeliveryVersionsInput
   connect?: Prisma.OrderWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutDeliveryVersionsInput, Prisma.OrderUpdateWithoutDeliveryVersionsInput>, Prisma.OrderUncheckedUpdateWithoutDeliveryVersionsInput>
+}
+
+export type OrderUpdateOneWithoutActiveDeliveryVersionNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutActiveDeliveryVersionInput, Prisma.OrderUncheckedCreateWithoutActiveDeliveryVersionInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutActiveDeliveryVersionInput
+  upsert?: Prisma.OrderUpsertWithoutActiveDeliveryVersionInput
+  disconnect?: Prisma.OrderWhereInput | boolean
+  delete?: Prisma.OrderWhereInput | boolean
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutActiveDeliveryVersionInput, Prisma.OrderUpdateWithoutActiveDeliveryVersionInput>, Prisma.OrderUncheckedUpdateWithoutActiveDeliveryVersionInput>
+}
+
+export type OrderUncheckedUpdateOneWithoutActiveDeliveryVersionNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutActiveDeliveryVersionInput, Prisma.OrderUncheckedCreateWithoutActiveDeliveryVersionInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutActiveDeliveryVersionInput
+  upsert?: Prisma.OrderUpsertWithoutActiveDeliveryVersionInput
+  disconnect?: Prisma.OrderWhereInput | boolean
+  delete?: Prisma.OrderWhereInput | boolean
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutActiveDeliveryVersionInput, Prisma.OrderUpdateWithoutActiveDeliveryVersionInput>, Prisma.OrderUncheckedUpdateWithoutActiveDeliveryVersionInput>
 }
 
 export type OrderCreateNestedOneWithoutFraudFlagsInput = {
@@ -1685,7 +1719,6 @@ export type OrderCreateWithoutCustomerInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1693,6 +1726,7 @@ export type OrderCreateWithoutCustomerInput = {
   updatedAt?: Date | string
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -1795,7 +1829,6 @@ export type OrderCreateWithoutAssigneeInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1803,6 +1836,7 @@ export type OrderCreateWithoutAssigneeInput = {
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -1977,7 +2011,6 @@ export type OrderCreateWithoutOrganizationInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1986,6 +2019,7 @@ export type OrderCreateWithoutOrganizationInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
@@ -2103,7 +2137,6 @@ export type OrderCreateWithoutWebsiteInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2111,6 +2144,7 @@ export type OrderCreateWithoutWebsiteInput = {
   updatedAt?: Date | string
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -2229,7 +2263,6 @@ export type OrderCreateWithoutCampaignInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2238,6 +2271,7 @@ export type OrderCreateWithoutCampaignInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
@@ -2355,7 +2389,6 @@ export type OrderCreateWithoutItemsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2364,6 +2397,7 @@ export type OrderCreateWithoutItemsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -2471,7 +2505,6 @@ export type OrderUpdateWithoutItemsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2480,6 +2513,7 @@ export type OrderUpdateWithoutItemsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -2571,7 +2605,6 @@ export type OrderCreateWithoutEventsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2580,6 +2613,7 @@ export type OrderCreateWithoutEventsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -2687,7 +2721,6 @@ export type OrderUpdateWithoutEventsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2696,6 +2729,7 @@ export type OrderUpdateWithoutEventsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -2787,7 +2821,6 @@ export type OrderCreateWithoutDisputeInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2796,6 +2829,7 @@ export type OrderCreateWithoutDisputeInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -2903,7 +2937,6 @@ export type OrderUpdateWithoutDisputeInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -2912,6 +2945,7 @@ export type OrderUpdateWithoutDisputeInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -3003,7 +3037,6 @@ export type OrderCreateWithoutSettlementsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3012,6 +3045,7 @@ export type OrderCreateWithoutSettlementsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -3119,7 +3153,6 @@ export type OrderUpdateWithoutSettlementsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3128,6 +3161,7 @@ export type OrderUpdateWithoutSettlementsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -3219,7 +3253,6 @@ export type OrderCreateWithoutFulfillmentAssignmentsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3228,6 +3261,7 @@ export type OrderCreateWithoutFulfillmentAssignmentsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -3335,7 +3369,6 @@ export type OrderUpdateWithoutFulfillmentAssignmentsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3344,6 +3377,7 @@ export type OrderUpdateWithoutFulfillmentAssignmentsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -3435,7 +3469,6 @@ export type OrderCreateWithoutDeliveryVersionsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3444,6 +3477,7 @@ export type OrderCreateWithoutDeliveryVersionsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -3518,6 +3552,111 @@ export type OrderCreateOrConnectWithoutDeliveryVersionsInput = {
   create: Prisma.XOR<Prisma.OrderCreateWithoutDeliveryVersionsInput, Prisma.OrderUncheckedCreateWithoutDeliveryVersionsInput>
 }
 
+export type OrderCreateWithoutActiveDeliveryVersionInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
+  version?: number
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  turnaroundDays?: number | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
+  assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
+  campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
+  listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
+  listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
+  contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+}
+
+export type OrderUncheckedCreateWithoutActiveDeliveryVersionInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  customerId: string
+  assigneeId?: string | null
+  websiteId?: string | null
+  organizationId: string
+  campaignId?: string | null
+  idempotencyKey?: string | null
+  version?: number
+  listingId?: string | null
+  listingServiceId?: string | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  turnaroundDays?: number | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+}
+
+export type OrderCreateOrConnectWithoutActiveDeliveryVersionInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutActiveDeliveryVersionInput, Prisma.OrderUncheckedCreateWithoutActiveDeliveryVersionInput>
+}
+
 export type OrderUpsertWithoutDeliveryVersionsInput = {
   update: Prisma.XOR<Prisma.OrderUpdateWithoutDeliveryVersionsInput, Prisma.OrderUncheckedUpdateWithoutDeliveryVersionsInput>
   create: Prisma.XOR<Prisma.OrderCreateWithoutDeliveryVersionsInput, Prisma.OrderUncheckedCreateWithoutDeliveryVersionsInput>
@@ -3551,7 +3690,6 @@ export type OrderUpdateWithoutDeliveryVersionsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3560,6 +3698,7 @@ export type OrderUpdateWithoutDeliveryVersionsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -3629,6 +3768,117 @@ export type OrderUncheckedUpdateWithoutDeliveryVersionsInput = {
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
 }
 
+export type OrderUpsertWithoutActiveDeliveryVersionInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutActiveDeliveryVersionInput, Prisma.OrderUncheckedUpdateWithoutActiveDeliveryVersionInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutActiveDeliveryVersionInput, Prisma.OrderUncheckedCreateWithoutActiveDeliveryVersionInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutActiveDeliveryVersionInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutActiveDeliveryVersionInput, Prisma.OrderUncheckedUpdateWithoutActiveDeliveryVersionInput>
+}
+
+export type OrderUpdateWithoutActiveDeliveryVersionInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
+  assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
+  campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
+  listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
+  listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
+  contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutActiveDeliveryVersionInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  customerId?: Prisma.StringFieldUpdateOperationsInput | string
+  assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  listingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+}
+
 export type OrderCreateWithoutFraudFlagsInput = {
   id?: string
   type: $Enums.ServiceType
@@ -3651,7 +3901,6 @@ export type OrderCreateWithoutFraudFlagsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3660,6 +3909,7 @@ export type OrderCreateWithoutFraudFlagsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -3767,7 +4017,6 @@ export type OrderUpdateWithoutFraudFlagsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3776,6 +4025,7 @@ export type OrderUpdateWithoutFraudFlagsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -3867,7 +4117,6 @@ export type OrderCreateWithoutReviewInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3876,6 +4125,7 @@ export type OrderCreateWithoutReviewInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -3983,7 +4233,6 @@ export type OrderUpdateWithoutReviewInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -3992,6 +4241,7 @@ export type OrderUpdateWithoutReviewInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -4083,7 +4333,6 @@ export type OrderCreateWithoutContentOrderInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4092,6 +4341,7 @@ export type OrderCreateWithoutContentOrderInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -4199,7 +4449,6 @@ export type OrderUpdateWithoutContentOrderInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4208,6 +4457,7 @@ export type OrderUpdateWithoutContentOrderInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -4299,7 +4549,6 @@ export type OrderCreateWithoutRevisionsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4308,6 +4557,7 @@ export type OrderCreateWithoutRevisionsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -4415,7 +4665,6 @@ export type OrderUpdateWithoutRevisionsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4424,6 +4673,7 @@ export type OrderUpdateWithoutRevisionsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -4515,7 +4765,6 @@ export type OrderCreateWithoutReportsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4524,6 +4773,7 @@ export type OrderCreateWithoutReportsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -4631,7 +4881,6 @@ export type OrderUpdateWithoutReportsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4640,6 +4889,7 @@ export type OrderUpdateWithoutReportsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -4731,7 +4981,6 @@ export type OrderCreateWithoutPlatformRevenueInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4740,6 +4989,7 @@ export type OrderCreateWithoutPlatformRevenueInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -4847,7 +5097,6 @@ export type OrderUpdateWithoutPlatformRevenueInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4856,6 +5105,7 @@ export type OrderUpdateWithoutPlatformRevenueInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -4947,7 +5197,6 @@ export type OrderCreateWithoutTransactionsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -4956,6 +5205,7 @@ export type OrderCreateWithoutTransactionsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -5063,7 +5313,6 @@ export type OrderUpdateWithoutTransactionsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5072,6 +5321,7 @@ export type OrderUpdateWithoutTransactionsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -5163,7 +5413,6 @@ export type OrderCreateWithoutTicketsInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5172,6 +5421,7 @@ export type OrderCreateWithoutTicketsInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -5279,7 +5529,6 @@ export type OrderUpdateWithoutTicketsInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5288,6 +5537,7 @@ export type OrderUpdateWithoutTicketsInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -5379,7 +5629,6 @@ export type OrderCreateWithoutListingInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5388,6 +5637,7 @@ export type OrderCreateWithoutListingInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
@@ -5505,7 +5755,6 @@ export type OrderCreateWithoutListingServiceInput = {
   revisionCount?: number
   idempotencyKey?: string | null
   version?: number
-  activeDeliveryVersionId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5514,6 +5763,7 @@ export type OrderCreateWithoutListingServiceInput = {
   customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
   assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
   website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
   organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
@@ -5703,7 +5953,6 @@ export type OrderUpdateWithoutCustomerInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5711,6 +5960,7 @@ export type OrderUpdateWithoutCustomerInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -5839,7 +6089,6 @@ export type OrderUpdateWithoutAssigneeInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -5847,6 +6096,7 @@ export type OrderUpdateWithoutAssigneeInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -6011,7 +6261,6 @@ export type OrderUpdateWithoutOrganizationInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6020,6 +6269,7 @@ export type OrderUpdateWithoutOrganizationInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
@@ -6183,7 +6433,6 @@ export type OrderUpdateWithoutWebsiteInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6191,6 +6440,7 @@ export type OrderUpdateWithoutWebsiteInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -6355,7 +6605,6 @@ export type OrderUpdateWithoutCampaignInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6364,6 +6613,7 @@ export type OrderUpdateWithoutCampaignInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
@@ -6527,7 +6777,6 @@ export type OrderUpdateWithoutListingInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6536,6 +6785,7 @@ export type OrderUpdateWithoutListingInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
@@ -6699,7 +6949,6 @@ export type OrderUpdateWithoutListingServiceInput = {
   revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
   idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   version?: Prisma.IntFieldUpdateOperationsInput | number
-  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -6708,6 +6957,7 @@ export type OrderUpdateWithoutListingServiceInput = {
   customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
   assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
   organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
@@ -6963,6 +7213,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
   website?: boolean | Prisma.Order$websiteArgs<ExtArgs>
+  activeDeliveryVersion?: boolean | Prisma.Order$activeDeliveryVersionArgs<ExtArgs>
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
   campaign?: boolean | Prisma.Order$campaignArgs<ExtArgs>
   listing?: boolean | Prisma.Order$listingArgs<ExtArgs>
@@ -7022,6 +7273,7 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
   website?: boolean | Prisma.Order$websiteArgs<ExtArgs>
+  activeDeliveryVersion?: boolean | Prisma.Order$activeDeliveryVersionArgs<ExtArgs>
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
   campaign?: boolean | Prisma.Order$campaignArgs<ExtArgs>
   listing?: boolean | Prisma.Order$listingArgs<ExtArgs>
@@ -7066,6 +7318,7 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
   website?: boolean | Prisma.Order$websiteArgs<ExtArgs>
+  activeDeliveryVersion?: boolean | Prisma.Order$activeDeliveryVersionArgs<ExtArgs>
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
   campaign?: boolean | Prisma.Order$campaignArgs<ExtArgs>
   listing?: boolean | Prisma.Order$listingArgs<ExtArgs>
@@ -7114,6 +7367,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
   website?: boolean | Prisma.Order$websiteArgs<ExtArgs>
+  activeDeliveryVersion?: boolean | Prisma.Order$activeDeliveryVersionArgs<ExtArgs>
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
   campaign?: boolean | Prisma.Order$campaignArgs<ExtArgs>
   listing?: boolean | Prisma.Order$listingArgs<ExtArgs>
@@ -7138,6 +7392,7 @@ export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
   website?: boolean | Prisma.Order$websiteArgs<ExtArgs>
+  activeDeliveryVersion?: boolean | Prisma.Order$activeDeliveryVersionArgs<ExtArgs>
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
   campaign?: boolean | Prisma.Order$campaignArgs<ExtArgs>
   listing?: boolean | Prisma.Order$listingArgs<ExtArgs>
@@ -7147,6 +7402,7 @@ export type OrderIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
   website?: boolean | Prisma.Order$websiteArgs<ExtArgs>
+  activeDeliveryVersion?: boolean | Prisma.Order$activeDeliveryVersionArgs<ExtArgs>
   organization?: boolean | Prisma.OrganizationDefaultArgs<ExtArgs>
   campaign?: boolean | Prisma.Order$campaignArgs<ExtArgs>
   listing?: boolean | Prisma.Order$listingArgs<ExtArgs>
@@ -7159,6 +7415,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     customer: Prisma.$UserPayload<ExtArgs>
     assignee: Prisma.$UserPayload<ExtArgs> | null
     website: Prisma.$WebsitePayload<ExtArgs> | null
+    activeDeliveryVersion: Prisma.$OrderDeliveryVersionPayload<ExtArgs> | null
     organization: Prisma.$OrganizationPayload<ExtArgs>
     campaign: Prisma.$CampaignPayload<ExtArgs> | null
     listing: Prisma.$MarketplaceListingPayload<ExtArgs> | null
@@ -7610,6 +7867,7 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   customer<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   assignee<T extends Prisma.Order$assigneeArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$assigneeArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   website<T extends Prisma.Order$websiteArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$websiteArgs<ExtArgs>>): Prisma.Prisma__WebsiteClient<runtime.Types.Result.GetResult<Prisma.$WebsitePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  activeDeliveryVersion<T extends Prisma.Order$activeDeliveryVersionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$activeDeliveryVersionArgs<ExtArgs>>): Prisma.Prisma__OrderDeliveryVersionClient<runtime.Types.Result.GetResult<Prisma.$OrderDeliveryVersionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   organization<T extends Prisma.OrganizationDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrganizationDefaultArgs<ExtArgs>>): Prisma.Prisma__OrganizationClient<runtime.Types.Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   campaign<T extends Prisma.Order$campaignArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$campaignArgs<ExtArgs>>): Prisma.Prisma__CampaignClient<runtime.Types.Result.GetResult<Prisma.$CampaignPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   listing<T extends Prisma.Order$listingArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$listingArgs<ExtArgs>>): Prisma.Prisma__MarketplaceListingClient<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
@@ -8127,6 +8385,25 @@ export type Order$websiteArgs<ExtArgs extends runtime.Types.Extensions.InternalA
    */
   include?: Prisma.WebsiteInclude<ExtArgs> | null
   where?: Prisma.WebsiteWhereInput
+}
+
+/**
+ * Order.activeDeliveryVersion
+ */
+export type Order$activeDeliveryVersionArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OrderDeliveryVersion
+   */
+  select?: Prisma.OrderDeliveryVersionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OrderDeliveryVersion
+   */
+  omit?: Prisma.OrderDeliveryVersionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrderDeliveryVersionInclude<ExtArgs> | null
+  where?: Prisma.OrderDeliveryVersionWhereInput
 }
 
 /**
