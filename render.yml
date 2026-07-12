@@ -1,0 +1,142 @@
+# GuestPost.cc — Render Blueprint
+#
+# Six stateless services sharing one Postgres (Neon) and one Redis (Render KV).
+# All services use rootDir: "." so pnpm/turbo resolve the monorepo workspace
+# correctly. Builds run through Turbo which handles the entire dependency chain
+# (shared → database → integrations → ui → api-client → app).
+
+services:
+  # ────────────────────────────────────────────────────────
+  # 1. BACKGROUND TASK ENGINE (apps/worker)
+  # ────────────────────────────────────────────────────────
+  - type: worker
+    name: guestpost-worker
+    env: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/worker
+    startCommand: cd apps/worker && node dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+        value: postgresql://neondb_owner:npg_iPQ4u9csUmAV@ep-jolly-bonus-aoh6som9-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      - key: REDIS_URL
+        fromService:
+          name: guestpost-redis
+          type: kv
+          property: connectionString
+      - key: JWT_SECRET
+        value: REPLACE_WITH_32_CHAR_PLUS_SECRET
+      - key: QUEUE_SIGNING_SECRET
+        value: REPLACE_WITH_DIFFERENT_32_CHAR_PLUS_SECRET
+
+  # ────────────────────────────────────────────────────────
+  # 2. CENTRAL BACKEND API (apps/api) — NestJS
+  # ────────────────────────────────────────────────────────
+  - type: web
+    name: guestpost-api
+    env: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/api
+    startCommand: cd apps/api && node dist/main.js
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+        value: postgresql://neondb_owner:npg_iPQ4u9csUmAV@ep-jolly-bonus-aoh6som9-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      - key: REDIS_URL
+        fromService:
+          name: guestpost-redis
+          type: kv
+          property: connectionString
+      - key: JWT_SECRET
+        value: REPLACE_WITH_32_CHAR_PLUS_SECRET
+      - key: QUEUE_SIGNING_SECRET
+        value: REPLACE_WITH_DIFFERENT_32_CHAR_PLUS_SECRET
+      - key: BETTER_AUTH_URL
+        value: https://api.guestpost.cc
+      - key: API_BASE_URL
+        value: https://api.guestpost.cc/api/v1
+      - key: CORS_ORIGIN
+        value: https://guestpost.cc,https://app.guestpost.cc,https://publisher.guestpost.cc,https://admin.guestpost.cc
+
+  # ────────────────────────────────────────────────────────
+  # 3. ADVERTISER / BUYER PORTAL (apps/portal) — Next.js
+  # ────────────────────────────────────────────────────────
+  - type: web
+    name: guestpost-portal
+    env: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/portal
+    startCommand: cd apps/portal && npx next start --port $PORT
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.guestpost.cc
+
+  # ────────────────────────────────────────────────────────
+  # 4. PUBLISHER PORTAL (apps/publisher) — Next.js
+  # ────────────────────────────────────────────────────────
+  - type: web
+    name: guestpost-publisher
+    env: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/publisher
+    startCommand: cd apps/publisher && npx next start --port $PORT
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.guestpost.cc
+
+  # ────────────────────────────────────────────────────────
+  # 5. STAFF ADMIN SUITE (apps/admin) — Next.js
+  # ────────────────────────────────────────────────────────
+  - type: web
+    name: guestpost-admin
+    env: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/admin
+    startCommand: cd apps/admin && npx next start --port $PORT
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.guestpost.cc
+
+  # ────────────────────────────────────────────────────────
+  # 6. PUBLIC MARKETING WEBSITE (apps/website) — Next.js
+  # ────────────────────────────────────────────────────────
+  - type: web
+    name: guestpost-website
+    env: node
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/website
+    startCommand: cd apps/website && npx next start --port $PORT
+    envVars:
+      - key: NODE_ENV
+        value: production
+
+# ────────────────────────────────────────────────────────
+# REDIS (BullMQ backing)
+# ────────────────────────────────────────────────────────
+kvResources:
+  - type: redis
+    name: guestpost-redis
+    plan: free
