@@ -132,21 +132,28 @@ export default function ListingDetailPage() {
     enabled: !!params.slug,
   })
 
-  // ── Wallet: check if customer has deposited at least once ────────────
-  // Customers who have never deposited cannot see the publisher's website
-  // URL. Other details (title, description, price, DR, etc.) remain visible.
+  // ── URL visibility check ────────────────────────────────────────────
+  // Publisher website URLs are blurred for customers who have never
+  // deposited money, have no balance, AND have never placed an order.
+  // The URL becomes fully visible once the customer meets ANY of:
+  //   1. Has a positive wallet balance
+  //   2. Has a DEPOSIT transaction on record
+  //   3. Has created at least one order on the platform
   const { data: walletData } = useQuery({
     queryKey: ["wallet"],
     queryFn: () => api.billing.getWallet(),
   })
-  const hasDeposited = useMemo(() => {
+  const { data: ordersData } = useQuery({
+    queryKey: ["my-orders"],
+    queryFn: () => api.orders.list(),
+  })
+  const canViewUrl = useMemo(() => {
     if (!walletData) return false
-    // User has deposited if they have a positive balance or any deposit
-    // transaction on record.
     if (Number(walletData.availableBalance) > 0) return true
     if (walletData.transactions?.some((t) => t.type === "DEPOSIT")) return true
+    if (ordersData && ordersData.length > 0) return true
     return false
-  }, [walletData])
+  }, [walletData, ordersData])
 
   // ── Service-picker state, URL-synced ──────────────────────────────────
   const searchParams = useSearchParams()
@@ -559,7 +566,7 @@ export default function ListingDetailPage() {
                 </div>
               ) : null
             })()}
-            {listing.websiteUrl && hasDeposited ? (
+            {listing.websiteUrl && canViewUrl ? (
               <a
                 href={listing.websiteUrl}
                 target="_blank"
