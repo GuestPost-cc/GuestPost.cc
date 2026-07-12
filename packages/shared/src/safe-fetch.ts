@@ -9,7 +9,7 @@
 //      an attacker-controlled A record that returned a public IP at
 //      check time and 169.254.169.254 (AWS metadata) at fetch time
 //      bypassed the guard (TOCTOU). The undici Agent below resolves DNS
-//      inside the connection callback and binds the connection to the
+//      inside the lookup callback and binds the connection to the
 //      validated IP — no gap to exploit.
 //
 //   2. Response-body size cap. The legacy code did `await res.text()`
@@ -111,31 +111,34 @@ export function validateResolvedAddress(
 // Per-fetch instantiation would defeat the connection-reuse benefit.
 // The lookup callback is intentionally minimal — all validation logic
 // lives in validateResolvedAddress() above for direct unit-testability.
+//
+// Uses undici v7+ dns.lookup (Promise-based) instead of the deprecated
+// connect.lookup (callback-based) which broke in undici 7.x / Node 24+.
+// The undici type definitions don't include the dns property yet, so
+// the inner options are spread via a cast to avoid TS errors.
 const SAFE_LOOKUP_AGENT = new Agent({
   pipelining: 0,
-  connect: {
-    // Per-connection DNS resolution. undici binds the connection to
-    // the IP this returns — no TOCTOU gap. If the DNS server later
-    // changes the A record, the next connection re-resolves, but the
-    // in-flight connection stays pinned to the validated IP.
-    lookup: (hostname, options, callback) => {
-      // Force single-address resolution — the dispatcher binds the
-      // connection to one IP, so we don't need the array overload.
-      dns.lookup(
-        hostname,
-        { ...options, all: false },
-        (err, address, family) => {
-          if (err) return callback(err, "", 0)
-          // With all: false, address is always a string (the overload's
-          // array form requires all: true).
-          const addr = address as string
-          const violation = validateResolvedAddress(hostname, addr)
-          if (violation) return callback(violation, "", 0)
-          callback(null, addr, family as number)
-        },
-      )
+  ...({
+    dns: {
+      lookup: (hostname: string, options: object) => {
+        return new Promise<{ address: string; family: number }>(
+          (resolve, reject) => {
+            dns.lookup(
+              hostname,
+              { ...options, all: false },
+              (err, address, family) => {
+                if (err) return reject(err)
+                const addr = address as string
+                const violation = validateResolvedAddress(hostname, addr)
+                if (violation) return reject(violation)
+                resolve({ address: addr, family: family as number })
+              },
+            )
+          },
+        )
+      },
     },
-  },
+  } as any),
 })
 
 /**
