@@ -566,16 +566,9 @@ export default function WebsiteDetailPage() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-muted-foreground">Property</span>
-                  <p className="mt-0.5 font-medium font-mono text-xs">
-                    {seoIntegration!.propertyUrl}
-                  </p>
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Permission</span>
-                  <p className="mt-0.5 font-medium capitalize">
-                    {seoIntegration!.permissionLevel
-                      ?.replace(/([A-Z])/g, " $1")
-                      .trim() ?? "—"}
+                  <p className="mt-0.5 font-medium font-mono text-xs break-all">
+                    {seoIntegration!.externalResourceName ??
+                      seoIntegration!.externalResourceId}
                   </p>
                 </div>
                 <div>
