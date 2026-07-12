@@ -1,9 +1,11 @@
 # GuestPost.cc — Render Blueprint
 #
 # Six stateless services sharing one Postgres (Neon) and one Redis (Render KV).
-# All services use rootDir: "." so pnpm/turbo resolve the monorepo workspace
-# correctly. Builds run through Turbo which handles the entire dependency chain
-# (shared → database → integrations → ui → api-client → app).
+# All services use rootDir: "." so pnpm/turbo resolve the monorepo workspace.
+#
+# NOTE: Secrets (JWT_SECRET, QUEUE_SIGNING_SECRET, R2 credentials, etc.) are
+# NOT stored in this file. Set them in each service's Render dashboard under
+# Environment → Environment Variables after the initial deploy.
 
 services:
   # ────────────────────────────────────────────────────────
@@ -28,18 +30,6 @@ services:
           name: guestpost-redis
           type: kv
           property: connectionString
-      - key: JWT_SECRET
-        value: REPLACE_WITH_32_CHAR_PLUS_SECRET
-      - key: QUEUE_SIGNING_SECRET
-      - key: R2_ENDPOINT
-        value: https://609f8603d87e7a51eae4f9ef8d9ad51d.r2.cloudflarestorage.com
-      - key: R2_ACCESS_KEY_ID
-        value: 71ff9a1651ff36c504db52c92956a397
-      - key: R2_SECRET_ACCESS_KEY
-        value: ddc03afd47bd1c6e6a543bae14561149d2324b1f560857bfeb61a8193d5af2b2
-      - key: R2_BUCKET
-        value: guestpost-snapshots
-        value: REPLACE_WITH_DIFFERENT_32_CHAR_PLUS_SECRET
 
   # ────────────────────────────────────────────────────────
   # 2. CENTRAL BACKEND API (apps/api) — NestJS
@@ -64,18 +54,6 @@ services:
           name: guestpost-redis
           type: kv
           property: connectionString
-      - key: JWT_SECRET
-        value: REPLACE_WITH_32_CHAR_PLUS_SECRET
-      - key: QUEUE_SIGNING_SECRET
-      - key: R2_ENDPOINT
-        value: https://609f8603d87e7a51eae4f9ef8d9ad51d.r2.cloudflarestorage.com
-      - key: R2_ACCESS_KEY_ID
-        value: 71ff9a1651ff36c504db52c92956a397
-      - key: R2_SECRET_ACCESS_KEY
-        value: ddc03afd47bd1c6e6a543bae14561149d2324b1f560857bfeb61a8193d5af2b2
-      - key: R2_BUCKET
-        value: guestpost-snapshots
-        value: REPLACE_WITH_DIFFERENT_32_CHAR_PLUS_SECRET
       - key: BETTER_AUTH_URL
         value: https://api.guestpost.cc
       - key: API_BASE_URL
