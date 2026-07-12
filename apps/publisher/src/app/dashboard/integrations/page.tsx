@@ -306,7 +306,7 @@ export default function IntegrationsPage() {
     try {
       const result = await connectMutation.mutateAsync({
         provider: IntegrationProvider.GOOGLE_SEARCH_CONSOLE,
-        returnUrl: "/dashboard/integrations",
+        returnUrl: `${window.location.origin}/dashboard/integrations`,
       })
       window.location.assign(result.authorizationUrl!)
     } catch (err: any) {
