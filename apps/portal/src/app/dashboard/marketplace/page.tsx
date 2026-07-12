@@ -27,8 +27,6 @@ interface Listing {
   slug: string
   description: string
   shortDescription?: string
-  // Phase 7: type / price / turnaroundDays are LEGACY listing-level columns
-  // scheduled for drop. Prefer priceFrom + serviceTypes[] + services[].
   type?: string
   fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
   price?: number
@@ -169,20 +167,21 @@ export default function MarketplacePage() {
     filters.maxTurnaroundDays
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Marketplace</h1>
-        <p className="mt-1.5 text-muted-foreground">
-          Browse guest post opportunities and SEO services from verified
-          publishers.
+        <h1 className="text-2xl font-bold tracking-tight">Marketplace</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Browse guest post opportunities from verified publishers
         </p>
       </div>
 
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      {/* Search + Controls */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search listings..."
+            placeholder="Search by title, niche, or keyword..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -191,7 +190,7 @@ export default function MarketplacePage() {
 
         <div className="flex flex-wrap items-center gap-2">
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-[150px]">
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
@@ -205,14 +204,14 @@ export default function MarketplacePage() {
           </Select>
 
           <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[150px]">
+            <SelectTrigger className="w-[140px]">
               <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="recommended">Recommended</SelectItem>
               <SelectItem value="dr">Highest DR</SelectItem>
               <SelectItem value="price_asc">Lowest Price</SelectItem>
-              <SelectItem value="price_desc">Price: High to Low</SelectItem>
+              <SelectItem value="price_desc">Highest Price</SelectItem>
               <SelectItem value="newest">Newest</SelectItem>
             </SelectContent>
           </Select>
@@ -221,12 +220,12 @@ export default function MarketplacePage() {
             variant={showFilters ? "secondary" : "outline"}
             size="sm"
             onClick={() => setShowFilters(!showFilters)}
-            className="gap-2"
+            className="gap-1.5"
           >
             <SlidersHorizontal className="h-4 w-4" />
             Filters
             {hasActiveFilters && (
-              <span className="ml-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground">
                 !
               </span>
             )}
@@ -234,9 +233,10 @@ export default function MarketplacePage() {
         </div>
       </div>
 
+      {/* Filters Panel */}
       {showFilters && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-5 border rounded-xl bg-card sm:grid-cols-3 lg:grid-cols-6">
-          <div className="space-y-1.5 sm:col-span-1">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-4 border rounded-lg bg-card sm:grid-cols-3 lg:grid-cols-4">
+          <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
               Domain Rating
             </label>
@@ -249,7 +249,7 @@ export default function MarketplacePage() {
                   setFilters((f) => ({ ...f, minDR: e.target.value }))
                 }
               />
-              <span className="text-muted-foreground text-xs">to</span>
+              <span className="text-muted-foreground text-xs">—</span>
               <Input
                 type="number"
                 placeholder="Max"
@@ -273,7 +273,7 @@ export default function MarketplacePage() {
                   setFilters((f) => ({ ...f, minPrice: e.target.value }))
                 }
               />
-              <span className="text-muted-foreground text-xs">to</span>
+              <span className="text-muted-foreground text-xs">—</span>
               <Input
                 type="number"
                 placeholder="Max"
@@ -286,7 +286,7 @@ export default function MarketplacePage() {
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">
-              Min Traffic
+              Min Traffic / mo
             </label>
             <Input
               type="number"
@@ -294,6 +294,19 @@ export default function MarketplacePage() {
               value={filters.minTraffic}
               onChange={(e) =>
                 setFilters((f) => ({ ...f, minTraffic: e.target.value }))
+              }
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-xs font-medium text-muted-foreground">
+              Max Turnaround
+            </label>
+            <Input
+              type="number"
+              placeholder="Days"
+              value={filters.maxTurnaroundDays}
+              onChange={(e) =>
+                setFilters((f) => ({ ...f, maxTurnaroundDays: e.target.value }))
               }
             />
           </div>
@@ -321,36 +334,21 @@ export default function MarketplacePage() {
               }
             />
           </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Max Turnaround
-            </label>
-            <Input
-              type="number"
-              placeholder="Days"
-              value={filters.maxTurnaroundDays}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, maxTurnaroundDays: e.target.value }))
-              }
-            />
-          </div>
-          <div className="col-span-full flex items-center justify-between pt-1">
-            <span className="text-xs text-muted-foreground">
-              {listings.length} listing{listings.length !== 1 ? "s" : ""} found
-            </span>
+          <div className="col-span-full flex items-center justify-end pt-1">
             <Button
               variant="ghost"
               size="sm"
               onClick={resetFilters}
-              className="gap-1.5"
+              className="gap-1.5 text-muted-foreground"
             >
               <X className="h-3.5 w-3.5" />
-              Reset all filters
+              Reset filters
             </Button>
           </div>
         </div>
       )}
 
+      {/* Listing Results */}
       {isLoading ? (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -362,16 +360,17 @@ export default function MarketplacePage() {
           ))}
         </div>
       ) : listings.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="rounded-full bg-muted p-4 mb-4">
-            <Search className="h-8 w-8 text-muted-foreground" />
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="rounded-full bg-muted p-5 mb-5">
+            <Search className="h-10 w-10 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-semibold">No listings found</h3>
-          <p className="text-muted-foreground mt-1 mb-5">
-            Try adjusting your filters or search query
+          <p className="text-sm text-muted-foreground mt-1 mb-5 max-w-sm">
+            Try adjusting your search query or filters to find what you're
+            looking for.
           </p>
           <Button variant="outline" onClick={resetFilters}>
-            Reset Filters
+            Reset all filters
           </Button>
         </div>
       ) : (
@@ -381,16 +380,17 @@ export default function MarketplacePage() {
               <Link
                 key={listing.id}
                 href={`/dashboard/marketplace/${listing.slug}`}
-                className="group rounded-xl border bg-card hover:shadow-md transition-all"
+                className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:shadow-lg hover:border-primary/30"
               >
-                <div className="relative aspect-[4/3] overflow-hidden rounded-t-xl bg-muted">
+                {/* Image */}
+                <div className="relative aspect-[16/10] overflow-hidden bg-muted">
                   {listing.image ? (
                     <Image
                       fill
                       unoptimized
                       src={listing.image}
                       alt={listing.title}
-                      className="object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="object-cover group-hover:scale-105 transition-transform duration-500"
                       sizes="(max-width: 768px) 50vw, 33vw"
                     />
                   ) : (
@@ -401,39 +401,60 @@ export default function MarketplacePage() {
                     </div>
                   )}
                   {listing.featured && (
-                    <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-primary-foreground">
+                    <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm">
                       Featured
                     </span>
                   )}
+                  {listing.verified && (
+                    <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white shadow-sm">
+                      <svg
+                        className="h-3.5 w-3.5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={3}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M5 13l4 4L19 7"
+                        />
+                      </svg>
+                    </span>
+                  )}
                 </div>
-                <div className="p-4 space-y-2.5">
-                  <div className="flex items-center gap-2">
+
+                {/* Content */}
+                <div className="flex flex-1 flex-col p-4">
+                  {/* Category + Fulfillment badges */}
+                  <div className="mb-2 flex items-center gap-1.5">
                     {listing.category && (
                       <Badge
                         variant="secondary"
-                        className="text-[10px] px-1.5 py-0"
+                        className="text-[10px] px-1.5 py-0 font-medium"
                       >
                         {listing.category.name}
                       </Badge>
                     )}
                     {listing.fulfillmentType && (
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] px-1.5 py-0"
-                      >
+                      <span className="text-[10px] text-muted-foreground">
                         {listing.fulfillmentType === "INTERNAL"
                           ? "Platform"
                           : listing.fulfillmentType === "HYBRID"
                             ? "Hybrid"
                             : "Publisher"}
-                      </Badge>
+                      </span>
                     )}
                   </div>
+
+                  {/* Title */}
                   <h3 className="font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                     {listing.title}
                   </h3>
+
+                  {/* Website URL (blurred if not eligible) */}
                   {listing.websiteUrl && (
-                    <div className="flex items-center gap-1.5 text-xs">
+                    <div className="mt-1.5 text-xs">
                       {canViewUrls ? (
                         <span className="truncate text-muted-foreground">
                           {listing.websiteUrl}
@@ -448,56 +469,65 @@ export default function MarketplacePage() {
                       )}
                     </div>
                   )}
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+
+                  {/* Stats row */}
+                  <div className="mt-3 flex items-center gap-3 text-xs">
                     {listing.domainRating && (
-                      <span className="font-medium text-foreground">
+                      <span className="font-semibold text-foreground">
                         DR {listing.domainRating}
                       </span>
                     )}
                     {listing.traffic && (
-                      <span>{listing.traffic.toLocaleString()} /mo</span>
+                      <span className="text-muted-foreground">
+                        {listing.traffic.toLocaleString()}/mo
+                      </span>
+                    )}
+                    {listing.avgRating && (
+                      <span className="flex items-center gap-0.5 text-muted-foreground">
+                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                        {listing.avgRating.toFixed(1)}
+                      </span>
                     )}
                   </div>
+
+                  {/* Service type chips */}
                   {(listing as any).serviceTypes?.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="mt-2.5 flex flex-wrap gap-1">
                       {((listing as any).serviceTypes as string[])
                         .slice(0, 2)
                         .map((t) => (
                           <span
                             key={t}
-                            className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground"
+                            className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground"
                           >
                             {t.replace(/_/g, " ")}
                           </span>
                         ))}
                     </div>
                   )}
-                  <div className="flex items-center justify-between pt-1.5">
-                    <span className="font-bold text-lg">
+
+                  {/* Price — pinned to bottom */}
+                  <div className="mt-auto flex items-center justify-between border-t pt-3 mt-4">
+                    <span className="text-lg font-bold">
                       {(listing as any).priceFrom != null ? (
-                        <>
-                          <span className="text-xs text-muted-foreground font-normal mr-1">
+                        <span className="flex items-baseline gap-1">
+                          <span className="text-[11px] text-muted-foreground font-normal">
                             from
                           </span>
                           {formatPrice(
                             (listing as any).priceFrom,
                             listing.currency,
                           )}
-                        </>
+                        </span>
                       ) : (
                         formatPrice(listing.price ?? 0, listing.currency)
                       )}
                     </span>
-                    {listing.avgRating && (
-                      <div className="flex items-center gap-1">
-                        <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
-                        <span className="text-sm font-medium">
-                          {listing.avgRating.toFixed(1)}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          ({listing.reviewCount})
-                        </span>
-                      </div>
+                    {listing.reviewCount > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        {listing.reviewCount} review
+                        {listing.reviewCount !== 1 ? "s" : ""}
+                      </span>
                     )}
                   </div>
                 </div>
@@ -505,8 +535,9 @@ export default function MarketplacePage() {
             ))}
           </div>
 
+          {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-2 pt-4">
               <Button
                 variant="outline"
                 size="sm"
@@ -515,7 +546,7 @@ export default function MarketplacePage() {
               >
                 Previous
               </Button>
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 {Array.from(
                   { length: Math.min(pagination.totalPages, 5) },
                   (_, i) => {
@@ -527,7 +558,7 @@ export default function MarketplacePage() {
                           pagination.page === pageNum ? "default" : "ghost"
                         }
                         size="sm"
-                        className="w-8"
+                        className="h-8 w-8 p-0"
                         onClick={() => setPage(pageNum)}
                       >
                         {pageNum}
@@ -536,7 +567,7 @@ export default function MarketplacePage() {
                   },
                 )}
                 {pagination.totalPages > 5 && (
-                  <span className="text-xs text-muted-foreground px-1">
+                  <span className="px-1 text-xs text-muted-foreground">
                     … {pagination.totalPages}
                   </span>
                 )}

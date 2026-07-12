@@ -5,6 +5,8 @@ import {
   AvatarFallback,
   Badge,
   Button,
+  Card,
+  CardContent,
   ErrorState,
   Skeleton,
   Tabs,
@@ -22,7 +24,6 @@ import {
   Heart,
   Languages,
   Lock,
-  Share2,
   ShieldCheck,
   Star,
   TrendingUp,
@@ -41,9 +42,6 @@ interface Listing {
   slug: string
   description: string
   shortDescription?: string
-  // Phase 7: type / price / revisionRounds / turnaroundDays are LEGACY
-  // listing-level columns scheduled for drop. priceFrom + services[] are
-  // the new source of truth; see resolveDisplay* helpers in api-client.
   type?: string
   status: string
   price?: number
@@ -63,8 +61,6 @@ interface Listing {
   featured: boolean
   verified: boolean
   fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
-  // allowGuestPost / allowNicheEdit deprecated in Phase 5; the services[]
-  // array tells you which serviceTypes the listing offers.
   doFollowOnly: boolean
   websiteUrl?: string
   websiteId?: string | null
@@ -72,8 +68,6 @@ interface Listing {
   category?: { id: string; name: string; slug: string }
   tags: Array<{ id: string; name: string; slug: string }>
   images: Array<{ url: string; isPrimary: boolean }>
-  // pricingTiers removed in Phase 5 — replaced by `services[]` (each row is
-  // its own purchasable offering with price/TAT/requirements).
   reviews: Array<{
     id: string
     rating: number
@@ -91,9 +85,6 @@ interface Listing {
   reviewCount: number
   isFavorited?: boolean
   relatedListings: any[]
-  // Phase 2 fields. attribution drives the "Listed by …" header; services
-  // is the menu of orderable rows the customer must pick from before the
-  // wizard accepts a checkout. Both fall back gracefully on legacy listings.
   ownerType?: "PUBLISHER" | "PLATFORM"
   attribution?: { kind: "PUBLISHER" | "PLATFORM"; label: string }
   services?: Array<{
@@ -133,16 +124,9 @@ export default function ListingDetailPage() {
     enabled: !!params.slug,
   })
 
-  // ── URL visibility check ────────────────────────────────────────────
-  // Publisher website URLs are blurred for customers who have never
-  // deposited money, have no balance, AND have never placed an order.
-  // The URL becomes fully visible once the customer meets ANY of:
-  //   1. Has a positive wallet balance
-  //   2. Has a DEPOSIT transaction on record
-  //   3. Has created at least one order on the platform
+  // URL visibility: blurred for customers with no balance, deposits, or orders
   const { canViewUrls: canViewUrl } = useCustomerAccess()
 
-  // ── Service-picker state, URL-synced ──────────────────────────────────
   const searchParams = useSearchParams()
   const services = listing?.services ?? []
   const orderableServices = useMemo(
@@ -154,12 +138,9 @@ export default function ListingDetailPage() {
     [services, selectedServiceId],
   )
 
-  // Initial selection: respect ?service=GUEST_POST in the URL, else default
-  // to the first AVAILABLE row (cheapest, since the API sorts by price asc).
   useEffect(() => {
     if (!listing || services.length === 0) return
     const requested = searchParams?.get("service")
-    // If a service is already selected and the URL param hasn't changed, keep it
     if (selectedServiceId && services.some((s) => s.id === selectedServiceId)) {
       if (!requested || selectedService?.serviceType === requested) return
     }
@@ -201,18 +182,13 @@ export default function ListingDetailPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => router.back()}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <Skeleton className="h-10 w-64" />
-        </div>
+        <Skeleton className="h-9 w-40" />
         <div className="grid lg:grid-cols-2 gap-8">
-          <Skeleton className="h-96" />
+          <Skeleton className="aspect-[4/3] rounded-xl" />
           <div className="space-y-4">
             <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-6 w-1/4" />
-            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-28 w-full rounded-xl" />
           </div>
         </div>
       </div>
@@ -231,10 +207,10 @@ export default function ListingDetailPage() {
 
   if (!listing) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
+      <div className="flex flex-col items-center justify-center py-20 text-center">
         <AlertCircle className="h-12 w-12 text-destructive mb-4" />
         <h2 className="text-xl font-semibold mb-2">Listing Not Found</h2>
-        <p className="text-muted-foreground mb-4">
+        <p className="text-muted-foreground mb-5">
           This listing doesn't exist or has been removed.
         </p>
         <Button asChild>
@@ -249,33 +225,31 @@ export default function ListingDetailPage() {
 
   return (
     <div className="space-y-6">
+      {/* Top bar */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Marketplace
+          <ArrowLeft className="h-4 w-4 mr-1.5" />
+          Back
         </Button>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => toggleFavorite()}
-            disabled={favoriting}
-          >
-            <Heart
-              className={`h-4 w-4 mr-2 ${listing.isFavorited ? "fill-red-500 text-red-500" : ""}`}
-            />
-            {listing.isFavorited ? "Saved" : "Save"}
-          </Button>
-          <Button variant="outline" size="sm">
-            <Share2 className="h-4 w-4 mr-2" />
-            Share
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => toggleFavorite()}
+          disabled={favoriting}
+          className="gap-1.5"
+        >
+          <Heart
+            className={`h-4 w-4 ${listing.isFavorited ? "fill-red-500 text-red-500" : ""}`}
+          />
+          {listing.isFavorited ? "Saved" : "Save"}
+        </Button>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-8">
-        <div className="space-y-4">
-          <div className="relative aspect-[4/3] bg-muted rounded-lg overflow-hidden">
+      {/* Main content grid */}
+      <div className="grid lg:grid-cols-5 gap-8">
+        {/* Left: Image gallery */}
+        <div className="lg:col-span-3 space-y-3">
+          <div className="relative aspect-[16/10] bg-muted rounded-xl overflow-hidden">
             {images[activeImage]?.url ? (
               <Image
                 fill
@@ -284,29 +258,31 @@ export default function ListingDetailPage() {
                 src={images[activeImage].url}
                 alt={listing.title}
                 className="object-cover"
-                sizes="(max-width: 768px) 100vw, 50vw"
+                sizes="(max-width: 768px) 100vw, 60vw"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-6xl font-bold text-primary/20">
+              <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
+                <span className="text-6xl font-bold text-primary/15">
                   {listing.title[0]}
                 </span>
               </div>
             )}
             {listing.featured && (
-              <span className="absolute top-4 left-4 px-3 py-1 text-sm font-medium bg-primary text-primary-foreground rounded-full">
+              <span className="absolute left-4 top-4 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-sm">
                 Featured
               </span>
             )}
           </div>
           {images.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto">
+            <div className="flex gap-2 overflow-x-auto pb-1">
               {images.map((img, i) => (
                 <button
                   key={i}
                   onClick={() => setActiveImage(i)}
-                  className={`relative w-20 h-20 rounded-lg overflow-hidden border-2 ${
-                    i === activeImage ? "border-primary" : "border-transparent"
+                  className={`relative h-16 w-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${
+                    i === activeImage
+                      ? "border-primary"
+                      : "border-transparent hover:border-muted-foreground/30"
                   }`}
                 >
                   <Image
@@ -315,7 +291,7 @@ export default function ListingDetailPage() {
                     src={img.url}
                     alt=""
                     className="object-cover"
-                    sizes="80px"
+                    sizes="64px"
                   />
                 </button>
               ))}
@@ -323,41 +299,43 @@ export default function ListingDetailPage() {
           )}
         </div>
 
-        <div className="space-y-6">
+        {/* Right: Purchase panel */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Title + badges */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex flex-wrap items-center gap-2 mb-3">
               {listing.category && (
-                <Badge variant="secondary">{listing.category.name}</Badge>
+                <Badge variant="secondary" className="text-xs">
+                  {listing.category.name}
+                </Badge>
               )}
-              {/* Phase 7: prefer the first AVAILABLE service. */}
-              <Badge variant="outline">
-                {(
-                  (listing as any).serviceTypes?.[0] ??
-                  listing.type ??
-                  ""
-                ).replace(/_/g, " ")}
-              </Badge>
-              {listing.fulfillmentType === "INTERNAL" ? (
-                <Badge>Platform fulfilled</Badge>
-              ) : listing.fulfillmentType === "HYBRID" ? (
-                <Badge variant="secondary">Hybrid fulfillment</Badge>
-              ) : (
-                <Badge variant="secondary">Publisher fulfilled</Badge>
+              {listing.fulfillmentType && (
+                <Badge variant="outline" className="text-xs">
+                  {listing.fulfillmentType === "INTERNAL"
+                    ? "Platform"
+                    : listing.fulfillmentType === "HYBRID"
+                      ? "Hybrid"
+                      : "Publisher"}
+                </Badge>
               )}
               {listing.verified && (
-                <span className="flex items-center gap-1 text-xs text-green-600">
-                  <ShieldCheck className="h-4 w-4" /> Verified
+                <span className="flex items-center gap-1 text-xs font-medium text-green-600">
+                  <ShieldCheck className="h-3.5 w-3.5" /> Verified
                 </span>
               )}
             </div>
-            <h1 className="text-3xl font-bold mb-2">{listing.title}</h1>
+            <h1 className="text-2xl font-bold leading-tight">
+              {listing.title}
+            </h1>
+
+            {/* Rating */}
             {listing.avgRating && (
-              <div className="flex items-center gap-2">
+              <div className="mt-2 flex items-center gap-2">
                 <div className="flex">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Star
                       key={i}
-                      className={`h-5 w-5 ${
+                      className={`h-4 w-4 ${
                         i < Math.round(listing.avgRating!)
                           ? "fill-yellow-400 text-yellow-400"
                           : "text-gray-300"
@@ -365,154 +343,138 @@ export default function ListingDetailPage() {
                     />
                   ))}
                 </div>
-                <span className="font-medium">
+                <span className="text-sm font-medium">
                   {listing.avgRating.toFixed(1)}
                 </span>
-                <span className="text-muted-foreground">
+                <span className="text-sm text-muted-foreground">
                   ({listing.reviewCount} reviews)
                 </span>
               </div>
             )}
           </div>
 
-          <div className="p-6 border rounded-lg space-y-4">
-            {/* Phase 7: header price now reflects selected service when one
-                is picked, otherwise priceFrom (min AVAILABLE). Legacy
-                listing.price is the last-resort fallback. */}
-            <div className="flex items-baseline justify-between">
-              <span className="text-3xl font-bold">
-                {formatPrice(
-                  selectedService?.price ??
-                    (listing as any).priceFrom ??
-                    listing.price ??
-                    0,
-                  listing.currency,
-                )}
-              </span>
-              {(listing as any).priceFrom != null && !selectedService && (
-                <span className="text-muted-foreground text-sm">
-                  starting at
+          {/* Pricing card with stats + service picker */}
+          <Card>
+            <CardContent className="p-5 space-y-4">
+              {/* Price */}
+              <div className="flex items-baseline justify-between">
+                <span className="text-3xl font-bold">
+                  {formatPrice(
+                    selectedService?.price ??
+                      (listing as any).priceFrom ??
+                      listing.price ??
+                      0,
+                    listing.currency,
+                  )}
                 </span>
-              )}
-            </div>
-            <div className="grid grid-cols-3 gap-4">
-              {listing.domainRating && (
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold">
-                    {listing.domainRating}
+                {(listing as any).priceFrom != null && !selectedService && (
+                  <span className="text-sm text-muted-foreground">
+                    starting at
+                  </span>
+                )}
+              </div>
+
+              {/* Quick stats */}
+              <div className="grid grid-cols-3 gap-2">
+                {listing.domainRating && (
+                  <div className="rounded-lg bg-muted p-2.5 text-center">
+                    <div className="text-xl font-bold">
+                      {listing.domainRating}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">DR</div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Domain Rating
+                )}
+                {listing.traffic && (
+                  <div className="rounded-lg bg-muted p-2.5 text-center">
+                    <div className="text-xl font-bold">
+                      {listing.traffic.toLocaleString()}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Traffic / mo
+                    </div>
                   </div>
-                </div>
-              )}
-              {listing.traffic && (
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold">
-                    {listing.traffic.toLocaleString()}
+                )}
+                {listing.referringDomains && (
+                  <div className="rounded-lg bg-muted p-2.5 text-center">
+                    <div className="text-xl font-bold">
+                      {listing.referringDomains.toLocaleString()}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      Ref domains
+                    </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Monthly Traffic
-                  </div>
-                </div>
-              )}
-              {listing.referringDomains && (
-                <div className="text-center p-3 bg-muted rounded-lg">
-                  <div className="text-2xl font-bold">
-                    {listing.referringDomains.toLocaleString()}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    Referring Domains
-                  </div>
-                </div>
-              )}
-            </div>
-            {/*
-              Services picker. Replaces the single price/CTA block with a list
-              of orderable services. The customer's choice locks the
-              listingServiceId carried into the wizard — service is not
-              re-selectable downstream.
-            */}
-            {services.length > 0 && (
-              <div
-                className="space-y-2"
-                role="radiogroup"
-                aria-label="Choose a service"
-              >
-                <div className="text-sm font-medium text-muted-foreground">
-                  Available services
-                </div>
-                {services.map((svc) => {
-                  const isSelected = svc.id === selectedServiceId
-                  const isWaitlist = svc.availability === "WAITLIST"
-                  return (
-                    <button
-                      key={svc.id}
-                      role="radio"
-                      aria-checked={isSelected}
-                      disabled={isWaitlist}
-                      onClick={() => setSelectedServiceId(svc.id)}
-                      className={`w-full text-left p-3 border rounded-lg transition-colors ${isSelected ? "border-primary ring-1 ring-primary" : "border-border hover:border-primary/50"} ${isWaitlist ? "opacity-60 cursor-not-allowed" : ""}`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="font-medium text-sm">
-                            {svc.serviceType.replace(/_/g, " ")}
+                )}
+              </div>
+
+              {/* Service picker */}
+              {services.length > 0 && (
+                <div
+                  className="space-y-1.5"
+                  role="radiogroup"
+                  aria-label="Choose a service"
+                >
+                  <div className="text-sm font-medium">Choose a service</div>
+                  {services.map((svc) => {
+                    const isSelected = svc.id === selectedServiceId
+                    const isWaitlist = svc.availability === "WAITLIST"
+                    return (
+                      <button
+                        key={svc.id}
+                        role="radio"
+                        aria-checked={isSelected}
+                        disabled={isWaitlist}
+                        onClick={() => setSelectedServiceId(svc.id)}
+                        className={`w-full text-left p-3 border rounded-lg transition-colors ${isSelected ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border hover:border-primary/50"} ${isWaitlist ? "opacity-60 cursor-not-allowed" : ""}`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-medium">
+                              {svc.serviceType.replace(/_/g, " ")}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {svc.turnaroundDays}d · {svc.revisionRounds}{" "}
+                              revisions
+                              {isWaitlist && (
+                                <span className="ml-1.5 text-amber-600">
+                                  · Waitlist
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {svc.turnaroundDays}d turnaround ·{" "}
-                            {svc.revisionRounds} revisions
-                            {isWaitlist && (
-                              <span className="ml-2 text-amber-600">
-                                Waitlist
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
                           <div className="font-semibold">
                             {formatPrice(svc.price, svc.currency)}
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            <Button
-              className="w-full"
-              size="lg"
-              disabled={services.length > 0 && !selectedService}
-              asChild
-            >
-              <Link
-                href={
-                  selectedService
-                    ? `/dashboard/marketplace/${listing?.slug}/order?service=${selectedService.id}`
-                    : "#"
-                }
-              >
-                {services.length > 0 && !selectedService
-                  ? "Pick a service to continue"
-                  : "Order Now"}
-              </Link>
-            </Button>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.href)
-              }}
-            >
-              <Share2 className="mr-2 h-4 w-4" />
-              Share
-            </Button>
-          </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
 
-          <div className="space-y-3">
-            {/* Phase 7: prefer the selected service's TAT; fall back to the
-                first AVAILABLE service; last resort is the legacy column. */}
+              {/* Order CTA */}
+              <Button
+                className="w-full"
+                size="lg"
+                disabled={services.length > 0 && !selectedService}
+                asChild
+              >
+                <Link
+                  href={
+                    selectedService
+                      ? `/dashboard/marketplace/${listing?.slug}/order?service=${selectedService.id}`
+                      : "#"
+                  }
+                >
+                  {services.length > 0 && !selectedService
+                    ? "Select a service to continue"
+                    : "Order Now"}
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Info row */}
+          <div className="space-y-2.5 rounded-xl border p-4">
             {(() => {
               const td =
                 selectedService?.turnaroundDays ??
@@ -520,34 +482,32 @@ export default function ListingDetailPage() {
                   ?.turnaroundDays ??
                 listing.turnaroundDays
               return td ? (
-                <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center gap-2.5 text-sm">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <span>{td} days turnaround</span>
                 </div>
               ) : null
             })()}
             {listing.country && (
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-2.5 text-sm">
                 <Globe className="h-4 w-4 text-muted-foreground" />
                 <span>{listing.country}</span>
               </div>
             )}
             {listing.language && (
-              <div className="flex items-center gap-3 text-sm">
+              <div className="flex items-center gap-2.5 text-sm">
                 <Languages className="h-4 w-4 text-muted-foreground" />
                 <span>{listing.language}</span>
               </div>
             )}
             {(() => {
-              // Phase 7: same fallback chain as turnaround days. Hide the
-              // row entirely if no service or legacy column declares it.
               const rr =
                 selectedService?.revisionRounds ??
                 services.find((s) => s.availability === "AVAILABLE")
                   ?.revisionRounds ??
                 listing.revisionRounds
               return rr != null ? (
-                <div className="flex items-center gap-3 text-sm">
+                <div className="flex items-center gap-2.5 text-sm">
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                   <span>{rr} revision rounds included</span>
                 </div>
@@ -558,17 +518,17 @@ export default function ListingDetailPage() {
                 href={listing.websiteUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-3 text-sm text-primary hover:underline"
+                className="flex items-center gap-2.5 text-sm text-primary hover:underline"
               >
                 <ExternalLink className="h-4 w-4" />
-                <span>{listing.websiteUrl}</span>
+                <span className="truncate">{listing.websiteUrl}</span>
               </a>
             ) : listing.websiteUrl ? (
               <div
                 className="group relative"
                 title="Deposit funds or place an order to reveal the site URL"
               >
-                <div className="flex items-center gap-3 text-sm text-muted-foreground blur-sm">
+                <div className="flex items-center gap-2.5 text-sm text-muted-foreground blur-sm">
                   <ExternalLink className="h-4 w-4" />
                   <span>{listing.websiteUrl}</span>
                 </div>
@@ -582,45 +542,44 @@ export default function ListingDetailPage() {
             ) : null}
           </div>
 
+          {/* Publisher card */}
           {listing.publisher && (
-            <div className="p-4 border rounded-lg">
-              <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback>{listing.publisher.name[0]}</AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <div className="font-medium">{listing.publisher.name}</div>
-                  {listing.publisher.profile && (
-                    <div className="text-sm text-muted-foreground">
-                      {listing.publisher.profile.rating && (
-                        <span className="inline-flex items-center gap-1 mr-3">
-                          <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                          {listing.publisher.profile.rating.toFixed(1)}
-                        </span>
-                      )}
-                      {listing.publisher.profile.totalReviews && (
-                        <span>
-                          {listing.publisher.profile.totalReviews} reviews
-                        </span>
-                      )}
-                      {listing.publisher.profile.responseTime && (
-                        <span className="ml-3">
-                          ~{listing.publisher.profile.responseTime}h response
-                        </span>
-                      )}
-                    </div>
-                  )}
+            <div className="flex items-center gap-3 rounded-xl border p-4">
+              <Avatar>
+                <AvatarFallback>{listing.publisher.name[0]}</AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <div className="truncate font-medium">
+                  {listing.publisher.name}
                 </div>
-                <Button variant="outline" size="sm">
-                  View Profile
-                </Button>
+                {listing.publisher.profile && (
+                  <div className="text-sm text-muted-foreground">
+                    {listing.publisher.profile.rating && (
+                      <span className="inline-flex items-center gap-1 mr-3">
+                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                        {listing.publisher.profile.rating.toFixed(1)}
+                      </span>
+                    )}
+                    {listing.publisher.profile.totalReviews && (
+                      <span>
+                        {listing.publisher.profile.totalReviews} reviews
+                      </span>
+                    )}
+                    {listing.publisher.profile.responseTime && (
+                      <span className="ml-3">
+                        ~{listing.publisher.profile.responseTime}h response
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
 
-      <Tabs defaultValue="description" className="mt-8">
+      {/* Tabs: Description, Pricing, Reviews */}
+      <Tabs defaultValue="description" className="mt-6">
         <TabsList>
           <TabsTrigger value="description">Description</TabsTrigger>
           <TabsTrigger value="pricing">Pricing</TabsTrigger>
@@ -628,12 +587,14 @@ export default function ListingDetailPage() {
             Reviews ({listing.reviewCount})
           </TabsTrigger>
         </TabsList>
+
+        {/* Description tab */}
         <TabsContent value="description" className="mt-4 space-y-4">
-          <div className="prose max-w-none">
+          <div className="prose prose-sm max-w-none dark:prose-invert">
             <p>{listing.description}</p>
           </div>
           {listing.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-4">
+            <div className="flex flex-wrap gap-2 pt-2">
               {listing.tags.map((tag) => (
                 <Badge key={tag.id} variant="secondary">
                   {tag.name}
@@ -642,29 +603,28 @@ export default function ListingDetailPage() {
             </div>
           )}
         </TabsContent>
+
+        {/* Pricing tab */}
         <TabsContent value="pricing" className="mt-4">
-          {/*
-            Phase 5: the Pricing tab now mirrors the services panel — one card
-            per ListingService with its price + turnaround. The legacy
-            MarketplacePricingTier table has been removed; this is the only
-            "pricing schedule" the listing carries.
-          */}
           {services.length > 0 ? (
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {services.map((svc) => (
-                <div key={svc.id} className="p-6 border rounded-lg">
-                  <h3 className="font-semibold mb-2">
+                <div
+                  key={svc.id}
+                  className="rounded-xl border p-5 transition-colors hover:border-primary/30"
+                >
+                  <h3 className="font-semibold capitalize">
                     {svc.serviceType.replace(/_/g, " ")}
                   </h3>
-                  <div className="text-2xl font-bold mb-2">
+                  <div className="mt-2 text-2xl font-bold">
                     {formatPrice(svc.price, svc.currency)}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="mt-1.5 text-sm text-muted-foreground">
                     {svc.turnaroundDays}d turnaround · {svc.revisionRounds}{" "}
                     revisions
                   </p>
                   {svc.availability === "WAITLIST" && (
-                    <p className="text-xs text-amber-600 mt-2">
+                    <p className="mt-2 text-xs text-amber-600">
                       Currently waitlisted
                     </p>
                   )}
@@ -672,7 +632,7 @@ export default function ListingDetailPage() {
               ))}
             </div>
           ) : (
-            <div className="p-6 border rounded-lg text-center">
+            <div className="rounded-xl border p-6 text-center">
               <p className="text-lg font-medium">
                 {formatPrice(listing.price ?? 0, listing.currency)}
               </p>
@@ -680,17 +640,66 @@ export default function ListingDetailPage() {
             </div>
           )}
         </TabsContent>
+
+        {/* Reviews tab */}
         <TabsContent value="reviews" className="mt-4">
           {listing.reviews.length > 0 ? (
             <div className="space-y-4">
-              {listing.reviews.map((review) => (
-                <div key={review.id} className="p-4 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex">
+              {/* Rating Summary */}
+              {listing.avgRating && (
+                <div className="flex items-center gap-4 rounded-xl border p-4">
+                  <div className="text-center">
+                    <div className="text-4xl font-bold">
+                      {listing.avgRating.toFixed(1)}
+                    </div>
+                    <div className="mt-1 flex justify-center">
                       {Array.from({ length: 5 }).map((_, i) => (
                         <Star
                           key={i}
                           className={`h-4 w-4 ${
+                            i < Math.round(listing.avgRating!)
+                              ? "fill-yellow-400 text-yellow-400"
+                              : "text-gray-300"
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="h-12 w-px bg-border" />
+                  <div>
+                    <div className="text-sm font-medium">
+                      {listing.reviewCount} review
+                      {listing.reviewCount !== 1 ? "s" : ""}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      Based on verified orders
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Individual reviews */}
+              {listing.reviews.map((review) => (
+                <div key={review.id} className="rounded-xl border p-4">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Avatar className="h-8 w-8">
+                      <AvatarFallback className="text-xs">
+                        {review.user.name?.[0] || "U"}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium">
+                        {review.user.name || "Anonymous"}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {new Date(review.createdAt).toLocaleDateString()}
+                      </div>
+                    </div>
+                    <div className="flex">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-3.5 w-3.5 ${
                             i < review.rating
                               ? "fill-yellow-400 text-yellow-400"
                               : "text-gray-300"
@@ -698,31 +707,25 @@ export default function ListingDetailPage() {
                         />
                       ))}
                     </div>
-                    {review.title && (
-                      <span className="font-medium">{review.title}</span>
-                    )}
                   </div>
-                  <p className="text-sm text-muted-foreground">
+                  {review.title && (
+                    <h4 className="font-medium mb-1">{review.title}</h4>
+                  )}
+                  <p className="text-sm text-muted-foreground leading-relaxed">
                     {review.content}
                   </p>
-                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                    <Avatar className="h-5 w-5">
-                      <AvatarFallback className="text-[10px]">
-                        {review.user.name?.[0] || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span>{review.user.name || "Anonymous"}</span>
-                    <span>•</span>
-                    <span>
-                      {new Date(review.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">No reviews yet</p>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="rounded-full bg-muted p-3 mb-3">
+                <Star className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <h3 className="text-sm font-semibold">No reviews yet</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Reviews appear after verified orders are completed.
+              </p>
             </div>
           )}
         </TabsContent>
