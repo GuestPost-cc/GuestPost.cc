@@ -1143,6 +1143,23 @@ export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedFloatNullableFilter<$PrismaModel>
 }
 
+export type EnumExternalAccountStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.ExternalAccountStatus | Prisma.EnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel> | $Enums.ExternalAccountStatus
+}
+
+export type EnumExternalAccountStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ExternalAccountStatus | Prisma.EnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumExternalAccountStatusWithAggregatesFilter<$PrismaModel> | $Enums.ExternalAccountStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel>
+}
+
 export type EnumIntegrationOwnerTypeFilter<$PrismaModel = never> = {
   equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
   in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
@@ -1194,11 +1211,21 @@ export type EnumIntegrationStatusWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumIntegrationStatusFilter<$PrismaModel>
 }
 
-export type EnumGooglePermissionLevelFilter<$PrismaModel = never> = {
-  equals?: $Enums.GooglePermissionLevel | Prisma.EnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  in?: $Enums.GooglePermissionLevel[] | Prisma.ListEnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  notIn?: $Enums.GooglePermissionLevel[] | Prisma.ListEnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumGooglePermissionLevelFilter<$PrismaModel> | $Enums.GooglePermissionLevel
+export type EnumIntegrationSyncStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationSyncStatus | Prisma.EnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel> | $Enums.IntegrationSyncStatus
+}
+
+export type EnumIntegrationSyncStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationSyncStatus | Prisma.EnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationSyncStatusWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationSyncStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel>
 }
 
 export type EnumWebsiteIntegrationStatusFilter<$PrismaModel = never> = {
@@ -1206,16 +1233,6 @@ export type EnumWebsiteIntegrationStatusFilter<$PrismaModel = never> = {
   in?: $Enums.WebsiteIntegrationStatus[] | Prisma.ListEnumWebsiteIntegrationStatusFieldRefInput<$PrismaModel>
   notIn?: $Enums.WebsiteIntegrationStatus[] | Prisma.ListEnumWebsiteIntegrationStatusFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumWebsiteIntegrationStatusFilter<$PrismaModel> | $Enums.WebsiteIntegrationStatus
-}
-
-export type EnumGooglePermissionLevelWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.GooglePermissionLevel | Prisma.EnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  in?: $Enums.GooglePermissionLevel[] | Prisma.ListEnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  notIn?: $Enums.GooglePermissionLevel[] | Prisma.ListEnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumGooglePermissionLevelWithAggregatesFilter<$PrismaModel> | $Enums.GooglePermissionLevel
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumGooglePermissionLevelFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumGooglePermissionLevelFilter<$PrismaModel>
 }
 
 export type EnumWebsiteIntegrationStatusWithAggregatesFilter<$PrismaModel = never> = {
@@ -1228,11 +1245,11 @@ export type EnumWebsiteIntegrationStatusWithAggregatesFilter<$PrismaModel = neve
   _max?: Prisma.NestedEnumWebsiteIntegrationStatusFilter<$PrismaModel>
 }
 
-export type EnumIntegrationSyncStatusFilter<$PrismaModel = never> = {
-  equals?: $Enums.IntegrationSyncStatus | Prisma.EnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  in?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel> | $Enums.IntegrationSyncStatus
+export type EnumIntegrationSyncJobTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationSyncJobType | Prisma.EnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationSyncJobType[] | Prisma.ListEnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationSyncJobType[] | Prisma.ListEnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationSyncJobTypeFilter<$PrismaModel> | $Enums.IntegrationSyncJobType
 }
 
 export type EnumIntegrationSyncTriggerFilter<$PrismaModel = never> = {
@@ -1242,14 +1259,14 @@ export type EnumIntegrationSyncTriggerFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumIntegrationSyncTriggerFilter<$PrismaModel> | $Enums.IntegrationSyncTrigger
 }
 
-export type EnumIntegrationSyncStatusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.IntegrationSyncStatus | Prisma.EnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  in?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumIntegrationSyncStatusWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationSyncStatus
+export type EnumIntegrationSyncJobTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationSyncJobType | Prisma.EnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationSyncJobType[] | Prisma.ListEnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationSyncJobType[] | Prisma.ListEnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationSyncJobTypeWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationSyncJobType
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumIntegrationSyncJobTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumIntegrationSyncJobTypeFilter<$PrismaModel>
 }
 
 export type EnumIntegrationSyncTriggerWithAggregatesFilter<$PrismaModel = never> = {
@@ -2328,6 +2345,23 @@ export type NestedFloatNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedFloatNullableFilter<$PrismaModel>
 }
 
+export type NestedEnumExternalAccountStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.ExternalAccountStatus | Prisma.EnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel> | $Enums.ExternalAccountStatus
+}
+
+export type NestedEnumExternalAccountStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ExternalAccountStatus | Prisma.EnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumExternalAccountStatusWithAggregatesFilter<$PrismaModel> | $Enums.ExternalAccountStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel>
+}
+
 export type NestedEnumIntegrationOwnerTypeFilter<$PrismaModel = never> = {
   equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
   in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
@@ -2379,11 +2413,21 @@ export type NestedEnumIntegrationStatusWithAggregatesFilter<$PrismaModel = never
   _max?: Prisma.NestedEnumIntegrationStatusFilter<$PrismaModel>
 }
 
-export type NestedEnumGooglePermissionLevelFilter<$PrismaModel = never> = {
-  equals?: $Enums.GooglePermissionLevel | Prisma.EnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  in?: $Enums.GooglePermissionLevel[] | Prisma.ListEnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  notIn?: $Enums.GooglePermissionLevel[] | Prisma.ListEnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumGooglePermissionLevelFilter<$PrismaModel> | $Enums.GooglePermissionLevel
+export type NestedEnumIntegrationSyncStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationSyncStatus | Prisma.EnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel> | $Enums.IntegrationSyncStatus
+}
+
+export type NestedEnumIntegrationSyncStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationSyncStatus | Prisma.EnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationSyncStatusWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationSyncStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumWebsiteIntegrationStatusFilter<$PrismaModel = never> = {
@@ -2391,16 +2435,6 @@ export type NestedEnumWebsiteIntegrationStatusFilter<$PrismaModel = never> = {
   in?: $Enums.WebsiteIntegrationStatus[] | Prisma.ListEnumWebsiteIntegrationStatusFieldRefInput<$PrismaModel>
   notIn?: $Enums.WebsiteIntegrationStatus[] | Prisma.ListEnumWebsiteIntegrationStatusFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumWebsiteIntegrationStatusFilter<$PrismaModel> | $Enums.WebsiteIntegrationStatus
-}
-
-export type NestedEnumGooglePermissionLevelWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.GooglePermissionLevel | Prisma.EnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  in?: $Enums.GooglePermissionLevel[] | Prisma.ListEnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  notIn?: $Enums.GooglePermissionLevel[] | Prisma.ListEnumGooglePermissionLevelFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumGooglePermissionLevelWithAggregatesFilter<$PrismaModel> | $Enums.GooglePermissionLevel
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumGooglePermissionLevelFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumGooglePermissionLevelFilter<$PrismaModel>
 }
 
 export type NestedEnumWebsiteIntegrationStatusWithAggregatesFilter<$PrismaModel = never> = {
@@ -2413,11 +2447,11 @@ export type NestedEnumWebsiteIntegrationStatusWithAggregatesFilter<$PrismaModel 
   _max?: Prisma.NestedEnumWebsiteIntegrationStatusFilter<$PrismaModel>
 }
 
-export type NestedEnumIntegrationSyncStatusFilter<$PrismaModel = never> = {
-  equals?: $Enums.IntegrationSyncStatus | Prisma.EnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  in?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel> | $Enums.IntegrationSyncStatus
+export type NestedEnumIntegrationSyncJobTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationSyncJobType | Prisma.EnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationSyncJobType[] | Prisma.ListEnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationSyncJobType[] | Prisma.ListEnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationSyncJobTypeFilter<$PrismaModel> | $Enums.IntegrationSyncJobType
 }
 
 export type NestedEnumIntegrationSyncTriggerFilter<$PrismaModel = never> = {
@@ -2427,14 +2461,14 @@ export type NestedEnumIntegrationSyncTriggerFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumIntegrationSyncTriggerFilter<$PrismaModel> | $Enums.IntegrationSyncTrigger
 }
 
-export type NestedEnumIntegrationSyncStatusWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.IntegrationSyncStatus | Prisma.EnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  in?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  notIn?: $Enums.IntegrationSyncStatus[] | Prisma.ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumIntegrationSyncStatusWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationSyncStatus
+export type NestedEnumIntegrationSyncJobTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationSyncJobType | Prisma.EnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationSyncJobType[] | Prisma.ListEnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationSyncJobType[] | Prisma.ListEnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationSyncJobTypeWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationSyncJobType
   _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumIntegrationSyncStatusFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumIntegrationSyncJobTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumIntegrationSyncJobTypeFilter<$PrismaModel>
 }
 
 export type NestedEnumIntegrationSyncTriggerWithAggregatesFilter<$PrismaModel = never> = {

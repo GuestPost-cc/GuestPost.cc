@@ -1,95 +1,165 @@
-import { createPrismaClient, IntegrationStatus } from "@guestpost/database"
-import { Redis } from "ioredis"
+import { createPrismaClient } from "@guestpost/database"
+import { Queue } from "bullmq"
 import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
-import { REDIS_KEYS } from "../constants"
 import {
   DiscoveryInProgressError,
   IntegrationNotFoundError,
   NoActiveCredentialError,
 } from "../errors"
 import { getProvider } from "../providers"
-import type { DiscoveredResource, OwnerContext } from "../types"
-import { normalizePropertyUrl } from "../utils"
+import type { DiscoveryResource, OwnerContext } from "../types"
+import { QUEUES } from "../workers"
 
 const db = createPrismaClient()
 const encryption = new IntegrationEncryptionService()
+
+function createDiscoveryQueue(): Queue {
+  return new Queue(QUEUES.DISCOVERY, {
+    connection: {
+      host: process.env.REDIS_HOST ?? "localhost",
+      port: Number(process.env.REDIS_PORT ?? 6379),
+    },
+    defaultJobOptions: {
+      attempts: 2,
+      backoff: { type: "exponential", delay: 30_000 },
+      removeOnComplete: 50,
+      removeOnFail: 20,
+    },
+  })
+}
 
 export interface DiscoveryJobPayload {
   integrationId: string
 }
 
 export class DiscoveryService {
-  constructor(private readonly redis: Redis) {}
+  private readonly discoveryQueue: Queue
+
+  constructor() {
+    this.discoveryQueue = createDiscoveryQueue()
+  }
 
   async enqueueDiscovery(
     owner: OwnerContext,
     integrationId: string,
-  ): Promise<{ enqueued: boolean; message?: string }> {
-    const lockKey = `${REDIS_KEYS.DISCOVERY_LOCK}${integrationId}`
-    const lockAcquired = await this.redis.set(lockKey, "1", "EX", 300, "NX")
-    if (!lockAcquired) {
-      throw new DiscoveryInProgressError()
-    }
-
-    const integration = await db.publisherIntegration.findFirst({
+  ): Promise<{ enqueued: boolean }> {
+    const integration = await (db as any).publisherIntegration.findFirst({
       where: {
         id: integrationId,
         ownerType: owner.ownerType,
         ownerId: owner.ownerId,
       },
-      include: { credentials: true },
+      include: { connection: true },
     })
     if (!integration) throw new IntegrationNotFoundError()
-    if (!integration.credentials) throw new NoActiveCredentialError()
+    if (!integration.connection) throw new NoActiveCredentialError()
 
-    await db.publisherIntegration.update({
-      where: { id: integrationId },
-      data: { status: IntegrationStatus.DISCOVERING },
+    // Check for existing in-progress discovery
+    const existingDiscovery = await (db as any).integrationDiscovery.findFirst({
+      where: {
+        integrationId,
+        status: "PENDING",
+      },
     })
+    if (existingDiscovery) {
+      throw new DiscoveryInProgressError()
+    }
+
+    // Create discovery record
+    await (db as any).integrationDiscovery.create({
+      data: {
+        integrationId,
+        status: "PENDING",
+      },
+    })
+
+    // Enqueue BullMQ job
+    await this.discoveryQueue.add("discover", {
+      integrationId,
+    } satisfies DiscoveryJobPayload)
 
     return { enqueued: true }
   }
 
   async processDiscoveryJob(payload: DiscoveryJobPayload): Promise<{
     success: boolean
-    resources: DiscoveredResource[]
+    resources: DiscoveryResource[]
     error?: string
   }> {
     const { integrationId } = payload
-    const lockKey = `${REDIS_KEYS.DISCOVERY_LOCK}${integrationId}`
 
     try {
-      const integration = await db.publisherIntegration.findFirst({
+      const integration = await (db as any).publisherIntegration.findFirst({
         where: { id: integrationId },
-        include: { credentials: true },
+        include: { connection: true },
       })
 
-      if (!integration?.credentials) {
+      if (!integration?.connection) {
         return {
           success: false,
           resources: [],
-          error: "Integration or credentials not found",
+          error: "Integration or connection not found",
         }
       }
 
       const accessToken = (
-        encryption.decrypt(integration.credentials.encryptedAccessToken) as {
+        encryption.decrypt(integration.connection.encryptedAccessToken) as {
           value: string
         }
       ).value
 
-      const providerImpl = getProvider(integration.provider)
-      const resources = await providerImpl.discoverResources(accessToken)
+      const registration = getProvider(integration.provider)
+      if (!registration?.discoveryProvider) {
+        return {
+          success: false,
+          resources: [],
+          error: `Provider ${integration.provider} does not support discovery`,
+        }
+      }
 
-      await db.publisherIntegration.update({
-        where: { id: integrationId },
+      const resources =
+        await registration.discoveryProvider.discoverResources(accessToken)
+
+      // Create WebsiteIntegration rows in a transaction
+      let resourcesCreated = 0
+      await (db as any).$transaction(async (tx: any) => {
+        for (const resource of resources) {
+          await tx.websiteIntegration.upsert({
+            where: {
+              integrationId_externalResourceId: {
+                integrationId,
+                externalResourceId: resource.externalResourceId,
+              },
+            },
+            update: {
+              externalResourceName: resource.externalResourceName,
+              metadata: resource.metadata ?? undefined,
+              status: "CONNECTED",
+            },
+            create: {
+              integrationId,
+              websiteId: "", // Will be linked later by the user
+              externalResourceId: resource.externalResourceId,
+              externalResourceName: resource.externalResourceName,
+              metadata: resource.metadata ?? undefined,
+              status: "CONNECTED",
+            },
+          })
+          resourcesCreated++
+        }
+      })
+
+      // Mark discovery as complete
+      await (db as any).integrationDiscovery.updateMany({
+        where: {
+          integrationId,
+          status: "PENDING",
+        },
         data: {
-          status: IntegrationStatus.ACTIVE,
-          discoveredAt: new Date(),
-          discoveredResources: resources.map((r) => ({
-            ...r,
-            normalizedUrl: normalizePropertyUrl(r.url),
-          })),
+          status: "COMPLETED",
+          resourcesFound: resources.length,
+          resourcesCreated,
+          completedAt: new Date(),
         },
       })
 
@@ -97,51 +167,21 @@ export class DiscoveryService {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
 
-      await db.publisherIntegration
-        .update({
-          where: { id: integrationId },
-          data: { status: IntegrationStatus.ERROR },
+      await (db as any).integrationDiscovery
+        .updateMany({
+          where: {
+            integrationId,
+            status: "PENDING",
+          },
+          data: {
+            status: "FAILED",
+            errorMessage,
+            completedAt: new Date(),
+          },
         })
         .catch(() => {})
 
       return { success: false, resources: [], error: errorMessage }
-    } finally {
-      await this.redis.del(lockKey).catch(() => {})
-    }
-  }
-
-  async getCachedResources(
-    owner: OwnerContext,
-    integrationId: string,
-  ): Promise<{
-    resources: DiscoveredResource[]
-    discoveredAt: string | null
-    isStale: boolean
-  }> {
-    const integration = await db.publisherIntegration.findFirst({
-      where: {
-        id: integrationId,
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
-      },
-    })
-    if (!integration) throw new IntegrationNotFoundError()
-
-    const cached = integration.discoveredResources as Array<{
-      externalId: string
-      url: string
-      permissionLevel: string
-    }> | null
-
-    const fifteenMinutes = 15 * 60 * 1000
-    const isStale =
-      !integration.discoveredAt ||
-      Date.now() - integration.discoveredAt.getTime() > fifteenMinutes
-
-    return {
-      resources: cached ?? [],
-      discoveredAt: integration.discoveredAt?.toISOString() ?? null,
-      isStale,
     }
   }
 }

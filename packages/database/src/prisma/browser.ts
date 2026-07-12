@@ -323,15 +323,25 @@ export type ListingFulfillmentRule = Prisma.ListingFulfillmentRuleModel
  */
 export type PlatformSettings = Prisma.PlatformSettingsModel
 /**
+ * Model ExternalAccount
+ * 
+ */
+export type ExternalAccount = Prisma.ExternalAccountModel
+/**
  * Model PublisherIntegration
  * 
  */
 export type PublisherIntegration = Prisma.PublisherIntegrationModel
 /**
- * Model IntegrationCredential
+ * Model IntegrationSchedule
  * 
  */
-export type IntegrationCredential = Prisma.IntegrationCredentialModel
+export type IntegrationSchedule = Prisma.IntegrationScheduleModel
+/**
+ * Model IntegrationDiscovery
+ * 
+ */
+export type IntegrationDiscovery = Prisma.IntegrationDiscoveryModel
 /**
  * Model WebsiteIntegration
  * 

@@ -29,7 +29,7 @@ export const listIntegrationsRequestSchema = z.object({
 })
 
 export const linkPropertyRequestSchema = z.object({
-  externalId: z.string().min(1),
+  externalResourceId: z.string().min(1),
   websiteId: z.string().cuid(),
 })
 
@@ -41,7 +41,7 @@ export const triggerSyncRequestSchema = z.object({
     .default(IntegrationSyncTrigger.MANUAL),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
-  propertyUrl: z.string().optional(),
+  websiteIntegrationId: z.string().optional(),
 })
 
 export const getSyncHistoryRequestSchema = z.object({
@@ -58,7 +58,8 @@ export const getSyncHistoryRequestSchema = z.object({
 const linkedWebsiteSchema = z.object({
   id: z.string(),
   websiteId: z.string(),
-  propertyUrl: z.string(),
+  externalResourceId: z.string(),
+  externalResourceName: z.string().nullable(),
   status: z.nativeEnum(WebsiteIntegrationStatus),
   syncedAt: z.string().datetime().nullable(),
 })
@@ -75,10 +76,16 @@ export const integrationResponseSchema = z.object({
   ownerType: z.nativeEnum(IntegrationOwnerType),
   ownerId: z.string(),
   provider: z.nativeEnum(IntegrationProvider),
-  providerAccountId: z.string(),
   status: z.nativeEnum(IntegrationStatus),
   linkedWebsites: z.array(linkedWebsiteSchema),
-  lastSyncAt: z.string().datetime().nullable(),
+  connection: z
+    .object({
+      email: z.string().nullable(),
+      displayName: z.string().nullable(),
+      grantedScopes: z.array(z.string()),
+      status: z.string(),
+    })
+    .nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 })
@@ -89,9 +96,9 @@ export const integrationListResponseSchema = z.object({
 })
 
 export const discoveredResourceSchema = z.object({
-  externalId: z.string(),
-  url: z.string(),
-  permissionLevel: z.string(),
+  externalResourceId: z.string(),
+  externalResourceName: z.string().nullable(),
+  metadata: z.record(z.unknown()).nullable(),
 })
 
 export const discoverResourcesResponseSchema = z.object({
@@ -101,9 +108,8 @@ export const discoverResourcesResponseSchema = z.object({
 })
 
 export const linkPropertyResponseSchema = z.object({
-  externalPropertyId: z.string(),
-  propertyUrl: z.string(),
-  permissionLevel: z.string(),
+  externalResourceId: z.string(),
+  externalResourceName: z.string().nullable(),
   alreadyLinked: z.boolean(),
   linkedWebsiteId: z.string().nullable().optional(),
   linkedWebsiteUrl: z.string().nullable().optional(),
@@ -117,6 +123,8 @@ const syncProgressSchema = z.object({
 export const syncJobResponseSchema = z.object({
   id: z.string(),
   integrationId: z.string(),
+  jobType: z.string(),
+  websiteIntegrationId: z.string().nullable(),
   status: z.nativeEnum(IntegrationSyncStatus),
   trigger: z.nativeEnum(IntegrationSyncTrigger),
   recordsProcessed: z.number(),

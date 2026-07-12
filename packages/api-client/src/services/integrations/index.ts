@@ -75,11 +75,11 @@ export class IntegrationsService {
   linkProperty(
     integrationId: string,
     websiteId: string,
-    externalId: string,
+    externalResourceId: string,
   ): Promise<LinkPropertyResponse> {
     return this.client.post<LinkPropertyResponse>(
       `/integrations/${integrationId}/link`,
-      { json: { websiteId, externalId } satisfies LinkPropertyRequest },
+      { json: { websiteId, externalResourceId } satisfies LinkPropertyRequest },
     )
   }
 
@@ -97,7 +97,7 @@ export class IntegrationsService {
   triggerSync(
     integrationId: string,
     options?: {
-      propertyUrl?: string
+      websiteIntegrationId?: string
       startDate?: string
       endDate?: string
     },

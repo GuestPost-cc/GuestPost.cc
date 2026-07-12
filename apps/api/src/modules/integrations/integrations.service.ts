@@ -1,40 +1,31 @@
 import { randomBytes } from "node:crypto"
-import type { OAuthStatePayload, OwnerContext } from "@guestpost/integrations"
+import type { OwnerContext } from "@guestpost/integrations"
 import {
   DiscoveryService,
-  IntegrationProvider,
+  IntegrationEncryptionService,
   IntegrationService,
-  IntegrationSyncTrigger,
+  type OAuthStatePayload,
   OAuthStateService,
-  QUEUES,
   SyncService,
 } from "@guestpost/integrations"
 import { Injectable } from "@nestjs/common"
-import { Queue } from "bullmq"
 import { Redis } from "ioredis"
 
 @Injectable()
-export class IntegrationsService {
+export class IntegrationsApiService {
   private readonly integrationService: IntegrationService
   private readonly syncService: SyncService
   private readonly oauthStateService: OAuthStateService
   private readonly discoveryService: DiscoveryService
   private readonly redis: Redis
-  private readonly syncQueue: Queue
-  private readonly discoveryQueue: Queue
 
   constructor() {
     this.redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379")
     this.integrationService = new IntegrationService()
-    this.syncService = new SyncService(this.redis)
+    this.syncService = new SyncService()
     this.oauthStateService = new OAuthStateService(this.redis)
-    this.discoveryService = new DiscoveryService(this.redis)
-    const connection = {
-      host: process.env.REDIS_HOST ?? "localhost",
-      port: Number(process.env.REDIS_PORT ?? 6379),
-    }
-    this.syncQueue = new Queue(QUEUES.SYNC, { connection })
-    this.discoveryQueue = new Queue(QUEUES.DISCOVERY, { connection })
+    this.discoveryService = new DiscoveryService()
+    this.encryption = new IntegrationEncryptionService()
   }
 
   async initiateConnect(
@@ -42,12 +33,11 @@ export class IntegrationsService {
     provider: string,
     returnUrl: string,
   ): Promise<{ authorizationUrl: string }> {
-    const parsedProvider = provider as IntegrationProvider
     const nonce = randomBytes(32).toString("hex")
     const statePayload: OAuthStatePayload = {
       ownerType: owner.ownerType,
       ownerId: owner.ownerId,
-      provider: parsedProvider,
+      provider: provider as any,
       nonce,
       returnUrl,
       createdAt: new Date().toISOString(),
@@ -55,7 +45,7 @@ export class IntegrationsService {
     await this.oauthStateService.createState(statePayload)
     const authorizationUrl = await this.integrationService.initiateOAuth(
       owner,
-      parsedProvider,
+      provider,
       returnUrl,
       nonce,
     )
@@ -74,13 +64,12 @@ export class IntegrationsService {
     }
     const { integrationId } = await this.integrationService.handleOAuthCallback(
       owner,
-      statePayload.provider,
+      statePayload.provider as string,
       code,
     )
 
-    await this.discoveryQueue.add("discover", {
-      integrationId,
-    })
+    // Enqueue discovery after connect
+    await this.discoveryService.enqueueDiscovery(owner, integrationId)
 
     return { integrationId }
   }
@@ -97,70 +86,25 @@ export class IntegrationsService {
     owner: OwnerContext,
     integrationId: string,
   ): Promise<{ enqueued: boolean }> {
-    await this.discoveryService.enqueueDiscovery(owner, integrationId)
-    await this.discoveryQueue.add("discover", {
-      integrationId,
-    })
-    return { enqueued: true }
-  }
-
-  async getCachedResources(owner: OwnerContext, integrationId: string) {
-    return this.discoveryService.getCachedResources(owner, integrationId)
-  }
-
-  async linkProperty(
-    owner: OwnerContext,
-    integrationId: string,
-    websiteId: string,
-    externalId: string,
-  ) {
-    return this.integrationService.linkProperty(
-      owner,
-      integrationId,
-      websiteId,
-      externalId,
-    )
-  }
-
-  async unlinkProperty(
-    owner: OwnerContext,
-    integrationId: string,
-    websiteIntegrationId: string,
-  ): Promise<void> {
-    await this.integrationService.unlinkProperty(
-      owner,
-      integrationId,
-      websiteIntegrationId,
-    )
+    return this.discoveryService.enqueueDiscovery(owner, integrationId)
   }
 
   async triggerSync(
     owner: OwnerContext,
     integrationId: string,
     options: {
-      trigger?: IntegrationSyncTrigger
-      propertyUrl?: string
+      trigger?: string
+      websiteIntegrationId?: string
       startDate?: string
       endDate?: string
     },
   ) {
-    const { syncId, websiteIntegrationIds } =
-      await this.syncService.triggerSync(
-        owner,
-        integrationId,
-        options.trigger ?? IntegrationSyncTrigger.MANUAL,
-        options.propertyUrl,
-      )
-
-    await this.syncQueue.add("sync", {
+    return this.syncService.triggerSync(
+      owner,
       integrationId,
-      trigger: options.trigger ?? IntegrationSyncTrigger.MANUAL,
-      propertyUrl: options.propertyUrl,
-      startDate: options.startDate,
-      endDate: options.endDate,
-    })
-
-    return { syncId, websiteIntegrationIds }
+      options.trigger ?? "MANUAL",
+      options.websiteIntegrationId,
+    )
   }
 
   async getSyncHistory(

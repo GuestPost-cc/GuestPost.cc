@@ -35,6 +35,18 @@ export enum IntegrationSyncTrigger {
   OAUTH = "OAUTH",
 }
 
+export enum IntegrationSyncJobType {
+  SYNC = "SYNC",
+  BACKFILL = "BACKFILL",
+}
+
+export enum ExternalAccountStatus {
+  ACTIVE = "ACTIVE",
+  EXPIRED = "EXPIRED",
+  REVOKED = "REVOKED",
+  ERROR = "ERROR",
+}
+
 export enum IntegrationOwnerType {
   PUBLISHER = "PUBLISHER",
   PLATFORM = "PLATFORM",
@@ -45,14 +57,6 @@ export interface OwnerContext {
   ownerId: string
 }
 
-export enum GooglePermissionLevel {
-  SITE_OWNER = "siteOwner",
-  SITE_FULL_USER = "siteFullUser",
-  SITE_LIMITED_USER = "siteLimitedUser",
-  SITE_ASSOCIATE = "siteAssociate",
-  NONE = "none",
-}
-
 export interface CredentialTokens {
   accessToken: string
   refreshToken: string
@@ -61,16 +65,9 @@ export interface CredentialTokens {
 }
 
 export interface DiscoveredResource {
-  externalId: string
-  url: string
-  permissionLevel: string
-}
-
-export interface ValidationResult {
-  valid: boolean
-  ownershipVerified: boolean
-  permissionLevel: string
-  issues?: string[]
+  externalResourceId: string
+  externalResourceName: string
+  metadata?: Record<string, unknown>
 }
 
 export interface SyncResult {
@@ -90,11 +87,16 @@ export interface OAuthStatePayload {
   createdAt: string
 }
 
-export interface LinkedResource {
-  externalPropertyId: string
-  propertyUrl: string
-  permissionLevel: string
-  alreadyLinked: boolean
-  linkedWebsiteId?: string | null
-  linkedWebsiteUrl?: string | null
+export interface ProviderCapabilities {
+  oauth: boolean
+  discovery: boolean
+  sync: boolean
+  backfill: boolean
+  incrementalScopes: boolean
+}
+
+export interface DiscoveryResource {
+  externalResourceId: string
+  externalResourceName: string
+  metadata?: Record<string, unknown>
 }

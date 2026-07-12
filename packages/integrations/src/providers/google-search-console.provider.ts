@@ -1,18 +1,11 @@
-import { GOOGLE_SEARCH_CONSOLE_SCOPES } from "../constants"
+import { createPrismaClient } from "@guestpost/database"
 import {
   ProviderError,
   ProviderRateLimitError,
-  ReauthRequiredError,
   TokenExpiredError,
 } from "../errors"
-import type {
-  CredentialTokens,
-  DiscoveredResource,
-  SyncResult,
-  ValidationResult,
-} from "../types"
-import { GooglePermissionLevel, IntegrationProvider } from "../types"
-import type { IntegrationProviderBase } from "./provider.interface"
+import type { DiscoveryResource, SyncResult } from "../types"
+import type { DiscoveryProvider, SyncProvider } from "./provider.interface"
 
 interface GscSite {
   siteUrl: string
@@ -32,164 +25,184 @@ interface GscSearchAnalyticsRow {
   position: number
 }
 
-interface GoogleTokenResponse {
-  access_token: string
-  refresh_token?: string
-  expires_in: number
-  scope?: string
-  error?: string
+interface GscSearchAnalyticsResponse {
+  rows?: GscSearchAnalyticsRow[]
+  responseAggregationType?: string
 }
 
-interface GoogleErrorResponse {
-  error: string
-}
+const db = createPrismaClient()
 
-export class GoogleSearchConsoleProvider implements IntegrationProviderBase {
-  readonly name = IntegrationProvider.GOOGLE_SEARCH_CONSOLE
-  readonly scopes = GOOGLE_SEARCH_CONSOLE_SCOPES
-
+export class GoogleSearchConsoleProvider
+  implements DiscoveryProvider, SyncProvider
+{
   private readonly baseUrl = "https://www.googleapis.com/webmasters/v3"
 
-  async validateOwnership(
-    accessToken: string,
-    propertyUrl: string,
-  ): Promise<ValidationResult> {
-    const sites = await this.listSites(accessToken)
-    const normalizedProperty = this.normalizeUrl(propertyUrl)
-    const found = sites.find(
-      (s) => this.normalizeUrl(s.url) === normalizedProperty,
-    )
-
-    if (!found) {
-      return {
-        valid: false,
-        ownershipVerified: false,
-        permissionLevel: GooglePermissionLevel.NONE,
-        issues: ["Property not found in Google Search Console"],
-      }
-    }
-
-    const level = found.permissionLevel as GooglePermissionLevel
-    const isOwner =
-      level === GooglePermissionLevel.SITE_OWNER ||
-      level === GooglePermissionLevel.SITE_FULL_USER
-
-    return {
-      valid: isOwner,
-      ownershipVerified: isOwner,
-      permissionLevel: level,
-      issues: isOwner ? undefined : ["You must be a site owner or full user"],
-    }
-  }
-
-  async discoverResources(accessToken: string): Promise<DiscoveredResource[]> {
+  async discoverResources(accessToken: string): Promise<DiscoveryResource[]> {
     const sites = await this.listSites(accessToken)
     return sites.map((site) => ({
-      externalId: site.url,
-      url: site.url,
-      permissionLevel: site.permissionLevel,
+      externalResourceId: site.url,
+      externalResourceName: site.url.replace(/^sc-domain:/, ""),
+      metadata: { permissionLevel: site.permissionLevel },
     }))
   }
 
-  async refreshTokens(refreshToken: string): Promise<CredentialTokens> {
-    const { clientId, clientSecret } = this.getOAuthConfig()
-    const response = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        refresh_token: refreshToken,
-        client_id: clientId,
-        client_secret: clientSecret,
-      }),
-    })
-
-    if (!response.ok) {
-      const err = (await response.json()) as GoogleErrorResponse
-      if (err.error === "invalid_grant") {
-        throw new ReauthRequiredError()
-      }
-      throw new ProviderError("Failed to refresh token", err.error)
-    }
-
-    const data = (await response.json()) as GoogleTokenResponse
-    return {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token ?? refreshToken,
-      expiresAt: new Date(Date.now() + data.expires_in * 1000),
-      scopes: data.scope?.split(" ") ?? this.scopes,
-    }
-  }
-
-  async revokeToken(accessToken: string): Promise<void> {
-    await fetch("https://oauth2.googleapis.com/revoke", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ token: accessToken }),
-    })
-  }
-
-  async triggerSync(
-    _accessToken: string,
-    _propertyUrl: string,
-    _startDate?: Date,
-    _endDate?: Date,
+  async sync(
+    accessToken: string,
+    externalResourceId: string,
+    startDate?: Date,
+    endDate?: Date,
   ): Promise<SyncResult> {
     const startMs = Date.now()
+
+    const end = endDate ?? new Date()
+    // Default: last 3 days if no start date provided
+    const start = startDate ?? new Date(end.getTime() - 3 * 24 * 60 * 60 * 1000)
+
+    // Find all website integrations for this external resource
+    const websiteIntegrations = await (db.websiteIntegration as any).findMany({
+      where: { externalResourceId },
+    })
+
+    if (websiteIntegrations.length === 0) {
+      return {
+        success: true,
+        recordsProcessed: 0,
+        syncedAt: new Date(),
+        durationMs: Date.now() - startMs,
+      }
+    }
+
+    let totalRecordsProcessed = 0
+
+    for (const wi of websiteIntegrations) {
+      try {
+        const rows = await this.fetchSearchAnalytics(
+          accessToken,
+          externalResourceId,
+          start,
+          end,
+        )
+
+        if (rows.length === 0) continue
+
+        // Aggregate rows by date (keys[0] is the date when dimension is "date")
+        const byDate = new Map<
+          string,
+          {
+            clicks: number
+            impressions: number
+            ctrTotal: number
+            positionWeighted: number
+            count: number
+          }
+        >()
+        for (const row of rows) {
+          const date = row.keys[0]
+          const existing = byDate.get(date) ?? {
+            clicks: 0,
+            impressions: 0,
+            ctrTotal: 0,
+            positionWeighted: 0,
+            count: 0,
+          }
+          existing.clicks += row.clicks
+          existing.impressions += row.impressions
+          existing.ctrTotal += row.ctr * row.impressions
+          existing.positionWeighted += row.position * row.impressions
+          existing.count++
+          byDate.set(date, existing)
+        }
+
+        // Upsert daily aggregates
+        for (const [dateStr, data] of byDate) {
+          const date = new Date(dateStr)
+          const avgCtr =
+            data.impressions > 0 ? data.ctrTotal / data.impressions : 0
+          const avgPosition =
+            data.impressions > 0 ? data.positionWeighted / data.impressions : 0
+
+          await (db.websiteSearchDaily as any).upsert({
+            where: {
+              websiteId_sourceIntegrationId_date: {
+                websiteId: wi.websiteId,
+                sourceIntegrationId: wi.id,
+                date,
+              },
+            },
+            update: {
+              clicks: data.clicks,
+              impressions: data.impressions,
+              ctr: avgCtr,
+              position: avgPosition,
+            },
+            create: {
+              websiteId: wi.websiteId,
+              sourceIntegrationId: wi.id,
+              date,
+              clicks: data.clicks,
+              impressions: data.impressions,
+              ctr: avgCtr,
+              position: avgPosition,
+            },
+          })
+
+          totalRecordsProcessed++
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : String(err)
+        return {
+          success: false,
+          recordsProcessed: totalRecordsProcessed,
+          syncedAt: new Date(),
+          error: errorMessage,
+          durationMs: Date.now() - startMs,
+        }
+      }
+    }
+
     return {
       success: true,
-      recordsProcessed: 0,
+      recordsProcessed: totalRecordsProcessed,
       syncedAt: new Date(),
       durationMs: Date.now() - startMs,
     }
   }
 
-  async getAuthorizationUrl(
-    state: string,
-    redirectUri: string,
-  ): Promise<string> {
-    const clientId = this.getRequiredEnv("GOOGLE_CLIENT_ID")
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: this.scopes.join(" "),
-      access_type: "offline",
-      state,
-      prompt: "consent",
-    })
-    return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
-  }
+  private async fetchSearchAnalytics(
+    accessToken: string,
+    siteUrl: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<GscSearchAnalyticsRow[]> {
+    const url = `${this.baseUrl}/sites/${encodeURIComponent(siteUrl)}/searchAnalytics/query`
 
-  async exchangeCodeForTokens(
-    code: string,
-    redirectUri: string,
-  ): Promise<CredentialTokens> {
-    const { clientId, clientSecret } = this.getOAuthConfig()
-    const response = await fetch("https://oauth2.googleapis.com/token", {
+    const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "authorization_code",
-        code,
-        redirect_uri: redirectUri,
-        client_id: clientId,
-        client_secret: clientSecret,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        startDate: this.formatDate(startDate),
+        endDate: this.formatDate(endDate),
+        dimensions: ["date"],
+        rowLimit: 25000,
       }),
     })
 
+    if (response.status === 401) throw new TokenExpiredError()
+    if (response.status === 429) {
+      const retryAfter = response.headers.get("Retry-After")
+      throw new ProviderRateLimitError(
+        `Google rate limit. Retry after ${retryAfter ?? "unknown"}`,
+      )
+    }
     if (!response.ok) {
-      const err = (await response.json()) as GoogleErrorResponse
-      throw new ProviderError("Failed to exchange code for tokens", err.error)
+      throw new ProviderError(`Failed to fetch search analytics for ${siteUrl}`)
     }
 
-    const data = (await response.json()) as GoogleTokenResponse
-    return {
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token ?? "",
-      expiresAt: new Date(Date.now() + data.expires_in * 1000),
-      scopes: data.scope?.split(" ") ?? this.scopes,
-    }
+    const data = (await response.json()) as GscSearchAnalyticsResponse
+    return data.rows ?? []
   }
 
   private async listSites(accessToken: string): Promise<GscSiteWithUrl[]> {
@@ -218,37 +231,7 @@ export class GoogleSearchConsoleProvider implements IntegrationProviderBase {
     }))
   }
 
-  private getOAuthConfig(): { clientId: string; clientSecret: string } {
-    return {
-      clientId: this.getRequiredEnv("GOOGLE_CLIENT_ID"),
-      clientSecret: this.getRequiredEnv("GOOGLE_CLIENT_SECRET"),
-    }
-  }
-
-  private getRequiredEnv(name: "GOOGLE_CLIENT_ID" | "GOOGLE_CLIENT_SECRET") {
-    const value = process.env[name]?.trim()
-    if (!value) {
-      throw new ProviderError(
-        `Google Search Console OAuth is not configured. Set ${name} in the API/worker environment before connecting Google Search Console.`,
-        "GOOGLE_OAUTH_CONFIG_MISSING",
-      )
-    }
-    return value
-  }
-
-  private normalizeUrl(url: string): string {
-    let normalized = url.toLowerCase().trim()
-    if (normalized.startsWith("http://")) {
-      normalized = `https://${normalized.slice("http://".length)}`
-    } else if (!normalized.startsWith("https://")) {
-      normalized = `https://${normalized}`
-    }
-    if (normalized.endsWith("/")) {
-      normalized = normalized.slice(0, -1)
-    }
-    if (normalized.startsWith("https://www.")) {
-      normalized = `https://${normalized.slice("https://www.".length)}`
-    }
-    return normalized
+  private formatDate(date: Date): string {
+    return date.toISOString().split("T")[0]
   }
 }

@@ -1,34 +1,26 @@
-import { createPrismaClient, IntegrationStatus } from "@guestpost/database"
+import { createPrismaClient } from "@guestpost/database"
 import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
 import {
   IntegrationNotFoundError,
   NoActiveCredentialError,
-  PropertyAlreadyLinkedError,
-  PropertyNotFoundError,
   ProviderError,
-  ReauthRequiredError,
-  TokenExpiredError,
-  WebsiteAlreadyLinkedError,
 } from "../errors"
 import { getProvider } from "../providers"
-import type {
-  DiscoveredResource,
-  LinkedResource,
-  OwnerContext,
-  ValidationResult,
-} from "../types"
-import {
-  GooglePermissionLevel,
-  IntegrationProvider,
-  WebsiteIntegrationStatus,
-} from "../types"
-import { isPropertyUrlMatch, normalizePropertyUrl } from "../utils"
+import type { OwnerContext } from "../types"
+import { ExternalAccountStatus } from "../types"
 
 const db = createPrismaClient()
 const encryption = new IntegrationEncryptionService()
 
+interface GoogleUserInfo {
+  id: string
+  email?: string
+  name?: string
+  picture?: string
+}
+
 export class IntegrationService {
-  private getRedirectUri(provider: IntegrationProvider): string {
+  private getRedirectUri(provider: string): string {
     const apiBaseUrl = this.getApiBaseUrl()
     return `${apiBaseUrl}/integrations/${provider}/callback`
   }
@@ -48,120 +40,125 @@ export class IntegrationService {
     }
 
     throw new ProviderError(
-      "API_BASE_URL or NEXT_PUBLIC_API_URL is required to build Google Search Console OAuth redirect URIs. Set API_BASE_URL in .env.development, for example http://localhost:4000/api/v1.",
+      "API_BASE_URL or NEXT_PUBLIC_API_URL is required to build OAuth redirect URIs. Set API_BASE_URL in .env.development, for example http://localhost:4000/api/v1.",
       "API_BASE_URL_MISSING",
     )
   }
 
   async initiateOAuth(
     _owner: OwnerContext,
-    provider: IntegrationProvider,
+    provider: string,
     returnUrl: string,
     stateNonce: string,
   ): Promise<string> {
-    const providerImpl = getProvider(provider)
+    const registration = getProvider(provider)
+    if (!registration?.oauthProvider) {
+      throw new ProviderError(
+        `Provider ${provider} does not support OAuth`,
+        "OAUTH_NOT_SUPPORTED",
+      )
+    }
     const redirectUri = this.getRedirectUri(provider)
-    return providerImpl.getAuthorizationUrl(stateNonce, redirectUri)
+    return registration.oauthProvider.getAuthorizationUrl(
+      stateNonce,
+      redirectUri,
+    )
   }
 
   async handleOAuthCallback(
     owner: OwnerContext,
-    provider: IntegrationProvider,
+    provider: string,
     code: string,
-  ): Promise<{ integrationId: string; providerAccountId: string }> {
-    const providerImpl = getProvider(provider)
+  ): Promise<{ integrationId: string }> {
+    const registration = getProvider(provider)
+    if (!registration?.oauthProvider) {
+      throw new ProviderError(
+        `Provider ${provider} does not support OAuth`,
+        "OAUTH_NOT_SUPPORTED",
+      )
+    }
     const redirectUri = this.getRedirectUri(provider)
 
-    const tokens = await providerImpl.exchangeCodeForTokens(code, redirectUri)
+    // 1. Exchange code for tokens
+    const tokens = await registration.oauthProvider.exchangeCodeForTokens(
+      code,
+      redirectUri,
+    )
 
-    const discovered = await providerImpl.discoverResources(tokens.accessToken)
-    const primarySite = discovered[0]
+    // 2. Fetch Google user info to get externalUserId
+    const userInfo = await this.fetchGoogleUserInfo(tokens.accessToken)
 
-    const existing = await db.publisherIntegration.findFirst({
-      where: {
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
-        provider,
-        providerAccountId: primarySite?.externalId ?? "",
-      },
-    })
-    if (existing) {
-      await db.publisherIntegration.update({
-        where: { id: existing.id },
-        data: { status: IntegrationStatus.DISCOVERING },
-      })
-      await db.integrationCredential.upsert({
-        where: { integrationId: existing.id },
-        update: {
-          encryptedAccessToken: encryption.encrypt({
-            value: tokens.accessToken,
-          }).ciphertext,
-          encryptedRefreshToken: encryption.encrypt({
-            value: tokens.refreshToken,
-          }).ciphertext,
-          tokenExpiresAt: tokens.expiresAt,
-          scopes: tokens.scopes,
-        },
-        create: {
-          integrationId: existing.id,
-          encryptedAccessToken: encryption.encrypt({
-            value: tokens.accessToken,
-          }).ciphertext,
-          encryptedRefreshToken: encryption.encrypt({
-            value: tokens.refreshToken,
-          }).ciphertext,
-          tokenExpiresAt: tokens.expiresAt,
-          scopes: tokens.scopes,
-        },
-      })
-      return {
-        integrationId: existing.id,
-        providerAccountId: primarySite?.externalId ?? "",
-      }
-    }
-
-    const integration = await db.publisherIntegration.create({
+    // 3. Create ExternalAccount with encrypted tokens
+    const externalAccount = await (db as any).externalAccount.create({
       data: {
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
         provider,
-        providerAccountId: primarySite?.externalId ?? "",
-        status: IntegrationStatus.DISCOVERING,
-      },
-    })
-
-    await db.integrationCredential.create({
-      data: {
-        integrationId: integration.id,
-        encryptedAccessToken: encryption.encrypt({ value: tokens.accessToken })
-          .ciphertext,
+        externalUserId: userInfo.id,
+        email: userInfo.email ?? null,
+        displayName: userInfo.name ?? null,
+        encryptedAccessToken: encryption.encrypt({
+          value: tokens.accessToken,
+        }).ciphertext,
         encryptedRefreshToken: encryption.encrypt({
           value: tokens.refreshToken,
         }).ciphertext,
         tokenExpiresAt: tokens.expiresAt,
-        scopes: tokens.scopes,
+        grantedScopes: tokens.scopes,
+        status: ExternalAccountStatus.ACTIVE,
       },
     })
 
-    return {
-      integrationId: integration.id,
-      providerAccountId: primarySite?.externalId ?? "",
-    }
+    // 4. Create PublisherIntegration with connectionId
+    const integration = await (db as any).publisherIntegration.create({
+      data: {
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
+        provider,
+        connectionId: externalAccount.id,
+        status: "DISCOVERING",
+      },
+    })
+
+    // 5. Create IntegrationSchedule with nextRunAt = now
+    await (db as any).integrationSchedule.create({
+      data: {
+        integrationId: integration.id,
+        nextRunAt: new Date(),
+      },
+    })
+
+    return { integrationId: integration.id }
   }
 
   async listIntegrations(owner: OwnerContext, page = 1, pageSize = 20) {
     const where = { ownerType: owner.ownerType, ownerId: owner.ownerId }
     const [items, total] = await Promise.all([
-      db.publisherIntegration.findMany({
+      (db as any).publisherIntegration.findMany({
         where,
         include: {
+          connection: {
+            select: {
+              id: true,
+              provider: true,
+              email: true,
+              displayName: true,
+              status: true,
+            },
+          },
           websiteIntegrations: {
             select: {
               id: true,
               websiteId: true,
-              propertyUrl: true,
+              externalResourceId: true,
+              externalResourceName: true,
               status: true,
               syncedAt: true,
+            },
+          },
+          schedule: {
+            select: {
+              id: true,
+              enabled: true,
+              nextRunAt: true,
             },
           },
         },
@@ -169,19 +166,38 @@ export class IntegrationService {
         take: pageSize,
         orderBy: { createdAt: "desc" },
       }),
-      db.publisherIntegration.count({ where }),
+      (db as any).publisherIntegration.count({ where }),
     ])
 
     return {
-      data: items.map((i) => ({
+      data: items.map((i: any) => ({
         id: i.id,
         ownerType: i.ownerType,
         ownerId: i.ownerId,
         provider: i.provider,
-        providerAccountId: i.providerAccountId,
+        connection: i.connection
+          ? {
+              id: i.connection.id,
+              email: i.connection.email,
+              displayName: i.connection.displayName,
+              status: i.connection.status,
+            }
+          : null,
         status: i.status,
-        linkedWebsites: i.websiteIntegrations,
-        lastSyncAt: i.lastSyncAt?.toISOString() ?? null,
+        linkedWebsites: (i.websiteIntegrations ?? []).map((w: any) => ({
+          id: w.id,
+          websiteId: w.websiteId,
+          externalResourceId: w.externalResourceId,
+          externalResourceName: w.externalResourceName,
+          status: w.status,
+          syncedAt: w.syncedAt?.toISOString() ?? null,
+        })),
+        schedule: i.schedule
+          ? {
+              enabled: i.schedule.enabled,
+              nextRunAt: i.schedule.nextRunAt.toISOString(),
+            }
+          : null,
         createdAt: i.createdAt.toISOString(),
         updatedAt: i.updatedAt.toISOString(),
       })),
@@ -195,17 +211,18 @@ export class IntegrationService {
   }
 
   async getIntegration(owner: OwnerContext, integrationId: string) {
-    const integration = await db.publisherIntegration.findFirst({
+    const integration = await (db as any).publisherIntegration.findFirst({
       where: {
         id: integrationId,
         ownerType: owner.ownerType,
         ownerId: owner.ownerId,
       },
       include: {
-        credentials: true,
+        connection: true,
         websiteIntegrations: {
           include: { integration: false },
         },
+        schedule: true,
         syncs: {
           take: 10,
           orderBy: { startedAt: "desc" },
@@ -213,242 +230,74 @@ export class IntegrationService {
       },
     })
     if (!integration) throw new IntegrationNotFoundError()
-
-    const creds = integration.credentials
-    if (!creds) throw new NoActiveCredentialError()
-
-    const accessToken = (
-      encryption.decrypt(creds.encryptedAccessToken) as { value: string }
-    ).value
-    const providerImpl = getProvider(integration.provider)
-    let permissionValidated: ValidationResult | null = null
-
-    if (integration.websiteIntegrations.length > 0) {
-      const primaryProperty = integration.websiteIntegrations[0]
-      permissionValidated = await providerImpl
-        .validateOwnership(accessToken, primaryProperty.propertyUrl)
-        .catch((err) => {
-          if (
-            err instanceof TokenExpiredError ||
-            err instanceof ReauthRequiredError
-          ) {
-            return null
-          }
-          throw err
-        })
-    }
+    if (!integration.connection) throw new NoActiveCredentialError()
 
     return {
       id: integration.id,
       ownerType: integration.ownerType,
       ownerId: integration.ownerId,
       provider: integration.provider,
-      providerAccountId: integration.providerAccountId,
-      status:
-        permissionValidated === null &&
-        integration.status === IntegrationStatus.ACTIVE
-          ? IntegrationStatus.TOKEN_EXPIRED
-          : integration.status,
-      linkedWebsites: integration.websiteIntegrations.map((w) => ({
+      connection: {
+        id: integration.connection.id,
+        email: integration.connection.email,
+        displayName: integration.connection.displayName,
+        status: integration.connection.status,
+        tokenExpiresAt: integration.connection.tokenExpiresAt.toISOString(),
+      },
+      status: integration.status,
+      linkedWebsites: (integration.websiteIntegrations ?? []).map((w: any) => ({
         id: w.id,
         websiteId: w.websiteId,
-        propertyUrl: w.propertyUrl,
+        externalResourceId: w.externalResourceId,
+        externalResourceName: w.externalResourceName,
+        metadata: w.metadata,
         status: w.status,
         syncedAt: w.syncedAt?.toISOString() ?? null,
       })),
-      lastSyncAt: integration.lastSyncAt?.toISOString() ?? null,
+      schedule: integration.schedule
+        ? {
+            enabled: integration.schedule.enabled,
+            intervalMinutes: integration.schedule.intervalMinutes,
+            nextRunAt: integration.schedule.nextRunAt.toISOString(),
+            lastRunAt: integration.schedule.lastRunAt?.toISOString() ?? null,
+            lastSuccessAt:
+              integration.schedule.lastSuccessAt?.toISOString() ?? null,
+          }
+        : null,
       createdAt: integration.createdAt.toISOString(),
       updatedAt: integration.updatedAt.toISOString(),
     }
   }
 
-  async discoverAvailableProperties(
-    owner: OwnerContext,
-    integrationId: string,
-  ): Promise<DiscoveredResource[]> {
-    const integration = await db.publisherIntegration.findFirst({
-      where: {
-        id: integrationId,
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
-      },
-      include: { credentials: true },
+  async getActiveAccessToken(connectionId: string): Promise<string> {
+    const account = await (db as any).externalAccount.findUnique({
+      where: { id: connectionId },
     })
-    if (!integration) throw new IntegrationNotFoundError()
-    const creds = integration.credentials
-    if (!creds) throw new NoActiveCredentialError()
-
-    const accessToken = (
-      encryption.decrypt(creds.encryptedAccessToken) as { value: string }
-    ).value
-    const providerImpl = getProvider(integration.provider)
-    return providerImpl.discoverResources(accessToken)
-  }
-
-  async linkProperty(
-    owner: OwnerContext,
-    integrationId: string,
-    websiteId: string,
-    externalId: string,
-  ): Promise<LinkedResource> {
-    const integration = await db.publisherIntegration.findFirst({
-      where: {
-        id: integrationId,
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
-      },
-      include: {
-        credentials: true,
-        websiteIntegrations: { where: { websiteId } },
-      },
-    })
-    if (!integration) throw new IntegrationNotFoundError()
-
-    const existingForWebsite = await db.websiteIntegration.findFirst({
-      where: { websiteId },
-    })
-    if (existingForWebsite) {
-      throw new WebsiteAlreadyLinkedError(existingForWebsite.propertyUrl)
-    }
-
-    const cachedResources =
-      (integration.discoveredResources as unknown as
-        | DiscoveredResource[]
-        | null) ?? []
-    const resource = cachedResources.find(
-      (r) =>
-        r.externalId === externalId ||
-        normalizePropertyUrl(r.url) === normalizePropertyUrl(externalId),
-    )
-    if (!resource) {
-      throw new PropertyNotFoundError()
-    }
-
-    const normalizedPropertyUrl = normalizePropertyUrl(resource.url)
-
-    const alreadyLinked = integration.websiteIntegrations.find((w) =>
-      isPropertyUrlMatch(w.propertyUrl, resource.url),
-    )
-    if (alreadyLinked) {
-      const linkedWebsite = await db.website.findUnique({
-        where: { id: alreadyLinked.websiteId },
-      })
-      throw new PropertyAlreadyLinkedError(linkedWebsite?.url ?? undefined)
-    }
-
-    const creds = integration.credentials
-    if (!creds) throw new NoActiveCredentialError()
-    const accessToken = (
-      encryption.decrypt(creds.encryptedAccessToken) as { value: string }
-    ).value
-    const providerImpl = getProvider(integration.provider)
-
-    const validation = await providerImpl.validateOwnership(
-      accessToken,
-      resource.url,
-    )
-    if (!validation.valid) {
-      throw new IntegrationNotFoundError()
-    }
-
-    const linked = await db.websiteIntegration.create({
-      data: {
-        integrationId,
-        websiteId,
-        propertyUrl: normalizedPropertyUrl,
-        permissionLevel: validation.permissionLevel as GooglePermissionLevel,
-        status: WebsiteIntegrationStatus.CONNECTED,
-      },
-    })
-
-    return {
-      externalPropertyId: externalId,
-      propertyUrl: normalizedPropertyUrl,
-      permissionLevel: validation.permissionLevel,
-      alreadyLinked: false,
-      linkedWebsiteId: linked.websiteId,
-      linkedWebsiteUrl: null,
-    }
-  }
-
-  async unlinkProperty(
-    owner: OwnerContext,
-    integrationId: string,
-    websiteIntegrationId: string,
-  ): Promise<void> {
-    const integration = await db.publisherIntegration.findFirst({
-      where: {
-        id: integrationId,
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
-      },
-    })
-    if (!integration) throw new IntegrationNotFoundError()
-
-    const websiteIntegration = await db.websiteIntegration.findFirst({
-      where: { id: websiteIntegrationId, integrationId },
-    })
-    if (!websiteIntegration) {
-      throw new IntegrationNotFoundError()
-    }
-
-    await db.websiteIntegration.delete({
-      where: { id: websiteIntegrationId },
-    })
-  }
-
-  async disconnect(owner: OwnerContext, integrationId: string): Promise<void> {
-    const integration = await db.publisherIntegration.findFirst({
-      where: {
-        id: integrationId,
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
-      },
-      include: { credentials: true },
-    })
-    if (!integration) throw new IntegrationNotFoundError()
-
-    if (integration.credentials) {
-      try {
-        const accessToken = (
-          encryption.decrypt(integration.credentials.encryptedAccessToken) as {
-            value: string
-          }
-        ).value
-        const providerImpl = getProvider(integration.provider)
-        await providerImpl.revokeToken(accessToken)
-      } catch {
-        // best-effort revocation
-      }
-      await db.integrationCredential.delete({ where: { integrationId } })
-    }
-
-    await db.websiteIntegration.deleteMany({ where: { integrationId } })
-    await db.publisherIntegration.update({
-      where: { id: integrationId },
-      data: { status: IntegrationStatus.DISCONNECTED },
-    })
-  }
-
-  async getActiveAccessToken(integrationId: string): Promise<string> {
-    const creds = await db.integrationCredential.findUnique({
-      where: { integrationId },
-    })
-    if (!creds) throw new NoActiveCredentialError()
+    if (!account) throw new NoActiveCredentialError()
 
     const isExpired =
-      creds.tokenExpiresAt.getTime() - Date.now() < 30 * 60 * 1000
-    if (isExpired) {
-      const refreshToken = (
-        encryption.decrypt(creds.encryptedRefreshToken) as { value: string }
-      ).value
-      const providerImpl = getProvider(
-        process.env.DEFAULT_INTEGRATION_PROVIDER ?? "GOOGLE_SEARCH_CONSOLE",
-      )
-      const tokens = await providerImpl.refreshTokens(refreshToken)
+      account.tokenExpiresAt.getTime() - Date.now() < 30 * 60 * 1000
 
-      await db.integrationCredential.update({
-        where: { integrationId },
+    if (isExpired && account.encryptedRefreshToken) {
+      const refreshToken = (
+        encryption.decrypt(account.encryptedRefreshToken) as {
+          value: string
+        }
+      ).value
+
+      const registration = getProvider(account.provider)
+      if (!registration?.oauthProvider) {
+        throw new ProviderError(
+          `Provider ${account.provider} does not support OAuth`,
+          "OAUTH_NOT_SUPPORTED",
+        )
+      }
+
+      const tokens =
+        await registration.oauthProvider.refreshTokens(refreshToken)
+
+      await (db as any).externalAccount.update({
+        where: { id: connectionId },
         data: {
           encryptedAccessToken: encryption.encrypt({
             value: tokens.accessToken,
@@ -457,13 +306,70 @@ export class IntegrationService {
             value: tokens.refreshToken,
           }).ciphertext,
           tokenExpiresAt: tokens.expiresAt,
+          grantedScopes: tokens.scopes,
+          lastUsedAt: new Date(),
         },
       })
 
       return tokens.accessToken
     }
 
-    return (encryption.decrypt(creds.encryptedAccessToken) as { value: string })
-      .value
+    return (
+      encryption.decrypt(account.encryptedAccessToken) as {
+        value: string
+      }
+    ).value
+  }
+
+  async disconnect(owner: OwnerContext, integrationId: string): Promise<void> {
+    const integration = await (db as any).publisherIntegration.findFirst({
+      where: {
+        id: integrationId,
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
+      },
+      include: { connection: true },
+    })
+    if (!integration) throw new IntegrationNotFoundError()
+
+    // Revoke tokens if possible
+    if (integration.connection) {
+      try {
+        const accessToken = (
+          encryption.decrypt(integration.connection.encryptedAccessToken) as {
+            value: string
+          }
+        ).value
+        const registration = getProvider(integration.provider)
+        await registration?.oauthProvider?.revokeToken(accessToken)
+      } catch {
+        // best-effort revocation
+      }
+    }
+
+    // Cascade delete will remove websiteIntegrations, syncs, schedule, discoveries
+    await (db as any).publisherIntegration.delete({
+      where: { id: integrationId },
+    })
+  }
+
+  private async fetchGoogleUserInfo(
+    accessToken: string,
+  ): Promise<GoogleUserInfo> {
+    const response = await fetch(
+      "https://www.googleapis.com/oauth2/v2/userinfo",
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    )
+
+    if (!response.ok) {
+      throw new ProviderError(
+        "Failed to fetch Google user info",
+        "GOOGLE_USERINFO_FAILED",
+      )
+    }
+
+    return response.json() as Promise<GoogleUserInfo>
   }
 }

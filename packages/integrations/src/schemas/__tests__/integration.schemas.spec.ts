@@ -80,14 +80,14 @@ describe("connectCallbackRequestSchema", () => {
 describe("linkPropertyRequestSchema", () => {
   it("parses valid externalId and websiteId", () => {
     const result = linkPropertyRequestSchema.parse({
-      externalId: "sc-domain:example.com",
+      externalResourceId: "sc-domain:example.com",
       websiteId: "clx123abc",
     })
-    expect(result.externalId).toBe("sc-domain:example.com")
+    expect(result.externalResourceId).toBe("sc-domain:example.com")
     expect(result.websiteId).toBe("clx123abc")
   })
 
-  it("rejects missing externalId", () => {
+  it("rejects missing externalResourceId", () => {
     expect(() =>
       linkPropertyRequestSchema.parse({
         websiteId: "clx123",

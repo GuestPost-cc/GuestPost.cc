@@ -2,7 +2,6 @@ import {
   connectCallbackRequestSchema,
   connectRequestSchema,
   IntegrationError,
-  linkPropertyRequestSchema,
   triggerDiscoveryRequestSchema,
   triggerSyncRequestSchema,
 } from "@guestpost/integrations"
@@ -20,13 +19,13 @@ import {
 } from "@nestjs/common"
 import { Request } from "express"
 import { Public } from "../../common/decorators/public.decorator"
-import { IntegrationsService } from "./integrations.service"
+import { IntegrationsApiService } from "./integrations.service"
 import { OwnerResolver } from "./owner-resolver.service"
 
 @Controller("integrations")
 export class IntegrationsController {
   constructor(
-    private readonly service: IntegrationsService,
+    private readonly service: IntegrationsApiService,
     private readonly ownerResolver: OwnerResolver,
   ) {}
 
@@ -38,7 +37,9 @@ export class IntegrationsController {
   ) {
     const parsed = connectRequestSchema.safeParse(body)
     if (!parsed.success) {
-      throw new IntegrationError("INVALID_REQUEST", "Invalid request body")
+      throw new IntegrationError("INVALID_REQUEST", "Invalid request body", {
+        issues: parsed.error.issues,
+      })
     }
     const { returnUrl } = parsed.data
     return this.service.initiateConnect(
@@ -56,7 +57,9 @@ export class IntegrationsController {
   ) {
     const parsed = connectCallbackRequestSchema.safeParse(query)
     if (!parsed.success) {
-      throw new IntegrationError("INVALID_REQUEST", "Invalid callback params")
+      throw new IntegrationError("INVALID_REQUEST", "Invalid callback params", {
+        issues: parsed.error.issues,
+      })
     }
     const { code, state, error } = parsed.data
     if (error) {
@@ -69,8 +72,6 @@ export class IntegrationsController {
   async listIntegrations(
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
-    @Query("status") status?: string,
-    @Query("provider") provider?: string,
     @Req() req?: Request,
   ) {
     return this.service.listIntegrations(
@@ -99,55 +100,13 @@ export class IntegrationsController {
   ) {
     const parsed = triggerDiscoveryRequestSchema.safeParse(body)
     if (!parsed.success) {
-      throw new IntegrationError("INVALID_REQUEST", "Invalid request body")
+      throw new IntegrationError("INVALID_REQUEST", "Invalid request body", {
+        issues: parsed.error.issues,
+      })
     }
     return this.service.enqueueDiscovery(
       this.ownerResolver.resolve(req),
       integrationId,
-    )
-  }
-
-  @Get(":integrationId/resources")
-  async getCachedResources(
-    @Param("integrationId") integrationId: string,
-    @Req() req: Request,
-  ) {
-    return this.service.getCachedResources(
-      this.ownerResolver.resolve(req),
-      integrationId,
-    )
-  }
-
-  @Post(":integrationId/link")
-  async linkProperty(
-    @Param("integrationId") integrationId: string,
-    @Body() body: unknown,
-    @Req() req: Request,
-  ) {
-    const parsed = linkPropertyRequestSchema.safeParse(body)
-    if (!parsed.success) {
-      throw new IntegrationError("INVALID_REQUEST", "Invalid request body")
-    }
-    const { externalId, websiteId } = parsed.data
-    return this.service.linkProperty(
-      this.ownerResolver.resolve(req),
-      integrationId,
-      websiteId!,
-      externalId!,
-    )
-  }
-
-  @Delete(":integrationId/link/:websiteIntegrationId")
-  @HttpCode(HttpStatus.NO_CONTENT)
-  async unlinkProperty(
-    @Param("integrationId") integrationId: string,
-    @Param("websiteIntegrationId") websiteIntegrationId: string,
-    @Req() req: Request,
-  ) {
-    await this.service.unlinkProperty(
-      this.ownerResolver.resolve(req),
-      integrationId,
-      websiteIntegrationId,
     )
   }
 
@@ -160,15 +119,17 @@ export class IntegrationsController {
   ) {
     const parsed = triggerSyncRequestSchema.safeParse(body)
     if (!parsed.success) {
-      throw new IntegrationError("INVALID_REQUEST", "Invalid request body")
+      throw new IntegrationError("INVALID_REQUEST", "Invalid request body", {
+        issues: parsed.error.issues,
+      })
     }
-    const { trigger, propertyUrl, startDate, endDate } = parsed.data
+    const { trigger, websiteIntegrationId, startDate, endDate } = parsed.data
     return this.service.triggerSync(
       this.ownerResolver.resolve(req),
       integrationId,
       {
         trigger: trigger!,
-        propertyUrl,
+        websiteIntegrationId,
         startDate,
         endDate,
       },

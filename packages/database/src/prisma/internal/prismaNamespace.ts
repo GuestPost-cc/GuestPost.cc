@@ -445,8 +445,10 @@ export const ModelName = {
   MarketplaceFlag: 'MarketplaceFlag',
   ListingFulfillmentRule: 'ListingFulfillmentRule',
   PlatformSettings: 'PlatformSettings',
+  ExternalAccount: 'ExternalAccount',
   PublisherIntegration: 'PublisherIntegration',
-  IntegrationCredential: 'IntegrationCredential',
+  IntegrationSchedule: 'IntegrationSchedule',
+  IntegrationDiscovery: 'IntegrationDiscovery',
   WebsiteIntegration: 'WebsiteIntegration',
   IntegrationSync: 'IntegrationSync',
   WebsiteSearchDaily: 'WebsiteSearchDaily',
@@ -466,7 +468,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "publisherIntegration" | "integrationCredential" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -4984,6 +4986,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ExternalAccount: {
+      payload: Prisma.$ExternalAccountPayload<ExtArgs>
+      fields: Prisma.ExternalAccountFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ExternalAccountFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ExternalAccountFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload>
+        }
+        findFirst: {
+          args: Prisma.ExternalAccountFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ExternalAccountFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload>
+        }
+        findMany: {
+          args: Prisma.ExternalAccountFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload>[]
+        }
+        create: {
+          args: Prisma.ExternalAccountCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload>
+        }
+        createMany: {
+          args: Prisma.ExternalAccountCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ExternalAccountCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload>[]
+        }
+        delete: {
+          args: Prisma.ExternalAccountDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload>
+        }
+        update: {
+          args: Prisma.ExternalAccountUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload>
+        }
+        deleteMany: {
+          args: Prisma.ExternalAccountDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ExternalAccountUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ExternalAccountUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload>[]
+        }
+        upsert: {
+          args: Prisma.ExternalAccountUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ExternalAccountPayload>
+        }
+        aggregate: {
+          args: Prisma.ExternalAccountAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateExternalAccount>
+        }
+        groupBy: {
+          args: Prisma.ExternalAccountGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ExternalAccountGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ExternalAccountCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ExternalAccountCountAggregateOutputType> | number
+        }
+      }
+    }
     PublisherIntegration: {
       payload: Prisma.$PublisherIntegrationPayload<ExtArgs>
       fields: Prisma.PublisherIntegrationFieldRefs
@@ -5058,77 +5134,151 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    IntegrationCredential: {
-      payload: Prisma.$IntegrationCredentialPayload<ExtArgs>
-      fields: Prisma.IntegrationCredentialFieldRefs
+    IntegrationSchedule: {
+      payload: Prisma.$IntegrationSchedulePayload<ExtArgs>
+      fields: Prisma.IntegrationScheduleFieldRefs
       operations: {
         findUnique: {
-          args: Prisma.IntegrationCredentialFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload> | null
+          args: Prisma.IntegrationScheduleFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload> | null
         }
         findUniqueOrThrow: {
-          args: Prisma.IntegrationCredentialFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload>
+          args: Prisma.IntegrationScheduleFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload>
         }
         findFirst: {
-          args: Prisma.IntegrationCredentialFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload> | null
+          args: Prisma.IntegrationScheduleFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload> | null
         }
         findFirstOrThrow: {
-          args: Prisma.IntegrationCredentialFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload>
+          args: Prisma.IntegrationScheduleFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload>
         }
         findMany: {
-          args: Prisma.IntegrationCredentialFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload>[]
+          args: Prisma.IntegrationScheduleFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload>[]
         }
         create: {
-          args: Prisma.IntegrationCredentialCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload>
+          args: Prisma.IntegrationScheduleCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload>
         }
         createMany: {
-          args: Prisma.IntegrationCredentialCreateManyArgs<ExtArgs>
+          args: Prisma.IntegrationScheduleCreateManyArgs<ExtArgs>
           result: BatchPayload
         }
         createManyAndReturn: {
-          args: Prisma.IntegrationCredentialCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload>[]
+          args: Prisma.IntegrationScheduleCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload>[]
         }
         delete: {
-          args: Prisma.IntegrationCredentialDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload>
+          args: Prisma.IntegrationScheduleDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload>
         }
         update: {
-          args: Prisma.IntegrationCredentialUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload>
+          args: Prisma.IntegrationScheduleUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload>
         }
         deleteMany: {
-          args: Prisma.IntegrationCredentialDeleteManyArgs<ExtArgs>
+          args: Prisma.IntegrationScheduleDeleteManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateMany: {
-          args: Prisma.IntegrationCredentialUpdateManyArgs<ExtArgs>
+          args: Prisma.IntegrationScheduleUpdateManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateManyAndReturn: {
-          args: Prisma.IntegrationCredentialUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload>[]
+          args: Prisma.IntegrationScheduleUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload>[]
         }
         upsert: {
-          args: Prisma.IntegrationCredentialUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationCredentialPayload>
+          args: Prisma.IntegrationScheduleUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationSchedulePayload>
         }
         aggregate: {
-          args: Prisma.IntegrationCredentialAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateIntegrationCredential>
+          args: Prisma.IntegrationScheduleAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateIntegrationSchedule>
         }
         groupBy: {
-          args: Prisma.IntegrationCredentialGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.IntegrationCredentialGroupByOutputType>[]
+          args: Prisma.IntegrationScheduleGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.IntegrationScheduleGroupByOutputType>[]
         }
         count: {
-          args: Prisma.IntegrationCredentialCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.IntegrationCredentialCountAggregateOutputType> | number
+          args: Prisma.IntegrationScheduleCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.IntegrationScheduleCountAggregateOutputType> | number
+        }
+      }
+    }
+    IntegrationDiscovery: {
+      payload: Prisma.$IntegrationDiscoveryPayload<ExtArgs>
+      fields: Prisma.IntegrationDiscoveryFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.IntegrationDiscoveryFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.IntegrationDiscoveryFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload>
+        }
+        findFirst: {
+          args: Prisma.IntegrationDiscoveryFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.IntegrationDiscoveryFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload>
+        }
+        findMany: {
+          args: Prisma.IntegrationDiscoveryFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload>[]
+        }
+        create: {
+          args: Prisma.IntegrationDiscoveryCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload>
+        }
+        createMany: {
+          args: Prisma.IntegrationDiscoveryCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.IntegrationDiscoveryCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload>[]
+        }
+        delete: {
+          args: Prisma.IntegrationDiscoveryDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload>
+        }
+        update: {
+          args: Prisma.IntegrationDiscoveryUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload>
+        }
+        deleteMany: {
+          args: Prisma.IntegrationDiscoveryDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.IntegrationDiscoveryUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.IntegrationDiscoveryUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload>[]
+        }
+        upsert: {
+          args: Prisma.IntegrationDiscoveryUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$IntegrationDiscoveryPayload>
+        }
+        aggregate: {
+          args: Prisma.IntegrationDiscoveryAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateIntegrationDiscovery>
+        }
+        groupBy: {
+          args: Prisma.IntegrationDiscoveryGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.IntegrationDiscoveryGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.IntegrationDiscoveryCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.IntegrationDiscoveryCountAggregateOutputType> | number
         }
       }
     }
@@ -6456,16 +6606,32 @@ export const PlatformSettingsScalarFieldEnum = {
 export type PlatformSettingsScalarFieldEnum = (typeof PlatformSettingsScalarFieldEnum)[keyof typeof PlatformSettingsScalarFieldEnum]
 
 
+export const ExternalAccountScalarFieldEnum = {
+  id: 'id',
+  provider: 'provider',
+  externalUserId: 'externalUserId',
+  email: 'email',
+  displayName: 'displayName',
+  encryptedAccessToken: 'encryptedAccessToken',
+  encryptedRefreshToken: 'encryptedRefreshToken',
+  tokenExpiresAt: 'tokenExpiresAt',
+  grantedScopes: 'grantedScopes',
+  status: 'status',
+  lastUsedAt: 'lastUsedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ExternalAccountScalarFieldEnum = (typeof ExternalAccountScalarFieldEnum)[keyof typeof ExternalAccountScalarFieldEnum]
+
+
 export const PublisherIntegrationScalarFieldEnum = {
   id: 'id',
   ownerType: 'ownerType',
   ownerId: 'ownerId',
   provider: 'provider',
-  providerAccountId: 'providerAccountId',
+  connectionId: 'connectionId',
   status: 'status',
-  lastSyncAt: 'lastSyncAt',
-  discoveredAt: 'discoveredAt',
-  discoveredResources: 'discoveredResources',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -6473,27 +6639,45 @@ export const PublisherIntegrationScalarFieldEnum = {
 export type PublisherIntegrationScalarFieldEnum = (typeof PublisherIntegrationScalarFieldEnum)[keyof typeof PublisherIntegrationScalarFieldEnum]
 
 
-export const IntegrationCredentialScalarFieldEnum = {
+export const IntegrationScheduleScalarFieldEnum = {
   id: 'id',
   integrationId: 'integrationId',
-  encryptedAccessToken: 'encryptedAccessToken',
-  encryptedRefreshToken: 'encryptedRefreshToken',
-  encryptedTokensVersion: 'encryptedTokensVersion',
-  tokenExpiresAt: 'tokenExpiresAt',
-  scopes: 'scopes',
+  enabled: 'enabled',
+  intervalMinutes: 'intervalMinutes',
+  nextRunAt: 'nextRunAt',
+  lastRunAt: 'lastRunAt',
+  lastSuccessAt: 'lastSuccessAt',
+  lastFailureAt: 'lastFailureAt',
+  consecutiveFailures: 'consecutiveFailures',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
-export type IntegrationCredentialScalarFieldEnum = (typeof IntegrationCredentialScalarFieldEnum)[keyof typeof IntegrationCredentialScalarFieldEnum]
+export type IntegrationScheduleScalarFieldEnum = (typeof IntegrationScheduleScalarFieldEnum)[keyof typeof IntegrationScheduleScalarFieldEnum]
+
+
+export const IntegrationDiscoveryScalarFieldEnum = {
+  id: 'id',
+  integrationId: 'integrationId',
+  status: 'status',
+  resourcesFound: 'resourcesFound',
+  resourcesCreated: 'resourcesCreated',
+  errorMessage: 'errorMessage',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt'
+} as const
+
+export type IntegrationDiscoveryScalarFieldEnum = (typeof IntegrationDiscoveryScalarFieldEnum)[keyof typeof IntegrationDiscoveryScalarFieldEnum]
 
 
 export const WebsiteIntegrationScalarFieldEnum = {
   id: 'id',
   integrationId: 'integrationId',
   websiteId: 'websiteId',
-  propertyUrl: 'propertyUrl',
-  permissionLevel: 'permissionLevel',
+  externalResourceId: 'externalResourceId',
+  externalResourceName: 'externalResourceName',
+  metadata: 'metadata',
   status: 'status',
   syncedAt: 'syncedAt',
   createdAt: 'createdAt',
@@ -6506,6 +6690,8 @@ export type WebsiteIntegrationScalarFieldEnum = (typeof WebsiteIntegrationScalar
 export const IntegrationSyncScalarFieldEnum = {
   id: 'id',
   integrationId: 'integrationId',
+  websiteIntegrationId: 'websiteIntegrationId',
+  jobType: 'jobType',
   status: 'status',
   trigger: 'trigger',
   recordsProcessed: 'recordsProcessed',
@@ -6523,6 +6709,7 @@ export type IntegrationSyncScalarFieldEnum = (typeof IntegrationSyncScalarFieldE
 export const WebsiteSearchDailyScalarFieldEnum = {
   id: 'id',
   websiteId: 'websiteId',
+  sourceIntegrationId: 'sourceIntegrationId',
   date: 'date',
   clicks: 'clicks',
   impressions: 'impressions',
@@ -6538,6 +6725,7 @@ export type WebsiteSearchDailyScalarFieldEnum = (typeof WebsiteSearchDailyScalar
 export const WebsitePageSearchDailyScalarFieldEnum = {
   id: 'id',
   websiteId: 'websiteId',
+  sourceIntegrationId: 'sourceIntegrationId',
   pageUrl: 'pageUrl',
   date: 'date',
   clicks: 'clicks',
@@ -7257,6 +7445,20 @@ export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMode
 
 
 /**
+ * Reference to a field of type 'ExternalAccountStatus'
+ */
+export type EnumExternalAccountStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ExternalAccountStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'ExternalAccountStatus[]'
+ */
+export type ListEnumExternalAccountStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ExternalAccountStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'IntegrationOwnerType'
  */
 export type EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'IntegrationOwnerType'>
@@ -7299,16 +7501,16 @@ export type ListEnumIntegrationStatusFieldRefInput<$PrismaModel> = FieldRefInput
 
 
 /**
- * Reference to a field of type 'GooglePermissionLevel'
+ * Reference to a field of type 'IntegrationSyncStatus'
  */
-export type EnumGooglePermissionLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'GooglePermissionLevel'>
+export type EnumIntegrationSyncStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'IntegrationSyncStatus'>
     
 
 
 /**
- * Reference to a field of type 'GooglePermissionLevel[]'
+ * Reference to a field of type 'IntegrationSyncStatus[]'
  */
-export type ListEnumGooglePermissionLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'GooglePermissionLevel[]'>
+export type ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'IntegrationSyncStatus[]'>
     
 
 
@@ -7327,16 +7529,16 @@ export type ListEnumWebsiteIntegrationStatusFieldRefInput<$PrismaModel> = FieldR
 
 
 /**
- * Reference to a field of type 'IntegrationSyncStatus'
+ * Reference to a field of type 'IntegrationSyncJobType'
  */
-export type EnumIntegrationSyncStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'IntegrationSyncStatus'>
+export type EnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'IntegrationSyncJobType'>
     
 
 
 /**
- * Reference to a field of type 'IntegrationSyncStatus[]'
+ * Reference to a field of type 'IntegrationSyncJobType[]'
  */
-export type ListEnumIntegrationSyncStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'IntegrationSyncStatus[]'>
+export type ListEnumIntegrationSyncJobTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'IntegrationSyncJobType[]'>
     
 
 
@@ -7524,8 +7726,10 @@ export type GlobalOmitConfig = {
   marketplaceFlag?: Prisma.MarketplaceFlagOmit
   listingFulfillmentRule?: Prisma.ListingFulfillmentRuleOmit
   platformSettings?: Prisma.PlatformSettingsOmit
+  externalAccount?: Prisma.ExternalAccountOmit
   publisherIntegration?: Prisma.PublisherIntegrationOmit
-  integrationCredential?: Prisma.IntegrationCredentialOmit
+  integrationSchedule?: Prisma.IntegrationScheduleOmit
+  integrationDiscovery?: Prisma.IntegrationDiscoveryOmit
   websiteIntegration?: Prisma.WebsiteIntegrationOmit
   integrationSync?: Prisma.IntegrationSyncOmit
   websiteSearchDaily?: Prisma.WebsiteSearchDailyOmit

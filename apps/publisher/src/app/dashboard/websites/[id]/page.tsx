@@ -143,11 +143,11 @@ export default function WebsiteDetailPage() {
     },
   })
 
-  const resources = (resourcesData?.resources ?? []) as {
-    externalId: string
-    url: string
-    permissionLevel: string
-  }[]
+  const resources = (resourcesData?.resources ?? []) as Array<{
+    externalResourceId: string
+    externalResourceName: string
+    metadata?: Record<string, unknown>
+  }>
 
   const syncRows = syncHistory?.data ?? []
   const pagination = (syncHistory?.pagination ?? {
@@ -198,7 +198,7 @@ export default function WebsiteDetailPage() {
     try {
       await linkMutation.mutateAsync({
         websiteId,
-        externalId: selectedResource,
+        externalResourceId: selectedResource,
       })
       toast.success("Property linked")
       setShowLinkDialog(false)

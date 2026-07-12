@@ -388,17 +388,6 @@ export const IntegrationSyncTrigger = {
 export type IntegrationSyncTrigger = (typeof IntegrationSyncTrigger)[keyof typeof IntegrationSyncTrigger]
 
 
-export const GooglePermissionLevel = {
-  siteOwner: 'siteOwner',
-  siteFullUser: 'siteFullUser',
-  siteLimitedUser: 'siteLimitedUser',
-  siteAssociate: 'siteAssociate',
-  none: 'none'
-} as const
-
-export type GooglePermissionLevel = (typeof GooglePermissionLevel)[keyof typeof GooglePermissionLevel]
-
-
 export const MembershipStatus = {
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE'
@@ -526,3 +515,21 @@ export const ListingFulfillmentType = {
 } as const
 
 export type ListingFulfillmentType = (typeof ListingFulfillmentType)[keyof typeof ListingFulfillmentType]
+
+
+export const ExternalAccountStatus = {
+  ACTIVE: 'ACTIVE',
+  EXPIRED: 'EXPIRED',
+  REVOKED: 'REVOKED',
+  ERROR: 'ERROR'
+} as const
+
+export type ExternalAccountStatus = (typeof ExternalAccountStatus)[keyof typeof ExternalAccountStatus]
+
+
+export const IntegrationSyncJobType = {
+  SYNC: 'SYNC',
+  BACKFILL: 'BACKFILL'
+} as const
+
+export type IntegrationSyncJobType = (typeof IntegrationSyncJobType)[keyof typeof IntegrationSyncJobType]

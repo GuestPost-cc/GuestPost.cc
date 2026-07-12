@@ -112,8 +112,10 @@ export const ModelName = {
   MarketplaceFlag: 'MarketplaceFlag',
   ListingFulfillmentRule: 'ListingFulfillmentRule',
   PlatformSettings: 'PlatformSettings',
+  ExternalAccount: 'ExternalAccount',
   PublisherIntegration: 'PublisherIntegration',
-  IntegrationCredential: 'IntegrationCredential',
+  IntegrationSchedule: 'IntegrationSchedule',
+  IntegrationDiscovery: 'IntegrationDiscovery',
   WebsiteIntegration: 'WebsiteIntegration',
   IntegrationSync: 'IntegrationSync',
   WebsiteSearchDaily: 'WebsiteSearchDaily',
@@ -1125,16 +1127,32 @@ export const PlatformSettingsScalarFieldEnum = {
 export type PlatformSettingsScalarFieldEnum = (typeof PlatformSettingsScalarFieldEnum)[keyof typeof PlatformSettingsScalarFieldEnum]
 
 
+export const ExternalAccountScalarFieldEnum = {
+  id: 'id',
+  provider: 'provider',
+  externalUserId: 'externalUserId',
+  email: 'email',
+  displayName: 'displayName',
+  encryptedAccessToken: 'encryptedAccessToken',
+  encryptedRefreshToken: 'encryptedRefreshToken',
+  tokenExpiresAt: 'tokenExpiresAt',
+  grantedScopes: 'grantedScopes',
+  status: 'status',
+  lastUsedAt: 'lastUsedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ExternalAccountScalarFieldEnum = (typeof ExternalAccountScalarFieldEnum)[keyof typeof ExternalAccountScalarFieldEnum]
+
+
 export const PublisherIntegrationScalarFieldEnum = {
   id: 'id',
   ownerType: 'ownerType',
   ownerId: 'ownerId',
   provider: 'provider',
-  providerAccountId: 'providerAccountId',
+  connectionId: 'connectionId',
   status: 'status',
-  lastSyncAt: 'lastSyncAt',
-  discoveredAt: 'discoveredAt',
-  discoveredResources: 'discoveredResources',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -1142,27 +1160,45 @@ export const PublisherIntegrationScalarFieldEnum = {
 export type PublisherIntegrationScalarFieldEnum = (typeof PublisherIntegrationScalarFieldEnum)[keyof typeof PublisherIntegrationScalarFieldEnum]
 
 
-export const IntegrationCredentialScalarFieldEnum = {
+export const IntegrationScheduleScalarFieldEnum = {
   id: 'id',
   integrationId: 'integrationId',
-  encryptedAccessToken: 'encryptedAccessToken',
-  encryptedRefreshToken: 'encryptedRefreshToken',
-  encryptedTokensVersion: 'encryptedTokensVersion',
-  tokenExpiresAt: 'tokenExpiresAt',
-  scopes: 'scopes',
+  enabled: 'enabled',
+  intervalMinutes: 'intervalMinutes',
+  nextRunAt: 'nextRunAt',
+  lastRunAt: 'lastRunAt',
+  lastSuccessAt: 'lastSuccessAt',
+  lastFailureAt: 'lastFailureAt',
+  consecutiveFailures: 'consecutiveFailures',
+  version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
-export type IntegrationCredentialScalarFieldEnum = (typeof IntegrationCredentialScalarFieldEnum)[keyof typeof IntegrationCredentialScalarFieldEnum]
+export type IntegrationScheduleScalarFieldEnum = (typeof IntegrationScheduleScalarFieldEnum)[keyof typeof IntegrationScheduleScalarFieldEnum]
+
+
+export const IntegrationDiscoveryScalarFieldEnum = {
+  id: 'id',
+  integrationId: 'integrationId',
+  status: 'status',
+  resourcesFound: 'resourcesFound',
+  resourcesCreated: 'resourcesCreated',
+  errorMessage: 'errorMessage',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt'
+} as const
+
+export type IntegrationDiscoveryScalarFieldEnum = (typeof IntegrationDiscoveryScalarFieldEnum)[keyof typeof IntegrationDiscoveryScalarFieldEnum]
 
 
 export const WebsiteIntegrationScalarFieldEnum = {
   id: 'id',
   integrationId: 'integrationId',
   websiteId: 'websiteId',
-  propertyUrl: 'propertyUrl',
-  permissionLevel: 'permissionLevel',
+  externalResourceId: 'externalResourceId',
+  externalResourceName: 'externalResourceName',
+  metadata: 'metadata',
   status: 'status',
   syncedAt: 'syncedAt',
   createdAt: 'createdAt',
@@ -1175,6 +1211,8 @@ export type WebsiteIntegrationScalarFieldEnum = (typeof WebsiteIntegrationScalar
 export const IntegrationSyncScalarFieldEnum = {
   id: 'id',
   integrationId: 'integrationId',
+  websiteIntegrationId: 'websiteIntegrationId',
+  jobType: 'jobType',
   status: 'status',
   trigger: 'trigger',
   recordsProcessed: 'recordsProcessed',
@@ -1192,6 +1230,7 @@ export type IntegrationSyncScalarFieldEnum = (typeof IntegrationSyncScalarFieldE
 export const WebsiteSearchDailyScalarFieldEnum = {
   id: 'id',
   websiteId: 'websiteId',
+  sourceIntegrationId: 'sourceIntegrationId',
   date: 'date',
   clicks: 'clicks',
   impressions: 'impressions',
@@ -1207,6 +1246,7 @@ export type WebsiteSearchDailyScalarFieldEnum = (typeof WebsiteSearchDailyScalar
 export const WebsitePageSearchDailyScalarFieldEnum = {
   id: 'id',
   websiteId: 'websiteId',
+  sourceIntegrationId: 'sourceIntegrationId',
   pageUrl: 'pageUrl',
   date: 'date',
   clicks: 'clicks',

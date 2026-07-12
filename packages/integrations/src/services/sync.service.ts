@@ -1,44 +1,57 @@
-import {
-  createPrismaClient,
-  IntegrationStatus,
-  IntegrationSyncStatus,
-  IntegrationSyncTrigger,
-} from "@guestpost/database"
-import { Redis } from "ioredis"
+import { createPrismaClient } from "@guestpost/database"
+import { Queue } from "bullmq"
 import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
-import { REDIS_KEYS } from "../constants"
 import {
   IntegrationNotFoundError,
   NoActiveCredentialError,
-  SyncAlreadyRunningError,
   SyncNotFoundError,
 } from "../errors"
 import { getProvider } from "../providers"
 import type { OwnerContext, SyncResult } from "../types"
-import { WebsiteIntegrationStatus } from "../types"
+import { IntegrationSyncJobType } from "../types"
+import { QUEUES } from "../workers"
 
 const db = createPrismaClient()
 const encryption = new IntegrationEncryptionService()
 
+function createSyncQueue(): Queue {
+  return new Queue(QUEUES.SYNC, {
+    connection: {
+      host: process.env.REDIS_HOST ?? "localhost",
+      port: Number(process.env.REDIS_PORT ?? 6379),
+    },
+    defaultJobOptions: {
+      attempts: 3,
+      backoff: { type: "exponential", delay: 60_000 },
+      removeOnComplete: 100,
+      removeOnFail: 50,
+    },
+  })
+}
+
 export interface SyncJobPayload {
   integrationId: string
   websiteIntegrationId?: string
-  trigger?: IntegrationSyncTrigger
+  trigger?: string
   startDate?: string
   endDate?: string
-  propertyUrl?: string
+  jobType?: IntegrationSyncJobType
 }
 
 export class SyncService {
-  constructor(private readonly redis?: Redis) {}
+  private readonly syncQueue: Queue
+
+  constructor() {
+    this.syncQueue = createSyncQueue()
+  }
 
   async triggerSync(
     owner: OwnerContext,
     integrationId: string,
-    trigger: IntegrationSyncTrigger = IntegrationSyncTrigger.MANUAL,
-    propertyUrl?: string,
+    trigger: string = "MANUAL",
+    websiteIntegrationId?: string,
   ): Promise<{ syncId: string; websiteIntegrationIds: string[] }> {
-    const integration = await db.publisherIntegration.findFirst({
+    const integration = await (db as any).publisherIntegration.findFirst({
       where: {
         id: integrationId,
         ownerType: owner.ownerType,
@@ -48,9 +61,9 @@ export class SyncService {
     })
     if (!integration) throw new IntegrationNotFoundError()
 
-    const websiteIntegrations = propertyUrl
+    const websiteIntegrations = websiteIntegrationId
       ? integration.websiteIntegrations.filter(
-          (w) => w.propertyUrl === propertyUrl,
+          (w: any) => w.id === websiteIntegrationId,
         )
       : integration.websiteIntegrations
 
@@ -58,136 +71,131 @@ export class SyncService {
       throw new SyncNotFoundError()
     }
 
-    const locks: string[] = []
-    for (const wi of websiteIntegrations) {
-      const lockKey = `${REDIS_KEYS.INTEGRATION_LOCK}website:${wi.id}`
-      const acquired = await this.redis?.set(lockKey, "1", "EX", 3600, "NX")
-      if (!acquired) {
-        for (const l of locks) {
-          await this.redis?.del(l).catch(() => {})
-        }
-        throw new SyncAlreadyRunningError()
-      }
-      locks.push(lockKey)
-    }
-
-    const sync = await db.integrationSync.create({
+    // Create IntegrationSync record
+    const sync = await (db as any).integrationSync.create({
       data: {
         integrationId,
+        websiteIntegrationId: websiteIntegrationId ?? null,
+        jobType: IntegrationSyncJobType.SYNC,
         trigger,
-        status: IntegrationSyncStatus.PENDING,
+        status: "PENDING",
         itemsTotal: websiteIntegrations.length,
         recordsExpected: 0,
         itemsCompleted: 0,
       },
     })
 
+    // Enqueue BullMQ job
+    await this.syncQueue.add("sync", {
+      integrationId,
+      websiteIntegrationId: websiteIntegrationId ?? undefined,
+      trigger,
+    } satisfies SyncJobPayload)
+
     return {
       syncId: sync.id,
-      websiteIntegrationIds: websiteIntegrations.map((w) => w.id),
+      websiteIntegrationIds: websiteIntegrations.map((w: any) => w.id),
     }
   }
 
   async processSyncJob(payload: SyncJobPayload): Promise<SyncResult> {
     const startMs = Date.now()
-    const { integrationId, propertyUrl, websiteIntegrationId } = payload
-
+    const { integrationId, websiteIntegrationId } = payload
     const progress = { itemsCompleted: 0, itemsTotal: 0, recordsProcessed: 0 }
 
     try {
-      await db.integrationSync
-        .update({
-          where: { id: integrationId },
-          data: { status: IntegrationSyncStatus.PROCESSING },
-        })
-        .catch(() => {})
+      // Find the sync record by integrationId and PENDING status
+      const syncRecord = await (db as any).integrationSync.findFirst({
+        where: {
+          integrationId,
+          status: "PENDING",
+        },
+        orderBy: { startedAt: "desc" },
+      })
 
-      const integration = await db.publisherIntegration.findFirst({
+      if (syncRecord) {
+        await (db as any).integrationSync.update({
+          where: { id: syncRecord.id },
+          data: { status: "PROCESSING" },
+        })
+      }
+
+      // Find the integration with its connection
+      const integration = await (db as any).publisherIntegration.findFirst({
         where: { id: integrationId },
         include: {
-          credentials: true,
-          websiteIntegrations: propertyUrl
-            ? { where: { propertyUrl } }
-            : websiteIntegrationId
-              ? { where: { id: websiteIntegrationId } }
-              : { take: 1 },
+          connection: true,
+          websiteIntegrations: websiteIntegrationId
+            ? { where: { id: websiteIntegrationId } }
+            : { take: 1 },
         },
       })
 
-      if (!integration?.credentials) {
+      if (!integration?.connection) {
         throw new NoActiveCredentialError()
       }
 
+      // Decrypt access token
       const accessToken = (
-        encryption.decrypt(integration.credentials.encryptedAccessToken) as {
+        encryption.decrypt(integration.connection.encryptedAccessToken) as {
           value: string
         }
       ).value
-      const providerImpl = getProvider(integration.provider)
+
+      const registration = getProvider(integration.provider)
+      if (!registration?.syncProvider) {
+        throw new NoActiveCredentialError()
+      }
 
       progress.itemsTotal = integration.websiteIntegrations.length
 
       for (let i = 0; i < integration.websiteIntegrations.length; i++) {
         const wi = integration.websiteIntegrations[i]
-        const lockKey = `${REDIS_KEYS.INTEGRATION_LOCK}website:${wi.id}`
 
-        const result = await providerImpl.triggerSync(
+        // Call sync provider with the external resource ID
+        const result = await registration.syncProvider.sync(
           accessToken,
-          wi.propertyUrl,
+          wi.externalResourceId,
           payload.startDate ? new Date(payload.startDate) : undefined,
           payload.endDate ? new Date(payload.endDate) : undefined,
         )
         progress.recordsProcessed += result.recordsProcessed
 
-        await db.websiteIntegration
+        // Update WebsiteIntegration
+        await (db as any).websiteIntegration
           .update({
             where: { id: wi.id },
             data: {
               syncedAt: result.syncedAt,
-              status: result.success
-                ? WebsiteIntegrationStatus.CONNECTED
-                : WebsiteIntegrationStatus.OUT_OF_SYNC,
+              status: result.success ? "CONNECTED" : "OUT_OF_SYNC",
             },
           })
           .catch(() => {})
 
         progress.itemsCompleted = i + 1
-        await db.integrationSync
-          .update({
-            where: { id: integrationId },
-            data: {
-              itemsCompleted: progress.itemsCompleted,
-              recordsProcessed: progress.recordsProcessed,
-            },
-          })
-          .catch(() => {})
-
-        await this.redis?.del(lockKey).catch(() => {})
       }
 
-      await db.publisherIntegration
-        .update({
-          where: { id: integrationId },
-          data: { lastSyncAt: new Date() },
-        })
-        .catch(() => {})
-
-      const syncRecord = await db.integrationSync.findFirst({
-        where: { integrationId, status: IntegrationSyncStatus.PROCESSING },
-        orderBy: { startedAt: "desc" },
-      })
+      // Mark sync record as completed
       if (syncRecord) {
-        await db.integrationSync
+        await (db as any).integrationSync
           .update({
             where: { id: syncRecord.id },
             data: {
-              status: IntegrationSyncStatus.COMPLETED,
+              status: "COMPLETED",
               recordsProcessed: progress.recordsProcessed,
               completedAt: new Date(),
             },
           })
           .catch(() => {})
       }
+
+      // Update schedule
+      await (db as any).integrationSchedule
+        .updateMany({
+          where: { integrationId },
+          data: { lastRunAt: new Date(), lastSuccessAt: new Date() },
+        })
+        .catch(() => {})
 
       return {
         success: true,
@@ -197,42 +205,23 @@ export class SyncService {
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err)
-      const syncRecord = await db.integrationSync.findFirst({
-        where: { integrationId, status: IntegrationSyncStatus.PROCESSING },
+
+      // Mark sync record as failed
+      const syncRecord = await (db as any).integrationSync.findFirst({
+        where: { integrationId, status: "PROCESSING" },
         orderBy: { startedAt: "desc" },
       })
       if (syncRecord) {
-        await db.integrationSync
+        await (db as any).integrationSync
           .update({
             where: { id: syncRecord.id },
             data: {
-              status: IntegrationSyncStatus.FAILED,
+              status: "FAILED",
               errorMessage,
               completedAt: new Date(),
             },
           })
           .catch(() => {})
-      }
-
-      await db.publisherIntegration
-        .update({
-          where: { id: integrationId },
-          data: { status: IntegrationStatus.ERROR },
-        })
-        .catch(() => {})
-
-      for (const wi of (
-        await db.publisherIntegration.findFirst({
-          where: { id: integrationId },
-          include: {
-            websiteIntegrations: propertyUrl
-              ? { where: { propertyUrl } }
-              : undefined,
-          },
-        })
-      )?.websiteIntegrations ?? []) {
-        const lockKey = `${REDIS_KEYS.INTEGRATION_LOCK}website:${wi.id}`
-        await this.redis?.del(lockKey).catch(() => {})
       }
 
       return {
@@ -257,7 +246,7 @@ export class SyncService {
       dateTo?: string
     },
   ) {
-    const integration = await db.publisherIntegration.findFirst({
+    const integration = await (db as any).publisherIntegration.findFirst({
       where: {
         id: integrationId,
         ownerType: owner.ownerType,
@@ -277,19 +266,21 @@ export class SyncService {
     }
 
     const [items, total] = await Promise.all([
-      db.integrationSync.findMany({
+      (db as any).integrationSync.findMany({
         where,
         skip: (page - 1) * pageSize,
         take: pageSize,
         orderBy: { startedAt: "desc" },
       }),
-      db.integrationSync.count({ where }),
+      (db as any).integrationSync.count({ where }),
     ])
 
     return {
-      data: items.map((s) => ({
+      data: items.map((s: any) => ({
         id: s.id,
         integrationId: s.integrationId,
+        websiteIntegrationId: s.websiteIntegrationId,
+        jobType: s.jobType,
         status: s.status,
         trigger: s.trigger,
         recordsProcessed: s.recordsProcessed,
@@ -311,11 +302,15 @@ export class SyncService {
   }
 
   async getSyncStatus(syncId: string) {
-    const sync = await db.integrationSync.findUnique({ where: { id: syncId } })
+    const sync = await (db as any).integrationSync.findUnique({
+      where: { id: syncId },
+    })
     if (!sync) throw new SyncNotFoundError()
     return {
       id: sync.id,
       integrationId: sync.integrationId,
+      websiteIntegrationId: sync.websiteIntegrationId,
+      jobType: sync.jobType,
       status: sync.status,
       trigger: sync.trigger,
       recordsProcessed: sync.recordsProcessed,

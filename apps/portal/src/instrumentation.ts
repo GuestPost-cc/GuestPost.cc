@@ -1,14 +1,12 @@
-// Phase 7.0 — Next 15 instrumentation hook (Sentry server + edge init).
-// Called once at app boot per runtime.
+// Phase 7.0 — Next 15 instrumentation hook (Sentry server init).
 import { initSentry } from "@guestpost/shared"
 
 export async function register(): Promise<void> {
   const Sentry = await import("@sentry/nextjs")
   if (process.env.NEXT_RUNTIME === "nodejs") {
     initSentry(Sentry, { runtime: "portal-server" })
-  } else if (process.env.NEXT_RUNTIME === "edge") {
-    initSentry(Sentry, { runtime: "portal-edge" })
   }
+  // Edge runtime init skipped - Turbopack hangs on edge compilation in instrumentation
 }
 
 // Forward request-level errors to Sentry (per Next 15 instrumentation contract).

@@ -38,11 +38,16 @@ export function useLinkProperty(integrationId: string) {
   return useMutation({
     mutationFn: ({
       websiteId,
-      externalId,
+      externalResourceId,
     }: {
       websiteId: string
-      externalId: string
-    }) => api.integrations.linkProperty(integrationId, websiteId, externalId),
+      externalResourceId: string
+    }) =>
+      api.integrations.linkProperty(
+        integrationId,
+        websiteId,
+        externalResourceId,
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: integrationKeys.detail(integrationId),
@@ -74,7 +79,7 @@ export function useUnlinkProperty(integrationId: string) {
 export function useTriggerSync(integrationId: string) {
   return useMutation({
     mutationFn: (options?: {
-      propertyUrl?: string
+      websiteIntegrationId?: string
       startDate?: string
       endDate?: string
     }) => api.integrations.triggerSync(integrationId, options),

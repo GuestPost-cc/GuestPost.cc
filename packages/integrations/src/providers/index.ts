@@ -1,36 +1,40 @@
+import { GoogleAuthProvider } from "./google-auth.provider"
 import { GoogleSearchConsoleProvider } from "./google-search-console.provider"
-import type {
-  IntegrationProviderBase,
-  ProviderRegistry,
-} from "./provider.interface"
+import type { ProviderRegistration } from "./provider.interface"
 
-const providers: Map<string, IntegrationProviderBase> = new Map()
+const registry = new Map<string, ProviderRegistration>()
 
-function registerDefaultProviders() {
-  const gsc = new GoogleSearchConsoleProvider()
-  providers.set(gsc.name, gsc)
+function register(provider: string, registration: ProviderRegistration) {
+  registry.set(provider, registration)
 }
 
-registerDefaultProviders()
+register("GOOGLE_SEARCH_CONSOLE", {
+  name: "Google Search Console",
+  scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
+  capabilities: {
+    oauth: true,
+    discovery: true,
+    sync: true,
+    backfill: true,
+    incrementalScopes: false,
+  },
+  oauthProvider: new GoogleAuthProvider([
+    "https://www.googleapis.com/auth/webmasters.readonly",
+  ]),
+  discoveryProvider: new GoogleSearchConsoleProvider(),
+  syncProvider: new GoogleSearchConsoleProvider(),
+})
 
-export function getProvider(name: string): IntegrationProviderBase {
-  const provider = providers.get(name)
-  if (!provider) {
-    throw new Error(`Unknown integration provider: ${name}`)
-  }
-  return provider
+export function getProvider(
+  provider: string,
+): ProviderRegistration | undefined {
+  return registry.get(provider)
 }
 
-export function listProviders(): IntegrationProviderBase[] {
-  return Array.from(providers.values())
+export function listProviders(): ProviderRegistration[] {
+  return Array.from(registry.values())
 }
 
-export function hasProvider(name: string): boolean {
-  return providers.has(name)
-}
-
-export const providerRegistry: ProviderRegistry = {
-  get: getProvider,
-  list: listProviders,
-  has: hasProvider,
+export function hasProvider(provider: string): boolean {
+  return registry.has(provider)
 }
