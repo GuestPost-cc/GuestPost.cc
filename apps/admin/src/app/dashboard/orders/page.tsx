@@ -146,16 +146,10 @@ function OrderActions({ order }: { order: Order }) {
   return (
     <>
       <div className="flex items-center gap-1">
-        <Button
-          size="sm"
-          variant="ghost"
-          title="View"
-          onClick={() => {
-            setSelectedOrder(order)
-            setDetailOpen(true)
-          }}
-        >
-          <Eye className="h-3.5 w-3.5" />
+        <Button size="sm" variant="ghost" title="View" asChild>
+          <Link href={`/dashboard/orders/${order.id}`}>
+            <Eye className="h-3.5 w-3.5" />
+          </Link>
         </Button>
         {order.status === "DISPUTED" && (
           <Button size="sm" variant="ghost" title="Work dispute" asChild>

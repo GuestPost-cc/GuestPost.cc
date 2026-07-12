@@ -320,6 +320,12 @@ export class AdminController {
     return this.admin.listOrders(t, s, user)
   }
 
+  @Get("orders/:id")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  getOrder(@Param("id") id: string) {
+    return this.admin.getOrder(id)
+  }
+
   @Post("orders/:id/manual-verify")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   manualVerify(

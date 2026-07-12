@@ -363,9 +363,71 @@ export class AdminService {
     })
   }
 
+  async getOrder(id: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id },
+      include: {
+        organization: { select: { id: true, name: true, slug: true } },
+        customer: {
+          select: { id: true, name: true, email: true, userType: true },
+        },
+        website: {
+          select: {
+            id: true,
+            url: true,
+            name: true,
+            ownershipType: true,
+            verificationStatus: true,
+            publisher: {
+              select: {
+                id: true,
+                name: true,
+                tier: true,
+                profile: { select: { trustScore: true } },
+              },
+            },
+            managedBy: { select: { id: true, name: true, email: true } },
+          },
+        },
+        items: {
+          include: { website: { select: { url: true, publisherId: true } } },
+        },
+        events: { orderBy: { createdAt: "desc" } },
+        activeDeliveryVersion: {
+          include: {
+            evidence: { orderBy: { createdAt: "desc" } },
+            fraudFlags: true,
+            snapshots: true,
+            adminVerifiedBy: { select: { id: true, name: true, email: true } },
+          },
+        },
+        settlements: {
+          include: {
+            approvals: true,
+            publisher: { select: { id: true, name: true, tier: true } },
+          },
+        },
+        dispute: true,
+        contentOrder: true,
+        revisions: true,
+        platformRevenue: true,
+        fulfillmentAssignments: {
+          select: {
+            id: true,
+            assignedToUserId: true,
+            status: true,
+            assignedAt: true,
+            completedAt: true,
+          },
+        },
+      },
+    })
+    if (!order) throw new NotFoundException(`Order ${id} not found`)
+    return order
+  }
+
   async listPlatformOrders(status?: string, take = 50, skip = 0) {
     const where: any = { website: { ownershipType: "PLATFORM" } }
-    if (status) where.status = status
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({

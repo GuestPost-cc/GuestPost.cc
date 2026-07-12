@@ -117,7 +117,7 @@ export class AdminService {
   }
 
   getOrderById(id: string) {
-    return this.client.get(`/admin/orders/${id}`)
+    return this.client.get<any>(`/admin/orders/${id}`)
   }
   // Order interventions — verification/advancement is automated; staff only
   // force-cancel (SUPER_ADMIN) or refund (SUPER_ADMIN/FINANCE), reason required.
