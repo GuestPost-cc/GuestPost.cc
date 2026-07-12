@@ -141,8 +141,16 @@ export class AdminService {
     )
   }
 
-  approveSettlement(id: string) {
-    return this.client.post(`/admin/settlements/${id}/admin-approve`)
+  approveSettlement(id: string, reason: string) {
+    return this.client.post(`/admin/settlements/${id}/admin-approve`, {
+      json: { reason },
+    })
+  }
+
+  forceApproveSettlement(id: string, reason: string) {
+    return this.client.post(`/admin/settlements/${id}/force-approve`, {
+      json: { reason },
+    })
   }
 
   listWithdrawals(take?: number, skip?: number) {

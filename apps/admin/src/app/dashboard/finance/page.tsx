@@ -603,10 +603,16 @@ function FinancePageInner() {
   const invalidateWithdrawals = () =>
     queryClient.invalidateQueries({ queryKey: ["withdrawals"] })
 
+  const [approveTarget, setApproveTarget] = useState<string | null>(null)
+  const [approveReason, setApproveReason] = useState("")
+
   const approveSettlement = useMutation({
-    mutationFn: (id: string) => api.admin.approveSettlement(id),
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      api.admin.approveSettlement(id, reason),
     onSuccess: () => {
       toast.success("Settlement approved")
+      setApproveTarget(null)
+      setApproveReason("")
       queryClient.invalidateQueries({ queryKey: ["settlements"] })
     },
     onError: (e: any) =>
@@ -818,8 +824,10 @@ function FinancePageInner() {
                           s.status === "UNDER_REVIEW") && (
                           <Button
                             size="sm"
-                            onClick={() => approveSettlement.mutate(s.id)}
-                            disabled={approveSettlement.isPending}
+                            onClick={() => {
+                              setApproveTarget(s.id)
+                              setApproveReason("")
+                            }}
                           >
                             Approve
                           </Button>
@@ -1237,6 +1245,67 @@ function FinancePageInner() {
                 {decryptMutation.isPending ? "Unlocking..." : "Unlock"}
               </Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Approve Settlement dialog */}
+      <Dialog
+        open={!!approveTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setApproveTarget(null)
+            setApproveReason("")
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Approve settlement</DialogTitle>
+            <DialogDescription>
+              Record a reason for approving this settlement. This is captured in
+              the audit trail.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="settlement-reason">Reason</Label>
+            <textarea
+              id="settlement-reason"
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              placeholder="Explain why this settlement is being approved..."
+              value={approveReason}
+              onChange={(e) => setApproveReason(e.target.value)}
+              maxLength={1000}
+            />
+            <p className="text-xs text-muted-foreground">
+              {approveReason.length}/1000 characters
+            </p>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setApproveTarget(null)
+                setApproveReason("")
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={
+                approveReason.trim().length < 1 || approveSettlement.isPending
+              }
+              onClick={() =>
+                approveSettlement.mutate({
+                  id: approveTarget!,
+                  reason: approveReason.trim(),
+                })
+              }
+            >
+              {approveSettlement.isPending
+                ? "Approving..."
+                : "Approve settlement"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
