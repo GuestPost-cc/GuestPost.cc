@@ -786,6 +786,7 @@ function FinancePageInner() {
                     <TableHead>Amount</TableHead>
                     <TableHead>Release</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Review Window</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -813,6 +814,37 @@ function FinancePageInner() {
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={s.status} />
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {s.reviewEndsAt &&
+                        ["PENDING", "UNDER_REVIEW"].includes(s.status) ? (
+                          <span className="tabular-nums">
+                            {(() => {
+                              const remaining = Math.ceil(
+                                (new Date(s.reviewEndsAt).getTime() -
+                                  Date.now()) /
+                                  (1000 * 60 * 60 * 24),
+                              )
+                              if (remaining <= 0)
+                                return (
+                                  <span className="text-amber-600">
+                                    Due now
+                                  </span>
+                                )
+                              if (remaining === 1)
+                                return (
+                                  <span className="text-amber-600">1 day</span>
+                                )
+                              return `${remaining} days`
+                            })()}
+                          </span>
+                        ) : s.reviewEndsAt ? (
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(s.reviewEndsAt), "MMM d")}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {s.createdAt

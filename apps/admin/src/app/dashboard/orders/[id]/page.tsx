@@ -1126,6 +1126,34 @@ export default function OrderDetailPage() {
                       <Clock className="h-4 w-4 text-blue-600" />
                       <span>
                         Review ends at {format(new Date(s.reviewEndsAt), "PPp")}
+                        {["PENDING", "UNDER_REVIEW"].includes(s.status) &&
+                          (() => {
+                            const remaining = Math.ceil(
+                              (new Date(s.reviewEndsAt).getTime() -
+                                Date.now()) /
+                                (1000 * 60 * 60 * 24),
+                            )
+                            if (remaining <= 0)
+                              return (
+                                <span className="text-amber-600 font-medium">
+                                  {" "}
+                                  (due now)
+                                </span>
+                              )
+                            if (remaining === 1)
+                              return (
+                                <span className="text-amber-600 font-medium">
+                                  {" "}
+                                  (1 day remaining)
+                                </span>
+                              )
+                            return (
+                              <span className="text-muted-foreground">
+                                {" "}
+                                ({remaining} days remaining)
+                              </span>
+                            )
+                          })()}
                       </span>
                     </div>
                   )}
