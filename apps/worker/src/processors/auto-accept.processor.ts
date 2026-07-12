@@ -1,6 +1,7 @@
 import { prisma } from "@guestpost/database"
 import {
   defaultWorkflowConfig,
+  getSettlementReviewDays,
   QUEUE_JOBS,
   QUEUES,
   WorkflowDecisionService,
@@ -151,8 +152,9 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
             null,
           )
 
-          const reviewDays = decision.computeReviewWindowDays(
-            publisherTierRow ?? null,
+          const reviewDays = getSettlementReviewDays(
+            (publisherTierRow?.tier ?? "NEW") as any,
+            process.env.SETTLEMENT_REVIEW_DAYS,
           )
 
           const settlement = await tx.settlement.create({
