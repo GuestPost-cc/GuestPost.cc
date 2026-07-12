@@ -119,6 +119,7 @@ export const ModelName = {
   WebsiteIntegration: 'WebsiteIntegration',
   IntegrationSync: 'IntegrationSync',
   WebsiteSearchDaily: 'WebsiteSearchDaily',
+  WebsiteAnalyticsDaily: 'WebsiteAnalyticsDaily',
   WebsitePageSearchDaily: 'WebsitePageSearchDaily'
 } as const
 
@@ -1138,6 +1139,7 @@ export const ExternalAccountScalarFieldEnum = {
   tokenExpiresAt: 'tokenExpiresAt',
   grantedScopes: 'grantedScopes',
   status: 'status',
+  lastDiscoveryAt: 'lastDiscoveryAt',
   lastUsedAt: 'lastUsedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -1241,6 +1243,24 @@ export const WebsiteSearchDailyScalarFieldEnum = {
 } as const
 
 export type WebsiteSearchDailyScalarFieldEnum = (typeof WebsiteSearchDailyScalarFieldEnum)[keyof typeof WebsiteSearchDailyScalarFieldEnum]
+
+
+export const WebsiteAnalyticsDailyScalarFieldEnum = {
+  id: 'id',
+  websiteId: 'websiteId',
+  sourceIntegrationId: 'sourceIntegrationId',
+  date: 'date',
+  sessions: 'sessions',
+  users: 'users',
+  newUsers: 'newUsers',
+  pageviews: 'pageviews',
+  bounceRate: 'bounceRate',
+  avgSessionDuration: 'avgSessionDuration',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type WebsiteAnalyticsDailyScalarFieldEnum = (typeof WebsiteAnalyticsDailyScalarFieldEnum)[keyof typeof WebsiteAnalyticsDailyScalarFieldEnum]
 
 
 export const WebsitePageSearchDailyScalarFieldEnum = {

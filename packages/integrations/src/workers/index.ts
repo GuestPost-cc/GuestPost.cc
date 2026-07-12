@@ -65,7 +65,7 @@ export function createDiscoveryWorker(connection: Record<string, unknown>) {
     QUEUES.DISCOVERY,
     async (job: Job<DiscoveryJobPayload>) => {
       logger.log(
-        `Processing discovery job ${job.id} for integration ${job.data.integrationId}`,
+        `Processing discovery job ${job.id} for account ${job.data.externalAccountId}`,
       )
       const result = await service.processDiscoveryJob(job.data)
       logger.log(

@@ -69,7 +69,7 @@ export class IntegrationService {
     owner: OwnerContext,
     provider: string,
     code: string,
-  ): Promise<{ integrationId: string }> {
+  ): Promise<{ externalAccountId: string }> {
     const registration = getProvider(provider)
     if (!registration?.oauthProvider) {
       throw new ProviderError(
@@ -88,9 +88,17 @@ export class IntegrationService {
     // 2. Fetch Google user info to get externalUserId
     const userInfo = await this.fetchGoogleUserInfo(tokens.accessToken)
 
-    // 3. Create ExternalAccount with encrypted tokens
-    const externalAccount = await (db as any).externalAccount.create({
-      data: {
+    // 3. Upsert ExternalAccount with encrypted tokens
+    //    One Google identity = one ExternalAccount. If the account already
+    //    exists (e.g. reconnecting with new scopes), update tokens in place.
+    await (db as any).externalAccount.upsert({
+      where: {
+        provider_externalUserId: {
+          provider,
+          externalUserId: userInfo.id,
+        },
+      },
+      create: {
         provider,
         externalUserId: userInfo.id,
         email: userInfo.email ?? null,
@@ -105,28 +113,34 @@ export class IntegrationService {
         grantedScopes: tokens.scopes,
         status: ExternalAccountStatus.ACTIVE,
       },
-    })
-
-    // 4. Create PublisherIntegration with connectionId
-    const integration = await (db as any).publisherIntegration.create({
-      data: {
-        ownerType: owner.ownerType,
-        ownerId: owner.ownerId,
-        provider,
-        connectionId: externalAccount.id,
-        status: "DISCOVERING",
+      update: {
+        email: userInfo.email ?? null,
+        displayName: userInfo.name ?? null,
+        encryptedAccessToken: encryption.encrypt({
+          value: tokens.accessToken,
+        }).ciphertext,
+        encryptedRefreshToken: encryption.encrypt({
+          value: tokens.refreshToken,
+        }).ciphertext,
+        tokenExpiresAt: tokens.expiresAt,
+        grantedScopes: tokens.scopes,
+        status: ExternalAccountStatus.ACTIVE,
       },
     })
 
-    // 5. Create IntegrationSchedule with nextRunAt = now
-    await (db as any).integrationSchedule.create({
-      data: {
-        integrationId: integration.id,
-        nextRunAt: new Date(),
+    // 4. Return externalAccountId so the caller can queue discovery.
+    //    Discovery will create PublisherIntegration + IntegrationSchedule
+    //    + WebsiteIntegration for each Google service that has resources.
+    const account = await (db as any).externalAccount.findUniqueOrThrow({
+      where: {
+        provider_externalUserId: {
+          provider,
+          externalUserId: userInfo.id,
+        },
       },
     })
 
-    return { integrationId: integration.id }
+    return { externalAccountId: account.id }
   }
 
   async listIntegrations(owner: OwnerContext, page = 1, pageSize = 20) {

@@ -452,6 +452,7 @@ export const ModelName = {
   WebsiteIntegration: 'WebsiteIntegration',
   IntegrationSync: 'IntegrationSync',
   WebsiteSearchDaily: 'WebsiteSearchDaily',
+  WebsiteAnalyticsDaily: 'WebsiteAnalyticsDaily',
   WebsitePageSearchDaily: 'WebsitePageSearchDaily'
 } as const
 
@@ -468,7 +469,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -5504,6 +5505,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    WebsiteAnalyticsDaily: {
+      payload: Prisma.$WebsiteAnalyticsDailyPayload<ExtArgs>
+      fields: Prisma.WebsiteAnalyticsDailyFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WebsiteAnalyticsDailyFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WebsiteAnalyticsDailyFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload>
+        }
+        findFirst: {
+          args: Prisma.WebsiteAnalyticsDailyFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WebsiteAnalyticsDailyFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload>
+        }
+        findMany: {
+          args: Prisma.WebsiteAnalyticsDailyFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload>[]
+        }
+        create: {
+          args: Prisma.WebsiteAnalyticsDailyCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload>
+        }
+        createMany: {
+          args: Prisma.WebsiteAnalyticsDailyCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WebsiteAnalyticsDailyCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload>[]
+        }
+        delete: {
+          args: Prisma.WebsiteAnalyticsDailyDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload>
+        }
+        update: {
+          args: Prisma.WebsiteAnalyticsDailyUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload>
+        }
+        deleteMany: {
+          args: Prisma.WebsiteAnalyticsDailyDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WebsiteAnalyticsDailyUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WebsiteAnalyticsDailyUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload>[]
+        }
+        upsert: {
+          args: Prisma.WebsiteAnalyticsDailyUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WebsiteAnalyticsDailyPayload>
+        }
+        aggregate: {
+          args: Prisma.WebsiteAnalyticsDailyAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWebsiteAnalyticsDaily>
+        }
+        groupBy: {
+          args: Prisma.WebsiteAnalyticsDailyGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WebsiteAnalyticsDailyGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WebsiteAnalyticsDailyCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WebsiteAnalyticsDailyCountAggregateOutputType> | number
+        }
+      }
+    }
     WebsitePageSearchDaily: {
       payload: Prisma.$WebsitePageSearchDailyPayload<ExtArgs>
       fields: Prisma.WebsitePageSearchDailyFieldRefs
@@ -6617,6 +6692,7 @@ export const ExternalAccountScalarFieldEnum = {
   tokenExpiresAt: 'tokenExpiresAt',
   grantedScopes: 'grantedScopes',
   status: 'status',
+  lastDiscoveryAt: 'lastDiscoveryAt',
   lastUsedAt: 'lastUsedAt',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -6720,6 +6796,24 @@ export const WebsiteSearchDailyScalarFieldEnum = {
 } as const
 
 export type WebsiteSearchDailyScalarFieldEnum = (typeof WebsiteSearchDailyScalarFieldEnum)[keyof typeof WebsiteSearchDailyScalarFieldEnum]
+
+
+export const WebsiteAnalyticsDailyScalarFieldEnum = {
+  id: 'id',
+  websiteId: 'websiteId',
+  sourceIntegrationId: 'sourceIntegrationId',
+  date: 'date',
+  sessions: 'sessions',
+  users: 'users',
+  newUsers: 'newUsers',
+  pageviews: 'pageviews',
+  bounceRate: 'bounceRate',
+  avgSessionDuration: 'avgSessionDuration',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type WebsiteAnalyticsDailyScalarFieldEnum = (typeof WebsiteAnalyticsDailyScalarFieldEnum)[keyof typeof WebsiteAnalyticsDailyScalarFieldEnum]
 
 
 export const WebsitePageSearchDailyScalarFieldEnum = {
@@ -7733,6 +7827,7 @@ export type GlobalOmitConfig = {
   websiteIntegration?: Prisma.WebsiteIntegrationOmit
   integrationSync?: Prisma.IntegrationSyncOmit
   websiteSearchDaily?: Prisma.WebsiteSearchDailyOmit
+  websiteAnalyticsDaily?: Prisma.WebsiteAnalyticsDailyOmit
   websitePageSearchDaily?: Prisma.WebsitePageSearchDailyOmit
 }
 

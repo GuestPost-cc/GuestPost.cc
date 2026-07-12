@@ -276,6 +276,7 @@ enum WebsiteIntegrationStatus {
   CONNECTED
   SYNCING
   OUT_OF_SYNC
+  INACCESSIBLE
   REMOVED
   DISABLED
 }
@@ -1921,6 +1922,7 @@ model ExternalAccount {
   grantedScopes           String[]
 
   status              ExternalAccountStatus @default(ACTIVE)
+  lastDiscoveryAt     DateTime?
   lastUsedAt          DateTime?
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
@@ -2036,6 +2038,26 @@ model WebsiteSearchDaily {
   impressions         Int      @default(0)
   ctr                 Float    @default(0)
   position            Float    @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([websiteId, sourceIntegrationId, date])
+  @@index([websiteId, date])
+  @@index([sourceIntegrationId, date])
+  @@index([date])
+}
+
+model WebsiteAnalyticsDaily {
+  id                  String   @id @default(cuid())
+  websiteId           String
+  sourceIntegrationId String
+  date                DateTime @db.Date
+  sessions            Int      @default(0)
+  users               Int      @default(0)
+  newUsers            Int      @default(0)
+  pageviews           Int      @default(0)
+  bounceRate          Float    @default(0)
+  avgSessionDuration  Float    @default(0)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

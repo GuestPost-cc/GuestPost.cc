@@ -2,7 +2,6 @@ import {
   connectCallbackRequestSchema,
   connectRequestSchema,
   IntegrationError,
-  triggerDiscoveryRequestSchema,
   triggerSyncRequestSchema,
 } from "@guestpost/integrations"
 import {
@@ -92,21 +91,15 @@ export class IntegrationsController {
     )
   }
 
-  @Post(":integrationId/discover")
-  async triggerDiscovery(
-    @Param("integrationId") integrationId: string,
-    @Body() body: unknown,
+  @Post("connections/:externalAccountId/rediscover")
+  @HttpCode(HttpStatus.ACCEPTED)
+  async rediscover(
+    @Param("externalAccountId") externalAccountId: string,
     @Req() req: Request,
   ) {
-    const parsed = triggerDiscoveryRequestSchema.safeParse(body)
-    if (!parsed.success) {
-      throw new IntegrationError("INVALID_REQUEST", "Invalid request body", {
-        issues: parsed.error.issues,
-      })
-    }
-    return this.service.enqueueDiscovery(
+    return this.service.rediscover(
       this.ownerResolver.resolve(req),
-      integrationId,
+      externalAccountId,
     )
   }
 

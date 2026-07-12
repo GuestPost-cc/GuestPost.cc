@@ -362,6 +362,7 @@ export const WebsiteIntegrationStatus = {
   CONNECTED: 'CONNECTED',
   SYNCING: 'SYNCING',
   OUT_OF_SYNC: 'OUT_OF_SYNC',
+  INACCESSIBLE: 'INACCESSIBLE',
   REMOVED: 'REMOVED',
   DISABLED: 'DISABLED'
 } as const

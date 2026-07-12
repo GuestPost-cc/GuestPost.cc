@@ -358,6 +358,11 @@ export type IntegrationSync = Prisma.IntegrationSyncModel
  */
 export type WebsiteSearchDaily = Prisma.WebsiteSearchDailyModel
 /**
+ * Model WebsiteAnalyticsDaily
+ * 
+ */
+export type WebsiteAnalyticsDaily = Prisma.WebsiteAnalyticsDailyModel
+/**
  * Model WebsitePageSearchDaily
  * 
  */

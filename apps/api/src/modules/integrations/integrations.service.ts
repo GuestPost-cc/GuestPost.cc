@@ -54,22 +54,25 @@ export class IntegrationsApiService {
     provider: string,
     code: string,
     state: string,
-  ): Promise<{ integrationId: string }> {
+  ): Promise<{ externalAccountId: string }> {
     const statePayload = await this.oauthStateService.consumeState(state)
     const owner: OwnerContext = {
       ownerType: statePayload.ownerType,
       ownerId: statePayload.ownerId,
     }
-    const { integrationId } = await this.integrationService.handleOAuthCallback(
-      owner,
-      statePayload.provider as string,
-      code,
-    )
+    const { externalAccountId } =
+      await this.integrationService.handleOAuthCallback(
+        owner,
+        statePayload.provider as string,
+        code,
+      )
 
-    // Enqueue discovery after connect
-    await this.discoveryService.enqueueDiscovery(owner, integrationId)
+    // Enqueue discovery for the ExternalAccount. Discovery will
+    // create PublisherIntegration + IntegrationSchedule + WebsiteIntegration
+    // for each Google service (GSC, GA4) that has accessible resources.
+    await this.discoveryService.enqueueDiscovery(owner, externalAccountId)
 
-    return { integrationId }
+    return { externalAccountId }
   }
 
   async listIntegrations(owner: OwnerContext, page: number, pageSize: number) {
@@ -82,9 +85,16 @@ export class IntegrationsApiService {
 
   async enqueueDiscovery(
     owner: OwnerContext,
-    integrationId: string,
+    externalAccountId: string,
   ): Promise<{ enqueued: boolean }> {
-    return this.discoveryService.enqueueDiscovery(owner, integrationId)
+    return this.discoveryService.enqueueDiscovery(owner, externalAccountId)
+  }
+
+  async rediscover(
+    owner: OwnerContext,
+    externalAccountId: string,
+  ): Promise<{ enqueued: boolean }> {
+    return this.discoveryService.rediscover(owner, externalAccountId)
   }
 
   async triggerSync(
