@@ -80,10 +80,12 @@ export const integrationResponseSchema = z.object({
   linkedWebsites: z.array(linkedWebsiteSchema),
   connection: z
     .object({
+      id: z.string(),
       email: z.string().nullable(),
       displayName: z.string().nullable(),
       grantedScopes: z.array(z.string()),
       status: z.string(),
+      lastDiscoveryAt: z.string().datetime().nullable(),
     })
     .nullable(),
   createdAt: z.string().datetime(),

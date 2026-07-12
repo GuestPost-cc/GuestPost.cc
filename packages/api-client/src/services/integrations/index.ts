@@ -112,6 +112,12 @@ export class IntegrationsService {
     return this.client.get<SyncJob>(`/integrations/syncs/${syncId}`)
   }
 
+  rediscoverConnection(connectionId: string): Promise<{ enqueued: boolean }> {
+    return this.client.post<{ enqueued: boolean }>(
+      `/integrations/connections/${connectionId}/rediscover`,
+    )
+  }
+
   getSyncHistory(
     integrationId: string,
     params?: {

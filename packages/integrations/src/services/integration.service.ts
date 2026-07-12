@@ -195,6 +195,9 @@ export class IntegrationService {
               email: i.connection.email,
               displayName: i.connection.displayName,
               status: i.connection.status,
+              grantedScopes: i.connection.grantedScopes ?? [],
+              lastDiscoveryAt:
+                i.connection.lastDiscoveryAt?.toISOString() ?? null,
             }
           : null,
         status: i.status,
