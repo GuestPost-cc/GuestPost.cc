@@ -45,6 +45,7 @@ import {
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 import { RevenuePanel } from "./_revenue-panel"
 
@@ -603,12 +604,15 @@ function FinancePageInner() {
   const invalidateWithdrawals = () =>
     queryClient.invalidateQueries({ queryKey: ["withdrawals"] })
 
+  const { user } = useAuth()
+  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
+
   const [approveTarget, setApproveTarget] = useState<string | null>(null)
   const [approveReason, setApproveReason] = useState("")
 
   const approveSettlement = useMutation({
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      api.admin.approveSettlement(id, reason),
+      api.admin.forceApproveSettlement(id, reason),
     onSuccess: () => {
       toast.success("Settlement approved")
       setApproveTarget(null)
@@ -852,18 +856,19 @@ function FinancePageInner() {
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right">
-                        {(s.status === "PENDING" ||
-                          s.status === "UNDER_REVIEW") && (
-                          <Button
-                            size="sm"
-                            onClick={() => {
-                              setApproveTarget(s.id)
-                              setApproveReason("")
-                            }}
-                          >
-                            Approve
-                          </Button>
-                        )}
+                        {isSuperAdmin &&
+                          (s.status === "PENDING" ||
+                            s.status === "UNDER_REVIEW") && (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                setApproveTarget(s.id)
+                                setApproveReason("")
+                              }}
+                            >
+                              Approve
+                            </Button>
+                          )}
                       </TableCell>
                     </TableRow>
                   ))}
