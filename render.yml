@@ -13,7 +13,7 @@ services:
     name: guestpost-worker
     env: node
     plan: free
-    region: oregon
+    region: singapore
     rootDir: .
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/worker
     startCommand: cd apps/worker && node dist/index.js
@@ -40,7 +40,7 @@ services:
     name: guestpost-api
     env: node
     plan: free
-    region: oregon
+    region: singapore
     rootDir: .
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/api
     startCommand: cd apps/api && node dist/main.js
@@ -74,7 +74,7 @@ services:
     name: guestpost-portal
     env: node
     plan: free
-    region: oregon
+    region: singapore
     rootDir: .
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/portal
     startCommand: cd apps/portal && npx next start --port $PORT
@@ -91,7 +91,7 @@ services:
     name: guestpost-publisher
     env: node
     plan: free
-    region: oregon
+    region: singapore
     rootDir: .
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/publisher
     startCommand: cd apps/publisher && npx next start --port $PORT
@@ -108,7 +108,7 @@ services:
     name: guestpost-admin
     env: node
     plan: free
-    region: oregon
+    region: singapore
     rootDir: .
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/admin
     startCommand: cd apps/admin && npx next start --port $PORT
@@ -125,7 +125,7 @@ services:
     name: guestpost-website
     env: node
     plan: free
-    region: oregon
+    region: singapore
     rootDir: .
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/website
     startCommand: cd apps/website && npx next start --port $PORT
