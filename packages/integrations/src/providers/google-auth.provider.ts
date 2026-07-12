@@ -34,11 +34,19 @@ export class GoogleAuthProvider implements OAuthProvider {
     state: string,
     redirectUri: string,
   ): Promise<string> {
+    // Always include openid/email/profile alongside the service-specific
+    // scopes so we can fetch the user's Google identity via userinfo endpoint.
+    const allScopes = [
+      "openid",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile",
+      ...this.scopes,
+    ]
     const params = new URLSearchParams({
       client_id: this.clientId,
       redirect_uri: redirectUri,
       response_type: "code",
-      scope: this.scopes.join(" "),
+      scope: allScopes.join(" "),
       access_type: "offline",
       state,
       prompt: "consent",
