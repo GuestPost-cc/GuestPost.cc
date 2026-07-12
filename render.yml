@@ -23,7 +23,6 @@ services:
       - key: NODE_ENV
         value: development
       - key: DATABASE_URL
-        sync: false
         value: postgresql://neondb_owner:npg_iPQ4u9csUmAV@ep-jolly-bonus-aoh6som9-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       - key: REDIS_URL
         fromService:
@@ -47,7 +46,6 @@ services:
       - key: NODE_ENV
         value: development
       - key: DATABASE_URL
-        sync: false
         value: postgresql://neondb_owner:npg_iPQ4u9csUmAV@ep-jolly-bonus-aoh6som9-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       - key: REDIS_URL
         fromService:
