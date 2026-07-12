@@ -54,7 +54,7 @@ export class IntegrationsApiService {
     provider: string,
     code: string,
     state: string,
-  ): Promise<{ externalAccountId: string }> {
+  ): Promise<{ externalAccountId: string; returnUrl: string }> {
     const statePayload = await this.oauthStateService.consumeState(state)
     const owner: OwnerContext = {
       ownerType: statePayload.ownerType,
@@ -72,7 +72,7 @@ export class IntegrationsApiService {
     // for each Google service (GSC, GA4) that has accessible resources.
     await this.discoveryService.enqueueDiscovery(owner, externalAccountId)
 
-    return { externalAccountId }
+    return { externalAccountId, returnUrl: statePayload.returnUrl }
   }
 
   async listIntegrations(owner: OwnerContext, page: number, pageSize: number) {

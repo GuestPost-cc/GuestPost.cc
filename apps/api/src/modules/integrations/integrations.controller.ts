@@ -15,8 +15,9 @@ import {
   Post,
   Query,
   Req,
+  Res,
 } from "@nestjs/common"
-import { Request } from "express"
+import { Request, Response } from "express"
 import { Public } from "../../common/decorators/public.decorator"
 import { IntegrationsApiService } from "./integrations.service"
 import { OwnerResolver } from "./owner-resolver.service"
@@ -53,6 +54,7 @@ export class IntegrationsController {
   async handleCallback(
     @Param("provider") provider: string,
     @Query() query: unknown,
+    @Res() res: Response,
   ) {
     const parsed = connectCallbackRequestSchema.safeParse(query)
     if (!parsed.success) {
@@ -61,10 +63,24 @@ export class IntegrationsController {
       })
     }
     const { code, state, error } = parsed.data
+
+    // Redirect errors back to the publisher integrations page
     if (error) {
-      throw new IntegrationError("OAUTH_ERROR", error)
+      return res.redirect(
+        `/dashboard/integrations?error=${encodeURIComponent(error)}`,
+      )
     }
-    return this.service.handleCallback(provider, code!, state!)
+
+    try {
+      const result = await this.service.handleCallback(provider, code!, state!)
+      // Redirect to the publisher app — discovery runs in the background
+      return res.redirect(
+        `${result.returnUrl}?connected=${result.externalAccountId}`,
+      )
+    } catch (err: any) {
+      const msg = encodeURIComponent(err?.message ?? "OAuth callback failed")
+      return res.redirect(`/dashboard/integrations?error=${msg}`)
+    }
   }
 
   @Get()
