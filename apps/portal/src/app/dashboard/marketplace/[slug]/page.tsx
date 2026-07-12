@@ -33,6 +33,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
+import { useCustomerAccess } from "../../../../lib/hooks/use-customer-access"
 
 interface Listing {
   id: string
@@ -139,21 +140,7 @@ export default function ListingDetailPage() {
   //   1. Has a positive wallet balance
   //   2. Has a DEPOSIT transaction on record
   //   3. Has created at least one order on the platform
-  const { data: walletData } = useQuery({
-    queryKey: ["wallet"],
-    queryFn: () => api.billing.getWallet(),
-  })
-  const { data: ordersData } = useQuery({
-    queryKey: ["my-orders"],
-    queryFn: () => api.orders.list(),
-  })
-  const canViewUrl = useMemo(() => {
-    if (!walletData) return false
-    if (Number(walletData.availableBalance) > 0) return true
-    if (walletData.transactions?.some((t) => t.type === "DEPOSIT")) return true
-    if (ordersData && ordersData.length > 0) return true
-    return false
-  }, [walletData, ordersData])
+  const { canViewUrls: canViewUrl } = useCustomerAccess()
 
   // ── Service-picker state, URL-synced ──────────────────────────────────
   const searchParams = useSearchParams()
@@ -574,18 +561,21 @@ export default function ListingDetailPage() {
                 className="flex items-center gap-3 text-sm text-primary hover:underline"
               >
                 <ExternalLink className="h-4 w-4" />
-                <span>Visit Website</span>
+                <span>{listing.websiteUrl}</span>
               </a>
             ) : listing.websiteUrl ? (
-              <div className="group relative">
-                <div className="flex items-center gap-3 text-sm text-muted-foreground/50 blur-sm select-none pointer-events-none">
+              <div
+                className="group relative"
+                title="Deposit funds or place an order to reveal the site URL"
+              >
+                <div className="flex items-center gap-3 text-sm text-muted-foreground blur-sm">
                   <ExternalLink className="h-4 w-4" />
-                  <span>Visit Website</span>
+                  <span>{listing.websiteUrl}</span>
                 </div>
-                <div className="absolute inset-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute inset-0 flex items-center gap-1.5">
                   <Lock className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">
-                    Deposit to reveal site URL
+                    Deposit to reveal URL
                   </span>
                 </div>
               </div>

@@ -13,12 +13,13 @@ import {
   Skeleton,
 } from "@guestpost/ui"
 import { useQuery } from "@tanstack/react-query"
-import { Search, SlidersHorizontal, Star, X } from "lucide-react"
+import { Lock, Search, SlidersHorizontal, Star, X } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useMemo, useState } from "react"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
+import { useCustomerAccess } from "../../../lib/hooks/use-customer-access"
 
 interface Listing {
   id: string
@@ -46,6 +47,7 @@ interface Listing {
   image?: string
   avgRating?: number
   reviewCount: number
+  websiteUrl?: string
 }
 
 interface Category {
@@ -116,6 +118,8 @@ export default function MarketplacePage() {
     total: 0,
     totalPages: 0,
   }
+
+  const { canViewUrls } = useCustomerAccess()
 
   function formatPrice(price: number, currency: string = "USD") {
     return new Intl.NumberFormat("en-US", {
@@ -428,6 +432,22 @@ export default function MarketplacePage() {
                   <h3 className="font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
                     {listing.title}
                   </h3>
+                  {listing.websiteUrl && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      {canViewUrls ? (
+                        <span className="truncate text-muted-foreground">
+                          {listing.websiteUrl}
+                        </span>
+                      ) : (
+                        <span className="relative inline-block">
+                          <span className="select-none text-muted-foreground blur-sm">
+                            {listing.websiteUrl}
+                          </span>
+                          <Lock className="absolute left-0 top-0 h-3 w-3 text-muted-foreground" />
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 text-xs text-muted-foreground">
                     {listing.domainRating && (
                       <span className="font-medium text-foreground">
