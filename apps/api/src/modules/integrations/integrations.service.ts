@@ -2,7 +2,6 @@ import { randomBytes } from "node:crypto"
 import type { OwnerContext } from "@guestpost/integrations"
 import {
   DiscoveryService,
-  IntegrationEncryptionService,
   IntegrationService,
   type OAuthStatePayload,
   OAuthStateService,
@@ -25,7 +24,6 @@ export class IntegrationsApiService {
     this.syncService = new SyncService()
     this.oauthStateService = new OAuthStateService(this.redis)
     this.discoveryService = new DiscoveryService()
-    this.encryption = new IntegrationEncryptionService()
   }
 
   async initiateConnect(
