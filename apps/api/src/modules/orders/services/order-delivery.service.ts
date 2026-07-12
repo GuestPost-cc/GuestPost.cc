@@ -14,6 +14,7 @@ import {
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
+import { OrderReviewService } from "./order-review.service"
 import { assertOwnerOrCreator } from "./owner-or-creator"
 
 // Rejected placeholder "deliveries" — a human typing "done" is not a delivery.
@@ -35,6 +36,7 @@ export class OrderDeliveryService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    private readonly orderReview: OrderReviewService,
   ) {}
 
   // Validate + normalize a published URL. Throws on empty/placeholder/invalid.
@@ -222,6 +224,8 @@ export class OrderDeliveryService {
             : "PUBLISHER")) === "PLATFORM"
           ? "Platform"
           : "Publisher",
+      verifyMethod: order.verifyMethod ?? null,
+      autoAcceptAt: order.autoAcceptAt ?? null,
       verifiedAt: order.verifiedAt,
       pageTitle: ev?.pageTitle ?? null,
       results: ev
@@ -380,6 +384,10 @@ export class OrderDeliveryService {
           }
         }
       }
+
+      // Create settlement with computed release policy — same as the
+      // confirmDelivery path uses via OrderReviewService.
+      await this.orderReview.createSettlementForOrder(tx, orderId)
 
       return { status: "DELIVERED", acceptedBy: "customer" }
     })

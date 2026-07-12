@@ -354,7 +354,7 @@ export class OrderReviewService {
     return updated
   }
 
-  private async createSettlementForOrder(tx: any, orderId: string) {
+  async createSettlementForOrder(tx: any, orderId: string) {
     const existingSettlement = await tx.settlement.findFirst({
       where: { orderId, status: { not: "CANCELLED" } },
     })

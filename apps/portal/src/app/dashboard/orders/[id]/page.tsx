@@ -104,12 +104,17 @@ const eventLabels: Record<string, string> = {
   PUBLISHED: "Published live",
   VERIFIED: "Verified",
   UNDER_REVIEW: "Sent for review",
+  DELIVERED: "Delivered",
   SETTLED: "Settlement processed",
   COMPLETED: "Completed",
   CANCELLED: "Cancelled",
   REFUNDED: "Refunded",
   DISPUTED: "Dispute opened",
   REJECTED: "Rejected",
+  VERIFIED_AUTO: "Automatically verified",
+  AUTO_ACCEPTED: "Auto-accepted (review window expired)",
+  REVIEW_REMINDER: "Review reminder sent",
+  VERIFICATION_ESCALATED: "Verification escalated to admin",
 }
 
 interface TimelineEvent {
@@ -184,6 +189,9 @@ interface OrderDetail {
   currency: string
   createdAt: string
   updatedAt: string
+  autoAcceptAt: string | null
+  verifyMethod: string | null
+  deliveryAcceptedMethod: string | null
   events: TimelineEvent[]
 }
 
@@ -820,14 +828,22 @@ export default function OrderDetailPage({
                 </>
               )}
               {canConfirmDelivery && (
-                <Button
-                  onClick={() => confirmDeliveryMutation.mutate()}
-                  disabled={confirmDeliveryMutation.isPending}
-                >
-                  {confirmDeliveryMutation.isPending
-                    ? "Confirming..."
-                    : "Confirm Delivery"}
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowDisputeDialog(true)}
+                  >
+                    Report Issue
+                  </Button>
+                  <Button
+                    onClick={() => confirmDeliveryMutation.mutate()}
+                    disabled={confirmDeliveryMutation.isPending}
+                  >
+                    {confirmDeliveryMutation.isPending
+                      ? "Confirming..."
+                      : "Confirm Delivery"}
+                  </Button>
+                </>
               )}
             </div>
           </CardContent>
@@ -840,6 +856,42 @@ export default function OrderDetailPage({
             <RefreshCw className="h-4 w-4 animate-spin" />
             Automated verification is running. We&apos;re checking the live
             placement — this usually takes a few minutes.
+          </CardContent>
+        </Card>
+      )}
+
+      {order.status === "VERIFIED" && order.autoAcceptAt && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-blue-600" />
+                  <p className="font-medium">
+                    Review window open until{" "}
+                    {format(new Date(order.autoAcceptAt), "PPp")}
+                  </p>
+                </div>
+                <p className="text-sm text-muted-foreground ml-7">
+                  {(() => {
+                    const remaining = Math.ceil(
+                      (new Date(order.autoAcceptAt).getTime() - Date.now()) /
+                        (1000 * 60 * 60 * 24),
+                    )
+                    if (remaining > 0) {
+                      return `If you take no action, this order will be automatically accepted in ${remaining} day(s).`
+                    }
+                    return "Auto-accepting shortly — the review window has ended."
+                  })()}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowDisputeDialog(true)}
+              >
+                Report Issue
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -898,8 +950,11 @@ export default function OrderDetailPage({
                   Proof
                 </CardTitle>
                 <CardDescription>
-                  Independently verified by the platform — no manual checking
-                  needed.
+                  {proof.verifyMethod === "AUTO"
+                    ? "Independently verified by the platform — no manual checking needed."
+                    : proof.verifyMethod === "MANUAL_ADMIN"
+                      ? "Verified by an admin reviewer."
+                      : "Verified by customer confirmation."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -933,6 +988,23 @@ export default function OrderDetailPage({
                         : proof.verificationStatus
                     }
                   />
+                  {proof.verifyMethod && (
+                    <span
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        proof.verifyMethod === "AUTO"
+                          ? "bg-emerald-100 text-emerald-700"
+                          : proof.verifyMethod === "MANUAL_ADMIN"
+                            ? "bg-blue-100 text-blue-700"
+                            : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {proof.verifyMethod === "AUTO"
+                        ? "Auto"
+                        : proof.verifyMethod === "MANUAL_ADMIN"
+                          ? "Admin"
+                          : "Customer"}
+                    </span>
+                  )}
                 </div>
                 {proof.results && (
                   <div className="grid grid-cols-2 gap-2 text-sm">

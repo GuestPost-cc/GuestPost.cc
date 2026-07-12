@@ -69,6 +69,9 @@ interface RawOrder {
   anchorText: string | null
   publishedUrl: string | null
   campaignId: string | null
+  autoAcceptAt: string | null
+  verifyMethod: string | null
+  deliveryAcceptedMethod: string | null
   website?: { id: string; url: string; name?: string | null } | null
   items?: RawOrderItem[]
   events?: Array<{
@@ -155,6 +158,9 @@ export interface OrderResponse {
     metadata: Record<string, unknown> | null
     createdAt: string
   }>
+  autoAcceptAt: string | null
+  verifyMethod: string | null
+  deliveryAcceptedMethod: string | null
   settlements?: unknown[]
   dispute?: unknown
 }
@@ -211,6 +217,9 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
     })),
     totalAmount: raw.amount != null ? Number(raw.amount) : null,
     currency: raw.currency,
+    autoAcceptAt: raw.autoAcceptAt ?? null,
+    verifyMethod: raw.verifyMethod ?? null,
+    deliveryAcceptedMethod: raw.deliveryAcceptedMethod ?? null,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
     events: (raw.events ?? []).map((e) => ({
