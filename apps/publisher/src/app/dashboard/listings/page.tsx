@@ -35,11 +35,13 @@ import {
   Layers3,
   Plus,
   RefreshCw,
+  Search,
   Send,
   Settings2,
   Store,
+  X,
 } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
@@ -178,6 +180,20 @@ export default function PublisherListingsPage() {
     warrantyDays: string
     currency: string
   } | null>(null)
+  const [search, setSearch] = useState("")
+  const [debouncedSearch, setDebouncedSearch] = useState("")
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  )
+
+  useEffect(() => {
+    clearTimeout(searchTimer.current)
+    searchTimer.current = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, 300)
+    return () => clearTimeout(searchTimer.current)
+  }, [search])
+
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -200,8 +216,12 @@ export default function PublisherListingsPage() {
   })
 
   const listingsQ = useQuery({
-    queryKey: ["publisher-listings", publisherId],
-    queryFn: () => api.marketplace.getPublisherListings(publisherId!),
+    queryKey: ["publisher-listings", publisherId, debouncedSearch],
+    queryFn: () =>
+      api.marketplace.getPublisherListings(
+        publisherId!,
+        debouncedSearch ? debouncedSearch : undefined,
+      ),
     enabled: !!publisherId,
   })
 
@@ -395,12 +415,19 @@ export default function PublisherListingsPage() {
   })
 
   const listings = (listingsQ.data ?? []) as any[]
+  // Websites that already have an active (non-ARCHIVED) listing — block re-selection.
+  const takenWebsiteIds = new Set(
+    listings
+      .filter((l: any) => l.status !== "ARCHIVED" && l.websiteId)
+      .map((l: any) => l.websiteId),
+  )
   const initialServiceIsValid =
     !form.addServiceNow ||
     (initialService.price.trim().length > 0 && Number(initialService.price) > 0)
   const canSubmit =
     form.title.trim().length >= 3 &&
     form.description.trim().length >= 1 &&
+    !!form.websiteId &&
     initialServiceIsValid
 
   if (listingsQ.error) {
@@ -441,6 +468,26 @@ export default function PublisherListingsPage() {
         </Button>
       </div>
 
+      {/* Search bar */}
+      <div className="relative">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          placeholder="Search by title, description, or domain…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 pr-9"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
       {listingsQ.isLoading ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {[...Array(4)].map((_, i) => (
@@ -456,7 +503,7 @@ export default function PublisherListingsPage() {
             </Card>
           ))}
         </div>
-      ) : listings.length === 0 ? (
+      ) : listings.length === 0 && !debouncedSearch ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16 text-center">
             <div className="rounded-full bg-muted p-4">
@@ -473,227 +520,389 @@ export default function PublisherListingsPage() {
             </Button>
           </CardContent>
         </Card>
+      ) : listings.length === 0 && debouncedSearch ? (
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <Search className="mx-auto h-10 w-10 text-muted-foreground" />
+            <h3 className="mt-5 text-xl font-semibold">No matching listings</h3>
+            <p className="mt-2 max-w-md text-sm text-muted-foreground">
+              No listings match "{debouncedSearch}". Try a different search
+              term.
+            </p>
+            <Button
+              variant="outline"
+              className="mt-5 gap-2"
+              onClick={() => setSearch("")}
+            >
+              <X className="h-4 w-4" />
+              Clear search
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {listings.map((l: any) => {
-            const services: ServiceRow[] =
-              (l.services as ServiceRow[] | undefined) ?? []
-            const phase: string = l.lifecyclePhase ?? l.status
-            const copy = phaseCopy(phase)
-            const lowestService = services
-              .filter((s) => s.availability !== "PAUSED")
-              .sort((a, b) => Number(a.price) - Number(b.price))[0]
-            const websiteLabel =
-              l.website?.url ?? l.websiteUrl ?? "Site not selected"
+        <>
+          {/* Active listings */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            {listings
+              .filter((l: any) => l.status !== "ARCHIVED")
+              .map((l: any) => {
+                const services: ServiceRow[] =
+                  (l.services as ServiceRow[] | undefined) ?? []
+                const phase: string = l.lifecyclePhase ?? l.status
+                const copy = phaseCopy(phase)
+                const lowestService = services
+                  .filter((s) => s.availability !== "PAUSED")
+                  .sort((a, b) => Number(a.price) - Number(b.price))[0]
+                const websiteLabel =
+                  l.website?.url ?? l.websiteUrl ?? "Site not selected"
 
-            return (
-              <Card key={l.id} className="overflow-hidden">
-                <CardHeader className="space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
-                      <CardTitle className="truncate text-xl">
-                        {l.title}
-                      </CardTitle>
-                      <CardDescription className="line-clamp-2">
-                        {l.description ||
-                          "Add a short buyer-facing description."}
-                      </CardDescription>
-                    </div>
-                    <Badge variant={STATUS_VARIANTS[phase] ?? "secondary"}>
-                      {copy.title}
-                    </Badge>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
-                      <Globe2 className="h-3.5 w-3.5" />
-                      {websiteLabel}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
-                      <Layers3 className="h-3.5 w-3.5" />
-                      {services.length} service
-                      {services.length === 1 ? "" : "s"}
-                    </span>
-                    {lowestService && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
-                        <DollarSign className="h-3.5 w-3.5" />
-                        From{" "}
-                        {formatMoney(
-                          lowestService.price,
-                          lowestService.currency,
-                        )}
-                      </span>
-                    )}
-                  </div>
-                </CardHeader>
-
-                <CardContent className="space-y-4">
-                  <div className="rounded-lg border bg-muted/30 p-4">
-                    <div className="flex items-start gap-3">
-                      <div className="mt-0.5 rounded-full bg-background p-2 text-muted-foreground">
-                        <Settings2 className="h-4 w-4" />
+                return (
+                  <Card key={l.id} className="overflow-hidden">
+                    <CardHeader className="space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-1">
+                          <CardTitle className="truncate text-xl">
+                            {l.title}
+                          </CardTitle>
+                          <CardDescription className="line-clamp-2">
+                            {l.description ||
+                              "Add a short buyer-facing description."}
+                          </CardDescription>
+                        </div>
+                        <Badge variant={STATUS_VARIANTS[phase] ?? "secondary"}>
+                          {copy.title}
+                        </Badge>
                       </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium">{copy.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {copy.description}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="space-y-2">
-                    {services.length === 0 ? (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setServicesForListing({
-                            id: l.id,
-                            title: l.title,
-                            services,
-                          })
-                        }
-                        className="flex w-full items-center justify-between rounded-lg border border-dashed p-4 text-left transition hover:bg-muted/50"
-                      >
-                        <span>
-                          <span className="block text-sm font-medium">
-                            Add your first service
-                          </span>
-                          <span className="text-sm text-muted-foreground">
-                            Buyers need a service and price before review.
-                          </span>
+                      <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                          <Globe2 className="h-3.5 w-3.5" />
+                          {websiteLabel}
                         </span>
-                        <Plus className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    ) : (
-                      services.slice(0, 3).map((s) => (
-                        <div
-                          key={s.id}
-                          className="flex items-center justify-between rounded-lg border p-3"
-                        >
-                          <div>
-                            <p className="text-sm font-medium">
-                              {serviceLabel(s.serviceType)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {s.turnaroundDays} days · {s.revisionRounds}{" "}
-                              revisions
-                            </p>
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                          <Layers3 className="h-3.5 w-3.5" />
+                          {services.length} service
+                          {services.length === 1 ? "" : "s"}
+                        </span>
+                        {lowestService && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                            <DollarSign className="h-3.5 w-3.5" />
+                            From{" "}
+                            {formatMoney(
+                              lowestService.price,
+                              lowestService.currency,
+                            )}
+                          </span>
+                        )}
+                      </div>
+                    </CardHeader>
+
+                    <CardContent className="space-y-4">
+                      <div className="rounded-lg border bg-muted/30 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 rounded-full bg-background p-2 text-muted-foreground">
+                            <Settings2 className="h-4 w-4" />
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm font-semibold">
-                              {formatMoney(s.price, s.currency)}
+                          <div className="space-y-1">
+                            <p className="text-sm font-medium">{copy.title}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {copy.description}
                             </p>
-                            <Badge variant="outline" className="mt-1">
-                              {s.availability.toLowerCase()}
-                            </Badge>
                           </div>
                         </div>
-                      ))
-                    )}
-                  </div>
+                      </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
-                    <div className="flex flex-wrap gap-2">
-                      {phase === "READY_FOR_REVIEW" && (
-                        <Button
-                          size="sm"
-                          onClick={() => submitMut.mutate(l.id)}
-                          disabled={submitMut.isPending}
-                          className="gap-2"
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                          Submit for review
-                        </Button>
-                      )}
-                      {phase === "PUBLISHED" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => pauseMut.mutate(l.id)}
-                          disabled={pauseMut.isPending}
-                        >
-                          Pause
-                        </Button>
-                      )}
-                      {phase === "PAUSED" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => unpauseMut.mutate(l.id)}
-                          disabled={unpauseMut.isPending}
-                        >
-                          Unpause
-                        </Button>
-                      )}
-                      {l.status === "REJECTED" && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => submitMut.mutate(l.id)}
-                          disabled={submitMut.isPending}
-                        >
-                          Resubmit
-                        </Button>
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setServicesForListing({
-                            id: l.id,
-                            title: l.title,
-                            services,
-                          })
-                        }
-                        className="gap-2"
-                      >
-                        <Layers3 className="h-3.5 w-3.5" />
-                        Services
-                      </Button>
-                    </div>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                          setEditingListing({
-                            id: l.id,
-                            title: l.title,
-                            description: l.description ?? "",
-                          })
-                        }
-                        className="gap-2"
-                      >
-                        <Edit3 className="h-3.5 w-3.5" />
-                        Edit
-                      </Button>
-                      {phase !== "ARCHIVED" && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            if (
-                              confirm(
-                                "Archive this listing? Existing orders are untouched.",
-                              )
-                            )
-                              archiveMut.mutate(l.id)
-                          }}
-                          disabled={archiveMut.isPending}
-                          className="gap-2 text-muted-foreground"
-                        >
-                          <Archive className="h-3.5 w-3.5" />
-                          Archive
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })}
-        </div>
+                      <div className="space-y-2">
+                        {services.length === 0 ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setServicesForListing({
+                                id: l.id,
+                                title: l.title,
+                                services,
+                              })
+                            }
+                            className="flex w-full items-center justify-between rounded-lg border border-dashed p-4 text-left transition hover:bg-muted/50"
+                          >
+                            <span>
+                              <span className="block text-sm font-medium">
+                                Add your first service
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                Buyers need a service and price before review.
+                              </span>
+                            </span>
+                            <Plus className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        ) : (
+                          services.slice(0, 3).map((s) => (
+                            <div
+                              key={s.id}
+                              className="flex items-center justify-between rounded-lg border p-3"
+                            >
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {serviceLabel(s.serviceType)}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {s.turnaroundDays} days · {s.revisionRounds}{" "}
+                                  revisions
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-semibold">
+                                  {formatMoney(s.price, s.currency)}
+                                </p>
+                                <Badge variant="outline" className="mt-1">
+                                  {s.availability.toLowerCase()}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+                        <div className="flex flex-wrap gap-2">
+                          {phase === "READY_FOR_REVIEW" && (
+                            <Button
+                              size="sm"
+                              onClick={() => submitMut.mutate(l.id)}
+                              disabled={submitMut.isPending}
+                              className="gap-2"
+                            >
+                              <Send className="h-3.5 w-3.5" />
+                              Submit for review
+                            </Button>
+                          )}
+                          {phase === "PUBLISHED" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => pauseMut.mutate(l.id)}
+                              disabled={pauseMut.isPending}
+                            >
+                              Pause
+                            </Button>
+                          )}
+                          {phase === "PAUSED" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => unpauseMut.mutate(l.id)}
+                              disabled={unpauseMut.isPending}
+                            >
+                              Unpause
+                            </Button>
+                          )}
+                          {l.status === "REJECTED" && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => submitMut.mutate(l.id)}
+                              disabled={submitMut.isPending}
+                            >
+                              Resubmit
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setServicesForListing({
+                                id: l.id,
+                                title: l.title,
+                                services,
+                              })
+                            }
+                            className="gap-2"
+                          >
+                            <Layers3 className="h-3.5 w-3.5" />
+                            Services
+                          </Button>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setEditingListing({
+                                id: l.id,
+                                title: l.title,
+                                description: l.description ?? "",
+                              })
+                            }
+                            className="gap-2"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                            Edit
+                          </Button>
+                          {phase !== "ARCHIVED" && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    "Archive this listing? Existing orders are untouched.",
+                                  )
+                                )
+                                  archiveMut.mutate(l.id)
+                              }}
+                              disabled={archiveMut.isPending}
+                              className="gap-2 text-muted-foreground"
+                            >
+                              <Archive className="h-3.5 w-3.5" />
+                              Archive
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+          </div>
+
+          {/* Archived listings */}
+          {listings.filter((l: any) => l.status === "ARCHIVED").length > 0 && (
+            <>
+              <div className="flex items-center gap-2 pt-4">
+                <Archive className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold text-muted-foreground">
+                  Archived (
+                  {listings.filter((l: any) => l.status === "ARCHIVED").length})
+                </h2>
+                <div className="flex-1 border-t" />
+              </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {listings
+                  .filter((l: any) => l.status === "ARCHIVED")
+                  .map((l: any) => {
+                    const services: ServiceRow[] =
+                      (l.services as ServiceRow[] | undefined) ?? []
+                    const phase: string = l.lifecyclePhase ?? l.status
+                    const copy = phaseCopy(phase)
+                    const lowestService = services
+                      .filter((s) => s.availability !== "PAUSED")
+                      .sort((a, b) => Number(a.price) - Number(b.price))[0]
+                    const websiteLabel =
+                      l.website?.url ?? l.websiteUrl ?? "Site not selected"
+
+                    return (
+                      <Card key={l.id} className="overflow-hidden">
+                        <CardHeader className="space-y-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0 space-y-1">
+                              <CardTitle className="truncate text-xl">
+                                {l.title}
+                              </CardTitle>
+                              <CardDescription className="line-clamp-2">
+                                {l.description ||
+                                  "Add a short buyer-facing description."}
+                              </CardDescription>
+                            </div>
+                            <Badge
+                              variant={STATUS_VARIANTS[phase] ?? "secondary"}
+                            >
+                              {copy.title}
+                            </Badge>
+                          </div>
+
+                          <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                              <Globe2 className="h-3.5 w-3.5" />
+                              {websiteLabel}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                              <Layers3 className="h-3.5 w-3.5" />
+                              {services.length} service
+                              {services.length === 1 ? "" : "s"}
+                            </span>
+                            {lowestService && (
+                              <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-3 py-1">
+                                <DollarSign className="h-3.5 w-3.5" />
+                                From{" "}
+                                {formatMoney(
+                                  lowestService.price,
+                                  lowestService.currency,
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        </CardHeader>
+
+                        <CardContent className="space-y-4">
+                          <div className="rounded-lg border bg-muted/30 p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 rounded-full bg-background p-2 text-muted-foreground">
+                                <Settings2 className="h-4 w-4" />
+                              </div>
+                              <div className="space-y-1">
+                                <p className="text-sm font-medium">
+                                  {copy.title}
+                                </p>
+                                <p className="text-sm text-muted-foreground">
+                                  {copy.description}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-4">
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => submitMut.mutate(l.id)}
+                                disabled={submitMut.isPending}
+                                className="gap-2"
+                              >
+                                <Send className="h-3.5 w-3.5" />
+                                Resubmit for review
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  setServicesForListing({
+                                    id: l.id,
+                                    title: l.title,
+                                    services,
+                                  })
+                                }
+                                className="gap-2"
+                              >
+                                <Layers3 className="h-3.5 w-3.5" />
+                                Services
+                              </Button>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  setEditingListing({
+                                    id: l.id,
+                                    title: l.title,
+                                    description: l.description ?? "",
+                                  })
+                                }
+                                className="gap-2"
+                              >
+                                <Edit3 className="h-3.5 w-3.5" />
+                                Edit
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+              </div>
+            </>
+          )}
+        </>
       )}
 
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
@@ -766,11 +975,22 @@ export default function PublisherListingsPage() {
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        {(websitesQ.data ?? []).map((w: any) => (
-                          <SelectItem key={w.id} value={w.id}>
-                            {w.url}
-                          </SelectItem>
-                        ))}
+                        {(websitesQ.data ?? [])
+                          .filter((w: any) => !takenWebsiteIds.has(w.id))
+                          .map((w: any) => (
+                            <SelectItem key={w.id} value={w.id}>
+                              {w.url}
+                            </SelectItem>
+                          ))}
+                        {websitesQ.data &&
+                          websitesQ.data.length > 0 &&
+                          (websitesQ.data ?? []).every((w: any) =>
+                            takenWebsiteIds.has(w.id),
+                          ) && (
+                            <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                              All websites already have a listing.
+                            </div>
+                          )}
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
@@ -905,10 +1125,21 @@ export default function PublisherListingsPage() {
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
+                  <Badge variant={form.websiteId ? "default" : "outline"}>
+                    2
+                  </Badge>
+                  <div>
+                    <p className="font-medium">Website selected</p>
+                    <p className="text-xs text-muted-foreground">
+                      Choose the site this listing represents.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
                   <Badge
                     variant={form.description.trim() ? "default" : "outline"}
                   >
-                    2
+                    3
                   </Badge>
                   <div>
                     <p className="font-medium">Buyer description</p>
@@ -925,7 +1156,7 @@ export default function PublisherListingsPage() {
                         : "outline"
                     }
                   >
-                    3
+                    4
                   </Badge>
                   <div>
                     <p className="font-medium">Priced service</p>

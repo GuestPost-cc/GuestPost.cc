@@ -239,9 +239,14 @@ export class MarketplaceController {
   @Get("publisher/:publisherId/listings")
   async getPublisherListings(
     @Param("publisherId") publisherId: string,
+    @Query("q") search?: string,
     @CurrentUser() user?: any,
   ) {
-    return this.marketplaceService.getPublisherListings(publisherId, user?.id)
+    return this.marketplaceService.getPublisherListings(
+      publisherId,
+      user?.id,
+      search,
+    )
   }
 
   // =============================================================================

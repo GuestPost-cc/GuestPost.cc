@@ -1577,6 +1577,10 @@ model MarketplaceListing {
 
   // Publisher reference (for PUBLISHER type)
   publisherId String?
+  // Phase X: DB-level partial unique index `MarketplaceListing_websiteId_active_key`
+  // on (websiteId) WHERE websiteId IS NOT NULL AND status != 'ARCHIVED' — at most
+  // one active listing per website. Multiple services go on the same listing via
+  // the ListingService child table. See migration 20260713120000_listing_per_website_unique.
   websiteId   String?
 
   // Organization reference (for INTERNAL and publisher listings)
@@ -1618,6 +1622,10 @@ model MarketplaceListing {
   // Sorting/filtering by price now hits the ListingService(availability,
   // serviceType, price) composite index.
   @@index([ownerType, status])
+  // Phase X: Partial unique index `MarketplaceListing_websiteId_active_key`
+  // exists at the DB level via custom migration 20260713120000. Not represented
+  // in Prisma @@unique syntax because it is a partial index (WHERE clause).
+  // See the migration SQL for the exact definition.
 }
 
 // A purchasable service offering on a MarketplaceListing. One listing can

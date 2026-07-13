@@ -322,8 +322,14 @@ export class MarketplaceService {
     return this.client.post("/marketplace/reviews", { json: data })
   }
 
-  getPublisherListings(publisherId: string): Promise<MarketplaceListing[]> {
-    return this.client.get(`/marketplace/publisher/${publisherId}/listings`)
+  getPublisherListings(
+    publisherId: string,
+    search?: string,
+  ): Promise<MarketplaceListing[]> {
+    const params = search ? { q: search } : undefined
+    return this.client.get(`/marketplace/publisher/${publisherId}/listings`, {
+      params,
+    })
   }
 
   createListing(data: any): Promise<any> {
