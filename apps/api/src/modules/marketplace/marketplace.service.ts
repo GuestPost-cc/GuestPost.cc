@@ -426,6 +426,7 @@ export class MarketplaceService {
   async createPlatformListing(
     userId: string,
     dto: CreateListingDto & { websiteId?: string },
+    actor?: { staffRole?: string },
   ) {
     const slug = slugify(dto.title)
     const existing = await this.prisma.marketplaceListing.findUnique({
@@ -449,6 +450,15 @@ export class MarketplaceService {
         )
       }
       websiteId = website.id
+
+      // Auto-assign: when an OPERATIONS staff member creates a listing on
+      // a platform website that has no manager, claim it for them.
+      if (!website.managedByUserId && actor?.staffRole === "OPERATIONS") {
+        await this.prisma.website.update({
+          where: { id: website.id },
+          data: { managedByUserId: userId },
+        })
+      }
     }
 
     const data: any = { ...dto }

@@ -663,13 +663,7 @@ export class SupportService {
           // Universal participant — can write PUBLIC and INTERNAL anywhere.
           return
         case "FINANCE":
-          // PUBLISHER channel: full participant.
-          // PLATFORM channel: read-only on customer thread; INTERNAL notes allowed.
-          if (channel === "PLATFORM" && visibility === "PUBLIC") {
-            throw new ForbiddenException(
-              "FINANCE cannot post public replies on PLATFORM tickets — escalate to SUPER_ADMIN or Ops, or post an internal note",
-            )
-          }
+          // PUBLISHER & PLATFORM channels: full participant on both.
           return
         case "OPERATIONS":
           // Only on tickets they actually own. Unassigned-platform pool is

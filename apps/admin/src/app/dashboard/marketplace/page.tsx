@@ -10,6 +10,8 @@ import {
   CardTitle,
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DropdownMenu,
@@ -19,6 +21,7 @@ import {
   ErrorState,
   getListingStatusPresentation,
   Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -88,8 +91,11 @@ interface Listing {
   websiteVerificationStatus?: string | null
   websiteVerifiedAt?: string | null
   websiteDomain?: string | null
+  websiteUrl?: string | null
+  websiteManagedBy?: { id: string; name: string | null; email: string } | null
   createdAt: string
   ownerType?: "PUBLISHER" | "PLATFORM"
+  fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
   services?: ListingServiceRow[]
 }
 
@@ -125,6 +131,45 @@ export default function AdminMarketplacePage() {
   const canManage =
     user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
   const [showCreate, setShowCreate] = useState(false)
+  // ── Reassign listing owner state ──
+  const [reassignFor, setReassignFor] = useState<{
+    listingId: string
+    listingTitle: string
+    websiteId: string | null
+    currentOwner: string | null
+  } | null>(null)
+  const [pickedOwnerId, setPickedOwnerId] = useState("")
+  const [reassignReason, setReassignReason] = useState("")
+
+  const opsQ = useQuery({
+    queryKey: ["admin", "ops-staff"],
+    queryFn: () => api.admin.listOpsStaff(),
+    enabled: !!reassignFor,
+  })
+
+  const reassignMut = useMutation({
+    mutationFn: (vars: {
+      websiteId: string
+      managedByUserId: string | null
+      reason?: string
+    }) =>
+      api.admin.assignWebsite(vars.websiteId, {
+        managedByUserId: vars.managedByUserId,
+        reason: vars.reason,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["admin-marketplace-listings"],
+      })
+      toast.success("Listing owner updated")
+      setReassignFor(null)
+      setPickedOwnerId("")
+      setReassignReason("")
+    },
+    onError: (e: Error) =>
+      toast.error(e.message || "Failed to reassign listing"),
+  })
+
   const [pform, setPform] = useState({
     title: "",
     description: "",
@@ -636,9 +681,11 @@ export default function AdminMarketplacePage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[300px]">Listing</TableHead>
+              <TableHead className="w-[240px]">Listing</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Owner</TableHead>
+              <TableHead>Managed by</TableHead>
               <TableHead>Domain</TableHead>
               <TableHead>Price</TableHead>
               <TableHead>DR</TableHead>
@@ -652,7 +699,7 @@ export default function AdminMarketplacePage() {
             {isLoading ? (
               Array.from({ length: 10 }).map((_, i) => (
                 <TableRow key={i}>
-                  {Array.from({ length: 10 }).map((_, j) => (
+                  {Array.from({ length: 12 }).map((_, j) => (
                     <TableCell key={j}>
                       <Skeleton className="h-4 w-full" />
                     </TableCell>
@@ -662,7 +709,7 @@ export default function AdminMarketplacePage() {
             ) : listings.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={10}
+                  colSpan={12}
                   className="text-center py-8 text-muted-foreground"
                 >
                   No listings found
@@ -698,6 +745,32 @@ export default function AdminMarketplacePage() {
                         <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
                       )
                     })()}
+                  </TableCell>
+                  <TableCell>
+                    {listing.ownerType === "PLATFORM" ? (
+                      <Badge
+                        variant="default"
+                        className="bg-blue-100 text-blue-800 hover:bg-blue-100"
+                      >
+                        Platform
+                      </Badge>
+                    ) : listing.ownerType === "PUBLISHER" ? (
+                      <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
+                        Publisher
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {listing.websiteManagedBy ? (
+                      <span className="text-sm">
+                        {listing.websiteManagedBy.name ||
+                          listing.websiteManagedBy.email}
+                      </span>
+                    ) : (
+                      <Badge variant="outline">Unassigned</Badge>
+                    )}
                   </TableCell>
                   <TableCell>
                     {listing.websiteVerificationStatus ? (
@@ -885,6 +958,28 @@ export default function AdminMarketplacePage() {
                             >
                               Delete
                             </DropdownMenuItem>
+                            {/* Reassign listing owner — only for platform listings */}
+                            {listing.ownerType === "PLATFORM" && (
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setReassignFor({
+                                    listingId: listing.id,
+                                    listingTitle: listing.title,
+                                    websiteId:
+                                      (listing as any).websiteId ?? null,
+                                    currentOwner:
+                                      listing.websiteManagedBy?.name ??
+                                      listing.websiteManagedBy?.email ??
+                                      null,
+                                  })
+                                  setPickedOwnerId(
+                                    (listing as any).websiteManagedBy?.id ?? "",
+                                  )
+                                }}
+                              >
+                                Reassign Owner
+                              </DropdownMenuItem>
+                            )}
                           </>
                         )}
                       </DropdownMenuContent>
@@ -1114,6 +1209,86 @@ export default function AdminMarketplacePage() {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reassign listing owner dialog */}
+      <Dialog
+        open={!!reassignFor}
+        onOpenChange={(v) => !v && setReassignFor(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Reassign owner{reassignFor ? `: ${reassignFor.listingTitle}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              The new owner will be the default assignee for new orders and
+              support tickets on this listing&apos;s website.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Current owner</Label>
+              <div className="text-sm text-muted-foreground">
+                {reassignFor?.currentOwner ?? "Unassigned (shared queue)"}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label>New owner</Label>
+              <Select value={pickedOwnerId} onValueChange={setPickedOwnerId}>
+                <SelectTrigger>
+                  <SelectValue
+                    placeholder={
+                      opsQ.isLoading ? "Loading…" : "Pick an Ops member"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__unassigned__">
+                    — Unassigned (shared queue) —
+                  </SelectItem>
+                  {(opsQ.data ?? []).map((o) => (
+                    <SelectItem key={o.id} value={o.id}>
+                      {o.name || o.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Reason (audit log)</Label>
+              <Input
+                placeholder="e.g. workload rebalance, vacation handoff"
+                value={reassignReason}
+                onChange={(e) => setReassignReason(e.target.value)}
+                maxLength={200}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setReassignFor(null)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() =>
+                reassignFor?.websiteId &&
+                reassignMut.mutate({
+                  websiteId: reassignFor.websiteId,
+                  managedByUserId:
+                    pickedOwnerId === "__unassigned__" ? null : pickedOwnerId,
+                  reason: reassignReason || undefined,
+                })
+              }
+              disabled={
+                !pickedOwnerId ||
+                !reassignFor?.websiteId ||
+                reassignMut.isPending
+              }
+            >
+              {reassignMut.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

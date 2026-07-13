@@ -827,7 +827,7 @@ export class AdminController {
     @Body() body: CreateListingDto & { websiteId?: string },
     @CurrentUser() user: any,
   ) {
-    return this.marketplace.createPlatformListing(user.id, body)
+    return this.marketplace.createPlatformListing(user.id, body, user)
   }
 
   // Per-service endpoints for PLATFORM-owned listings. Mirror of the publisher

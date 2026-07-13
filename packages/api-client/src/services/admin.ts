@@ -255,6 +255,8 @@ export class AdminService {
         currency: string
         domainRating?: number
         traffic?: number
+        ownerType: "PUBLISHER" | "PLATFORM"
+        fulfillmentType: "INTERNAL" | "PUBLISHER" | "HYBRID"
         featured: boolean
         verified: boolean
         category?: { name: string }
@@ -264,6 +266,12 @@ export class AdminService {
         websiteVerificationStatus: string | null
         websiteVerifiedAt: string | null
         websiteDomain: string | null
+        websiteUrl: string | null
+        websiteManagedBy: {
+          id: string
+          name: string | null
+          email: string
+        } | null
         services: Array<{
           id: string
           serviceType: string

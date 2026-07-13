@@ -623,9 +623,15 @@ export class AdminService {
           publisher: { select: { name: true } },
           website: {
             select: {
+              id: true,
+              url: true,
+              domain: true,
               verificationStatus: true,
               verifiedAt: true,
-              domain: true,
+              managedByUserId: true,
+              managedBy: {
+                select: { id: true, name: true, email: true },
+              },
             },
           },
           // Phase 7: ALL service rows (not just AVAILABLE) so the Manage
@@ -661,6 +667,8 @@ export class AdminService {
           currency: l.currency,
           domainRating: l.domainRating,
           traffic: l.traffic,
+          ownerType: l.ownerType,
+          fulfillmentType: l.fulfillmentType,
           featured: l.featured,
           verified: l.verified,
           category: l.category,
@@ -669,6 +677,8 @@ export class AdminService {
           websiteVerificationStatus: l.website?.verificationStatus ?? null,
           websiteVerifiedAt: l.website?.verifiedAt?.toISOString() ?? null,
           websiteDomain: l.website?.domain ?? null,
+          websiteUrl: l.website?.url ?? null,
+          websiteManagedBy: l.website?.managedBy ?? null,
           createdAt: l.createdAt.toISOString(),
           // Phase 7: ALL service rows for the Manage Services dialog
           services: l.services.map((s) => ({
