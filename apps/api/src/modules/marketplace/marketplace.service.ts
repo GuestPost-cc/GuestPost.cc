@@ -1,5 +1,10 @@
-import { ListingStatus, Prisma } from "@guestpost/database"
-import { computeListingPhase } from "@guestpost/shared"
+import {
+  ListingStatus,
+  Prisma,
+  ServiceAvailability,
+  type ServiceType,
+} from "@guestpost/database"
+import { computeListingPhase, QUEUES } from "@guestpost/shared"
 import {
   BadRequestException,
   ForbiddenException,
@@ -10,9 +15,13 @@ import { PrismaService } from "../../common/prisma.service"
 import { slugify } from "../../common/utils/slugify"
 import { QueueService } from "../queues/queue.service"
 import {
+  AddToSavedListDto,
   CreateListingDto,
   CreateReviewDto,
+  CreateSavedListDto,
+  GetRecommendationsDto,
   ListingServiceInput,
+  SearchListingsDto,
   UpdateListingDto,
   UpdateListingServiceInput,
 } from "./dto/marketplace.dto"
@@ -29,7 +38,8 @@ export class MarketplaceService {
 
   // Strips internal/sensitive fields before a listing leaves a PUBLIC route.
   // The raw row leaked publisher email/tier/org, internal ids, and raw
-  // verification codes — stripped here.
+  // provider metric dumps (semrush/traffic) to anyone scraping the public
+  // marketplace. Whitelist what a buyer legitimately needs to see.
   private toPublicListing(listing: any) {
     const {
       organizationId,
@@ -120,44 +130,110 @@ export class MarketplaceService {
     return rest
   }
 
-  async getListingServices(listingId: string) {
+  // Lightweight read used by the order-creation UI to power the service
+  // picker on the listing detail page. Returns AVAILABLE + WAITLIST rows
+  // only; PAUSED is hidden from buyers. Listing must be APPROVED — drafts
+  // and rejected listings 404 even if their parent has services.
+  async getListingServices(slug: string) {
     const listing = await this.prisma.marketplaceListing.findUnique({
-      where: { id: listingId },
+      where: { slug },
       select: {
         id: true,
         status: true,
         ownerType: true,
         services: {
-          where: { availability: { in: ["AVAILABLE", "PAUSED"] } },
+          where: { availability: { in: ["AVAILABLE", "WAITLIST"] } },
           orderBy: [{ availability: "asc" }, { price: "asc" }],
         },
       },
     })
-    if (!listing) throw new NotFoundException("Listing not found")
-    // Always return raw services — the caller's auth gate decides what to show.
-    return listing.services.map((s) => this.toPublicListingService(s))
+    if (!listing || listing.status !== ListingStatus.APPROVED) {
+      throw new NotFoundException("Listing not found")
+    }
+    return {
+      ownerType: listing.ownerType,
+      services: listing.services.map((s) => this.toPublicListingService(s)),
+    }
   }
 
-  async searchListings(
-    page: number,
-    limit: number,
-    query?: string,
-    category?: string,
-    type?: string,
-    tags?: string[],
-    country?: string,
-    language?: string,
-    minPrice?: number,
-    maxPrice?: number,
-    minDR?: number,
-    maxDR?: number,
-    minTraffic?: number,
-    maxTurnaroundDays?: number,
-    sortBy?: string,
-    ownershipType?: string,
-  ) {
+  // =============================================================================
+  // LISTING CRUD
+  // =============================================================================
+
+  async searchListings(dto: SearchListingsDto) {
+    const {
+      query,
+      category,
+      type,
+      tags,
+      country,
+      language,
+      minPrice,
+      maxPrice,
+      minDR,
+      maxDR,
+      minTraffic,
+      maxTurnaroundDays,
+      sortBy,
+      page = 1,
+      limit = 20,
+      ownershipType,
+    } = dto
+
     const where: any = {
       status: ListingStatus.APPROVED,
+    }
+
+    if (category) {
+      where.category = { slug: category }
+    }
+
+    if (ownershipType) {
+      where.website = { ownershipType: ownershipType as any }
+    }
+
+    if (country) {
+      where.country = country
+    }
+
+    if (language) {
+      where.language = language
+    }
+
+    // ── Phase 6 service-level filtering ──────────────────────────────────
+    // The customer's price / TAT / serviceType picker keys off
+    // ListingService rows, not the listing-level legacy columns. We require
+    // at least ONE matching AVAILABLE service per returned listing — that
+    // also excludes listings whose services are entirely paused/waitlisted.
+    const serviceFilter: any = { availability: "AVAILABLE" }
+    if (type) serviceFilter.serviceType = type
+    if (minPrice !== undefined || maxPrice !== undefined) {
+      serviceFilter.price = {}
+      if (minPrice !== undefined) serviceFilter.price.gte = minPrice
+      if (maxPrice !== undefined) serviceFilter.price.lte = maxPrice
+    }
+    if (maxTurnaroundDays !== undefined)
+      serviceFilter.turnaroundDays = { lte: maxTurnaroundDays }
+    where.services = { some: serviceFilter }
+
+    // DR / traffic remain listing-level (they're properties of the website,
+    // not of a service).
+    if (minDR !== undefined || maxDR !== undefined) {
+      where.domainRating = {}
+      if (minDR !== undefined) where.domainRating.gte = minDR
+      if (maxDR !== undefined) where.domainRating.lte = maxDR
+    }
+
+    if (minTraffic !== undefined) {
+      where.traffic = { gte: minTraffic }
+    }
+
+    if (tags && tags.length > 0) {
+      where.tags = {
+        some: {
+          tag: { slug: { in: tags } },
+        },
+      }
     }
 
     if (query) {
@@ -213,8 +289,8 @@ export class MarketplaceService {
           reviews: { where: { status: "APPROVED" }, select: { rating: true } },
           publisher: { include: { profile: true } },
           website: true,
-          // Phase 6: service rows drive `priceFrom` computation below; only
-          // AVAILABLE rows are exposed to buyers for ordering.
+          // Card view: surface only AVAILABLE services so listing cards can
+          // show "from $X" / service chips without leaking paused/waitlist.
           services: {
             where: { availability: "AVAILABLE" },
             orderBy: { price: "asc" },
@@ -224,17 +300,17 @@ export class MarketplaceService {
       this.prisma.marketplaceListing.count({ where }),
     ])
 
-    const listingsWithStats = listings.map((l: any) => {
+    const listingsWithStats = listings.map((listing) => {
       const avgRating =
-        l.reviews.length > 0
-          ? l.reviews.reduce((sum: number, r: any) => sum + r.rating, 0) /
-            l.reviews.length
+        listing.reviews.length > 0
+          ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) /
+            listing.reviews.length
           : null
       return this.toPublicListing({
-        ...l,
-        tags: l.tags.map((t: any) => t.tag),
-        image: l.images[0]?.url ?? null,
-        reviewCount: l.reviews.length,
+        ...listing,
+        tags: listing.tags.map((t) => t.tag),
+        image: listing.images[0]?.url || null,
+        reviewCount: listing.reviews.length,
         avgRating,
       })
     })
@@ -261,21 +337,19 @@ export class MarketplaceService {
         tags: { include: { tag: true } },
         images: { orderBy: { sortOrder: "asc" } },
         reviews: {
-          include: {
-            user: { select: { id: true, name: true, image: true } },
-          },
+          include: { user: { select: { id: true, name: true, image: true } } },
           orderBy: { createdAt: "desc" },
           take: 10,
         },
         publisher: { include: { profile: true } },
         website: true,
-        services: {
-          orderBy: [{ availability: "asc" }, { price: "asc" }],
-        },
+        // Staff sees ALL services regardless of availability, so reviewers
+        // can spot paused/waitlist rows and judge the listing holistically.
+        services: { orderBy: [{ availability: "asc" }, { price: "asc" }] },
       },
     })
     if (!listing) throw new NotFoundException("Listing not found")
-    return listing
+    return { ...listing, relatedListings: [] }
   }
 
   async getListing(slug: string, userId?: string) {
@@ -287,75 +361,67 @@ export class MarketplaceService {
         images: { orderBy: { sortOrder: "asc" } },
         reviews: {
           where: { status: "APPROVED" },
-          include: {
-            user: { select: { id: true, name: true, image: true } },
-          },
+          include: { user: { select: { id: true, name: true, image: true } } },
           orderBy: { createdAt: "desc" },
-          take: 5,
+          take: 10,
         },
         publisher: { include: { profile: true } },
         website: true,
-        // Phase 6: expose all non-WAITLIST services on the detail page so
-        // buyers see what's available (AVAILABLE) or temporarily paused.
+        // Detail page surfaces AVAILABLE + WAITLIST (so buyers can register
+        // interest via the favorite-with-serviceType waitlist path) but never
+        // PAUSED (publisher temporarily took it offline).
         services: {
-          where: { availability: { in: ["AVAILABLE", "PAUSED"] } },
+          where: { availability: { in: ["AVAILABLE", "WAITLIST"] } },
           orderBy: [{ availability: "asc" }, { price: "asc" }],
         },
       },
     })
-    if (!listing) throw new NotFoundException("Listing not found")
 
-    // Record view (async, non-blocking)
-    await this.prisma.marketplaceListingView
-      .create({
-        data: { listingId: listing.id },
-      })
-      .catch(() => {}) // Swallow errors for view tracking
+    if (!listing) {
+      throw new NotFoundException("Listing not found")
+    }
 
     // Non-APPROVED listings are visible only to a member of the owning publisher.
     // Everyone else gets 404 — do not reveal existence of draft/rejected/paused/archived.
     if (listing.status !== ListingStatus.APPROVED) {
       const isOwner =
-        userId &&
-        listing.publisherId &&
-        (await this.verifyPublisherAccess(userId, listing.publisherId))
-      if (!isOwner) throw new NotFoundException("Listing not found")
+        userId && listing.publisherId
+          ? await this.verifyPublisherAccess(userId, listing.publisherId)
+          : false
+      if (!isOwner) {
+        throw new NotFoundException("Listing not found")
+      }
     }
 
-    // Phase 7: service-scoped favorites — pull favorites for all service types
-    // this user has favorited on this listing, keyed by serviceType.
-    const ownServiceTypes = userId
-      ? (
-          await this.prisma.marketplaceFavorite.findMany({
-            where: {
-              userId,
-              listingId: listing.id,
-              serviceType: { not: null },
-            },
-            select: { serviceType: true },
-          })
-        ).map((f) => f.serviceType)
-      : []
+    // Track view
+    await this.prisma.marketplaceListingView.create({
+      data: { listingId: listing.id, userId },
+    })
 
-    // Phase 7.12: Related listings — same category, same service types, same publisher
+    // Phase 7: "related" used to match on the deprecated listing-level
+    // `type` column. Match on service overlap instead — any listing that
+    // offers at least one of THIS listing's AVAILABLE serviceTypes counts.
+    const ownServiceTypes = (listing.services ?? [])
+      .filter((s: any) => s.availability === "AVAILABLE")
+      .map((s: any) => s.serviceType)
     const relatedListings = await this.prisma.marketplaceListing.findMany({
       where: {
         id: { not: listing.id },
         status: ListingStatus.APPROVED,
         OR: [
           { categoryId: listing.categoryId },
-          listing.services.length > 0
-            ? {
-                services: {
-                  some: {
-                    availability: "AVAILABLE",
-                    serviceType: {
-                      in: listing.services.map((s: any) => s.serviceType),
+          ...(ownServiceTypes.length > 0
+            ? [
+                {
+                  services: {
+                    some: {
+                      availability: "AVAILABLE" as const,
+                      serviceType: { in: ownServiceTypes },
                     },
                   },
                 },
-              }
-            : {},
+              ]
+            : []),
         ],
       },
       take: 4,
@@ -372,9 +438,11 @@ export class MarketplaceService {
           listing.reviews.length
         : null
 
-    // Also check for listing-level favorites
     let isFavorited = false
     if (userId) {
+      // Whole-listing favorite = serviceType NULL. Service-scoped favorites
+      // (WAITLIST notify-me) live alongside but don't satisfy "isFavorited"
+      // at the listing card level.
       const favorite = await this.prisma.marketplaceFavorite.findFirst({
         where: { userId, listingId: listing.id, serviceType: null },
       })
@@ -385,30 +453,31 @@ export class MarketplaceService {
       ...this.toPublicListing({
         ...listing,
         tags: listing.tags.map((t) => t.tag),
-        image: listing.images[0]?.url ?? null,
-        reviewCount: listing.reviews.length,
         avgRating,
+        reviewCount: listing.reviews.length,
+        isFavorited,
       }),
-      isFavorited,
-      ownServiceTypes,
-      relatedListings: relatedListings.map((l: any) => ({
-        ...l,
-        tags: l.tags.map((t: any) => t.tag),
-        image: l.images[0]?.url ?? null,
-      })),
+      relatedListings: relatedListings.map((l) =>
+        this.toPublicListing({
+          ...l,
+          tags: l.tags.map((t) => t.tag),
+          image: l.images[0]?.url || null,
+        }),
+      ),
     }
   }
 
+  // Resolves and authorizes the owning publisher for a listing mutation.
   // Ownership is keyed on PublisherMembership, NOT organizationId (publishers
   // have no active organization context, so an org check is unsound here).
   private async resolveOwnedPublisherId(
     userId: string,
     activePublisherId: string | null,
-    requestedPublisherId?: string,
-  ) {
-    const publisherId = activePublisherId ?? requestedPublisherId
+    dtoPublisherId?: string,
+  ): Promise<string> {
+    const publisherId = dtoPublisherId ?? activePublisherId
     if (!publisherId) {
-      throw new BadRequestException("No publisher context available")
+      throw new BadRequestException("No publisher context for this listing")
     }
     const hasAccess = await this.verifyPublisherAccess(userId, publisherId)
     if (!hasAccess) {
@@ -544,8 +613,6 @@ export class MarketplaceService {
     // ── One listing per verified website ──
     // Every publisher listing must be associated with a website. Publishers
     // may create at most one active (non-ARCHIVED) listing per website.
-    // Multiple service offerings (Guest Post, Outreach Link, etc.) go on the
-    // same listing via the ListingService child table.
     if (!dto.websiteId) {
       throw new BadRequestException(
         "A website is required to create a listing. Select the site this listing will represent.",
@@ -708,40 +775,25 @@ export class MarketplaceService {
     return updated
   }
 
-  // Build a Prisma nested-create payload for ListingService rows from either
-  // the new `services[]` shape (v2 request body) or the legacy listing-level
-  // fields (shim for clients that haven't migrated). Sentinel helper kept
-  // tight on purpose so the schema-level uniqueness (listingId, serviceType)
-  // and defaults — currency USD, 2 revisionRounds — stay in one place.
-  private resolveServicesInput(
-    dto: CreateListingDto,
-  ): ListingServiceInput[] | null {
-    // New shape: services[].
-    if (dto.services && dto.services.length > 0) {
-      return dto.services.map((s) => ({
-        ...s,
-        serviceType: s.serviceType ?? "GUEST_POST",
-        price: s.price,
-        turnaroundDays: s.turnaroundDays ?? 7,
-        revisionRounds: s.revisionRounds ?? 2,
-      }))
+  // ── ListingService helpers (Phase 2 dual-write) ────────────────────────
+  //
+  // Phase 7: the legacy single-service shape was dropped — `services[]` is
+  // now the only accepted input. We keep the deduping + validation step
+  // (was inline in the old shim) here so the create call sites stay tidy.
+  private resolveServicesInput(dto: {
+    services?: ListingServiceInput[]
+  }): ListingServiceInput[] | null {
+    if (!dto.services || dto.services.length === 0) return null
+    const seen = new Set<ServiceType>()
+    for (const s of dto.services) {
+      if (seen.has(s.serviceType)) {
+        throw new BadRequestException(
+          `Duplicate service ${s.serviceType} in listing`,
+        )
+      }
+      seen.add(s.serviceType)
     }
-
-    // Legacy shape: single service inferred from listing-level fields.
-    // Phase 2 fallback — removed in Phase 4.
-    if (dto.price != null || dto.turnaroundDays != null) {
-      const legacyType: any = dto.type ?? "GUEST_POST"
-      return [
-        {
-          serviceType: legacyType,
-          price: dto.price ?? 0,
-          turnaroundDays: dto.turnaroundDays ?? 7,
-          revisionRounds: dto.revisionRounds ?? 2,
-        },
-      ]
-    }
-
-    return null
+    return dto.services
   }
 
   // Build a Prisma nested-create payload for ListingService rows. Sentinel
@@ -757,18 +809,28 @@ export class MarketplaceService {
         currency: s.currency ?? "USD",
         turnaroundDays: s.turnaroundDays,
         revisionRounds: s.revisionRounds ?? 2,
-        warrantyDays: s.warrantyDays ?? null,
-        requirements: (s.requirements as Prisma.InputJsonValue) ?? undefined,
-        fulfillmentSettings:
-          (s.fulfillmentSettings as Prisma.InputJsonValue) ?? undefined,
-        availability: s.availability ?? ("AVAILABLE" as any),
+        warrantyDays: s.warrantyDays,
+        requirements: s.requirements as Prisma.InputJsonValue | undefined,
+        fulfillmentSettings: s.fulfillmentSettings as
+          | Prisma.InputJsonValue
+          | undefined,
+        availability: s.availability ?? "AVAILABLE",
       })),
     }
   }
 
+  // ── ListingService CRUD ────────────────────────────────────────────────
+  // Per-service endpoints used by the Publisher + Admin Services tab. The
+  // listing's parent ownership check (publisherId membership for publisher,
+  // staff guard for platform) is enforced by the controller; this method
+  // does the listing-level access check + version-guarded write.
+
   async addServiceToListing(
-    userId: string,
-    _activePublisherId: string | null,
+    actor: {
+      userId: string
+      activePublisherId?: string | null
+      isStaff?: boolean
+    },
     listingId: string,
     input: ListingServiceInput,
   ) {
@@ -783,15 +845,7 @@ export class MarketplaceService {
       },
     })
     if (!listing) throw new NotFoundException("Listing not found")
-
-    if (listing.publisherId) {
-      const hasAccess = await this.verifyPublisherAccess(
-        userId,
-        listing.publisherId,
-      )
-      if (!hasAccess)
-        throw new ForbiddenException("You don't have access to this listing")
-    }
+    await this.assertListingWriteAccess(actor, listing)
 
     try {
       const created = await this.prisma.listingService.create({
@@ -807,41 +861,40 @@ export class MarketplaceService {
           fulfillmentSettings: input.fulfillmentSettings as
             | Prisma.InputJsonValue
             | undefined,
-          availability: input.availability ?? ("AVAILABLE" as any),
+          availability: input.availability ?? "AVAILABLE",
         },
       })
-
       await this.createAuditLog(
-        userId,
-        listing.organizationId ?? undefined,
+        actor.userId,
+        listing.organizationId,
         "LISTING_SERVICE_ADDED",
-        listingId,
+        created.id,
         {
-          serviceType: input.serviceType,
-          price: input.price,
+          listingId,
+          serviceType: created.serviceType,
+          price: created.price.toString(),
         },
       )
-
       return created
-    } catch (err: any) {
-      // Phase 7: schema-level unique constraint on (listingId, serviceType).
-      // Translates the opaque Prisma P2002 into a human-readable error.
-      if (err?.code === "P2002") {
+    } catch (e: any) {
+      if (e?.code === "P2002") {
         throw new BadRequestException(
-          `Service "${input.serviceType}" already exists on this listing. Edit the existing service instead.`,
+          `Service ${input.serviceType} already exists on this listing`,
         )
       }
-      throw err
+      throw e
     }
   }
 
   async updateServiceOnListing(
-    userId: string,
-    _activePublisherId: string | null,
+    actor: {
+      userId: string
+      activePublisherId?: string | null
+      isStaff?: boolean
+    },
     listingId: string,
     serviceId: string,
     input: UpdateListingServiceInput,
-    isStaff = false,
   ) {
     const service = await this.prisma.listingService.findUnique({
       where: { id: serviceId },
@@ -856,22 +909,17 @@ export class MarketplaceService {
         },
       },
     })
-    if (!service) {
+    if (!service || service.listingId !== listingId) {
       throw new NotFoundException("Service not found on this listing")
     }
+    await this.assertListingWriteAccess(actor, service.listing)
 
-    // Authorization: publisher-owned listings need membership check;
-    // platform-owned listings bypass the publisher check.
-    if (!isStaff && service.listing.publisherId) {
-      const hasAccess = await this.verifyPublisherAccess(
-        userId,
-        service.listing.publisherId,
-      )
-      if (!hasAccess)
-        throw new ForbiddenException("You don't have access to this listing")
+    // Version-guarded update — concurrent edits or a stale tab cannot silently
+    // overwrite each other. The optimistic lock matches the pattern used
+    // throughout orders/settlements.
+    const updateData: Prisma.ListingServiceUncheckedUpdateInput = {
+      version: { increment: 1 },
     }
-
-    const updateData: any = {}
     if (input.price !== undefined)
       updateData.price = new Prisma.Decimal(input.price)
     if (input.currency !== undefined) updateData.currency = input.currency
@@ -888,154 +936,138 @@ export class MarketplaceService {
         input.fulfillmentSettings as Prisma.InputJsonValue
     if (input.availability !== undefined)
       updateData.availability = input.availability
-    if (input.serviceType !== undefined) {
-      // The schema-level unique constraint on (listingId, serviceType) means
-      // changing the service type could collide. Delegate the uniqueness check
-      // to the DB layer (P2002 → human-readable error below).
-      updateData.serviceType = input.serviceType
-    }
-
-    // Optimistic lock: version must match what the caller read (fetched from
-    // the GET response). This prevents two tabs from silently overwriting each
-    // other. Write fails if version field is stale.
-    updateData.version = { increment: 1 }
-
-    try {
-      const res = await this.prisma.listingService.updateMany({
-        where: { id: serviceId, version: input.version },
-        data: updateData,
-      })
-
-      if (res.count === 0) {
-        throw new BadRequestException(
-          "Service was modified by another session. Reload and try again.",
-        )
-      }
-
-      const updated = await this.prisma.listingService.findUnique({
-        where: { id: serviceId },
-      })
-
-      // ── Notify waitlisted users on back-in-stock ──
-      // When a service moves from PAUSED/WAITLIST → AVAILABLE, notify every
-      // user who had a service-scoped favorite (waitlist "notify me").
-      const becomingAvailable =
-        input.availability === "AVAILABLE" &&
-        service.availability !== "AVAILABLE"
-
-      if (becomingAvailable && input.availability === "AVAILABLE") {
-        const favorites = await this.prisma.marketplaceFavorite.findMany({
-          where: {
-            listingId,
-            OR: [
-              { serviceType: service.serviceType },
-              { serviceType: input.serviceType },
-            ],
-            serviceType: { not: null },
-          },
-          select: { userId: true },
-        })
-
-        const userIds = [...new Set(favorites.map((f) => f.userId))]
-        for (const uid of userIds) {
-          await this.queue.publish("notifications", "back-in-stock", {
-            userId: uid,
-            listingId,
-            serviceId,
-            serviceType: input.serviceType ?? service.serviceType,
-            listing: { organizationId: service.listing.organizationId },
-          })
-        }
-
-        await this.createAuditLog(
-          userId,
-          service.listing.organizationId ?? undefined,
-          "BACK_IN_STOCK_NOTIFICATION",
-          listingId,
-          {
-            serviceType: input.serviceType ?? service.serviceType,
-            notifiedCount: userIds.length,
-            fromAvailability: service.availability,
-          },
-        )
-      }
-
-      await this.createAuditLog(
-        userId,
-        service.listing.organizationId ?? undefined,
-        "LISTING_SERVICE_UPDATED",
-        listingId,
-        {
-          serviceId,
-          changes: Object.keys(input),
-          serviceType: input.serviceType ?? service.serviceType,
-        },
-      )
-
-      return updated
-    } catch (err: any) {
-      if (err?.code === "P2002") {
-        throw new BadRequestException(
-          `Service "${input.serviceType}" already exists on this listing.`,
-        )
-      }
-      throw err
-    }
-  }
-
-  async pauseServiceOnListing(
-    userId: string,
-    _activePublisherId: string | null,
-    listingId: string,
-    serviceId: string,
-    isStaff = false,
-  ) {
-    const listing = await this.prisma.listingService.findUnique({
-      where: { id: serviceId },
-      include: {
-        listing: { select: { id: true, publisherId: true } },
-      },
-    })
-    if (!listing) throw new NotFoundException("Service not found")
-
-    if (!isStaff && listing.listing.publisherId) {
-      const hasAccess = await this.verifyPublisherAccess(
-        userId,
-        listing.listing.publisherId,
-      )
-      if (!hasAccess)
-        throw new ForbiddenException("You don't have access to this listing")
-    }
 
     const res = await this.prisma.listingService.updateMany({
-      where: { id: serviceId, availability: { not: "PAUSED" }, version: 0 },
-      data: {
-        availability: "PAUSED",
-        version: { increment: 1 },
-      },
+      where: { id: serviceId, version: input.version },
+      data: updateData,
     })
     if (res.count === 0) {
-      throw new BadRequestException(
-        "Service is already paused or was modified. Reload and try again.",
+      throw new BadRequestException({
+        code: "VERSION_CONFLICT",
+        message: "Service was modified by another request — reload and retry",
+      })
+    }
+
+    const updated = await this.prisma.listingService.findUnique({
+      where: { id: serviceId },
+    })
+    await this.createAuditLog(
+      actor.userId,
+      service.listing.organizationId,
+      "LISTING_SERVICE_UPDATED",
+      serviceId,
+      {
+        listingId,
+        changes: Object.keys(input).filter((k) => k !== "version"),
+      },
+    )
+
+    // ── Phase 6: waitlist → available fan-out ────────────────────────────
+    // Notifies every user with a MarketplaceFavorite scoped to this
+    // (listingId, serviceType) plus those who favorited the whole listing
+    // (serviceType=NULL). Fire-and-forget via the existing notification
+    // queue — no new processor needed since the recipient set is small.
+    // Sites toggling rapidly aren't a real concern (this is a publisher-
+    // initiated edit, not a system-driven flap), so we don't rate-limit.
+    if (
+      service.availability === "WAITLIST" &&
+      input.availability === "AVAILABLE"
+    ) {
+      const favorites = await this.prisma.marketplaceFavorite.findMany({
+        where: {
+          listingId,
+          OR: [{ serviceType: service.serviceType }, { serviceType: null }],
+        },
+        select: { userId: true },
+      })
+      for (const f of favorites) {
+        await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+          userId: f.userId,
+          organizationId: null,
+          type: "WAITLIST_AVAILABLE",
+          message: `A service you favorited is now available`,
+        })
+      }
+      await this.createAuditLog(
+        actor.userId,
+        service.listing.organizationId,
+        "LISTING_SERVICE_WAITLIST_RELEASED",
+        serviceId,
+        {
+          listingId,
+          serviceType: service.serviceType,
+          notifiedCount: favorites.length,
+        },
       )
     }
 
-    return this.prisma.listingService.findUnique({ where: { id: serviceId } })
+    return updated
   }
 
-  // ── Lifecycle transitions ──────────────────────────────────────────────
-  //   Lifecycle (publisher side):
+  // Soft-disable rather than hard-delete: a paused row stays linked to any
+  // historical Order that snapshotted its id, so order detail can still
+  // resolve listingService.* fields. Removing the row would orphan those.
+  async pauseServiceOnListing(
+    actor: {
+      userId: string
+      activePublisherId?: string | null
+      isStaff?: boolean
+    },
+    listingId: string,
+    serviceId: string,
+  ) {
+    return this.updateServiceOnListing(actor, listingId, serviceId, {
+      availability: "PAUSED",
+      version:
+        (
+          await this.prisma.listingService.findUnique({
+            where: { id: serviceId },
+            select: { version: true },
+          })
+        )?.version ?? 0,
+    })
+  }
+
+  // Listing write access: publisher path uses the existing membership check,
+  // platform path requires a staff actor (route guard already enforces it).
+  private async assertListingWriteAccess(
+    actor: {
+      userId: string
+      activePublisherId?: string | null
+      isStaff?: boolean
+    },
+    listing: {
+      publisherId: string | null
+      ownerType?: "PUBLISHER" | "PLATFORM" | null
+    },
+  ) {
+    if (actor.isStaff) return
+    if (!listing.publisherId) {
+      throw new ForbiddenException(
+        "Only platform staff can edit this listing's services",
+      )
+    }
+    const hasAccess = await this.verifyPublisherAccess(
+      actor.userId,
+      listing.publisherId,
+    )
+    if (!hasAccess) {
+      throw new ForbiddenException("You don't have access to this listing")
+    }
+  }
+
+  // ── Phase 6 lifecycle transitions ─────────────────────────────────────
   //
-  //   DRAFT ──submit──▶ PENDING_REVIEW ──approve──▶ APPROVED ──pause──▶ PAUSED
-  //                     (admin)                     PAUSED ──unpause──▶ APPROVED
-  //                     all except ARCHIVED ──archive──▶ ARCHIVED
+  // The source status is the "version" — every transition narrows the
+  // updateMany where-clause to (id, currentStatus). If the row already
+  // moved, updateMany returns 0 and we throw 409. Cheap optimistic
+  // concurrency without a new schema column.
   //
-  //   Transition gating:
-  //   - submit: DRAFT → PENDING_REVIEW. Requires websiteId + at least one
+  // Gates layered on top:
+  //   - submit: must be the publisher; website must be VERIFIED; ≥1
   //     AVAILABLE ListingService row.
   //   - pause / unpause: must be APPROVED / PAUSED respectively.
   //   - archive: any non-ARCHIVED → ARCHIVED.
-  //   - resubmit: ARCHIVED → PENDING_REVIEW (same as submit).
 
   async submitListingForReview(
     userId: string,
@@ -1048,21 +1080,24 @@ export class MarketplaceService {
       listing.status !== ListingStatus.DRAFT &&
       listing.status !== ListingStatus.ARCHIVED
     ) {
+      throw new BadRequestException(
+        "Only draft or archived listings can be submitted for review.",
+      )
+    }
+    if (listing.website?.verificationStatus !== "VERIFIED") {
       throw new BadRequestException({
-        code: "LISTING_NOT_DRAFT",
-        message: "Only draft or archived listings can be submitted for review.",
+        code: "WEBSITE_NOT_VERIFIED",
+        message: "Cannot submit: verify domain ownership first.",
       })
     }
-
-    // Phase 6: at least one AVAILABLE service required before submission.
     const availableCount = await this.prisma.listingService.count({
       where: { listingId, availability: "AVAILABLE" },
     })
-    if (availableCount < 1) {
+    if (availableCount === 0) {
       throw new BadRequestException({
         code: "NO_AVAILABLE_SERVICES",
         message:
-          "Add at least one priced service before submitting for review.",
+          "Add at least one available service before submitting for review.",
       })
     }
 
@@ -1073,25 +1108,25 @@ export class MarketplaceService {
       },
       data: { status: ListingStatus.PENDING_REVIEW },
     })
-
     if (res.count === 0) {
       throw new BadRequestException({
-        code: "TRANSITION_FAILED",
-        message:
-          "Listing could not be submitted. It may have been modified or is in an unexpected state.",
+        code: "STATUS_CONFLICT",
+        message: "Listing was modified — reload and retry.",
       })
     }
 
     await this.createAuditLog(
       userId,
       listing.organizationId,
-      "LISTING_SUBMITTED",
+      "LISTING_SUBMITTED_FOR_REVIEW",
       listingId,
-      { title: listing.title, websiteId: listing.websiteId },
+      {
+        title: listing.title,
+        websiteId: listing.websiteId,
+      },
     )
 
-    // Invalidate phase-7 query
-    await this.prisma.marketplaceListing.findUnique({
+    return this.prisma.marketplaceListing.findUniqueOrThrow({
       where: { id: listingId },
     })
   }
@@ -1102,20 +1137,20 @@ export class MarketplaceService {
     listingId: string,
   ) {
     const listing = await this.assertPublisherOwnedListing(userId, listingId)
-
+    if (listing.status !== ListingStatus.APPROVED) {
+      throw new BadRequestException(
+        `Only APPROVED listings can be paused (currently ${listing.status})`,
+      )
+    }
     const res = await this.prisma.marketplaceListing.updateMany({
       where: { id: listingId, status: ListingStatus.APPROVED },
       data: { status: ListingStatus.PAUSED },
     })
-
-    if (res.count === 0) {
+    if (res.count === 0)
       throw new BadRequestException({
-        code: "TRANSITION_FAILED",
-        message:
-          "Listing could not be paused. Only approved listings can be paused.",
+        code: "STATUS_CONFLICT",
+        message: "Listing was modified — reload and retry.",
       })
-    }
-
     await this.createAuditLog(
       userId,
       listing.organizationId,
@@ -1123,6 +1158,9 @@ export class MarketplaceService {
       listingId,
       { title: listing.title },
     )
+    return this.prisma.marketplaceListing.findUniqueOrThrow({
+      where: { id: listingId },
+    })
   }
 
   async unpauseListing(
@@ -1131,20 +1169,20 @@ export class MarketplaceService {
     listingId: string,
   ) {
     const listing = await this.assertPublisherOwnedListing(userId, listingId)
-
+    if (listing.status !== ListingStatus.PAUSED) {
+      throw new BadRequestException(
+        `Only PAUSED listings can be unpaused (currently ${listing.status})`,
+      )
+    }
     const res = await this.prisma.marketplaceListing.updateMany({
       where: { id: listingId, status: ListingStatus.PAUSED },
       data: { status: ListingStatus.APPROVED },
     })
-
-    if (res.count === 0) {
+    if (res.count === 0)
       throw new BadRequestException({
-        code: "TRANSITION_FAILED",
-        message:
-          "Listing could not be unpaused. Only paused listings can be unpaused.",
+        code: "STATUS_CONFLICT",
+        message: "Listing was modified — reload and retry.",
       })
-    }
-
     await this.createAuditLog(
       userId,
       listing.organizationId,
@@ -1152,6 +1190,9 @@ export class MarketplaceService {
       listingId,
       { title: listing.title },
     )
+    return this.prisma.marketplaceListing.findUniqueOrThrow({
+      where: { id: listingId },
+    })
   }
 
   async archiveListing(
@@ -1163,19 +1204,15 @@ export class MarketplaceService {
     if (listing.status === ListingStatus.ARCHIVED) {
       throw new BadRequestException("Listing is already archived")
     }
-
     const res = await this.prisma.marketplaceListing.updateMany({
       where: { id: listingId, status: listing.status },
       data: { status: ListingStatus.ARCHIVED },
     })
-
-    if (res.count === 0) {
+    if (res.count === 0)
       throw new BadRequestException({
-        code: "TRANSITION_FAILED",
-        message: "Listing could not be archived.",
+        code: "STATUS_CONFLICT",
+        message: "Listing was modified — reload and retry.",
       })
-    }
-
     await this.createAuditLog(
       userId,
       listing.organizationId,
@@ -1183,23 +1220,26 @@ export class MarketplaceService {
       listingId,
       { title: listing.title, fromStatus: listing.status },
     )
+    return this.prisma.marketplaceListing.findUniqueOrThrow({
+      where: { id: listingId },
+    })
   }
 
-  private async assertPublisherOwnedListing(
-    userId: string,
-    listingId: string,
-  ): Promise<any> {
+  // Shared ownership + load helper for the four transitions above. Loads
+  // the website so submit can check VERIFIED without a second query.
+  private async assertPublisherOwnedListing(userId: string, listingId: string) {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id: listingId },
       include: {
-        website: {
-          select: { verificationStatus: true, ownershipType: true },
-        },
+        website: { select: { verificationStatus: true, ownershipType: true } },
       },
     })
     if (!listing) throw new NotFoundException("Listing not found")
-    if (!listing.publisherId)
-      throw new ForbiddenException("You don't have access to this listing")
+    if (!listing.publisherId) {
+      throw new ForbiddenException(
+        "Platform listings use admin-side transitions, not publisher endpoints",
+      )
+    }
     const hasAccess = await this.verifyPublisherAccess(
       userId,
       listing.publisherId,
@@ -1217,17 +1257,21 @@ export class MarketplaceService {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id: listingId },
     })
-    if (!listing) throw new NotFoundException("Listing not found")
-    if (!listing.publisherId)
+
+    if (!listing) {
+      throw new NotFoundException("Listing not found")
+    }
+    if (!listing.publisherId) {
       throw new ForbiddenException("You don't have access to this listing")
+    }
     const hasAccess = await this.verifyPublisherAccess(
       userId,
       listing.publisherId,
     )
-    if (!hasAccess)
+    if (!hasAccess) {
       throw new ForbiddenException("You don't have access to this listing")
+    }
 
-    // Soft-delete: archive listing
     await this.prisma.marketplaceListing.update({
       where: { id: listingId },
       data: { status: ListingStatus.ARCHIVED },
@@ -1236,20 +1280,21 @@ export class MarketplaceService {
     await this.createAuditLog(
       userId,
       listing.organizationId,
-      "LISTING_ARCHIVED",
+      "LISTING_DELETED",
       listingId,
       { title: listing.title },
     )
   }
 
+  // =============================================================================
+  // CATEGORIES & TAGS
+  // =============================================================================
+
   async getCategories() {
     return this.prisma.marketplaceCategory.findMany({
       where: { isActive: true, parentId: null },
       include: {
-        children: {
-          where: { isActive: true },
-          orderBy: { sortOrder: "asc" },
-        },
+        children: { where: { isActive: true }, orderBy: { sortOrder: "asc" } },
       },
       orderBy: { sortOrder: "asc" },
     })
@@ -1261,48 +1306,53 @@ export class MarketplaceService {
     })
   }
 
-  // ── Reviews ────────────────────────────────────────────────────────────
+  // =============================================================================
+  // REVIEWS
+  // =============================================================================
 
-  async createReview(userId: string, listingId: string, dto: CreateReviewDto) {
+  async createReview(userId: string, dto: CreateReviewDto) {
     const listing = await this.prisma.marketplaceListing.findUnique({
-      where: { id: listingId },
+      where: { id: dto.listingId },
     })
-    if (!listing) throw new NotFoundException("Listing not found")
-
-    // Publishers cannot review their own listings
-    const listingPublisherId = listing.publisherId
-    if (listingPublisherId) {
-      const publisherMembership =
-        await this.prisma.publisherMembership.findUnique({
-          where: {
-            userId_publisherId: {
-              userId,
-              publisherId: listingPublisherId,
-            },
-          },
-        })
-      if (publisherMembership) {
-        throw new BadRequestException("You cannot review your own listing")
-      }
+    if (!listing) {
+      throw new NotFoundException("Listing not found")
     }
 
-    // Must have a completed order for this listing
+    const listingPublisherId = listing.publisherId
+    if (!listingPublisherId) {
+      throw new BadRequestException("Listing has no publisher")
+    }
+
+    // Prevent self-review: publisher cannot review own listing
+    const publisherMembership = await this.prisma.publisherMembership.findFirst(
+      {
+        where: { userId, publisherId: listingPublisherId },
+      },
+    )
+    if (publisherMembership) {
+      throw new ForbiddenException("You cannot review your own listing")
+    }
+
+    // Verify customer completed an order with this publisher. SETTLED is the
+    // actual terminal status (release keeps the order at SETTLED; nothing
+    // sets COMPLETED today) — gating on COMPLETED alone made reviews
+    // impossible for everyone.
     const completedOrder = await this.prisma.order.findFirst({
       where: {
         customerId: userId,
-        listing: { publisherId: listingPublisherId ?? undefined },
-        status: { in: ["DELIVERED", "COMPLETED"] },
+        website: { publisherId: listingPublisherId },
+        status: { in: ["COMPLETED", "SETTLED", "DELIVERED"] },
       },
     })
     if (!completedOrder) {
-      throw new BadRequestException(
-        "You must have a completed order to review this listing",
+      throw new ForbiddenException(
+        "You must complete an order before reviewing",
       )
     }
 
-    // One review per listing per user
-    const existing = await this.prisma.marketplaceReview.findUnique({
-      where: { userId_listingId: { userId, listingId } },
+    // Prevent duplicate review
+    const existing = await this.prisma.marketplaceReview.findFirst({
+      where: { listingId: dto.listingId, userId },
     })
     if (existing) {
       throw new BadRequestException("You have already reviewed this listing")
@@ -1310,132 +1360,130 @@ export class MarketplaceService {
 
     const review = await this.prisma.marketplaceReview.create({
       data: {
-        listingId,
+        listingId: dto.listingId,
         userId,
         rating: dto.rating,
         title: dto.title,
         content: dto.content,
       },
-      include: {
-        user: { select: { id: true, name: true, image: true } },
-      },
+      include: { user: { select: { id: true, name: true, image: true } } },
     })
 
     return review
   }
 
-  // ── Favorites ───────────────────────────────────────────────────────────
+  // =============================================================================
+  // FAVORITES
+  // =============================================================================
 
-  async getFavorites(userId: string, page = 1, limit = 12) {
-    const where = { userId }
-    const [favorites, total] = await Promise.all([
-      this.prisma.marketplaceFavorite.findMany({
-        where,
-        include: {
-          listing: {
-            include: {
-              category: true,
-              images: { where: { isPrimary: true }, take: 1 },
-              tags: { include: { tag: true } },
-              services: {
-                where: { availability: { not: "UNAVAILABLE" } },
-                orderBy: { price: "asc" },
-                select: {
-                  id: true,
-                  serviceType: true,
-                  price: true,
-                  currency: true,
-                  availability: true,
-                  turnaroundDays: true,
-                },
+  async getFavorites(userId: string) {
+    return this.prisma.marketplaceFavorite.findMany({
+      where: { userId },
+      include: {
+        listing: {
+          include: {
+            category: true,
+            images: { where: { isPrimary: true }, take: 1 },
+            tags: { include: { tag: true } },
+            // Phase 7.12 (#20): include services so the favorites page can
+            // compute price-from-services. The listing-level `price` column
+            // was dropped in Phase 7; without `services` the page falls
+            // back to $0 for every entry. Filter out PAUSED (soft-disabled
+            // by the publisher, kept for historical-order linkage —
+            // shouldn't surface as a current price option). Strongly typed
+            // via the Prisma enum so a future rename fails tsc instead of
+            // silently letting rows through.
+            services: {
+              where: { availability: { not: ServiceAvailability.PAUSED } },
+              orderBy: { price: "asc" },
+              select: {
+                id: true,
+                serviceType: true,
+                price: true,
+                currency: true,
+                availability: true,
+                turnaroundDays: true,
               },
             },
           },
         },
-        orderBy: { createdAt: "desc" },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.marketplaceFavorite.count({ where }),
-    ])
-
-    return {
-      favorites: favorites.map((f: any) => ({
-        ...f,
-        listing: this.toPublicListing({
-          ...f.listing,
-          tags: f.listing.tags.map((t: any) => t.tag),
-          image: f.listing.images[0]?.url ?? null,
-          avgRating: null,
-          reviewCount: 0,
-        }),
-      })),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    }
+      },
+    })
   }
 
   async addFavorite(
     userId: string,
     listingId: string,
-    serviceType?: string | null,
+    serviceType: ServiceType | null = null,
   ) {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id: listingId },
-      select: { id: true },
     })
-    if (!listing) throw new NotFoundException("Listing not found")
+    if (!listing) {
+      throw new NotFoundException("Listing not found")
+    }
 
-    // Phase 7.14 #45 — when serviceType is provided, validate that the
-    // service actually exists and is not waitlist-only (unavailable).
-    if (serviceType) {
+    // Phase 7.12 (#17): if a non-NULL serviceType is supplied, verify the
+    // service exists on the listing AND isn't paused. PAUSED services
+    // never transition WAITLIST → AVAILABLE (the publisher took them down,
+    // they only stay around for historical-order linkage per
+    // pauseServiceOnListing's comment), so a favorite scoped to a paused
+    // service is a dead-write — the WAITLIST fan-out would never fire for
+    // it. Reject up-front instead of writing a useless row.
+    if (serviceType !== null) {
       const service = await this.prisma.listingService.findFirst({
         where: {
           listingId,
-          serviceType: serviceType as any,
-          availability: { not: "UNAVAILABLE" },
+          serviceType,
+          availability: { not: ServiceAvailability.PAUSED },
         },
-        select: { id: true },
       })
       if (!service) {
-        throw new NotFoundException("Service not found or unavailable")
+        throw new NotFoundException(
+          `Service ${serviceType} not found on this listing`,
+        )
       }
     }
 
-    // Plan B: try-create + handle P2002 on the unique constraint. Avoids the
-    // findFirst-then-create race by relying on the PostgreSQL unique index
-    // to reject a concurrent duplicate. The unique constraint is defined as
-    //   @@unique([userId, listingId, serviceType])
-    // with NULLS NOT DISTINCT (so multiple serviceType:null rows for the
-    // same (userId, listingId) are collapsed to one).
+    // Phase 7.13.2A: race-proofed via the NULLS NOT DISTINCT unique
+    // (MarketplaceFavorite_uniq_nullsnotdistinct). Try the create; if
+    // a concurrent request beat us to the same (userId, listingId,
+    // serviceType) row, the DB rejects with P2002 — we re-fetch the
+    // winning row and return it (Plan B; Gate 0.5 ruled out Plan A
+    // because Prisma 7's WhereUniqueInput validator rejects `null`
+    // for nullable composite-key parts before any SQL is emitted).
     let favorite
     try {
       favorite = await this.prisma.marketplaceFavorite.create({
-        data: {
-          userId,
-          listingId,
-          serviceType: serviceType ?? null,
-        },
+        data: { userId, listingId, serviceType },
       })
-    } catch (err: any) {
-      if (err?.code === "P2002") {
-        // Already favorited — treat as success (idempotent).
+    } catch (e: any) {
+      if (e?.code === "P2002") {
         const existing = await this.prisma.marketplaceFavorite.findFirst({
-          where: { userId, listingId, serviceType: serviceType ?? null },
+          where: { userId, listingId, serviceType },
         })
-        if (existing) return existing
+        if (!existing) throw e
+        favorite = existing
+      } else {
+        throw e
       }
-      throw err
     }
 
-    await this.createAuditLog(userId, listingId, "FAVORITE_ADDED", listingId, {
-      action: "FAVORITE_ADDED",
-      serviceType: serviceType ?? null,
+    // Track click
+    await this.prisma.marketplaceListingClick.create({
+      data: { listingId, userId, action: "favorite" },
     })
 
     return favorite
   }
 
   async removeFavorite(userId: string, listingId: string) {
+    // Phase 7.12 (#16): scope to the NULL-serviceType row only. The
+    // previous unscoped deleteMany silently destroyed any service-scoped
+    // WAITLIST notify-me favorites for the same listing — meaning a
+    // customer who un-starred the whole listing lost their service-
+    // specific subscriptions too. Service-scoped removal goes through
+    // removeFavoriteService below.
     await this.prisma.marketplaceFavorite.deleteMany({
       where: { userId, listingId, serviceType: null },
     })
@@ -1444,17 +1492,23 @@ export class MarketplaceService {
   async removeFavoriteService(
     userId: string,
     listingId: string,
-    serviceType: string,
+    serviceType: ServiceType,
   ) {
+    // Phase 7.12 (#16 sibling): scoped removal for service-specific
+    // (WAITLIST notify-me) favorites. Mirrors removeFavorite but for the
+    // serviceType-scoped rows that the new addFavorite(serviceType) path
+    // creates.
     await this.prisma.marketplaceFavorite.deleteMany({
       where: { userId, listingId, serviceType },
     })
   }
 
-  // ── Saved Lists ─────────────────────────────────────────────────────────
+  // =============================================================================
+  // SAVED LISTS
+  // =============================================================================
 
   async getSavedLists(userId: string) {
-    const lists = await this.prisma.marketplaceSavedList.findMany({
+    return this.prisma.marketplaceSavedList.findMany({
       where: { userId },
       include: {
         items: {
@@ -1470,56 +1524,48 @@ export class MarketplaceService {
         },
       },
     })
-    return lists.map((l: any) => ({
-      ...l,
-      items: l.items.map((item: any) => ({
-        ...item,
-        listing: this.toPublicListing({
-          ...item.listing,
-          tags: [],
-          image: item.listing.images[0]?.url ?? null,
-          avgRating: null,
-          reviewCount: 0,
-        }),
-      })),
-    }))
   }
 
-  async createSavedList(userId: string, name: string) {
-    const slug = slugify(name)
+  async createSavedList(userId: string, dto: CreateSavedListDto) {
+    const slug = dto.slug || slugify(dto.name)
+
     const list = await this.prisma.marketplaceSavedList.create({
       data: {
         userId,
-        name,
+        name: dto.name,
         slug,
-        isPublic: false,
+        isPublic: dto.isPublic || false,
       },
     })
+
     return list
   }
 
-  async addToSavedList(
-    userId: string,
-    listId: string,
-    listingId: string,
-    note?: string,
-  ) {
+  async addToSavedList(userId: string, listId: string, dto: AddToSavedListDto) {
     const list = await this.prisma.marketplaceSavedList.findUnique({
       where: { id: listId },
     })
-    if (!list) throw new NotFoundException("List not found")
-    if (list.userId !== userId) throw new ForbiddenException()
+    if (!list || list.userId !== userId) {
+      throw new NotFoundException("List not found")
+    }
 
     const listing = await this.prisma.marketplaceListing.findUnique({
-      where: { id: listingId },
+      where: { id: dto.listingId },
     })
-    if (!listing) throw new NotFoundException("Listing not found")
+    if (!listing) {
+      throw new NotFoundException("Listing not found")
+    }
 
     const item = await this.prisma.marketplaceSavedListItem.upsert({
-      where: { listId_listingId: { listId, listingId } },
-      create: { listId, listingId, note },
-      update: { note },
+      where: { listId_listingId: { listId, listingId: dto.listingId } },
+      create: {
+        listId,
+        listingId: dto.listingId,
+        note: dto.note,
+      },
+      update: { note: dto.note },
     })
+
     return item
   }
 
@@ -1527,51 +1573,42 @@ export class MarketplaceService {
     const list = await this.prisma.marketplaceSavedList.findUnique({
       where: { id: listId },
     })
-    if (!list) throw new NotFoundException("List not found")
-    if (list.userId !== userId) throw new ForbiddenException()
+    if (!list || list.userId !== userId) {
+      throw new NotFoundException("List not found")
+    }
 
     await this.prisma.marketplaceSavedListItem.deleteMany({
       where: { listId, listingId },
     })
   }
 
-  // ── Service Discovery ───────────────────────────────────────────────────
+  // =============================================================================
+  // INTERNAL SERVICES
+  // =============================================================================
 
-  async getServices(page = 1, limit = 20) {
-    const where = {
-      status: ListingStatus.APPROVED,
-      fulfillmentType: "PUBLISHER" as const,
-      services: { some: { availability: "AVAILABLE" as const } },
-    }
-
-    const [listings, total] = await Promise.all([
-      this.prisma.marketplaceListing.findMany({
-        where,
-        include: {
-          category: true,
-          images: { where: { isPrimary: true }, take: 1 },
-          services: { where: { availability: "AVAILABLE" } },
-        },
-        orderBy: { featured: "desc" as const },
-        skip: (page - 1) * limit,
-        take: limit,
-      }),
-      this.prisma.marketplaceListing.count({ where }),
-    ])
-
-    return {
-      listings: listings.map((l: any) =>
-        this.toPublicListing({
-          ...l,
-          tags: [],
-          image: l.images[0]?.url ?? null,
-          avgRating: null,
-          reviewCount: 0,
-        }),
-      ),
-      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
-    }
+  async getServices() {
+    // Phase 7: "internal services" used to filter on the deprecated
+    // ListingType column. Now: any APPROVED listing with INTERNAL
+    // fulfillment that offers ≥1 AVAILABLE service qualifies — the
+    // listing-level `type` is gone.
+    return this.prisma.marketplaceListing.findMany({
+      where: {
+        status: ListingStatus.APPROVED,
+        fulfillmentType: "INTERNAL",
+        services: { some: { availability: "AVAILABLE" } },
+      },
+      include: {
+        category: true,
+        images: { where: { isPrimary: true }, take: 1 },
+        services: { where: { availability: "AVAILABLE" } },
+      },
+      orderBy: { featured: "desc" },
+    })
   }
+
+  // =============================================================================
+  // PUBLISHER LISTINGS
+  // =============================================================================
 
   async getPublisherListings(
     publisherId: string,
@@ -1620,7 +1657,6 @@ export class MarketplaceService {
     })
 
     // Sort: active (non-ARCHIVED) listings first, ARCHIVED at the bottom.
-    // Within each group, newest first.
     listings.sort((a, b) => {
       const aArchived = a.status === ListingStatus.ARCHIVED ? 1 : 0
       const bArchived = b.status === ListingStatus.ARCHIVED ? 1 : 0
@@ -1646,25 +1682,20 @@ export class MarketplaceService {
   // RECOMMENDATIONS (AI Layer Abstraction)
   // =============================================================================
 
-  async getRecommendations(slug: string) {
-    const listingId = (
-      await this.prisma.marketplaceListing.findUnique({
-        where: { slug },
-        select: { id: true },
-      })
-    )?.id
-    if (!listingId) throw new NotFoundException("Listing not found")
+  async getRecommendations(userId: string, dto: GetRecommendationsDto) {
+    const { listingId, type = "recommended", limit = 10 } = dto
 
-    // Try AI recommendations first
+    // Try to get AI recommendations first
     const recommendations =
       await this.prisma.marketplaceRecommendation.findMany({
-        where: { listingId },
+        where: { userId, type },
         orderBy: { score: "desc" },
-        take: 4,
+        take: limit,
       })
 
     if (recommendations.length > 0) {
-      const listingIds = recommendations.map((r) => r.recommendedListingId)
+      // Fetch listings separately since relation isn't defined in schema
+      const listingIds = recommendations.map((r) => r.listingId)
       const listings = await this.prisma.marketplaceListing.findMany({
         where: { id: { in: listingIds } },
         include: {
@@ -1675,18 +1706,15 @@ export class MarketplaceService {
       })
 
       const listingMap = new Map(listings.map((l) => [l.id, l]))
+
       return recommendations
         .map((r) => {
-          const listing = listingMap.get(r.recommendedListingId)
+          const listing = listingMap.get(r.listingId)
           if (!listing) return null
           return {
-            ...this.toPublicListing({
-              ...listing,
-              tags: listing.tags.map((t: any) => t.tag),
-              image: listing.images[0]?.url ?? null,
-              avgRating: null,
-              reviewCount: 0,
-            }),
+            ...listing,
+            tags: listing.tags.map((t: any) => t.tag),
+            image: listing.images[0]?.url || null,
             recommendationScore: r.score,
             recommendationReason: r.reason,
           }
@@ -1695,101 +1723,101 @@ export class MarketplaceService {
     }
 
     // Fallback to rule-based recommendations
-    return this.getRuleBasedRecommendations(listingId)
+    return this.getRuleBasedRecommendations(listingId, type, limit)
   }
 
-  private async getRuleBasedRecommendations(listingId: string) {
-    const listing = await this.prisma.marketplaceListing.findUnique({
-      where: { id: listingId },
-      include: {
-        services: {
-          where: { availability: "AVAILABLE" },
-          select: { serviceType: true },
+  private async getRuleBasedRecommendations(
+    listingId?: string,
+    _type?: string,
+    limit = 10,
+  ) {
+    if (listingId) {
+      // Phase 7: pull the offered serviceTypes off the source listing's
+      // child services so we can match recommendations on service overlap
+      // instead of the deprecated listing-level `type` column.
+      const listing = await this.prisma.marketplaceListing.findUnique({
+        where: { id: listingId },
+        include: {
+          services: {
+            where: { availability: "AVAILABLE" },
+            select: { serviceType: true },
+          },
         },
-      },
-    })
-    if (!listing) return []
-
-    const ownServiceTypes = listing.services.map((s) => s.serviceType)
-
-    // Find listings with same category or overlapping service types
-    const recommendations = await this.prisma.marketplaceListing.findMany({
-      where: {
-        id: { not: listingId },
-        status: ListingStatus.APPROVED,
-        OR: [
-          { categoryId: listing.categoryId },
-          ownServiceTypes.length > 0
-            ? {
-                services: {
-                  some: {
-                    availability: "AVAILABLE",
-                    serviceType: { in: ownServiceTypes },
-                  },
-                },
-              }
-            : {},
-        ],
-      },
-      include: {
-        category: true,
-        images: { where: { isPrimary: true }, take: 1 },
-        tags: { include: { tag: true } },
-      },
-      take: 10,
-      orderBy: { domainRating: "desc" },
-    })
-
-    if (recommendations.length >= 4) {
-      return recommendations.slice(0, 4).map((l: any) =>
-        this.toPublicListing({
-          ...l,
-          tags: l.tags.map((t: any) => t.tag),
-          image: l.images[0]?.url ?? null,
-          avgRating: null,
-          reviewCount: 0,
-        }),
-      )
-    }
-
-    // Fill remaining slots with trending listings
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    const trendingIds = (
-      await this.prisma.marketplaceListingView.groupBy({
-        by: ["listingId"],
-        where: { createdAt: { gte: sevenDaysAgo } },
-        _count: { listingId: true },
-        orderBy: { _count: { listingId: "desc" } },
-        take: 4,
       })
-    ).map((v) => v.listingId)
+      if (!listing) return []
+      const ownServiceTypes = listing.services.map((s) => s.serviceType)
 
-    if (trendingIds.length > 0) {
-      const trending = await this.prisma.marketplaceListing.findMany({
+      return this.prisma.marketplaceListing.findMany({
         where: {
-          id: { in: trendingIds },
+          id: { not: listingId },
           status: ListingStatus.APPROVED,
+          OR: [
+            { categoryId: listing.categoryId },
+            ...(ownServiceTypes.length > 0
+              ? [
+                  {
+                    services: {
+                      some: {
+                        availability: "AVAILABLE" as const,
+                        serviceType: { in: ownServiceTypes },
+                      },
+                    },
+                  },
+                ]
+              : []),
+            { publisherId: listing.publisherId },
+          ],
         },
         include: {
           category: true,
           images: { where: { isPrimary: true }, take: 1 },
           tags: { include: { tag: true } },
         },
+        take: limit,
+        orderBy: { domainRating: "desc" },
       })
-
-      return trending.slice(0, 4).map((l: any) =>
-        this.toPublicListing({
-          ...l,
-          tags: l.tags.map((t: any) => t.tag),
-          image: l.images[0]?.url ?? null,
-          avgRating: null,
-          reviewCount: 0,
-        }),
-      )
     }
 
-    return []
+    // Trending - get most viewed in last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+
+    const trendingIds = await this.prisma.marketplaceListingView.groupBy({
+      by: ["listingId"],
+      where: { createdAt: { gte: sevenDaysAgo } },
+      _count: { listingId: true },
+      orderBy: { _count: { listingId: "desc" } },
+      take: limit,
+    })
+
+    const listings = await this.prisma.marketplaceListing.findMany({
+      where: {
+        id: { in: trendingIds.map((t) => t.listingId) },
+        status: ListingStatus.APPROVED,
+      },
+      include: {
+        category: true,
+        images: { where: { isPrimary: true }, take: 1 },
+        tags: { include: { tag: true } },
+      },
+    })
+
+    // Maintain trending order
+    return trendingIds
+      .map((t) => {
+        const listing = listings.find((l) => l.id === t.listingId)
+        if (!listing) return null
+        return {
+          ...listing,
+          tags: listing.tags.map((tag) => tag.tag),
+          image: listing.images[0]?.url || null,
+        }
+      })
+      .filter(Boolean)
   }
+
+  // =============================================================================
+  // ANALYTICS
+  // =============================================================================
 
   async getMarketplaceStats() {
     const [
@@ -1800,19 +1828,20 @@ export class MarketplaceService {
       totalServices,
       activeServices,
       servicesByTypeRaw,
-      topCategories,
     ] = await Promise.all([
       this.prisma.marketplaceListing.count(),
       this.prisma.marketplaceListing.count({
         where: { status: ListingStatus.APPROVED },
       }),
-      this.prisma.marketplaceReview.count({
-        where: { status: "APPROVED" },
-      }),
+      this.prisma.marketplaceReview.count({ where: { status: "APPROVED" } }),
       this.prisma.marketplaceReview.aggregate({
         _avg: { rating: true },
         where: { status: "APPROVED" },
       }),
+      // Phase 6: surface service-level cardinality. A listing with 3
+      // services counts as 1 above but 3 here, so per-service revenue
+      // dashboards have a denominator that matches the buyer-side
+      // inventory shape.
       this.prisma.listingService.count(),
       this.prisma.listingService.count({
         where: { availability: "AVAILABLE" },
@@ -1823,28 +1852,23 @@ export class MarketplaceService {
         _count: { id: true },
         _avg: { price: true },
       }),
-      this.prisma.marketplaceListing.groupBy({
-        by: ["categoryId"],
-        where: {
-          status: ListingStatus.APPROVED,
-          categoryId: { not: null },
-        },
-        _count: { id: true },
-        orderBy: { _count: { id: "desc" } },
-        take: 5,
-      }),
     ])
+
+    const topCategories = await this.prisma.marketplaceListing.groupBy({
+      by: ["categoryId"],
+      where: { status: ListingStatus.APPROVED, categoryId: { not: null } },
+      _count: { id: true },
+      orderBy: { _count: { id: "desc" } },
+      take: 5,
+    })
 
     const categoryData = await Promise.all(
       topCategories.map(async (c) => {
+        if (!c.categoryId) return null
         const category = await this.prisma.marketplaceCategory.findUnique({
-          where: { id: c.categoryId! },
+          where: { id: c.categoryId },
         })
-        return {
-          categoryId: c.categoryId,
-          categoryName: category?.name ?? "Unknown",
-          count: c._count.id,
-        }
+        return { category, count: c._count.id }
       }),
     )
 
@@ -1852,46 +1876,48 @@ export class MarketplaceService {
       totalListings,
       activeListings,
       totalReviews,
-      avgRating: avgRating._avg.rating ?? 0,
+      avgRating: avgRating._avg.rating || 0,
+      topCategories: categoryData,
+      // Phase 6: per-service breakdown.
       totalServices,
       activeServices,
-      topCategories: categoryData,
       servicesByType: servicesByTypeRaw.map((s) => ({
         serviceType: s.serviceType,
         count: s._count.id,
-        avgPrice: s._avg.price ? Number(s._avg.price) : 0,
+        avgPrice: s._avg.price !== null ? Number(s._avg.price) : null,
       })),
     }
   }
 
-  // ── Helpers ────────────────────────────────────────────────────────────
+  // =============================================================================
+  // HELPER METHODS
+  // =============================================================================
 
   private async verifyPublisherAccess(
     userId: string,
     publisherId: string,
   ): Promise<boolean> {
-    const membership = await this.prisma.publisherMembership.findUnique({
-      where: { userId_publisherId: { userId, publisherId } },
+    const membership = await this.prisma.publisherMembership.findFirst({
+      where: { userId, publisherId },
     })
     return !!membership
   }
 
   private async createAuditLog(
-    actorId: string,
-    organizationId: string | undefined,
+    userId: string,
+    organizationId: string | null,
     action: string,
-    entityId: string,
-    metadata?: Record<string, any>,
+    entityId?: string,
+    metadata?: any,
   ) {
-    if (!organizationId) return
     await this.prisma.auditLog.create({
       data: {
-        userId: actorId,
-        organizationId,
         action,
-        entityType: "MarketplaceListing",
+        entityType: "MARKETPLACE_LISTING",
         entityId,
-        metadata: metadata ?? {},
+        metadata,
+        userId,
+        organizationId: organizationId ?? null,
       },
     })
   }
