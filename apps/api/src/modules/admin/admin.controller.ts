@@ -796,14 +796,18 @@ export class AdminController {
     @Query("search") search?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @CurrentUser() user?: any,
   ) {
-    return this.admin.listMarketplaceListings({
-      status,
-      type,
-      search,
-      page: page ? parseInt(page, 10) : undefined,
-      limit: limit ? parseInt(limit, 10) : undefined,
-    })
+    return this.admin.listMarketplaceListings(
+      {
+        status,
+        type,
+        search,
+        page: page ? parseInt(page, 10) : undefined,
+        limit: limit ? parseInt(limit, 10) : undefined,
+      },
+      user,
+    )
   }
 
   @Get("marketplace/stats")
@@ -935,8 +939,9 @@ export class AdminController {
   }
 
   // Phase 6.5: site-ownership reassignment + OPS staff picker for the admin
-  // UI. Both staff-gated; reassignment writes an audit row with from/to.
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  // UI. Only SUPER_ADMIN can reassign; OPERATIONS can manage listings on
+  // their assigned sites but cannot transfer ownership.
+  @StaffRoles("SUPER_ADMIN")
   @Patch("websites/:id/assign")
   assignWebsite(
     @Param("id") id: string,

@@ -579,26 +579,32 @@ export class AdminService {
     })
   }
 
-  async listMarketplaceListings(params: {
-    status?: string
-    type?: string
-    search?: string
-    page?: number
-    limit?: number
-  }) {
+  async listMarketplaceListings(
+    params: {
+      status?: string
+      type?: string
+      search?: string
+      page?: number
+      limit?: number
+    },
+    user?: any,
+  ) {
     const page = Number.isFinite(params.page) ? Math.max(1, params.page!) : 1
     const limit = Number.isFinite(params.limit)
       ? Math.min(100, Math.max(1, params.limit!))
       : 20
     const where: any = {}
     if (params.status) where.status = params.status
-    // Phase 7: the listing-level `type` column is gone. The `type` filter
-    // now means "listings with at least one AVAILABLE service of this
-    // serviceType" — matches the public search semantics.
     if (params.type)
       where.services = {
         some: { availability: "AVAILABLE", serviceType: params.type as any },
       }
+
+    // Scope: OPS staff only sees listings on websites they manage.
+    if (user?.staffRole === "OPERATIONS") {
+      where.website = { managedByUserId: user.id }
+    }
+
     if (params.search) {
       where.OR = [
         { title: { contains: params.search, mode: "insensitive" } },

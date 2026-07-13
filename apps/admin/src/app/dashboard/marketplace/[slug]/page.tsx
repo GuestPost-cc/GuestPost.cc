@@ -7,6 +7,12 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -30,7 +36,7 @@ import Link from "next/link"
  * Action visibility mirrors the backend guards exactly:
  * status/featured/verified mutations are SUPER_ADMIN + OPERATIONS routes.
  */
-import { use } from "react"
+import { use, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
@@ -117,6 +123,45 @@ export default function AdminListingPreviewPage({
     statusMutation.isPending ||
     featuredMutation.isPending ||
     verifiedMutation.isPending
+
+  // ── Service management ──
+  const [showServices, setShowServices] = useState(false)
+  const [newService, setNewService] = useState({
+    serviceType: "GUEST_POST",
+    price: "",
+    turnaroundDays: "7",
+    revisionRounds: "2",
+  })
+
+  const addServiceMut = useMutation({
+    mutationFn: (data: {
+      serviceType: string
+      price: number
+      turnaroundDays: number
+      revisionRounds?: number
+    }) => api.admin.addPlatformListingService(listing?.id, data),
+    onSuccess: () => {
+      toast.success("Service added")
+      invalidate()
+      setNewService({
+        serviceType: "GUEST_POST",
+        price: "",
+        turnaroundDays: "7",
+        revisionRounds: "2",
+      })
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to add service"),
+  })
+
+  const pauseServiceMut = useMutation({
+    mutationFn: (serviceId: string) =>
+      api.admin.pausePlatformListingService(listing?.id, serviceId),
+    onSuccess: () => {
+      toast.success("Service paused")
+      invalidate()
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to pause service"),
+  })
 
   if (isLoading) {
     return (
@@ -357,6 +402,138 @@ export default function AdminListingPreviewPage({
           </CardContent>
         </Card>
       )}
+
+      {/* ── Services ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            Services
+            <Badge variant="outline">
+              {((listing as any).services ?? []).length}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!(listing as any).services ||
+          (listing as any).services.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No services configured.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {(listing as any).services.map((s: any) => (
+                <div
+                  key={s.id}
+                  className="flex items-center justify-between rounded-lg border p-3"
+                >
+                  <div>
+                    <p className="text-sm font-medium">
+                      {s.serviceType.replace(/_/g, " ")}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      ${Number(s.price).toFixed(2)} · {s.turnaroundDays} days ·{" "}
+                      {s.revisionRounds} revisions
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge
+                      variant={
+                        s.availability === "AVAILABLE"
+                          ? "default"
+                          : s.availability === "PAUSED"
+                            ? "secondary"
+                            : "outline"
+                      }
+                    >
+                      {s.availability.toLowerCase()}
+                    </Badge>
+                    {canModerate && s.availability !== "PAUSED" && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => pauseServiceMut.mutate(s.id)}
+                      >
+                        Pause
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {canModerate && (
+            <div className="mt-4 border-t pt-4 space-y-3">
+              <p className="text-sm font-medium">Add a service</p>
+              <div className="grid grid-cols-4 gap-3">
+                <Select
+                  value={newService.serviceType}
+                  onValueChange={(v) =>
+                    setNewService({ ...newService, serviceType: v })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[
+                      "GUEST_POST",
+                      "NICHE_EDIT",
+                      "EDITORIAL_LINK",
+                      "OUTREACH_LINK",
+                      "LOCAL_CITATION",
+                      "BLOG_ARTICLE",
+                      "SEO_CONTENT",
+                    ].map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t.replace(/_/g, " ")}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="Price"
+                  value={newService.price}
+                  onChange={(e) =>
+                    setNewService({ ...newService, price: e.target.value })
+                  }
+                />
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="TAT days"
+                  value={newService.turnaroundDays}
+                  onChange={(e) =>
+                    setNewService({
+                      ...newService,
+                      turnaroundDays: e.target.value,
+                    })
+                  }
+                />
+                <Button
+                  size="sm"
+                  disabled={
+                    !newService.price ||
+                    Number(newService.price) <= 0 ||
+                    addServiceMut.isPending
+                  }
+                  onClick={() =>
+                    addServiceMut.mutate({
+                      serviceType: newService.serviceType,
+                      price: Number(newService.price),
+                      turnaroundDays: Number(newService.turnaroundDays) || 7,
+                      revisionRounds: Number(newService.revisionRounds) || 2,
+                    })
+                  }
+                >
+                  {addServiceMut.isPending ? "Adding..." : "Add"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

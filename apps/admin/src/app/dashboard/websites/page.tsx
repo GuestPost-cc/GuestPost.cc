@@ -17,6 +17,12 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -25,11 +31,9 @@ import {
   DialogTitle,
   Input,
   Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Skeleton,
   Table,
   TableBody,
@@ -43,6 +47,7 @@ import { Plus } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 
 interface PlatformWebsiteRow {
   id: string
@@ -50,11 +55,13 @@ interface PlatformWebsiteRow {
   domain: string | null
   ownershipType: "PLATFORM" | "PUBLISHER"
   managedByUserId: string | null
-  managedBy?: { id: string; name: string | null } | null
+  managedBy?: { id: string; name: string | null; email: string } | null
 }
 
 export default function PlatformWebsitesPage() {
+  const { user } = useAuth()
   const qc = useQueryClient()
+  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
   const [reassignFor, setReassignFor] = useState<PlatformWebsiteRow | null>(
     null,
   )
@@ -195,16 +202,22 @@ export default function PlatformWebsitesPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setReassignFor(w)
-                          setPickedOwnerId(w.managedByUserId ?? "")
-                        }}
-                      >
-                        Reassign
-                      </Button>
+                      {isSuperAdmin ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setReassignFor(w)
+                            setPickedOwnerId(w.managedByUserId ?? "")
+                          }}
+                        >
+                          Reassign
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          {w.managedBy?.name || w.managedBy?.id || "—"}
+                        </span>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -239,25 +252,50 @@ export default function PlatformWebsitesPage() {
           <div className="space-y-4">
             <div className="space-y-1">
               <Label>New owner</Label>
-              <Select value={pickedOwnerId} onValueChange={setPickedOwnerId}>
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      opsQ.isLoading ? "Loading…" : "Pick an Ops member"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__unassigned__">
-                    — Unassigned (shared queue) —
-                  </SelectItem>
-                  {(opsQ.data ?? []).map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.name || o.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    className="w-full justify-between"
+                  >
+                    {pickedOwnerId && pickedOwnerId !== "__unassigned__"
+                      ? (opsQ.data ?? []).find((o) => o.id === pickedOwnerId)
+                          ?.name ||
+                        (opsQ.data ?? []).find((o) => o.id === pickedOwnerId)
+                          ?.email ||
+                        "Pick an Ops member"
+                      : pickedOwnerId === "__unassigned__"
+                        ? "Unassigned (shared queue)"
+                        : "Pick an Ops member"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search Ops members…" />
+                    <CommandList>
+                      <CommandEmpty>No Ops members found.</CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="__unassigned__"
+                          onSelect={() => setPickedOwnerId("__unassigned__")}
+                        >
+                          — Unassigned (shared queue) —
+                        </CommandItem>
+                        {(opsQ.data ?? []).map((o) => (
+                          <CommandItem
+                            key={o.id}
+                            value={o.id}
+                            onSelect={() => setPickedOwnerId(o.id)}
+                          >
+                            {o.name || o.email}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-1">
               <Label>Reason (audit log)</Label>

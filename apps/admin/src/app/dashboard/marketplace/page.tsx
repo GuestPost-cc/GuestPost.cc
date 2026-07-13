@@ -958,28 +958,30 @@ export default function AdminMarketplacePage() {
                             >
                               Delete
                             </DropdownMenuItem>
-                            {/* Reassign listing owner — only for platform listings */}
-                            {listing.ownerType === "PLATFORM" && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setReassignFor({
-                                    listingId: listing.id,
-                                    listingTitle: listing.title,
-                                    websiteId:
-                                      (listing as any).websiteId ?? null,
-                                    currentOwner:
-                                      listing.websiteManagedBy?.name ??
-                                      listing.websiteManagedBy?.email ??
-                                      null,
-                                  })
-                                  setPickedOwnerId(
-                                    (listing as any).websiteManagedBy?.id ?? "",
-                                  )
-                                }}
-                              >
-                                Reassign Owner
-                              </DropdownMenuItem>
-                            )}
+                            {/* Reassign listing owner — only for platform listings, SUPER_ADMIN only */}
+                            {listing.ownerType === "PLATFORM" &&
+                              isSuperAdmin && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setReassignFor({
+                                      listingId: listing.id,
+                                      listingTitle: listing.title,
+                                      websiteId:
+                                        (listing as any).websiteId ?? null,
+                                      currentOwner:
+                                        listing.websiteManagedBy?.name ??
+                                        listing.websiteManagedBy?.email ??
+                                        null,
+                                    })
+                                    setPickedOwnerId(
+                                      (listing as any).websiteManagedBy?.id ??
+                                        "",
+                                    )
+                                  }}
+                                >
+                                  Reassign Owner
+                                </DropdownMenuItem>
+                              )}
                           </>
                         )}
                       </DropdownMenuContent>
