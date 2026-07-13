@@ -17,6 +17,7 @@ import {
   DollarSign,
   Globe,
   Loader2,
+  Lock,
   Send,
 } from "lucide-react"
 import Link from "next/link"
@@ -25,6 +26,7 @@ import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { BriefForm } from "../../../../../components/BriefForm"
 import { api } from "../../../../../lib/api"
+import { useCustomerAccess } from "../../../../../lib/hooks/use-customer-access"
 
 interface Listing {
   id: string
@@ -64,6 +66,8 @@ export default function MarketplaceOrderPage() {
 
   const [briefData, setBriefData] = useState<Record<string, unknown>>({})
   const [campaignId, setCampaignId] = useState<string | null>(null)
+
+  const { canViewUrls: canViewUrl } = useCustomerAccess()
 
   const {
     data: listing,
@@ -225,7 +229,20 @@ export default function MarketplaceOrderPage() {
                 <p className="font-medium">{listing.title}</p>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Globe className="h-3.5 w-3.5" />
-                  {listing.websiteUrl ?? "—"}
+                  {listing.websiteUrl ? (
+                    canViewUrl ? (
+                      <span className="truncate">{listing.websiteUrl}</span>
+                    ) : (
+                      <span className="relative inline-block">
+                        <span className="select-none blur-sm">
+                          {listing.websiteUrl}
+                        </span>
+                        <Lock className="absolute left-0 top-0 h-3 w-3" />
+                      </span>
+                    )
+                  ) : (
+                    "—"
+                  )}
                 </div>
               </div>
             </div>
