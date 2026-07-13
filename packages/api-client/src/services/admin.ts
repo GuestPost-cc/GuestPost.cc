@@ -332,6 +332,20 @@ export class AdminService {
       json: data,
     })
   }
+  createPlatformWebsite(data: {
+    url: string
+    name?: string
+    category?: string
+    language?: string
+    country?: string
+    domainRating?: number
+    monthlyTraffic?: number
+    price?: number
+    turnaroundDays?: number
+    managedByUserId?: string
+  }) {
+    return this.client.post<any>("/admin/websites", { json: data })
+  }
   listOpsStaff() {
     return this.client.get<
       Array<{ id: string; name: string | null; email: string }>

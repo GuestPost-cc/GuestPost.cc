@@ -39,6 +39,7 @@ import {
   TableRow,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { Plus } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
@@ -93,6 +94,52 @@ export default function PlatformWebsitesPage() {
     onError: (e: Error) => toast.error(e.message || "Failed to reassign"),
   })
 
+  // ── Create platform website state ──
+  const [showCreate, setShowCreate] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    url: "",
+    name: "",
+    category: "",
+    language: "",
+    country: "",
+    domainRating: "",
+    monthlyTraffic: "",
+  })
+
+  const createMut = useMutation({
+    mutationFn: () =>
+      api.admin.createPlatformWebsite({
+        url: createForm.url.trim(),
+        name: createForm.name.trim() || undefined,
+        category: createForm.category.trim() || undefined,
+        language: createForm.language.trim() || undefined,
+        country: createForm.country.trim() || undefined,
+        domainRating: createForm.domainRating
+          ? Number(createForm.domainRating)
+          : undefined,
+        monthlyTraffic: createForm.monthlyTraffic
+          ? Number(createForm.monthlyTraffic)
+          : undefined,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin", "platform-websites"] })
+      toast.success("Platform website created")
+      setShowCreate(false)
+      setCreateForm({
+        url: "",
+        name: "",
+        category: "",
+        language: "",
+        country: "",
+        domainRating: "",
+        monthlyTraffic: "",
+      })
+    },
+    onError: (e: Error) => toast.error(e.message || "Failed to create website"),
+  })
+
+  const canCreate = createForm.url.trim().length > 0
+
   return (
     <div className="space-y-6">
       <div>
@@ -101,6 +148,13 @@ export default function PlatformWebsitesPage() {
           Reassign platform sites between Operations staff. In-flight orders are
           not migrated; new orders + tickets route to the new owner.
         </p>
+      </div>
+
+      <div className="flex items-center justify-end">
+        <Button onClick={() => setShowCreate(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          Create Website
+        </Button>
       </div>
 
       <Card>
@@ -232,6 +286,115 @@ export default function PlatformWebsitesPage() {
               disabled={!pickedOwnerId || reassignMut.isPending}
             >
               {reassignMut.isPending ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create platform website dialog */}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Platform Website</DialogTitle>
+            <DialogDescription>
+              Add a website the platform owns. DNS verification is automatic for
+              platform-owned sites.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Website URL *</Label>
+              <Input
+                placeholder="https://example.com"
+                value={createForm.url}
+                onChange={(e) =>
+                  setCreateForm({ ...createForm, url: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label>Name</Label>
+                <Input
+                  placeholder="My Site"
+                  value={createForm.name}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, name: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Category</Label>
+                <Input
+                  placeholder="Technology"
+                  value={createForm.category}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, category: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Language</Label>
+                <Input
+                  placeholder="en"
+                  value={createForm.language}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, language: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Country</Label>
+                <Input
+                  placeholder="US"
+                  value={createForm.country}
+                  onChange={(e) =>
+                    setCreateForm({ ...createForm, country: e.target.value })
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Domain Rating</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={100}
+                  placeholder="60"
+                  value={createForm.domainRating}
+                  onChange={(e) =>
+                    setCreateForm({
+                      ...createForm,
+                      domainRating: e.target.value,
+                    })
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Monthly Traffic</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  placeholder="10000"
+                  value={createForm.monthlyTraffic}
+                  onChange={(e) =>
+                    setCreateForm({
+                      ...createForm,
+                      monthlyTraffic: e.target.value,
+                    })
+                  }
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreate(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => createMut.mutate()}
+              disabled={!canCreate || createMut.isPending}
+            >
+              {createMut.isPending ? "Creating..." : "Create"}
             </Button>
           </DialogFooter>
         </DialogContent>
