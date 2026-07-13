@@ -240,6 +240,7 @@ export class AdminService {
     status?: string
     type?: string
     search?: string
+    ownerType?: string
     page?: number
     limit?: number
   }) {

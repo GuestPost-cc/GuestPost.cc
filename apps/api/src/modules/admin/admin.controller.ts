@@ -794,20 +794,18 @@ export class AdminController {
     @Query("status") status?: string,
     @Query("type") type?: string,
     @Query("search") search?: string,
+    @Query("ownerType") ownerType?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
-    @CurrentUser() user?: any,
   ) {
-    return this.admin.listMarketplaceListings(
-      {
-        status,
-        type,
-        search,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
-      },
-      user,
-    )
+    return this.admin.listMarketplaceListings({
+      status,
+      type,
+      search,
+      ownerType,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    })
   }
 
   @Get("marketplace/stats")
@@ -962,9 +960,10 @@ export class AdminController {
   listWebsites(
     @Query("ownershipType") ownershipType?: string,
     @Query() pagination?: any,
+    @CurrentUser() user?: any,
   ) {
     const p = parsePagination(pagination?.take, pagination?.skip)
-    return this.admin.listWebsites(ownershipType, p.take, p.skip)
+    return this.admin.listWebsites(ownershipType, p.take, p.skip, user)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")

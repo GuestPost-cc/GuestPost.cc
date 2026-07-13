@@ -579,16 +579,14 @@ export class AdminService {
     })
   }
 
-  async listMarketplaceListings(
-    params: {
-      status?: string
-      type?: string
-      search?: string
-      page?: number
-      limit?: number
-    },
-    user?: any,
-  ) {
+  async listMarketplaceListings(params: {
+    status?: string
+    type?: string
+    search?: string
+    ownerType?: string
+    page?: number
+    limit?: number
+  }) {
     const page = Number.isFinite(params.page) ? Math.max(1, params.page!) : 1
     const limit = Number.isFinite(params.limit)
       ? Math.min(100, Math.max(1, params.limit!))
@@ -599,11 +597,7 @@ export class AdminService {
       where.services = {
         some: { availability: "AVAILABLE", serviceType: params.type as any },
       }
-
-    // Scope: OPS staff only sees listings on websites they manage.
-    if (user?.staffRole === "OPERATIONS") {
-      where.website = { managedByUserId: user.id }
-    }
+    if (params.ownerType) where.ownerType = params.ownerType
 
     if (params.search) {
       where.OR = [
@@ -1124,9 +1118,14 @@ export class AdminService {
     return updated
   }
 
-  async listWebsites(ownershipType?: string, take = 50, skip = 0) {
+  async listWebsites(ownershipType?: string, take = 50, skip = 0, user?: any) {
     const where: any = {}
     if (ownershipType) where.ownershipType = ownershipType
+
+    // Scope: OPS staff only sees websites assigned to them.
+    if (user?.staffRole === "OPERATIONS") {
+      where.managedByUserId = user.id
+    }
 
     const [websites, total] = await Promise.all([
       this.prisma.website.findMany({

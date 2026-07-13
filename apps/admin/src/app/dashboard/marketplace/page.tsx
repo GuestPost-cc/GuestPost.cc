@@ -126,6 +126,7 @@ export default function AdminMarketplacePage() {
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
+  const [ownerTypeFilter, setOwnerTypeFilter] = useState("all")
   const [page, setPage] = useState(1)
   // Moderation + platform-listing creation are SUPER_ADMIN/OPERATIONS
   const canManage =
@@ -233,6 +234,7 @@ export default function AdminMarketplacePage() {
       const params: any = { page, limit: 20 }
       if (statusFilter !== "all") params.status = statusFilter
       if (typeFilter !== "all") params.type = typeFilter
+      if (ownerTypeFilter !== "all") params.ownerType = ownerTypeFilter
       if (search) params.search = search
       const res = await api.admin.listMarketplaceListings(params)
       return res
@@ -630,6 +632,38 @@ export default function AdminMarketplacePage() {
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
+        </div>
+        <div className="flex gap-1">
+          <Button
+            variant={ownerTypeFilter === "all" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setOwnerTypeFilter("all")
+              setPage(1)
+            }}
+          >
+            All
+          </Button>
+          <Button
+            variant={ownerTypeFilter === "PLATFORM" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setOwnerTypeFilter("PLATFORM")
+              setPage(1)
+            }}
+          >
+            Platform
+          </Button>
+          <Button
+            variant={ownerTypeFilter === "PUBLISHER" ? "default" : "outline"}
+            size="sm"
+            onClick={() => {
+              setOwnerTypeFilter("PUBLISHER")
+              setPage(1)
+            }}
+          >
+            Publisher
+          </Button>
         </div>
         <div className="flex gap-2">
           <Select
