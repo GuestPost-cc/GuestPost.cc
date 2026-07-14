@@ -26,7 +26,6 @@ import {
   ArrowUpCircle,
   Clock,
   CreditCard,
-  Download,
   FileText,
   Plus,
   RefreshCw,
@@ -42,17 +41,19 @@ import { api } from "../../../lib/api"
 
 interface WalletData {
   id: string
-  availableBalance: string | number
-  reservedBalance: string | number
+  availableBalance: number
+  reservedBalance: number
   currency: string
+  version: number
 }
 
 interface Transaction {
   id: string
   type: string
-  amount: string | number
+  amount: number
+  description: string | null
+  reference: string | null
   createdAt: string
-  description?: string | null
 }
 
 const transactionIcons: Record<string, React.ElementType> = {
@@ -75,24 +76,14 @@ const transactionColors: Record<string, string> = {
 
 function WalletSkeleton() {
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card>
-        <CardHeader className="pb-2">
-          <Skeleton className="h-4 w-24" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-10 w-32" />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader className="pb-2">
-          <Skeleton className="h-4 w-24" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-10 w-32" />
-        </CardContent>
-      </Card>
-    </div>
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-24" />
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="h-10 w-40" />
+      </CardContent>
+    </Card>
   )
 }
 
@@ -100,18 +91,17 @@ function TransactionsSkeleton() {
   return (
     <div className="space-y-3">
       {[...Array(5)].map((_, i) => (
-        <div key={i} className="flex items-center gap-4 rounded-lg border p-4">
-          <Skeleton className="h-8 w-8 rounded-full" />
-          <div className="flex-1 space-y-2">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-3 w-24" />
-          </div>
-          <Skeleton className="h-5 w-20" />
-        </div>
+        <Skeleton key={i} className="h-16 w-full" />
       ))}
     </div>
   )
 }
+
+const depositSchema = z.object({
+  amount: z.coerce.number().min(1, "Minimum deposit is $1.00"),
+})
+
+type DepositForm = z.infer<typeof depositSchema>
 
 export default function BillingPage() {
   const queryClient = useQueryClient()
@@ -128,12 +118,8 @@ export default function BillingPage() {
     setValue,
     reset,
     formState: { errors },
-  } = useForm({
-    resolver: zodResolver(
-      z.object({
-        amount: z.coerce.number().positive("Amount must be positive"),
-      }),
-    ),
+  } = useForm<DepositForm>({
+    resolver: zodResolver(depositSchema),
     defaultValues: { amount: 0 },
   })
 
@@ -142,7 +128,7 @@ export default function BillingPage() {
     isLoading: walletLoading,
     error: walletError,
     refetch: refetchWallet,
-  } = useQuery<WalletData>({
+  } = useQuery({
     queryKey: ["wallet"],
     queryFn: () => api.billing.getWallet(),
   })
@@ -152,9 +138,9 @@ export default function BillingPage() {
     isLoading: transactionsLoading,
     error: transactionsError,
     refetch: refetchTransactions,
-  } = useQuery<Transaction[]>({
+  } = useQuery({
     queryKey: ["transactions"],
-    queryFn: () => api.billing.listTransactions() as Promise<Transaction[]>,
+    queryFn: () => api.billing.listTransactions(),
   })
 
   const {
@@ -166,9 +152,11 @@ export default function BillingPage() {
     queryFn: () => api.orders.list() as Promise<any[]>,
   })
 
+  // Reserved balance: sum of amounts on DRAFT/SUBMITTED orders
   const reservedBalance = (ordersData ?? [])
     .filter(
-      (o: any) => !["COMPLETED", "CANCELLED", "REFUNDED"].includes(o.status),
+      (o: any) =>
+        o.status === "DRAFT" || o.status === "SUBMITTED" || o.status === "PAID",
     )
     .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
 
@@ -183,28 +171,37 @@ export default function BillingPage() {
       setValue("amount", Math.ceil(amt), { shouldValidate: true })
     }
     if (ret) setReturnTo(ret)
-  }, [setValue])
+
+    // After a successful Stripe redirect (?success=true), check sessionStorage
+    // for a pending returnTo from before the Stripe redirect.
+    if (sp.get("success") === "true") {
+      const pendingReturn = sessionStorage.getItem("deposit_returnTo")
+      if (pendingReturn) {
+        sessionStorage.removeItem("deposit_returnTo")
+        router.replace(pendingReturn)
+      }
+    }
+  }, [setValue, router])
 
   const depositMutation = useMutation({
-    mutationFn: (amount: number) => {
+    mutationFn: async (amount: number) => {
       if (!walletData?.id) throw new Error("Wallet not loaded")
-      return api.billing.deposit({ walletId: walletData.id, amount })
-    },
-    onSuccess: (_data, variables) => {
-      toast.success(`Deposited $${variables.toFixed(2)} successfully!`)
-      queryClient.invalidateQueries({ queryKey: ["wallet"] })
-      queryClient.invalidateQueries({ queryKey: ["transactions"] })
-      setShowDepositDialog(false)
-      reset()
-      // Bounce back to checkout (or wherever) now that funds are available.
-      if (returnTo) {
-        const dest = returnTo
-        setReturnTo(null)
-        router.push(dest)
+      const session = await api.billing.createCheckoutSession({
+        walletId: walletData.id,
+        amount,
+      })
+      if (session?.url) {
+        // Preserve returnTo through Stripe redirect cycle
+        if (returnTo) {
+          sessionStorage.setItem("deposit_returnTo", returnTo)
+        }
+        window.location.href = session.url
+      } else {
+        throw new Error("No checkout URL returned")
       }
     },
     onError: () => {
-      toast.error("Failed to process deposit")
+      toast.error("Failed to initiate deposit")
     },
   })
 
@@ -225,46 +222,32 @@ export default function BillingPage() {
     .reduce((sum: number, tx: Transaction) => sum + Number(tx.amount), 0)
 
   const _totalSpent = (transactionsData ?? [])
-    .filter((tx: Transaction) => tx.type === "PURCHASE")
+    .filter(
+      (tx: Transaction) => tx.type === "PURCHASE" || tx.type === "RESERVATION",
+    )
     .reduce(
       (sum: number, tx: Transaction) => sum + Math.abs(Number(tx.amount)),
       0,
     )
 
+  // Combine errors from all queries
   const billingError = walletError || transactionsError || ordersError
 
   if (billingError) {
     return (
-      <ErrorState
-        title="Failed to load billing"
-        description={(billingError as Error).message}
-        onRetry={() => {
-          refetchWallet()
-          refetchTransactions()
-          refetchOrders()
-        }}
-      />
-    )
-  }
-
-  if (walletLoading) {
-    return (
       <div className="space-y-6">
-        <div>
+        <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight">Billing</h1>
-          <p className="text-muted-foreground">
-            Manage your wallet and payments
-          </p>
         </div>
-        <WalletSkeleton />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-6 w-32" />
-          </CardHeader>
-          <CardContent>
-            <TransactionsSkeleton />
-          </CardContent>
-        </Card>
+        <ErrorState
+          title="Something went wrong"
+          description={(billingError as Error).message}
+          onRetry={() => {
+            refetchWallet()
+            refetchTransactions()
+            refetchOrders()
+          }}
+        />
       </div>
     )
   }
@@ -284,128 +267,166 @@ export default function BillingPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="bg-gradient-to-br from-primary/5 to-primary/10">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Wallet className="h-4 w-4" />
-              Available Balance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold font-mono">
-              ${Number(walletData?.availableBalance ?? 0).toFixed(2)}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {walletData?.currency || "USD"}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Wallet Cards */}
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        {walletLoading ? (
+          <>
+            <WalletSkeleton />
+            <WalletSkeleton />
+            <WalletSkeleton />
+            <WalletSkeleton />
+          </>
+        ) : walletData ? (
+          <>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Available Balance
+                </CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold font-mono">
+                  ${Number(walletData.availableBalance).toFixed(2)}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Ready to spend
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <Clock className="h-4 w-4" />
-              Reserved
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold font-mono">
-              ${reservedBalance.toFixed(2)}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Funds in progress
-            </p>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Reserved Balance
+                </CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold font-mono">
+                  ${reservedBalance.toFixed(2)}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  In pending orders
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-              <CreditCard className="h-4 w-4" />
-              Total Deposited
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold font-mono">
-              ${totalDeposits.toFixed(2)}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              All time deposits
-            </p>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total Deposited
+                </CardTitle>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold font-mono">
+                  ${totalDeposits.toFixed(2)}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  All time deposits
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Version
+                </CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold font-mono">
+                  {walletData.version}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Optimistic lock counter
+                </p>
+              </CardContent>
+            </Card>
+          </>
+        ) : null}
       </div>
 
+      {/* Transactions */}
       <Card>
-        <CardHeader className="pb-4">
+        <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle>Transaction History</CardTitle>
-              <CardDescription>Your recent wallet transactions</CardDescription>
-            </div>
-            <div className="relative">
+            <CardTitle>Transaction History</CardTitle>
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Search transactions..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 w-64"
+                className="pl-9"
               />
             </div>
           </div>
+          <CardDescription>
+            All wallet activity, including deposits, payments, and refunds.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {transactionsLoading ? (
             <TransactionsSkeleton />
           ) : filteredTransactions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground/50" />
-              <h3 className="mt-4 text-lg font-medium">No transactions</h3>
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <Wallet className="h-12 w-12 text-muted-foreground" />
+              <h3 className="mt-4 text-lg font-semibold">No transactions</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 {searchQuery
-                  ? "Try adjusting your search"
-                  : "Your transaction history will appear here"}
+                  ? "No transactions match your search."
+                  : "Deposit funds to get started."}
               </p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
               {filteredTransactions.map((tx: Transaction) => {
-                const Icon = transactionIcons[tx.type] || RefreshCw
-                const colorClass =
-                  transactionColors[tx.type] || "text-muted-foreground"
-                const isNegative = Number(tx.amount) < 0
-
+                const Icon = transactionIcons[tx.type] || FileText
+                const colorClass = transactionColors[tx.type] || ""
+                const isNegative =
+                  tx.type === "PURCHASE" ||
+                  tx.type === "RESERVATION" ||
+                  tx.type === "WITHDRAWAL"
                 return (
                   <div
                     key={tx.id}
-                    className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                    className="flex items-center gap-4 rounded-lg border p-4"
                   >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-full bg-muted ${colorClass}`}
-                      >
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="font-medium capitalize">
-                          {tx.type.replace(/_/g, " ").toLowerCase()}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {tx.description || tx.id.slice(0, 8)} •{" "}
-                          {formatDistanceToNow(new Date(tx.createdAt), {
-                            addSuffix: true,
-                          })}
-                        </p>
-                      </div>
+                    <div className={`${colorClass}`}>
+                      <Icon className="h-5 w-5" />
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`font-mono font-medium ${isNegative ? "text-red-500" : "text-emerald-500"}`}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium capitalize">
+                        {tx.type.toLowerCase().replace(/_/g, " ")}
+                        {tx.reference && (
+                          <span className="ml-1 text-xs text-muted-foreground font-mono">
+                            #{tx.reference}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {tx.description || (
+                          <span className="italic">No description</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p
+                        className={`text-sm font-mono font-medium ${
+                          isNegative ? "text-red-600" : "text-emerald-600"
+                        }`}
                       >
                         {isNegative ? "-" : "+"}$
                         {Math.abs(Number(tx.amount)).toFixed(2)}
-                      </span>
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(tx.createdAt), {
+                          addSuffix: true,
+                        })}
+                      </p>
                     </div>
                   </div>
                 )
@@ -415,33 +436,7 @@ export default function BillingPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Invoices</CardTitle>
-              <CardDescription>Your billing invoices</CardDescription>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => toast.info("No invoices to download yet")}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download All
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <FileText className="h-10 w-10 text-muted-foreground/50" />
-            <p className="mt-2 text-sm text-muted-foreground">
-              No invoices yet. Invoices will be generated automatically.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* Deposit Dialog */}
       <Dialog open={showDepositDialog} onOpenChange={setShowDepositDialog}>
         <DialogContent className="sm:max-w-[400px]">
           <form
@@ -456,7 +451,8 @@ export default function BillingPage() {
                 payment provider.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4 space-y-4">
+
+            <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="amount">Amount (USD)</Label>
                 <div className="relative">
@@ -469,29 +465,30 @@ export default function BillingPage() {
                     step="0.01"
                     min="1"
                     placeholder="0.00"
-                    {...register("amount", { valueAsNumber: true })}
                     className="pl-7"
+                    {...register("amount", { valueAsNumber: true })}
                   />
                 </div>
-                {errors.amount?.message && (
+                {errors.amount && (
                   <p className="text-sm text-destructive">
                     {errors.amount.message}
                   </p>
                 )}
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                {[50, 100, 250, 500, 1000, 2500].map((amount) => (
+              <div className="flex gap-2">
+                {[50, 100, 250, 500].map((amt) => (
                   <Button
-                    key={amount}
-                    variant={watch("amount") === amount ? "default" : "outline"}
-                    size="sm"
+                    key={amt}
                     type="button"
-                    onClick={() =>
-                      setValue("amount", amount, { shouldValidate: true })
-                    }
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => {
+                      setValue("amount", amt, { shouldValidate: true })
+                    }}
                   >
-                    ${amount}
+                    ${amt}
                   </Button>
                 ))}
               </div>
@@ -504,6 +501,7 @@ export default function BillingPage() {
                 </p>
               </div>
             </div>
+
             <DialogFooter>
               <Button
                 type="button"
