@@ -53,6 +53,17 @@ export class BillingService {
     )
   }
 
+  checkDepositStatus(walletId: string, sessionId: string) {
+    return this.client.get<{
+      status: "COMPLETED" | "PAID_PENDING_WEBHOOK" | "PENDING"
+      processed: boolean
+      walletBalance: number | null
+      transactionId: string | null
+    }>(`/billing/wallet/${walletId}/deposit-status`, {
+      params: { sessionId },
+    })
+  }
+
   withdraw(data: {
     walletId: string
     amount: number

@@ -27,13 +27,14 @@ import {
   Clock,
   CreditCard,
   FileText,
+  Loader2,
   Plus,
   RefreshCw,
   Search,
   Wallet,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -108,6 +109,10 @@ export default function BillingPage() {
   const router = useRouter()
   const [showDepositDialog, setShowDepositDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const [processingPayment, setProcessingPayment] = useState(false)
+  const pollTimer = useRef<ReturnType<typeof setInterval> | undefined>(
+    undefined,
+  )
   // Set when checkout sends the customer here to top up; we return them after.
   const [returnTo, setReturnTo] = useState<string | null>(null)
 
@@ -160,6 +165,51 @@ export default function BillingPage() {
     )
     .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
 
+  // ── Post-Stripe redirect: poll wallet until webhook credits it ──────
+  // The webhook is the ONLY code path that credits the wallet. The frontend
+  // just polls the read-only deposit-status endpoint + wallet balance until
+  // the webhook fires, then shows success.
+  //
+  // Scenarios handled:
+  //   1. Webhook fires fast   → deposit-status returns COMPLETED → success
+  //   2. Webhook slow/missing → polls 2s, timeout after 60s → graceful message
+  //   3. Reload after success → deposit-status returns COMPLETED → success
+  //   4. Stale ?success=true  → no sessionStorage, no sessionId → show billing page
+  const checkDeposit = useCallback(async () => {
+    const sessionId = sessionStorage.getItem("deposit_sessionId") ?? ""
+    const walletId = sessionStorage.getItem("deposit_walletId") ?? ""
+
+    if (!sessionId || !walletId) {
+      // Stale URL — nothing to poll.
+      setProcessingPayment(false)
+      return
+    }
+
+    try {
+      const result = await api.billing.checkDepositStatus(walletId, sessionId)
+      if (result.processed) {
+        clearInterval(pollTimer.current)
+        sessionStorage.removeItem("deposit_sessionId")
+        sessionStorage.removeItem("deposit_walletId")
+        sessionStorage.removeItem("deposit_expectedAmount")
+        sessionStorage.removeItem("deposit_timestamp")
+        toast.success("Deposit successful!")
+        queryClient.invalidateQueries({ queryKey: ["wallet"] })
+        queryClient.invalidateQueries({ queryKey: ["transactions"] })
+        const pendingReturn = sessionStorage.getItem("deposit_returnTo")
+        if (pendingReturn) {
+          sessionStorage.removeItem("deposit_returnTo")
+          router.replace(pendingReturn)
+        } else {
+          setProcessingPayment(false)
+        }
+      }
+      // If not processed yet, just wait for the next poll cycle.
+    } catch {
+      // API error — keep polling, the timeout will handle the failure case.
+    }
+  }, [router, queryClient])
+
   // Auto-open the deposit dialog (prefilled) when checkout redirects here for a
   // top-up: /dashboard/billing?deposit=<amount>&returnTo=<url>
   useEffect(() => {
@@ -172,16 +222,34 @@ export default function BillingPage() {
     }
     if (ret) setReturnTo(ret)
 
-    // After a successful Stripe redirect (?success=true), check sessionStorage
-    // for a pending returnTo from before the Stripe redirect.
     if (sp.get("success") === "true") {
-      const pendingReturn = sessionStorage.getItem("deposit_returnTo")
-      if (pendingReturn) {
-        sessionStorage.removeItem("deposit_returnTo")
-        router.replace(pendingReturn)
+      // Stripe appends ?session_id=cs_xxx to the success_url via the
+      // {CHECKOUT_SESSION_ID} placeholder in the backend's success_url.
+      const sid = sp.get("session_id")
+      if (sid) sessionStorage.setItem("deposit_sessionId", sid)
+
+      // Only start polling if we have a session ID to check.
+      const sessionId = sessionStorage.getItem("deposit_sessionId")
+      const walletId = sessionStorage.getItem("deposit_walletId")
+      if (sessionId && walletId) {
+        setProcessingPayment(true)
+        checkDeposit()
+        pollTimer.current = setInterval(checkDeposit, 2000)
+        // Timeout after 60 seconds — webhook should fire by then.
+        setTimeout(() => {
+          clearInterval(pollTimer.current)
+          setProcessingPayment(false)
+          toast(
+            "Payment received. Your wallet is still being updated. Refresh this page shortly.",
+          )
+        }, 60000)
       }
+      // No sessionId + walletId = stale URL → just show billing page.
     }
-  }, [setValue, router])
+
+    return () => clearInterval(pollTimer.current)
+    // biome-ignore lint/correctness/useExhaustiveDependencies: router is used inside checkDeposit, not directly here
+  }, [setValue, checkDeposit])
 
   const depositMutation = useMutation({
     mutationFn: async (amount: number) => {
@@ -191,7 +259,10 @@ export default function BillingPage() {
         amount,
       })
       if (session?.url) {
-        // Preserve returnTo through Stripe redirect cycle
+        // Preserve returnTo and expected amount through Stripe redirect cycle
+        sessionStorage.setItem("deposit_expectedAmount", String(amount))
+        sessionStorage.setItem("deposit_timestamp", String(Date.now()))
+        sessionStorage.setItem("deposit_walletId", walletData!.id)
         if (returnTo) {
           sessionStorage.setItem("deposit_returnTo", returnTo)
         }
@@ -232,6 +303,19 @@ export default function BillingPage() {
 
   // Combine errors from all queries
   const billingError = walletError || transactionsError || ordersError
+
+  if (processingPayment) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <h2 className="text-xl font-semibold">Processing your payment…</h2>
+        <p className="text-muted-foreground text-sm max-w-md text-center">
+          Your payment was successful. We&apos;re waiting for the confirmation
+          to credit your wallet. This usually takes a few seconds.
+        </p>
+      </div>
+    )
+  }
 
   if (billingError) {
     return (

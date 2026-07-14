@@ -80,7 +80,7 @@ export class BillingService {
           },
         ],
         mode: "payment",
-        success_url: `${process.env.NEXT_PUBLIC_PORTAL_URL || "http://localhost:3001"}/dashboard/billing?success=true`,
+        success_url: `${process.env.NEXT_PUBLIC_PORTAL_URL || "http://localhost:3001"}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${process.env.NEXT_PUBLIC_PORTAL_URL || "http://localhost:3001"}/dashboard/billing?canceled=true`,
         client_reference_id: walletId,
         metadata: {
@@ -978,5 +978,62 @@ export class BillingService {
     })
 
     return result
+  }
+
+  // ── Check deposit status (read-only) ────────────────────────────────
+  // Called by the frontend after a successful Stripe redirect to check
+  // whether the webhook has already credited the wallet. This endpoint
+  // NEVER credits the wallet — the webhook is the only code path allowed
+  // to move money. It simply retrieves the Stripe session and checks
+  // whether a matching Transaction row exists in our ledger.
+  async checkDepositStatus(walletId: string, sessionId: string) {
+    if (!this.stripe) {
+      throw new BadRequestException("Stripe not configured")
+    }
+
+    // Check our ledger first — if the webhook already fired, we have a
+    // Transaction row with reference = sessionId.
+    const existingTx = await this.prisma.transaction.findFirst({
+      where: { reference: sessionId, type: "DEPOSIT" },
+    })
+
+    if (existingTx) {
+      // Already processed — return success with the wallet state.
+      const wallet = await this.prisma.wallet.findUniqueOrThrow({
+        where: { id: walletId },
+      })
+      return {
+        status: "COMPLETED",
+        processed: true,
+        walletBalance: Number(wallet.availableBalance),
+        transactionId: existingTx.id,
+      }
+    }
+
+    // Not in our ledger yet. Retrieve the Stripe session to see if the
+    // payment actually succeeded (without crediting the wallet).
+    const session = await this.stripe.checkout.sessions.retrieve(sessionId)
+    if (!session) {
+      throw new NotFoundException("Stripe session not found")
+    }
+
+    // Verify this session belongs to this wallet.
+    const refWalletId =
+      session.metadata?.walletId || session.client_reference_id
+    if (refWalletId !== walletId) {
+      throw new BadRequestException(
+        "Session does not match the specified wallet",
+      )
+    }
+
+    const paid =
+      session.payment_status === "paid" || session.status === "complete"
+
+    return {
+      status: paid ? "PAID_PENDING_WEBHOOK" : "PENDING",
+      processed: false,
+      walletBalance: null,
+      transactionId: null,
+    }
   }
 }

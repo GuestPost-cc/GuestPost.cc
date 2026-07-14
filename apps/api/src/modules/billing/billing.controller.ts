@@ -7,6 +7,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   type RawBodyRequest,
   Req,
   UseGuards,
@@ -64,6 +65,15 @@ export class BillingController {
     @CurrentUser() user: any,
   ) {
     return this.billing.createCheckoutSession(walletId, body.amount, user)
+  }
+
+  @Public()
+  @Get("wallet/:id/deposit-status")
+  checkDepositStatus(
+    @Param("id") walletId: string,
+    @Query("sessionId") sessionId: string,
+  ) {
+    return this.billing.checkDepositStatus(walletId, sessionId)
   }
 
   @Public()
