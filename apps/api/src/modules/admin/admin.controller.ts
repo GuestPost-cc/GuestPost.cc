@@ -5,16 +5,16 @@ import {
   Delete,
   Get,
   Header,
-  Headers,
   Param,
   Patch,
   Post,
   Put,
   Query,
+  Req,
   Res,
   UseGuards,
 } from "@nestjs/common"
-import { Response } from "express"
+import { Request, Response } from "express"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { Permissions } from "../../common/decorators/permissions.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
@@ -56,6 +56,7 @@ import {
   ToggleListingFeaturedDto,
   ToggleListingVerifiedDto,
   UpdateListingStatusDto,
+  UpdatePlatformFeeDto,
   UpdatePublisherTierDto,
   UpdateStaffRoleDto,
   UpdateSupportTicketStatusDto,
@@ -646,6 +647,19 @@ export class AdminController {
     return this.payoutExecution.cancelExecution(id, user.id)
   }
 
+  // FIN-06: source IP + User-Agent for the decrypt audit event MUST come
+  // from server-resolved request properties, NOT from client-spoofable
+  // headers. Previous implementation read `x-forwarded-for` directly from
+  // `@Headers("x-forwarded-for")`, which any client can forge — a malicious
+  // actor could file a decrypt request and leave an arbitrary IP in the
+  // audit log, covering their tracks for finance investigation. The fix:
+  // `req.ip` reads the Express-resolved client IP, which under
+  // `server.set("trust proxy", 1)` uses the FIRST hop in `X-Forwarded-For`
+  // as set by our single trusted reverse proxy (see main.ts:97). An
+  // attacker cannot bump `trust proxy` above 1 and cannot influence which
+  // hop Express picks. `user-agent` stays informational-only (inherently
+  // client-controlled and outside the spoofable-header threat model) but is
+  // now read from the same Request object for consistency.
   @Post("payout-methods/:id/decrypt")
   @UseGuards(PermissionsGuard)
   @Permissions("FINANCIAL_DATA_DECRYPT")
@@ -656,20 +670,20 @@ export class AdminController {
     @Param("id") id: string,
     @Body() body: DecryptPayoutMethodDto,
     @CurrentUser() user: any,
-    @Headers("x-forwarded-for") forwardedFor?: string,
-    @Headers("user-agent") userAgent?: string,
+    @Req() req: Request,
   ) {
-    const ip = forwardedFor ?? "unknown"
+    const ip = req.ip ?? "unknown"
+    const userAgent = req.headers["user-agent"] ?? "unknown"
     return this.payouts.decryptPayoutMethod(
       id,
       user.id,
       body.reason,
       ip,
-      userAgent ?? "unknown",
+      userAgent,
     )
   }
 
-  // ── Audit log browsing — staff-action forensics is SUPER_ADMIN-only ────
+  // ── Audit log browsing — staff-action forensics is SUPER_ADMIN-only ─────
   // Phase 7.7 A2: requestId filter added. EXACT-MATCH ONLY — never accept
   // contains/startsWith/endsWith operators here. RequestIds are identifiers,
   // not searchable text; substring search would seq-scan the index and
@@ -697,6 +711,29 @@ export class AdminController {
       endDate,
       page: page ? parseInt(page, 10) || 1 : 1,
       limit: limit ? parseInt(limit, 10) || 50 : 50,
+    })
+  }
+
+  // ── Platform configuration (FIN-08) ───────────────────────────────────
+  // Reading the current singleton is a universal staff read — same shape as
+  // `listPublishers` / `listOrders`.
+  @Get("settings")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  getPlatformSettings() {
+    return this.admin.getPlatformSettings()
+  }
+
+  // Fee changes are a money-risk lever — finance-controlled, not operations.
+  // Same role gate as `publishers/:id/tier` and the other money-write routes.
+  // Reason is required by the DTO and persisted into the audit event.
+  @Patch("settings/platform-fee")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  updatePlatformFee(
+    @Body() body: UpdatePlatformFeeDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.admin.updatePlatformFee(body.platformFeePct, body.reason, {
+      id: user.id,
     })
   }
 

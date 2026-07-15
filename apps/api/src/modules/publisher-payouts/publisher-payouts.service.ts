@@ -371,30 +371,136 @@ export class PublisherPayoutsService {
     return withdrawal
   }
 
+  // FIN-04: re-validate every withdrawal precondition INSIDE the same
+  // transaction that performs the status transition. Reading the withdrawal,
+  // publisher, membership, balance, payout method, and executions before the
+  // transaction and then mutating inside it opened a TOCTOU window — between
+  // the outer reads and the inner write a publisher could be banned, the
+  // balance consumed by a concurrent withdrawal, or the payout method removed.
+  //
+  // Each failed precondition emits a `WITHDRAWAL_APPROVAL_BLOCKED` audit
+  // event with a STRUCTURED reason code (`reason`) plus a human-readable
+  // `message`. Structured codes keep finance investigations queryable.
+  private static readonly APPROVAL_BLOCK_REASONS = {
+    NOT_PENDING: "Withdrawal is no longer pending",
+    TIER_HOLD_ACTIVE: "Withdrawal tier hold has not elapsed",
+    PUBLISHER_BANNED: "Publisher account is banned",
+    MEMBERSHIP_REVOKED: "Publisher membership no longer exists",
+    INSUFFICIENT_BALANCE: "Withdrawable balance no longer covers the amount",
+    PAYOUT_METHOD_INVALID: "Payout method is missing or deactivated",
+    ALREADY_EXECUTING: "A payout execution is already in flight",
+  } as const
+
   async approveWithdrawal(id: string, approvedBy: string) {
-    const withdrawal = await this.prisma.withdrawal.findUnique({
-      where: { id },
-      include: { publisher: true },
-    })
-    if (!withdrawal) throw new NotFoundException("Withdrawal not found")
-    if (withdrawal.status !== "PENDING") {
-      throw new BadRequestException("Withdrawal is not pending")
-    }
-
-    // Tier hold is a hard gate, not advisory metadata.
-    if (
-      withdrawal.availableAt &&
-      withdrawal.availableAt.getTime() > Date.now()
-    ) {
-      throw new BadRequestException(
-        `Withdrawal is in its ${withdrawal.publisher.tier} tier hold until ${withdrawal.availableAt.toISOString()}`,
-      )
-    }
-
     const result = await this.prisma.$transaction(async (tx: any) => {
-      // Status-guarded write: concurrent approve/reject — only one transition wins
+      // ── Consistent snapshot for every re-validation ──────────────────────
+      // Narrow `publisher` projection — we only need `banned`, `tier`, and
+      // `organizationId` here, not the full row.
+      const w = await tx.withdrawal.findUnique({
+        where: { id },
+        include: {
+          publisher: {
+            select: {
+              banned: true,
+              tier: true,
+              organizationId: true,
+            },
+          },
+        },
+      })
+      if (!w) throw new NotFoundException("Withdrawal not found")
+
+      // Shared helper — emits the blocked audit event and throws a
+      // BadRequestException with a structured reason code smuggled into the
+      // `code` field so callers (admin controller + finance tooling) can react
+      // programmatically without parsing English prose.
+      const block = async (
+        reason: keyof typeof PublisherPayoutsService.APPROVAL_BLOCK_REASONS,
+      ) => {
+        const message = PublisherPayoutsService.APPROVAL_BLOCK_REASONS[reason]
+        await this.audit.log(
+          {
+            action: "WITHDRAWAL_APPROVAL_BLOCKED",
+            entityType: "Withdrawal",
+            entityId: id,
+            metadata: {
+              withdrawalId: id,
+              publisherId: w.publisherId,
+              reason,
+              message,
+              amount: Number(w.amount),
+            },
+            userId: approvedBy,
+            organizationId: w.publisher.organizationId,
+          },
+          tx,
+        )
+        throw new BadRequestException({ code: reason, message })
+      }
+
+      // 1. State must still be PENDING at approval time.
+      if (w.status !== "PENDING") {
+        await block("NOT_PENDING")
+      }
+
+      // 2. Tier hold is a hard gate, not advisory metadata.
+      if (w.availableAt && w.availableAt.getTime() > Date.now()) {
+        await block("TIER_HOLD_ACTIVE")
+      }
+
+      // 3. Publisher must not be banned (re-checked here, not trusted from
+      //    the auth cache, so that a ban issued between request and approval
+      //    is honoured).
+      if (w.publisher.banned) {
+        await block("PUBLISHER_BANNED")
+      }
+
+      // 4. Publisher membership must still exist (revocation = deletion).
+      const membership = await tx.publisherMembership.findFirst({
+        where: { publisherId: w.publisherId },
+        select: { id: true },
+      })
+      if (!membership) {
+        await block("MEMBERSHIP_REVOKED")
+      }
+
+      // 5. Withdrawable balance must still cover the amount (another
+      //    withdrawal or settlement clawback may have consumed it).
+      const balance = await tx.publisherBalance.findUnique({
+        where: { publisherId: w.publisherId },
+      })
+      if (
+        !balance ||
+        new Decimal(balance.withdrawableBalance).lessThan(new Decimal(w.amount))
+      ) {
+        await block("INSUFFICIENT_BALANCE")
+      }
+
+      // 6. Payout method must still exist and be active. `isActive = false`
+      //    means the publisher retired it after requesting the withdrawal.
+      const method = w.payoutMethodId
+        ? await tx.payoutMethod.findUnique({
+            where: { id: w.payoutMethodId },
+            select: { id: true, isActive: true },
+          })
+        : null
+      if (!method || !method.isActive) {
+        await block("PAYOUT_METHOD_INVALID")
+      }
+
+      // 7. No payout execution may already be in flight — if one exists,
+      //    money may already have moved via the provider.
+      const executionCount = await tx.payoutExecution.count({
+        where: { withdrawalId: id },
+      })
+      if (executionCount > 0) {
+        await block("ALREADY_EXECUTING")
+      }
+
+      // ── Re-validations passed — transition APPROVED ────────────────────
+      // Status + version guard: concurrent approve/reject — only one wins.
       const transitioned = await tx.withdrawal.updateMany({
-        where: { id, status: "PENDING", version: withdrawal.version },
+        where: { id, status: "PENDING", version: w.version },
         data: {
           status: "APPROVED",
           approvedBy,
@@ -405,7 +511,10 @@ export class PublisherPayoutsService {
       if (transitioned.count === 0) {
         throw new ConflictException("Withdrawal is no longer pending")
       }
-      const updated = await tx.withdrawal.findUniqueOrThrow({ where: { id } })
+      const updated = await tx.withdrawal.findUniqueOrThrow({
+        where: { id },
+        include: { publisher: { select: { organizationId: true } } },
+      })
 
       await this.audit.log(
         {
@@ -413,26 +522,31 @@ export class PublisherPayoutsService {
           entityType: "Withdrawal",
           entityId: id,
           metadata: {
-            publisherId: withdrawal.publisherId,
-            amount: Number(withdrawal.amount),
+            publisherId: w.publisherId,
+            amount: Number(w.amount),
           },
           userId: approvedBy,
-          organizationId: withdrawal.publisher.organizationId,
+          organizationId: w.publisher.organizationId,
         },
         tx,
       )
 
-      return updated
+      return {
+        updated,
+        publisherId: w.publisherId,
+        organizationId: w.publisher.organizationId,
+        amount: w.amount,
+      }
     })
 
     await this.notifyPublisherMembers(
-      withdrawal.publisherId,
-      withdrawal.publisher.organizationId,
+      result.publisherId,
+      result.organizationId,
       "WITHDRAWAL_APPROVED",
-      `Withdrawal of ${withdrawal.amount} has been approved.`,
+      `Withdrawal of ${result.amount} has been approved.`,
     )
 
-    return result
+    return result.updated
   }
 
   private async notifyPublisherMembers(

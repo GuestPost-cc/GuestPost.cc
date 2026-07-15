@@ -1458,10 +1458,87 @@ export class AdminService {
     return updated
   }
 
-  // ── Support tickets ─────────────────────────────────────────────────────
+  // ── Support tickets ─────────────────────────────────────────────────
   // Phase 6.6: the four legacy bypass methods (listTicketsAdmin /
   // getTicketAdmin / updateTicketStatusAdmin / addTicketMessageAdmin) were
   // removed. The admin support routes now delegate to SupportService with
   // the staff actor, so the channel-aware visibility matrix is the single
   // code path used by customer/publisher/admin frontends.
+
+  // ── Platform configuration (FIN-08) ────────────────────────────────
+  // PlatformSettings is a singleton (one row). `updatePlatformFee` reads
+  // the row, bounds-checks the new value, swaps it with an optimistic-lock
+  // `updateMany({ where: { version } })` and writes a structured audit
+  // event (`PLATFORM_SETTINGS_UPDATED`) capturing `{ field, oldValue,
+  // newValue, reason }`. The generic action name means future settings
+  // (tax rate, payout threshold) flow through the same audit shape
+  // automatically — only the `field` discriminator changes.
+  async getPlatformSettings() {
+    let settings = await this.prisma.platformSettings.findFirst()
+    if (!settings) {
+      settings = await this.prisma.platformSettings.create({ data: {} })
+    }
+    return settings
+  }
+
+  async updatePlatformFee(
+    platformFeePct: number,
+    reason: string,
+    actor: { id: string },
+  ) {
+    // Clamp defensively — the DTO already bounds 0–100, but a future
+    // internal callsite might bypass the pipe.
+    const clamped = Math.min(Math.max(platformFeePct, 0), 100)
+
+    return this.prisma.$transaction(async (tx: any) => {
+      const settings = await tx.platformSettings.findFirst()
+      if (!settings) {
+        throw new NotFoundException("PlatformSettings row not initialized")
+      }
+
+      const oldValue = Number(settings.platformFeePct)
+      if (oldValue === clamped) {
+        throw new BadRequestException(
+          `platformFeePct is already ${clamped} — no change`,
+        )
+      }
+
+      // Optimistic-lock via version — concurrent fee changes resolve to one
+      // winner; the loser retries. `updateMany` returns count 0 → conflict.
+      const updated = await tx.platformSettings.updateMany({
+        where: { id: settings.id, version: settings.version },
+        data: {
+          platformFeePct: clamped,
+          version: { increment: 1 },
+        },
+      })
+      if (updated.count === 0) {
+        throw new ConflictException(
+          "PlatformSettings was modified by another request. Retry.",
+        )
+      }
+
+      await this.audit.log(
+        {
+          action: "PLATFORM_SETTINGS_UPDATED",
+          entityType: "PlatformSettings",
+          entityId: settings.id,
+          metadata: {
+            field: "platformFeePct",
+            oldValue,
+            newValue: clamped,
+            reason,
+          },
+          userId: actor.id,
+          organizationId: null,
+        },
+        tx,
+      )
+
+      return {
+        id: settings.id,
+        platformFeePct: clamped,
+      }
+    })
+  }
 }

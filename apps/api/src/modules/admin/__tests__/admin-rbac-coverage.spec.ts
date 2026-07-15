@@ -130,6 +130,11 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       { method: "deleteListing", expected: ["SUPER_ADMIN", "OPERATIONS"] },
       { method: "deleteWebsite", expected: ["SUPER_ADMIN", "OPERATIONS"] },
       { method: "listAuditLogs", expected: ["SUPER_ADMIN"] },
+      // Site reassignment is a SUPER_ADMIN-only trust action: OPERATIONS can
+      // manage listings on sites already assigned to them, but transferring
+      // ownership of a platform website is reserved for SUPER_ADMIN (see the
+      // assignWebsite decorator + header comment in admin.controller.ts).
+      { method: "assignWebsite", expected: ["SUPER_ADMIN"] },
     ]
 
     for (const { method, expected } of expectations) {
@@ -144,7 +149,7 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     }
   })
 
-  it("every money-write route includes FINANCE (refund, settlement approve/cancel, withdrawal lifecycle, payout execute/retry/cancel/decrypt)", () => {
+  it("every money-write route includes FINANCE (refund, settlement approve/cancel, withdrawal lifecycle, payout execute/retry/cancel/decrypt, platform fee)", () => {
     const moneyWrites = [
       "refundOrder",
       "adminApproveSettlement",
@@ -158,6 +163,7 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       "cancelPayoutExecution",
       "decryptPayoutMethod",
       "updatePublisherTier",
+      "updatePlatformFee",
     ]
 
     for (const method of moneyWrites) {
@@ -184,7 +190,6 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       "toggleListingVerified",
       "createWebsite",
       "updateWebsite",
-      "assignWebsite",
       "pauseWebsite",
       "recomputePublisherTrust",
       "recomputeTrust",
@@ -205,7 +210,7 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     }
   })
 
-  it("universal-read routes include all three staff roles (listUsers, listOrders, listPublishers, marketplace reads, websites reads, support inbox)", () => {
+  it("universal-read routes include all three staff roles (listUsers, listOrders, listPublishers, marketplace reads, websites reads, support inbox, platform settings)", () => {
     const universalReads = [
       "listUsers",
       "getUser",
@@ -219,6 +224,7 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       "getWebsite",
       "listSupportTickets",
       "getSupportTicket",
+      "getPlatformSettings",
     ]
 
     for (const method of universalReads) {

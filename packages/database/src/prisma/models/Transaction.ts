@@ -41,6 +41,7 @@ export type TransactionMinAggregateOutputType = {
   type: $Enums.TransactionType | null
   reference: string | null
   providerRef: string | null
+  provider: string | null
   description: string | null
   walletId: string | null
   orderId: string | null
@@ -56,6 +57,7 @@ export type TransactionMaxAggregateOutputType = {
   type: $Enums.TransactionType | null
   reference: string | null
   providerRef: string | null
+  provider: string | null
   description: string | null
   walletId: string | null
   orderId: string | null
@@ -71,6 +73,7 @@ export type TransactionCountAggregateOutputType = {
   type: number
   reference: number
   providerRef: number
+  provider: number
   description: number
   walletId: number
   orderId: number
@@ -96,6 +99,7 @@ export type TransactionMinAggregateInputType = {
   type?: true
   reference?: true
   providerRef?: true
+  provider?: true
   description?: true
   walletId?: true
   orderId?: true
@@ -111,6 +115,7 @@ export type TransactionMaxAggregateInputType = {
   type?: true
   reference?: true
   providerRef?: true
+  provider?: true
   description?: true
   walletId?: true
   orderId?: true
@@ -126,6 +131,7 @@ export type TransactionCountAggregateInputType = {
   type?: true
   reference?: true
   providerRef?: true
+  provider?: true
   description?: true
   walletId?: true
   orderId?: true
@@ -228,6 +234,7 @@ export type TransactionGroupByOutputType = {
   type: $Enums.TransactionType
   reference: string | null
   providerRef: string | null
+  provider: string | null
   description: string | null
   walletId: string | null
   orderId: string | null
@@ -266,6 +273,7 @@ export type TransactionWhereInput = {
   type?: Prisma.EnumTransactionTypeFilter<"Transaction"> | $Enums.TransactionType
   reference?: Prisma.StringNullableFilter<"Transaction"> | string | null
   providerRef?: Prisma.StringNullableFilter<"Transaction"> | string | null
+  provider?: Prisma.StringNullableFilter<"Transaction"> | string | null
   description?: Prisma.StringNullableFilter<"Transaction"> | string | null
   walletId?: Prisma.StringNullableFilter<"Transaction"> | string | null
   orderId?: Prisma.StringNullableFilter<"Transaction"> | string | null
@@ -285,6 +293,7 @@ export type TransactionOrderByWithRelationInput = {
   type?: Prisma.SortOrder
   reference?: Prisma.SortOrderInput | Prisma.SortOrder
   providerRef?: Prisma.SortOrderInput | Prisma.SortOrder
+  provider?: Prisma.SortOrderInput | Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   walletId?: Prisma.SortOrderInput | Prisma.SortOrder
   orderId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -307,6 +316,7 @@ export type TransactionWhereUniqueInput = Prisma.AtLeast<{
   currency?: Prisma.StringFilter<"Transaction"> | string
   type?: Prisma.EnumTransactionTypeFilter<"Transaction"> | $Enums.TransactionType
   providerRef?: Prisma.StringNullableFilter<"Transaction"> | string | null
+  provider?: Prisma.StringNullableFilter<"Transaction"> | string | null
   description?: Prisma.StringNullableFilter<"Transaction"> | string | null
   walletId?: Prisma.StringNullableFilter<"Transaction"> | string | null
   orderId?: Prisma.StringNullableFilter<"Transaction"> | string | null
@@ -326,6 +336,7 @@ export type TransactionOrderByWithAggregationInput = {
   type?: Prisma.SortOrder
   reference?: Prisma.SortOrderInput | Prisma.SortOrder
   providerRef?: Prisma.SortOrderInput | Prisma.SortOrder
+  provider?: Prisma.SortOrderInput | Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   walletId?: Prisma.SortOrderInput | Prisma.SortOrder
   orderId?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -349,6 +360,7 @@ export type TransactionScalarWhereWithAggregatesInput = {
   type?: Prisma.EnumTransactionTypeWithAggregatesFilter<"Transaction"> | $Enums.TransactionType
   reference?: Prisma.StringNullableWithAggregatesFilter<"Transaction"> | string | null
   providerRef?: Prisma.StringNullableWithAggregatesFilter<"Transaction"> | string | null
+  provider?: Prisma.StringNullableWithAggregatesFilter<"Transaction"> | string | null
   description?: Prisma.StringNullableWithAggregatesFilter<"Transaction"> | string | null
   walletId?: Prisma.StringNullableWithAggregatesFilter<"Transaction"> | string | null
   orderId?: Prisma.StringNullableWithAggregatesFilter<"Transaction"> | string | null
@@ -364,6 +376,7 @@ export type TransactionCreateInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   createdAt?: Date | string
   wallet?: Prisma.WalletCreateNestedOneWithoutTransactionsInput
@@ -379,6 +392,7 @@ export type TransactionUncheckedCreateInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   walletId?: string | null
   orderId?: string | null
@@ -394,6 +408,7 @@ export type TransactionUpdateInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallet?: Prisma.WalletUpdateOneWithoutTransactionsNestedInput
@@ -409,6 +424,7 @@ export type TransactionUncheckedUpdateInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -424,6 +440,7 @@ export type TransactionCreateManyInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   walletId?: string | null
   orderId?: string | null
@@ -439,6 +456,7 @@ export type TransactionUpdateManyMutationInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -450,6 +468,7 @@ export type TransactionUncheckedUpdateManyInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -475,6 +494,7 @@ export type TransactionCountOrderByAggregateInput = {
   type?: Prisma.SortOrder
   reference?: Prisma.SortOrder
   providerRef?: Prisma.SortOrder
+  provider?: Prisma.SortOrder
   description?: Prisma.SortOrder
   walletId?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
@@ -494,6 +514,7 @@ export type TransactionMaxOrderByAggregateInput = {
   type?: Prisma.SortOrder
   reference?: Prisma.SortOrder
   providerRef?: Prisma.SortOrder
+  provider?: Prisma.SortOrder
   description?: Prisma.SortOrder
   walletId?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
@@ -509,6 +530,7 @@ export type TransactionMinOrderByAggregateInput = {
   type?: Prisma.SortOrder
   reference?: Prisma.SortOrder
   providerRef?: Prisma.SortOrder
+  provider?: Prisma.SortOrder
   description?: Prisma.SortOrder
   walletId?: Prisma.SortOrder
   orderId?: Prisma.SortOrder
@@ -700,6 +722,7 @@ export type TransactionCreateWithoutPublisherInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   createdAt?: Date | string
   wallet?: Prisma.WalletCreateNestedOneWithoutTransactionsInput
@@ -714,6 +737,7 @@ export type TransactionUncheckedCreateWithoutPublisherInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   walletId?: string | null
   orderId?: string | null
@@ -757,6 +781,7 @@ export type TransactionScalarWhereInput = {
   type?: Prisma.EnumTransactionTypeFilter<"Transaction"> | $Enums.TransactionType
   reference?: Prisma.StringNullableFilter<"Transaction"> | string | null
   providerRef?: Prisma.StringNullableFilter<"Transaction"> | string | null
+  provider?: Prisma.StringNullableFilter<"Transaction"> | string | null
   description?: Prisma.StringNullableFilter<"Transaction"> | string | null
   walletId?: Prisma.StringNullableFilter<"Transaction"> | string | null
   orderId?: Prisma.StringNullableFilter<"Transaction"> | string | null
@@ -772,6 +797,7 @@ export type TransactionCreateWithoutOrderInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   createdAt?: Date | string
   wallet?: Prisma.WalletCreateNestedOneWithoutTransactionsInput
@@ -786,6 +812,7 @@ export type TransactionUncheckedCreateWithoutOrderInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   walletId?: string | null
   publisherId?: string | null
@@ -826,6 +853,7 @@ export type TransactionCreateWithoutSettlementInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   createdAt?: Date | string
   wallet?: Prisma.WalletCreateNestedOneWithoutTransactionsInput
@@ -840,6 +868,7 @@ export type TransactionUncheckedCreateWithoutSettlementInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   walletId?: string | null
   orderId?: string | null
@@ -880,6 +909,7 @@ export type TransactionCreateWithoutWalletInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   createdAt?: Date | string
   order?: Prisma.OrderCreateNestedOneWithoutTransactionsInput
@@ -894,6 +924,7 @@ export type TransactionUncheckedCreateWithoutWalletInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   orderId?: string | null
   publisherId?: string | null
@@ -934,6 +965,7 @@ export type TransactionCreateManyPublisherInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   walletId?: string | null
   orderId?: string | null
@@ -948,6 +980,7 @@ export type TransactionUpdateWithoutPublisherInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallet?: Prisma.WalletUpdateOneWithoutTransactionsNestedInput
@@ -962,6 +995,7 @@ export type TransactionUncheckedUpdateWithoutPublisherInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -976,6 +1010,7 @@ export type TransactionUncheckedUpdateManyWithoutPublisherInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -990,6 +1025,7 @@ export type TransactionCreateManyOrderInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   walletId?: string | null
   publisherId?: string | null
@@ -1004,6 +1040,7 @@ export type TransactionUpdateWithoutOrderInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallet?: Prisma.WalletUpdateOneWithoutTransactionsNestedInput
@@ -1018,6 +1055,7 @@ export type TransactionUncheckedUpdateWithoutOrderInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1032,6 +1070,7 @@ export type TransactionUncheckedUpdateManyWithoutOrderInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1046,6 +1085,7 @@ export type TransactionCreateManySettlementInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   walletId?: string | null
   orderId?: string | null
@@ -1060,6 +1100,7 @@ export type TransactionUpdateWithoutSettlementInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallet?: Prisma.WalletUpdateOneWithoutTransactionsNestedInput
@@ -1074,6 +1115,7 @@ export type TransactionUncheckedUpdateWithoutSettlementInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1088,6 +1130,7 @@ export type TransactionUncheckedUpdateManyWithoutSettlementInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   walletId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1102,6 +1145,7 @@ export type TransactionCreateManyWalletInput = {
   type: $Enums.TransactionType
   reference?: string | null
   providerRef?: string | null
+  provider?: string | null
   description?: string | null
   orderId?: string | null
   publisherId?: string | null
@@ -1116,6 +1160,7 @@ export type TransactionUpdateWithoutWalletInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   order?: Prisma.OrderUpdateOneWithoutTransactionsNestedInput
@@ -1130,6 +1175,7 @@ export type TransactionUncheckedUpdateWithoutWalletInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1144,6 +1190,7 @@ export type TransactionUncheckedUpdateManyWithoutWalletInput = {
   type?: Prisma.EnumTransactionTypeFieldUpdateOperationsInput | $Enums.TransactionType
   reference?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   providerRef?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  provider?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1160,6 +1207,7 @@ export type TransactionSelect<ExtArgs extends runtime.Types.Extensions.InternalA
   type?: boolean
   reference?: boolean
   providerRef?: boolean
+  provider?: boolean
   description?: boolean
   walletId?: boolean
   orderId?: boolean
@@ -1179,6 +1227,7 @@ export type TransactionSelectCreateManyAndReturn<ExtArgs extends runtime.Types.E
   type?: boolean
   reference?: boolean
   providerRef?: boolean
+  provider?: boolean
   description?: boolean
   walletId?: boolean
   orderId?: boolean
@@ -1198,6 +1247,7 @@ export type TransactionSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.E
   type?: boolean
   reference?: boolean
   providerRef?: boolean
+  provider?: boolean
   description?: boolean
   walletId?: boolean
   orderId?: boolean
@@ -1217,6 +1267,7 @@ export type TransactionSelectScalar = {
   type?: boolean
   reference?: boolean
   providerRef?: boolean
+  provider?: boolean
   description?: boolean
   walletId?: boolean
   orderId?: boolean
@@ -1225,7 +1276,7 @@ export type TransactionSelectScalar = {
   createdAt?: boolean
 }
 
-export type TransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "amount" | "currency" | "type" | "reference" | "providerRef" | "description" | "walletId" | "orderId" | "publisherId" | "settlementId" | "createdAt", ExtArgs["result"]["transaction"]>
+export type TransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "amount" | "currency" | "type" | "reference" | "providerRef" | "provider" | "description" | "walletId" | "orderId" | "publisherId" | "settlementId" | "createdAt", ExtArgs["result"]["transaction"]>
 export type TransactionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   wallet?: boolean | Prisma.Transaction$walletArgs<ExtArgs>
   order?: boolean | Prisma.Transaction$orderArgs<ExtArgs>
@@ -1260,6 +1311,7 @@ export type $TransactionPayload<ExtArgs extends runtime.Types.Extensions.Interna
     type: $Enums.TransactionType
     reference: string | null
     providerRef: string | null
+    provider: string | null
     description: string | null
     walletId: string | null
     orderId: string | null
@@ -1699,6 +1751,7 @@ export interface TransactionFieldRefs {
   readonly type: Prisma.FieldRef<"Transaction", 'TransactionType'>
   readonly reference: Prisma.FieldRef<"Transaction", 'String'>
   readonly providerRef: Prisma.FieldRef<"Transaction", 'String'>
+  readonly provider: Prisma.FieldRef<"Transaction", 'String'>
   readonly description: Prisma.FieldRef<"Transaction", 'String'>
   readonly walletId: Prisma.FieldRef<"Transaction", 'String'>
   readonly orderId: Prisma.FieldRef<"Transaction", 'String'>

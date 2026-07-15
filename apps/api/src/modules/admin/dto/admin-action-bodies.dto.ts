@@ -4,11 +4,14 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsNumber,
   IsOptional,
   IsString,
   IsUrl,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
   ValidateIf,
 } from "class-validator"
@@ -268,4 +271,27 @@ export class UpdateSupportTicketStatusDto {
   @IsString()
   @IsIn(TICKET_STATUSES as unknown as string[])
   status!: (typeof TICKET_STATUSES)[number]
+}
+
+// ── Platform configuration ───────────────────────────────────────────────────
+
+// FIN-08: every PlatformSettings field update must carry a reason so finance
+// reconciliation and internal accountability have a paper trail. The audit
+// event emitted is generic (`PLATFORM_SETTINGS_UPDATED`) with a structured
+// `{ field, oldValue, newValue, reason }` payload, so future settings (tax
+// rate, payout threshold, etc.) reuse the same audit shape automatically.
+export class UpdatePlatformFeeDto {
+  // Fee must be 0–100 inclusive. Bounds check is in the DTO so a malformed
+  // payload never reaches the service; the service still clamps for safety.
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  platformFeePct!: number
+
+  @IsString()
+  @MinLength(10, {
+    message: "Reason must be at least 10 characters for audit clarity",
+  })
+  @MaxLength(2_000)
+  reason!: string
 }

@@ -36,6 +36,9 @@ describe("PublisherPayoutsService", () => {
       getExecutionsForWithdrawal: jest.fn(),
       getPendingStatusChecks: jest.fn(),
     }
+    // Default payout method + execution mocks — approval re-validation
+    // (FIN-04) needs both to pass before the transition is allowed.
+    const payoutMethod = { id: "pm-1", isActive: true }
     prismaMock = {
       publisherMembership: {
         findFirst: jest.fn().mockResolvedValue({ id: "mem-1" }),
@@ -55,13 +58,17 @@ describe("PublisherPayoutsService", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       payoutMethod: {
+        findUnique: jest.fn().mockResolvedValue(payoutMethod),
         findFirst: jest.fn(),
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
       },
-      payoutExecution: { create: jest.fn().mockResolvedValue({}) },
+      payoutExecution: {
+        create: jest.fn().mockResolvedValue({}),
+        count: jest.fn().mockResolvedValue(0),
+      },
       payoutProvider: {
         findUnique: jest
           .fn()
@@ -131,36 +138,42 @@ describe("PublisherPayoutsService", () => {
   })
 
   describe("approveWithdrawal", () => {
-    it("rejects approval while tier hold is active", async () => {
+    // Shared fixtures — the happy path plus every FIN-04 blocked reason.
+    const baseWithdrawal = {
+      id: "wd-1",
+      status: "PENDING",
+      version: 0,
+      publisherId: "pub-1",
+      amount: new Decimal(100),
+      payoutMethodId: "pm-1",
+      availableAt: new Date(Date.now() - 1000),
+      publisher: { banned: false, tier: "NEW", organizationId: "org-1" },
+    }
+
+    it("rejects approval while tier hold is active (TIER_HOLD_ACTIVE)", async () => {
       prismaMock.withdrawal.findUnique.mockResolvedValue({
-        id: "wd-1",
-        status: "PENDING",
-        version: 0,
-        publisherId: "pub-1",
-        amount: new Decimal(100),
+        ...baseWithdrawal,
         availableAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        publisher,
       })
 
       await expect(
         service.approveWithdrawal("wd-1", "staff-1"),
-      ).rejects.toThrow(/tier hold/)
+      ).rejects.toThrow(/tier hold/i)
       expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
+      // FIN-04: every blocked path must emit a structured audit event so
+      // finance investigations can query by reason code later.
+      const blocked = auditMock.log.mock.calls.find(
+        (c: any) => c[0]?.action === "WITHDRAWAL_APPROVAL_BLOCKED",
+      )
+      expect(blocked?.[0].metadata.reason).toBe("TIER_HOLD_ACTIVE")
     })
 
-    it("approves once the hold has elapsed", async () => {
-      prismaMock.withdrawal.findUnique.mockResolvedValue({
-        id: "wd-1",
-        status: "PENDING",
-        version: 0,
-        publisherId: "pub-1",
-        amount: new Decimal(100),
-        availableAt: new Date(Date.now() - 1000),
-        publisher,
-      })
+    it("approves once the hold has elapsed after every re-validation passes", async () => {
+      prismaMock.withdrawal.findUnique.mockResolvedValue(baseWithdrawal)
       prismaMock.withdrawal.findUniqueOrThrow.mockResolvedValue({
         id: "wd-1",
         status: "APPROVED",
+        publisher: { organizationId: "org-1" },
       })
 
       const result = await service.approveWithdrawal("wd-1", "staff-1")
@@ -170,6 +183,114 @@ describe("PublisherPayoutsService", () => {
           where: { id: "wd-1", status: "PENDING", version: 0 },
         }),
       )
+      // All seven re-validation reads happened INSIDE the txn (tx.* =
+      // prismaMock here), proving TOCTOU safety.
+      expect(prismaMock.publisherMembership.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { publisherId: "pub-1" } }),
+      )
+      expect(prismaMock.publisherBalance.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { publisherId: "pub-1" } }),
+      )
+      expect(prismaMock.payoutMethod.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: "pm-1" } }),
+      )
+      expect(prismaMock.payoutExecution.count).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { withdrawalId: "wd-1" } }),
+      )
+    })
+
+    it("blocks with NOT_PENDING when a concurrent approve/reject already moved the status", async () => {
+      prismaMock.withdrawal.findUnique.mockResolvedValue({
+        ...baseWithdrawal,
+        status: "APPROVED",
+      })
+
+      await expect(
+        service.approveWithdrawal("wd-1", "staff-1"),
+      ).rejects.toThrow(/no longer pending/i)
+      expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
+      const blocked = auditMock.log.mock.calls.find(
+        (c: any) => c[0]?.action === "WITHDRAWAL_APPROVAL_BLOCKED",
+      )
+      expect(blocked?.[0].metadata.reason).toBe("NOT_PENDING")
+    })
+
+    it("blocks with PUBLISHER_BANNED when the publisher was banned after request", async () => {
+      prismaMock.withdrawal.findUnique.mockResolvedValue({
+        ...baseWithdrawal,
+        publisher: { banned: true, tier: "NEW", organizationId: "org-1" },
+      })
+
+      await expect(
+        service.approveWithdrawal("wd-1", "staff-1"),
+      ).rejects.toThrow(/banned/i)
+      expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
+      const blocked = auditMock.log.mock.calls.find(
+        (c: any) => c[0]?.action === "WITHDRAWAL_APPROVAL_BLOCKED",
+      )
+      expect(blocked?.[0].metadata.reason).toBe("PUBLISHER_BANNED")
+    })
+
+    it("blocks with MEMBERSHIP_REVOKED when the publisher membership was deleted", async () => {
+      prismaMock.withdrawal.findUnique.mockResolvedValue(baseWithdrawal)
+      prismaMock.publisherMembership.findFirst.mockResolvedValueOnce(null)
+
+      await expect(
+        service.approveWithdrawal("wd-1", "staff-1"),
+      ).rejects.toThrow(/membership/i)
+      expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
+      const blocked = auditMock.log.mock.calls.find(
+        (c: any) => c[0]?.action === "WITHDRAWAL_APPROVAL_BLOCKED",
+      )
+      expect(blocked?.[0].metadata.reason).toBe("MEMBERSHIP_REVOKED")
+    })
+
+    it("blocks with INSUFFICIENT_BALANCE when a concurrent withdrawal drained the balance", async () => {
+      prismaMock.withdrawal.findUnique.mockResolvedValue(baseWithdrawal)
+      prismaMock.publisherBalance.findUnique.mockResolvedValueOnce({
+        ...balance,
+        withdrawableBalance: new Decimal(50), // < amount 100
+      })
+
+      await expect(
+        service.approveWithdrawal("wd-1", "staff-1"),
+      ).rejects.toThrow(/balance/i)
+      expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
+      const blocked = auditMock.log.mock.calls.find(
+        (c: any) => c[0]?.action === "WITHDRAWAL_APPROVAL_BLOCKED",
+      )
+      expect(blocked?.[0].metadata.reason).toBe("INSUFFICIENT_BALANCE")
+    })
+
+    it("blocks with PAYOUT_METHOD_INVALID when the payout method was retired", async () => {
+      prismaMock.withdrawal.findUnique.mockResolvedValue(baseWithdrawal)
+      prismaMock.payoutMethod.findUnique.mockResolvedValueOnce({
+        id: "pm-1",
+        isActive: false,
+      })
+
+      await expect(
+        service.approveWithdrawal("wd-1", "staff-1"),
+      ).rejects.toThrow(/payout method/i)
+      expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
+      const blocked = auditMock.log.mock.calls.find(
+        (c: any) => c[0]?.action === "WITHDRAWAL_APPROVAL_BLOCKED",
+      )
+      expect(blocked?.[0].metadata.reason).toBe("PAYOUT_METHOD_INVALID")
+    })
+
+    it("blocks with ALREADY_EXECUTING when a payout execution is in flight", async () => {
+      prismaMock.withdrawal.findUnique.mockResolvedValue(baseWithdrawal)
+      prismaMock.payoutExecution.count.mockResolvedValueOnce(1)
+
+      await expect(
+        service.approveWithdrawal("wd-1", "staff-1"),
+      ).rejects.toThrow(/in flight/i)
+      expect(prismaMock.withdrawal.updateMany).not.toHaveBeenCalled()
+      const blocked = auditMock.log.mock.calls.find(
+        (c: any) => c[0]?.action === "WITHDRAWAL_APPROVAL_BLOCKED",
+      )
+      expect(blocked?.[0].metadata.reason).toBe("ALREADY_EXECUTING")
     })
   })
 

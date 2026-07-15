@@ -152,10 +152,17 @@ export class BillingService {
     const disputedAmount = new Decimal(dispute.amount ?? 0).div(100)
     const paymentIntent: string | null = dispute.payment_intent ?? null
 
-    // Link dispute -> originating deposit -> wallet
+    // Link dispute -> originating deposit -> wallet. The `provider: "stripe"`
+    // predicate aligns with the provider-aware partial unique index added in
+    // FIN-02 (migration 20260716030403) so the lookup lands on the same
+    // identity guarantee that write-time uses.
     const depositTx = paymentIntent
       ? await this.prisma.transaction.findFirst({
-          where: { providerRef: paymentIntent, type: "DEPOSIT" },
+          where: {
+            provider: "stripe",
+            providerRef: paymentIntent,
+            type: "DEPOSIT",
+          },
           select: { id: true, walletId: true, amount: true, reference: true },
         })
       : null
@@ -204,12 +211,16 @@ export class BillingService {
 
           // Hold row is written even for a zero hold so duplicate webhooks
           // and the dispute-closed handler have a single source of truth.
+          // FIN-02: `provider: "stripe"` pairs with `providerRef` so this row
+          // participates in the provider-aware partial unique index (and so
+          // chargeback webhooks replaying the same payment_intent fail fast).
           await tx.transaction.create({
             data: {
               walletId: wallet.id,
               amount: held.negated(),
               type: "RESERVATION",
               reference: `chargeback-hold-${dispute.id}`,
+              provider: "stripe",
               providerRef: paymentIntent,
               description:
                 `Chargeback hold of ${held.toFixed(2)} for dispute ${dispute.id}` +
@@ -455,10 +466,16 @@ export class BillingService {
       return
     }
 
-    // Locate the internal payment via payment_intent on the deposit transaction
+    // Locate the internal payment via payment_intent on the deposit transaction.
+    // FIN-02: `provider: "stripe"` aligns with the provider-aware partial
+    // unique index so lookups and writes share one identity model.
     const depositTx = paymentIntent
       ? await this.prisma.transaction.findFirst({
-          where: { providerRef: paymentIntent, type: "DEPOSIT" },
+          where: {
+            provider: "stripe",
+            providerRef: paymentIntent,
+            type: "DEPOSIT",
+          },
           select: { id: true, walletId: true, orderId: true, reference: true },
         })
       : null
@@ -581,14 +598,23 @@ export class BillingService {
 
         // P2002 here MUST propagate and roll the transaction back — catching
         // it and returning would commit the wallet increment above without a
-        // ledger row (double credit). The unique constraint is the idempotency
-        // guarantee; the findFirst above is only the fast path.
+        // ledger row (double credit). The unique constraint on
+        // `reference` (session.id) is the primary idempotency guarantee; the
+        // provider-aware partial unique on `(provider, providerRef)` added in
+        // FIN-02 is a defense-in-depth backstop for the rare case where a
+        // Stripe event replays under a new session.id but the same
+        // payment_intent. Either constraint firing surfaces as P2002 here.
+        // The findFirst above is only the fast path.
         await tx.transaction.create({
           data: {
             walletId,
             amount,
             type: "DEPOSIT",
             reference: session.id,
+            // FIN-02: explicit provider label pairs with `providerRef` to
+            // populate the `(provider, providerRef)` unique key — identical
+            // row identity for write and lookup paths.
+            provider: "stripe",
             // payment_intent linkage lets chargeback webhooks find this deposit
             providerRef: session.payment_intent ?? null,
             description: `Stripe deposit of ${amount.toFixed(2)}`,

@@ -241,6 +241,12 @@ export async function makeTransaction(
     publisherId?: string | null
     description?: string
     providerRef?: string
+    // FIN-02: paired with `providerRef` for the provider-aware partial unique.
+    // Callers that want to simulate a real Stripe deposit should pass
+    // `provider: "stripe"` together with `providerRef: "pi_…"`. Defaults to
+    // null for internal ledger rows (PURCHASE, REFUND, …) that never had a
+    // provider link.
+    provider?: string | null
   },
 ) {
   return prisma.transaction.create({
@@ -254,6 +260,7 @@ export async function makeTransaction(
       publisherId: args.publisherId ?? null,
       description: args.description ?? null,
       providerRef: args.providerRef ?? null,
+      provider: args.provider ?? null,
       currency: "USD",
     },
   })

@@ -778,6 +778,7 @@ export const TransactionScalarFieldEnum = {
   type: 'type',
   reference: 'reference',
   providerRef: 'providerRef',
+  provider: 'provider',
   description: 'description',
   walletId: 'walletId',
   orderId: 'orderId',

@@ -1256,6 +1256,17 @@ model Transaction {
   // External provider linkage (e.g. Stripe payment_intent for deposits) —
   // lets chargeback webhooks find the originating deposit + wallet.
   providerRef  String?
+  // FIN-02: paired with `providerRef` to form a provider-aware uniqueness
+  // key for external deposits (Stripe, Wise, manual, etc.). Composite key
+  // `[provider, providerRef]` is realised at the DB level via a partial
+  // unique index (migration `20260716030403_fin02_transaction_provider_unique`)
+  // scoped to `WHERE "providerRef" IS NOT NULL`. Internal ledger rows
+  // (PURCHASE / REFUND / WITHDRAWAL / SETTLEMENT_CLAWBACK / etc.) carry
+  // `providerRef = null` and stay exempt — same partial-unique pattern
+  // used by `MarketplaceFavorite_userId_listingId_serviceType_key` and
+  // `MarketplaceListing_websiteId_active_key`. Prisma's `@@unique` syntax
+  // doesn't express partial predicates, so the constraint lives in raw SQL.
+  provider     String?
   description  String?
   walletId     String?
   orderId      String?
@@ -1276,6 +1287,7 @@ model Transaction {
   @@index([publisherId])
   @@index([settlementId])
   @@index([providerRef])
+  @@index([provider, providerRef])
 }
 
 model Ticket {

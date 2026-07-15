@@ -120,10 +120,17 @@ describe("F-1: deposit webhook double-credit race", () => {
         where: { id: "wallet-1", version: 3 },
       }),
     )
-    // Ledger row carries the payment_intent linkage for chargeback lookup (F-6)
+    // Ledger row carries the payment_intent linkage for chargeback lookup (F-6).
+    // FIN-02 regression guard: `provider: "stripe"` MUST be set so the row
+    // participates in the provider-aware partial unique index
+    // `(provider, providerRef) WHERE providerRef IS NOT NULL` (migration
+    // 20260716030403). Without it, a replayed webhook with a new session.id
+    // but the same payment_intent bypasses the constraint (NULL=NULL is
+    // treated as distinct by PostgreSQL unique indexes).
     expect(prisma.transaction.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         reference: "cs_test_123",
+        provider: "stripe",
         providerRef: "pi_test_456",
         type: "DEPOSIT",
       }),
@@ -216,10 +223,15 @@ describe("F-6: chargeback hold workflow", () => {
         }),
       }),
     )
+    // FIN-02 regression guard: the hold row also carries `provider: "stripe"`
+    // so it sits under the same provider-aware identity as the originating
+    // deposit (the partial unique sees (`stripe`, `pi_test_456`) for both).
     expect(prisma.transaction.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         type: "RESERVATION",
         reference: "chargeback-hold-dp_1",
+        provider: "stripe",
+        providerRef: "pi_test_456",
       }),
     })
     expect(audit.log).toHaveBeenCalledWith(
@@ -811,5 +823,123 @@ describe("F-5: customerApprove cannot corrupt a RELEASED settlement", () => {
       service.customerApprove("set-1", "u1", "org-1", "OWNER"),
     ).rejects.toThrow(ConflictException)
     expect(prisma.settlementApproval.upsert).not.toHaveBeenCalled()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FIN-02: provider-aware uniqueness on Transaction
+//
+// Audit finding: deposit idempotency relied solely on `reference` (Stripe
+// session.id), leaving a hole when a replayed webhook returned a new session.id
+// but the same `payment_intent`. Sprint 3 closes the race at the DB level with
+// a partial unique index on `(provider, providerRef) WHERE providerRef IS NOT
+// NULL` (migration 20260716030403). The application MUST set `provider: "stripe"`
+// on every row that sets `providerRef` — otherwise the row falls outside the
+// partial-unique identity model and the constraint can't see it. These tests
+// lock in that invariant on the two write paths (deposit + chargeback hold) AND
+// on the two read paths (chargeback lookup + early-fraud-warning lookup) —
+// every callsite that touches `providerRef` must filter/write by `provider`.
+//
+// Note: the write-time assertions are duplicated in the F-1 / F-6 blocks
+// above (so future regression PRs that touch only one path still hear about
+// it); this block additionally covers the early-fraud-warning path which has
+// no other test coverage of `provider`-awareness.
+// ──────────────────────────────────────────────────────────
+describe("FIN-02: provider-aware uniqueness on Transaction", () => {
+  let service: BillingService
+  let prisma: any
+  let audit: any
+
+  const depositRow = {
+    id: "t-dep",
+    walletId: "wallet-1",
+    amount: new Decimal(1000),
+    reference: "cs_1",
+    orderId: null,
+  }
+
+  beforeEach(() => {
+    prisma = makePrismaMock()
+    audit = auditMock()
+    service = new BillingService(prisma, audit as any)
+  })
+
+  it("handleChargeback filters the deposit lookup by `provider: stripe`", async () => {
+    prisma.transaction.findFirst.mockResolvedValueOnce(depositRow) // outer lookup
+    prisma.transaction.findFirst.mockResolvedValueOnce(null) // inner: no existing hold
+    prisma.wallet.findUniqueOrThrow.mockResolvedValue({
+      id: "wallet-1",
+      version: 2,
+      availableBalance: new Decimal(1000),
+      reservedBalance: new Decimal(0),
+    })
+
+    await (service as any).handleChargeback({
+      id: "dp_fin02",
+      charge: "ch_fin02",
+      payment_intent: "pi_fin02",
+      amount: 10000,
+      currency: "usd",
+      reason: "fraudulent",
+      status: "needs_response",
+    })
+
+    // Outer (pre-tx) findFirst MUST scope by provider + providerRef + type.
+    // Without `provider` in the WHERE, the lookup could miss rows that the
+    // partial-unique constraint already anchored on `provider = 'stripe'`.
+    const outerLookup = prisma.transaction.findFirst.mock.calls[0][0]
+    expect(outerLookup).toEqual({
+      where: {
+        provider: "stripe",
+        providerRef: "pi_fin02",
+        type: "DEPOSIT",
+      },
+      select: {
+        id: true,
+        walletId: true,
+        amount: true,
+        reference: true,
+      },
+    })
+  })
+
+  it("handleEarlyFraudWarning filters the deposit lookup by `provider: stripe`", async () => {
+    // The audit-log idempotency precheck returns null so the handler
+    // proceeds to the deposit lookup.
+    prisma.auditLog.findFirst.mockResolvedValueOnce(null)
+    prisma.transaction.findFirst.mockResolvedValueOnce({
+      ...depositRow,
+      orderId: "order-1",
+    })
+
+    await (service as any).handleEarlyFraudWarning({
+      id: "evt_fin02",
+      type: "radar.early_fraud_warning.created",
+      data: {
+        object: {
+          id: "ifw_fin02",
+          payment_intent: "pi_fin02",
+          charge: "ch_fin02",
+          amount: 10000,
+          currency: "usd",
+        },
+      },
+    })
+
+    // The deposit-lookup WHERE must include `provider: "stripe"` — same
+    // identity model as the write path. A lookup that forgets the provider
+    // would still HIT a matching row today (the backfill set `provider='stripe'`
+    // on historical rows), but tying the read to the write identity keeps a
+    // future Wise/PayPal integration from cross-pollinating deposit refs.
+    const depositLookup = prisma.transaction.findFirst.mock.calls.find(
+      (c: any) =>
+        c[0]?.where?.providerRef === "pi_fin02" &&
+        c[0]?.where?.type === "DEPOSIT",
+    )
+    expect(depositLookup?.[0]?.where).toEqual({
+      provider: "stripe",
+      providerRef: "pi_fin02",
+      type: "DEPOSIT",
+    })
   })
 })
