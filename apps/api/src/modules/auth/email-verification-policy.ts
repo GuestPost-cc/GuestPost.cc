@@ -1,10 +1,10 @@
 /**
- * Phase 7.8 #25 — email-verification gate policy.
+ * Phase 7.8 #25 + AUTH-04 — email-verification gate policy.
  *
- * CUSTOMER state-changing routes require `User.emailVerified === true`.
- * GET reads stay open so locked-out users can still load dashboards
- * and trigger their own verification email. PUBLISHER and STAFF are
- * unaffected (different verification tracks).
+ * All user types (CUSTOMER, PUBLISHER, STAFF) require `User.emailVerified === true`
+ * for state-changing operations. GET reads stay open so locked-out users
+ * can still load dashboards and trigger their own verification email.
+ * Auth and resend-verification endpoints are exempt (see EXEMPT_POST_PATHS).
  *
  * Pre-merge GET-mutation audit completed (Phase 7.8 commit 5): no GET
  * route in apps/api/src/modules/** mutates state, so "GETs stay open"

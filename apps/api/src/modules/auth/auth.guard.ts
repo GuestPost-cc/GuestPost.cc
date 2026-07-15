@@ -20,7 +20,36 @@ import { requiresEmailVerification } from "./email-verification-policy"
 
 const SESSION_FRESH_AGE_SEC = 15 * 60
 const SESSION_EXPIRES_IN_SEC = 8 * 60 * 60
-const DEFAULT_SECRET = "better-auth-secret-12345678901234567890"
+
+// Validate that the session signing secret is configured at startup.
+// A hardcoded or missing secret would allow session forgery — fail fast.
+function getSessionSecret(): string {
+  const secret = process.env.BETTER_AUTH_SECRET
+  if (!secret?.trim()) {
+    throw new Error(
+      "BETTER_AUTH_SECRET must be configured. Set it in .env.development.",
+    )
+  }
+  return secret
+}
+
+// Parse comma-separated allowed origins from the CORS_ORIGIN env var.
+// Falls back to localhost defaults for development.
+function getAllowedOrigins(): string[] {
+  const raw = process.env.CORS_ORIGIN
+  if (raw?.trim()) {
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+  return [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "http://localhost:3002",
+    "http://localhost:4000",
+  ]
+}
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -46,6 +75,26 @@ export class AuthGuard implements CanActivate {
 
     if (!session) throw new UnauthorizedException()
 
+    // ── CSRF protection for state-changing requests ──
+    // Validate the Origin header against the configured allowlist.
+    if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
+      const origin = request.headers.origin || request.headers.referer
+      if (origin) {
+        const allowed = getAllowedOrigins()
+        const originHost = new URL(origin).host
+        const isAllowed = allowed.some((a) => {
+          try {
+            return new URL(a).host === originHost
+          } catch {
+            return a === origin
+          }
+        })
+        if (!isAllowed) {
+          throw new ForbiddenException("Cross-origin request denied")
+        }
+      }
+    }
+
     // Session is verified above on every request; the derived context (user
     // row, active org/publisher, roles) is cached briefly. Mutations that
     // change it call invalidateAuthContext().
@@ -54,11 +103,7 @@ export class AuthGuard implements CanActivate {
       // Phase 7.8 #25 — verification gate runs on the cache-hit path too;
       // otherwise an unverified user who first hits an exempt GET path
       // could bypass the gate on subsequent POSTs within the 30s TTL.
-      if (
-        cached.userType === "CUSTOMER" &&
-        !cached.emailVerified &&
-        requiresEmailVerification(request)
-      ) {
+      if (!cached.emailVerified && requiresEmailVerification(request)) {
         throw new ForbiddenException("EMAIL_NOT_VERIFIED")
       }
       request.user = cached
@@ -73,16 +118,10 @@ export class AuthGuard implements CanActivate {
     if (!user) throw new UnauthorizedException("User not found")
     if (user.banned) throw new ForbiddenException("Account is banned")
 
-    // Phase 7.8 #25 — CUSTOMER state-changing routes require a verified
-    // email. GET reads + sign-out + verification-resend endpoints stay
-    // open so locked-out users can act on the lockout. PUBLISHER/STAFF
-    // unaffected (different verification tracks). Frontend should detect
-    // the `EMAIL_NOT_VERIFIED` code and render a resend-banner.
-    if (
-      user.userType === "CUSTOMER" &&
-      !user.emailVerified &&
-      requiresEmailVerification(request)
-    ) {
+    // Phase 7.8 #25 + AUTH-04: All user types require a verified email for
+    // state-changing operations. GET reads + sign-out + verification-resend
+    // endpoints stay open so locked-out users can act on the lockout.
+    if (!user.emailVerified && requiresEmailVerification(request)) {
       throw new ForbiddenException("EMAIL_NOT_VERIFIED")
     }
 
@@ -193,19 +232,20 @@ export class AuthGuard implements CanActivate {
     const expiresAt = new Date(Date.now() + SESSION_EXPIRES_IN_SEC * 1000)
 
     try {
-      await this.prisma.session.create({
-        data: {
-          token: newToken,
-          userId: sessionRecord.userId,
-          expiresAt,
-        },
-      })
+      await this.prisma.$transaction([
+        this.prisma.session.create({
+          data: {
+            token: newToken,
+            userId: sessionRecord.userId,
+            expiresAt,
+          },
+        }),
+        this.prisma.session.deleteMany({
+          where: { token: sessionRecord.token },
+        }),
+      ])
 
-      await this.prisma.session.deleteMany({
-        where: { token: sessionRecord.token },
-      })
-
-      const secret = process.env.BETTER_AUTH_SECRET || DEFAULT_SECRET
+      const secret = getSessionSecret()
       const hmac = crypto.createHmac("sha256", secret)
       hmac.update(newToken)
       const signedValue = `${newToken}.${hmac.digest("base64")}`
