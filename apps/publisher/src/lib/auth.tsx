@@ -34,7 +34,12 @@ interface AuthContextValue {
   user: User | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, name: string) => Promise<void>
+  signUp: (
+    email: string,
+    password: string,
+    name: string,
+    termsAccepted: boolean,
+  ) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -150,7 +155,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    name: string,
+    termsAccepted: boolean,
+  ) => {
     setLoading(true)
     try {
       // Birth-time provisioning: the databaseHooks in packages/auth set
@@ -160,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email,
         password,
         name,
+        termsAccepted,
         portal: "publisher",
       })
       const token = result.status === "authenticated" ? result.token : undefined

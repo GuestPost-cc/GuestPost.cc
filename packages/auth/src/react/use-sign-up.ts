@@ -10,6 +10,7 @@ export interface UseSignUpReturn {
     name: string
     email: string
     password: string
+    termsAccepted: boolean
     returnTo?: string
     portal?: "customer" | "publisher"
   }) => Promise<void>
@@ -26,6 +27,7 @@ export function useSignUp(): UseSignUpReturn {
       name: string
       email: string
       password: string
+      termsAccepted: boolean
       returnTo?: string
       portal?: "customer" | "publisher"
     }) => {
@@ -36,6 +38,7 @@ export function useSignUp(): UseSignUpReturn {
           name: input.name,
           email: input.email,
           password: input.password,
+          termsAccepted: input.termsAccepted,
           portal: input.portal,
         })
         // Hard navigation — forces the dashboard middleware to re-evaluate

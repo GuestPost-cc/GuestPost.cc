@@ -62,14 +62,20 @@ export async function signUp(input: {
   name: string
   email: string
   password: string
+  termsAccepted: boolean
   portal?: "customer" | "publisher"
 }): Promise<SignInResult> {
+  const payload = {
+    name: input.name,
+    email: input.email,
+    password: input.password,
+    termsAccepted: input.termsAccepted,
+  } as Parameters<typeof authClient.signUp.email>[0] & {
+    termsAccepted: boolean
+  }
+
   const { data, error } = await authClient.signUp.email(
-    {
-      name: input.name,
-      email: input.email,
-      password: input.password,
-    },
+    payload,
     input.portal
       ? {
           headers: {

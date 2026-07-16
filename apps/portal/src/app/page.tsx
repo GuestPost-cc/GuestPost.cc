@@ -5,7 +5,6 @@ import type { AuthError } from "@guestpost/auth"
 import {
   getErrorMessage,
   getSession,
-  isAuthError,
   signIn as signInTransport,
   signInWithProvider,
   signUp as signUpTransport,
@@ -106,12 +105,8 @@ function LoginContent() {
     setError(null)
     try {
       await signInWithProvider("google", window.location.origin, "customer")
-    } catch (err: any) {
-      setError(
-        isAuthError(err)
-          ? getErrorMessage(err)
-          : (err.message ?? "Something went wrong"),
-      )
+    } catch (err: unknown) {
+      setError(getErrorMessage(err))
     }
   }
 
@@ -144,12 +139,8 @@ function LoginContent() {
       const safeReturnTo =
         returnTo && returnTo !== "/" ? returnTo : "/dashboard"
       window.location.href = safeReturnTo
-    } catch (err: any) {
-      setError(
-        isAuthError(err)
-          ? getErrorMessage(err)
-          : (err.message ?? "Something went wrong"),
-      )
+    } catch (err: unknown) {
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -159,6 +150,7 @@ function LoginContent() {
     name: string
     email: string
     password: string
+    termsAccepted: boolean
   }) => {
     setError(null)
     setLoading(true)
@@ -188,12 +180,8 @@ function LoginContent() {
       const safeReturnTo =
         returnTo && returnTo !== "/" ? returnTo : "/dashboard"
       window.location.href = safeReturnTo
-    } catch (err: any) {
-      setError(
-        isAuthError(err)
-          ? getErrorMessage(err)
-          : (err.message ?? "Something went wrong"),
-      )
+    } catch (err: unknown) {
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }

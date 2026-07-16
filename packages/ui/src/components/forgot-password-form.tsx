@@ -33,19 +33,36 @@ export function ForgotPasswordForm({
   return (
     <div className="grid gap-6">
       {successMessage ? (
-        <p className="text-center text-sm text-emerald-400">{successMessage}</p>
+        <p
+          role="status"
+          aria-live="polite"
+          className="text-center text-sm text-emerald-400"
+        >
+          {successMessage}
+        </p>
       ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className="grid gap-4"
+          noValidate
+        >
           <p className="text-sm text-muted-foreground">
             Enter your email address and we&apos;ll send you a link to reset
             your password.
           </p>
           <div className="grid">
+            <label
+              htmlFor="forgot-email"
+              className="mb-2 block text-xs font-semibold uppercase tracking-wider text-zinc-400"
+            >
+              Email address
+            </label>
             <Input
               id="forgot-email"
               type="email"
               placeholder="you@example.com"
               autoComplete="email"
+              required
               aria-invalid={!!errors.email}
               aria-describedby={errors.email ? "forgot-email-error" : undefined}
               {...register("email")}
@@ -59,7 +76,15 @@ export function ForgotPasswordForm({
               </p>
             )}
           </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <p
+              role="alert"
+              aria-live="assertive"
+              className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2.5 text-sm leading-6 text-destructive"
+            >
+              {error}
+            </p>
+          )}
           <SpinnerButton type="submit" className="w-full" loading={busy}>
             Send Reset Link
           </SpinnerButton>

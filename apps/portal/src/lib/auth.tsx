@@ -40,7 +40,12 @@ interface AuthContextValue {
   user: User | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string, name: string) => Promise<void>
+  signUp: (
+    email: string,
+    password: string,
+    name: string,
+    termsAccepted: boolean,
+  ) => Promise<void>
   signOut: () => Promise<void>
   refresh: () => Promise<void>
 }
@@ -140,13 +145,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  const signUp = async (email: string, password: string, name: string) => {
+  const signUp = async (
+    email: string,
+    password: string,
+    name: string,
+    termsAccepted: boolean,
+  ) => {
     setLoading(true)
     try {
       const res = await fetch(`${getBaseUrl()}/api/v1/auth/sign-up/email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, termsAccepted }),
         credentials: "include",
       })
       if (!res.ok) {

@@ -116,6 +116,7 @@ async function main() {
           email: u.email,
           password: u.password,
           name: u.name,
+          termsAccepted: true,
         }),
       })
       console.log(

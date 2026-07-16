@@ -32,6 +32,21 @@ export function mapBetterAuthError(
         recoverable: true,
         httpStatus: error.status ?? 404,
       }
+    case "INVALID_EMAIL":
+      return {
+        code: "VALIDATION_ERROR",
+        message: "Enter a valid email address.",
+        recoverable: true,
+        httpStatus: error.status ?? 400,
+      }
+    case "USER_ALREADY_EXISTS":
+    case "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL":
+      return {
+        code: "ACCOUNT_EXISTS",
+        message: "An account with this email already exists. Sign in instead.",
+        recoverable: true,
+        httpStatus: error.status ?? 422,
+      }
     case "EMAIL_NOT_VERIFIED":
       return {
         code: "EMAIL_NOT_VERIFIED",
@@ -68,7 +83,30 @@ export function mapBetterAuthError(
         recoverable: true,
         httpStatus: error.status ?? 422,
       }
+    case "PASSWORD_TOO_LONG":
+      return {
+        code: "VALIDATION_ERROR",
+        message: "Password must be 128 characters or fewer.",
+        recoverable: true,
+        httpStatus: error.status ?? 422,
+      }
     default:
+      if (error.status === 429) {
+        return {
+          code: "RATE_LIMITED",
+          message: "Too many attempts. Please try again later.",
+          recoverable: true,
+          httpStatus: 429,
+        }
+      }
+      if (error.status && error.status >= 500) {
+        return {
+          code: "UNKNOWN",
+          message: "We couldn't complete your request. Please try again.",
+          recoverable: true,
+          httpStatus: error.status,
+        }
+      }
       return {
         code: error.code ?? "UNKNOWN",
         message: error.message ?? "Something went wrong",

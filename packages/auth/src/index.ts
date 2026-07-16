@@ -1,7 +1,7 @@
 import { prisma } from "@guestpost/database"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
-import { getOAuthState } from "better-auth/api"
+import { APIError, createAuthMiddleware, getOAuthState } from "better-auth/api"
 import { toNodeHandler } from "better-auth/node"
 import { bearer } from "better-auth/plugins/bearer"
 import { renderVerificationEmail } from "./email-templates/verification.js"
@@ -9,6 +9,7 @@ import {
   type EmailRateLimitOptions,
   emailRateLimitPlugin,
 } from "./plugins/email-rate-limit.js"
+import { validateAuthRequest } from "./request-validation.js"
 
 export type { VerificationEmailContext } from "./email-templates/verification.js"
 export { renderVerificationEmail } from "./email-templates/verification.js"
@@ -248,6 +249,27 @@ async function convertFreshCustomerToPublisher(userId: string) {
   })
 }
 
+const validateAuthRequestMiddleware = createAuthMiddleware(async (ctx) => {
+  const validation = validateAuthRequest(ctx.path, ctx.body)
+  if (!validation) return
+
+  if (!validation.success) {
+    throw APIError.from("BAD_REQUEST", {
+      code: "VALIDATION_ERROR",
+      message: validation.message,
+    })
+  }
+
+  Object.assign(ctx.body, validation.data)
+
+  // Terms acceptance is request-only. It is validated before account
+  // creation but is not a Better Auth user field and must not reach the
+  // database adapter as an unknown column.
+  if (ctx.path === "/sign-up/email") {
+    delete ctx.body.termsAccepted
+  }
+})
+
 /**
  * Phase 7.10 test seam — builds the option object passed to betterAuth().
  * Exposed so unit tests can inspect what we wire (`emailVerification` block,
@@ -276,6 +298,9 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
       expiresIn: 8 * 60 * 60, // 8 hours — stolen cookie window bounded
       updateAge: 30 * 60, // 30 min — active users extend expiry; keeps
       // thieves' window from being infinite
+    },
+    hooks: {
+      before: validateAuthRequestMiddleware,
     },
     emailAndPassword: {
       enabled: true,

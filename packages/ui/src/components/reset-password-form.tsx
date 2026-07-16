@@ -29,17 +29,26 @@ export function ResetPasswordForm({
   const busy = loading || isSubmitting
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
+    <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4" noValidate>
       <PasswordInput
         id="reset-password"
         label="New password"
         placeholder="At least 8 characters"
         autoComplete="new-password"
-        description="Must be at least 8 characters"
+        required
+        description="Use at least 8 characters for a secure password."
         error={errors.password?.message}
         {...register("password")}
       />
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && (
+        <p
+          role="alert"
+          aria-live="assertive"
+          className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2.5 text-sm leading-6 text-destructive"
+        >
+          {error}
+        </p>
+      )}
       <SpinnerButton type="submit" className="w-full" loading={busy}>
         Reset Password
       </SpinnerButton>

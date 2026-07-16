@@ -3,7 +3,8 @@
 import type { SignupInput } from "@guestpost/shared"
 import { signupSchema } from "@guestpost/shared"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
+import { Checkbox } from "./checkbox"
 import { Input } from "./input"
 import { PasswordInput } from "./password-input"
 import { SpinnerButton } from "./spinner-button"
@@ -14,6 +15,7 @@ export interface SignupFormProps {
   error?: string
   onToggleMode?: () => void
   submitLabel?: string
+  termsHref?: string
 }
 
 export function SignupForm({
@@ -21,20 +23,28 @@ export function SignupForm({
   loading,
   error,
   submitLabel = "Create account",
+  termsHref = "https://guestpost.cc/legal/terms",
 }: SignupFormProps) {
   const {
+    control,
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<SignupInput>({
     resolver: zodResolver(signupSchema),
+    defaultValues: {
+      email: "",
+      name: "",
+      password: "",
+      termsAccepted: false,
+    },
   })
 
   const busy = loading || isSubmitting
 
   return (
     <div>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <div>
           <label
             htmlFor="signup-name"
@@ -47,6 +57,7 @@ export function SignupForm({
             type="text"
             placeholder="Jane Smith"
             autoComplete="name"
+            required
             aria-invalid={!!errors.name}
             aria-describedby={errors.name ? "signup-name-error" : undefined}
             {...register("name")}
@@ -73,6 +84,7 @@ export function SignupForm({
             type="email"
             placeholder="you@example.com"
             autoComplete="email"
+            required
             aria-invalid={!!errors.email}
             aria-describedby={errors.email ? "signup-email-error" : undefined}
             {...register("email")}
@@ -92,14 +104,66 @@ export function SignupForm({
           label="Password"
           placeholder="At least 8 characters"
           autoComplete="new-password"
+          required
           description="Use at least 8 characters for a secure password."
           error={errors.password?.message}
           {...register("password")}
         />
 
+        <div>
+          <div className="flex items-start gap-2.5">
+            <Controller
+              control={control}
+              name="termsAccepted"
+              render={({ field }) => (
+                <Checkbox
+                  ref={field.ref}
+                  id="signup-terms"
+                  name={field.name}
+                  checked={field.value}
+                  onBlur={field.onBlur}
+                  onCheckedChange={(checked) =>
+                    field.onChange(checked === true)
+                  }
+                  required
+                  aria-invalid={!!errors.termsAccepted}
+                  aria-describedby={
+                    errors.termsAccepted ? "signup-terms-error" : undefined
+                  }
+                  className="mt-0.5"
+                />
+              )}
+            />
+            <label
+              htmlFor="signup-terms"
+              className="text-sm leading-5 text-muted-foreground"
+            >
+              I agree to the{" "}
+              <a
+                href={termsHref}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium text-primary underline-offset-4 hover:underline"
+              >
+                Terms of Service
+              </a>
+              .
+            </label>
+          </div>
+          {errors.termsAccepted && (
+            <p
+              id="signup-terms-error"
+              className="mt-1.5 text-sm text-destructive"
+            >
+              {errors.termsAccepted.message}
+            </p>
+          )}
+        </div>
+
         {error && (
           <p
             role="alert"
+            aria-live="assertive"
             className="rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2.5 text-sm leading-6 text-destructive"
           >
             {error}

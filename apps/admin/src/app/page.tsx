@@ -3,7 +3,6 @@
 import type { AuthError } from "@guestpost/auth"
 import {
   getErrorMessage,
-  isAuthError,
   getSession as serverGetSession,
   signIn as signInTransport,
 } from "@guestpost/auth/client"
@@ -78,12 +77,8 @@ function LoginPageInner() {
         } as AuthError
       }
       window.location.href = safeReturnTo
-    } catch (err: any) {
-      setError(
-        isAuthError(err)
-          ? getErrorMessage(err)
-          : (err.message ?? "Something went wrong"),
-      )
+    } catch (err: unknown) {
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }

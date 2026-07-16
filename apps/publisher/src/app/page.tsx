@@ -5,7 +5,6 @@ import type { AuthError } from "@guestpost/auth"
 import {
   getErrorMessage,
   getSession,
-  isAuthError,
   signIn as signInTransport,
   signInWithProvider,
   signUp as signUpTransport,
@@ -143,13 +142,9 @@ function LoginContent() {
     try {
       sessionStorage.setItem("gp:oauth-pending", "true")
       await signInWithProvider("google", window.location.origin, "publisher")
-    } catch (err: any) {
+    } catch (err: unknown) {
       sessionStorage.removeItem("gp:oauth-pending")
-      setError(
-        isAuthError(err)
-          ? getErrorMessage(err)
-          : (err.message ?? "Something went wrong"),
-      )
+      setError(getErrorMessage(err))
     }
   }
 
@@ -179,12 +174,8 @@ function LoginContent() {
       const safeReturnTo =
         returnTo && returnTo !== "/" ? returnTo : "/dashboard"
       window.location.href = safeReturnTo
-    } catch (err: any) {
-      setError(
-        isAuthError(err)
-          ? getErrorMessage(err)
-          : (err.message ?? "Something went wrong"),
-      )
+    } catch (err: unknown) {
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }
@@ -194,6 +185,7 @@ function LoginContent() {
     name: string
     email: string
     password: string
+    termsAccepted: boolean
   }) => {
     setError(null)
     setLoading(true)
@@ -222,12 +214,8 @@ function LoginContent() {
       const safeReturnTo =
         returnTo && returnTo !== "/" ? returnTo : "/dashboard"
       window.location.href = safeReturnTo
-    } catch (err: any) {
-      setError(
-        isAuthError(err)
-          ? getErrorMessage(err)
-          : (err.message ?? "Something went wrong"),
-      )
+    } catch (err: unknown) {
+      setError(getErrorMessage(err))
     } finally {
       setLoading(false)
     }
