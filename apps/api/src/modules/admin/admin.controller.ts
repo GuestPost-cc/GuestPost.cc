@@ -1,3 +1,4 @@
+import { CancellationRequestStatus } from "@guestpost/database"
 import {
   BadRequestException,
   Body,
@@ -6,6 +7,7 @@ import {
   Get,
   Header,
   Param,
+  ParseEnumPipe,
   Patch,
   Post,
   Put,
@@ -26,7 +28,16 @@ import {
   UpdateListingServiceInput,
 } from "../marketplace/dto/marketplace.dto"
 import { MarketplaceService } from "../marketplace/marketplace.service"
+import {
+  CancelOrderDto,
+  CreateCancellationRequestDto,
+  FinanceApproveCancellationDto,
+  ForceCancelOrderDto,
+  RespondCancellationRequestDto,
+  ReviewCancellationRequestDto,
+} from "../orders/dto/order-cancellation.dto"
 import { OrdersService } from "../orders/orders.service"
+import { OrderCancellationService } from "../orders/services/order-cancellation.service"
 import { OrderDisputeService } from "../orders/services/order-dispute.service"
 import { OrderOperationsService } from "../orders/services/order-operations.service"
 import { OrderReviewService } from "../orders/services/order-review.service"
@@ -46,7 +57,6 @@ import {
   MarkPlatformPublishedDto,
   MarkVerifiedDto,
   PauseWebsiteDto,
-  ReasonRequiredDto,
   ReassignWebsiteDto,
   RejectVerificationDto,
   RequestReverifyDto,
@@ -84,6 +94,14 @@ function staffActor(user: any): SupportActor {
     staffRole: user.staffRole ?? null,
     customerRole: null,
     publisherRole: null,
+  }
+}
+
+function staffCancellationActor(user: any) {
+  return {
+    userId: user.id,
+    kind: "STAFF" as const,
+    staffRole: user.staffRole ?? null,
   }
 }
 
@@ -139,6 +157,7 @@ export class AdminController {
     private readonly payouts: PublisherPayoutsService,
     readonly _orders: OrdersService,
     private readonly dispute: OrderDisputeService,
+    private readonly cancellation: OrderCancellationService,
     private readonly ops: OrderOperationsService,
     private readonly reconciliation: ReconciliationService,
     private readonly payoutExecution: PayoutExecutionService,
@@ -397,17 +416,6 @@ export class AdminController {
     )
   }
 
-  @Post("orders/:id/refund")
-  @StaffRoles("SUPER_ADMIN", "FINANCE")
-  refundOrder(
-    @Param("id") id: string,
-    @Body() body: ReasonRequiredDto,
-    @CurrentUser() user: any,
-  ) {
-    const reason = body.reason
-    return this.admin.refundOrder(id, reason, user.id)
-  }
-
   @Get("disputes")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listDisputes(
@@ -429,7 +437,7 @@ export class AdminController {
   }
 
   @Post("disputes/:id/resolve")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   resolveDispute(
     @Param("id") id: string,
     @Body() body: ResolveDisputeDto,
@@ -441,6 +449,7 @@ export class AdminController {
       user.staffRole,
       body.resolution,
       body.action,
+      body.responsibility,
     )
   }
 
@@ -448,11 +457,94 @@ export class AdminController {
   @StaffRoles("SUPER_ADMIN")
   forceCancelOrder(
     @Param("id") id: string,
-    @Body() body: ReasonRequiredDto,
+    @Body() body: ForceCancelOrderDto,
     @CurrentUser() user: any,
   ) {
-    const reason = body.reason
-    return this.admin.forceCancelOrder(id, reason, user.id)
+    return this.cancellation.forceCancel(id, user.id, body)
+  }
+
+  @Get("cancellation-requests")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  listCancellationRequests(
+    @Query(
+      "status",
+      new ParseEnumPipe(CancellationRequestStatus, { optional: true }),
+    )
+    status?: CancellationRequestStatus,
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+  ) {
+    const pagination = parsePagination(take, skip)
+    return this.cancellation.listRequests({ status, ...pagination })
+  }
+
+  @Post("cancellation-requests/:id/review")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  reviewCancellationRequest(
+    @Param("id") id: string,
+    @Body() body: ReviewCancellationRequestDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.review(id, user.id, body)
+  }
+
+  @Post("cancellation-requests/:id/finance-approve")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  financeApproveCancellation(
+    @Param("id") id: string,
+    @Body() body: FinanceApproveCancellationDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.financeApprove(id, user.id, body)
+  }
+
+  @Post("orders/:id/decline")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  declinePlatformOrder(
+    @Param("id") id: string,
+    @Body() body: CancelOrderDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.decline(id, staffCancellationActor(user), body)
+  }
+
+  @Get("orders/:id/cancellation-preview")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  previewPlatformCancellation(
+    @Param("id") id: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.preview(id, staffCancellationActor(user))
+  }
+
+  @Post("orders/:id/cancellation-requests")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  requestPlatformCancellation(
+    @Param("id") id: string,
+    @Body() body: CreateCancellationRequestDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.createRequest(
+      id,
+      staffCancellationActor(user),
+      body,
+    )
+  }
+
+  @Post("orders/:orderId/cancellation-requests/:requestId/respond")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  respondToPlatformCancellation(
+    @Param("orderId") orderId: string,
+    @Param("requestId") requestId: string,
+    @Body() body: RespondCancellationRequestDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.respond(
+      orderId,
+      requestId,
+      staffCancellationActor(user),
+      body,
+    )
   }
 
   // ─── OPERATIONS FULFILLMENT ─────────────────────────
@@ -471,7 +563,7 @@ export class AdminController {
   @Post("orders/:id/accept")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   acceptPlatformOrder(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.ops.acceptOrder(id, user.id)
+    return this.ops.acceptOrder(id, user.id, user.staffRole)
   }
 
   @Post("orders/:id/submit-content")
@@ -482,19 +574,19 @@ export class AdminController {
     @CurrentUser() user: any,
   ) {
     const content = body.content
-    return this.ops.submitContent(id, user.id, content)
+    return this.ops.submitContent(id, user.id, user.staffRole, content)
   }
 
   @Post("orders/:id/mark-content-ready")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   markPlatformContentReady(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.ops.markContentReady(id, user.id)
+    return this.ops.markContentReady(id, user.id, user.staffRole)
   }
 
   @Post("orders/:id/submit-for-review")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   submitPlatformForReview(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.ops.submitForReview(id, user.id)
+    return this.ops.submitForReview(id, user.id, user.staffRole)
   }
 
   @Post("orders/:id/mark-published")
@@ -505,7 +597,7 @@ export class AdminController {
     @CurrentUser() user: any,
   ) {
     const url = body.url
-    return this.ops.markPublished(id, user.id, url)
+    return this.ops.markPublished(id, user.id, user.staffRole, url)
   }
 
   @StaffRoles("SUPER_ADMIN", "FINANCE")

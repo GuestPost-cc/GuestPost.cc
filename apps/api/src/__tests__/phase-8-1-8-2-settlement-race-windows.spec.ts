@@ -185,7 +185,11 @@ describe("Phase 8.2 (audit #2) — releaseFundsInternal Order.status version gua
         version: 3,
         status: { notIn: ["CANCELLED", "REFUNDED", "DISPUTED"] },
       },
-      data: { status: "COMPLETED", version: { increment: 1 } },
+      data: {
+        status: "COMPLETED",
+        warrantyEndsAt: null,
+        version: { increment: 1 },
+      },
     })
   })
 

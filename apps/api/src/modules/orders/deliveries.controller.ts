@@ -122,11 +122,17 @@ export class DeliveriesController {
     },
     @CurrentUser() user: any,
   ) {
-    return this.operations.markPublished(id, user.id, body.publishedUrl, {
-      articleTitle: body.articleTitle,
-      notes: body.notes,
-      screenshotUrl: body.screenshotUrl,
-    })
+    return this.operations.markPublished(
+      id,
+      user.id,
+      user.staffRole,
+      body.publishedUrl,
+      {
+        articleTitle: body.articleTitle,
+        notes: body.notes,
+        screenshotUrl: body.screenshotUrl,
+      },
+    )
   }
 
   // ── Intervention ─────────────────────────────────────────────────────────

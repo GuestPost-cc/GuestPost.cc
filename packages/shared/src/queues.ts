@@ -80,6 +80,8 @@ export const QUEUE_JOBS = {
   [QUEUES.AUTO_ACCEPT]: {
     SWEEP: "auto-accept-sweep",
     REMINDER_SWEEP: "review-reminder-sweep",
+    CANCELLATION_TIMEOUT_SWEEP: "cancellation-response-timeout-sweep",
+    ACCEPTANCE_TIMEOUT_SWEEP: "order-acceptance-timeout-sweep",
   },
   [QUEUES.INTEGRATION_SYNC]: {
     SYNC: "sync",

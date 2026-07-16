@@ -43,7 +43,6 @@ import {
   AlertCircle,
   Ban,
   ClipboardList,
-  DollarSign,
   Eye,
   Scale,
   Search,
@@ -58,8 +57,10 @@ import { getOrderBadgeVariant } from "../../../lib/order-status-badge-variant"
 
 interface Order {
   id: string
+  version: number
   type: string
   status: string
+  paymentStatus: string
   amount: number | null
   currency: string
   createdAt: string
@@ -70,66 +71,36 @@ interface Order {
 
 // Lifecycle is automated: customer pays -> publisher/ops fulfill -> the system
 // verifies the live link -> customer confirms -> settlement. Staff don't push
-// status manually; they monitor and intervene (force-cancel / refund), review
+// status manually; they monitor and intervene through force-cancel, structured
+// cancellation, or dispute review, and work deliveries in Fulfillment.
 // deliveries in Fulfillment, and work Disputes there.
-const TERMINAL = ["COMPLETED", "CANCELLED", "REFUNDED"]
-const CANCELLABLE = [
-  "DRAFT",
-  "PENDING_PAYMENT",
-  "PAID",
-  "SUBMITTED",
-  "ACCEPTED",
-  "CONTENT_REQUESTED",
-  "CONTENT_CREATION",
-  "CONTENT_READY",
-  "CUSTOMER_REVIEW",
-  "APPROVED",
-]
-const REFUNDABLE = [
-  "PAID",
-  "SUBMITTED",
-  "ACCEPTED",
-  "CONTENT_REQUESTED",
-  "CONTENT_CREATION",
-  "CONTENT_READY",
-  "CUSTOMER_REVIEW",
-  "APPROVED",
-  "PUBLISHED",
-  "VERIFIED",
-  "DELIVERED",
-  "SETTLED",
-  "DISPUTED",
-]
+const TERMINAL = ["CANCELLED", "REFUNDED"]
 
 function OrderActions({ order }: { order: Order }) {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
-  const canRefund =
-    user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "FINANCE"
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
-  const [action, setAction] = useState<null | "cancel" | "refund">(null)
+  const [action, setAction] = useState<null | "cancel">(null)
   const [reason, setReason] = useState("")
+  const [responsibility, setResponsibility] = useState("SYSTEM")
 
   const refresh = () =>
     queryClient.invalidateQueries({ queryKey: ["admin", "orders"] })
 
   const intervene = useMutation({
-    mutationFn: ({
-      kind,
-      reason,
-    }: {
-      kind: "cancel" | "refund"
-      reason: string
-    }) =>
-      kind === "cancel"
-        ? api.admin.forceCancelOrder(order.id, reason)
-        : api.admin.refundOrder(order.id, reason),
-    onSuccess: (_d, vars) => {
-      toast.success(
-        vars.kind === "cancel" ? "Order force-cancelled" : "Order refunded",
-      )
+    mutationFn: ({ reason }: { reason: string }) =>
+      api.admin.forceCancelOrder(order.id, {
+        reasonCode: "LEGAL_OR_SECURITY_EMERGENCY",
+        note: reason,
+        expectedVersion: order.version,
+        idempotencyKey: `admin-${order.id}-${order.version}`,
+        confirmationOrderId: order.id,
+        responsibility,
+      }),
+    onSuccess: () => {
+      toast.success("Order force-cancelled")
       setAction(null)
       setReason("")
       refresh()
@@ -137,11 +108,7 @@ function OrderActions({ order }: { order: Order }) {
     onError: (e: any) => toast.error(e?.message || "Action failed"),
   })
 
-  const showCancel = isSuperAdmin && CANCELLABLE.includes(order.status)
-  const showRefund =
-    canRefund &&
-    REFUNDABLE.includes(order.status) &&
-    !TERMINAL.includes(order.status)
+  const showCancel = isSuperAdmin && !TERMINAL.includes(order.status)
 
   return (
     <>
@@ -184,20 +151,6 @@ function OrderActions({ order }: { order: Order }) {
             <Ban className="h-3.5 w-3.5" />
           </Button>
         )}
-        {showRefund && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-destructive hover:text-destructive"
-            title="Refund"
-            onClick={() => {
-              setAction("refund")
-              setReason("")
-            }}
-          >
-            <DollarSign className="h-3.5 w-3.5" />
-          </Button>
-        )}
       </div>
 
       <Dialog
@@ -211,13 +164,11 @@ function OrderActions({ order }: { order: Order }) {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {action === "cancel" ? "Force-cancel order" : "Refund order"}
-            </DialogTitle>
+            <DialogTitle>Force-cancel order</DialogTitle>
             <DialogDescription>
-              {action === "cancel"
-                ? "Cancels the order and refunds any captured payment. Use only for stuck or erroneous orders."
-                : "Refunds the customer. If a settlement was already released, the publisher is clawed back."}
+              Cancels the order and refunds any captured payment. Use only for a
+              verified emergency; normal refunds go through Cancellations or
+              Disputes.
             </DialogDescription>
           </DialogHeader>
           <Textarea
@@ -227,6 +178,18 @@ function OrderActions({ order }: { order: Order }) {
             rows={3}
             maxLength={1000}
           />
+          <Select value={responsibility} onValueChange={setResponsibility}>
+            <SelectTrigger>
+              <SelectValue placeholder="Who is responsible?" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="CUSTOMER">Customer</SelectItem>
+              <SelectItem value="PUBLISHER">Publisher</SelectItem>
+              <SelectItem value="PLATFORM">Platform</SelectItem>
+              <SelectItem value="SHARED">Shared</SelectItem>
+              <SelectItem value="SYSTEM">System</SelectItem>
+            </SelectContent>
+          </Select>
           <DialogFooter>
             <Button
               variant="outline"
@@ -241,15 +204,10 @@ function OrderActions({ order }: { order: Order }) {
               variant="destructive"
               disabled={intervene.isPending || reason.trim().length < 3}
               onClick={() =>
-                action &&
-                intervene.mutate({ kind: action, reason: reason.trim() })
+                action && intervene.mutate({ reason: reason.trim() })
               }
             >
-              {intervene.isPending
-                ? "Working..."
-                : action === "cancel"
-                  ? "Force Cancel"
-                  : "Refund"}
+              {intervene.isPending ? "Working..." : "Force Cancel"}
             </Button>
           </DialogFooter>
         </DialogContent>

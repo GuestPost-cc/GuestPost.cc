@@ -548,12 +548,7 @@ describe("F-3: tenant-scoped order idempotency", () => {
 
   beforeEach(() => {
     prisma = makePrismaMock()
-    service = new OrdersService(
-      prisma,
-      auditMock() as any,
-      queueMock() as any,
-      {} as any,
-    )
+    service = new OrdersService(prisma)
   })
 
   it("replays via the composite (organizationId, idempotencyKey) lookup — never key-only", async () => {

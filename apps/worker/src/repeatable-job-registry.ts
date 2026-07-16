@@ -34,6 +34,8 @@ const JOB_NAMES = [
   "settlement-auto-release",
   "auto-accept-sweep",
   "review-reminder-sweep",
+  "cancellation-response-timeout-sweep",
+  "order-acceptance-timeout-sweep",
 ] as const
 
 export type RepeatableJobName = (typeof JOB_NAMES)[number]

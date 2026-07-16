@@ -14,7 +14,6 @@ import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { normalizeDomain } from "../../common/domain"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
-import { RefundService } from "../orders/services/refund.service"
 import { QueueService } from "../queues/queue.service"
 
 const VALID_STAFF_ROLES: StaffRole[] = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
@@ -25,7 +24,6 @@ export class AdminService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
-    private readonly refund: RefundService,
   ) {}
 
   async listUsers(params: {
@@ -522,85 +520,6 @@ export class AdminService {
         entityType: "Order",
         entityId: orderId,
         metadata: { fromStatus: order.status, verifyMethod: method },
-        userId,
-        organizationId: order.organizationId,
-      })
-
-      return updated
-    })
-  }
-
-  async refundOrder(orderId: string, reason: string, userId: string) {
-    // Delegates to the single consolidated refund path (duplicate check,
-    // settlement cancellation + clawback, wallet credit, audit)
-    return this.refund.refundOrder(orderId, reason, userId)
-  }
-
-  async forceCancelOrder(orderId: string, reason: string, userId: string) {
-    const order = await this.prisma.order.findUnique({ where: { id: orderId } })
-    if (!order) throw new NotFoundException("Order not found")
-    if (order.status === "COMPLETED" || order.status === "CANCELLED") {
-      throw new BadRequestException(
-        `Order cannot be force-cancelled in ${order.status} status`,
-      )
-    }
-
-    // Captured payments must go through the canonical refund path —
-    // cancelling here would keep the customer's money while killing the
-    // order, and would skip released-settlement clawback.
-    if (order.paymentStatus === "PAID") {
-      return this.refund.refundOrder(
-        orderId,
-        `Force-cancelled by admin: ${reason}`,
-        userId,
-      )
-    }
-
-    return this.prisma.$transaction(async (tx: any) => {
-      // Cancel active settlement if any
-      const activeSettlement = await tx.settlement.findFirst({
-        where: { orderId, status: { not: "CANCELLED" } },
-      })
-      if (activeSettlement && activeSettlement.status !== "RELEASED") {
-        const cancelled = await tx.settlement.updateMany({
-          where: { id: activeSettlement.id, version: activeSettlement.version },
-          data: { status: "CANCELLED", version: { increment: 1 } },
-        })
-        if (cancelled.count === 0) {
-          throw new ConflictException(
-            "Settlement was modified by another request. Retry.",
-          )
-        }
-      }
-
-      const cancelled = await tx.order.updateMany({
-        where: { id: orderId, version: order.version },
-        data: { status: "CANCELLED", version: { increment: 1 } },
-      })
-      if (cancelled.count === 0) {
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
-        )
-      }
-      const updated = await tx.order.findUniqueOrThrow({
-        where: { id: orderId },
-      })
-
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "ORDER_CANCELLED",
-          actorId: userId,
-          message: `Order force-cancelled by admin: ${reason}`,
-          metadata: { reason, cancelledBy: userId },
-        },
-      })
-
-      await this.audit.log({
-        action: "ORDER_FORCE_CANCELLED",
-        entityType: "Order",
-        entityId: orderId,
-        metadata: { fromStatus: order.status, reason },
         userId,
         organizationId: order.organizationId,
       })

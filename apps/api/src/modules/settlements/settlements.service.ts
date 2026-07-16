@@ -779,6 +779,8 @@ export class SettlementsService {
         activeDeliveryVersionId: true,
         fulfillmentChannel: true,
         organizationId: true,
+        warrantyDays: true,
+        deliveredAt: true,
         website: { select: { ownershipType: true } },
       },
     })
@@ -910,7 +912,16 @@ export class SettlementsService {
         version: order.version,
         status: { notIn: ["CANCELLED", "REFUNDED", "DISPUTED"] },
       },
-      data: { status: "COMPLETED", version: { increment: 1 } },
+      data: {
+        status: "COMPLETED",
+        warrantyEndsAt: order.warrantyDays
+          ? new Date(
+              (order.deliveredAt?.getTime() ?? Date.now()) +
+                order.warrantyDays * 86_400_000,
+            )
+          : null,
+        version: { increment: 1 },
+      },
     })
     if (orderUpdated.count === 0) {
       throw new ConflictException(

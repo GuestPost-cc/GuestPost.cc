@@ -31,6 +31,7 @@ export type OrderAvgAggregateOutputType = {
   revisionCount: number | null
   version: number | null
   turnaroundDays: number | null
+  warrantyDays: number | null
 }
 
 export type OrderSumAggregateOutputType = {
@@ -38,6 +39,7 @@ export type OrderSumAggregateOutputType = {
   revisionCount: number | null
   version: number | null
   turnaroundDays: number | null
+  warrantyDays: number | null
 }
 
 export type OrderMinAggregateOutputType = {
@@ -72,6 +74,12 @@ export type OrderMinAggregateOutputType = {
   listingServiceId: string | null
   fulfillmentChannel: $Enums.FulfillmentChannel | null
   turnaroundDays: number | null
+  warrantyDays: number | null
+  submittedAt: Date | null
+  acceptedAt: Date | null
+  fulfillmentDueAt: Date | null
+  warrantyEndsAt: Date | null
+  refundResponsibility: $Enums.CancellationResponsibility | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -108,6 +116,12 @@ export type OrderMaxAggregateOutputType = {
   listingServiceId: string | null
   fulfillmentChannel: $Enums.FulfillmentChannel | null
   turnaroundDays: number | null
+  warrantyDays: number | null
+  submittedAt: Date | null
+  acceptedAt: Date | null
+  fulfillmentDueAt: Date | null
+  warrantyEndsAt: Date | null
+  refundResponsibility: $Enums.CancellationResponsibility | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -144,6 +158,12 @@ export type OrderCountAggregateOutputType = {
   listingServiceId: number
   fulfillmentChannel: number
   turnaroundDays: number
+  warrantyDays: number
+  submittedAt: number
+  acceptedAt: number
+  fulfillmentDueAt: number
+  warrantyEndsAt: number
+  refundResponsibility: number
   briefData: number
   createdAt: number
   updatedAt: number
@@ -156,6 +176,7 @@ export type OrderAvgAggregateInputType = {
   revisionCount?: true
   version?: true
   turnaroundDays?: true
+  warrantyDays?: true
 }
 
 export type OrderSumAggregateInputType = {
@@ -163,6 +184,7 @@ export type OrderSumAggregateInputType = {
   revisionCount?: true
   version?: true
   turnaroundDays?: true
+  warrantyDays?: true
 }
 
 export type OrderMinAggregateInputType = {
@@ -197,6 +219,12 @@ export type OrderMinAggregateInputType = {
   listingServiceId?: true
   fulfillmentChannel?: true
   turnaroundDays?: true
+  warrantyDays?: true
+  submittedAt?: true
+  acceptedAt?: true
+  fulfillmentDueAt?: true
+  warrantyEndsAt?: true
+  refundResponsibility?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -233,6 +261,12 @@ export type OrderMaxAggregateInputType = {
   listingServiceId?: true
   fulfillmentChannel?: true
   turnaroundDays?: true
+  warrantyDays?: true
+  submittedAt?: true
+  acceptedAt?: true
+  fulfillmentDueAt?: true
+  warrantyEndsAt?: true
+  refundResponsibility?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -269,6 +303,12 @@ export type OrderCountAggregateInputType = {
   listingServiceId?: true
   fulfillmentChannel?: true
   turnaroundDays?: true
+  warrantyDays?: true
+  submittedAt?: true
+  acceptedAt?: true
+  fulfillmentDueAt?: true
+  warrantyEndsAt?: true
+  refundResponsibility?: true
   briefData?: true
   createdAt?: true
   updatedAt?: true
@@ -393,6 +433,12 @@ export type OrderGroupByOutputType = {
   listingServiceId: string | null
   fulfillmentChannel: $Enums.FulfillmentChannel | null
   turnaroundDays: number | null
+  warrantyDays: number | null
+  submittedAt: Date | null
+  acceptedAt: Date | null
+  fulfillmentDueAt: Date | null
+  warrantyEndsAt: Date | null
+  refundResponsibility: $Enums.CancellationResponsibility | null
   briefData: runtime.JsonValue | null
   createdAt: Date
   updatedAt: Date
@@ -453,6 +499,12 @@ export type OrderWhereInput = {
   listingServiceId?: Prisma.StringNullableFilter<"Order"> | string | null
   fulfillmentChannel?: Prisma.EnumFulfillmentChannelNullableFilter<"Order"> | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.IntNullableFilter<"Order"> | number | null
+  warrantyDays?: Prisma.IntNullableFilter<"Order"> | number | null
+  submittedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  acceptedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  fulfillmentDueAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  warrantyEndsAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  refundResponsibility?: Prisma.EnumCancellationResponsibilityNullableFilter<"Order"> | $Enums.CancellationResponsibility | null
   briefData?: Prisma.JsonNullableFilter<"Order">
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
@@ -478,6 +530,7 @@ export type OrderWhereInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
   review?: Prisma.XOR<Prisma.OrderReviewNullableScalarRelationFilter, Prisma.OrderReviewWhereInput> | null
+  cancellationRequests?: Prisma.OrderCancellationRequestListRelationFilter
 }
 
 export type OrderOrderByWithRelationInput = {
@@ -512,6 +565,12 @@ export type OrderOrderByWithRelationInput = {
   listingServiceId?: Prisma.SortOrderInput | Prisma.SortOrder
   fulfillmentChannel?: Prisma.SortOrderInput | Prisma.SortOrder
   turnaroundDays?: Prisma.SortOrderInput | Prisma.SortOrder
+  warrantyDays?: Prisma.SortOrderInput | Prisma.SortOrder
+  submittedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  acceptedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentDueAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  warrantyEndsAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  refundResponsibility?: Prisma.SortOrderInput | Prisma.SortOrder
   briefData?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -537,6 +596,7 @@ export type OrderOrderByWithRelationInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagOrderByRelationAggregateInput
   tickets?: Prisma.TicketOrderByRelationAggregateInput
   review?: Prisma.OrderReviewOrderByWithRelationInput
+  cancellationRequests?: Prisma.OrderCancellationRequestOrderByRelationAggregateInput
 }
 
 export type OrderWhereUniqueInput = Prisma.AtLeast<{
@@ -575,6 +635,12 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   listingServiceId?: Prisma.StringNullableFilter<"Order"> | string | null
   fulfillmentChannel?: Prisma.EnumFulfillmentChannelNullableFilter<"Order"> | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.IntNullableFilter<"Order"> | number | null
+  warrantyDays?: Prisma.IntNullableFilter<"Order"> | number | null
+  submittedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  acceptedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  fulfillmentDueAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  warrantyEndsAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  refundResponsibility?: Prisma.EnumCancellationResponsibilityNullableFilter<"Order"> | $Enums.CancellationResponsibility | null
   briefData?: Prisma.JsonNullableFilter<"Order">
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
@@ -600,6 +666,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   fraudFlags?: Prisma.DeliveryFraudFlagListRelationFilter
   tickets?: Prisma.TicketListRelationFilter
   review?: Prisma.XOR<Prisma.OrderReviewNullableScalarRelationFilter, Prisma.OrderReviewWhereInput> | null
+  cancellationRequests?: Prisma.OrderCancellationRequestListRelationFilter
 }, "id" | "activeDeliveryVersionId" | "organizationId_idempotencyKey">
 
 export type OrderOrderByWithAggregationInput = {
@@ -634,6 +701,12 @@ export type OrderOrderByWithAggregationInput = {
   listingServiceId?: Prisma.SortOrderInput | Prisma.SortOrder
   fulfillmentChannel?: Prisma.SortOrderInput | Prisma.SortOrder
   turnaroundDays?: Prisma.SortOrderInput | Prisma.SortOrder
+  warrantyDays?: Prisma.SortOrderInput | Prisma.SortOrder
+  submittedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  acceptedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  fulfillmentDueAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  warrantyEndsAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  refundResponsibility?: Prisma.SortOrderInput | Prisma.SortOrder
   briefData?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -679,6 +752,12 @@ export type OrderScalarWhereWithAggregatesInput = {
   listingServiceId?: Prisma.StringNullableWithAggregatesFilter<"Order"> | string | null
   fulfillmentChannel?: Prisma.EnumFulfillmentChannelNullableWithAggregatesFilter<"Order"> | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.IntNullableWithAggregatesFilter<"Order"> | number | null
+  warrantyDays?: Prisma.IntNullableWithAggregatesFilter<"Order"> | number | null
+  submittedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  acceptedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  fulfillmentDueAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  warrantyEndsAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Order"> | Date | string | null
+  refundResponsibility?: Prisma.EnumCancellationResponsibilityNullableWithAggregatesFilter<"Order"> | $Enums.CancellationResponsibility | null
   briefData?: Prisma.JsonNullableWithAggregatesFilter<"Order">
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Order"> | Date | string
@@ -708,6 +787,12 @@ export type OrderCreateInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -733,6 +818,7 @@ export type OrderCreateInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateInput = {
@@ -767,6 +853,12 @@ export type OrderUncheckedCreateInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -784,6 +876,7 @@ export type OrderUncheckedCreateInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUpdateInput = {
@@ -810,6 +903,12 @@ export type OrderUpdateInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -835,6 +934,7 @@ export type OrderUpdateInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateInput = {
@@ -869,6 +969,12 @@ export type OrderUncheckedUpdateInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -886,6 +992,7 @@ export type OrderUncheckedUpdateInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateManyInput = {
@@ -920,6 +1027,12 @@ export type OrderCreateManyInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -949,6 +1062,12 @@ export type OrderUpdateManyMutationInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -986,6 +1105,12 @@ export type OrderUncheckedUpdateManyInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1038,6 +1163,12 @@ export type OrderCountOrderByAggregateInput = {
   listingServiceId?: Prisma.SortOrder
   fulfillmentChannel?: Prisma.SortOrder
   turnaroundDays?: Prisma.SortOrder
+  warrantyDays?: Prisma.SortOrder
+  submittedAt?: Prisma.SortOrder
+  acceptedAt?: Prisma.SortOrder
+  fulfillmentDueAt?: Prisma.SortOrder
+  warrantyEndsAt?: Prisma.SortOrder
+  refundResponsibility?: Prisma.SortOrder
   briefData?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -1048,6 +1179,7 @@ export type OrderAvgOrderByAggregateInput = {
   revisionCount?: Prisma.SortOrder
   version?: Prisma.SortOrder
   turnaroundDays?: Prisma.SortOrder
+  warrantyDays?: Prisma.SortOrder
 }
 
 export type OrderMaxOrderByAggregateInput = {
@@ -1082,6 +1214,12 @@ export type OrderMaxOrderByAggregateInput = {
   listingServiceId?: Prisma.SortOrder
   fulfillmentChannel?: Prisma.SortOrder
   turnaroundDays?: Prisma.SortOrder
+  warrantyDays?: Prisma.SortOrder
+  submittedAt?: Prisma.SortOrder
+  acceptedAt?: Prisma.SortOrder
+  fulfillmentDueAt?: Prisma.SortOrder
+  warrantyEndsAt?: Prisma.SortOrder
+  refundResponsibility?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -1118,6 +1256,12 @@ export type OrderMinOrderByAggregateInput = {
   listingServiceId?: Prisma.SortOrder
   fulfillmentChannel?: Prisma.SortOrder
   turnaroundDays?: Prisma.SortOrder
+  warrantyDays?: Prisma.SortOrder
+  submittedAt?: Prisma.SortOrder
+  acceptedAt?: Prisma.SortOrder
+  fulfillmentDueAt?: Prisma.SortOrder
+  warrantyEndsAt?: Prisma.SortOrder
+  refundResponsibility?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -1127,6 +1271,7 @@ export type OrderSumOrderByAggregateInput = {
   revisionCount?: Prisma.SortOrder
   version?: Prisma.SortOrder
   turnaroundDays?: Prisma.SortOrder
+  warrantyDays?: Prisma.SortOrder
 }
 
 export type OrderScalarRelationFilter = {
@@ -1339,6 +1484,10 @@ export type NullableEnumFulfillmentChannelFieldUpdateOperationsInput = {
   set?: $Enums.FulfillmentChannel | null
 }
 
+export type NullableEnumCancellationResponsibilityFieldUpdateOperationsInput = {
+  set?: $Enums.CancellationResponsibility | null
+}
+
 export type OrderCreateNestedManyWithoutCampaignInput = {
   create?: Prisma.XOR<Prisma.OrderCreateWithoutCampaignInput, Prisma.OrderUncheckedCreateWithoutCampaignInput> | Prisma.OrderCreateWithoutCampaignInput[] | Prisma.OrderUncheckedCreateWithoutCampaignInput[]
   connectOrCreate?: Prisma.OrderCreateOrConnectWithoutCampaignInput | Prisma.OrderCreateOrConnectWithoutCampaignInput[]
@@ -1421,6 +1570,20 @@ export type OrderUpdateOneRequiredWithoutDisputeNestedInput = {
   upsert?: Prisma.OrderUpsertWithoutDisputeInput
   connect?: Prisma.OrderWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutDisputeInput, Prisma.OrderUpdateWithoutDisputeInput>, Prisma.OrderUncheckedUpdateWithoutDisputeInput>
+}
+
+export type OrderCreateNestedOneWithoutCancellationRequestsInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutCancellationRequestsInput, Prisma.OrderUncheckedCreateWithoutCancellationRequestsInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutCancellationRequestsInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
+export type OrderUpdateOneRequiredWithoutCancellationRequestsNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutCancellationRequestsInput, Prisma.OrderUncheckedCreateWithoutCancellationRequestsInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutCancellationRequestsInput
+  upsert?: Prisma.OrderUpsertWithoutCancellationRequestsInput
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutCancellationRequestsInput, Prisma.OrderUpdateWithoutCancellationRequestsInput>, Prisma.OrderUncheckedUpdateWithoutCancellationRequestsInput>
 }
 
 export type OrderCreateNestedOneWithoutSettlementsInput = {
@@ -1721,6 +1884,12 @@ export type OrderCreateWithoutCustomerInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1745,6 +1914,7 @@ export type OrderCreateWithoutCustomerInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutCustomerInput = {
@@ -1778,6 +1948,12 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1795,6 +1971,7 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutCustomerInput = {
@@ -1831,6 +2008,12 @@ export type OrderCreateWithoutAssigneeInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1855,6 +2038,7 @@ export type OrderCreateWithoutAssigneeInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutAssigneeInput = {
@@ -1888,6 +2072,12 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1905,6 +2095,7 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutAssigneeInput = {
@@ -1968,6 +2159,12 @@ export type OrderScalarWhereInput = {
   listingServiceId?: Prisma.StringNullableFilter<"Order"> | string | null
   fulfillmentChannel?: Prisma.EnumFulfillmentChannelNullableFilter<"Order"> | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.IntNullableFilter<"Order"> | number | null
+  warrantyDays?: Prisma.IntNullableFilter<"Order"> | number | null
+  submittedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  acceptedAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  fulfillmentDueAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  warrantyEndsAt?: Prisma.DateTimeNullableFilter<"Order"> | Date | string | null
+  refundResponsibility?: Prisma.EnumCancellationResponsibilityNullableFilter<"Order"> | $Enums.CancellationResponsibility | null
   briefData?: Prisma.JsonNullableFilter<"Order">
   createdAt?: Prisma.DateTimeFilter<"Order"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Order"> | Date | string
@@ -2013,6 +2210,12 @@ export type OrderCreateWithoutOrganizationInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2037,6 +2240,7 @@ export type OrderCreateWithoutOrganizationInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutOrganizationInput = {
@@ -2070,6 +2274,12 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2087,6 +2297,7 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutOrganizationInput = {
@@ -2139,6 +2350,12 @@ export type OrderCreateWithoutWebsiteInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2163,6 +2380,7 @@ export type OrderCreateWithoutWebsiteInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutWebsiteInput = {
@@ -2196,6 +2414,12 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2213,6 +2437,7 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutWebsiteInput = {
@@ -2265,6 +2490,12 @@ export type OrderCreateWithoutCampaignInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2289,6 +2520,7 @@ export type OrderCreateWithoutCampaignInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutCampaignInput = {
@@ -2322,6 +2554,12 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2339,6 +2577,7 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutCampaignInput = {
@@ -2391,6 +2630,12 @@ export type OrderCreateWithoutItemsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2415,6 +2660,7 @@ export type OrderCreateWithoutItemsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutItemsInput = {
@@ -2449,6 +2695,12 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2465,6 +2717,7 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutItemsInput = {
@@ -2507,6 +2760,12 @@ export type OrderUpdateWithoutItemsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2531,6 +2790,7 @@ export type OrderUpdateWithoutItemsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutItemsInput = {
@@ -2565,6 +2825,12 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2581,6 +2847,7 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutEventsInput = {
@@ -2607,6 +2874,12 @@ export type OrderCreateWithoutEventsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2631,6 +2904,7 @@ export type OrderCreateWithoutEventsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutEventsInput = {
@@ -2665,6 +2939,12 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2681,6 +2961,7 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutEventsInput = {
@@ -2723,6 +3004,12 @@ export type OrderUpdateWithoutEventsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2747,6 +3034,7 @@ export type OrderUpdateWithoutEventsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutEventsInput = {
@@ -2781,6 +3069,12 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2797,6 +3091,7 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutDisputeInput = {
@@ -2823,6 +3118,12 @@ export type OrderCreateWithoutDisputeInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2847,6 +3148,7 @@ export type OrderCreateWithoutDisputeInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutDisputeInput = {
@@ -2881,6 +3183,12 @@ export type OrderUncheckedCreateWithoutDisputeInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2897,6 +3205,7 @@ export type OrderUncheckedCreateWithoutDisputeInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutDisputeInput = {
@@ -2939,6 +3248,12 @@ export type OrderUpdateWithoutDisputeInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2963,6 +3278,7 @@ export type OrderUpdateWithoutDisputeInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutDisputeInput = {
@@ -2997,6 +3313,12 @@ export type OrderUncheckedUpdateWithoutDisputeInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3007,6 +3329,251 @@ export type OrderUncheckedUpdateWithoutDisputeInput = {
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
   events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
   settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
+}
+
+export type OrderCreateWithoutCancellationRequestsInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
+  version?: number
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
+  assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
+  organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
+  campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
+  listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
+  listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
+  contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+}
+
+export type OrderUncheckedCreateWithoutCancellationRequestsInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  customerId: string
+  assigneeId?: string | null
+  websiteId?: string | null
+  organizationId: string
+  campaignId?: string | null
+  idempotencyKey?: string | null
+  version?: number
+  activeDeliveryVersionId?: string | null
+  listingId?: string | null
+  listingServiceId?: string | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+}
+
+export type OrderCreateOrConnectWithoutCancellationRequestsInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutCancellationRequestsInput, Prisma.OrderUncheckedCreateWithoutCancellationRequestsInput>
+}
+
+export type OrderUpsertWithoutCancellationRequestsInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutCancellationRequestsInput, Prisma.OrderUncheckedUpdateWithoutCancellationRequestsInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutCancellationRequestsInput, Prisma.OrderUncheckedCreateWithoutCancellationRequestsInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutCancellationRequestsInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutCancellationRequestsInput, Prisma.OrderUncheckedUpdateWithoutCancellationRequestsInput>
+}
+
+export type OrderUpdateWithoutCancellationRequestsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
+  assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
+  campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
+  listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
+  listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
+  contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutCancellationRequestsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  customerId?: Prisma.StringFieldUpdateOperationsInput | string
+  assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  listingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
   platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
   deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutOrderNestedInput
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
@@ -3039,6 +3606,12 @@ export type OrderCreateWithoutSettlementsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3063,6 +3636,7 @@ export type OrderCreateWithoutSettlementsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutSettlementsInput = {
@@ -3097,6 +3671,12 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3113,6 +3693,7 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutSettlementsInput = {
@@ -3155,6 +3736,12 @@ export type OrderUpdateWithoutSettlementsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3179,6 +3766,7 @@ export type OrderUpdateWithoutSettlementsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutSettlementsInput = {
@@ -3213,6 +3801,12 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3229,6 +3823,7 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutFulfillmentAssignmentsInput = {
@@ -3255,6 +3850,12 @@ export type OrderCreateWithoutFulfillmentAssignmentsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3279,6 +3880,7 @@ export type OrderCreateWithoutFulfillmentAssignmentsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutFulfillmentAssignmentsInput = {
@@ -3313,6 +3915,12 @@ export type OrderUncheckedCreateWithoutFulfillmentAssignmentsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3329,6 +3937,7 @@ export type OrderUncheckedCreateWithoutFulfillmentAssignmentsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutFulfillmentAssignmentsInput = {
@@ -3371,6 +3980,12 @@ export type OrderUpdateWithoutFulfillmentAssignmentsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3395,6 +4010,7 @@ export type OrderUpdateWithoutFulfillmentAssignmentsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutFulfillmentAssignmentsInput = {
@@ -3429,6 +4045,12 @@ export type OrderUncheckedUpdateWithoutFulfillmentAssignmentsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3445,6 +4067,7 @@ export type OrderUncheckedUpdateWithoutFulfillmentAssignmentsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutDeliveryVersionsInput = {
@@ -3471,6 +4094,12 @@ export type OrderCreateWithoutDeliveryVersionsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3495,6 +4124,7 @@ export type OrderCreateWithoutDeliveryVersionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutDeliveryVersionsInput = {
@@ -3529,6 +4159,12 @@ export type OrderUncheckedCreateWithoutDeliveryVersionsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3545,6 +4181,7 @@ export type OrderUncheckedCreateWithoutDeliveryVersionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutDeliveryVersionsInput = {
@@ -3576,6 +4213,12 @@ export type OrderCreateWithoutActiveDeliveryVersionInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3600,6 +4243,7 @@ export type OrderCreateWithoutActiveDeliveryVersionInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutActiveDeliveryVersionInput = {
@@ -3633,6 +4277,12 @@ export type OrderUncheckedCreateWithoutActiveDeliveryVersionInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3650,6 +4300,7 @@ export type OrderUncheckedCreateWithoutActiveDeliveryVersionInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutActiveDeliveryVersionInput = {
@@ -3692,6 +4343,12 @@ export type OrderUpdateWithoutDeliveryVersionsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3716,6 +4373,7 @@ export type OrderUpdateWithoutDeliveryVersionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutDeliveryVersionsInput = {
@@ -3750,6 +4408,12 @@ export type OrderUncheckedUpdateWithoutDeliveryVersionsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3766,6 +4430,7 @@ export type OrderUncheckedUpdateWithoutDeliveryVersionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUpsertWithoutActiveDeliveryVersionInput = {
@@ -3803,6 +4468,12 @@ export type OrderUpdateWithoutActiveDeliveryVersionInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3827,6 +4498,7 @@ export type OrderUpdateWithoutActiveDeliveryVersionInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutActiveDeliveryVersionInput = {
@@ -3860,6 +4532,12 @@ export type OrderUncheckedUpdateWithoutActiveDeliveryVersionInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -3877,6 +4555,7 @@ export type OrderUncheckedUpdateWithoutActiveDeliveryVersionInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutFraudFlagsInput = {
@@ -3903,6 +4582,12 @@ export type OrderCreateWithoutFraudFlagsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3927,6 +4612,7 @@ export type OrderCreateWithoutFraudFlagsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutFraudFlagsInput = {
@@ -3961,6 +4647,12 @@ export type OrderUncheckedCreateWithoutFraudFlagsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -3977,6 +4669,7 @@ export type OrderUncheckedCreateWithoutFraudFlagsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutFraudFlagsInput = {
@@ -4019,6 +4712,12 @@ export type OrderUpdateWithoutFraudFlagsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4043,6 +4742,7 @@ export type OrderUpdateWithoutFraudFlagsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutFraudFlagsInput = {
@@ -4077,6 +4777,12 @@ export type OrderUncheckedUpdateWithoutFraudFlagsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4093,6 +4799,7 @@ export type OrderUncheckedUpdateWithoutFraudFlagsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutReviewInput = {
@@ -4119,6 +4826,12 @@ export type OrderCreateWithoutReviewInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4143,6 +4856,7 @@ export type OrderCreateWithoutReviewInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutReviewInput = {
@@ -4177,6 +4891,12 @@ export type OrderUncheckedCreateWithoutReviewInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4193,6 +4913,7 @@ export type OrderUncheckedCreateWithoutReviewInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutReviewInput = {
@@ -4235,6 +4956,12 @@ export type OrderUpdateWithoutReviewInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4259,6 +4986,7 @@ export type OrderUpdateWithoutReviewInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutReviewInput = {
@@ -4293,6 +5021,12 @@ export type OrderUncheckedUpdateWithoutReviewInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4309,6 +5043,7 @@ export type OrderUncheckedUpdateWithoutReviewInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutContentOrderInput = {
@@ -4335,6 +5070,12 @@ export type OrderCreateWithoutContentOrderInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4359,6 +5100,7 @@ export type OrderCreateWithoutContentOrderInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutContentOrderInput = {
@@ -4393,6 +5135,12 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4409,6 +5157,7 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutContentOrderInput = {
@@ -4451,6 +5200,12 @@ export type OrderUpdateWithoutContentOrderInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4475,6 +5230,7 @@ export type OrderUpdateWithoutContentOrderInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutContentOrderInput = {
@@ -4509,6 +5265,12 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4525,6 +5287,7 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutRevisionsInput = {
@@ -4551,6 +5314,12 @@ export type OrderCreateWithoutRevisionsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4575,6 +5344,7 @@ export type OrderCreateWithoutRevisionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutRevisionsInput = {
@@ -4609,6 +5379,12 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4625,6 +5401,7 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutRevisionsInput = {
@@ -4667,6 +5444,12 @@ export type OrderUpdateWithoutRevisionsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4691,6 +5474,7 @@ export type OrderUpdateWithoutRevisionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutRevisionsInput = {
@@ -4725,6 +5509,12 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4741,6 +5531,7 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutReportsInput = {
@@ -4767,6 +5558,12 @@ export type OrderCreateWithoutReportsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4791,6 +5588,7 @@ export type OrderCreateWithoutReportsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutReportsInput = {
@@ -4825,6 +5623,12 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -4841,6 +5645,7 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutReportsInput = {
@@ -4883,6 +5688,12 @@ export type OrderUpdateWithoutReportsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4907,6 +5718,7 @@ export type OrderUpdateWithoutReportsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutReportsInput = {
@@ -4941,6 +5753,12 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -4957,6 +5775,7 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutPlatformRevenueInput = {
@@ -4983,6 +5802,12 @@ export type OrderCreateWithoutPlatformRevenueInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5007,6 +5832,7 @@ export type OrderCreateWithoutPlatformRevenueInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutPlatformRevenueInput = {
@@ -5041,6 +5867,12 @@ export type OrderUncheckedCreateWithoutPlatformRevenueInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5057,6 +5889,7 @@ export type OrderUncheckedCreateWithoutPlatformRevenueInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutPlatformRevenueInput = {
@@ -5099,6 +5932,12 @@ export type OrderUpdateWithoutPlatformRevenueInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5123,6 +5962,7 @@ export type OrderUpdateWithoutPlatformRevenueInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutPlatformRevenueInput = {
@@ -5157,6 +5997,12 @@ export type OrderUncheckedUpdateWithoutPlatformRevenueInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5173,6 +6019,7 @@ export type OrderUncheckedUpdateWithoutPlatformRevenueInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutTransactionsInput = {
@@ -5199,6 +6046,12 @@ export type OrderCreateWithoutTransactionsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5223,6 +6076,7 @@ export type OrderCreateWithoutTransactionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutTransactionsInput = {
@@ -5257,6 +6111,12 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5273,6 +6133,7 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutTransactionsInput = {
@@ -5315,6 +6176,12 @@ export type OrderUpdateWithoutTransactionsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5339,6 +6206,7 @@ export type OrderUpdateWithoutTransactionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutTransactionsInput = {
@@ -5373,6 +6241,12 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5389,6 +6263,7 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutTicketsInput = {
@@ -5415,6 +6290,12 @@ export type OrderCreateWithoutTicketsInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5439,6 +6320,7 @@ export type OrderCreateWithoutTicketsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutTicketsInput = {
@@ -5473,6 +6355,12 @@ export type OrderUncheckedCreateWithoutTicketsInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5489,6 +6377,7 @@ export type OrderUncheckedCreateWithoutTicketsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutTicketsInput = {
@@ -5531,6 +6420,12 @@ export type OrderUpdateWithoutTicketsInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5555,6 +6450,7 @@ export type OrderUpdateWithoutTicketsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutTicketsInput = {
@@ -5589,6 +6485,12 @@ export type OrderUncheckedUpdateWithoutTicketsInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5605,6 +6507,7 @@ export type OrderUncheckedUpdateWithoutTicketsInput = {
   fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderCreateWithoutListingInput = {
@@ -5631,6 +6534,12 @@ export type OrderCreateWithoutListingInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5655,6 +6564,7 @@ export type OrderCreateWithoutListingInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutListingInput = {
@@ -5688,6 +6598,12 @@ export type OrderUncheckedCreateWithoutListingInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5705,6 +6621,7 @@ export type OrderUncheckedCreateWithoutListingInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutListingInput = {
@@ -5757,6 +6674,12 @@ export type OrderCreateWithoutListingServiceInput = {
   version?: number
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5781,6 +6704,7 @@ export type OrderCreateWithoutListingServiceInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
 }
 
 export type OrderUncheckedCreateWithoutListingServiceInput = {
@@ -5814,6 +6738,12 @@ export type OrderUncheckedCreateWithoutListingServiceInput = {
   listingId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5831,6 +6761,7 @@ export type OrderUncheckedCreateWithoutListingServiceInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
   tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
   review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
 }
 
 export type OrderCreateOrConnectWithoutListingServiceInput = {
@@ -5890,6 +6821,12 @@ export type OrderCreateManyCustomerInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5926,6 +6863,12 @@ export type OrderCreateManyAssigneeInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -5955,6 +6898,12 @@ export type OrderUpdateWithoutCustomerInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -5979,6 +6928,7 @@ export type OrderUpdateWithoutCustomerInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutCustomerInput = {
@@ -6012,6 +6962,12 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6029,6 +6985,7 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutCustomerInput = {
@@ -6062,6 +7019,12 @@ export type OrderUncheckedUpdateManyWithoutCustomerInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6091,6 +7054,12 @@ export type OrderUpdateWithoutAssigneeInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6115,6 +7084,7 @@ export type OrderUpdateWithoutAssigneeInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutAssigneeInput = {
@@ -6148,6 +7118,12 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6165,6 +7141,7 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutAssigneeInput = {
@@ -6198,6 +7175,12 @@ export type OrderUncheckedUpdateManyWithoutAssigneeInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6234,6 +7217,12 @@ export type OrderCreateManyOrganizationInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -6263,6 +7252,12 @@ export type OrderUpdateWithoutOrganizationInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6287,6 +7282,7 @@ export type OrderUpdateWithoutOrganizationInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutOrganizationInput = {
@@ -6320,6 +7316,12 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6337,6 +7339,7 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutOrganizationInput = {
@@ -6370,6 +7373,12 @@ export type OrderUncheckedUpdateManyWithoutOrganizationInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6406,6 +7415,12 @@ export type OrderCreateManyWebsiteInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -6435,6 +7450,12 @@ export type OrderUpdateWithoutWebsiteInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6459,6 +7480,7 @@ export type OrderUpdateWithoutWebsiteInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutWebsiteInput = {
@@ -6492,6 +7514,12 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6509,6 +7537,7 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutWebsiteInput = {
@@ -6542,6 +7571,12 @@ export type OrderUncheckedUpdateManyWithoutWebsiteInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6578,6 +7613,12 @@ export type OrderCreateManyCampaignInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -6607,6 +7648,12 @@ export type OrderUpdateWithoutCampaignInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6631,6 +7678,7 @@ export type OrderUpdateWithoutCampaignInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutCampaignInput = {
@@ -6664,6 +7712,12 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6681,6 +7735,7 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutCampaignInput = {
@@ -6714,6 +7769,12 @@ export type OrderUncheckedUpdateManyWithoutCampaignInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6750,6 +7811,12 @@ export type OrderCreateManyListingInput = {
   listingServiceId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -6779,6 +7846,12 @@ export type OrderUpdateWithoutListingInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6803,6 +7876,7 @@ export type OrderUpdateWithoutListingInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutListingInput = {
@@ -6836,6 +7910,12 @@ export type OrderUncheckedUpdateWithoutListingInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6853,6 +7933,7 @@ export type OrderUncheckedUpdateWithoutListingInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutListingInput = {
@@ -6886,6 +7967,12 @@ export type OrderUncheckedUpdateManyWithoutListingInput = {
   listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6922,6 +8009,12 @@ export type OrderCreateManyListingServiceInput = {
   listingId?: string | null
   fulfillmentChannel?: $Enums.FulfillmentChannel | null
   turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -6951,6 +8044,12 @@ export type OrderUpdateWithoutListingServiceInput = {
   version?: Prisma.IntFieldUpdateOperationsInput | number
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -6975,6 +8074,7 @@ export type OrderUpdateWithoutListingServiceInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateWithoutListingServiceInput = {
@@ -7008,6 +8108,12 @@ export type OrderUncheckedUpdateWithoutListingServiceInput = {
   listingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -7025,6 +8131,7 @@ export type OrderUncheckedUpdateWithoutListingServiceInput = {
   fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
   tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
   review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
 }
 
 export type OrderUncheckedUpdateManyWithoutListingServiceInput = {
@@ -7058,6 +8165,12 @@ export type OrderUncheckedUpdateManyWithoutListingServiceInput = {
   listingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
   turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -7079,6 +8192,7 @@ export type OrderCountOutputType = {
   fulfillmentAssignments: number
   fraudFlags: number
   tickets: number
+  cancellationRequests: number
 }
 
 export type OrderCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -7092,6 +8206,7 @@ export type OrderCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   fulfillmentAssignments?: boolean | OrderCountOutputTypeCountFulfillmentAssignmentsArgs
   fraudFlags?: boolean | OrderCountOutputTypeCountFraudFlagsArgs
   tickets?: boolean | OrderCountOutputTypeCountTicketsArgs
+  cancellationRequests?: boolean | OrderCountOutputTypeCountCancellationRequestsArgs
 }
 
 /**
@@ -7174,6 +8289,13 @@ export type OrderCountOutputTypeCountTicketsArgs<ExtArgs extends runtime.Types.E
   where?: Prisma.TicketWhereInput
 }
 
+/**
+ * OrderCountOutputType without action
+ */
+export type OrderCountOutputTypeCountCancellationRequestsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OrderCancellationRequestWhereInput
+}
+
 
 export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -7207,6 +8329,12 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   listingServiceId?: boolean
   fulfillmentChannel?: boolean
   turnaroundDays?: boolean
+  warrantyDays?: boolean
+  submittedAt?: boolean
+  acceptedAt?: boolean
+  fulfillmentDueAt?: boolean
+  warrantyEndsAt?: boolean
+  refundResponsibility?: boolean
   briefData?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -7232,6 +8360,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   fraudFlags?: boolean | Prisma.Order$fraudFlagsArgs<ExtArgs>
   tickets?: boolean | Prisma.Order$ticketsArgs<ExtArgs>
   review?: boolean | Prisma.Order$reviewArgs<ExtArgs>
+  cancellationRequests?: boolean | Prisma.Order$cancellationRequestsArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["order"]>
 
@@ -7267,6 +8396,12 @@ export type OrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   listingServiceId?: boolean
   fulfillmentChannel?: boolean
   turnaroundDays?: boolean
+  warrantyDays?: boolean
+  submittedAt?: boolean
+  acceptedAt?: boolean
+  fulfillmentDueAt?: boolean
+  warrantyEndsAt?: boolean
+  refundResponsibility?: boolean
   briefData?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -7312,6 +8447,12 @@ export type OrderSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   listingServiceId?: boolean
   fulfillmentChannel?: boolean
   turnaroundDays?: boolean
+  warrantyDays?: boolean
+  submittedAt?: boolean
+  acceptedAt?: boolean
+  fulfillmentDueAt?: boolean
+  warrantyEndsAt?: boolean
+  refundResponsibility?: boolean
   briefData?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -7357,12 +8498,18 @@ export type OrderSelectScalar = {
   listingServiceId?: boolean
   fulfillmentChannel?: boolean
   turnaroundDays?: boolean
+  warrantyDays?: boolean
+  submittedAt?: boolean
+  acceptedAt?: boolean
+  fulfillmentDueAt?: boolean
+  warrantyEndsAt?: boolean
+  refundResponsibility?: boolean
   briefData?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "status" | "amount" | "currency" | "paymentStatus" | "title" | "instructions" | "targetUrl" | "anchorText" | "publishedUrl" | "publishedAt" | "verifiedAt" | "verifiedBy" | "verifyMethod" | "autoAcceptAt" | "deliveryAcceptedMethod" | "deliveredAt" | "revisionCount" | "customerId" | "assigneeId" | "websiteId" | "organizationId" | "campaignId" | "idempotencyKey" | "version" | "activeDeliveryVersionId" | "listingId" | "listingServiceId" | "fulfillmentChannel" | "turnaroundDays" | "briefData" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
+export type OrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "type" | "status" | "amount" | "currency" | "paymentStatus" | "title" | "instructions" | "targetUrl" | "anchorText" | "publishedUrl" | "publishedAt" | "verifiedAt" | "verifiedBy" | "verifyMethod" | "autoAcceptAt" | "deliveryAcceptedMethod" | "deliveredAt" | "revisionCount" | "customerId" | "assigneeId" | "websiteId" | "organizationId" | "campaignId" | "idempotencyKey" | "version" | "activeDeliveryVersionId" | "listingId" | "listingServiceId" | "fulfillmentChannel" | "turnaroundDays" | "warrantyDays" | "submittedAt" | "acceptedAt" | "fulfillmentDueAt" | "warrantyEndsAt" | "refundResponsibility" | "briefData" | "createdAt" | "updatedAt", ExtArgs["result"]["order"]>
 export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   customer?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   assignee?: boolean | Prisma.Order$assigneeArgs<ExtArgs>
@@ -7386,6 +8533,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   fraudFlags?: boolean | Prisma.Order$fraudFlagsArgs<ExtArgs>
   tickets?: boolean | Prisma.Order$ticketsArgs<ExtArgs>
   review?: boolean | Prisma.Order$reviewArgs<ExtArgs>
+  cancellationRequests?: boolean | Prisma.Order$cancellationRequestsArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type OrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -7434,6 +8582,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     fraudFlags: Prisma.$DeliveryFraudFlagPayload<ExtArgs>[]
     tickets: Prisma.$TicketPayload<ExtArgs>[]
     review: Prisma.$OrderReviewPayload<ExtArgs> | null
+    cancellationRequests: Prisma.$OrderCancellationRequestPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -7467,6 +8616,12 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     listingServiceId: string | null
     fulfillmentChannel: $Enums.FulfillmentChannel | null
     turnaroundDays: number | null
+    warrantyDays: number | null
+    submittedAt: Date | null
+    acceptedAt: Date | null
+    fulfillmentDueAt: Date | null
+    warrantyEndsAt: Date | null
+    refundResponsibility: $Enums.CancellationResponsibility | null
     briefData: runtime.JsonValue | null
     createdAt: Date
     updatedAt: Date
@@ -7886,6 +9041,7 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   fraudFlags<T extends Prisma.Order$fraudFlagsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$fraudFlagsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$DeliveryFraudFlagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tickets<T extends Prisma.Order$ticketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$ticketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   review<T extends Prisma.Order$reviewArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$reviewArgs<ExtArgs>>): Prisma.Prisma__OrderReviewClient<runtime.Types.Result.GetResult<Prisma.$OrderReviewPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  cancellationRequests<T extends Prisma.Order$cancellationRequestsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$cancellationRequestsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderCancellationRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -7946,6 +9102,12 @@ export interface OrderFieldRefs {
   readonly listingServiceId: Prisma.FieldRef<"Order", 'String'>
   readonly fulfillmentChannel: Prisma.FieldRef<"Order", 'FulfillmentChannel'>
   readonly turnaroundDays: Prisma.FieldRef<"Order", 'Int'>
+  readonly warrantyDays: Prisma.FieldRef<"Order", 'Int'>
+  readonly submittedAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly acceptedAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly fulfillmentDueAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly warrantyEndsAt: Prisma.FieldRef<"Order", 'DateTime'>
+  readonly refundResponsibility: Prisma.FieldRef<"Order", 'CancellationResponsibility'>
   readonly briefData: Prisma.FieldRef<"Order", 'Json'>
   readonly createdAt: Prisma.FieldRef<"Order", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Order", 'DateTime'>
@@ -8777,6 +9939,30 @@ export type Order$reviewArgs<ExtArgs extends runtime.Types.Extensions.InternalAr
    */
   include?: Prisma.OrderReviewInclude<ExtArgs> | null
   where?: Prisma.OrderReviewWhereInput
+}
+
+/**
+ * Order.cancellationRequests
+ */
+export type Order$cancellationRequestsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OrderCancellationRequest
+   */
+  select?: Prisma.OrderCancellationRequestSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OrderCancellationRequest
+   */
+  omit?: Prisma.OrderCancellationRequestOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrderCancellationRequestInclude<ExtArgs> | null
+  where?: Prisma.OrderCancellationRequestWhereInput
+  orderBy?: Prisma.OrderCancellationRequestOrderByWithRelationInput | Prisma.OrderCancellationRequestOrderByWithRelationInput[]
+  cursor?: Prisma.OrderCancellationRequestWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.OrderCancellationRequestScalarFieldEnum | Prisma.OrderCancellationRequestScalarFieldEnum[]
 }
 
 /**

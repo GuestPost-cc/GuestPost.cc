@@ -93,7 +93,11 @@ export async function recomputePublisherTrustCore(
       },
     }),
     prisma.order.count({
-      where: { website: { publisherId }, status: "REFUNDED" },
+      where: {
+        website: { publisherId },
+        status: "REFUNDED",
+        refundResponsibility: "PUBLISHER",
+      },
     }),
     prisma.deliveryFraudFlag.count({
       where: { type: "LINK_REMOVED", order: { website: { publisherId } } },

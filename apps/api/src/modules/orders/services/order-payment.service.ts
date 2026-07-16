@@ -180,7 +180,7 @@ export class OrderPaymentService {
       // Auto-submit
       await tx.order.update({
         where: { id: orderId },
-        data: { status: "SUBMITTED" },
+        data: { status: "SUBMITTED", submittedAt: new Date() },
       })
 
       await tx.orderEvent.create({

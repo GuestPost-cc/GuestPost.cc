@@ -6,6 +6,12 @@ import type {
   WithdrawalStatus,
 } from "@guestpost/shared"
 import type { HttpClient, RequestOptions } from "../client"
+import type {
+  CancellationMutationData,
+  CancellationPreviewResponse,
+  CancellationRequestResponse,
+  CancellationRequestStatus,
+} from "./orders"
 
 export interface PaginatedResponse<T> {
   items: T[]
@@ -45,6 +51,7 @@ export interface AdminOrderDetailResponse {
   currency: string
   createdAt: string
   updatedAt: string
+  version: number
   autoAcceptAt: string | null
   verifyMethod: string | null
   deliveryAcceptedMethod: string | null
@@ -126,10 +133,25 @@ export interface AdminOrderDetailResponse {
   dispute?: { id: string; status: string } | null
 }
 
+export interface AdminCancellationRequestResponse
+  extends CancellationRequestResponse {
+  order: {
+    id: string
+    title: string | null
+    status: OrderStatus
+    amount: string | number | null
+    currency: string
+    fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
+    customer: { id: string; name: string | null; email: string }
+    website: { id: string; domain: string; publisherId: string | null } | null
+  }
+}
+
 export interface AdminOrderResponse {
   id: string
   type: string
   status: OrderStatus
+  paymentStatus: string
   amount: number | null
   currency: string
   createdAt: string
@@ -225,16 +247,80 @@ export class AdminService {
   getOrderById(id: string) {
     return this.client.get<AdminOrderDetailResponse>(`/admin/orders/${id}`)
   }
-  // Order interventions — verification/advancement is automated; staff only
-  // force-cancel (SUPER_ADMIN) or refund (SUPER_ADMIN/FINANCE), reason required.
-  forceCancelOrder(id: string, reason: string) {
+  // Emergency order intervention. Normal refunds must resolve through a
+  // cancellation request or dispute so approval and responsibility are retained.
+  forceCancelOrder(
+    id: string,
+    data: CancellationMutationData & {
+      confirmationOrderId: string
+      responsibility: string
+    },
+  ) {
     return this.client.post<any>(`/admin/orders/${id}/force-cancel`, {
-      json: { reason },
+      json: data as unknown as Record<string, unknown>,
     })
   }
-  refundOrder(id: string, reason: string) {
-    return this.client.post<any>(`/admin/orders/${id}/refund`, {
-      json: { reason },
+
+  previewPlatformCancellation(id: string) {
+    return this.client.get<CancellationPreviewResponse>(
+      `/admin/orders/${id}/cancellation-preview`,
+    )
+  }
+
+  listCancellationRequests(params?: {
+    status?: CancellationRequestStatus
+    take?: number
+    skip?: number
+  }) {
+    return this.client.get<PaginatedResponse<AdminCancellationRequestResponse>>(
+      "/admin/cancellation-requests",
+      {
+        params,
+      } as RequestOptions,
+    )
+  }
+
+  reviewCancellationRequest(
+    id: string,
+    data: {
+      resolution: "FULL_REFUND" | "CONTINUE_ORDER" | "ESCALATE_TO_DISPUTE"
+      responsibility: string
+      reason: string
+    },
+  ) {
+    return this.client.post(`/admin/cancellation-requests/${id}/review`, {
+      json: data,
+    })
+  }
+
+  financeApproveCancellation(id: string, reason: string) {
+    return this.client.post(
+      `/admin/cancellation-requests/${id}/finance-approve`,
+      { json: { reason } },
+    )
+  }
+
+  respondToPlatformCancellation(
+    orderId: string,
+    requestId: string,
+    action: "ACCEPT" | "CONTEST",
+    note?: string,
+  ) {
+    return this.client.post(
+      `/admin/orders/${orderId}/cancellation-requests/${requestId}/respond`,
+      { json: { action, note } },
+    )
+  }
+
+  declinePlatformOrder(id: string, data: CancellationMutationData) {
+    return this.client.post(`/admin/orders/${id}/decline`, {
+      json: data as unknown as Record<string, unknown>,
+    })
+  }
+
+  requestPlatformCancellation(id: string, data: CancellationMutationData) {
+    return this.client.post(`/admin/orders/${id}/cancellation-requests`, {
+      json: data as unknown as Record<string, unknown>,
     })
   }
 
@@ -643,9 +729,10 @@ export class AdminService {
     disputeId: string,
     action: "RESTORE" | "REFUND" | "REJECT",
     resolution: string,
+    responsibility?: string,
   ) {
     return this.client.post<any>(`/admin/disputes/${disputeId}/resolve`, {
-      json: { action, resolution },
+      json: { action, resolution, responsibility },
     })
   }
   reverifyDelivery(deliveryId: string) {

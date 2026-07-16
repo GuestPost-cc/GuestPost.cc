@@ -190,6 +190,7 @@ describe("runDeliveryVerification", () => {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
       },
+      orderEvent: { create: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       notification: { create: jest.fn().mockResolvedValue({}) },
       publisherMembership: {
@@ -368,6 +369,7 @@ describe("runDeliveryLinkRecheck", () => {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({}),
       },
+      orderEvent: { create: jest.fn().mockResolvedValue({}) },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       notification: { create: jest.fn().mockResolvedValue({}) },
       publisherMembership: {

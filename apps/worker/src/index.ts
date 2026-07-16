@@ -19,7 +19,11 @@ import {
   createDiscoveryWorker,
   createSyncWorker,
 } from "@guestpost/integrations/workers"
-import { QUEUES } from "@guestpost/shared"
+import {
+  QUEUE_JOBS,
+  QUEUES,
+  resolveOrderCancellationConfig,
+} from "@guestpost/shared"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { Queue } from "bullmq"
@@ -310,6 +314,44 @@ async function registerReviewReminderSweep(): Promise<RegisteredJob> {
   return { name: "review-reminder-sweep", queue: QUEUES.AUTO_ACCEPT }
 }
 
+async function registerCancellationResponseTimeoutSweep(): Promise<RegisteredJob> {
+  const { responseSweepMinutes } = resolveOrderCancellationConfig(process.env)
+  const everyMs = responseSweepMinutes * 60 * 1000
+  const jobName = QUEUE_JOBS[QUEUES.AUTO_ACCEPT].CANCELLATION_TIMEOUT_SWEEP
+  const queue = new Queue(QUEUES.AUTO_ACCEPT, { connection })
+  await queue.removeRepeatable(jobName, { every: everyMs }).catch(() => {})
+  await queue.add(jobName, signJobPayload({}, 0), {
+    repeat: { every: everyMs },
+    jobId: jobName,
+    removeOnComplete: { count: 24 },
+    removeOnFail: { count: 24 },
+  })
+  await queue.close()
+  return {
+    name: jobName,
+    queue: QUEUES.AUTO_ACCEPT,
+  }
+}
+
+async function registerOrderAcceptanceTimeoutSweep(): Promise<RegisteredJob> {
+  const { acceptanceSweepMinutes } = resolveOrderCancellationConfig(process.env)
+  const everyMs = acceptanceSweepMinutes * 60 * 1000
+  const jobName = QUEUE_JOBS[QUEUES.AUTO_ACCEPT].ACCEPTANCE_TIMEOUT_SWEEP
+  const queue = new Queue(QUEUES.AUTO_ACCEPT, { connection })
+  await queue.removeRepeatable(jobName, { every: everyMs }).catch(() => {})
+  await queue.add(jobName, signJobPayload({}, 0), {
+    repeat: { every: everyMs },
+    jobId: jobName,
+    removeOnComplete: { count: 24 },
+    removeOnFail: { count: 24 },
+  })
+  await queue.close()
+  return {
+    name: jobName,
+    queue: QUEUES.AUTO_ACCEPT,
+  }
+}
+
 async function checkConnections() {
   try {
     await connection.ping()
@@ -416,6 +458,8 @@ async function bootstrap() {
     registerSettlementAutoReleaseSweep(),
     registerAutoAcceptSweep(),
     registerReviewReminderSweep(),
+    registerCancellationResponseTimeoutSweep(),
+    registerOrderAcceptanceTimeoutSweep(),
   ])
   // Assert that the set of actually-registered jobs matches the canonical registry.
   // This catches drift between registration functions and REPEATABLE_JOB_NAMES in

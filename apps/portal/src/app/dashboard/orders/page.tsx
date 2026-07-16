@@ -1,5 +1,6 @@
 "use client"
 
+import type { CancellationReasonCode } from "@guestpost/api-client"
 import type { OrderStatus } from "@guestpost/database"
 import { isActiveOrder, sortOrdersByPriority } from "@guestpost/shared"
 import {
@@ -18,7 +19,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   getOrderStatusPresentation,
   Input,
@@ -57,7 +57,6 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Edit,
   Eye,
   FileText,
   MoreHorizontal,
@@ -126,6 +125,7 @@ function OrdersTableSkeleton() {
 
 interface Order {
   id: string
+  version: number
   status: string
   campaignId?: string
   campaign?: { id: string; name: string }
@@ -155,17 +155,55 @@ export default function OrdersPage() {
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 })
   const [_selectedOrder, _setSelectedOrder] = useState<Order | null>(null)
   const [showCancelDialog, setShowCancelDialog] = useState<Order | null>(null)
+  const [cancelReason, setCancelReason] = useState<CancellationReasonCode>(
+    "CUSTOMER_CHANGED_MIND",
+  )
+  const [cancelNote, setCancelNote] = useState("")
+
+  const { data: cancellationPreview, isLoading: previewLoading } = useQuery({
+    queryKey: ["order-cancellation-preview", showCancelDialog?.id],
+    queryFn: () => api.orders.cancellationPreview(showCancelDialog!.id),
+    enabled: Boolean(showCancelDialog),
+  })
 
   const cancelMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.orders.updateStatus(id, "CANCELLED") as Promise<any>,
+    mutationFn: async (order: Order) => {
+      if (!cancellationPreview)
+        throw new Error("Cancellation policy unavailable")
+      const data = {
+        reasonCode: cancelReason,
+        note: cancelNote.trim() || undefined,
+        expectedVersion: cancellationPreview.expectedVersion,
+        idempotencyKey: `portal-${order.id}-${cancellationPreview.expectedVersion}`,
+      }
+      if (cancellationPreview.action === "CANCEL_NOW") {
+        return api.orders.cancel(order.id, data)
+      }
+      if (cancellationPreview.action === "REQUEST_CANCELLATION") {
+        return api.orders.requestCancellation(order.id, data)
+      }
+      if (cancellationPreview.action === "OPEN_DISPUTE") {
+        return api.orders.openDispute(
+          order.id,
+          `${cancelReason}${cancelNote.trim() ? `: ${cancelNote.trim()}` : ""}`,
+        )
+      }
+      throw new Error(cancellationPreview.message)
+    },
     onSuccess: () => {
-      toast.success("Order cancelled successfully")
+      toast.success(
+        cancellationPreview?.action === "REQUEST_CANCELLATION"
+          ? "Cancellation request sent"
+          : cancellationPreview?.action === "OPEN_DISPUTE"
+            ? "Dispute opened for review"
+            : "Order cancelled and refund processed",
+      )
       queryClient.invalidateQueries({ queryKey: ["orders"] })
       setShowCancelDialog(null)
+      setCancelNote("")
     },
-    onError: () => {
-      toast.error("Failed to cancel order")
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to process cancellation")
     },
   })
 
@@ -343,25 +381,12 @@ export default function OrdersPage() {
                   View Details
                 </Link>
               </DropdownMenuItem>
-              {row.original.status !== "COMPLETED" &&
-                row.original.status !== "CANCELLED" && (
-                  <>
-                    <DropdownMenuItem asChild>
-                      <Link href={`/dashboard/orders/${row.original.id}`}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Request Revision
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      className="text-destructive"
-                      onClick={() => setShowCancelDialog(row.original)}
-                    >
-                      <XCircle className="mr-2 h-4 w-4" />
-                      Cancel Order
-                    </DropdownMenuItem>
-                  </>
-                )}
+              <DropdownMenuItem
+                onClick={() => setShowCancelDialog(row.original)}
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Cancellation / dispute options
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         ),
@@ -712,25 +737,87 @@ export default function OrdersPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel Order</DialogTitle>
+            <DialogTitle>Cancellation / dispute options</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel order #
-              {showCancelDialog?.id.slice(0, 8)}? This action cannot be undone.
-              Any reserved funds will be released back to your wallet.
+              {previewLoading
+                ? "Checking this order's cancellation policy…"
+                : (cancellationPreview?.message ??
+                  "Cancellation is not available for this order.")}
             </DialogDescription>
           </DialogHeader>
+          {cancellationPreview?.action !== "NOT_ALLOWED" && (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label>Reason</Label>
+                <Select
+                  value={cancelReason}
+                  onValueChange={(value) =>
+                    setCancelReason(value as CancellationReasonCode)
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CUSTOMER_CHANGED_MIND">
+                      Changed my mind
+                    </SelectItem>
+                    <SelectItem value="CAMPAIGN_CHANGED">
+                      Campaign changed
+                    </SelectItem>
+                    <SelectItem value="DUPLICATE_ORDER">
+                      Duplicate order
+                    </SelectItem>
+                    <SelectItem value="MISSED_DEADLINE">
+                      Deadline missed
+                    </SelectItem>
+                    <SelectItem value="QUALITY_FAILURE">
+                      Quality problem
+                    </SelectItem>
+                    <SelectItem value="OTHER">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cancellation-note">Details</Label>
+                <Input
+                  id="cancellation-note"
+                  value={cancelNote}
+                  onChange={(event) => setCancelNote(event.target.value)}
+                  placeholder="Add context for the other party or reviewer"
+                />
+              </div>
+              {cancellationPreview?.refund.type === "FULL" && (
+                <p className="rounded-md bg-muted p-3 text-sm">
+                  Full refund: {cancellationPreview.refund.amount.toFixed(2)}{" "}
+                  {cancellationPreview.refund.currency} to your wallet.
+                </p>
+              )}
+            </div>
+          )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowCancelDialog(null)}>
               Keep Order
             </Button>
             <Button
               variant="destructive"
-              disabled={cancelMutation.isPending}
+              disabled={
+                cancelMutation.isPending ||
+                previewLoading ||
+                !cancellationPreview ||
+                cancellationPreview.action === "NOT_ALLOWED"
+              }
               onClick={() =>
-                showCancelDialog && cancelMutation.mutate(showCancelDialog.id)
+                showCancelDialog && cancelMutation.mutate(showCancelDialog)
               }
             >
-              {cancelMutation.isPending ? "Cancelling..." : "Cancel Order"}
+              {cancelMutation.isPending
+                ? "Submitting…"
+                : cancellationPreview?.action === "REQUEST_CANCELLATION"
+                  ? "Send Cancellation Request"
+                  : cancellationPreview?.action === "OPEN_DISPUTE"
+                    ? "Open Dispute"
+                    : "Cancel Order"}
             </Button>
           </DialogFooter>
         </DialogContent>

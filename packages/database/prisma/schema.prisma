@@ -104,6 +104,55 @@ enum OrderStatus {
   DISPUTED
 }
 
+enum CancellationRequesterType {
+  CUSTOMER
+  PUBLISHER
+  STAFF
+  SYSTEM
+}
+
+enum CancellationRequestStatus {
+  REQUESTED
+  UNDER_REVIEW
+  PENDING_FINANCE
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  ESCALATED
+  DISPUTED
+}
+
+enum CancellationResolution {
+  FULL_REFUND
+  CONTINUE_ORDER
+  ESCALATE_TO_DISPUTE
+}
+
+enum CancellationResponsibility {
+  CUSTOMER
+  PUBLISHER
+  PLATFORM
+  SHARED
+  SYSTEM
+  UNDETERMINED
+}
+
+enum CancellationReasonCode {
+  CUSTOMER_CHANGED_MIND
+  CAMPAIGN_CHANGED
+  DUPLICATE_ORDER
+  CAPACITY_UNAVAILABLE
+  TOPIC_UNSUITABLE
+  WEBSITE_UNAVAILABLE
+  PRICING_ERROR
+  POLICY_CONFLICT
+  MISSED_DEADLINE
+  QUALITY_FAILURE
+  PLATFORM_ERROR
+  LEGAL_OR_SECURITY_EMERGENCY
+  OTHER
+}
+
 enum ServiceType {
   GUEST_POST
   NICHE_EDIT
@@ -158,6 +207,10 @@ enum OrderEventType {
   VERIFICATION_ESCALATED
   AUTO_ACCEPTED
   REVIEW_REMINDER
+  CANCELLATION_REQUESTED
+  CANCELLATION_RESPONDED
+  CANCELLATION_RESOLVED
+  ORDER_DECLINED
 }
 
 enum SettlementStatus {
@@ -308,26 +361,26 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  memberships          Membership[]
-  publisherMemberships PublisherMembership[]
-  staffMemberships     StaffMembership[]
-  ownedOrders          Order[]               @relation("OrderCustomer")
-  assignedOrders       Order[]               @relation("OrderAssignee")
-  orderEvents          OrderEvent[]
-  publications                Publication[]              @relation("PublicationVerifier")
-  approvedWithdrawals         Withdrawal[]               @relation("WithdrawalApprover")
-  adminVerifiedDeliveryVersions OrderDeliveryVersion[]    @relation("AdminVerifiedVersion")
-  tickets              Ticket[]
-  messages             TicketMessage[]
-  notifications        Notification[]
-  auditLogs            AuditLog[]
-  sessions             Session[]
-  accounts             Account[]
-  marketplaceReviews   MarketplaceReview[]
-  marketplaceFavorites MarketplaceFavorite[]
-  activeContext        ActiveContext?
-  managedWebsites      Website[]             @relation("WebsiteManager")
-  assignedTickets      Ticket[]              @relation("TicketAssignee")
+  memberships                   Membership[]
+  publisherMemberships          PublisherMembership[]
+  staffMemberships              StaffMembership[]
+  ownedOrders                   Order[]                @relation("OrderCustomer")
+  assignedOrders                Order[]                @relation("OrderAssignee")
+  orderEvents                   OrderEvent[]
+  publications                  Publication[]          @relation("PublicationVerifier")
+  approvedWithdrawals           Withdrawal[]           @relation("WithdrawalApprover")
+  adminVerifiedDeliveryVersions OrderDeliveryVersion[] @relation("AdminVerifiedVersion")
+  tickets                       Ticket[]
+  messages                      TicketMessage[]
+  notifications                 Notification[]
+  auditLogs                     AuditLog[]
+  sessions                      Session[]
+  accounts                      Account[]
+  marketplaceReviews            MarketplaceReview[]
+  marketplaceFavorites          MarketplaceFavorite[]
+  activeContext                 ActiveContext?
+  managedWebsites               Website[]              @relation("WebsiteManager")
+  assignedTickets               Ticket[]               @relation("TicketAssignee")
 
   @@index([userType, banned])
 }
@@ -570,7 +623,7 @@ model Website {
   orders              Order[]
   orderItems          OrderItem[]
   marketplaceListings MarketplaceListing[]
-  websiteIntegrations    WebsiteIntegration[]
+  websiteIntegrations WebsiteIntegration[]
 
   @@index([publisherId])
   @@index([isActive])
@@ -584,12 +637,12 @@ model Website {
 }
 
 model Order {
-  id                      String              @id @default(cuid())
+  id                      String                      @id @default(cuid())
   type                    ServiceType
-  status                  OrderStatus         @default(DRAFT)
+  status                  OrderStatus                 @default(DRAFT)
   amount                  Decimal?
-  currency                String              @default("USD")
-  paymentStatus           PaymentStatus       @default(PENDING)
+  currency                String                      @default("USD")
+  paymentStatus           PaymentStatus               @default(PENDING)
   title                   String?
   instructions            String?
   targetUrl               String?
@@ -602,17 +655,17 @@ model Order {
   autoAcceptAt            DateTime?
   deliveryAcceptedMethod  DeliveryAcceptedMethod?
   deliveredAt             DateTime?
-  revisionCount           Int                 @default(0)
+  revisionCount           Int                         @default(0)
   customerId              String
   assigneeId              String?
   websiteId               String?
   organizationId          String
   campaignId              String?
   idempotencyKey          String?
-  version                 Int                 @default(0)
+  version                 Int                         @default(0)
   // Points at the current OrderDeliveryVersion (source of truth for delivery).
   // Legacy publishedUrl/verifiedAt/deliveredAt are denormalized mirrors of it.
-  activeDeliveryVersionId String? @unique
+  activeDeliveryVersionId String?                     @unique
   // ── Listing-service snapshot (Phase 1 additive; required in Phase 4) ──
   // Captured at order creation from the chosen MarketplaceListing →
   // ListingService row so that subsequent price/TAT/availability edits on
@@ -623,21 +676,27 @@ model Order {
   listingServiceId        String?
   fulfillmentChannel      FulfillmentChannel?
   turnaroundDays          Int?
+  warrantyDays            Int?
+  submittedAt             DateTime?
+  acceptedAt              DateTime?
+  fulfillmentDueAt        DateTime?
+  warrantyEndsAt          DateTime?
+  refundResponsibility    CancellationResponsibility?
   // Phase 6: per-service structured brief. Validated server-side against
   // the @guestpost/shared briefSchemas registry keyed on serviceType. NULL
   // for legacy orders (renderers fall back to title/instructions).
   briefData               Json?
-  createdAt               DateTime            @default(now())
-  updatedAt               DateTime            @updatedAt
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
 
-  customer               User                    @relation("OrderCustomer", fields: [customerId], references: [id])
-  assignee               User?                   @relation("OrderAssignee", fields: [assigneeId], references: [id])
-  website                Website?                @relation(fields: [websiteId], references: [id])
-  activeDeliveryVersion  OrderDeliveryVersion?   @relation("ActiveOrderDeliveryVersion", fields: [activeDeliveryVersionId], references: [id])
-  organization           Organization            @relation(fields: [organizationId], references: [id])
-  campaign               Campaign?               @relation(fields: [campaignId], references: [id])
-  listing                MarketplaceListing?     @relation(fields: [listingId], references: [id])
-  listingService         ListingService?         @relation(fields: [listingServiceId], references: [id])
+  customer               User                       @relation("OrderCustomer", fields: [customerId], references: [id])
+  assignee               User?                      @relation("OrderAssignee", fields: [assigneeId], references: [id])
+  website                Website?                   @relation(fields: [websiteId], references: [id])
+  activeDeliveryVersion  OrderDeliveryVersion?      @relation("ActiveOrderDeliveryVersion", fields: [activeDeliveryVersionId], references: [id])
+  organization           Organization               @relation(fields: [organizationId], references: [id])
+  campaign               Campaign?                  @relation(fields: [campaignId], references: [id])
+  listing                MarketplaceListing?        @relation(fields: [listingId], references: [id])
+  listingService         ListingService?            @relation(fields: [listingServiceId], references: [id])
   contentOrder           ContentOrder?
   revisions              Revision[]
   reports                Report[]
@@ -647,11 +706,12 @@ model Order {
   settlements            Settlement[]
   dispute                OrderDispute?
   platformRevenue        PlatformRevenue?
-  deliveryVersions       OrderDeliveryVersion[] @relation("OrderDeliveryVersions")
+  deliveryVersions       OrderDeliveryVersion[]     @relation("OrderDeliveryVersions")
   fulfillmentAssignments FulfillmentAssignment[]
   fraudFlags             DeliveryFraudFlag[]
   tickets                Ticket[]
   review                 OrderReview?
+  cancellationRequests   OrderCancellationRequest[]
 
   // Scoped per organization — a globally unique key let one tenant replay
   // another tenant's key and read their order (cross-tenant leak).
@@ -762,18 +822,55 @@ model OrderDispute {
   updatedAt      DateTime      @updatedAt
 }
 
+// Structured, auditable cancellation case. Financial resolution is deliberately
+// separated from the operational review: a reviewer can recommend a refund,
+// but FINANCE must approve it before money moves.
+model OrderCancellationRequest {
+  id                      String                     @id @default(cuid())
+  orderId                 String
+  requestedByUserId       String?
+  requesterType           CancellationRequesterType
+  actorSnapshot           Json?
+  reasonCode              CancellationReasonCode
+  note                    String?
+  status                  CancellationRequestStatus  @default(REQUESTED)
+  previousOrderStatus     OrderStatus
+  fulfillmentChannel      FulfillmentChannel
+  responsibility          CancellationResponsibility @default(UNDETERMINED)
+  requestedResolution     CancellationResolution     @default(FULL_REFUND)
+  responseDeadlineAt      DateTime?
+  respondedByUserId       String?
+  responseNote            String?
+  reviewedByUserId        String?
+  financeApprovedByUserId String?
+  resolution              CancellationResolution?
+  resolutionReason        String?
+  refundTransactionId     String?
+  idempotencyKey          String?
+  resolvedAt              DateTime?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@unique([orderId, idempotencyKey])
+  @@index([orderId, status])
+  @@index([status, responseDeadlineAt])
+  @@index([createdAt])
+}
+
 model Settlement {
-  id                 String                @id @default(cuid())
+  id                 String                  @id @default(cuid())
   orderId            String
   publisherId        String
   grossAmount        Decimal
-  platformFee        Decimal               @default(0)
+  platformFee        Decimal                 @default(0)
   publisherAmount    Decimal
-  status             SettlementStatus      @default(PENDING)
+  status             SettlementStatus        @default(PENDING)
   reviewEndsAt       DateTime?
   releasePolicy      SettlementReleasePolicy @default(AUTO)
   settledAt          DateTime?
-  version            Int                   @default(0)
+  version            Int                     @default(0)
   // ── Phase 6 reporting snapshots (additive; NULL on legacy rows) ──
   // Captured at settlement creation by joining the order's snapshot. Frozen
   // forever so refunds, audits, and reports can re-derive the contract
@@ -783,8 +880,8 @@ model Settlement {
   ownerType          WebsiteOwnershipType?
   fulfillmentChannel FulfillmentChannel?
   unitPrice          Decimal?
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
 
   order          Order                @relation(fields: [orderId], references: [id])
   publisher      Publisher            @relation(fields: [publisherId], references: [id])
@@ -891,7 +988,7 @@ model FulfillmentAssignment {
 // Immutable delivery version. Revisions create NEW versions; nothing is ever
 // overwritten or deleted. Order.activeDeliveryVersionId points at the current.
 model OrderDeliveryVersion {
-  id                        String                     @id @default(cuid())
+  id                        String                      @id @default(cuid())
   orderId                   String
   version                   Int
   publishedUrl              String
@@ -900,24 +997,24 @@ model OrderDeliveryVersion {
   notes                     String?
   screenshotUrl             String?
   submittedByUserId         String
-  submittedAt               DateTime                   @default(now())
-  verificationStatus        DeliveryVerificationStatus @default(PENDING)
+  submittedAt               DateTime                    @default(now())
+  verificationStatus        DeliveryVerificationStatus  @default(PENDING)
   verificationFailureReason String?
-  interventionStatus        DeliveryInterventionStatus @default(NONE)
+  interventionStatus        DeliveryInterventionStatus  @default(NONE)
   supersededByVersion       Int?
   // Optimistic-lock guard for worker/intervention transitions
-  verificationVersion       Int                        @default(0)
+  verificationVersion       Int                         @default(0)
   adminVerifiedById         String?
   adminOverrideReason       VerificationOverrideReason?
   adminVerifiedNotes        String?
-  createdAt                 DateTime                   @default(now())
+  createdAt                 DateTime                    @default(now())
 
-  order             Order                          @relation("OrderDeliveryVersions", fields: [orderId], references: [id])
-  activeOrder       Order?                         @relation("ActiveOrderDeliveryVersion")
-  evidence          DeliveryVerificationEvidence[]
-  snapshots         DeliverySnapshot[]
-  fraudFlags        DeliveryFraudFlag[]
-  adminVerifiedBy   User?                          @relation("AdminVerifiedVersion", fields: [adminVerifiedById], references: [id])
+  order           Order                          @relation("OrderDeliveryVersions", fields: [orderId], references: [id])
+  activeOrder     Order?                         @relation("ActiveOrderDeliveryVersion")
+  evidence        DeliveryVerificationEvidence[]
+  snapshots       DeliverySnapshot[]
+  fraudFlags      DeliveryFraudFlag[]
+  adminVerifiedBy User?                          @relation("AdminVerifiedVersion", fields: [adminVerifiedById], references: [id])
 
   @@unique([orderId, version])
   @@index([orderId])
@@ -1405,7 +1502,7 @@ model TicketMessage {
   createdAt       DateTime                @default(now())
 
   // Phase 6.5 FK; Phase 8.12 added onDelete: SetNull.
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
   ticket Ticket @relation(fields: [ticketId], references: [id])
 
   @@index([ticketId])
@@ -1622,6 +1719,10 @@ model MarketplaceListing {
   orders     Order[]
 
   categoryId String?
+  // Phase X: Partial unique index `MarketplaceListing_websiteId_active_key`
+  // exists at the DB level via custom migration 20260713120000. Not represented
+  // in Prisma @@unique syntax because it is a partial index (WHERE clause).
+  // See the migration SQL for the exact definition.
 
   @@index([slug])
   // Phase 7: @@index([type]) dropped alongside MarketplaceListing.type.
@@ -1634,10 +1735,6 @@ model MarketplaceListing {
   // Sorting/filtering by price now hits the ListingService(availability,
   // serviceType, price) composite index.
   @@index([ownerType, status])
-  // Phase X: Partial unique index `MarketplaceListing_websiteId_active_key`
-  // exists at the DB level via custom migration 20260713120000. Not represented
-  // in Prisma @@unique syntax because it is a partial index (WHERE clause).
-  // See the migration SQL for the exact definition.
 }
 
 // A purchasable service offering on a MarketplaceListing. One listing can
@@ -1930,40 +2027,40 @@ enum IntegrationSyncJobType {
 }
 
 model ExternalAccount {
-  id                  String   @id @default(cuid())
-  provider            String                    // GOOGLE, MICROSOFT
-  externalUserId      String
-  email               String?
-  displayName         String?
+  id             String  @id @default(cuid())
+  provider       String // GOOGLE, MICROSOFT
+  externalUserId String
+  email          String?
+  displayName    String?
 
-  encryptedAccessToken    String
-  encryptedRefreshToken   String
-  tokenExpiresAt          DateTime
-  grantedScopes           String[]
+  encryptedAccessToken  String
+  encryptedRefreshToken String
+  tokenExpiresAt        DateTime
+  grantedScopes         String[]
 
-  status              ExternalAccountStatus @default(ACTIVE)
-  lastDiscoveryAt     DateTime?
-  lastUsedAt          DateTime?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
+  status          ExternalAccountStatus @default(ACTIVE)
+  lastDiscoveryAt DateTime?
+  lastUsedAt      DateTime?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
-  integrations        PublisherIntegration[]
+  integrations PublisherIntegration[]
 
   @@unique([provider, externalUserId])
   @@index([status])
 }
 
 model PublisherIntegration {
-  id                  String               @id @default(cuid())
-  ownerType           IntegrationOwnerType @default(PUBLISHER)
-  ownerId             String
-  provider            IntegrationProvider
-  connectionId        String
-  status              IntegrationStatus    @default(PENDING)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id           String               @id @default(cuid())
+  ownerType    IntegrationOwnerType @default(PUBLISHER)
+  ownerId      String
+  provider     IntegrationProvider
+  connectionId String
+  status       IntegrationStatus    @default(PENDING)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
-  connection          ExternalAccount      @relation(fields: [connectionId], references: [id])
+  connection          ExternalAccount        @relation(fields: [connectionId], references: [id])
   schedule            IntegrationSchedule?
   websiteIntegrations WebsiteIntegration[]
   syncs               IntegrationSync[]
@@ -1975,31 +2072,31 @@ model PublisherIntegration {
 }
 
 model IntegrationSchedule {
-  id                  String   @id @default(cuid())
-  integrationId       String   @unique
-  enabled             Boolean  @default(true)
-  intervalMinutes     Int      @default(1440) // 24h; supports 15min–30d
+  id                  String    @id @default(cuid())
+  integrationId       String    @unique
+  enabled             Boolean   @default(true)
+  intervalMinutes     Int       @default(1440) // 24h; supports 15min–30d
   nextRunAt           DateTime
   lastRunAt           DateTime?
   lastSuccessAt       DateTime?
   lastFailureAt       DateTime?
-  consecutiveFailures Int      @default(0)
-  version             Int      @default(1)    // optimistic lock
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  consecutiveFailures Int       @default(0)
+  version             Int       @default(1) // optimistic lock
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   integration PublisherIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 }
 
 model IntegrationDiscovery {
-  id                  String   @id @default(cuid())
-  integrationId       String
-  status              IntegrationSyncStatus @default(PENDING)
-  resourcesFound      Int      @default(0)
-  resourcesCreated    Int      @default(0)
-  errorMessage        String?
-  startedAt           DateTime @default(now())
-  completedAt         DateTime?
+  id               String                @id @default(cuid())
+  integrationId    String
+  status           IntegrationSyncStatus @default(PENDING)
+  resourcesFound   Int                   @default(0)
+  resourcesCreated Int                   @default(0)
+  errorMessage     String?
+  startedAt        DateTime              @default(now())
+  completedAt      DateTime?
 
   integration PublisherIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
 
@@ -2008,19 +2105,19 @@ model IntegrationDiscovery {
 }
 
 model WebsiteIntegration {
-  id                  String                   @id @default(cuid())
-  integrationId       String
-  websiteId           String
-  externalResourceId  String
+  id                   String                   @id @default(cuid())
+  integrationId        String
+  websiteId            String
+  externalResourceId   String
   externalResourceName String?
-  metadata            Json?                    // provider-owned
-  status              WebsiteIntegrationStatus @default(CONNECTED)
-  syncedAt            DateTime?
-  createdAt           DateTime                 @default(now())
-  updatedAt           DateTime                 @updatedAt
+  metadata             Json? // provider-owned
+  status               WebsiteIntegrationStatus @default(CONNECTED)
+  syncedAt             DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
 
   integration PublisherIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-  website     Website               @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  website     Website              @relation(fields: [websiteId], references: [id], onDelete: Cascade)
 
   @@unique([integrationId, externalResourceId])
   @@index([websiteId])
@@ -2028,7 +2125,7 @@ model WebsiteIntegration {
 }
 
 model IntegrationSync {
-  id                   String                @id @default(cuid())
+  id                   String                 @id @default(cuid())
   integrationId        String
   websiteIntegrationId String?
   jobType              IntegrationSyncJobType @default(SYNC)

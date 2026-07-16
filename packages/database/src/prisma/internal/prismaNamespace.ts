@@ -402,6 +402,7 @@ export const ModelName = {
   OrderEvent: 'OrderEvent',
   Publication: 'Publication',
   OrderDispute: 'OrderDispute',
+  OrderCancellationRequest: 'OrderCancellationRequest',
   Settlement: 'Settlement',
   SettlementApproval: 'SettlementApproval',
   FulfillmentAssignment: 'FulfillmentAssignment',
@@ -469,7 +470,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1802,6 +1803,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.OrderDisputeCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.OrderDisputeCountAggregateOutputType> | number
+        }
+      }
+    }
+    OrderCancellationRequest: {
+      payload: Prisma.$OrderCancellationRequestPayload<ExtArgs>
+      fields: Prisma.OrderCancellationRequestFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.OrderCancellationRequestFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.OrderCancellationRequestFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload>
+        }
+        findFirst: {
+          args: Prisma.OrderCancellationRequestFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.OrderCancellationRequestFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload>
+        }
+        findMany: {
+          args: Prisma.OrderCancellationRequestFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload>[]
+        }
+        create: {
+          args: Prisma.OrderCancellationRequestCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload>
+        }
+        createMany: {
+          args: Prisma.OrderCancellationRequestCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.OrderCancellationRequestCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload>[]
+        }
+        delete: {
+          args: Prisma.OrderCancellationRequestDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload>
+        }
+        update: {
+          args: Prisma.OrderCancellationRequestUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload>
+        }
+        deleteMany: {
+          args: Prisma.OrderCancellationRequestDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.OrderCancellationRequestUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.OrderCancellationRequestUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload>[]
+        }
+        upsert: {
+          args: Prisma.OrderCancellationRequestUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$OrderCancellationRequestPayload>
+        }
+        aggregate: {
+          args: Prisma.OrderCancellationRequestAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateOrderCancellationRequest>
+        }
+        groupBy: {
+          args: Prisma.OrderCancellationRequestGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderCancellationRequestGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.OrderCancellationRequestCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.OrderCancellationRequestCountAggregateOutputType> | number
         }
       }
     }
@@ -5905,6 +5980,12 @@ export const OrderScalarFieldEnum = {
   listingServiceId: 'listingServiceId',
   fulfillmentChannel: 'fulfillmentChannel',
   turnaroundDays: 'turnaroundDays',
+  warrantyDays: 'warrantyDays',
+  submittedAt: 'submittedAt',
+  acceptedAt: 'acceptedAt',
+  fulfillmentDueAt: 'fulfillmentDueAt',
+  warrantyEndsAt: 'warrantyEndsAt',
+  refundResponsibility: 'refundResponsibility',
   briefData: 'briefData',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -5988,6 +6069,36 @@ export const OrderDisputeScalarFieldEnum = {
 } as const
 
 export type OrderDisputeScalarFieldEnum = (typeof OrderDisputeScalarFieldEnum)[keyof typeof OrderDisputeScalarFieldEnum]
+
+
+export const OrderCancellationRequestScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  requestedByUserId: 'requestedByUserId',
+  requesterType: 'requesterType',
+  actorSnapshot: 'actorSnapshot',
+  reasonCode: 'reasonCode',
+  note: 'note',
+  status: 'status',
+  previousOrderStatus: 'previousOrderStatus',
+  fulfillmentChannel: 'fulfillmentChannel',
+  responsibility: 'responsibility',
+  requestedResolution: 'requestedResolution',
+  responseDeadlineAt: 'responseDeadlineAt',
+  respondedByUserId: 'respondedByUserId',
+  responseNote: 'responseNote',
+  reviewedByUserId: 'reviewedByUserId',
+  financeApprovedByUserId: 'financeApprovedByUserId',
+  resolution: 'resolution',
+  resolutionReason: 'resolutionReason',
+  refundTransactionId: 'refundTransactionId',
+  idempotencyKey: 'idempotencyKey',
+  resolvedAt: 'resolvedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OrderCancellationRequestScalarFieldEnum = (typeof OrderCancellationRequestScalarFieldEnum)[keyof typeof OrderCancellationRequestScalarFieldEnum]
 
 
 export const SettlementScalarFieldEnum = {
@@ -7190,6 +7301,20 @@ export type ListEnumFulfillmentChannelFieldRefInput<$PrismaModel> = FieldRefInpu
 
 
 /**
+ * Reference to a field of type 'CancellationResponsibility'
+ */
+export type EnumCancellationResponsibilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationResponsibility'>
+
+
+
+/**
+ * Reference to a field of type 'CancellationResponsibility[]'
+ */
+export type ListEnumCancellationResponsibilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationResponsibility[]'>
+
+
+
+/**
  * Reference to a field of type 'CampaignStatus'
  */
 export type EnumCampaignStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CampaignStatus'>
@@ -7243,6 +7368,62 @@ export type EnumDisputeStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pr
  */
 export type ListEnumDisputeStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DisputeStatus[]'>
     
+
+
+/**
+ * Reference to a field of type 'CancellationRequesterType'
+ */
+export type EnumCancellationRequesterTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationRequesterType'>
+
+
+
+/**
+ * Reference to a field of type 'CancellationRequesterType[]'
+ */
+export type ListEnumCancellationRequesterTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationRequesterType[]'>
+
+
+
+/**
+ * Reference to a field of type 'CancellationReasonCode'
+ */
+export type EnumCancellationReasonCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationReasonCode'>
+
+
+
+/**
+ * Reference to a field of type 'CancellationReasonCode[]'
+ */
+export type ListEnumCancellationReasonCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationReasonCode[]'>
+
+
+
+/**
+ * Reference to a field of type 'CancellationRequestStatus'
+ */
+export type EnumCancellationRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationRequestStatus'>
+
+
+
+/**
+ * Reference to a field of type 'CancellationRequestStatus[]'
+ */
+export type ListEnumCancellationRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationRequestStatus[]'>
+
+
+
+/**
+ * Reference to a field of type 'CancellationResolution'
+ */
+export type EnumCancellationResolutionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationResolution'>
+
+
+
+/**
+ * Reference to a field of type 'CancellationResolution[]'
+ */
+export type ListEnumCancellationResolutionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationResolution[]'>
+
 
 
 /**
@@ -7778,6 +7959,7 @@ export type GlobalOmitConfig = {
   orderEvent?: Prisma.OrderEventOmit
   publication?: Prisma.PublicationOmit
   orderDispute?: Prisma.OrderDisputeOmit
+  orderCancellationRequest?: Prisma.OrderCancellationRequestOmit
   settlement?: Prisma.SettlementOmit
   settlementApproval?: Prisma.SettlementApprovalOmit
   fulfillmentAssignment?: Prisma.FulfillmentAssignmentOmit
@@ -7892,4 +8074,3 @@ export type PrismaAction =
  * `PrismaClient` proxy available in interactive transactions.
  */
 export type TransactionClient = Omit<DefaultPrismaClient, runtime.ITXClientDenyList>
-

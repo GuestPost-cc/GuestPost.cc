@@ -1,5 +1,6 @@
 "use client"
 
+import type { CancellationReasonCode } from "@guestpost/api-client"
 import {
   Badge,
   Button,
@@ -9,11 +10,18 @@ import {
   CardTitle,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
   ErrorState,
   Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
   Table,
   TableBody,
@@ -21,6 +29,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -31,6 +40,7 @@ import {
   ShieldCheck,
   ShieldX,
   UserPlus,
+  XCircle,
 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -259,7 +269,25 @@ function DeliveryReview({
 
 export default function FulfillmentPage() {
   const qc = useQueryClient()
+  const { user } = useAuth()
   const [reviewOrderId, setReviewOrderId] = useState<string | null>(null)
+  const [cancelOrder, setCancelOrder] = useState<any | null>(null)
+  const [cancelReason, setCancelReason] = useState<CancellationReasonCode>(
+    "CAPACITY_UNAVAILABLE",
+  )
+  const [cancelNote, setCancelNote] = useState("")
+
+  const {
+    data: cancellationPreview,
+    isLoading: isPreviewLoading,
+    error: previewError,
+  } = useQuery({
+    queryKey: ["platform-cancellation-preview", cancelOrder?.id],
+    queryFn: () => api.admin.previewPlatformCancellation(cancelOrder.id),
+    enabled: Boolean(cancelOrder),
+    retry: false,
+  })
+  const isImmediateDecline = cancellationPreview?.action === "DECLINE_NOW"
 
   const {
     data: queue = [],
@@ -277,6 +305,37 @@ export default function FulfillmentPage() {
       qc.invalidateQueries({ queryKey: ["fulfillment-queue"] })
     },
     onError: (e: any) => toast.error(e?.message || "Failed to claim"),
+  })
+
+  const cancel = useMutation({
+    mutationFn: () => {
+      if (!cancelOrder) throw new Error("No order selected")
+      const data = {
+        reasonCode: cancelReason,
+        note: cancelNote.trim() || undefined,
+        expectedVersion: cancelOrder.version,
+        idempotencyKey: `operations-${cancelOrder.id}-${cancelOrder.version}`,
+      }
+      if (!cancellationPreview)
+        throw new Error("Cancellation policy unavailable")
+      return isImmediateDecline
+        ? api.admin.declinePlatformOrder(cancelOrder.id, data)
+        : cancellationPreview.action === "REQUEST_CANCELLATION"
+          ? api.admin.requestPlatformCancellation(cancelOrder.id, data)
+          : Promise.reject(new Error(cancellationPreview.message))
+    },
+    onSuccess: () => {
+      toast.success(
+        isImmediateDecline
+          ? "Order declined and customer refunded"
+          : "Cancellation request sent to the customer",
+      )
+      setCancelOrder(null)
+      setCancelNote("")
+      qc.invalidateQueries({ queryKey: ["fulfillment-queue"] })
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || "Cancellation failed"),
   })
 
   if (error)
@@ -363,6 +422,9 @@ export default function FulfillmentPage() {
                         ? (verifyBadge[dv.verificationStatus] ??
                           verifyBadge.PENDING)
                         : null
+                      const canActForOrder =
+                        user?.staffRole === "SUPER_ADMIN" ||
+                        asg?.assignedToUserId === user?.id
                       return (
                         <TableRow key={o.id}>
                           <TableCell className="font-mono text-xs">
@@ -415,6 +477,17 @@ export default function FulfillmentPage() {
                                 <Eye className="h-3 w-3 mr-1" />
                                 Review
                               </Button>
+                              {canActForOrder && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-destructive"
+                                  onClick={() => setCancelOrder(o)}
+                                >
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Cancellation
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
@@ -434,6 +507,86 @@ export default function FulfillmentPage() {
           onClose={() => setReviewOrderId(null)}
         />
       )}
+
+      <Dialog
+        open={Boolean(cancelOrder)}
+        onOpenChange={(open) => !open && setCancelOrder(null)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {isImmediateDecline
+                ? "Decline platform order"
+                : "Request platform cancellation"}
+            </DialogTitle>
+            <DialogDescription>
+              {isPreviewLoading
+                ? "Checking the current cancellation policy…"
+                : previewError
+                  ? (previewError as Error).message
+                  : cancellationPreview?.message}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Select
+                value={cancelReason}
+                onValueChange={(value) =>
+                  setCancelReason(value as CancellationReasonCode)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CAPACITY_UNAVAILABLE">
+                    Capacity unavailable
+                  </SelectItem>
+                  <SelectItem value="WEBSITE_UNAVAILABLE">
+                    Website unavailable
+                  </SelectItem>
+                  <SelectItem value="POLICY_CONFLICT">
+                    Policy conflict
+                  </SelectItem>
+                  <SelectItem value="PRICING_ERROR">Pricing error</SelectItem>
+                  <SelectItem value="PLATFORM_ERROR">Platform error</SelectItem>
+                  <SelectItem value="OTHER">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Textarea
+              value={cancelNote}
+              onChange={(event) => setCancelNote(event.target.value)}
+              placeholder="Explain the operational reason"
+              rows={4}
+              maxLength={2000}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelOrder(null)}>
+              Keep Order
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => cancel.mutate()}
+              disabled={
+                cancel.isPending ||
+                isPreviewLoading ||
+                Boolean(previewError) ||
+                !cancellationPreview ||
+                cancellationPreview.action === "NOT_ALLOWED"
+              }
+            >
+              {cancel.isPending
+                ? "Submitting…"
+                : isImmediateDecline
+                  ? "Decline and Refund"
+                  : "Send Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -50,6 +50,12 @@ const navItems: Array<{
     roles: ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
   },
   {
+    href: "/dashboard/cancellations",
+    label: "Cancellations",
+    icon: Scale,
+    roles: ["SUPER_ADMIN", "OPERATIONS", "FINANCE"],
+  },
+  {
     href: "/dashboard/marketplace",
     label: "Marketplace",
     icon: Store,

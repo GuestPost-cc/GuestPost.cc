@@ -50,18 +50,29 @@ import { useAuth } from "../../../lib/auth"
 // getDisputeStatusPresentation in @guestpost/ui. Local map deleted.
 
 type ResolveAction = "RESTORE" | "REFUND" | "REJECT"
+type RefundResponsibility =
+  | "CUSTOMER"
+  | "PUBLISHER"
+  | "PLATFORM"
+  | "SHARED"
+  | "SYSTEM"
 
 export default function DisputesPage() {
   const qc = useQueryClient()
   const { user } = useAuth()
-  const canResolve =
+  const canResolveOperationally =
     user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
+  const canApproveRefund =
+    user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "FINANCE"
   const [status, setStatus] = useState("all")
   const [resolveTarget, setResolveTarget] = useState<{
     id: string
     action: ResolveAction
   } | null>(null)
   const [reason, setReason] = useState("")
+  const [responsibility, setResponsibility] = useState<
+    RefundResponsibility | ""
+  >("")
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["admin", "disputes", status],
@@ -86,15 +97,18 @@ export default function DisputesPage() {
       id,
       action,
       resolution,
+      responsibility,
     }: {
       id: string
       action: ResolveAction
       resolution: string
-    }) => api.admin.resolveDispute(id, action, resolution),
+      responsibility?: RefundResponsibility
+    }) => api.admin.resolveDispute(id, action, resolution, responsibility),
     onSuccess: () => {
       toast.success("Dispute resolved")
       setResolveTarget(null)
       setReason("")
+      setResponsibility("")
       refresh()
       qc.invalidateQueries({ queryKey: ["admin", "orders"] })
     },
@@ -266,62 +280,70 @@ export default function DisputesPage() {
                               Evidence
                             </a>
                           </Button>
-                          {canResolve && active && (
-                            <>
-                              {d.status === "OPEN" && (
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => review.mutate(d.id)}
-                                  title="Mark under review"
-                                >
-                                  <Clock className="h-3.5 w-3.5" />
-                                </Button>
-                              )}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-emerald-600"
-                                title="Restore order"
-                                onClick={() =>
-                                  setResolveTarget({
-                                    id: d.id,
-                                    action: "RESTORE",
-                                  })
-                                }
-                              >
-                                <RotateCcw className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-blue-600"
-                                title="Refund customer"
-                                onClick={() =>
-                                  setResolveTarget({
-                                    id: d.id,
-                                    action: "REFUND",
-                                  })
-                                }
-                              >
-                                <DollarSign className="h-3.5 w-3.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-destructive"
-                                title="Reject dispute"
-                                onClick={() =>
-                                  setResolveTarget({
-                                    id: d.id,
-                                    action: "REJECT",
-                                  })
-                                }
-                              >
-                                <XCircle className="h-3.5 w-3.5" />
-                              </Button>
-                            </>
-                          )}
+                          {active &&
+                            (canResolveOperationally || canApproveRefund) && (
+                              <>
+                                {canResolveOperationally &&
+                                  d.status === "OPEN" && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => review.mutate(d.id)}
+                                      title="Mark under review"
+                                    >
+                                      <Clock className="h-3.5 w-3.5" />
+                                    </Button>
+                                  )}
+                                {canResolveOperationally && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-emerald-600"
+                                    title="Restore order"
+                                    onClick={() =>
+                                      setResolveTarget({
+                                        id: d.id,
+                                        action: "RESTORE",
+                                      })
+                                    }
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {canApproveRefund && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-blue-600"
+                                    title="Refund customer"
+                                    onClick={() =>
+                                      setResolveTarget({
+                                        id: d.id,
+                                        action: "REFUND",
+                                      })
+                                    }
+                                  >
+                                    <DollarSign className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {canResolveOperationally && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="text-destructive"
+                                    title="Reject dispute"
+                                    onClick={() =>
+                                      setResolveTarget({
+                                        id: d.id,
+                                        action: "REJECT",
+                                      })
+                                    }
+                                  >
+                                    <XCircle className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </>
+                            )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -339,6 +361,7 @@ export default function DisputesPage() {
           if (!o) {
             setResolveTarget(null)
             setReason("")
+            setResponsibility("")
           }
         }}
       >
@@ -365,24 +388,52 @@ export default function DisputesPage() {
             rows={3}
             maxLength={1000}
           />
+          {resolveTarget?.action === "REFUND" && (
+            <Select
+              value={responsibility}
+              onValueChange={(value) =>
+                setResponsibility(value as RefundResponsibility)
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Who is responsible for the refund?" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="PUBLISHER">Publisher</SelectItem>
+                <SelectItem value="PLATFORM">Platform</SelectItem>
+                <SelectItem value="CUSTOMER">Customer</SelectItem>
+                <SelectItem value="SHARED">Shared responsibility</SelectItem>
+                <SelectItem value="SYSTEM">System/technical failure</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
                 setResolveTarget(null)
                 setReason("")
+                setResponsibility("")
               }}
             >
               Cancel
             </Button>
             <Button
-              disabled={resolve.isPending || reason.trim().length < 3}
+              disabled={
+                resolve.isPending ||
+                reason.trim().length < 10 ||
+                (resolveTarget?.action === "REFUND" && !responsibility)
+              }
               onClick={() =>
                 resolveTarget &&
                 resolve.mutate({
                   id: resolveTarget.id,
                   action: resolveTarget.action,
                   resolution: reason.trim(),
+                  responsibility:
+                    resolveTarget.action === "REFUND" && responsibility
+                      ? responsibility
+                      : undefined,
                 })
               }
             >

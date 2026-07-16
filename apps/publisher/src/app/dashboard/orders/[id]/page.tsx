@@ -1,5 +1,6 @@
 "use client"
 
+import type { CancellationReasonCode } from "@guestpost/api-client"
 import type { OrderStatus } from "@guestpost/shared"
 import {
   Button,
@@ -8,10 +9,21 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   ErrorState,
   getOrderStatusPresentation,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
   Textarea,
   StatusBadge as UIStatusBadge,
@@ -237,6 +249,11 @@ export default function OrderDetailPage() {
   const [publishedUrl, setPublishedUrl] = useState("")
   const [content, setContent] = useState("")
   const [attachments, setAttachments] = useState<File[]>([])
+  const [showCancellationDialog, setShowCancellationDialog] = useState(false)
+  const [cancellationReason, setCancellationReason] =
+    useState<CancellationReasonCode>("CAPACITY_UNAVAILABLE")
+  const [cancellationNote, setCancellationNote] = useState("")
+  const [cancellationResponseNote, setCancellationResponseNote] = useState("")
 
   const {
     data: order,
@@ -245,6 +262,12 @@ export default function OrderDetailPage() {
   } = useQuery<any>({
     queryKey: ["order", orderId],
     queryFn: () => api.orders.getById(orderId),
+  })
+
+  const { data: cancellationPreview } = useQuery({
+    queryKey: ["order-cancellation-preview", orderId],
+    queryFn: () => api.orders.cancellationPreview(orderId),
+    enabled: Boolean(order),
   })
 
   const { data: proof } = useQuery<any>({
@@ -280,6 +303,64 @@ export default function OrderDetailPage() {
       refreshOrder()
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to accept"),
+  })
+
+  const cancellationMutation = useMutation({
+    mutationFn: async () => {
+      if (!cancellationPreview)
+        throw new Error("Cancellation policy unavailable")
+      const data = {
+        reasonCode: cancellationReason,
+        note: cancellationNote.trim() || undefined,
+        expectedVersion: cancellationPreview.expectedVersion,
+        idempotencyKey: `publisher-${orderId}-${cancellationPreview.expectedVersion}`,
+      }
+      if (cancellationPreview.action === "DECLINE_NOW") {
+        return api.orders.decline(orderId, data)
+      }
+      if (cancellationPreview.action === "REQUEST_CANCELLATION") {
+        return api.orders.requestCancellation(orderId, data)
+      }
+      throw new Error(cancellationPreview.message)
+    },
+    onSuccess: () => {
+      toast.success(
+        cancellationPreview?.action === "DECLINE_NOW"
+          ? "Order declined and customer refunded"
+          : "Cancellation request sent to the customer",
+      )
+      setShowCancellationDialog(false)
+      setCancellationNote("")
+      refreshOrder()
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || "Failed to process cancellation"),
+  })
+
+  const respondToCancellationMutation = useMutation({
+    mutationFn: (action: "ACCEPT" | "CONTEST") => {
+      const request = cancellationPreview?.activeRequest
+      if (!request) throw new Error("No active cancellation request")
+      return api.orders.respondToCancellation(
+        orderId,
+        request.id,
+        action,
+        cancellationResponseNote.trim() || undefined,
+      )
+    },
+    onSuccess: (_data, action) => {
+      toast.success(
+        action === "ACCEPT"
+          ? "Cancellation accepted; customer refunded"
+          : "Cancellation contested and sent for staff review",
+      )
+      setCancellationResponseNote("")
+      refreshOrder()
+      queryClient.invalidateQueries({
+        queryKey: ["order-cancellation-preview", orderId],
+      })
+    },
+    onError: (error: Error) => toast.error(error.message || "Response failed"),
   })
 
   const markPublishedMutation = useMutation({
@@ -380,6 +461,63 @@ export default function OrderDetailPage() {
       {/* Progress */}
       <OrderProgress status={s} />
 
+      {cancellationPreview?.activeRequest?.status === "REQUESTED" &&
+        cancellationPreview.activeRequest.requesterType === "CUSTOMER" && (
+          <Card className="border-amber-300 bg-amber-50/50">
+            <CardHeader>
+              <CardTitle className="text-base">
+                Cancellation response needed
+              </CardTitle>
+              <CardDescription>
+                The customer requested cancellation for{" "}
+                {cancellationPreview.activeRequest.reasonCode
+                  .replaceAll("_", " ")
+                  .toLowerCase()}
+                . Accepting issues the full wallet refund. Contesting sends the
+                case to staff review.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {cancellationPreview.actorCanMutate ? (
+                <>
+                  <Textarea
+                    value={cancellationResponseNote}
+                    onChange={(event) =>
+                      setCancellationResponseNote(event.target.value)
+                    }
+                    placeholder="Optional response details"
+                    rows={3}
+                    maxLength={2000}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() =>
+                        respondToCancellationMutation.mutate("ACCEPT")
+                      }
+                      disabled={respondToCancellationMutation.isPending}
+                    >
+                      Accept and Refund
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() =>
+                        respondToCancellationMutation.mutate("CONTEST")
+                      }
+                      disabled={respondToCancellationMutation.isPending}
+                    >
+                      Contest
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  A publisher owner must respond to this request.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           {/* Order Details */}
@@ -472,6 +610,15 @@ export default function OrderDetailPage() {
                   <CheckCircle className="mr-2 h-4 w-4" />
                   {acceptMutation.isPending ? "Accepting..." : "Accept Order"}
                 </Button>
+                {cancellationPreview?.action === "DECLINE_NOW" && (
+                  <Button
+                    variant="outline"
+                    className="ml-2"
+                    onClick={() => setShowCancellationDialog(true)}
+                  >
+                    Decline and Refund
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
@@ -816,6 +963,15 @@ export default function OrderDetailPage() {
                   <MessageSquare className="mr-2 h-4 w-4" /> Contact Support
                 </Link>
               </Button>
+              {cancellationPreview?.action === "REQUEST_CANCELLATION" && (
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-destructive"
+                  onClick={() => setShowCancellationDialog(true)}
+                >
+                  <XCircle className="mr-2 h-4 w-4" /> Request Cancellation
+                </Button>
+              )}
               <Button
                 variant="outline"
                 className="w-full justify-start"
@@ -849,6 +1005,85 @@ export default function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      <Dialog
+        open={showCancellationDialog}
+        onOpenChange={setShowCancellationDialog}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {cancellationPreview?.action === "DECLINE_NOW"
+                ? "Decline Order"
+                : "Request Cancellation"}
+            </DialogTitle>
+            <DialogDescription>
+              {cancellationPreview?.message}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Select
+                value={cancellationReason}
+                onValueChange={(value) =>
+                  setCancellationReason(value as CancellationReasonCode)
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CAPACITY_UNAVAILABLE">
+                    Capacity unavailable
+                  </SelectItem>
+                  <SelectItem value="TOPIC_UNSUITABLE">
+                    Topic unsuitable
+                  </SelectItem>
+                  <SelectItem value="WEBSITE_UNAVAILABLE">
+                    Website unavailable
+                  </SelectItem>
+                  <SelectItem value="PRICING_ERROR">Pricing error</SelectItem>
+                  <SelectItem value="POLICY_CONFLICT">
+                    Policy conflict
+                  </SelectItem>
+                  <SelectItem value="OTHER">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="publisher-cancellation-note">Details</Label>
+              <Textarea
+                id="publisher-cancellation-note"
+                rows={4}
+                value={cancellationNote}
+                onChange={(event) => setCancellationNote(event.target.value)}
+                placeholder="Explain why this order cannot continue"
+                maxLength={2000}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCancellationDialog(false)}
+            >
+              Keep Order
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => cancellationMutation.mutate()}
+              disabled={cancellationMutation.isPending}
+            >
+              {cancellationMutation.isPending
+                ? "Submitting…"
+                : cancellationPreview?.action === "DECLINE_NOW"
+                  ? "Decline and Refund"
+                  : "Send Request"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

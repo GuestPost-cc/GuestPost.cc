@@ -18,7 +18,16 @@ import { OrderOwnershipGuard } from "../../common/guards/order-ownership.guard"
 import { AuthGuard } from "../auth/auth.guard"
 import { AddOrderItemDto } from "./dto/add-order-item.dto"
 import { CreateOrderDto } from "./dto/create-order.dto"
+import {
+  CancelOrderDto,
+  CreateCancellationRequestDto,
+  RespondCancellationRequestDto,
+} from "./dto/order-cancellation.dto"
 import { OrdersService } from "./orders.service"
+import {
+  type CancellationActorContext,
+  OrderCancellationService,
+} from "./services/order-cancellation.service"
 import { OrderDeliveryService } from "./services/order-delivery.service"
 import { OrderDisputeService } from "./services/order-dispute.service"
 import { OrderFulfillmentService } from "./services/order-fulfillment.service"
@@ -35,6 +44,7 @@ export class OrdersController {
     private readonly review: OrderReviewService,
     private readonly dispute: OrderDisputeService,
     private readonly delivery: OrderDeliveryService,
+    private readonly cancellation: OrderCancellationService,
   ) {}
 
   // ─── CRUD ─────────────────────────────────────────────────
@@ -139,11 +149,53 @@ export class OrdersController {
 
   @Post(":id/cancel")
   @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
-  @MemberRoles("OWNER")
+  @MemberRoles("OWNER", "MEMBER")
   @ActorType("CUSTOMER")
   @RequireOrderOwnership()
-  cancelOrder(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.orders.cancelOrder(id, user.organizationId, user.id)
+  cancelOrder(
+    @Param("id") id: string,
+    @Body() body: CancelOrderDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.cancelNow(id, cancellationActor(user), body)
+  }
+
+  @Get(":id/cancellation-preview")
+  @UseGuards(OrderOwnershipGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @RequireOrderOwnership()
+  cancellationPreview(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.cancellation.preview(id, cancellationActor(user))
+  }
+
+  @Post(":id/cancellation-requests")
+  @UseGuards(OrderOwnershipGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @RequireOrderOwnership()
+  requestCancellation(
+    @Param("id") id: string,
+    @Body() body: CreateCancellationRequestDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.createRequest(id, cancellationActor(user), body)
+  }
+
+  @Post(":id/cancellation-requests/:requestId/respond")
+  @UseGuards(OrderOwnershipGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
+  @RequireOrderOwnership()
+  respondToCancellation(
+    @Param("id") id: string,
+    @Param("requestId") requestId: string,
+    @Body() body: RespondCancellationRequestDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.respond(
+      id,
+      requestId,
+      cancellationActor(user),
+      body,
+    )
   }
 
   // Phase 6.9 — Audit finding R-3. approve-content advances an order toward
@@ -261,6 +313,19 @@ export class OrdersController {
     return this.fulfillment.acceptOrder(id, user.publisherId, user.id)
   }
 
+  @Post(":id/decline")
+  @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
+  @MemberRoles("PUBLISHER_OWNER")
+  @ActorType("PUBLISHER")
+  @RequireOrderOwnership()
+  declineOrder(
+    @Param("id") id: string,
+    @Body() body: CancelOrderDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.cancellation.decline(id, cancellationActor(user), body)
+  }
+
   @Post(":id/submit-content")
   @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
   @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
@@ -308,5 +373,17 @@ export class OrdersController {
     @CurrentUser() user: any,
   ) {
     return this.fulfillment.markPublished(id, user.publisherId, user.id, url)
+  }
+}
+
+function cancellationActor(user: any): CancellationActorContext {
+  return {
+    userId: user.id,
+    kind: user.userType,
+    organizationId: user.organizationId ?? null,
+    publisherId: user.publisherId ?? null,
+    customerRole: user.customerRole ?? null,
+    publisherRole: user.publisherRole ?? null,
+    staffRole: user.staffRole ?? null,
   }
 }

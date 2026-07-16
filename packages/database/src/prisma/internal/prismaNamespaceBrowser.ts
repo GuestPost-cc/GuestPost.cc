@@ -69,6 +69,7 @@ export const ModelName = {
   OrderEvent: 'OrderEvent',
   Publication: 'Publication',
   OrderDispute: 'OrderDispute',
+  OrderCancellationRequest: 'OrderCancellationRequest',
   Settlement: 'Settlement',
   SettlementApproval: 'SettlementApproval',
   FulfillmentAssignment: 'FulfillmentAssignment',
@@ -352,6 +353,12 @@ export const OrderScalarFieldEnum = {
   listingServiceId: 'listingServiceId',
   fulfillmentChannel: 'fulfillmentChannel',
   turnaroundDays: 'turnaroundDays',
+  warrantyDays: 'warrantyDays',
+  submittedAt: 'submittedAt',
+  acceptedAt: 'acceptedAt',
+  fulfillmentDueAt: 'fulfillmentDueAt',
+  warrantyEndsAt: 'warrantyEndsAt',
+  refundResponsibility: 'refundResponsibility',
   briefData: 'briefData',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -435,6 +442,36 @@ export const OrderDisputeScalarFieldEnum = {
 } as const
 
 export type OrderDisputeScalarFieldEnum = (typeof OrderDisputeScalarFieldEnum)[keyof typeof OrderDisputeScalarFieldEnum]
+
+
+export const OrderCancellationRequestScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  requestedByUserId: 'requestedByUserId',
+  requesterType: 'requesterType',
+  actorSnapshot: 'actorSnapshot',
+  reasonCode: 'reasonCode',
+  note: 'note',
+  status: 'status',
+  previousOrderStatus: 'previousOrderStatus',
+  fulfillmentChannel: 'fulfillmentChannel',
+  responsibility: 'responsibility',
+  requestedResolution: 'requestedResolution',
+  responseDeadlineAt: 'responseDeadlineAt',
+  respondedByUserId: 'respondedByUserId',
+  responseNote: 'responseNote',
+  reviewedByUserId: 'reviewedByUserId',
+  financeApprovedByUserId: 'financeApprovedByUserId',
+  resolution: 'resolution',
+  resolutionReason: 'resolutionReason',
+  refundTransactionId: 'refundTransactionId',
+  idempotencyKey: 'idempotencyKey',
+  resolvedAt: 'resolvedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type OrderCancellationRequestScalarFieldEnum = (typeof OrderCancellationRequestScalarFieldEnum)[keyof typeof OrderCancellationRequestScalarFieldEnum]
 
 
 export const SettlementScalarFieldEnum = {

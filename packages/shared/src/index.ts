@@ -5,11 +5,14 @@ export * from "./dns-verification"
 export * from "./lifecycle/listing-phase"
 export * from "./notification-dedup-keys"
 export * from "./observability"
+export * from "./order-cancellation-config"
+export * from "./order-cancellation-policy"
 export * from "./order-priority"
 // NOT re-exported: job-signing uses Node crypto (HMAC) — server-only.
 // Consumer deep-import via `@guestpost/shared/dist/job-signing`.
 export * from "./payout-status"
 export * from "./payout-webhook"
+export * from "./platform-fee-core"
 export * from "./publisher-tier-policy"
 // NOT re-exported: publisher-trust-core struggles structured-logger → request-context
 // (node:async_hooks). Browser consumers that barrel-import @guestpost/shared would

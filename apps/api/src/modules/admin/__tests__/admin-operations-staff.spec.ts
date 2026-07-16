@@ -26,12 +26,7 @@ describe("Admin Operations staff picker", () => {
         ]),
       },
     }
-    const service = new AdminService(
-      prisma as any,
-      {} as any,
-      {} as any,
-      {} as any,
-    )
+    const service = new AdminService(prisma as any, {} as any, {} as any)
 
     await expect(service.listOperationsStaff()).resolves.toEqual([
       {

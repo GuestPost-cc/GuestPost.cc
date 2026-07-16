@@ -43,7 +43,13 @@ export class WebsiteVerificationService {
         },
       }),
       this.prisma.orderDispute.count({ where: { order: { websiteId } } }),
-      this.prisma.order.count({ where: { websiteId, status: "REFUNDED" } }),
+      this.prisma.order.count({
+        where: {
+          websiteId,
+          status: "REFUNDED",
+          refundResponsibility: "PUBLISHER",
+        },
+      }),
       this.prisma.transaction
         .count({ where: { type: "CHARGEBACK", order: { websiteId } } })
         .catch(() => 0),

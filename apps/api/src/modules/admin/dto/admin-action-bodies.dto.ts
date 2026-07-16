@@ -1,8 +1,10 @@
+import { CancellationResponsibility } from "@guestpost/database"
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsEnum,
   IsIn,
   IsNumber,
   IsOptional,
@@ -197,6 +199,10 @@ export class ResolveDisputeDto {
   @IsString()
   @IsIn(DISPUTE_ACTIONS as unknown as string[])
   action!: (typeof DISPUTE_ACTIONS)[number]
+
+  @ValidateIf((body: ResolveDisputeDto) => body.action === "REFUND")
+  @IsEnum(CancellationResponsibility)
+  responsibility?: CancellationResponsibility
 }
 
 // ── Listing moderation ────────────────────────────────────────────────────

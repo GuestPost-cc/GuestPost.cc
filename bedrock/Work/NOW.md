@@ -1,10 +1,22 @@
 # Current Status
 
-**Phase**: Post-July catch-up — integration and financial-security baseline shipped; the next product priority needs an owner decision.
+**Phase**: Structured order cancellation implemented and verified locally; staging deployment and lifecycle verification remain.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Structured Order Cancellation and Refunds
+
+- Replaced generic cancellation with a shared, code-backed policy across customer, publisher, and platform fulfillment channels.
+- Added structured cancellation cases, response deadlines, Operations review, Finance approval, Super Admin break-glass controls, responsibility attribution, and optimistic concurrency guards.
+- Unified captured-payment refunds into one atomic wallet/ledger/order/assignment/settlement-or-revenue transaction; only publisher-responsible refunds affect publisher trust.
+- Completed platform-owned orders into recognized platform revenue, hardened post-publication disputes, and added acceptance/cancellation timeout sweeps.
+- Added Customer, Publisher, Operations, Finance, and Super Admin interfaces plus policy/service/refund regression coverage and deployment documentation.
+- Validation is green across all 805 API unit tests, all 72 shared tests, affected application/package builds, frontend lint, Biome, and diff whitespace checks. Database-backed integration tests still require a local `psql` executable and isolated test database.
+- Applied the three pending local migrations through `20260716120000_order_cancellation_workflow`; all 34 migrations now report current. This fixed the reported customer portal 500 responses, and authenticated wallet, transaction, and order requests each return HTTP 200.
+- Aligned publisher-owned and platform-owned fulfillment with cancellation authorization: publisher actions resolve through ownership, platform actions require the active Operations assignment or a Super Admin override, and all deadline/warranty decisions come from the shared server policy.
+- Removed the generic admin refund bypass. Cancellation and dispute refunds now require a final responsibility value and use the shared atomic refund path for wallet, transaction, assignment, settlement/platform-revenue, event, and audit updates.
 
 ### Platform Website Ownership Reassignment
 
@@ -132,7 +144,9 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
-**Phase 5C is functionally complete.** DNS TXT verification is the website ownership gate; Google Search Console and GA4 are separate performance-data integrations. Search Analytics ingestion and reporting remain a future phase after production OAuth configuration is authorized.
+The cancellation implementation is code-complete and the local development database is current. The next in-scope action is to apply `20260716120000_order_cancellation_workflow` in a staging release window before starting the API and worker, then verify each money and fulfillment path against wallet, transaction, assignment, settlement/platform-revenue, event, and audit records.
+
+**Phase 5C remains functionally complete.** DNS TXT verification is the website ownership gate; Google Search Console and GA4 are separate performance-data integrations. Search Analytics ingestion and reporting remain a future phase after production OAuth configuration is authorized.
 
 The codebase also contains a July 14 operations-gap assessment. Its recommendation is to prioritise the existing admin fulfillment workflow before broad UX work; no such product phase has started.
 
@@ -145,17 +159,18 @@ The codebase also contains a July 14 operations-gap assessment. Its recommendati
 ## Next Actions
 
 1. **Urgent deployment secret remediation** — rotate the database credential exposed in `render.yml`, remove inline database values from the blueprint, and configure them only in Render's secret environment. This requires deployment/database authority.
-2. **OAuth configuration** — authorize the exact Google redirect URI used by the API, e.g. `http://localhost:4000/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback`, or set `API_BASE_URL` to the deployed API base and authorize that callback.
-3. **Worker operations** — ensure the worker queue process is running in local/dev when testing DNS TXT verification, otherwise jobs remain queued.
-4. **Choose the next product phase** — the committed operations-gap analysis recommends the admin fulfillment workflow as the first priority; Phase 5D remains the reporting alternative.
-5. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
+2. **Cancellation staging cutover** — apply migration `20260716120000_order_cancellation_workflow` before starting the updated API and worker, verify both new repeatable sweeps, and execute the scenario checklist in `docs/ORDER_CANCELLATION.md`. The local development database has already completed this cutover.
+3. **OAuth configuration** — authorize the exact Google redirect URI used by the API, e.g. `http://localhost:4000/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback`, or set `API_BASE_URL` to the deployed API base and authorize that callback.
+4. **Worker operations** — ensure the worker queue process is running in local/dev when testing DNS TXT verification, otherwise jobs remain queued.
+5. **Choose the next product phase** — the committed operations-gap analysis recommends the admin fulfillment workflow as the first priority; Phase 5D remains the reporting alternative.
+6. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
    - Implement real GSC Search Analytics API calls in provider
    - Pagination, date windows, UPSERT logic, deduplication, retries
    - Historical data imports
    - Reporting API endpoints (`GET /websites/:id/metrics`)
    - SEO Metrics KPI cards (impressions, clicks, CTR, position) + trend charts
-6. **Phase 6** — Admin/Operations UI for platform-owned websites
-7. **Additional providers** — GA4, Bing Webmaster Tools
+7. **Phase 6** — Admin/Operations UI for platform-owned websites
+8. **Additional providers** — GA4, Bing Webmaster Tools
 
 ## Backlog (Future Cleanup)
 
@@ -178,3 +193,5 @@ The codebase also contains a July 14 operations-gap assessment. Its recommendati
 ## Blockers
 
 - Database-secret rotation and Render environment remediation require operator access to the deployed database and Render project.
+- Cancellation staging validation requires a database migration/deployment window; the migration is schema-validated and applied locally, but not yet verified in staging.
+- Local database integration tests are not runnable in the current environment because `psql` is not installed; unit coverage and compile-time validation are green.

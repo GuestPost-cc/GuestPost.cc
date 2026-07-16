@@ -140,6 +140,70 @@ export const OrderStatus = {
 export type OrderStatus = (typeof OrderStatus)[keyof typeof OrderStatus]
 
 
+export const CancellationRequesterType = {
+  CUSTOMER: 'CUSTOMER',
+  PUBLISHER: 'PUBLISHER',
+  STAFF: 'STAFF',
+  SYSTEM: 'SYSTEM'
+} as const
+
+export type CancellationRequesterType = (typeof CancellationRequesterType)[keyof typeof CancellationRequesterType]
+
+
+export const CancellationRequestStatus = {
+  REQUESTED: 'REQUESTED',
+  UNDER_REVIEW: 'UNDER_REVIEW',
+  PENDING_FINANCE: 'PENDING_FINANCE',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+  WITHDRAWN: 'WITHDRAWN',
+  ESCALATED: 'ESCALATED',
+  DISPUTED: 'DISPUTED'
+} as const
+
+export type CancellationRequestStatus = (typeof CancellationRequestStatus)[keyof typeof CancellationRequestStatus]
+
+
+export const CancellationResolution = {
+  FULL_REFUND: 'FULL_REFUND',
+  CONTINUE_ORDER: 'CONTINUE_ORDER',
+  ESCALATE_TO_DISPUTE: 'ESCALATE_TO_DISPUTE'
+} as const
+
+export type CancellationResolution = (typeof CancellationResolution)[keyof typeof CancellationResolution]
+
+
+export const CancellationResponsibility = {
+  CUSTOMER: 'CUSTOMER',
+  PUBLISHER: 'PUBLISHER',
+  PLATFORM: 'PLATFORM',
+  SHARED: 'SHARED',
+  SYSTEM: 'SYSTEM',
+  UNDETERMINED: 'UNDETERMINED'
+} as const
+
+export type CancellationResponsibility = (typeof CancellationResponsibility)[keyof typeof CancellationResponsibility]
+
+
+export const CancellationReasonCode = {
+  CUSTOMER_CHANGED_MIND: 'CUSTOMER_CHANGED_MIND',
+  CAMPAIGN_CHANGED: 'CAMPAIGN_CHANGED',
+  DUPLICATE_ORDER: 'DUPLICATE_ORDER',
+  CAPACITY_UNAVAILABLE: 'CAPACITY_UNAVAILABLE',
+  TOPIC_UNSUITABLE: 'TOPIC_UNSUITABLE',
+  WEBSITE_UNAVAILABLE: 'WEBSITE_UNAVAILABLE',
+  PRICING_ERROR: 'PRICING_ERROR',
+  POLICY_CONFLICT: 'POLICY_CONFLICT',
+  MISSED_DEADLINE: 'MISSED_DEADLINE',
+  QUALITY_FAILURE: 'QUALITY_FAILURE',
+  PLATFORM_ERROR: 'PLATFORM_ERROR',
+  LEGAL_OR_SECURITY_EMERGENCY: 'LEGAL_OR_SECURITY_EMERGENCY',
+  OTHER: 'OTHER'
+} as const
+
+export type CancellationReasonCode = (typeof CancellationReasonCode)[keyof typeof CancellationReasonCode]
+
+
 export const ServiceType = {
   GUEST_POST: 'GUEST_POST',
   NICHE_EDIT: 'NICHE_EDIT',
@@ -202,7 +266,11 @@ export const OrderEventType = {
   REFUNDED: 'REFUNDED',
   VERIFICATION_ESCALATED: 'VERIFICATION_ESCALATED',
   AUTO_ACCEPTED: 'AUTO_ACCEPTED',
-  REVIEW_REMINDER: 'REVIEW_REMINDER'
+  REVIEW_REMINDER: 'REVIEW_REMINDER',
+  CANCELLATION_REQUESTED: 'CANCELLATION_REQUESTED',
+  CANCELLATION_RESPONDED: 'CANCELLATION_RESPONDED',
+  CANCELLATION_RESOLVED: 'CANCELLATION_RESOLVED',
+  ORDER_DECLINED: 'ORDER_DECLINED'
 } as const
 
 export type OrderEventType = (typeof OrderEventType)[keyof typeof OrderEventType]

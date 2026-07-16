@@ -108,6 +108,11 @@ export type Publication = Prisma.PublicationModel
  */
 export type OrderDispute = Prisma.OrderDisputeModel
 /**
+ * Model OrderCancellationRequest
+ *
+ */
+export type OrderCancellationRequest = Prisma.OrderCancellationRequestModel
+/**
  * Model Settlement
  * 
  */

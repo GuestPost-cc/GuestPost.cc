@@ -1,9 +1,5 @@
 import { Prisma } from "@guestpost/database"
-import {
-  orderEventMetadata,
-  UnknownServiceTypeError,
-  validateBrief,
-} from "@guestpost/shared"
+import { UnknownServiceTypeError, validateBrief } from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
@@ -12,18 +8,10 @@ import {
 } from "@nestjs/common"
 import { ZodError } from "zod"
 import { PrismaService } from "../../common/prisma.service"
-import { AuditService } from "../audit/audit.service"
-import { QueueService } from "../queues/queue.service"
-import { RefundService } from "./services/refund.service"
 
 @Injectable()
 export class OrdersService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly audit: AuditService,
-    readonly _queue: QueueService,
-    private readonly refund: RefundService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async createOrder(
     data: {
@@ -97,6 +85,7 @@ export class OrdersService {
         listingServiceId: string | null
         fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
         turnaroundDays: number | null
+        warrantyDays: number | null
         snapshotPrice: number | null
         snapshotServiceType: string | null
         websiteId: string | null
@@ -108,6 +97,7 @@ export class OrdersService {
         listingServiceId: null,
         fulfillmentChannel: null,
         turnaroundDays: null,
+        warrantyDays: null,
         snapshotPrice: null,
         snapshotServiceType: null,
         websiteId: firstItem?.websiteId ?? null,
@@ -172,6 +162,7 @@ export class OrdersService {
           fulfillmentChannel:
             ls.listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
           turnaroundDays: ls.turnaroundDays,
+          warrantyDays: ls.warrantyDays,
           snapshotPrice: Number(ls.price),
           snapshotServiceType: ls.serviceType,
           websiteId: site?.id ?? firstItem?.websiteId ?? null,
@@ -204,6 +195,7 @@ export class OrdersService {
               fulfillmentChannel:
                 listing.ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
               turnaroundDays: ls.turnaroundDays,
+              warrantyDays: ls.warrantyDays,
               snapshotPrice: Number(ls.price),
               snapshotServiceType: ls.serviceType,
               websiteId: firstItem.websiteId,
@@ -289,6 +281,7 @@ export class OrdersService {
           listingServiceId: snapshot.listingServiceId,
           fulfillmentChannel: snapshot.fulfillmentChannel,
           turnaroundDays: snapshot.turnaroundDays,
+          warrantyDays: snapshot.warrantyDays,
           // Phase 6: structured brief, validated above against the registry.
           briefData: validatedBrief ?? Prisma.JsonNull,
         },
@@ -545,108 +538,6 @@ export class OrdersService {
     return { success: true }
   }
 
-  async cancelOrder(orderId: string, organizationId: string, userId: string) {
-    const order = await this.prisma.order.findFirst({
-      where: { id: orderId, organizationId },
-    })
-    if (!order) throw new NotFoundException("Order not found")
-
-    const cancellableStatuses = [
-      "DRAFT",
-      "PENDING_PAYMENT",
-      "SUBMITTED",
-      "ACCEPTED",
-      "CONTENT_REQUESTED",
-      "CONTENT_CREATION",
-      "CONTENT_READY",
-      "CUSTOMER_REVIEW",
-      "APPROVED",
-      "PUBLISHED",
-      "VERIFIED",
-    ]
-    if (!cancellableStatuses.includes(order.status)) {
-      throw new BadRequestException(
-        `Order cannot be cancelled in ${order.status} status`,
-      )
-    }
-
-    const amount = order.amount ? Number(order.amount) : 0
-
-    // PAID orders: delegate to RefundService for canonical refund path
-    // (settlement cancel + clawback + wallet credit + transaction + event + audit)
-    if (order.paymentStatus === "PAID") {
-      await this.refund.refundOrder(
-        orderId,
-        "Order cancelled by customer",
-        userId,
-      )
-      return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
-    }
-
-    // NON-PAID orders: release reservation + cancel order
-    return this.prisma.$transaction(async (tx: any) => {
-      // Release reserved funds if any
-      if (
-        order.paymentStatus === "PENDING" &&
-        order.status === "PENDING_PAYMENT"
-      ) {
-        const wallet = await tx.wallet.findFirst({ where: { organizationId } })
-        if (wallet && amount > 0) {
-          const released = await tx.wallet.updateMany({
-            where: { id: wallet.id, version: wallet.version },
-            data: {
-              reservedBalance: { decrement: amount },
-              availableBalance: { increment: amount },
-              version: { increment: 1 },
-            },
-          })
-          if (released.count === 0) {
-            throw new ConflictException(
-              "Wallet was modified by another request. Retry.",
-            )
-          }
-        }
-      }
-
-      const cancelled = await tx.order.updateMany({
-        where: { id: orderId, version: order.version },
-        data: {
-          status: "CANCELLED",
-          version: { increment: 1 },
-        },
-      })
-      if (cancelled.count === 0) {
-        throw new ConflictException(
-          "Order was modified by another request. Retry.",
-        )
-      }
-      const updated = await tx.order.findUniqueOrThrow({
-        where: { id: orderId },
-      })
-
-      await tx.orderEvent.create({
-        data: {
-          orderId,
-          eventType: "ORDER_CANCELLED",
-          actorId: userId,
-          message: `Order cancelled by customer`,
-        },
-      })
-
-      await this.audit.log({
-        action: "ORDER_CANCELLED",
-        entityType: "Order",
-        entityId: orderId,
-        // Phase 6.9 — uniform snapshot trio across every Order-scoped audit.
-        metadata: { ...orderEventMetadata(order), fromStatus: order.status },
-        userId,
-        organizationId,
-      })
-
-      return updated
-    })
-  }
-
   // organizationId is null for publisher callers — OrderOwnershipGuard has
   // already verified the order's website belongs to their publisher account,
   // and a null org filter is a Prisma validation error (500), not a no-op.
@@ -662,6 +553,7 @@ export class OrdersService {
         website: true,
         settlements: { include: { approvals: true } },
         dispute: true,
+        cancellationRequests: { orderBy: { createdAt: "desc" }, take: 10 },
       },
     })
     if (!order) throw new NotFoundException(`Order ${id} not found`)
@@ -688,6 +580,7 @@ export class OrdersService {
           campaign: true,
           settlements: { include: { approvals: true } },
           dispute: true,
+          cancellationRequests: { orderBy: { createdAt: "desc" }, take: 1 },
         },
       }),
       this.prisma.order.count({ where }),
@@ -709,6 +602,7 @@ export class OrdersService {
           campaign: true,
           settlements: { include: { approvals: true } },
           dispute: true,
+          cancellationRequests: { orderBy: { createdAt: "desc" }, take: 1 },
         },
       }),
       this.prisma.order.count({ where }),

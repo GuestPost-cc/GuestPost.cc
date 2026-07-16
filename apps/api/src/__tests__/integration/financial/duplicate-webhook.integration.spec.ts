@@ -47,6 +47,7 @@ describe("[INTEGRATION] Financial — duplicate webhook idempotency", () => {
         "Duplicate test refund",
         ctx.customer.user.id,
         idempotencyKey,
+        { responsibility: "SYSTEM" },
       )
       expect(first.status).toBe(OrderStatus.REFUNDED)
 
@@ -56,6 +57,7 @@ describe("[INTEGRATION] Financial — duplicate webhook idempotency", () => {
         "Duplicate test refund",
         ctx.customer.user.id,
         idempotencyKey,
+        { responsibility: "SYSTEM" },
       )
       expect(second.status).toBe(OrderStatus.REFUNDED)
 

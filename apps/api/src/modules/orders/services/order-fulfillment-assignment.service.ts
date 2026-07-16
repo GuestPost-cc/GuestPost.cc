@@ -6,6 +6,7 @@ import {
 } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { OrderCancellationService } from "./order-cancellation.service"
 
 // Platform fulfillment assignment. Platform-owned orders enter the Operations
 // queue; Operations users claim / assign / reassign before delivering. Finance
@@ -15,6 +16,7 @@ export class OrderFulfillmentAssignmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly cancellation: OrderCancellationService,
   ) {}
 
   private async assertPlatformOrder(orderId: string) {
@@ -31,6 +33,22 @@ export class OrderFulfillmentAssignmentService {
         "Only platform-owned orders use fulfillment assignment",
       )
     }
+    if (
+      ![
+        "SUBMITTED",
+        "ACCEPTED",
+        "CONTENT_REQUESTED",
+        "CONTENT_CREATION",
+        "CONTENT_READY",
+        "CUSTOMER_REVIEW",
+        "APPROVED",
+      ].includes(order.status)
+    ) {
+      throw new BadRequestException(
+        `Order cannot be assigned in ${order.status} status`,
+      )
+    }
+    await this.cancellation.assertNoActiveCancellation(orderId)
     return order
   }
 

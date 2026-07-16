@@ -544,8 +544,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
       pushNotification: jest.fn().mockResolvedValue({}),
       sendEmail: jest.fn().mockResolvedValue({}),
     }
-    const refund = {} as any
-    admin = new AdminService(prisma, audit, queue as any, refund)
+    admin = new AdminService(prisma, audit, queue as any)
   })
 
   it("blocks APPROVED with WEBSITE_NOT_VERIFIED when the website is not VERIFIED", async () => {

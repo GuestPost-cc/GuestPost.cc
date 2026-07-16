@@ -42,6 +42,17 @@ const REGISTRY_PATH = join(
   "src",
   "repeatable-job-registry.ts",
 )
+const QUEUES_PATH = join(
+  __dirname,
+  "..",
+  "..",
+  "..",
+  "..",
+  "packages",
+  "shared",
+  "src",
+  "queues.ts",
+)
 
 function extractRegistryNames(): Set<string> {
   const src = readFileSync(REGISTRY_PATH, "utf8")
@@ -58,6 +69,7 @@ function extractRegistryNames(): Set<string> {
 
 function extractWorkerRepeatables(): Set<string> {
   const src = readFileSync(WORKER_INDEX_PATH, "utf8")
+  const queuesSrc = readFileSync(QUEUES_PATH, "utf8")
   // Find every queue.add("<name>", ..., { ...repeat:... }) call.
   // Strategy: locate every `repeat:` occurrence, then walk backward to
   // find the enclosing queue.add(...). The first string-literal arg
@@ -72,7 +84,27 @@ function extractWorkerRepeatables(): Set<string> {
     if (addStart === -1) continue
     const afterAdd = lookback.slice(addStart + "queue.add(".length)
     const nameMatch = afterAdd.match(/^\s*["']([^"']+)["']/)
-    if (nameMatch) names.add(nameMatch[1])
+    if (nameMatch) {
+      names.add(nameMatch[1])
+      continue
+    }
+
+    // Shared queue constants are preferred over repeating raw job-name
+    // strings. Resolve a local alias such as:
+    //   const jobName = QUEUE_JOBS[QUEUES.AUTO_ACCEPT].TIMEOUT_SWEEP
+    //   queue.add(jobName, ..., { repeat: ... })
+    const identifier = afterAdd.match(/^\s*([A-Za-z_$][\w$]*)\s*,/)?.[1]
+    if (!identifier) continue
+    const aliasPattern = new RegExp(
+      `const\\s+${identifier}\\s*=\\s*QUEUE_JOBS\\[[^\\]]+\\]\\.([A-Z0-9_]+)`,
+    )
+    const property = lookback.match(aliasPattern)?.[1]
+    if (!property) continue
+    const propertyPattern = new RegExp(
+      `\\b${property}\\s*:\\s*["']([^"']+)["']`,
+    )
+    const resolved = queuesSrc.match(propertyPattern)?.[1]
+    if (resolved) names.add(resolved)
   }
   return names
 }

@@ -1,7 +1,14 @@
-import { orderEventMetadata } from "@guestpost/shared"
+import { CancellationResponsibility } from "@guestpost/database"
+import {
+  ACTIVE_CANCELLATION_REQUEST_STATUSES,
+  decideOrderCancellation,
+  orderEventMetadata,
+} from "@guestpost/shared"
+import { FinalRefundResponsibility } from "@guestpost/shared/dist/order-refund-core"
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
@@ -127,11 +134,12 @@ export class OrderDisputeService {
   }
 
   private async transitionOrder(
+    db: any,
     orderId: string,
     fromVersion: number,
     data: any,
   ) {
-    const r = await this.prisma.order.updateMany({
+    const r = await db.order.updateMany({
       where: { id: orderId, version: fromVersion },
       data: { ...data, version: { increment: 1 } },
     })
@@ -150,68 +158,93 @@ export class OrderDisputeService {
   ) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, organizationId },
+      include: {
+        website: { select: { ownershipType: true } },
+        cancellationRequests: {
+          where: {
+            status: { in: [...ACTIVE_CANCELLATION_REQUEST_STATUSES] },
+          },
+          select: { id: true },
+          take: 1,
+        },
+        dispute: { select: { id: true } },
+      },
     })
     if (!order) throw new NotFoundException("Order not found")
 
-    const disputableStatuses = [
-      "PUBLISHED",
-      "VERIFIED",
-      "DELIVERED",
-      "CANCELLED",
-    ]
-    if (
-      !disputableStatuses.includes(order.status) &&
-      order.paymentStatus !== "PAID"
-    ) {
-      throw new BadRequestException(
-        "Order cannot be disputed in its current state",
+    const channel =
+      order.fulfillmentChannel ??
+      (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
+    const decision = decideOrderCancellation({
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      fulfillmentChannel: channel,
+      actor: "CUSTOMER",
+      hasActiveRequest: order.cancellationRequests.length > 0,
+      hasActiveDispute: Boolean(order.dispute),
+      fulfillmentDueAt: order.fulfillmentDueAt,
+      warrantyEndsAt: order.warrantyEndsAt,
+    })
+    if (decision.action !== "OPEN_DISPUTE") {
+      throw new BadRequestException(decision.message)
+    }
+
+    if (order.dispute) {
+      throw new ConflictException(
+        "This order already has a dispute record; reopen it through support instead of creating a duplicate",
       )
     }
 
-    const existingDispute = await this.prisma.orderDispute.findFirst({
-      where: { orderId },
-    })
-    if (
-      existingDispute &&
-      existingDispute.status !== "RESOLVED_REJECTED" &&
-      existingDispute.status !== "RESOLVED_RESTORED"
-    ) {
-      throw new BadRequestException(
-        "An active dispute already exists for this order",
-      )
+    let dispute: any
+    try {
+      dispute = await this.prisma.$transaction(async (tx: any) => {
+        const created = await tx.orderDispute.create({
+          data: {
+            orderId,
+            raisedBy: userId,
+            reason,
+            status: "OPEN",
+            // RESTORE/REJECT resolutions return the order to exactly this status
+            previousStatus: order.status as any,
+          },
+        })
+        await this.transitionOrder(tx, orderId, order.version, {
+          status: "DISPUTED",
+        })
+        await tx.orderEvent.create({
+          data: {
+            orderId,
+            eventType: "DISPUTE_OPENED",
+            actorId: userId,
+            message: `Dispute opened: ${reason}`,
+            metadata: { disputeId: created.id, reason },
+          },
+        })
+        await this.audit.log(
+          {
+            action: "DISPUTE_OPENED",
+            entityType: "Order",
+            entityId: orderId,
+            metadata: {
+              ...orderEventMetadata(order),
+              disputeId: created.id,
+              reason,
+            },
+            userId,
+            organizationId,
+          },
+          tx,
+        )
+        return created
+      })
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        throw new ConflictException(
+          "This order already has a dispute record; reopen it through support instead of creating a duplicate",
+        )
+      }
+      throw error
     }
-
-    const dispute = await this.prisma.orderDispute.create({
-      data: {
-        orderId,
-        raisedBy: userId,
-        reason,
-        status: "OPEN",
-        // RESTORE/REJECT resolutions return the order to exactly this status
-        previousStatus: order.status as any,
-      },
-    })
-
-    await this.transitionOrder(orderId, order.version, { status: "DISPUTED" })
-
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId,
-        eventType: "DISPUTE_OPENED",
-        actorId: userId,
-        message: `Dispute opened: ${reason}`,
-        metadata: { disputeId: dispute.id, reason },
-      },
-    })
-
-    await this.audit.log({
-      action: "DISPUTE_OPENED",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: { ...orderEventMetadata(order), disputeId: dispute.id, reason },
-      userId,
-      organizationId,
-    })
 
     // Snapshot the evidence inventory at dispute-open so reviewers see a
     // complete, immutable package (assembled live via GET /disputes/:id/evidence).
@@ -249,112 +282,140 @@ export class OrderDisputeService {
   async resolveDispute(
     disputeId: string,
     userId: string,
-    _staffRole: string,
+    staffRole: string,
     resolution: string,
     action: "RESTORE" | "REFUND" | "REJECT",
+    responsibility?: CancellationResponsibility,
   ) {
-    const dispute = await this.prisma.orderDispute.findUnique({
-      where: { id: disputeId },
-      include: { order: true },
-    })
-    if (!dispute) throw new NotFoundException("Dispute not found")
-    if (dispute.status !== "OPEN" && dispute.status !== "UNDER_REVIEW") {
+    if (
+      action === "REFUND" &&
+      !["SUPER_ADMIN", "FINANCE"].includes(staffRole)
+    ) {
+      throw new ForbiddenException(
+        "Finance approval is required for a dispute refund",
+      )
+    }
+    if (action !== "REFUND" && staffRole === "FINANCE") {
+      throw new ForbiddenException(
+        "Finance can approve refunds but cannot decide operational dispute outcomes",
+      )
+    }
+    if (
+      action === "REFUND" &&
+      (!responsibility ||
+        responsibility === CancellationResponsibility.UNDETERMINED)
+    ) {
       throw new BadRequestException(
-        "Dispute is not resolvable in current state",
+        "A specific responsibility attribution is required for a dispute refund",
       )
     }
 
-    const order = dispute.order
-    // Stored at dispute open; fall back to PUBLISHED only for pre-migration
-    // disputes that never recorded it.
-    const restoreStatus =
-      order.status === "DISPUTED"
-        ? (dispute.previousStatus ?? "PUBLISHED")
-        : order.status
-
-    if (action === "RESTORE") {
-      await this.prisma.$transaction(async (tx: any) => {
-        await tx.orderDispute.update({
-          where: { id: disputeId },
-          data: {
-            status: "RESOLVED_RESTORED",
-            resolvedBy: userId,
-            resolvedAt: new Date(),
-            resolution,
+    const resolved = await this.prisma.$transaction(async (tx: any) => {
+      const dispute = await tx.orderDispute.findUnique({
+        where: { id: disputeId },
+        include: {
+          order: {
+            include: {
+              website: { select: { ownershipType: true, publisherId: true } },
+            },
           },
-        })
-        await this.transitionOrder(order.id, order.version, {
-          status: restoreStatus as any,
-        })
+        },
       })
-    } else if (action === "REFUND") {
-      // Refund first — if it fails, the dispute stays open instead of being
-      // marked resolved with the customer never refunded. If the order was
-      // ALREADY refunded (a prior resolution attempt crashed after the refund
-      // committed), skip straight to resolving — otherwise the dispute is
-      // permanently stuck behind the duplicate-refund guard.
-      if (order.paymentStatus !== "REFUNDED") {
-        await this.refund.refundOrder(
-          order.id,
-          `Dispute resolved with refund: ${resolution}`,
-          userId,
+      if (!dispute) throw new NotFoundException("Dispute not found")
+      if (dispute.status !== "OPEN" && dispute.status !== "UNDER_REVIEW") {
+        throw new BadRequestException(
+          "Dispute is not resolvable in current state",
         )
       }
 
-      await this.prisma.$transaction(async (tx: any) => {
-        await tx.orderDispute.update({
-          where: { id: disputeId },
-          data: {
-            status: "RESOLVED_REFUNDED",
-            resolvedBy: userId,
-            resolvedAt: new Date(),
-            resolution,
-          },
-        })
-      })
-    } else if (action === "REJECT") {
-      await this.prisma.$transaction(async (tx: any) => {
-        await tx.orderDispute.update({
-          where: { id: disputeId },
-          data: {
-            status: "RESOLVED_REJECTED",
-            resolvedBy: userId,
-            resolvedAt: new Date(),
-            resolution,
-          },
-        })
-        // Restore order to pre-dispute state
-        await this.transitionOrder(order.id, order.version, {
+      const order = dispute.order
+      const restoreStatus =
+        order.status === "DISPUTED"
+          ? (dispute.previousStatus ?? "PUBLISHED")
+          : order.status
+      let refundTransactionId: string | null = null
+      if (action === "REFUND") {
+        const refunded = await this.refund.refundOrderInTransaction(
+          tx,
+          order,
+          `Dispute resolved with refund: ${resolution}`,
+          userId,
+          `dispute-refund:${disputeId}`,
+          responsibility as FinalRefundResponsibility,
+        )
+        refundTransactionId = refunded.refundTransactionId
+      } else {
+        await this.transitionOrder(tx, order.id, order.version, {
           status: restoreStatus as any,
         })
+      }
+
+      const updated = await tx.orderDispute.updateMany({
+        where: {
+          id: disputeId,
+          status: { in: ["OPEN", "UNDER_REVIEW"] },
+        },
+        data: {
+          status:
+            action === "REFUND"
+              ? "RESOLVED_REFUNDED"
+              : action === "RESTORE"
+                ? "RESOLVED_RESTORED"
+                : "RESOLVED_REJECTED",
+          resolvedBy: userId,
+          resolvedAt: new Date(),
+          resolution,
+        },
       })
-    }
-
-    await this.prisma.orderEvent.create({
-      data: {
+      if (updated.count === 0) {
+        throw new ConflictException("Dispute was resolved concurrently")
+      }
+      await tx.orderEvent.create({
+        data: {
+          orderId: order.id,
+          eventType: "DISPUTE_RESOLVED",
+          actorId: userId,
+          message: `Dispute resolved: ${resolution}`,
+          metadata: {
+            disputeId,
+            resolution,
+            action,
+            responsibility: responsibility ?? null,
+            refundTransactionId,
+          },
+        },
+      })
+      await this.audit.log(
+        {
+          action: `DISPUTE_${action}`,
+          entityType: "Dispute",
+          entityId: disputeId,
+          metadata: {
+            ...orderEventMetadata(order),
+            orderId: order.id,
+            resolution,
+            responsibility: responsibility ?? null,
+            refundTransactionId,
+          },
+          userId,
+          organizationId: order.organizationId,
+        },
+        tx,
+      )
+      return {
+        dispute: await tx.orderDispute.findUniqueOrThrow({
+          where: { id: disputeId },
+        }),
         orderId: order.id,
-        eventType: "DISPUTE_RESOLVED",
-        actorId: userId,
-        message: `Dispute resolved: ${resolution}`,
-        metadata: { disputeId, resolution, action },
-      },
-    })
-
-    await this.audit.log({
-      action: `DISPUTE_${action}`,
-      entityType: "Dispute",
-      entityId: disputeId,
-      metadata: { ...orderEventMetadata(order), orderId: order.id, resolution },
-      userId,
-      organizationId: order.organizationId,
+      }
     })
 
     await this.queue.enqueueTrustRecompute(
-      await this.publisherIdForOrder(order.id),
+      await this.publisherIdForOrder(resolved.orderId),
       "DISPUTE_RESOLVED",
       `dispute ${disputeId} resolved (${action})`,
     )
 
-    return this.prisma.orderDispute.findUnique({ where: { id: disputeId } })
+    return resolved.dispute
   }
 }

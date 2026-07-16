@@ -8,6 +8,7 @@ import {
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
+import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderDeliveryService } from "./order-delivery.service"
 
 @Injectable()
@@ -17,6 +18,7 @@ export class OrderFulfillmentService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
     private readonly delivery: OrderDeliveryService,
+    private readonly cancellation: OrderCancellationService,
   ) {}
 
   // Optimistic-lock status transition: the row only changes if its version
@@ -51,10 +53,18 @@ export class OrderFulfillmentService {
     if (!order) throw new NotFoundException("Order not found")
     if (order.status !== "SUBMITTED")
       throw new BadRequestException("Order must be SUBMITTED to accept")
+    await this.cancellation.assertNoActiveCancellation(orderId)
+
+    const acceptedAt = new Date()
+    const fulfillmentDueAt = order.turnaroundDays
+      ? new Date(acceptedAt.getTime() + order.turnaroundDays * 86_400_000)
+      : null
 
     const updated = await this.transition(orderId, order.version, "SUBMITTED", {
       status: "ACCEPTED",
       assigneeId: userId,
+      acceptedAt,
+      fulfillmentDueAt,
     })
 
     await this.prisma.orderEvent.create({
@@ -94,6 +104,7 @@ export class OrderFulfillmentService {
         "Order must be ACCEPTED or CONTENT_REQUESTED to submit content",
       )
     }
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     const updated = await this.transition(
       orderId,
@@ -137,6 +148,7 @@ export class OrderFulfillmentService {
         "Order must be in CONTENT_CREATION to mark content ready",
       )
     }
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     const updated = await this.transition(
       orderId,
@@ -167,6 +179,7 @@ export class OrderFulfillmentService {
         "Content must be ready before submitting for review",
       )
     }
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     const updated = await this.transition(
       orderId,
@@ -215,6 +228,7 @@ export class OrderFulfillmentService {
       throw new BadRequestException(
         "Content must be APPROVED before publishing",
       )
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     await this.delivery.submitDelivery(order, userId, {
       publishedUrl,

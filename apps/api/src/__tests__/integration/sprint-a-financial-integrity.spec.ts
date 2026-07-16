@@ -41,6 +41,8 @@ describe("[INTEGRATION] Sprint A — Financial Integrity", () => {
           ctx.order.id,
           "Customer refund test",
           ctx.customer.user.id,
+          undefined,
+          { responsibility: "SYSTEM" },
         ),
       ])
 

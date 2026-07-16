@@ -12,6 +12,7 @@ export type {
 export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, clearToken, getToken, HttpClient, setToken } from "./client"
 export type {
+  AdminCancellationRequestResponse,
   AdminOpsStaffResponse,
   AdminOrderDetailResponse,
   AdminOrderResponse,
@@ -35,6 +36,11 @@ export type {
 } from "./services/notifications"
 export { NotificationsService } from "./services/notifications"
 export type {
+  CancellationMutationData,
+  CancellationPreviewResponse,
+  CancellationReasonCode,
+  CancellationRequestResponse,
+  CancellationRequestStatus,
   CreateOrderData,
   OrderItemData,
   OrderResponse,

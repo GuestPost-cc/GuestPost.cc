@@ -1,9 +1,12 @@
 import { prisma } from "@guestpost/database"
 import {
+  ACTIVE_CANCELLATION_REQUEST_STATUSES,
   defaultWorkflowConfig,
   getSettlementReviewDays,
   QUEUE_JOBS,
   QUEUES,
+  resolveOrderCancellationConfig,
+  resolvePlatformFeeFractionCore,
   WorkflowDecisionService,
 } from "@guestpost/shared"
 import {
@@ -11,6 +14,8 @@ import {
   verifyJobPayload,
 } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
+import { refundUnacceptedPaidOrderInTransaction } from "@guestpost/shared/dist/order-refund-core"
+import { recomputePublisherTrustCore } from "@guestpost/shared/dist/publisher-trust-core"
 import * as Sentry from "@sentry/node"
 import { Queue } from "bullmq"
 import { createObservableWorker } from "../lib/queue-observability"
@@ -20,6 +25,18 @@ import { isRepeatableJob } from "../repeatable-job-registry"
 const logger = createLogger("worker.auto-accept")
 
 const decision = new WorkflowDecisionService()
+
+async function resolveListingUnitPrice(
+  tx: any,
+  listingServiceId: string | null | undefined,
+) {
+  if (!listingServiceId) return null
+  const service = await tx.listingService.findUnique({
+    where: { id: listingServiceId },
+    select: { price: true },
+  })
+  return service?.price ?? null
+}
 
 export function createAutoAcceptWorker() {
   return createObservableWorker(
@@ -34,18 +51,138 @@ export function createAutoAcceptWorker() {
         throw new Error("Invalid job signature")
       }
 
-      if (job.name === "auto-accept-sweep") {
+      if (job.name === QUEUE_JOBS[QUEUES.AUTO_ACCEPT].SWEEP) {
         return runAutoAcceptSweep()
       }
 
-      if (job.name === "review-reminder-sweep") {
+      if (job.name === QUEUE_JOBS[QUEUES.AUTO_ACCEPT].REMINDER_SWEEP) {
         return runReviewReminderSweep()
+      }
+
+      if (
+        job.name === QUEUE_JOBS[QUEUES.AUTO_ACCEPT].CANCELLATION_TIMEOUT_SWEEP
+      ) {
+        return runCancellationResponseTimeoutSweep()
+      }
+
+      if (
+        job.name === QUEUE_JOBS[QUEUES.AUTO_ACCEPT].ACCEPTANCE_TIMEOUT_SWEEP
+      ) {
+        return runOrderAcceptanceTimeoutSweep()
       }
 
       logger.warn("unexpected job name — skipping", { jobName: job.name })
     },
     { connection },
   )
+}
+
+async function runCancellationResponseTimeoutSweep() {
+  const now = new Date()
+  const expired = await prisma.orderCancellationRequest.findMany({
+    where: { status: "REQUESTED", responseDeadlineAt: { lte: now } },
+    select: { id: true, orderId: true },
+    take: 100,
+  })
+  let escalated = 0
+  for (const request of expired) {
+    const changed = await prisma.$transaction(async (tx: any) => {
+      const updated = await tx.orderCancellationRequest.updateMany({
+        where: { id: request.id, status: "REQUESTED" },
+        data: { status: "ESCALATED" },
+      })
+      if (updated.count === 0) return false
+      await tx.orderEvent.create({
+        data: {
+          orderId: request.orderId,
+          eventType: "CANCELLATION_RESPONDED",
+          actorId: null,
+          message: "Cancellation response deadline expired; escalated to staff",
+          metadata: { requestId: request.id, automatic: true },
+        },
+      })
+      await tx.auditLog.create({
+        data: {
+          action: "ORDER_CANCELLATION_ESCALATED",
+          entityType: "OrderCancellationRequest",
+          entityId: request.id,
+          metadata: { orderId: request.orderId, automatic: true },
+          userId: null,
+          organizationId: null,
+        },
+      })
+      return true
+    })
+    if (changed) escalated++
+  }
+  return { scanned: expired.length, escalated }
+}
+
+async function runOrderAcceptanceTimeoutSweep() {
+  const { acceptanceWindowHours: acceptanceHours } =
+    resolveOrderCancellationConfig(process.env)
+  const cutoff = new Date(Date.now() - acceptanceHours * 3_600_000)
+  const due = await prisma.order.findMany({
+    where: {
+      status: "SUBMITTED",
+      paymentStatus: "PAID",
+      submittedAt: { not: null, lte: cutoff },
+    },
+    include: {
+      website: { select: { ownershipType: true, publisherId: true } },
+      cancellationRequests: {
+        where: {
+          status: {
+            in: [...ACTIVE_CANCELLATION_REQUEST_STATUSES],
+          },
+        },
+        select: { id: true },
+        take: 1,
+      },
+    },
+    take: 100,
+  })
+  let refunded = 0
+  for (const order of due) {
+    if (order.cancellationRequests.length > 0) continue
+    const responsibility =
+      (order.fulfillmentChannel ??
+        (order.website?.ownershipType === "PLATFORM"
+          ? "PLATFORM"
+          : "PUBLISHER")) === "PLATFORM"
+        ? "PLATFORM"
+        : "PUBLISHER"
+    const didRefund = await prisma.$transaction(async (tx: any) => {
+      const existing = await tx.transaction.findFirst({
+        where: { reference: `acceptance-timeout:${order.id}` },
+      })
+      if (existing) return false
+      await refundUnacceptedPaidOrderInTransaction(
+        tx,
+        order,
+        {
+          reference: `acceptance-timeout:${order.id}`,
+          reason: `Order not accepted within ${acceptanceHours} hours`,
+          responsibility,
+          actorUserId: null,
+          auditAction: "ORDER_ACCEPTANCE_TIMEOUT_REFUND",
+          auditMetadata: { automatic: true, acceptanceHours },
+        },
+        (data, auditTx) => auditTx.auditLog.create({ data }),
+      )
+      return true
+    })
+    if (didRefund) {
+      refunded++
+      if (responsibility === "PUBLISHER" && order.website?.publisherId) {
+        await recomputePublisherTrustCore(prisma, order.website.publisherId, {
+          sourceEvent: "ORDER_ACCEPTANCE_TIMEOUT",
+          reason: `order ${order.id} was not accepted`,
+        })
+      }
+    }
+  }
+  return { scanned: due.length, refunded, acceptanceHours }
 }
 
 interface AutoAcceptResult {
@@ -66,6 +203,15 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
     },
     include: {
       dispute: { select: { status: true } },
+      cancellationRequests: {
+        where: {
+          status: {
+            in: [...ACTIVE_CANCELLATION_REQUEST_STATUSES],
+          },
+        },
+        select: { id: true },
+        take: 1,
+      },
       website: { select: { publisherId: true, ownershipType: true } },
       activeDeliveryVersion: {
         select: { id: true, publishedUrl: true },
@@ -92,19 +238,28 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
       skipped++
       continue
     }
+    if (order.cancellationRequests?.length) {
+      skipped++
+      continue
+    }
     if (!order.activeDeliveryVersion) {
       skipped++
       continue
     }
 
     try {
-      await prisma.$transaction(async (tx: any) => {
+      const didAccept = await prisma.$transaction(async (tx: any) => {
         const upd = await tx.order.updateMany({
-          where: { id: order.id, status: "VERIFIED" },
+          where: {
+            id: order.id,
+            status: "VERIFIED",
+            version: order.version,
+          },
           data: {
             status: "DELIVERED",
             deliveredAt: now,
             deliveryAcceptedMethod: "AUTO_TIMEOUT",
+            version: { increment: 1 },
           },
         })
         if (upd.count === 0) return false
@@ -129,15 +284,73 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
           order.items?.[0]?.website?.ownershipType ??
           order.website?.ownershipType ??
           null
+        const channel =
+          order.fulfillmentChannel ??
+          (ownerType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
 
-        if (publisherId && order.amount) {
+        if (channel === "PLATFORM") {
+          const feeFraction = await resolvePlatformFeeFractionCore(
+            tx,
+            process.env.PLATFORM_FEE_PERCENT,
+          )
+          const amount = Number(order.amount ?? 0)
+          const fee = Math.round(amount * feeFraction * 100) / 100
+          const net = Math.round((amount - fee) * 100) / 100
+          const existingRevenue = await tx.platformRevenue.findUnique({
+            where: { orderId: order.id },
+          })
+          if (!existingRevenue) {
+            await tx.platformRevenue.create({
+              data: {
+                orderId: order.id,
+                amount,
+                platformFee: fee,
+                netRevenue: net,
+                listingServiceId: order.listingServiceId ?? null,
+                serviceType: order.type,
+                ownerType,
+                fulfillmentChannel: "PLATFORM",
+                unitPrice: await resolveListingUnitPrice(
+                  tx,
+                  order.listingServiceId,
+                ),
+              },
+            })
+          }
+          const completed = await tx.order.updateMany({
+            where: { id: order.id, status: "DELIVERED" },
+            data: {
+              status: "COMPLETED",
+              warrantyEndsAt: order.warrantyDays
+                ? new Date(now.getTime() + order.warrantyDays * 86_400_000)
+                : null,
+              version: { increment: 1 },
+            },
+          })
+          if (completed.count === 0) {
+            throw new Error(
+              `Order ${order.id} changed during platform auto-accept`,
+            )
+          }
+          await tx.orderEvent.create({
+            data: {
+              orderId: order.id,
+              eventType: "SETTLEMENT_CREATED",
+              actorId: null,
+              message: `Platform revenue recognized after auto-accept — amount: ${amount}`,
+              metadata: { platformRevenue: true, amount, platformFee: fee },
+            },
+          })
+        } else if (publisherId && order.amount) {
           const publisherTierRow = await tx.publisher.findUnique({
             where: { id: publisherId },
             select: { tier: true },
           })
 
-          const pct = Number(process.env.PLATFORM_FEE_PERCENT ?? 20)
-          const feeFraction = Math.min(Math.max(pct, 0), 100) / 100
+          const feeFraction = await resolvePlatformFeeFractionCore(
+            tx,
+            process.env.PLATFORM_FEE_PERCENT,
+          )
           const amount =
             typeof order.amount === "number"
               ? order.amount
@@ -173,7 +386,10 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
               serviceType: order.type,
               ownerType,
               fulfillmentChannel: order.fulfillmentChannel ?? null,
-              unitPrice: null,
+              unitPrice: await resolveListingUnitPrice(
+                tx,
+                order.listingServiceId,
+              ),
             },
           })
 
@@ -195,7 +411,8 @@ async function runAutoAcceptSweep(): Promise<AutoAcceptResult> {
 
         return true
       })
-      accepted++
+      if (didAccept) accepted++
+      else skipped++
     } catch (err) {
       logger.error("auto-accept transaction failed", {
         orderId: order.id,

@@ -2,12 +2,14 @@ import { orderEventMetadata, QUEUES } from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
+import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderDeliveryService } from "./order-delivery.service"
 
 @Injectable()
@@ -17,6 +19,7 @@ export class OrderOperationsService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
     private readonly delivery: OrderDeliveryService,
+    private readonly cancellation: OrderCancellationService,
   ) {}
 
   private async transition(
@@ -62,14 +65,43 @@ export class OrderOperationsService {
     return order
   }
 
-  async acceptOrder(orderId: string, userId: string) {
+  private async assertAssignedOperator(
+    orderId: string,
+    userId: string,
+    staffRole: string,
+  ) {
+    const assignment = await this.prisma.fulfillmentAssignment.findFirst({
+      where: {
+        orderId,
+        status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+        ...(staffRole === "SUPER_ADMIN" ? {} : { assignedToUserId: userId }),
+      },
+    })
+    if (!assignment && staffRole !== "SUPER_ADMIN") {
+      throw new ForbiddenException(
+        "Only the assigned Operations user can progress this order",
+      )
+    }
+    return assignment
+  }
+
+  async acceptOrder(orderId: string, userId: string, staffRole: string) {
     const order = await this.assertPlatformOrder(orderId)
+    await this.assertAssignedOperator(orderId, userId, staffRole)
     if (order.status !== "SUBMITTED")
       throw new BadRequestException("Order must be SUBMITTED to accept")
+    await this.cancellation.assertNoActiveCancellation(orderId)
+
+    const acceptedAt = new Date()
+    const fulfillmentDueAt = order.turnaroundDays
+      ? new Date(acceptedAt.getTime() + order.turnaroundDays * 86_400_000)
+      : null
 
     const updated = await this.transition(orderId, order.version, "SUBMITTED", {
       status: "ACCEPTED",
       assigneeId: userId,
+      acceptedAt,
+      fulfillmentDueAt,
     })
 
     await this.prisma.orderEvent.create({
@@ -97,13 +129,20 @@ export class OrderOperationsService {
     return updated
   }
 
-  async submitContent(orderId: string, userId: string, content?: string) {
+  async submitContent(
+    orderId: string,
+    userId: string,
+    staffRole: string,
+    content?: string,
+  ) {
     const order = await this.assertPlatformOrder(orderId)
+    await this.assertAssignedOperator(orderId, userId, staffRole)
     if (order.status !== "ACCEPTED" && order.status !== "CONTENT_REQUESTED") {
       throw new BadRequestException(
         "Order must be ACCEPTED or CONTENT_REQUESTED to submit content",
       )
     }
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     const updated = await this.transition(
       orderId,
@@ -147,10 +186,12 @@ export class OrderOperationsService {
     return updated
   }
 
-  async markContentReady(orderId: string, userId: string) {
+  async markContentReady(orderId: string, userId: string, staffRole: string) {
     const order = await this.assertPlatformOrder(orderId)
+    await this.assertAssignedOperator(orderId, userId, staffRole)
     if (order.status !== "CONTENT_CREATION")
       throw new BadRequestException("Order must be in CONTENT_CREATION status")
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     const updated = await this.transition(
       orderId,
@@ -182,12 +223,14 @@ export class OrderOperationsService {
     return updated
   }
 
-  async submitForReview(orderId: string, userId: string) {
+  async submitForReview(orderId: string, userId: string, staffRole: string) {
     const order = await this.assertPlatformOrder(orderId)
+    await this.assertAssignedOperator(orderId, userId, staffRole)
     if (order.status !== "CONTENT_READY")
       throw new BadRequestException(
         "Order must be CONTENT_READY to submit for review",
       )
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     const updated = await this.transition(
       orderId,
@@ -232,6 +275,7 @@ export class OrderOperationsService {
   async markPublished(
     orderId: string,
     userId: string,
+    staffRole: string,
     publishedUrl: string,
     extra: {
       articleTitle?: string
@@ -240,21 +284,14 @@ export class OrderOperationsService {
     } = {},
   ) {
     const order = await this.assertPlatformOrder(orderId)
+    const assignment = await this.assertAssignedOperator(
+      orderId,
+      userId,
+      staffRole,
+    )
     if (order.status !== "APPROVED")
       throw new BadRequestException("Order must be APPROVED to mark published")
-
-    const assignment = await this.prisma.fulfillmentAssignment.findFirst({
-      where: {
-        orderId,
-        assignedToUserId: userId,
-        status: { in: ["ASSIGNED", "IN_PROGRESS"] },
-      },
-    })
-    if (!assignment) {
-      throw new BadRequestException(
-        "You must be assigned this order before submitting a delivery",
-      )
-    }
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     const version = await this.delivery.submitDelivery(order, userId, {
       publishedUrl,
@@ -262,18 +299,20 @@ export class OrderOperationsService {
     })
 
     // Mark the assignment delivered (version-guarded)
-    const delivered = await this.prisma.fulfillmentAssignment.updateMany({
-      where: { id: assignment.id, version: assignment.version },
-      data: {
-        status: "DELIVERED",
-        completedAt: new Date(),
-        version: { increment: 1 },
-      },
-    })
-    if (delivered.count === 0) {
-      throw new ConflictException(
-        "Assignment was modified by another request. Retry.",
-      )
+    if (assignment) {
+      const delivered = await this.prisma.fulfillmentAssignment.updateMany({
+        where: { id: assignment.id, version: assignment.version },
+        data: {
+          status: "DELIVERED",
+          completedAt: new Date(),
+          version: { increment: 1 },
+        },
+      })
+      if (delivered.count === 0) {
+        throw new ConflictException(
+          "Assignment was modified by another request. Retry.",
+        )
+      }
     }
 
     void version

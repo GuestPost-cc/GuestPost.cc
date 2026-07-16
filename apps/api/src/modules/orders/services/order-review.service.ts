@@ -20,6 +20,7 @@ import {
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
+import { OrderCancellationService } from "./order-cancellation.service"
 
 @Injectable()
 export class OrderReviewService {
@@ -29,6 +30,7 @@ export class OrderReviewService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly queue: QueueService,
+    private readonly cancellation: OrderCancellationService,
   ) {}
 
   // Customer review for a completed order. One per order. Recomputes the
@@ -161,6 +163,7 @@ export class OrderReviewService {
         "Order must be in CUSTOMER_REVIEW to approve content",
       )
     }
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     const membership = await this.prisma.membership.findFirst({
       where: { organizationId, userId },
@@ -216,6 +219,7 @@ export class OrderReviewService {
         "Order must be in CUSTOMER_REVIEW to request revision",
       )
     }
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     // Phase 7: revision-rounds cap moved off the deprecated listing-level
     // column onto the snapshotted ListingService. We read the SAME row the
@@ -283,6 +287,7 @@ export class OrderReviewService {
         "Order must be VERIFIED before confirming delivery",
       )
     }
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     const membership = await this.prisma.membership.findFirst({
       where: { organizationId, userId },
@@ -320,7 +325,7 @@ export class OrderReviewService {
           "Order was modified by another request. Retry.",
         )
       }
-      const fresh = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
+      let fresh = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
 
       await tx.orderEvent.create({
         data: {
@@ -332,6 +337,7 @@ export class OrderReviewService {
       })
 
       await this.createSettlementForOrder(tx, orderId)
+      fresh = await tx.order.findUniqueOrThrow({ where: { id: orderId } })
 
       await this.audit.log(
         {
@@ -355,6 +361,7 @@ export class OrderReviewService {
   }
 
   async createSettlementForOrder(tx: any, orderId: string) {
+    await this.cancellation.assertNoActiveCancellation(orderId, tx)
     const existingSettlement = await tx.settlement.findFirst({
       where: { orderId, status: { not: "CANCELLED" } },
     })
@@ -393,27 +400,42 @@ export class OrderReviewService {
       const existingRevenue = await tx.platformRevenue.findUnique({
         where: { orderId },
       })
-      if (existingRevenue) return
+      if (!existingRevenue) {
+        const feeFraction = await resolvePlatformFeeFraction(tx)
+        const { fee: platformFee, net: netRevenue } = splitPlatformFee(
+          order.amount,
+          feeFraction,
+        )
 
-      const feeFraction = await resolvePlatformFeeFraction(tx)
-      const { fee: platformFee, net: netRevenue } = splitPlatformFee(
-        order.amount,
-        feeFraction,
-      )
+        await tx.platformRevenue.create({
+          data: {
+            orderId,
+            amount: order.amount,
+            platformFee,
+            netRevenue,
+            recordedAt: new Date(),
+            // Phase 6 snapshots — frozen at recognition time.
+            listingServiceId: snapshotLsId,
+            serviceType: snapshotServiceType,
+            ownerType: snapshotOwnerType,
+            fulfillmentChannel: "PLATFORM",
+            unitPrice: snapshotUnitPrice,
+          },
+        })
+      }
 
-      await tx.platformRevenue.create({
+      const warrantyEndsAt = order.warrantyDays
+        ? new Date(
+            (order.deliveredAt?.getTime() ?? Date.now()) +
+              order.warrantyDays * 86_400_000,
+          )
+        : null
+      await tx.order.updateMany({
+        where: { id: orderId, status: "DELIVERED" },
         data: {
-          orderId,
-          amount: order.amount,
-          platformFee,
-          netRevenue,
-          recordedAt: new Date(),
-          // Phase 6 snapshots — frozen at recognition time.
-          listingServiceId: snapshotLsId,
-          serviceType: snapshotServiceType,
-          ownerType: snapshotOwnerType,
-          fulfillmentChannel: "PLATFORM",
-          unitPrice: snapshotUnitPrice,
+          status: "COMPLETED",
+          warrantyEndsAt,
+          version: { increment: 1 },
         },
       })
       return

@@ -58,6 +58,7 @@ interface RawOrderItem {
 
 interface RawOrder {
   id: string
+  version: number
   type: ServiceType
   status: OrderStatus
   amount: string | number | null
@@ -97,12 +98,15 @@ interface RawOrder {
   }>
   settlements?: unknown[]
   dispute?: unknown
+  fulfillmentChannel?: "PUBLISHER" | "PLATFORM" | null
+  cancellationRequests?: CancellationRequestResponse[]
   createdAt: string
   updatedAt: string
 }
 
 export interface OrderResponse {
   id: string
+  version: number
   type: ServiceType
   status: OrderStatus
   paymentStatus: string
@@ -163,6 +167,82 @@ export interface OrderResponse {
   deliveryAcceptedMethod: string | null
   settlements?: unknown[]
   dispute?: unknown
+  fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
+  cancellationRequests: CancellationRequestResponse[]
+}
+
+export type CancellationReasonCode =
+  | "CUSTOMER_CHANGED_MIND"
+  | "CAMPAIGN_CHANGED"
+  | "DUPLICATE_ORDER"
+  | "CAPACITY_UNAVAILABLE"
+  | "TOPIC_UNSUITABLE"
+  | "WEBSITE_UNAVAILABLE"
+  | "PRICING_ERROR"
+  | "POLICY_CONFLICT"
+  | "MISSED_DEADLINE"
+  | "QUALITY_FAILURE"
+  | "PLATFORM_ERROR"
+  | "LEGAL_OR_SECURITY_EMERGENCY"
+  | "OTHER"
+
+export interface CancellationMutationData {
+  reasonCode: CancellationReasonCode
+  note?: string
+  expectedVersion: number
+  idempotencyKey?: string
+}
+
+export type CancellationRequestStatus =
+  | "REQUESTED"
+  | "UNDER_REVIEW"
+  | "PENDING_FINANCE"
+  | "ESCALATED"
+  | "APPROVED"
+  | "REJECTED"
+  | "DISPUTED"
+
+export interface CancellationRequestResponse {
+  id: string
+  orderId: string
+  requesterType: "CUSTOMER" | "PUBLISHER" | "STAFF" | "SYSTEM"
+  reasonCode: CancellationReasonCode
+  note: string | null
+  status: CancellationRequestStatus
+  responsibility: string
+  responseDeadlineAt: string | null
+  responseNote: string | null
+  createdAt: string
+}
+
+export interface CancellationPreviewResponse {
+  orderId: string
+  status: OrderStatus
+  expectedVersion: number
+  actorCanMutate: boolean
+  fulfillmentChannel: "PUBLISHER" | "PLATFORM"
+  action:
+    | "CANCEL_NOW"
+    | "DECLINE_NOW"
+    | "REQUEST_CANCELLATION"
+    | "OPEN_DISPUTE"
+    | "NOT_ALLOWED"
+  refundRequired: boolean
+  requiresCounterpartyResponse: boolean
+  requiresStaffReview: boolean
+  message: string
+  refund: {
+    type: "FULL" | "NONE"
+    amount: number
+    currency: string
+    destination: "WALLET" | null
+  }
+  activeRequest: CancellationRequestResponse | null
+  deadlines: {
+    fulfillmentDueAt: string | null
+    warrantyEndsAt: string | null
+    fulfillmentOverdue: boolean
+  }
 }
 
 // Single mapping from the real API payload to the client contract — the type
@@ -172,6 +252,7 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
   const orderWebsite = raw.website ?? null
   return {
     id: raw.id,
+    version: raw.version,
     type: raw.type,
     status: raw.status,
     paymentStatus: raw.paymentStatus,
@@ -231,6 +312,8 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
     })),
     settlements: raw.settlements,
     dispute: raw.dispute,
+    fulfillmentChannel: raw.fulfillmentChannel ?? null,
+    cancellationRequests: raw.cancellationRequests ?? [],
   }
 }
 
@@ -263,28 +346,6 @@ export class OrdersService {
     return normalizeOrder(raw)
   }
 
-  updateStatus(
-    id: string,
-    status: OrderStatus,
-    metadata?: Record<string, unknown>,
-  ) {
-    return this.transitionStatus(id, status, metadata)
-  }
-
-  async transitionStatus(
-    id: string,
-    status: OrderStatus,
-    metadata?: Record<string, unknown>,
-  ) {
-    const raw = await this.client.patch<RawOrder>(`/orders/${id}/status`, {
-      json: { status, ...(metadata ? { metadata } : {}) } as Record<
-        string,
-        unknown
-      >,
-    })
-    return normalizeOrder(raw)
-  }
-
   getEvents(id: string) {
     return this.client.get<
       Array<{ id: string; eventType: OrderEventType; createdAt: string }>
@@ -303,15 +364,49 @@ export class OrdersService {
     return normalizeOrder(raw)
   }
 
-  async cancel(id: string) {
-    const raw = await this.client.post<RawOrder>(`/orders/${id}/cancel`)
+  cancellationPreview(id: string) {
+    return this.client.get<CancellationPreviewResponse>(
+      `/orders/${id}/cancellation-preview`,
+    )
+  }
+
+  async cancel(id: string, data: CancellationMutationData) {
+    const raw = await this.client.post<RawOrder>(`/orders/${id}/cancel`, {
+      json: data as unknown as Record<string, unknown>,
+    })
     return normalizeOrder(raw)
+  }
+
+  requestCancellation(id: string, data: CancellationMutationData) {
+    return this.client.post<CancellationRequestResponse>(
+      `/orders/${id}/cancellation-requests`,
+      { json: data as unknown as Record<string, unknown> },
+    )
+  }
+
+  respondToCancellation(
+    orderId: string,
+    requestId: string,
+    action: "ACCEPT" | "CONTEST",
+    note?: string,
+  ) {
+    return this.client.post<CancellationRequestResponse>(
+      `/orders/${orderId}/cancellation-requests/${requestId}/respond`,
+      { json: { action, note } },
+    )
   }
 
   // ─── Publisher fulfillment actions ───────────────────────
 
   async accept(id: string) {
     const raw = await this.client.post<RawOrder>(`/orders/${id}/accept`)
+    return normalizeOrder(raw)
+  }
+
+  async decline(id: string, data: CancellationMutationData) {
+    const raw = await this.client.post<RawOrder>(`/orders/${id}/decline`, {
+      json: data as unknown as Record<string, unknown>,
+    })
     return normalizeOrder(raw)
   }
 

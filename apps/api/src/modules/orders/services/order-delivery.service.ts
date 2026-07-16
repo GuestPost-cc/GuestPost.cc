@@ -14,6 +14,7 @@ import {
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
 import { QueueService } from "../../queues/queue.service"
+import { OrderCancellationService } from "./order-cancellation.service"
 import { OrderReviewService } from "./order-review.service"
 import { assertOwnerOrCreator } from "./owner-or-creator"
 
@@ -37,6 +38,7 @@ export class OrderDeliveryService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
     private readonly orderReview: OrderReviewService,
+    private readonly cancellation: OrderCancellationService,
   ) {}
 
   // Validate + normalize a published URL. Throws on empty/placeholder/invalid.
@@ -80,6 +82,7 @@ export class OrderDeliveryService {
       screenshotUrl?: string
     },
   ) {
+    await this.cancellation.assertNoActiveCancellation(order.id)
     const { publishedUrl, normalizedUrl } = this.validatePublishedUrl(
       dto.publishedUrl,
     )
@@ -290,6 +293,7 @@ export class OrderDeliveryService {
         "Order is not awaiting delivery confirmation",
       )
     }
+    await this.cancellation.assertNoActiveCancellation(orderId)
 
     return this.prisma.$transaction(async (tx: any) => {
       const upd = await tx.orderDeliveryVersion.updateMany({
@@ -388,8 +392,12 @@ export class OrderDeliveryService {
       // Create settlement with computed release policy — same as the
       // confirmDelivery path uses via OrderReviewService.
       await this.orderReview.createSettlementForOrder(tx, orderId)
+      const completed = await tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        select: { status: true },
+      })
 
-      return { status: "DELIVERED", acceptedBy: "customer" }
+      return { status: completed.status, acceptedBy: "customer" }
     })
   }
 

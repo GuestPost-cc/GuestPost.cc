@@ -6,6 +6,7 @@ import { DeliveriesController } from "./deliveries.controller"
 import { OrdersController } from "./orders.controller"
 import { OrdersService } from "./orders.service"
 import { DeliveryInterventionService } from "./services/delivery-intervention.service"
+import { OrderCancellationService } from "./services/order-cancellation.service"
 import { OrderDeliveryService } from "./services/order-delivery.service"
 import { OrderDisputeService } from "./services/order-dispute.service"
 import { OrderFulfillmentService } from "./services/order-fulfillment.service"
@@ -21,6 +22,7 @@ import { RefundService } from "./services/refund.service"
   providers: [
     OrdersService,
     OrderPaymentService,
+    OrderCancellationService,
     OrderFulfillmentService,
     OrderReviewService,
     OrderDisputeService,
@@ -32,6 +34,7 @@ import { RefundService } from "./services/refund.service"
   ],
   exports: [
     OrdersService,
+    OrderCancellationService,
     OrderDisputeService,
     RefundService,
     OrderOperationsService,

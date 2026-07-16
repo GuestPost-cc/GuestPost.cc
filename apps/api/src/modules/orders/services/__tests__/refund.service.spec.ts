@@ -6,6 +6,7 @@ describe("RefundService", () => {
   let service: RefundService
   let prismaMock: any
   let auditMock: any
+  let queueMock: any
 
   const baseOrder = {
     id: "order-1",
@@ -14,7 +15,7 @@ describe("RefundService", () => {
     paymentStatus: "PAID",
     amount: new Decimal(100),
     version: 3,
-    website: { ownershipType: "PUBLISHER" },
+    website: { ownershipType: "PUBLISHER", publisherId: "pub-1" },
   }
 
   const wallet = { id: "wallet-1", organizationId: "org-1", version: 1 }
@@ -31,7 +32,7 @@ describe("RefundService", () => {
       },
       transaction: {
         findFirst: jest.fn().mockResolvedValue(null),
-        create: jest.fn().mockResolvedValue({}),
+        create: jest.fn().mockResolvedValue({ id: "refund-tx-1" }),
       },
       settlement: {
         findFirst: jest.fn().mockResolvedValue(null),
@@ -40,6 +41,9 @@ describe("RefundService", () => {
       platformRevenue: {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         delete: jest.fn(),
+      },
+      fulfillmentAssignment: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       publisherBalance: {
         findUnique: jest.fn(),
@@ -58,7 +62,7 @@ describe("RefundService", () => {
         .fn()
         .mockImplementation(async (cb: any) => cb(prismaMock)),
     }
-    const queueMock = {
+    queueMock = {
       enqueueTrustRecompute: jest.fn().mockResolvedValue(undefined),
     }
     service = new RefundService(
@@ -73,7 +77,9 @@ describe("RefundService", () => {
     prismaMock.transaction.findFirst.mockResolvedValue({ id: "tx-existing" })
 
     await expect(
-      service.refundOrder("order-1", "dup", "admin-1"),
+      service.refundOrder("order-1", "dup", "admin-1", undefined, {
+        responsibility: "SYSTEM",
+      }),
     ).rejects.toThrow(BadRequestException)
     expect(prismaMock.wallet.updateMany).not.toHaveBeenCalled()
   })
@@ -84,7 +90,9 @@ describe("RefundService", () => {
       website: { ownershipType: "PLATFORM" },
     })
 
-    await service.refundOrder("order-1", "bad content", "admin-1")
+    await service.refundOrder("order-1", "bad content", "admin-1", undefined, {
+      responsibility: "PLATFORM",
+    })
 
     expect(prismaMock.platformRevenue.updateMany).toHaveBeenCalledWith({
       where: { orderId: "order-1", reversedAt: null },
@@ -104,7 +112,9 @@ describe("RefundService", () => {
       publisherAmount: new Decimal(80),
     })
 
-    await service.refundOrder("order-1", "cancelled", "admin-1")
+    await service.refundOrder("order-1", "cancelled", "admin-1", undefined, {
+      responsibility: "PUBLISHER",
+    })
 
     expect(prismaMock.settlement.updateMany).toHaveBeenCalledWith({
       where: { id: "set-1", version: 0 },
@@ -137,7 +147,9 @@ describe("RefundService", () => {
       },
     ])
 
-    await service.refundOrder("order-1", "dispute", "admin-1")
+    await service.refundOrder("order-1", "dispute", "admin-1", undefined, {
+      responsibility: "PUBLISHER",
+    })
 
     const balanceCall = prismaMock.publisherBalance.updateMany.mock.calls[0][0]
     expect(
@@ -153,6 +165,10 @@ describe("RefundService", () => {
     expect(clawbackTx).toBeDefined()
     expect(clawbackTx[0].data.amount.equals(new Decimal(-80))).toBe(true)
     expect(clawbackTx[0].data.reference).toBe("clawback-order-1")
+    expect(prismaMock.settlement.updateMany).toHaveBeenCalledWith({
+      where: { id: "set-1", status: "RELEASED", version: 2 },
+      data: { status: "CANCELLED", version: { increment: 1 } },
+    })
   })
 
   it("records remainder as debt when publisher already withdrew", async () => {
@@ -173,7 +189,9 @@ describe("RefundService", () => {
       },
     ])
 
-    await service.refundOrder("order-1", "dispute", "admin-1")
+    await service.refundOrder("order-1", "dispute", "admin-1", undefined, {
+      responsibility: "PUBLISHER",
+    })
 
     const balanceCall = prismaMock.publisherBalance.updateMany.mock.calls[0][0]
     expect(
@@ -199,7 +217,47 @@ describe("RefundService", () => {
       paymentStatus: "PENDING",
     })
     await expect(
-      service.refundOrder("order-1", "x", "admin-1"),
+      service.refundOrder("order-1", "x", "admin-1", undefined, {
+        responsibility: "SYSTEM",
+      }),
     ).rejects.toThrow(BadRequestException)
+  })
+
+  it("requires explicit final responsibility", async () => {
+    await expect(
+      (service.refundOrder as any)("order-1", "x", "admin-1"),
+    ).rejects.toThrow("final refund responsibility")
+  })
+
+  it("cancels active assignments and only penalizes publisher-attributed refunds", async () => {
+    prismaMock.order.findUnique.mockResolvedValue(baseOrder)
+
+    await service.refundOrder(
+      "order-1",
+      "publisher missed deadline",
+      "admin-1",
+      undefined,
+      { responsibility: "PUBLISHER" },
+    )
+
+    expect(prismaMock.fulfillmentAssignment.updateMany).toHaveBeenCalledWith({
+      where: {
+        orderId: "order-1",
+        status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+      },
+      data: { status: "CANCELLED", version: { increment: 1 } },
+    })
+    expect(prismaMock.order.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          refundResponsibility: "PUBLISHER",
+        }),
+      }),
+    )
+    expect(queueMock.enqueueTrustRecompute).toHaveBeenCalledWith(
+      "pub-1",
+      "REFUND_ISSUED",
+      expect.stringContaining("publisher-attributed"),
+    )
   })
 })

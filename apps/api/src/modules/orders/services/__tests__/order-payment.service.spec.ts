@@ -128,7 +128,12 @@ describe("OrderPaymentService", () => {
         }),
       )
       expect(prismaMock.order.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: "SUBMITTED" } }),
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: "SUBMITTED",
+            submittedAt: expect.any(Date),
+          }),
+        }),
       )
       expect(result.status).toBe("SUBMITTED")
       expect(auditMock.log).toHaveBeenCalledWith(

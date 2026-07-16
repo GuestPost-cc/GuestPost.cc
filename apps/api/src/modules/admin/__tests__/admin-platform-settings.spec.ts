@@ -25,7 +25,6 @@ describe("AdminService — PlatformSettings (FIN-08)", () => {
   let prismaMock: any
   let auditMock: any
   let queueMock: any
-  let refundMock: any
 
   const settingsRow = {
     id: "ps-1",
@@ -36,7 +35,6 @@ describe("AdminService — PlatformSettings (FIN-08)", () => {
   beforeEach(() => {
     auditMock = { log: jest.fn().mockResolvedValue(undefined) }
     queueMock = { addJob: jest.fn().mockResolvedValue(undefined) }
-    refundMock = { refund: jest.fn() }
     prismaMock = {
       platformSettings: {
         findFirst: jest.fn().mockResolvedValue(settingsRow),
@@ -52,7 +50,6 @@ describe("AdminService — PlatformSettings (FIN-08)", () => {
       prismaMock as any,
       auditMock as any,
       queueMock as any,
-      refundMock as any,
     )
   })
 

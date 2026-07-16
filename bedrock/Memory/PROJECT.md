@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-07-16
+updated: 2026-07-17
 ---
 
 # GuestPost.cc
@@ -36,13 +36,13 @@ Open/partial items require architectural design discussion.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 754 unit tests + integration tests
+- **apps/api** — NestJS REST API, 805 unit tests + integration tests
 - **apps/worker** — BullMQ queue processor
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard
 - **apps/publisher** — Publisher dashboard
 - **apps/website** — Public marketing site
-- **packages/shared** — Shared utilities (29 tests)
+- **packages/shared** — Shared utilities (72 tests)
 - **packages/database** — Prisma schema + migrations
 - **packages/ui** — Shared component library
 - **packages/api-client** — Generated API client
@@ -57,6 +57,11 @@ Open/partial items require architectural design discussion.
 - Job signing with configurable secret (QUEUE_SIGNING_SECRET / JWT_SECRET fallback)
 - Publisher integrations are a top-level dashboard area at `/dashboard/integrations`, separate from Settings; sidebar active-state matching uses path-segment boundaries to avoid selecting Settings for integration pages.
 - Publisher website ownership is proven via DNS TXT verification, not Google Search Console. GSC links search performance data after OAuth. DNS verification jobs require the worker queue process, and GSC OAuth requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, plus an authorized redirect URI matching `${API_BASE_URL}/integrations/GOOGLE_SEARCH_CONSOLE/callback`.
+- Order cancellation is a dedicated domain workflow, not a generic status mutation. `packages/shared/src/order-cancellation-policy.ts` owns the stage/channel decision matrix and `OrderCancellationRequest` retains structured case history.
+- Pre-acceptance exits are immediate; accepted work requires counterparty consent or Operations review plus Finance approval; published/delivered/completed work uses the dispute path. An active case holds fulfillment and increments `Order.version` to close transition races. Publisher actions require a publisher owner, and platform-fulfiller actions require the assigned Operations user (or Super Admin).
+- Paid refunds use one transaction-aware path that reverses platform revenue or publisher settlement, cancels active assignments, credits the organization wallet, transitions the order, and writes ledger/event/audit records together. `Order.refundResponsibility` prevents platform/customer-attributed refunds from lowering publisher trust.
+- Platform-fulfilled orders create platform revenue and complete directly rather than creating publisher settlements. Worker sweeps enforce the acceptance and cancellation-response deadlines. Dispute refunds require Finance/Super Admin plus explicit responsibility rather than inferring fault from the listing channel.
+- Prisma migrations are an API/worker release prerequisite. Generate the client from the migrated schema, apply migrations before serving requests that select new fields, and verify `prisma migrate status` during the release; otherwise shared reads such as order and billing queries can fail together with HTTP 500 responses.
 
 ## Seed Script (`scripts/seed.ts`)
 

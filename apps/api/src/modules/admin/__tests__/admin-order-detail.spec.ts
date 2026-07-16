@@ -10,7 +10,7 @@ describe("AdminService — order detail", () => {
       order: { findUnique: jest.fn() },
       user: { findMany: jest.fn() },
     }
-    service = new AdminService(prisma, {} as any, {} as any, {} as any)
+    service = new AdminService(prisma, {} as any, {} as any)
   })
 
   it("enriches human settlement approvers and preserves approval timestamps", async () => {

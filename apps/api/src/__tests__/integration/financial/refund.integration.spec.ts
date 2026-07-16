@@ -51,6 +51,7 @@ describe("[INTEGRATION] Financial — full refund after settlement release", () 
         "Integration test refund",
         ctx.customer.user.id,
         idempotencyKey,
+        { responsibility: "SYSTEM" },
       )
       expect(refundedOrder.status).toBe(OrderStatus.REFUNDED)
 

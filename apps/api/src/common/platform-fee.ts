@@ -1,3 +1,4 @@
+import { resolvePlatformFeeFractionCore } from "@guestpost/shared"
 import { Decimal } from "@prisma/client/runtime/client"
 
 // Splits a gross amount into platform fee and net using exact Decimal math.
@@ -18,16 +19,8 @@ export function splitPlatformFee(
 // Source priority: PlatformSettings row → PLATFORM_FEE_PERCENT env → 20%.
 // Historical settlements are unaffected (rate is captured at creation time).
 export async function resolvePlatformFeeFraction(prisma: any): Promise<number> {
-  const envPct = Number(process.env.PLATFORM_FEE_PERCENT ?? 20)
-  let pct = envPct
-  try {
-    const settings = await prisma.platformSettings.findFirst()
-    const dbPct = Number(settings?.platformFeePct)
-    if (Number.isFinite(dbPct)) pct = dbPct
-  } catch {
-    // keep env/default fallback
-  }
-  if (!Number.isFinite(pct)) pct = 20
-  pct = Math.min(Math.max(pct, 0), 100)
-  return pct / 100
+  return resolvePlatformFeeFractionCore(
+    prisma,
+    process.env.PLATFORM_FEE_PERCENT,
+  )
 }
