@@ -89,7 +89,7 @@ export class SettlementsController {
   // Staff listing
   @Get()
   @UseGuards(StaffRolesGuard)
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
   list(@Query("take") take?: string, @Query("skip") skip?: string) {
     const t = Math.min(Math.max(parseInt(take ?? "50", 10) || 50, 1), 100)
     const s = Math.max(0, parseInt(skip ?? "0", 10) || 0)
@@ -102,7 +102,7 @@ export class SettlementsController {
   @ActorType("STAFF", "CUSTOMER")
   get(@Param("id") id: string, @CurrentUser() user: any) {
     if (user.userType === "STAFF") {
-      const allowed = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
+      const allowed = ["SUPER_ADMIN", "FINANCE"]
       if (!user.staffRole || !allowed.includes(user.staffRole)) {
         throw new ForbiddenException("Insufficient staff permissions")
       }

@@ -1,6 +1,7 @@
 import type {
   OrderStatus,
   ReconciliationReport,
+  ServiceType,
   SettlementStatus,
   TicketStatus,
   WithdrawalStatus,
@@ -30,6 +31,230 @@ export interface AdminUserResponse {
   staffRole: string | null
   banned: boolean
   createdAt: string
+}
+
+export type MoneyByCurrency = Record<string, number>
+
+export interface AdminStaffPerformanceItem {
+  id: string
+  email: string
+  name: string | null
+  banned: boolean
+  createdAt: string
+  staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
+  permissions: unknown
+  metrics: {
+    activeAssigned: number
+    totalAssigned: number
+    claimed: number
+    completed: number
+    salesByCurrency: MoneyByCurrency
+    financeApprovals: number
+    financeVolumeByCurrency: MoneyByCurrency
+    withdrawalsApproved: number
+    auditActions: number
+    lastActivityAt: string | null
+  }
+}
+
+export interface AdminStaffPerformanceResponse {
+  summary: {
+    totalStaff: number
+    superAdmins: number
+    operations: number
+    finance: number
+    activeAssignments: number
+    totalClaimed: number
+    salesByCurrency: MoneyByCurrency
+  }
+  items: AdminStaffPerformanceItem[]
+}
+
+export type OperationsInboxView =
+  | "active"
+  | "available"
+  | "waiting"
+  | "ready"
+  | "verification"
+  | "history"
+
+export type OperationsNextAction =
+  | "CLAIM"
+  | "ACCEPT"
+  | "CONTENT"
+  | "WAITING_CUSTOMER"
+  | "PUBLISH"
+  | "VERIFICATION"
+  | "CANCELLATION"
+  | "VIEW"
+
+export interface OperationsAssignmentResponse {
+  id: string
+  orderId: string
+  assignedToUserId: string
+  assignedByUserId: string
+  assignedAt: string
+  completedAt: string | null
+  status: "ASSIGNED" | "IN_PROGRESS" | "DELIVERED" | "CANCELLED"
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface OperationsInboxOrder {
+  id: string
+  type: ServiceType
+  title: string | null
+  status: OrderStatus
+  amount: string | number | null
+  currency: string
+  version: number
+  turnaroundDays: number | null
+  fulfillmentDueAt: string | null
+  createdAt: string
+  updatedAt: string
+  website: {
+    id: string
+    name: string | null
+    url: string
+    domain: string
+  } | null
+  customer: { id: string; name: string | null } | null
+  organization: { id: string; name: string } | null
+  fulfillmentAssignments: OperationsAssignmentResponse[]
+  activeDeliveryVersion: {
+    id: string
+    verificationStatus: string
+    verificationFailureReason: string | null
+    publishedUrl: string
+  } | null
+  cancellationRequests: CancellationRequestResponse[]
+  claimable: boolean
+  canProgress: boolean
+  nextAction: OperationsNextAction
+}
+
+export interface OperationsInboxResponse
+  extends PaginatedResponse<OperationsInboxOrder> {
+  summary: {
+    myActive: number
+    available: number
+    waitingCustomer: number
+    readyToPublish: number
+    overdue: number
+    verificationTotal: number
+    verificationIssues: number
+    totalAssigned: number
+    claimed: number
+    completed: number
+    salesByCurrency: MoneyByCurrency
+  } | null
+}
+
+export interface OperationsOrderDetail extends OperationsInboxOrder {
+  instructions: string | null
+  targetUrl: string | null
+  anchorText: string | null
+  publishedUrl: string | null
+  acceptedAt: string | null
+  briefData: Record<string, unknown> | null
+  items: Array<{
+    id: string
+    targetUrl: string | null
+    anchorText: string | null
+    website: { id: string; url: string; domain: string } | null
+  }>
+  contentOrder: {
+    id: string
+    title: string | null
+    brief: string | null
+    deliverable: string | null
+    status: string
+  } | null
+  revisions: Array<{
+    id: string
+    notes: string | null
+    status: string
+    createdAt: string
+  }>
+  events: AdminOrderTimelineEvent[]
+  activeDeliveryVersion:
+    | (OperationsInboxOrder["activeDeliveryVersion"] & {
+        evidence: Array<{
+          id: string
+          httpStatus: number
+          anchorFound: boolean
+          linkFound: boolean
+          targetUrlMatched: boolean
+          checkedAt: string
+        }>
+        fraudFlags: Array<{
+          id: string
+          type: string
+          details: unknown
+          createdAt: string
+        }>
+      })
+    | null
+  access: {
+    claimable: boolean
+    canProgress: boolean
+    readOnly: boolean
+  }
+}
+
+export interface AdminDeliveryVerificationQueueItem {
+  orderId: string
+  status: OrderStatus
+  title: string | null
+  amount: string | number | null
+  targetUrl: string | null
+  anchorText: string | null
+  createdAt: string
+  customer: { id: string; name: string | null; email: string } | null
+  website: {
+    id: string
+    name: string | null
+    url: string
+    domain: string | null
+    ownershipType: "PUBLISHER" | "PLATFORM"
+  } | null
+  publisher: {
+    id: string
+    name: string
+    email: string | null
+    tier: string
+  } | null
+  deliveryVersion: {
+    id: string
+    version: number
+    verificationStatus:
+      | "PENDING"
+      | "VERIFIED"
+      | "FAILED"
+      | "MANUAL_REVIEW"
+      | "RETRYING"
+    verificationFailureReason: string | null
+    publishedUrl: string
+    submittedAt: string
+    verificationVersion: number
+    adminOverrideReason: string | null
+    adminVerifiedNotes: string | null
+    evidence: {
+      httpStatus: number
+      resolvedUrl: string | null
+      anchorFound: boolean
+      linkFound: boolean
+      targetUrlMatched: boolean
+      redirectChain: unknown
+      checkedAt: string
+    } | null
+    fraudFlags: Array<{ type: string; details: unknown }>
+  } | null
+  priority: {
+    score: number
+    label: "CRITICAL" | "HIGH" | "MEDIUM" | "LOW"
+  }
 }
 
 export interface AdminOrderTimelineEvent {
@@ -208,6 +433,21 @@ export class AdminService {
       {
         params: params as Record<string, string | number | undefined>,
       } as RequestOptions,
+    )
+  }
+
+  createStaff(data: {
+    email: string
+    name: string
+    role: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE"
+    password: string
+  }) {
+    return this.client.post<AdminUserResponse>("/admin/staff", { json: data })
+  }
+
+  staffPerformance() {
+    return this.client.get<AdminStaffPerformanceResponse>(
+      "/admin/staff/performance",
     )
   }
 
@@ -674,11 +914,41 @@ export class AdminService {
   }
 
   // -- Delivery verification + fulfillment --
+  operationsInbox(params?: {
+    view?: OperationsInboxView
+    take?: number
+    skip?: number
+    search?: string
+    includeSummary?: boolean
+  }) {
+    return this.client.get<OperationsInboxResponse>("/operations/fulfillment", {
+      params: params as Record<string, string | number | boolean | undefined>,
+    } as RequestOptions)
+  }
+  operationsOrder(orderId: string) {
+    return this.client.get<OperationsOrderDetail>(
+      `/operations/fulfillment/${orderId}`,
+    )
+  }
   fulfillmentQueue() {
     return this.client.get<any[]>("/operations/fulfillment-queue")
   }
   claimOrder(orderId: string) {
     return this.client.post(`/orders/${orderId}/claim`)
+  }
+  acceptPlatformOrder(orderId: string) {
+    return this.client.post(`/admin/orders/${orderId}/accept`)
+  }
+  savePlatformContent(orderId: string, content: string) {
+    return this.client.post(`/admin/orders/${orderId}/submit-content`, {
+      json: { content },
+    })
+  }
+  submitPlatformContentForReview(orderId: string, content: string) {
+    return this.client.post(
+      `/admin/orders/${orderId}/submit-content-for-review`,
+      { json: { content } },
+    )
   }
   assignOrder(orderId: string, assignedToUserId: string) {
     return this.client.post(`/orders/${orderId}/assign`, {
@@ -972,7 +1242,9 @@ export class AdminService {
   // ── Phase 8 — Delivery verification queue (admin) ──
 
   listVerificationQueue() {
-    return this.client.get<any[]>("/admin/verification-queue")
+    return this.client.get<AdminDeliveryVerificationQueueItem[]>(
+      "/admin/verification-queue",
+    )
   }
 
   retryVerification(id: string) {

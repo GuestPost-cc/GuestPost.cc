@@ -371,6 +371,10 @@ export class OrdersService {
             status: "ASSIGNED",
           },
         })
+        await tx.order.update({
+          where: { id: order.id },
+          data: { assigneeId: snapshot.managedByUserId },
+        })
         autoAssignedToUserId = snapshot.managedByUserId
       }
 

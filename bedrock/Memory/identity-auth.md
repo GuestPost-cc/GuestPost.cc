@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: identity-auth
 project: guestpost-platform
-updated: 2026-07-16
+updated: 2026-07-17
 ---
 
 # Identity & Auth
@@ -48,6 +48,34 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 - `PublisherMembership` — PUBLISHER membership
 - `StaffMembership` — STAFF membership with explicit `permissions` JSON field for sensitive permissions (e.g., `FINANCIAL_DATA_DECRYPT`)
 - `ApiKey`, `Team`
+
+## Staff RBAC Contract (2026-07-17)
+
+- `SUPER_ADMIN` is the governance and break-glass role. Global Users,
+  Organizations, staff-role management, Operations roster, audit logs, and
+  cross-staff fulfillment assignment are Super Admin-only.
+- `OPERATIONS` owns platform inventory and fulfillment. It has no global Users,
+  Organizations, Publishers, Operations roster, or Finance directory access.
+  Platform-site reads and mutations are scoped to `managedByUserId`; fulfillment
+  reads are scoped to self-assigned or unassigned claimable platform orders.
+- `FINANCE` has no global Users or customer Organizations access. It can read
+  Publishers and owns settlements, withdrawals, payouts, revenue,
+  reconciliation, publisher tier, and platform-fee workflows.
+- Work-item responses may include the minimum customer, organization,
+  publisher, or assignee context needed for an authorized order, dispute,
+  cancellation, ticket, settlement, or withdrawal. This does not grant a
+  searchable global directory.
+- Sensitive payout decryption still requires explicit
+  `FINANCIAL_DATA_DECRYPT`; Super Admin does not bypass that permission.
+- Only Super Admin can create staff credential accounts. The staff form creates
+  `SUPER_ADMIN`, `OPERATIONS`, or `FINANCE` users with a Better Auth credential
+  account and active `StaffMembership`; it does not create customer or
+  publisher tenancy records. Customer and Publisher accounts remain signup
+  only and cannot be promoted through the staff role endpoint.
+- Self-suspension, self-demotion, removal of the last active Super Admin, and
+  deactivation or role change of an Operations member with active fulfillment
+  assignments are rejected server-side.
+- The complete matrix and implementation rules live in `docs/ADMIN_RBAC.md`.
 
 ## Frontend Auth Entry Points
 

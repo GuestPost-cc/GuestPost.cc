@@ -609,14 +609,30 @@ function FinancePageInner() {
 
   const [approveTarget, setApproveTarget] = useState<string | null>(null)
   const [approveReason, setApproveReason] = useState("")
+  const [forceApproval, setForceApproval] = useState(false)
 
   const approveSettlement = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
-      api.admin.forceApproveSettlement(id, reason),
+    mutationFn: ({
+      id,
+      reason,
+      force,
+    }: {
+      id: string
+      reason: string
+      force: boolean
+    }) =>
+      force
+        ? api.admin.forceApproveSettlement(id, reason)
+        : api.admin.approveSettlement(id, reason),
     onSuccess: () => {
-      toast.success("Settlement approved")
+      toast.success(
+        forceApproval
+          ? "Customer approval recorded by Super Admin"
+          : "Settlement approved and released",
+      )
       setApproveTarget(null)
       setApproveReason("")
+      setForceApproval(false)
       queryClient.invalidateQueries({ queryKey: ["settlements"] })
     },
     onError: (e: any) =>
@@ -856,19 +872,23 @@ function FinancePageInner() {
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right">
-                        {isSuperAdmin &&
-                          (s.status === "PENDING" ||
-                            s.status === "UNDER_REVIEW") && (
-                            <Button
-                              size="sm"
-                              onClick={() => {
-                                setApproveTarget(s.id)
-                                setApproveReason("")
-                              }}
-                            >
-                              Approve
-                            </Button>
-                          )}
+                        {(s.status === "CUSTOMER_APPROVED" ||
+                          (isSuperAdmin &&
+                            (s.status === "PENDING" ||
+                              s.status === "UNDER_REVIEW"))) && (
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              setApproveTarget(s.id)
+                              setApproveReason("")
+                              setForceApproval(s.status !== "CUSTOMER_APPROVED")
+                            }}
+                          >
+                            {s.status === "CUSTOMER_APPROVED"
+                              ? "Approve"
+                              : "Force customer approval"}
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1293,15 +1313,19 @@ function FinancePageInner() {
           if (!open) {
             setApproveTarget(null)
             setApproveReason("")
+            setForceApproval(false)
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Approve settlement</DialogTitle>
+            <DialogTitle>
+              {forceApproval ? "Force customer approval" : "Approve settlement"}
+            </DialogTitle>
             <DialogDescription>
-              Record a reason for approving this settlement. This is captured in
-              the audit trail.
+              {forceApproval
+                ? "This Super Admin action records the missing customer approval. Finance or Super Admin must still perform the final settlement approval afterward."
+                : "Record a reason for the final Finance approval. This releases eligible publisher funds and is captured in the audit trail."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
@@ -1324,6 +1348,7 @@ function FinancePageInner() {
               onClick={() => {
                 setApproveTarget(null)
                 setApproveReason("")
+                setForceApproval(false)
               }}
             >
               Cancel
@@ -1336,12 +1361,15 @@ function FinancePageInner() {
                 approveSettlement.mutate({
                   id: approveTarget!,
                   reason: approveReason.trim(),
+                  force: forceApproval,
                 })
               }
             >
               {approveSettlement.isPending
                 ? "Approving..."
-                : "Approve settlement"}
+                : forceApproval
+                  ? "Record customer approval"
+                  : "Approve and release"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -52,6 +52,7 @@ import { AdminService } from "./admin.service"
 import {
   BanUserDto,
   BulkRetryVerificationDto,
+  CreateStaffDto,
   ExecuteWithdrawalDto,
   ManualVerifyDto,
   MarkPlatformPublishedDto,
@@ -127,27 +128,25 @@ const parsePagination = (take?: string, skip?: string) => ({
 //   MUST add @StaffRoles(...). The lint sweep in __tests__/role-coverage.spec.ts
 //   asserts this contract at test time.
 //
-// Role-allocation guide (Finance retains the broad read access required for
-// refund / settlement / dispute / reconciliation work — narrower mutations
-// stay on the right team):
+// Role-allocation guide:
 //
 //   SUPER_ADMIN only          — high-blast-radius writes (force-cancel,
 //                                force-approve, staff-role changes, audit
-//                                logs, listing delete, tier override)
+//                                logs), global users / organizations, and
+//                                cross-staff assignment
 //   SUPER_ADMIN + FINANCE     — money writes (refund, settlement approve /
 //                                cancel, withdrawal lifecycle, payout
 //                                execute / decrypt) + Finance-only reads
-//                                (settlement detail, withdrawal detail)
+//                                (publishers, settlements, withdrawals)
 //   SUPER_ADMIN + OPERATIONS  — fulfillment + inventory writes (accept /
 //                                submit-content / mark-published, listing
 //                                moderation, listing service CRUD, website
 //                                management, manual verify, dispute resolve)
-//   ALL THREE                 — broad reads that every role legitimately
-//                                needs (users, orgs, orders, publishers,
-//                                marketplace listings/stats, support inbox).
-//                                Channel-aware filtering lives in the
-//                                respective services (see SupportService for
-//                                the canonical pattern).
+//   ALL THREE                 — contextual order, dispute, cancellation,
+//                                support, and platform-settings reads. These
+//                                may include the minimum customer / publisher
+//                                context needed to complete the work item, but
+//                                do not grant access to a global directory.
 @Controller("admin")
 @UseGuards(StaffRolesGuard)
 export class AdminController {
@@ -258,7 +257,7 @@ export class AdminController {
   }
 
   @Get("users")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN")
   listUsers(
     @Query("take") take?: string,
     @Query("skip") skip?: string,
@@ -280,8 +279,20 @@ export class AdminController {
     })
   }
 
+  @Post("staff")
+  @StaffRoles("SUPER_ADMIN")
+  createStaff(@Body() body: CreateStaffDto, @CurrentUser() user: any) {
+    return this.admin.createStaff(body, user)
+  }
+
+  @Get("staff/performance")
+  @StaffRoles("SUPER_ADMIN")
+  staffPerformance() {
+    return this.admin.staffPerformance()
+  }
+
   @Get("users/:id")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN")
   getUser(@Param("id") id: string, @CurrentUser() user?: any) {
     return this.admin.getUser(id, user)
   }
@@ -319,7 +330,7 @@ export class AdminController {
   }
 
   @Get("organizations")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN")
   listOrganizations(
     @Query("take") take?: string,
     @Query("skip") skip?: string,
@@ -555,9 +566,10 @@ export class AdminController {
     @Query("status") status?: string,
     @Query("take") take?: string,
     @Query("skip") skip?: string,
+    @CurrentUser() user?: any,
   ) {
     const p = parsePagination(take, skip)
-    return this.admin.listPlatformOrders(status, p.take, p.skip)
+    return this.admin.listPlatformOrders(status, p.take, p.skip, user)
   }
 
   @Post("orders/:id/accept")
@@ -575,6 +587,21 @@ export class AdminController {
   ) {
     const content = body.content
     return this.ops.submitContent(id, user.id, user.staffRole, content)
+  }
+
+  @Post("orders/:id/submit-content-for-review")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  submitPlatformContentForReview(
+    @Param("id") id: string,
+    @Body() body: SubmitPlatformContentDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.ops.submitContentForReview(
+      id,
+      user.id,
+      user.staffRole,
+      body.content,
+    )
   }
 
   @Post("orders/:id/mark-content-ready")
@@ -831,7 +858,7 @@ export class AdminController {
 
   // ── Publisher directory ─────────────────────────────────────────────────
   @Get("publishers")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
   listPublishers(
     @Query("search") search?: string,
     @Query("page") page?: string,
@@ -918,7 +945,7 @@ export class AdminController {
   }
 
   @Get("marketplace/listings")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   listMarketplaceListings(
     @Query("status") status?: string,
     @Query("type") type?: string,
@@ -938,14 +965,14 @@ export class AdminController {
   }
 
   @Get("marketplace/stats")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   getMarketplaceStats() {
     return this.admin.getMarketplaceStats()
   }
 
   // Staff listing preview — any status (for moderation of pending/draft/etc).
   @Get("marketplace/listings/by-slug/:slug")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   getListingForStaff(@Param("slug") slug: string) {
     return this.marketplace.getListingForStaff(slug)
   }
@@ -1081,13 +1108,13 @@ export class AdminController {
   // Deliberately lives outside /users/:id. The old /users/ops path was
   // shadowed by that earlier dynamic route, which treated "ops" as a user ID
   // and returned 404 before this handler could run.
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   @Get("staff/operations")
   listOpsStaff() {
     return this.admin.listOperationsStaff()
   }
 
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Get("websites")
   listWebsites(
     @Query("ownershipType") ownershipType?: string,
@@ -1098,10 +1125,10 @@ export class AdminController {
     return this.admin.listWebsites(ownershipType, p.take, p.skip, user)
   }
 
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Get("websites/:id")
-  getWebsite(@Param("id") id: string) {
-    return this.admin.getWebsite(id)
+  getWebsite(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.admin.getWebsite(id, user)
   }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")

@@ -32,10 +32,13 @@ export class AdminVerificationQueueService {
         website: {
           select: {
             id: true,
+            name: true,
             url: true,
+            domain: true,
+            ownershipType: true,
             publisherId: true,
             publisher: {
-              select: { tier: true },
+              select: { id: true, name: true, email: true, tier: true },
             },
           },
         },
@@ -72,10 +75,21 @@ export class AdminVerificationQueueService {
         anchorText: order.anchorText,
         createdAt: order.createdAt,
         customer: order.customer,
-        publisher: order.website
+        website: order.website
           ? {
-              id: order.website.publisherId,
-              tier: order.website.publisher?.tier ?? null,
+              id: order.website.id,
+              name: order.website.name,
+              url: order.website.url,
+              domain: order.website.domain,
+              ownershipType: order.website.ownershipType,
+            }
+          : null,
+        publisher: order.website?.publisher
+          ? {
+              id: order.website.publisher.id,
+              name: order.website.publisher.name,
+              email: order.website.publisher.email,
+              tier: order.website.publisher.tier,
             }
           : null,
         deliveryVersion: version

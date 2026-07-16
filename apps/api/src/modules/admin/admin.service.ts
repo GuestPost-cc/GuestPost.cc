@@ -1,3 +1,4 @@
+import { hashPassword } from "@better-auth/utils/password"
 import {
   ListingStatus,
   WebsiteOwnershipType,
@@ -7,6 +8,7 @@ import { StaffRole } from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
@@ -25,6 +27,16 @@ export class AdminService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
   ) {}
+
+  private async activeSuperAdminCount() {
+    return this.prisma.user.count({
+      where: {
+        userType: "STAFF",
+        banned: false,
+        staffMemberships: { some: { role: "SUPER_ADMIN" } },
+      },
+    })
+  }
 
   async listUsers(params: {
     take?: number
@@ -131,6 +143,283 @@ export class AdminService {
           }
         : null,
       staffRole: u.staffMemberships?.[0]?.role ?? null,
+    }
+  }
+
+  async createStaff(
+    data: {
+      email: string
+      name: string
+      role: StaffRole
+      password: string
+    },
+    actor: any,
+  ) {
+    const email = data.email.trim().toLowerCase()
+    const name = data.name.trim()
+    if (!name) throw new BadRequestException("Staff name is required")
+    if (!VALID_STAFF_ROLES.includes(data.role)) {
+      throw new BadRequestException(`Invalid staff role: ${data.role}`)
+    }
+
+    const password = await hashPassword(data.password)
+    try {
+      const created = await this.prisma.$transaction(async (tx: any) => {
+        const user = await tx.user.create({
+          data: {
+            email,
+            name,
+            emailVerified: true,
+            userType: "STAFF",
+          },
+        })
+        await tx.account.create({
+          data: {
+            accountId: user.id,
+            providerId: "credential",
+            userId: user.id,
+            password,
+          },
+        })
+        const membership = await tx.staffMembership.create({
+          data: { userId: user.id, role: data.role },
+        })
+        await this.audit.log(
+          {
+            action: "STAFF_CREATED",
+            entityType: "StaffMembership",
+            entityId: membership.id,
+            metadata: { userId: user.id, role: data.role },
+            userId: actor.id,
+            organizationId: null,
+          },
+          tx,
+        )
+        return { user, membership }
+      })
+      invalidateAuthContext(created.user.id)
+      return {
+        id: created.user.id,
+        email: created.user.email,
+        name: created.user.name,
+        userType: created.user.userType,
+        staffRole: created.membership.role,
+        banned: created.user.banned,
+        createdAt: created.user.createdAt,
+      }
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        throw new ConflictException("A user with this email already exists")
+      }
+      throw error
+    }
+  }
+
+  async staffPerformance() {
+    const staff = await this.prisma.user.findMany({
+      where: { userType: "STAFF" },
+      orderBy: [{ banned: "asc" }, { createdAt: "asc" }],
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        banned: true,
+        createdAt: true,
+        staffMemberships: { select: { role: true, permissions: true } },
+      },
+    })
+    const staffIds = staff.map((member) => member.id)
+    if (staffIds.length === 0) {
+      return {
+        summary: {
+          totalStaff: 0,
+          superAdmins: 0,
+          operations: 0,
+          finance: 0,
+          activeAssignments: 0,
+          totalClaimed: 0,
+          salesByCurrency: {},
+        },
+        items: [],
+      }
+    }
+
+    const [assignments, claimAudits, activity, approvals, withdrawals] =
+      await Promise.all([
+        this.prisma.fulfillmentAssignment.findMany({
+          where: { assignedToUserId: { in: staffIds } },
+          select: {
+            orderId: true,
+            assignedToUserId: true,
+            status: true,
+            order: {
+              select: { amount: true, currency: true, status: true },
+            },
+          },
+        }),
+        this.prisma.auditLog.findMany({
+          where: {
+            action: "ORDER_DELIVERY_ASSIGNED",
+            userId: { in: staffIds },
+          },
+          select: { userId: true, metadata: true },
+        }),
+        this.prisma.auditLog.groupBy({
+          by: ["userId"],
+          where: { userId: { in: staffIds } },
+          _count: { _all: true },
+          _max: { createdAt: true },
+        }),
+        this.prisma.settlementApproval.findMany({
+          where: { type: "ADMIN", approvedBy: { in: staffIds } },
+          select: {
+            approvedBy: true,
+            settlement: {
+              select: {
+                grossAmount: true,
+                order: { select: { currency: true } },
+              },
+            },
+          },
+        }),
+        this.prisma.withdrawal.findMany({
+          where: { approvedBy: { in: staffIds } },
+          select: { approvedBy: true },
+        }),
+      ])
+
+    const metricsByUser = new Map<string, any>()
+    const metricsFor = (userId: string) => {
+      let value = metricsByUser.get(userId)
+      if (!value) {
+        value = {
+          assignments: new Map<string, any>(),
+          claimed: 0,
+          financeApprovals: 0,
+          financeVolumeByCurrency: {} as Record<string, number>,
+          withdrawalsApproved: 0,
+          auditActions: 0,
+          lastActivityAt: null as Date | null,
+        }
+        metricsByUser.set(userId, value)
+      }
+      return value
+    }
+
+    for (const assignment of assignments) {
+      const metrics = metricsFor(assignment.assignedToUserId)
+      const existing = metrics.assignments.get(assignment.orderId)
+      if (!existing || assignment.status === "DELIVERED") {
+        metrics.assignments.set(assignment.orderId, assignment)
+      }
+    }
+    const claimedOrdersByUser = new Map<string, Set<string>>()
+    for (const entry of claimAudits) {
+      if (!entry.userId) continue
+      const metadata = entry.metadata as Record<string, unknown> | null
+      if (
+        metadata?.assignedToUserId === entry.userId &&
+        metadata.assignedByUserId === entry.userId &&
+        typeof metadata.orderId === "string"
+      ) {
+        const claimedOrders = claimedOrdersByUser.get(entry.userId) ?? new Set()
+        claimedOrders.add(metadata.orderId)
+        claimedOrdersByUser.set(entry.userId, claimedOrders)
+      }
+    }
+    for (const [userId, orderIds] of claimedOrdersByUser) {
+      metricsFor(userId).claimed = orderIds.size
+    }
+    for (const entry of activity) {
+      if (!entry.userId) continue
+      const metrics = metricsFor(entry.userId)
+      metrics.auditActions = entry._count._all
+      metrics.lastActivityAt = entry._max.createdAt
+    }
+    for (const approval of approvals) {
+      const metrics = metricsFor(approval.approvedBy)
+      const currency = approval.settlement.order.currency ?? "USD"
+      metrics.financeApprovals += 1
+      metrics.financeVolumeByCurrency[currency] =
+        (metrics.financeVolumeByCurrency[currency] ?? 0) +
+        Number(approval.settlement.grossAmount)
+    }
+    for (const withdrawal of withdrawals) {
+      if (!withdrawal.approvedBy) continue
+      metricsFor(withdrawal.approvedBy).withdrawalsApproved += 1
+    }
+
+    const items = staff.map((member) => {
+      const metrics = metricsFor(member.id)
+      const uniqueAssignments = [...metrics.assignments.values()] as any[]
+      const delivered = uniqueAssignments.filter(
+        (assignment) =>
+          assignment.status === "DELIVERED" &&
+          ["DELIVERED", "SETTLED", "COMPLETED"].includes(
+            assignment.order.status,
+          ),
+      )
+      const salesByCurrency: Record<string, number> = {}
+      for (const assignment of delivered) {
+        const currency = assignment.order.currency ?? "USD"
+        salesByCurrency[currency] =
+          (salesByCurrency[currency] ?? 0) +
+          Number(assignment.order.amount ?? 0)
+      }
+      return {
+        id: member.id,
+        email: member.email,
+        name: member.name,
+        banned: member.banned,
+        createdAt: member.createdAt,
+        staffRole: member.staffMemberships[0]?.role ?? null,
+        permissions: member.staffMemberships[0]?.permissions ?? [],
+        metrics: {
+          activeAssigned: uniqueAssignments.filter((assignment) =>
+            ["ASSIGNED", "IN_PROGRESS"].includes(assignment.status),
+          ).length,
+          totalAssigned: uniqueAssignments.length,
+          claimed: metrics.claimed,
+          completed: delivered.length,
+          salesByCurrency,
+          financeApprovals: metrics.financeApprovals,
+          financeVolumeByCurrency: metrics.financeVolumeByCurrency,
+          withdrawalsApproved: metrics.withdrawalsApproved,
+          auditActions: metrics.auditActions,
+          lastActivityAt: metrics.lastActivityAt,
+        },
+      }
+    })
+
+    const salesByCurrency: Record<string, number> = {}
+    for (const item of items) {
+      for (const [currency, amount] of Object.entries(
+        item.metrics.salesByCurrency,
+      )) {
+        salesByCurrency[currency] =
+          (salesByCurrency[currency] ?? 0) + Number(amount)
+      }
+    }
+
+    return {
+      summary: {
+        totalStaff: items.length,
+        superAdmins: items.filter((item) => item.staffRole === "SUPER_ADMIN")
+          .length,
+        operations: items.filter((item) => item.staffRole === "OPERATIONS")
+          .length,
+        finance: items.filter((item) => item.staffRole === "FINANCE").length,
+        activeAssignments: items.reduce(
+          (total, item) => total + item.metrics.activeAssigned,
+          0,
+        ),
+        totalClaimed: items.reduce(
+          (total, item) => total + item.metrics.claimed,
+          0,
+        ),
+        salesByCurrency,
+      },
+      items,
     }
   }
 
@@ -256,7 +545,11 @@ export class AdminService {
   async updateStaffRole(userId: string, role: string, user?: any) {
     const target = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!target) throw new NotFoundException("User not found")
-    invalidateAuthContext(userId)
+    if (target.userType !== "STAFF") {
+      throw new BadRequestException(
+        "Customer and publisher accounts cannot be converted to staff",
+      )
+    }
 
     if (!VALID_STAFF_ROLES.includes(role as StaffRole)) {
       throw new BadRequestException(`Invalid staff role: ${role}`)
@@ -265,22 +558,38 @@ export class AdminService {
     const existing = await this.prisma.staffMembership.findUnique({
       where: { userId },
     })
-
-    let result: any
-    if (existing) {
-      result = await this.prisma.staffMembership.update({
-        where: { id: existing.id },
-        data: { role: role as StaffRole },
-      })
-    } else {
-      result = await this.prisma.staffMembership.create({
-        data: { userId, role: role as StaffRole },
-      })
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { userType: "STAFF" },
-      })
+    if (!existing) throw new NotFoundException("Staff membership not found")
+    if (user?.id === userId && existing.role !== role) {
+      throw new ForbiddenException(
+        "A different Super Admin must change your staff role",
+      )
     }
+    if (
+      existing.role === "SUPER_ADMIN" &&
+      role !== "SUPER_ADMIN" &&
+      (await this.activeSuperAdminCount()) <= 1
+    ) {
+      throw new ConflictException("At least one active Super Admin is required")
+    }
+    if (existing.role === "OPERATIONS" && role !== "OPERATIONS") {
+      const activeAssignments = await this.prisma.fulfillmentAssignment.count({
+        where: {
+          assignedToUserId: userId,
+          status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+        },
+      })
+      if (activeAssignments > 0) {
+        throw new ConflictException(
+          "Reassign active fulfillment orders before changing this Operations role",
+        )
+      }
+    }
+
+    const result = await this.prisma.staffMembership.update({
+      where: { id: existing.id },
+      data: { role: role as StaffRole },
+    })
+    invalidateAuthContext(userId)
 
     await this.audit.log({
       action: "STAFF_ROLE_UPDATE",
@@ -297,6 +606,37 @@ export class AdminService {
   async banUser(userId: string, banned: boolean, user?: any) {
     const target = await this.prisma.user.findUnique({ where: { id: userId } })
     if (!target) throw new NotFoundException("User not found")
+    if (banned && user?.id === userId) {
+      throw new ForbiddenException("You cannot suspend your own account")
+    }
+    if (banned && target.userType === "STAFF") {
+      const membership = await this.prisma.staffMembership.findUnique({
+        where: { userId },
+      })
+      if (
+        membership?.role === "SUPER_ADMIN" &&
+        (await this.activeSuperAdminCount()) <= 1
+      ) {
+        throw new ConflictException(
+          "At least one active Super Admin is required",
+        )
+      }
+      if (membership?.role === "OPERATIONS") {
+        const activeAssignments = await this.prisma.fulfillmentAssignment.count(
+          {
+            where: {
+              assignedToUserId: userId,
+              status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+            },
+          },
+        )
+        if (activeAssignments > 0) {
+          throw new ConflictException(
+            "Reassign active fulfillment orders before suspending this Operations user",
+          )
+        }
+      }
+    }
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -454,8 +794,44 @@ export class AdminService {
     }
   }
 
-  async listPlatformOrders(status?: string, take = 50, skip = 0) {
-    const where: any = { website: { ownershipType: "PLATFORM" } }
+  async listPlatformOrders(status?: string, take = 50, skip = 0, user?: any) {
+    const activeAssignment = { status: { in: ["ASSIGNED", "IN_PROGRESS"] } }
+    const claimableStatuses = [
+      "SUBMITTED",
+      "ACCEPTED",
+      "CONTENT_REQUESTED",
+      "CONTENT_CREATION",
+      "CONTENT_READY",
+      "CUSTOMER_REVIEW",
+      "APPROVED",
+    ]
+    const where: any = {
+      OR: [
+        { fulfillmentChannel: "PLATFORM" },
+        { fulfillmentChannel: null, website: { ownershipType: "PLATFORM" } },
+      ],
+    }
+
+    if (status) where.status = status
+    if (user?.staffRole === "OPERATIONS") {
+      where.AND = [
+        {
+          OR: [
+            {
+              fulfillmentAssignments: {
+                some: { ...activeAssignment, assignedToUserId: user.id },
+              },
+            },
+            {
+              AND: [
+                { status: { in: claimableStatuses } },
+                { fulfillmentAssignments: { none: activeAssignment } },
+              ],
+            },
+          ],
+        },
+      ]
+    }
 
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
@@ -850,25 +1226,23 @@ export class AdminService {
     // them on every order to come. SUPER_ADMIN creates can pass an explicit
     // managedByUserId; if omitted the site stays NULL (shared Ops queue).
     let managedByUserId: string | null = null
-    if (dto.managedByUserId) {
+    if (user.staffRole === "OPERATIONS") {
+      // An Operations user always owns a site they enlist. They cannot assign
+      // a new site to another operator by crafting managedByUserId.
+      managedByUserId = user.id
+    } else if (dto.managedByUserId) {
       const target = await this.prisma.staffMembership.findUnique({
         where: { userId: dto.managedByUserId },
-        select: { role: true },
+        select: { role: true, user: { select: { banned: true } } },
       })
-      if (target?.role !== "OPERATIONS") {
+      if (target?.role !== "OPERATIONS" || target.user.banned) {
         throw new BadRequestException({
           code: "INVALID_OWNER",
-          message: "managedByUserId must reference an OPERATIONS staff member",
+          message:
+            "managedByUserId must reference an active OPERATIONS staff member",
         })
       }
       managedByUserId = dto.managedByUserId
-    } else {
-      // Auto-default when the creator is OPERATIONS themselves.
-      const creator = await this.prisma.staffMembership.findUnique({
-        where: { userId: user.id },
-        select: { role: true },
-      })
-      if (creator?.role === "OPERATIONS") managedByUserId = user.id
     }
 
     const website = await this.prisma.website.create({
@@ -966,12 +1340,13 @@ export class AdminService {
     if (body.managedByUserId) {
       const target = await this.prisma.staffMembership.findUnique({
         where: { userId: body.managedByUserId },
-        select: { role: true },
+        select: { role: true, user: { select: { banned: true } } },
       })
-      if (target?.role !== "OPERATIONS") {
+      if (target?.role !== "OPERATIONS" || target.user.banned) {
         throw new BadRequestException({
           code: "INVALID_OWNER",
-          message: "managedByUserId must reference an OPERATIONS staff member",
+          message:
+            "managedByUserId must reference an active OPERATIONS staff member",
         })
       }
       newOwnerId = body.managedByUserId
@@ -1013,6 +1388,20 @@ export class AdminService {
     }))
   }
 
+  private assertWebsiteManagementAccess(
+    website: { managedByUserId: string | null },
+    user: any,
+  ) {
+    if (
+      user?.staffRole === "OPERATIONS" &&
+      website.managedByUserId !== user.id
+    ) {
+      throw new ForbiddenException(
+        "Operations can only manage platform websites assigned to them",
+      )
+    }
+  }
+
   async updatePlatformWebsite(id: string, dto: any, user: any) {
     const website = await this.prisma.website.findUnique({ where: { id } })
     if (!website) throw new NotFoundException("Website not found")
@@ -1020,6 +1409,7 @@ export class AdminService {
       throw new BadRequestException(
         "Only platform websites can be updated via admin",
       )
+    this.assertWebsiteManagementAccess(website, user)
 
     const updated = await this.prisma.website.update({
       where: { id },
@@ -1119,9 +1509,14 @@ export class AdminService {
     }
   }
 
-  async getWebsite(id: string) {
-    const website = await this.prisma.website.findUnique({
-      where: { id },
+  async getWebsite(id: string, user?: any) {
+    const website = await this.prisma.website.findFirst({
+      where: {
+        id,
+        ...(user?.staffRole === "OPERATIONS"
+          ? { ownershipType: "PLATFORM", managedByUserId: user.id }
+          : {}),
+      },
       include: {
         marketplaceListings: {
           where: { status: { not: ListingStatus.ARCHIVED } },
@@ -1142,6 +1537,10 @@ export class AdminService {
   async pauseWebsite(id: string, paused: boolean, user: any) {
     const website = await this.prisma.website.findUnique({ where: { id } })
     if (!website) throw new NotFoundException("Website not found")
+    if (website.ownershipType !== "PLATFORM") {
+      throw new BadRequestException("Only platform websites can be paused")
+    }
+    this.assertWebsiteManagementAccess(website, user)
 
     const updated = await this.prisma.website.update({
       where: { id },
@@ -1179,6 +1578,7 @@ export class AdminService {
       throw new BadRequestException(
         "Only platform websites can be deleted via admin",
       )
+    this.assertWebsiteManagementAccess(website, user)
 
     const updated = await this.prisma.website.update({
       where: { id },

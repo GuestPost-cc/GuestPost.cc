@@ -3,6 +3,7 @@
 import type { OrderStatus } from "@guestpost/shared"
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -16,31 +17,40 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import {
   AlertCircle,
+  AlertTriangle,
+  ArrowRight,
   Building2,
+  CheckCircle2,
+  CircleDollarSign,
+  ClipboardList,
   Clock,
   CreditCard,
   DollarSign,
   ShoppingCart,
   TrendingDown,
   TrendingUp,
+  UserPlus,
   Users,
 } from "lucide-react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
 import { getOrderBadgeVariant } from "../../lib/order-status-badge-variant"
 
 interface Stats {
-  revenue: number
-  gmv: number
+  revenue: number | null
+  gmv: number | null
   activeOrders: number
-  publishers: number
-  customers: number
-  pendingVerifications: number
-  pendingWithdrawals: number
+  publishers: number | null
+  customers: number | null
+  pendingSettlements: number | null
+  pendingWithdrawals: number | null
 }
 
 interface RecentOrder {
@@ -97,13 +107,13 @@ function StatCard({
 }) {
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <CardHeader className="flex flex-row items-center justify-between px-4 pt-4 pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
         <Icon className="h-4 w-4 text-muted-foreground" />
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 pb-4">
         {loading ? (
           <Skeleton className="h-8 w-20" />
         ) : (
@@ -122,54 +132,72 @@ function StatCard({
 function KPICards({
   stats,
   loading,
+  canSeeFinance,
+  canSeeUsers,
 }: {
   stats: Stats | undefined
   loading: boolean
+  canSeeFinance: boolean
+  canSeeUsers: boolean
 }) {
   return (
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-      <StatCard
-        title="Revenue"
-        value={stats ? `$${stats.revenue.toLocaleString()}` : "—"}
-        icon={DollarSign}
-        loading={loading}
-      />
-      <StatCard
-        title="GMV"
-        value={stats ? `$${stats.gmv.toLocaleString()}` : "—"}
-        icon={ShoppingCart}
-        loading={loading}
-      />
+      {canSeeFinance && (
+        <StatCard
+          title="Net Revenue"
+          value={
+            stats?.revenue != null ? `$${stats.revenue.toLocaleString()}` : "—"
+          }
+          icon={DollarSign}
+          loading={loading}
+        />
+      )}
+      {canSeeFinance && (
+        <StatCard
+          title="Platform GMV"
+          value={stats?.gmv != null ? `$${stats.gmv.toLocaleString()}` : "—"}
+          icon={ShoppingCart}
+          loading={loading}
+        />
+      )}
       <StatCard
         title="Active Orders"
         value={stats?.activeOrders ?? "—"}
         icon={Clock}
         loading={loading}
       />
-      <StatCard
-        title="Publishers"
-        value={stats?.publishers ?? "—"}
-        icon={Users}
-        loading={loading}
-      />
-      <StatCard
-        title="Customers"
-        value={stats?.customers ?? "—"}
-        icon={Building2}
-        loading={loading}
-      />
-      <StatCard
-        title="Pending Verifications"
-        value={stats?.pendingVerifications ?? "—"}
-        icon={AlertCircle}
-        loading={loading}
-      />
-      <StatCard
-        title="Pending Withdrawals"
-        value={stats?.pendingWithdrawals ?? "—"}
-        icon={CreditCard}
-        loading={loading}
-      />
+      {canSeeFinance && (
+        <StatCard
+          title="Publishers"
+          value={stats?.publishers ?? "—"}
+          icon={Users}
+          loading={loading}
+        />
+      )}
+      {canSeeUsers && (
+        <StatCard
+          title="Customers"
+          value={stats?.customers ?? "—"}
+          icon={Building2}
+          loading={loading}
+        />
+      )}
+      {canSeeFinance && (
+        <StatCard
+          title="Settlements In Review"
+          value={stats?.pendingSettlements ?? "—"}
+          icon={AlertCircle}
+          loading={loading}
+        />
+      )}
+      {canSeeFinance && (
+        <StatCard
+          title="Pending Withdrawals"
+          value={stats?.pendingWithdrawals ?? "—"}
+          icon={CreditCard}
+          loading={loading}
+        />
+      )}
     </div>
   )
 }
@@ -298,13 +326,225 @@ function ActivityFeed() {
   )
 }
 
-export default function DashboardPage() {
+function formatOperationsSales(values?: Record<string, number>) {
+  const entries = Object.entries(values ?? {})
+  if (entries.length === 0) return "$0.00"
+  return entries
+    .map(([currency, amount]) =>
+      new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
+        amount,
+      ),
+    )
+    .join(" + ")
+}
+
+function OperationsDashboard() {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const active = useQuery({
+    queryKey: ["operations-inbox", "active", "dashboard"],
+    queryFn: () => api.admin.operationsInbox({ view: "active", take: 6 }),
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+  })
+  const available = useQuery({
+    queryKey: ["operations-inbox", "available", "dashboard"],
+    queryFn: () =>
+      api.admin.operationsInbox({
+        view: "available",
+        take: 5,
+        includeSummary: false,
+      }),
+    refetchInterval: 5_000,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
+  })
+  const claim = useMutation({
+    mutationFn: (orderId: string) => api.admin.claimOrder(orderId),
+    onSuccess: async (_result, orderId) => {
+      await queryClient.invalidateQueries({ queryKey: ["operations-inbox"] })
+      toast.success("Order claimed")
+      router.push(`/dashboard/fulfillment/${orderId}`)
+    },
+    onError: async (error: Error) => {
+      await queryClient.invalidateQueries({ queryKey: ["operations-inbox"] })
+      toast.error(
+        error.message.includes("already assigned")
+          ? "Another operator claimed this order first."
+          : error.message,
+      )
+    },
+  })
+
+  const error = active.error || available.error
+  if (error) {
+    return (
+      <ErrorState
+        title="Failed to load Operations dashboard"
+        description={(error as Error).message}
+        onRetry={() => {
+          active.refetch()
+          available.refetch()
+        }}
+      />
+    )
+  }
+  const summary = active.data?.summary ?? available.data?.summary
+  const stats: Array<{
+    title: string
+    value: string | number
+    icon: React.ElementType
+  }> = [
+    { title: "My active", value: summary?.myActive ?? 0, icon: ClipboardList },
+    { title: "Available", value: summary?.available ?? 0, icon: UserPlus },
+    { title: "Overdue", value: summary?.overdue ?? 0, icon: AlertTriangle },
+    { title: "Claimed", value: summary?.claimed ?? 0, icon: CheckCircle2 },
+    { title: "Completed", value: summary?.completed ?? 0, icon: CheckCircle2 },
+    {
+      title: "Delivered sales",
+      value: formatOperationsSales(summary?.salesByCurrency),
+      icon: CircleDollarSign,
+    },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Operations Overview</h1>
+          <p className="mt-1 text-muted-foreground">
+            Your assigned work and the live platform queue.
+          </p>
+        </div>
+        <Button asChild>
+          <Link href="/dashboard/fulfillment">
+            Open fulfillment
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
+        {stats.map((stat) => (
+          <StatCard
+            key={stat.title}
+            title={stat.title}
+            value={stat.value}
+            icon={stat.icon}
+            loading={active.isLoading && available.isLoading}
+          />
+        ))}
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-lg">Continue working</CardTitle>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard/fulfillment">View all</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {active.isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Skeleton key={index} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : active.data?.items.length ? (
+              <div className="divide-y">
+                {active.data.items.map((order) => (
+                  <Link
+                    key={order.id}
+                    href={`/dashboard/fulfillment/${order.id}`}
+                    className="flex items-center justify-between gap-4 py-3 hover:bg-muted/40"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">
+                        {order.title || order.website?.domain || order.id}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {order.status.replaceAll("_", " ")}
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                No active work assigned.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Available to claim</CardTitle>
+              <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                Updates every 5 seconds
+              </div>
+            </div>
+            <Badge variant="secondary">{summary?.available ?? 0}</Badge>
+          </CardHeader>
+          <CardContent>
+            {available.isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <Skeleton key={index} className="h-14 w-full" />
+                ))}
+              </div>
+            ) : available.data?.items.length ? (
+              <div className="divide-y">
+                {available.data.items.map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between gap-4 py-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium">
+                        {order.title || order.website?.domain || order.id}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        {order.website?.domain ??
+                          order.type.replaceAll("_", " ")}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => claim.mutate(order.id)}
+                      disabled={claim.isPending}
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      Claim
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                No orders are waiting to be claimed.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  )
+}
+
+function GeneralDashboardPage() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   // Settlements/withdrawals are SUPER_ADMIN/FINANCE backend routes — never
   // fetch them for OPERATIONS (was a 403 storm on the overview page)
   const canSeeFinance =
     user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "FINANCE"
+  const canSeeUsers = user?.staffRole === "SUPER_ADMIN"
 
   const {
     data: usersData,
@@ -314,8 +554,20 @@ export default function DashboardPage() {
     queryKey: ["admin", "users"],
     queryFn: () => api.admin.listUsers(),
     retry: 1,
+    enabled: canSeeUsers,
   })
   const users = usersData?.items
+
+  const {
+    data: publishersData,
+    isLoading: publishersLoading,
+    error: publishersError,
+  } = useQuery({
+    queryKey: ["admin", "publishers", "overview"],
+    queryFn: () => api.admin.listPublishers({ page: 1, limit: 1 }),
+    retry: 1,
+    enabled: canSeeFinance,
+  })
 
   const {
     data: orders,
@@ -349,15 +601,32 @@ export default function DashboardPage() {
     enabled: canSeeFinance,
   })
 
+  const {
+    data: revenue,
+    isLoading: revenueLoading,
+    error: revenueError,
+  } = useQuery({
+    queryKey: ["admin", "revenue", "overview"],
+    queryFn: () => api.admin.getRevenue({ groupBy: "channel" }),
+    retry: 1,
+    enabled: canSeeFinance,
+  })
+
   const isLoading =
-    usersLoading ||
+    (canSeeUsers && usersLoading) ||
     ordersLoading ||
-    (canSeeFinance && (settlementsLoading || withdrawalsLoading))
+    (canSeeFinance &&
+      (publishersLoading ||
+        settlementsLoading ||
+        withdrawalsLoading ||
+        revenueLoading))
   // Finance query errors only matter for finance-capable staff
   const queryError =
-    usersError ||
+    (canSeeUsers ? usersError : undefined) ||
     ordersError ||
-    (canSeeFinance ? settlementsError || withdrawalsError : undefined)
+    (canSeeFinance
+      ? publishersError || settlementsError || withdrawalsError || revenueError
+      : undefined)
 
   if (queryError) {
     return (
@@ -377,33 +646,31 @@ export default function DashboardPage() {
 
   if (!isLoading) {
     const customers = users?.filter((u) => u.userType === "CUSTOMER") ?? []
-    const publishers = users?.filter((u) => u.userType === "PUBLISHER") ?? []
-    const completedOrders = orders?.filter((o) =>
-      ["COMPLETED", "SETTLED", "VERIFIED", "PUBLISHED"].includes(o.status),
-    )
     const pendingOrders = orders?.filter((o) =>
       ["PENDING_PAYMENT", "ASSIGNED", "CONTENT_CREATION", "OUTREACH"].includes(
         o.status,
       ),
     )
 
-    // Decimal columns arrive as strings — without Number() this reduce
-    // string-concatenates into a nonsense figure.
-    const gmv =
-      completedOrders?.reduce((sum, o) => sum + Number(o.amount ?? 0), 0) ?? 0
-
     stats = {
-      publishers: publishers.length,
-      customers: customers.length,
+      publishers: canSeeFinance ? (publishersData?.total ?? 0) : null,
+      customers: canSeeUsers ? customers.length : null,
       activeOrders: pendingOrders?.length ?? 0,
-      gmv,
-      revenue: Math.round(gmv * 0.3),
-      pendingVerifications:
-        settlements?.items?.filter(
-          (s) => s.status === "PENDING" || s.status === "UNDER_REVIEW",
-        ).length ?? 0,
-      pendingWithdrawals:
-        withdrawals?.items?.filter((w) => w.status === "PENDING").length ?? 0,
+      gmv: canSeeFinance
+        ? Number(revenue?.totals.current.grossAmount ?? 0)
+        : null,
+      revenue: canSeeFinance
+        ? Number(revenue?.totals.current.netRevenue ?? 0)
+        : null,
+      pendingSettlements: canSeeFinance
+        ? (settlements?.items?.filter(
+            (s) => s.status === "PENDING" || s.status === "UNDER_REVIEW",
+          ).length ?? 0)
+        : null,
+      pendingWithdrawals: canSeeFinance
+        ? (withdrawals?.items?.filter((w) => w.status === "PENDING").length ??
+          0)
+        : null,
     }
   }
 
@@ -413,7 +680,12 @@ export default function DashboardPage() {
         <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
       </div>
 
-      <KPICards stats={isLoading ? undefined : stats} loading={isLoading} />
+      <KPICards
+        stats={isLoading ? undefined : stats}
+        loading={isLoading}
+        canSeeFinance={canSeeFinance}
+        canSeeUsers={canSeeUsers}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <RecentOrdersTable orders={orders ?? []} loading={ordersLoading} />
@@ -421,4 +693,11 @@ export default function DashboardPage() {
       </div>
     </div>
   )
+}
+
+export default function DashboardPage() {
+  const { user, loading } = useAuth()
+  if (loading) return <Skeleton className="h-72 w-full" />
+  if (user?.staffRole === "OPERATIONS") return <OperationsDashboard />
+  return <GeneralDashboardPage />
 }

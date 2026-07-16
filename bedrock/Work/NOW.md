@@ -1,10 +1,63 @@
 # Current Status
 
-**Phase**: Structured order cancellation implemented and verified locally; staging deployment and lifecycle verification remain.
+**Phase**: Operations fulfillment, staff monitoring, and RBAC realignment are implemented and verified locally; staging lifecycle verification remains.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Admin Verification Navigation And Queue Recovery
+
+- Renamed the DNS ownership surface to Domain Verification while retaining
+  Delivery Verification for order-delivery intervention.
+- Made sidebar selection choose the most specific visible route, so Delivery
+  Verification no longer highlights its Domain Verification parent.
+- Aligned the delivery queue UI and typed API client with the server payload,
+  including website/source, publisher context, evidence, and `orderId`-based
+  actions. Removed order-detail queue links for non-actionable delivery states.
+- Replaced the dashboard's signed-out `null` render with a reliable sign-in
+  redirect and visible transition state.
+- Validation: targeted queue contract test, API/admin builds, admin typecheck
+  and lint, API-client build, Biome, and signed-in browser verification pass.
+
+### Admin Staff RBAC Realignment
+
+- Restricted global Users and customer Organizations to Super Admin; Finance
+  retains the Publisher directory while Operations has no global Publisher or
+  Operations-staff roster access.
+- Scoped Operations platform-site reads and mutations to assigned sites. A
+  site enlisted by Operations is always assigned to its creator; only Super
+  Admin can reassign ownership across staff.
+- Scoped platform fulfillment to self-assigned and unassigned claimable work,
+  made cross-staff assignment Super Admin-only, validated active Operations
+  targets, and fixed claim so it cannot cancel or steal an existing assignment.
+- Removed Operations access to settlement list/detail and Finance access to
+  admin marketplace/platform-site inventory. Preserved contextual identity
+  snippets inside authorized work items.
+- Aligned admin navigation, deep-link guards, action visibility, Finance
+  settlement approval, support copy, and overview KPIs. Fixed the marketplace
+  Platform/Publisher/All filter query-key bug and removed unsupported
+  Organization create/edit/delete controls.
+- Added `docs/ADMIN_RBAC.md`, RBAC/scoping regression tests, and updated the
+  existing fulfillment race guard. Validation: all 830 API unit tests, API
+  build, admin production build/typecheck/lint, Biome, and diff checks pass.
+
+### Operations Fulfillment And Staff Monitoring
+
+- Added the Operations dashboard and Fulfillment workbench for assigned and
+  self-claimed platform orders: accept, draft/save, customer review, revision,
+  publish, verification, and structured cancellation.
+- Added five-second and focus refresh for active and claimable orders. Claims
+  remain per-order and race-safe through the active-assignment unique index;
+  stale assignment writes are rejected transactionally.
+- Added Operations production metrics for assigned, claimed, completed, and
+  delivered sales, plus Super Admin staff monitoring with role-specific Finance
+  activity and Publisher/Customer read-only account views.
+- Redesigned Users & Staff around staff monitoring and added Super Admin-only
+  credential creation for Super Admin, Operations, and Finance. Customers and
+  Publishers remain signup-only.
+- Added protections against staff conversion, self-demotion/suspension, removal
+  of the final active Super Admin, and orphaning active Operations work.
 
 ### Structured Order Cancellation and Refunds
 
@@ -144,11 +197,17 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
-The cancellation implementation is code-complete and the local development database is current. The next in-scope action is to apply `20260716120000_order_cancellation_workflow` in a staging release window before starting the API and worker, then verify each money and fulfillment path against wallet, transaction, assignment, settlement/platform-revenue, event, and audit records.
+The cancellation and Operations fulfillment implementations are code-complete,
+and the local development database is current. The next in-scope action is a
+staging lifecycle pass covering claim contention, content review, publication,
+verification, cancellation, staff monitoring, and the related money records.
 
 **Phase 5C remains functionally complete.** DNS TXT verification is the website ownership gate; Google Search Console and GA4 are separate performance-data integrations. Search Analytics ingestion and reporting remain a future phase after production OAuth configuration is authorized.
 
-The codebase also contains a July 14 operations-gap assessment. Its recommendation is to prioritise the existing admin fulfillment workflow before broad UX work; no such product phase has started.
+The July 14 Operations fulfillment gap is now implemented locally. Staging
+validation should cover claim contention, customer review, publication,
+verification, cancellation, and staff performance totals using production-like
+data.
 
 ## Explicit Phase Boundaries
 
@@ -162,7 +221,9 @@ The codebase also contains a July 14 operations-gap assessment. Its recommendati
 2. **Cancellation staging cutover** — apply migration `20260716120000_order_cancellation_workflow` before starting the updated API and worker, verify both new repeatable sweeps, and execute the scenario checklist in `docs/ORDER_CANCELLATION.md`. The local development database has already completed this cutover.
 3. **OAuth configuration** — authorize the exact Google redirect URI used by the API, e.g. `http://localhost:4000/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback`, or set `API_BASE_URL` to the deployed API base and authorize that callback.
 4. **Worker operations** — ensure the worker queue process is running in local/dev when testing DNS TXT verification, otherwise jobs remain queued.
-5. **Choose the next product phase** — the committed operations-gap analysis recommends the admin fulfillment workflow as the first priority; Phase 5D remains the reporting alternative.
+5. **Operations staging verification** — run concurrent claim attempts and the
+   full assigned/claimed fulfillment lifecycle, then reconcile staff metrics
+   with assignment, audit, and order records.
 6. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
    - Implement real GSC Search Analytics API calls in provider
    - Pagination, date windows, UPSERT logic, deduplication, retries

@@ -37,6 +37,7 @@ import {
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
+import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 
 const statusBadge: Record<string, { variant: any; Icon: any }> = {
   VERIFIED: { variant: "success", Icon: ShieldCheck },
@@ -52,6 +53,13 @@ const trustVariant: Record<string, any> = {
 }
 
 export default function VerificationCenterPage() {
+  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
+  if (loading) return null
+  if (!allowed) return <ForbiddenPage requires="Operations or Super Admin" />
+  return <VerificationCenterPageInner />
+}
+
+function VerificationCenterPageInner() {
   const qc = useQueryClient()
   const [tab, setTab] = useState<"review" | "force">("review")
   const [domain, setDomain] = useState("")
@@ -86,7 +94,7 @@ export default function VerificationCenterPage() {
   if (error)
     return (
       <ErrorState
-        title="Failed to load verification center"
+        title="Failed to load domain verification"
         description={(error as Error).message}
       />
     )
@@ -107,7 +115,7 @@ export default function VerificationCenterPage() {
 
   const exportCsv = () => {
     downloadCsv(
-      "verification-review.csv",
+      "domain-verification-review.csv",
       [
         "Domain",
         "Status",
@@ -133,7 +141,7 @@ export default function VerificationCenterPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <ShieldCheck className="h-7 w-7" /> Verification Center
+          <ShieldCheck className="h-7 w-7" /> Domain Verification
         </h1>
         <p className="text-muted-foreground">
           Domain ownership operations, trust scoring, and force-approval

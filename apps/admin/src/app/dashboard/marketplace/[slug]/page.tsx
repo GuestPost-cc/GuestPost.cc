@@ -40,6 +40,7 @@ import { use, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
+import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
 
 const PORTAL_URL = process.env.NEXT_PUBLIC_PORTAL_URL ?? "http://localhost:3001"
 
@@ -60,12 +61,22 @@ export default function AdminListingPreviewPage({
 }: {
   params: Promise<{ slug: string }>
 }) {
+  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
+  if (loading) return null
+  if (!allowed) return <ForbiddenPage requires="Operations or Super Admin" />
+  return <AdminListingPreviewPageInner params={params} />
+}
+
+function AdminListingPreviewPageInner({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
   const { slug } = use(params)
   const { user } = useAuth()
   const queryClient = useQueryClient()
 
-  // Moderation is SUPER_ADMIN/OPERATIONS on the backend — FINANCE can look,
-  // not touch (buttons hidden; API would 403 anyway)
+  // Moderation is SUPER_ADMIN/OPERATIONS on the backend.
   const canModerate =
     user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
 

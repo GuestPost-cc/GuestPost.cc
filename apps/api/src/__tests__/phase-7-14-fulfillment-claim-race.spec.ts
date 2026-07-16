@@ -14,12 +14,13 @@
  *   - Partial unique index on FulfillmentAssignment(orderId) WHERE status IN
  *     ('ASSIGNED','IN_PROGRESS') — makes the race structurally impossible
  *     at the DB level. Second-to-commit hits P2002.
- *   - app-layer: remove findFirst pre-check from claim(); each of the 3
- *     upsertAssignment callers (claim, assign, reassign) wraps the call in
- *     try/catch and maps P2002 → ConflictException with a caller-appropriate
- *     message. Gate 0.25 enumeration found 3 callers and decided per-caller
- *     catches (mixed semantics — claim's "self-pickup" vs assign/reassign's
- *     "admin override changed concurrently").
+ *   - app-layer: remove findFirst pre-check from claim(). Claim uses a
+ *     create-only transaction so it never cancels an existing assignment;
+ *     assign/reassign retain the transfer helper. All callers map P2002 to a
+ *     caller-appropriate ConflictException.
+ *   - claim/assign/reassign also advance Order.version in the assignment
+ *     transaction. Cancellation, fulfillment progression, and assignment
+ *     changes racing on the same order therefore cannot both commit.
  *
  * Static-source assertions + regression guards. The deep "5-caller real
  * Promise.allSettled race" integration belongs in the manual-smoke step or
@@ -39,15 +40,18 @@ describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
   )
   const serviceSource = readFileSync(servicePath, "utf-8")
 
-  // ─── app-layer: Plan B per-caller P2002 catches ────────────────────────
-  describe("app-layer: 3 upsertAssignment callers each have try/catch(P2002)", () => {
-    it("claim() wraps upsertAssignment in try/catch and maps P2002 to 'Order is already assigned'", () => {
+  // ─── app-layer: per-caller P2002 catches ───────────────────────────────
+  describe("app-layer: claim and transfer paths handle P2002", () => {
+    it("claim() uses the create-only helper and maps P2002 to 'Order is already assigned'", () => {
       const startIdx = serviceSource.indexOf("async claim(")
       const endIdx = serviceSource.indexOf("async assign(")
       expect(startIdx).toBeGreaterThan(-1)
       expect(endIdx).toBeGreaterThan(startIdx)
       const block = serviceSource.slice(startIdx, endIdx)
-      expect(block).toMatch(/try\s*\{[\s\S]*?await\s+this\.upsertAssignment\(/)
+      expect(block).toMatch(
+        /try\s*\{[\s\S]*?await\s+this\.createClaimAssignment\(/,
+      )
+      expect(block).not.toMatch(/await\s+this\.upsertAssignment\(/)
       expect(block).toMatch(
         /catch\s*\([^)]+\)\s*\{[\s\S]*?P2002[\s\S]*?ConflictException\(["']Order is already assigned["']\)/,
       )
@@ -62,6 +66,25 @@ describe("Phase 7.14 #23 — FulfillmentAssignment claim race", () => {
       expect(block).not.toMatch(
         /this\.prisma\.fulfillmentAssignment\.findFirst/,
       )
+    })
+
+    it("assignment transactions claim the order version before committing ownership", () => {
+      const helperStart = serviceSource.indexOf(
+        "private async upsertAssignment(",
+      )
+      const claimStart = serviceSource.indexOf(
+        "private async createClaimAssignment(",
+      )
+      const publicClaimStart = serviceSource.indexOf("async claim(")
+      const transferHelper = serviceSource.slice(helperStart, claimStart)
+      const claimHelper = serviceSource.slice(claimStart, publicClaimStart)
+
+      for (const block of [transferHelper, claimHelper]) {
+        expect(block).toMatch(/tx\.order\.updateMany/)
+        expect(block).toMatch(/version:\s*expectedVersion/)
+        expect(block).toMatch(/version:\s*\{\s*increment:\s*1\s*\}/)
+        expect(block).toMatch(/updatedOrder\.count\s*===\s*0/)
+      }
     })
 
     it("assign() wraps upsertAssignment in try/catch and maps P2002 to the concurrent-change message", () => {

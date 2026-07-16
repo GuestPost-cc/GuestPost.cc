@@ -13,13 +13,20 @@ export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, clearToken, getToken, HttpClient, setToken } from "./client"
 export type {
   AdminCancellationRequestResponse,
+  AdminDeliveryVerificationQueueItem,
   AdminOpsStaffResponse,
   AdminOrderDetailResponse,
   AdminOrderResponse,
   AdminOrderTimelineEvent,
   AdminSettlementResponse,
+  AdminStaffPerformanceItem,
+  AdminStaffPerformanceResponse,
   AdminUserResponse,
   AdminWithdrawalResponse,
+  OperationsInboxOrder,
+  OperationsInboxResponse,
+  OperationsInboxView,
+  OperationsOrderDetail,
 } from "./services/admin"
 export { AdminService } from "./services/admin"
 export type { ApiKeyCreatedResponse, ApiKeyResponse } from "./services/api-keys"

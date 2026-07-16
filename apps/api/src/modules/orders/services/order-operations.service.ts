@@ -85,9 +85,40 @@ export class OrderOperationsService {
     return assignment
   }
 
+  private async guardAssignment(
+    tx: any,
+    assignment: any,
+    userId: string,
+    staffRole: string,
+    status?: "ASSIGNED" | "IN_PROGRESS",
+  ) {
+    if (!assignment) return
+    const guarded = await tx.fulfillmentAssignment.updateMany({
+      where: {
+        id: assignment.id,
+        version: assignment.version,
+        status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+        ...(staffRole === "SUPER_ADMIN" ? {} : { assignedToUserId: userId }),
+      },
+      data: {
+        ...(status ? { status } : {}),
+        version: { increment: 1 },
+      },
+    })
+    if (guarded.count === 0) {
+      throw new ConflictException(
+        "Order assignment changed. Refresh before continuing.",
+      )
+    }
+  }
+
   async acceptOrder(orderId: string, userId: string, staffRole: string) {
     const order = await this.assertPlatformOrder(orderId)
-    await this.assertAssignedOperator(orderId, userId, staffRole)
+    const assignment = await this.assertAssignedOperator(
+      orderId,
+      userId,
+      staffRole,
+    )
     if (order.status !== "SUBMITTED")
       throw new BadRequestException("Order must be SUBMITTED to accept")
     await this.cancellation.assertNoActiveCancellation(orderId)
@@ -97,36 +128,54 @@ export class OrderOperationsService {
       ? new Date(acceptedAt.getTime() + order.turnaroundDays * 86_400_000)
       : null
 
-    const updated = await this.transition(orderId, order.version, "SUBMITTED", {
-      status: "ACCEPTED",
-      assigneeId: userId,
-      acceptedAt,
-      fulfillmentDueAt,
+    return this.prisma.$transaction(async (tx: any) => {
+      const changed = await tx.order.updateMany({
+        where: { id: orderId, version: order.version, status: "SUBMITTED" },
+        data: {
+          status: "ACCEPTED",
+          assigneeId: userId,
+          acceptedAt,
+          fulfillmentDueAt,
+          version: { increment: 1 },
+        },
+      })
+      if (changed.count === 0) {
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
+      }
+      await this.guardAssignment(
+        tx,
+        assignment,
+        userId,
+        staffRole,
+        "IN_PROGRESS",
+      )
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "ORDER_ACCEPTED",
+          actorId: userId,
+          message: `Order accepted by operations staff`,
+        },
+      })
+      await this.audit.log(
+        {
+          action: "ORDER_ACCEPTED",
+          entityType: "Order",
+          entityId: orderId,
+          metadata: {
+            ...orderEventMetadata(order),
+            fromStatus: order.status,
+            fulfilledBy: "operations",
+          },
+          userId,
+          organizationId: order.organizationId,
+        },
+        tx,
+      )
+      return tx.order.findUniqueOrThrow({ where: { id: orderId } })
     })
-
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId,
-        eventType: "ORDER_ACCEPTED",
-        actorId: userId,
-        message: `Order accepted by operations staff`,
-      },
-    })
-
-    await this.audit.log({
-      action: "ORDER_ACCEPTED",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: {
-        ...orderEventMetadata(order),
-        fromStatus: order.status,
-        fulfilledBy: "operations",
-      },
-      userId,
-      organizationId: order.organizationId,
-    })
-
-    return updated
   }
 
   async submitContent(
@@ -136,53 +185,153 @@ export class OrderOperationsService {
     content?: string,
   ) {
     const order = await this.assertPlatformOrder(orderId)
-    await this.assertAssignedOperator(orderId, userId, staffRole)
-    if (order.status !== "ACCEPTED" && order.status !== "CONTENT_REQUESTED") {
+    const assignment = await this.assertAssignedOperator(
+      orderId,
+      userId,
+      staffRole,
+    )
+    if (
+      order.status !== "ACCEPTED" &&
+      order.status !== "CONTENT_REQUESTED" &&
+      order.status !== "CONTENT_CREATION"
+    ) {
+      throw new BadRequestException("Order must be ready for content creation")
+    }
+    await this.cancellation.assertNoActiveCancellation(orderId)
+
+    return this.prisma.$transaction(async (tx: any) => {
+      const changed = await tx.order.updateMany({
+        where: { id: orderId, version: order.version, status: order.status },
+        data: { status: "CONTENT_CREATION", version: { increment: 1 } },
+      })
+      if (changed.count === 0) {
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
+      }
+      await this.guardAssignment(
+        tx,
+        assignment,
+        userId,
+        staffRole,
+        "IN_PROGRESS",
+      )
+      await tx.contentOrder.upsert({
+        where: { orderId },
+        create: {
+          orderId,
+          title: order.title ?? "Content",
+          brief: content,
+          status: "IN_PROGRESS",
+        },
+        update: { brief: content, status: "IN_PROGRESS" },
+      })
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "CONTENT_SUBMITTED",
+          actorId: userId,
+          message: `Content draft saved by operations`,
+          metadata: { hasContent: !!content },
+        },
+      })
+      await this.audit.log(
+        {
+          action: "CONTENT_SUBMITTED",
+          entityType: "Order",
+          entityId: orderId,
+          metadata: { ...orderEventMetadata(order), fromStatus: order.status },
+          userId,
+          organizationId: order.organizationId,
+        },
+        tx,
+      )
+      return tx.order.findUniqueOrThrow({ where: { id: orderId } })
+    })
+  }
+
+  async submitContentForReview(
+    orderId: string,
+    userId: string,
+    staffRole: string,
+    content: string,
+  ) {
+    const order = await this.assertPlatformOrder(orderId)
+    const assignment = await this.assertAssignedOperator(
+      orderId,
+      userId,
+      staffRole,
+    )
+    if (
+      ![
+        "ACCEPTED",
+        "CONTENT_REQUESTED",
+        "CONTENT_CREATION",
+        "CONTENT_READY",
+      ].includes(order.status)
+    ) {
       throw new BadRequestException(
-        "Order must be ACCEPTED or CONTENT_REQUESTED to submit content",
+        "Order must be in the content workflow to submit for review",
       )
     }
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    const updated = await this.transition(
-      orderId,
-      order.version,
-      order.status,
-      {
-        status: "CONTENT_CREATION",
-      },
-    )
-
-    await this.prisma.contentOrder.upsert({
-      where: { orderId },
-      create: {
-        orderId,
-        title: order.title ?? "Content",
-        brief: content,
-        status: "IN_PROGRESS",
-      },
-      update: { brief: content, status: "IN_PROGRESS" },
+    const updated = await this.prisma.$transaction(async (tx: any) => {
+      const changed = await tx.order.updateMany({
+        where: { id: orderId, version: order.version, status: order.status },
+        data: { status: "CUSTOMER_REVIEW", version: { increment: 1 } },
+      })
+      if (changed.count === 0) {
+        throw new ConflictException(
+          "Order was modified by another request. Retry.",
+        )
+      }
+      await this.guardAssignment(
+        tx,
+        assignment,
+        userId,
+        staffRole,
+        "IN_PROGRESS",
+      )
+      await tx.contentOrder.upsert({
+        where: { orderId },
+        create: {
+          orderId,
+          title: order.title ?? "Content",
+          brief: content,
+          status: "IN_PROGRESS",
+        },
+        update: { brief: content, status: "IN_PROGRESS" },
+      })
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
+          actorId: userId,
+          message: `Content submitted for review by operations`,
+          metadata: { hasContent: true, fromStatus: order.status },
+        },
+      })
+      await this.audit.log(
+        {
+          action: "CONTENT_SUBMITTED_FOR_REVIEW",
+          entityType: "Order",
+          entityId: orderId,
+          metadata: { ...orderEventMetadata(order), fromStatus: order.status },
+          userId,
+          organizationId: order.organizationId,
+        },
+        tx,
+      )
+      return tx.order.findUniqueOrThrow({ where: { id: orderId } })
     })
 
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId,
-        eventType: "CONTENT_SUBMITTED",
-        actorId: userId,
-        message: `Content submitted by operations`,
-        metadata: { hasContent: !!content },
-      },
-    })
-
-    await this.audit.log({
-      action: "CONTENT_SUBMITTED",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: { ...orderEventMetadata(order), fromStatus: order.status },
-      userId,
+    await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
+      userId: order.customerId,
       organizationId: order.organizationId,
+      type: "CONTENT_READY_FOR_REVIEW",
+      message: "Your content is ready for review",
     })
-
     return updated
   }
 
@@ -293,27 +442,36 @@ export class OrderOperationsService {
       throw new BadRequestException("Order must be APPROVED to mark published")
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    const version = await this.delivery.submitDelivery(order, userId, {
-      publishedUrl,
-      ...extra,
-    })
-
-    // Mark the assignment delivered (version-guarded)
-    if (assignment) {
-      const delivered = await this.prisma.fulfillmentAssignment.updateMany({
-        where: { id: assignment.id, version: assignment.version },
-        data: {
-          status: "DELIVERED",
-          completedAt: new Date(),
-          version: { increment: 1 },
-        },
-      })
-      if (delivered.count === 0) {
-        throw new ConflictException(
-          "Assignment was modified by another request. Retry.",
-        )
-      }
-    }
+    const version = await this.delivery.submitDelivery(
+      order,
+      userId,
+      {
+        publishedUrl,
+        ...extra,
+      },
+      assignment
+        ? async (tx: any) => {
+            const delivered = await tx.fulfillmentAssignment.updateMany({
+              where: {
+                id: assignment.id,
+                assignedToUserId: assignment.assignedToUserId,
+                status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+                version: assignment.version,
+              },
+              data: {
+                status: "DELIVERED",
+                completedAt: new Date(),
+                version: { increment: 1 },
+              },
+            })
+            if (delivered.count === 0) {
+              throw new ConflictException(
+                "Assignment was modified by another request. Retry.",
+              )
+            }
+          }
+        : undefined,
+    )
 
     void version
     return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })

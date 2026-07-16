@@ -53,6 +53,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
+import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 
 // Listing-service row (Phase 2). Mirrors the API response; staff view shows
 // ALL availability values (not just AVAILABLE) so reviewers can spot paused
@@ -121,8 +122,16 @@ const LISTING_TYPES = [
 ] as const
 
 export default function AdminMarketplacePage() {
+  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
+  if (loading) return null
+  if (!allowed) return <ForbiddenPage requires="Operations or Super Admin" />
+  return <AdminMarketplacePageInner />
+}
+
+function AdminMarketplacePageInner() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
@@ -145,7 +154,7 @@ export default function AdminMarketplacePage() {
   const opsQ = useQuery({
     queryKey: ["admin", "ops-staff"],
     queryFn: () => api.admin.listOpsStaff(),
-    enabled: !!reassignFor,
+    enabled: isSuperAdmin && !!reassignFor,
   })
 
   const reassignMut = useMutation({
@@ -228,6 +237,7 @@ export default function AdminMarketplacePage() {
       page,
       statusFilter,
       typeFilter,
+      ownerTypeFilter,
       search,
     ],
     queryFn: async () => {
@@ -250,8 +260,6 @@ export default function AdminMarketplacePage() {
   })
 
   const queryError = listingsError || statsError
-  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
-
   const updateStatus = useMutation({
     mutationFn: ({
       id,

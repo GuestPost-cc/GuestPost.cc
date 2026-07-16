@@ -81,6 +81,7 @@ export class OrderDeliveryService {
       notes?: string
       screenshotUrl?: string
     },
+    beforeCommit?: (tx: any) => Promise<void>,
   ) {
     await this.cancellation.assertNoActiveCancellation(order.id)
     const { publishedUrl, normalizedUrl } = this.validatePublishedUrl(
@@ -134,6 +135,11 @@ export class OrderDeliveryService {
         throw new ConflictException(
           "Order was modified by another request. Retry.",
         )
+
+      // Platform fulfillment uses this hook to close the assignment in the
+      // same transaction as publication. A reassignment, cancellation, or
+      // duplicate publish racing this transaction therefore has one winner.
+      await beforeCommit?.(tx)
 
       await tx.orderEvent.create({
         data: {

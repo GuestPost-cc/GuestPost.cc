@@ -5,18 +5,7 @@ import {
   Button,
   Card,
   CardContent,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -30,8 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@guestpost/ui"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import {
   type ColumnDef,
   createColumnHelper,
@@ -42,22 +30,10 @@ import {
   useReactTable,
 } from "@tanstack/react-table"
 import { format } from "date-fns"
-import {
-  AlertCircle,
-  Building,
-  Calendar,
-  MoreHorizontal,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  Users,
-} from "lucide-react"
+import { AlertCircle, Building, Calendar, Search, Users } from "lucide-react"
 import { useMemo, useState } from "react"
-import { useForm } from "react-hook-form"
-import { toast } from "sonner"
-import { z } from "zod"
-import { adminFetch, api } from "../../../lib/api"
+import { api } from "../../../lib/api"
+import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 
 interface Organization {
   id: string
@@ -72,266 +48,18 @@ interface Organization {
   }
 }
 
-const createOrgSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  slug: z
-    .string()
-    .min(2, "Slug must be at least 2 characters")
-    .regex(/^[a-z0-9-]+$/, {
-      message: "Slug must be lowercase letters, numbers, and hyphens only",
-    }),
-  plan: z.string().optional(),
-})
-
-function CreateOrgDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}) {
-  const queryClient = useQueryClient()
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<z.infer<typeof createOrgSchema>>({
-    resolver: zodResolver(createOrgSchema),
-    defaultValues: { name: "", slug: "", plan: "FREE" },
-  })
-
-  const name = watch("name")
-
-  const createMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof createOrgSchema>) => {
-      const token = (await import("../../../lib/api")).getToken()
-      const res = await fetch(
-        `${(await import("../../../lib/api")).getApiUrl()}/admin/organizations`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify(data),
-          credentials: "include",
-        },
-      )
-      if (!res.ok) throw new Error(await res.text())
-      return res.json()
-    },
-    onSuccess: () => {
-      toast.success("Organization created")
-      queryClient.invalidateQueries({ queryKey: ["admin", "organizations"] })
-      onOpenChange(false)
-      reset()
-    },
-    onError: () => toast.error("Failed to create organization"),
-  })
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Create Organization</DialogTitle>
-          <DialogDescription>
-            Create a new organization on the platform.
-          </DialogDescription>
-        </DialogHeader>
-        <form
-          onSubmit={handleSubmit((d) => createMutation.mutate(d))}
-          className="space-y-4"
-        >
-          <div>
-            <Label htmlFor="name">Name</Label>
-            <Input id="name" {...register("name")} className="mt-1" />
-            {errors.name && (
-              <p className="mt-1 text-xs text-destructive">
-                {errors.name.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="slug">Slug</Label>
-            <Input
-              id="slug"
-              {...register("slug")}
-              className="mt-1"
-              placeholder={name?.toLowerCase().replace(/\s+/g, "-") ?? "my-org"}
-            />
-            {errors.slug && (
-              <p className="mt-1 text-xs text-destructive">
-                {errors.slug.message}
-              </p>
-            )}
-          </div>
-          <div>
-            <Label htmlFor="plan">Plan</Label>
-            <Select
-              defaultValue="FREE"
-              onValueChange={(v) => setValue("plan", v)}
-            >
-              <SelectTrigger className="mt-1">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="FREE">Free</SelectItem>
-                <SelectItem value="STARTER">Starter</SelectItem>
-                <SelectItem value="PRO">Pro</SelectItem>
-                <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false)
-                reset()
-              }}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? "Creating..." : "Create"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function OrgRowActions({ org }: { org: Organization }) {
-  const queryClient = useQueryClient()
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editName, setEditName] = useState(org.name)
-  const [editPlan, setEditPlan] = useState(org.plan ?? "FREE")
-  const [editSaving, setEditSaving] = useState(false)
-
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return adminFetch(`/admin/organizations/${id}`)
-    },
-    onSuccess: () => {
-      toast.success("Organization deleted")
-      queryClient.invalidateQueries({ queryKey: ["admin", "organizations"] })
-    },
-    onError: () => toast.error("Failed to delete organization"),
-  })
-
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="sm">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setDialogOpen(true)}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            className="text-destructive"
-            onClick={() => {
-              if (confirm("Delete this organization?")) {
-                deleteMutation.mutate(org.id)
-              }
-            }}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Organization</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div>
-              <Label>Name</Label>
-              <Input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>Plan</Label>
-              <Select value={editPlan} onValueChange={setEditPlan}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="FREE">Free</SelectItem>
-                  <SelectItem value="STARTER">Starter</SelectItem>
-                  <SelectItem value="PRO">Pro</SelectItem>
-                  <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={async () => {
-                setEditSaving(true)
-                try {
-                  const { getToken, getApiUrl } = await import(
-                    "../../../lib/api"
-                  )
-                  const token = getToken()
-                  const res = await fetch(
-                    `${getApiUrl()}/admin/organizations/${org.id}`,
-                    {
-                      method: "PATCH",
-                      headers: {
-                        "Content-Type": "application/json",
-                        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-                      },
-                      body: JSON.stringify({ name: editName, plan: editPlan }),
-                      credentials: "include",
-                    },
-                  )
-                  if (!res.ok) throw new Error(await res.text())
-                  toast.success("Organization updated")
-                  queryClient.invalidateQueries({
-                    queryKey: ["admin", "organizations"],
-                  })
-                  setDialogOpen(false)
-                } catch {
-                  toast.error("Failed to update organization")
-                } finally {
-                  setEditSaving(false)
-                }
-              }}
-              disabled={editSaving}
-            >
-              {editSaving ? "Saving..." : "Save"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  )
-}
-
 const columnHelper = createColumnHelper<Organization>()
 
 export default function OrganizationsPage() {
+  const { allowed, loading } = useRequireRole("SUPER_ADMIN")
+  if (loading) return null
+  if (!allowed) return <ForbiddenPage requires="Super Admin" />
+  return <OrganizationsPageInner />
+}
+
+function OrganizationsPageInner() {
   const [search, setSearch] = useState("")
   const [planFilter, setPlanFilter] = useState<string>("all")
-  const [createOpen, setCreateOpen] = useState(false)
 
   const {
     data: orgs = [],
@@ -415,10 +143,6 @@ export default function OrganizationsPage() {
           </span>
         ),
       }),
-      columnHelper.display({
-        id: "actions",
-        cell: (info) => <OrgRowActions org={info.row.original} />,
-      }),
     ],
     [],
   )
@@ -455,12 +179,11 @@ export default function OrganizationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div>
         <h1 className="text-3xl font-bold tracking-tight">Organizations</h1>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create
-        </Button>
+        <p className="text-muted-foreground">
+          Global customer organization directory
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
@@ -560,8 +283,6 @@ export default function OrganizationsPage() {
           </Button>
         </div>
       )}
-
-      <CreateOrgDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   )
 }

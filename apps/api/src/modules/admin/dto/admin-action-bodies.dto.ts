@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsEmail,
   IsEnum,
   IsIn,
   IsNumber,
@@ -62,6 +63,30 @@ export class UpdateStaffRoleDto {
   @IsString()
   @IsIn(STAFF_ROLES as unknown as string[])
   role!: StaffRoleValue
+}
+
+export class CreateStaffDto {
+  @IsEmail()
+  @MaxLength(254)
+  email!: string
+
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  name!: string
+
+  @IsString()
+  @IsIn(STAFF_ROLES as unknown as string[])
+  role!: StaffRoleValue
+
+  @IsString()
+  @MinLength(12)
+  @MaxLength(128)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/, {
+    message:
+      "Password must include uppercase, lowercase, number, and special character",
+  })
+  password!: string
 }
 
 const PUBLISHER_TIERS = ["NEW", "TRUSTED", "VERIFIED"] as const

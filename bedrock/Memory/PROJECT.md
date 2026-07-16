@@ -36,7 +36,7 @@ Open/partial items require architectural design discussion.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 805 unit tests + integration tests
+- **apps/api** — NestJS REST API, 817 unit tests + integration tests
 - **apps/worker** — BullMQ queue processor
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard

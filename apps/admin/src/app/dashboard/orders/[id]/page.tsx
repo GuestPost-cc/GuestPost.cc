@@ -480,7 +480,9 @@ export default function OrderDetailPage() {
   const ownershipType = order.website?.ownershipType
   const isPlatformOwned = ownershipType === "PLATFORM"
 
-  const showVerificationLink = ["PUBLISHED", "VERIFIED"].includes(order.status)
+  const showVerificationLink = ["FAILED", "MANUAL_REVIEW"].includes(
+    order.activeDeliveryVersion?.verificationStatus ?? "",
+  )
   const hasDispute = !!order.dispute
 
   const activeDelivery = order.activeDeliveryVersion
@@ -531,7 +533,7 @@ export default function OrderDetailPage() {
             <Button variant="outline" size="sm" asChild>
               <Link href="/dashboard/verification/delivery">
                 <ShieldCheck className="mr-2 h-4 w-4" />
-                View in Verification Queue
+                Review Delivery Verification
               </Link>
             </Button>
           )}

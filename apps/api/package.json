@@ -13,6 +13,7 @@
     "test:watch": "jest --watch --selectProjects=unit"
   },
   "dependencies": {
+    "@better-auth/utils": "0.4.2",
     "@guestpost/auth": "workspace:*",
     "@guestpost/database": "workspace:*",
     "@guestpost/integrations": "workspace:*",

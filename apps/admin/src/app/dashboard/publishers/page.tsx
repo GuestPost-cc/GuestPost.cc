@@ -25,6 +25,8 @@ import { AlertCircle, Newspaper, RefreshCw, Search } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
+import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 
 type Tier = "NEW" | "TRUSTED" | "VERIFIED"
 
@@ -39,7 +41,16 @@ const TIER_BADGES: Record<
 }
 
 export default function AdminPublishersPage() {
+  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "FINANCE")
+  if (loading) return null
+  if (!allowed) return <ForbiddenPage requires="Finance or Super Admin" />
+  return <PublishersPageInner />
+}
+
+function PublishersPageInner() {
+  const { user } = useAuth()
   const queryClient = useQueryClient()
+  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
 
@@ -210,16 +221,18 @@ export default function AdminPublishersPage() {
                               ★ {p.rating.toFixed(1)}
                             </span>
                           )}
-                          <button
-                            className="text-muted-foreground hover:text-foreground"
-                            title="Recompute trust"
-                            onClick={() => recomputeMutation.mutate(p.id)}
-                            disabled={recomputeMutation.isPending}
-                          >
-                            <RefreshCw
-                              className={`h-3 w-3 ${recomputeMutation.isPending ? "animate-spin" : ""}`}
-                            />
-                          </button>
+                          {isSuperAdmin && (
+                            <button
+                              className="text-muted-foreground hover:text-foreground"
+                              title="Recompute trust"
+                              onClick={() => recomputeMutation.mutate(p.id)}
+                              disabled={recomputeMutation.isPending}
+                            >
+                              <RefreshCw
+                                className={`h-3 w-3 ${recomputeMutation.isPending ? "animate-spin" : ""}`}
+                              />
+                            </button>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-center">

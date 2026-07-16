@@ -47,6 +47,7 @@ import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
+import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 
 interface PlatformWebsiteRow {
   id: string
@@ -58,6 +59,13 @@ interface PlatformWebsiteRow {
 }
 
 export default function PlatformWebsitesPage() {
+  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
+  if (loading) return null
+  if (!allowed) return <ForbiddenPage requires="Operations or Super Admin" />
+  return <PlatformWebsitesPageInner />
+}
+
+function PlatformWebsitesPageInner() {
   const { user } = useAuth()
   const qc = useQueryClient()
   const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
@@ -79,7 +87,7 @@ export default function PlatformWebsitesPage() {
   const opsQ = useQuery({
     queryKey: ["admin", "operations-staff"],
     queryFn: () => api.admin.listOpsStaff(),
-    enabled: !!reassignFor,
+    enabled: isSuperAdmin && !!reassignFor,
   })
 
   const reassignMut = useMutation({
@@ -180,9 +188,9 @@ export default function PlatformWebsitesPage() {
             Platform Websites
           </h1>
           <p className="mt-1 max-w-3xl text-muted-foreground">
-            Manage platform inventory ownership. Existing work stays with its
-            current assignee; new orders and support tickets route to the
-            selected Operations owner.
+            {isSuperAdmin
+              ? "Manage platform inventory ownership. Existing work stays with its current assignee; new work routes to the selected Operations owner."
+              : "Manage platform sites assigned to you. Sites you enlist are assigned to you automatically, including their new orders and support tickets."}
           </p>
         </div>
         <Button onClick={() => setShowCreate(true)} className="gap-2">

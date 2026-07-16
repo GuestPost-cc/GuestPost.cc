@@ -129,12 +129,12 @@ describe("DeliveriesController — RBAC coverage", () => {
     }
   })
 
-  it("fulfillment endpoints include SUPER_ADMIN and OPERATIONS", () => {
+  it("self-service fulfillment endpoints include SUPER_ADMIN and OPERATIONS", () => {
     const fulfillmentEndpoints = [
       "fulfillmentQueue",
+      "operationsInbox",
+      "operationsOrder",
       "claim",
-      "assign",
-      "reassign",
       "submitPlatformDelivery",
       "reverify",
     ]
@@ -146,6 +146,15 @@ describe("DeliveriesController — RBAC coverage", () => {
         (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
       ).sort()
       expect([method, roles]).toEqual([method, ["OPERATIONS", "SUPER_ADMIN"]])
+    }
+  })
+
+  it("cross-staff assignment and reassignment are SUPER_ADMIN-only", () => {
+    for (const method of ["assign", "reassign"]) {
+      const handler = (DeliveriesController.prototype as any)[method]
+      const roles =
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      expect([method, roles]).toEqual([method, ["SUPER_ADMIN"]])
     }
   })
 })

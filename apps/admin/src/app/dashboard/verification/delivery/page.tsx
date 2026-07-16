@@ -1,5 +1,6 @@
 "use client"
 
+import type { AdminDeliveryVerificationQueueItem } from "@guestpost/api-client"
 import {
   Badge,
   Button,
@@ -30,10 +31,11 @@ import {
   ShieldX,
   Ticket,
 } from "lucide-react"
-import { useState } from "react"
+import Link from "next/link"
+import { Fragment, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../../lib/api"
-import { useAuth } from "../../../../lib/auth"
+import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
 
 const priorityBadge: Record<string, { variant: any; label: string }> = {
   CRITICAL: { variant: "destructive", label: "Critical" },
@@ -43,11 +45,14 @@ const priorityBadge: Record<string, { variant: any; label: string }> = {
 }
 
 export default function DeliveryVerificationQueuePage() {
-  const qc = useQueryClient()
-  const { user } = useAuth()
-  const canAct =
-    user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
+  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
+  if (loading) return null
+  if (!allowed) return <ForbiddenPage requires="Operations or Super Admin" />
+  return <DeliveryVerificationQueuePageInner />
+}
 
+function DeliveryVerificationQueuePageInner() {
+  const qc = useQueryClient()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [actionDialog, setActionDialog] = useState<{
     mode: "verify" | "reject"
@@ -118,17 +123,18 @@ export default function DeliveryVerificationQueuePage() {
     onError: () => toast.error("Failed to request re-verification"),
   })
 
-  const items: any[] = queue ?? []
+  const items = queue ?? []
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">
             Delivery Verification Queue
           </h1>
           <p className="text-muted-foreground mt-1">
-            Orders pending or failed delivery verification, sorted by priority
+            Deliveries that failed automated checks or need manual review,
+            sorted by priority.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => refetch()}>
@@ -142,15 +148,17 @@ export default function DeliveryVerificationQueuePage() {
       ) : error ? (
         <ErrorState
           title="Failed to load verification queue"
+          description={(error as Error).message}
           onRetry={() => refetch()}
         />
       ) : items.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center">
             <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-            <p className="text-lg font-medium">All caught up</p>
+            <p className="text-lg font-medium">No deliveries need review</p>
             <p className="text-muted-foreground text-sm">
-              No orders pending delivery verification
+              Failed and manual-review deliveries will appear here
+              automatically.
             </p>
           </CardContent>
         </Card>
@@ -161,34 +169,70 @@ export default function DeliveryVerificationQueuePage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Order</TableHead>
-                  <TableHead>Publisher</TableHead>
+                  <TableHead>Website</TableHead>
+                  <TableHead>Fulfilled By</TableHead>
                   <TableHead>Priority</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Attempts</TableHead>
-                  <TableHead>Last Verified</TableHead>
+                  <TableHead>Verification</TableHead>
+                  <TableHead>Version</TableHead>
+                  <TableHead>Submitted</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item: any) => (
-                  <>
-                    <TableRow
-                      key={item.id}
-                      className="cursor-pointer"
-                      onClick={() =>
-                        setExpandedId(expandedId === item.id ? null : item.id)
-                      }
-                    >
-                      <TableCell className="font-mono text-xs">
-                        {item.orderId?.slice(0, 8)}
-                      </TableCell>
-                      <TableCell>
-                        {item.publisherName ??
-                          item.publisherId?.slice(0, 8) ??
-                          "—"}
-                      </TableCell>
-                      <TableCell>
-                        {item.priority ? (
+                {items.map((item: AdminDeliveryVerificationQueueItem) => {
+                  const delivery = item.deliveryVersion
+                  const verificationStatus =
+                    delivery?.verificationStatus ?? "UNKNOWN"
+                  const fulfilledBy =
+                    item.website?.ownershipType === "PLATFORM"
+                      ? "Platform"
+                      : (item.publisher?.name ??
+                        item.publisher?.email ??
+                        "Publisher")
+
+                  return (
+                    <Fragment key={item.orderId}>
+                      <TableRow
+                        className="cursor-pointer"
+                        onClick={() =>
+                          setExpandedId(
+                            expandedId === item.orderId ? null : item.orderId,
+                          )
+                        }
+                      >
+                        <TableCell>
+                          <Link
+                            href={`/dashboard/orders/${item.orderId}`}
+                            className="block max-w-52 truncate text-sm font-medium hover:underline"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            {item.title || `Order ${item.orderId.slice(0, 8)}`}
+                          </Link>
+                          <span className="font-mono text-xs text-muted-foreground">
+                            {item.orderId.slice(0, 8)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="block max-w-48 truncate text-sm font-medium">
+                            {item.website?.domain ?? item.website?.name ?? "—"}
+                          </span>
+                          {item.website?.url && (
+                            <span className="block max-w-48 truncate text-xs text-muted-foreground">
+                              {item.website.url}
+                            </span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="text-sm">{fulfilledBy}</span>
+                            {item.publisher?.tier && (
+                              <Badge variant="outline">
+                                {item.publisher.tier.replace(/_/g, " ")}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
                           <Badge
                             variant={
                               priorityBadge[item.priority.label]?.variant ??
@@ -198,174 +242,212 @@ export default function DeliveryVerificationQueuePage() {
                             {priorityBadge[item.priority.label]?.label ??
                               item.priority.label}
                           </Badge>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            item.status === "VERIFIED"
-                              ? "success"
-                              : item.status === "FAILED"
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              verificationStatus === "FAILED"
                                 ? "destructive"
-                                : "secondary"
-                          }
-                        >
-                          {item.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="tabular-nums">
-                        {item.attempts ?? 0}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {item.lastVerifiedAt
-                          ? format(
-                              new Date(item.lastVerifiedAt),
-                              "MMM d, HH:mm",
-                            )
-                          : "—"}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!canAct || retry.isPending}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              retry.mutate(item.id)
-                            }}
+                                : verificationStatus === "MANUAL_REVIEW"
+                                  ? "warning"
+                                  : "secondary"
+                            }
                           >
-                            <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                            Retry
-                          </Button>
-                          {canAct && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-green-600"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setActionDialog({
-                                    mode: "verify",
-                                    id: item.id,
-                                    orderId: item.orderId,
-                                  })
-                                }}
-                              >
-                                <ShieldCheck className="h-3.5 w-3.5 mr-1" />
-                                Verify
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-600"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setActionDialog({
-                                    mode: "reject",
-                                    id: item.id,
-                                    orderId: item.orderId,
-                                  })
-                                }}
-                              >
-                                <ShieldX className="h-3.5 w-3.5 mr-1" />
-                                Reject
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {expandedId === item.id && (
-                      <TableRow key={`${item.id}-detail`}>
-                        <TableCell colSpan={7} className="bg-muted/30 p-4">
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-2">
-                              <strong className="text-sm">Order:</strong>
-                              <span className="font-mono text-xs">
-                                {item.orderId}
-                              </span>
-                            </div>
-
-                            {item.diagnostics && (
-                              <div className="space-y-1">
-                                <strong className="text-sm">Diagnostics</strong>
-                                <div className="bg-background rounded border p-3 space-y-1 text-xs font-mono">
-                                  {item.diagnostics.reason && (
-                                    <p>
-                                      <span className="text-muted-foreground">
-                                        Reason:
-                                      </span>{" "}
-                                      {item.diagnostics.reason}
-                                    </p>
-                                  )}
-                                  {item.diagnostics.httpStatus && (
-                                    <p>
-                                      <span className="text-muted-foreground">
-                                        HTTP Status:
-                                      </span>{" "}
-                                      {item.diagnostics.httpStatus}
-                                    </p>
-                                  )}
-                                  {item.diagnostics.error && (
-                                    <p>
-                                      <span className="text-muted-foreground">
-                                        Error:
-                                      </span>{" "}
-                                      {item.diagnostics.error}
-                                    </p>
-                                  )}
-                                  {item.diagnostics.redirectChain && (
-                                    <p>
-                                      <span className="text-muted-foreground">
-                                        Redirect Chain:
-                                      </span>{" "}
-                                      {item.diagnostics.redirectChain}
-                                    </p>
-                                  )}
+                            {verificationStatus.replace(/_/g, " ")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {delivery?.version ?? "—"}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {delivery?.submittedAt
+                            ? format(
+                                new Date(delivery.submittedAt),
+                                "MMM d, HH:mm",
+                              )
+                            : "—"}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={retry.isPending}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                retry.mutate(item.orderId)
+                              }}
+                            >
+                              <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                              Retry
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-green-600"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setActionDialog({
+                                  mode: "verify",
+                                  id: item.orderId,
+                                  orderId: item.orderId,
+                                })
+                              }}
+                            >
+                              <ShieldCheck className="h-3.5 w-3.5 mr-1" />
+                              Verify
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setActionDialog({
+                                  mode: "reject",
+                                  id: item.orderId,
+                                  orderId: item.orderId,
+                                })
+                              }}
+                            >
+                              <ShieldX className="h-3.5 w-3.5 mr-1" />
+                              Reject
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      {expandedId === item.orderId && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="bg-muted/30 p-4">
+                            <div className="space-y-3">
+                              <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Order
+                                  </p>
+                                  <p className="font-mono text-xs">
+                                    {item.orderId}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Customer
+                                  </p>
+                                  <p>
+                                    {item.customer?.name ??
+                                      item.customer?.email ??
+                                      "—"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Target URL
+                                  </p>
+                                  <p className="break-all text-xs">
+                                    {item.targetUrl ?? "—"}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-xs text-muted-foreground">
+                                    Anchor text
+                                  </p>
+                                  <p>{item.anchorText ?? "—"}</p>
                                 </div>
                               </div>
-                            )}
 
-                            {item.url && (
-                              <div className="flex items-center gap-2">
-                                <strong className="text-sm">URL:</strong>
-                                <a
-                                  href={item.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-600 hover:underline text-xs flex items-center gap-1"
-                                >
-                                  {item.url}
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              </div>
-                            )}
+                              {delivery?.verificationFailureReason && (
+                                <div>
+                                  <strong className="text-sm">
+                                    Failure reason
+                                  </strong>
+                                  <p className="mt-1 text-sm text-destructive">
+                                    {delivery.verificationFailureReason}
+                                  </p>
+                                </div>
+                              )}
 
-                            <div className="flex items-center gap-2 pt-1">
-                              {canAct && (
+                              {delivery?.evidence && (
+                                <div className="space-y-1">
+                                  <strong className="text-sm">
+                                    Diagnostics
+                                  </strong>
+                                  <div className="grid gap-2 rounded border bg-background p-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
+                                    <p>HTTP {delivery.evidence.httpStatus}</p>
+                                    <p>
+                                      Link{" "}
+                                      {delivery.evidence.linkFound
+                                        ? "found"
+                                        : "missing"}
+                                    </p>
+                                    <p>
+                                      Target{" "}
+                                      {delivery.evidence.targetUrlMatched
+                                        ? "matched"
+                                        : "mismatched"}
+                                    </p>
+                                    <p>
+                                      Anchor{" "}
+                                      {delivery.evidence.anchorFound
+                                        ? "found"
+                                        : "missing"}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {delivery?.publishedUrl && (
+                                <div className="flex items-center gap-2">
+                                  <strong className="text-sm">
+                                    Published URL:
+                                  </strong>
+                                  <a
+                                    href={delivery.publishedUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex min-w-0 items-center gap-1 break-all text-xs text-primary hover:underline"
+                                  >
+                                    {delivery.publishedUrl}
+                                    <ExternalLink className="h-3 w-3 shrink-0" />
+                                  </a>
+                                </div>
+                              )}
+
+                              {delivery && delivery.fraudFlags.length > 0 && (
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <strong className="text-sm">
+                                    Fraud flags:
+                                  </strong>
+                                  {delivery.fraudFlags.map((flag, index) => (
+                                    <Badge
+                                      key={`${flag.type}-${index}`}
+                                      variant="destructive"
+                                    >
+                                      {flag.type.replace(/_/g, " ")}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+
+                              <div className="flex items-center gap-2 pt-1">
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   onClick={() => {
-                                    setReverifyId(item.id)
+                                    setReverifyId(item.orderId)
                                     setTicketId("")
                                   }}
                                 >
                                   <Ticket className="h-3.5 w-3.5 mr-1" />
                                   Request Re-verify
                                 </Button>
-                              )}
+                              </div>
                             </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </>
-                ))}
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  )
+                })}
               </TableBody>
             </Table>
           </CardContent>

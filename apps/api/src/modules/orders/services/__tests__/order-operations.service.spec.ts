@@ -11,6 +11,7 @@ describe("OrderOperationsService", () => {
   let prismaMock: any
   let auditMock: any
   let queueMock: any
+  let deliveryMock: any
 
   const mockPlatformOrder = {
     id: "order-1",
@@ -43,14 +44,33 @@ describe("OrderOperationsService", () => {
       orderEvent: { create: jest.fn() },
       contentOrder: { upsert: jest.fn() },
       fulfillmentAssignment: {
-        findFirst: jest.fn().mockResolvedValue({ id: "fa-1", version: 0 }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: "fa-1",
+          version: 0,
+          assignedToUserId: "ops-user",
+        }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       $transaction: jest.fn(),
     }
+    prismaMock.$transaction.mockImplementation(async (callback: any) =>
+      callback(prismaMock),
+    )
 
-    const deliveryMock = {
-      submitDelivery: jest.fn().mockResolvedValue({ id: "dv-1" }),
+    deliveryMock = {
+      submitDelivery: jest
+        .fn()
+        .mockImplementation(
+          async (
+            _order: any,
+            _userId: string,
+            _delivery: any,
+            beforeCommit?: (tx: any) => Promise<void>,
+          ) => {
+            await beforeCommit?.(prismaMock)
+            return { id: "dv-1" }
+          },
+        ),
     }
     service = new OrderOperationsService(
       prismaMock as any,
@@ -94,6 +114,7 @@ describe("OrderOperationsService", () => {
       )
       expect(auditMock.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: "ORDER_ACCEPTED" }),
+        prismaMock,
       )
     })
 
@@ -186,12 +207,81 @@ describe("OrderOperationsService", () => {
     })
   })
 
+  describe("submitContentForReview", () => {
+    it("atomically stores content and advances to customer review", async () => {
+      const contentOrder = {
+        ...mockPlatformOrder,
+        status: "CONTENT_CREATION",
+      }
+      prismaMock.order.findUnique.mockResolvedValue(contentOrder)
+      prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+      prismaMock.order.findUniqueOrThrow.mockResolvedValue({
+        ...contentOrder,
+        status: "CUSTOMER_REVIEW",
+        version: 2,
+      })
+
+      const result = await service.submitContentForReview(
+        "order-1",
+        "ops-user",
+        "OPERATIONS",
+        "Final content",
+      )
+
+      expect(result.status).toBe("CUSTOMER_REVIEW")
+      expect(prismaMock.contentOrder.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({ brief: "Final content" }),
+          update: expect.objectContaining({ brief: "Final content" }),
+        }),
+      )
+      expect(prismaMock.fulfillmentAssignment.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            assignedToUserId: "ops-user",
+            version: 0,
+          }),
+        }),
+      )
+      expect(queueMock.addJob).toHaveBeenCalledWith(
+        expect.anything(),
+        "push-in-app",
+        expect.objectContaining({ userId: mockPlatformOrder.customerId }),
+      )
+    })
+
+    it("rejects a stale assignment before review submission commits", async () => {
+      prismaMock.order.findUnique.mockResolvedValue({
+        ...mockPlatformOrder,
+        status: "CONTENT_CREATION",
+      })
+      prismaMock.order.updateMany.mockResolvedValue({ count: 1 })
+      prismaMock.fulfillmentAssignment.updateMany.mockResolvedValue({
+        count: 0,
+      })
+
+      await expect(
+        service.submitContentForReview(
+          "order-1",
+          "ops-user",
+          "OPERATIONS",
+          "Final content",
+        ),
+      ).rejects.toThrow(ConflictException)
+      expect(queueMock.addJob).not.toHaveBeenCalled()
+    })
+  })
+
   describe("markPublished", () => {
     it("creates a delivery version when an assigned ops user publishes", async () => {
       const approvedOrder = { ...mockPlatformOrder, status: "APPROVED" }
       prismaMock.order.findUnique.mockResolvedValue(approvedOrder)
       prismaMock.fulfillmentAssignment = {
-        findFirst: jest.fn().mockResolvedValue({ id: "fa-1", version: 0 }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: "fa-1",
+          version: 0,
+          assignedToUserId: "ops-user",
+        }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       }
       prismaMock.order.findUniqueOrThrow.mockResolvedValue({
@@ -216,8 +306,26 @@ describe("OrderOperationsService", () => {
         expect.objectContaining({
           publishedUrl: "https://example.com/article",
         }),
+        expect.any(Function),
       )
       expect(prismaMock.fulfillmentAssignment.updateMany).toHaveBeenCalled()
+    })
+
+    it("rolls publication back when the assignment changed concurrently", async () => {
+      const approvedOrder = { ...mockPlatformOrder, status: "APPROVED" }
+      prismaMock.order.findUnique.mockResolvedValue(approvedOrder)
+      prismaMock.fulfillmentAssignment.updateMany.mockResolvedValue({
+        count: 0,
+      })
+
+      await expect(
+        service.markPublished(
+          "order-1",
+          "ops-user",
+          "OPERATIONS",
+          "https://example.com/article",
+        ),
+      ).rejects.toThrow(ConflictException)
     })
 
     it("rejects publish when ops user has no active assignment", async () => {

@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
@@ -79,18 +80,54 @@ export class DeliveriesController {
   // ── Platform fulfillment (Operations) — Finance excluded ─────────────────
   @Get("operations/fulfillment-queue")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  fulfillmentQueue() {
-    return this.assignment.operationsQueue()
+  fulfillmentQueue(@CurrentUser() user: any) {
+    return this.assignment.operationsQueue(user)
+  }
+
+  @Get("operations/fulfillment")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  operationsInbox(
+    @CurrentUser() user: any,
+    @Query("view") rawView?: string,
+    @Query("take") rawTake?: string,
+    @Query("skip") rawSkip?: string,
+    @Query("search") search?: string,
+    @Query("includeSummary") rawIncludeSummary?: string,
+  ) {
+    const views = new Set([
+      "active",
+      "available",
+      "waiting",
+      "ready",
+      "verification",
+      "history",
+    ])
+    if (rawView && !views.has(rawView)) {
+      throw new BadRequestException("Invalid fulfillment inbox view")
+    }
+    return this.assignment.operationsInbox(user, {
+      view: rawView as any,
+      take: rawTake ? Number.parseInt(rawTake, 10) || 50 : 50,
+      skip: rawSkip ? Number.parseInt(rawSkip, 10) || 0 : 0,
+      search,
+      includeSummary: rawIncludeSummary !== "false",
+    })
+  }
+
+  @Get("operations/fulfillment/:id")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  operationsOrder(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.assignment.getOperationsOrder(id, user)
   }
 
   @Post("orders/:id/claim")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   claim(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.assignment.claim(id, user.id)
+    return this.assignment.claim(id, user.id, user.staffRole)
   }
 
   @Post("orders/:id/assign")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   assign(
     @Param("id") id: string,
     @Body("assignedToUserId") to: string,
@@ -100,7 +137,7 @@ export class DeliveriesController {
   }
 
   @Post("orders/:id/reassign")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   reassign(
     @Param("id") id: string,
     @Body("assignedToUserId") to: string,

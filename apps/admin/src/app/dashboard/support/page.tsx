@@ -108,7 +108,7 @@ export default function AdminSupportPage() {
           <h1 className="text-3xl font-bold tracking-tight">Support</h1>
           <p className="text-muted-foreground">
             {isFinance
-              ? "Full reply on Platform and Publisher tickets. Internal notes available on every ticket."
+              ? "Publisher-ticket replies and internal notes. Platform tickets are read-only except for internal notes."
               : "Customer support ticket queue"}
           </p>
         </div>

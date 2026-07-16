@@ -127,6 +127,8 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       { method: "forceApproveSettlement", expected: ["SUPER_ADMIN"] },
       { method: "updateUserRole", expected: ["SUPER_ADMIN"] },
       { method: "updateStaffRole", expected: ["SUPER_ADMIN"] },
+      { method: "createStaff", expected: ["SUPER_ADMIN"] },
+      { method: "staffPerformance", expected: ["SUPER_ADMIN"] },
       { method: "deleteListing", expected: ["SUPER_ADMIN", "OPERATIONS"] },
       { method: "deleteWebsite", expected: ["SUPER_ADMIN", "OPERATIONS"] },
       { method: "listAuditLogs", expected: ["SUPER_ADMIN"] },
@@ -180,6 +182,7 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       "manualVerify",
       "acceptPlatformOrder",
       "submitPlatformContent",
+      "submitPlatformContentForReview",
       "markPlatformContentReady",
       "submitPlatformForReview",
       "markPlatformPublished",
@@ -210,18 +213,51 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     }
   })
 
-  it("universal-read routes include all three staff roles (listUsers, listOrders, listPublishers, marketplace reads, websites reads, support inbox, platform settings)", () => {
-    const universalReads = [
+  it("global user and organization directories are SUPER_ADMIN-only", () => {
+    const superAdminOnly = [
       "listUsers",
       "getUser",
+      "createStaff",
+      "staffPerformance",
       "listOrganizations",
-      "listOrders",
-      "listPublishers",
+      "listOpsStaff",
+    ]
+
+    for (const method of superAdminOnly) {
+      const handler = (AdminController.prototype as any)[method]
+      const roles =
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      expect([method, roles]).toEqual([method, ["SUPER_ADMIN"]])
+    }
+  })
+
+  it("publisher directory is available to Finance but not Operations", () => {
+    const handler = (AdminController.prototype as any).listPublishers
+    const roles = (
+      (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+    ).sort()
+    expect(roles).toEqual(["FINANCE", "SUPER_ADMIN"])
+  })
+
+  it("inventory reads are available to Operations but not Finance", () => {
+    for (const method of [
+      "listWebsites",
+      "getWebsite",
       "listMarketplaceListings",
       "getMarketplaceStats",
       "getListingForStaff",
-      "listWebsites",
-      "getWebsite",
+    ]) {
+      const handler = (AdminController.prototype as any)[method]
+      const roles = (
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      ).sort()
+      expect([method, roles]).toEqual([method, ["OPERATIONS", "SUPER_ADMIN"]])
+    }
+  })
+
+  it("shared contextual reads include all three staff roles", () => {
+    const universalReads = [
+      "listOrders",
       "listSupportTickets",
       "getSupportTicket",
       "getPlatformSettings",
