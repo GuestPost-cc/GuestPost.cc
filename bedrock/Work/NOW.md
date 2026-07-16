@@ -1,8 +1,57 @@
 # Current Status
 
-**Phase**: 5C — Website Integration + DNS Ownership Hardening
+**Phase**: Post-July catch-up — integration and financial-security baseline shipped; the next product priority needs an owner decision.
+
+**Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Platform Website Ownership Reassignment
+
+- Fixed the missing Operations roster caused by the static `/admin/users/ops` endpoint being shadowed by the earlier dynamic `/admin/users/:id` route.
+- Moved the roster to `/admin/staff/operations`, restricted results to active non-banned Operations staff, and added a route-regression test.
+- Redesigned the admin ownership view and reassignment dialog with an always-visible owner roster, shared-queue option, loading/error/empty states, no-op prevention, and optional audit-reason validation.
+- Verified the reported site in the signed-in admin browser: the seeded Operations member is visible and selectable without mutating the current assignment.
+
+### Completed Admin Order Detail Recovery
+
+- Fixed the completed-order detail crash caused by treating `SettlementApproval.approvedBy` as a user object and formatting the nonexistent `createdAt` field instead of `approvedAt`.
+- Added a typed admin order-detail API contract, server-side human-approver enrichment, explicit system-actor labels, and defensive timestamp formatting.
+- Aligned the same detail view with the actual order, publisher-profile, and delivery-evidence fields; verified the reported completed-order eye action and a delivered-order control in the signed-in admin browser.
+
+### Admin Route Recovery and Settlement Queue Isolation
+
+- Fixed valid admin app-router pages appearing as 404s under the long-running development stack by clearing only generated `.next/dev` outputs during `pnpm dev:all`; production build artifacts remain available.
+- Isolated settlement auto-release onto its own BullMQ queue and clean up legacy repeatable registrations so auto-approve and auto-release workers cannot consume and skip each other's jobs.
+- Verified all reported admin pages in a signed-in browser, including the exact order detail route, and observed both settlement sweeps complete on their intended workers without the prior unexpected-job warning.
+
+### Authenticated Marketplace Access
+
+- Removed the anonymous marketplace page plus its marketing-site header and footer links.
+- Protected every marketplace discovery endpoint with the API's global session guard; anonymous requests now return HTTP 401.
+- Added controller metadata coverage for all eight discovery handlers and verified the old marketing URL renders the not-found page while portal marketplace access remains available after login.
+
+### Portal Billing Build Type Alignment
+
+- Removed the stale page-local transaction interface from the buyer billing page so callbacks inherit the API client's `TransactionResponse` type.
+- Preserved numeric conversion at arithmetic/display boundaries because serialized transaction amounts can be `string | number`.
+- Verified the complete `pnpm dev:all` workflow: all 12 workspace builds passed and website, portal, publisher, admin, worker, and API returned HTTP 200.
+
+### Auth Form Validation Hardening
+
+- Fixed the shared auth forms so portal, publisher, and admin login/forgot-password flows reject empty and whitespace-only inputs with inline field errors.
+- Added required Terms of Service acceptance to customer and publisher email signup; the acceptance flag is also enforced at the Better Auth request boundary.
+- Upgraded only the shared UI resolver to the Zod 4-compatible release, preserving app-local resolver behavior outside the auth scope.
+- Added schema, request-boundary, and UI regression coverage for empty submissions, normalization, Terms gating, and accessible server-error announcements.
+
+### July 3–16 Code-Backed Catch-up
+
+- Hardened worker, queue, logging, Prisma pool, encryption-verification, and test-template operations; CI now covers the integration database template path.
+- Completed Integration Management v1 with encrypted OAuth state, ownership resolution, discovery/sync jobs, GSC and GA4 providers, publisher integration views, and website-level integration management.
+- Shipped the enterprise delivery and settlement controls: auto-accept/release sweeps, delivery verification intervention, review-window visibility, and reasoned manual settlement approval.
+- Added platform listing management and Ops scoping, permanent first-deposit URL reveal in the buyer portal, and the one-listing-per-website constraint.
+- Moved wallet funding to Stripe Checkout with a webhook-only credit path; added financial transaction and withdrawal-approval hardening.
+- Tightened mutation authentication: mandatory session secret, origin validation, all-actor verification gates, and atomic session rotation.
 
 ### Portal Marketplace Redesign
 
@@ -83,7 +132,9 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
-**Phase 5C is functionally complete with DNS/GSC lifecycle hardening in progress.** DNS TXT verification is the website ownership gate; Google Search Console is a separate integration for search performance data. Next milestone remains Phase 5D (SEO Reporting) after local OAuth redirect configuration is authorized in Google Cloud.
+**Phase 5C is functionally complete.** DNS TXT verification is the website ownership gate; Google Search Console and GA4 are separate performance-data integrations. Search Analytics ingestion and reporting remain a future phase after production OAuth configuration is authorized.
+
+The codebase also contains a July 14 operations-gap assessment. Its recommendation is to prioritise the existing admin fulfillment workflow before broad UX work; no such product phase has started.
 
 ## Explicit Phase Boundaries
 
@@ -93,16 +144,18 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Next Actions
 
-1. **Local OAuth configuration** — authorize the exact Google redirect URI used by the API, e.g. `http://localhost:4000/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback`, or set `API_BASE_URL` to the deployed API base and authorize that callback.
-2. **Worker operations** — ensure the worker queue process is running in local/dev when testing DNS TXT verification, otherwise jobs remain queued.
-3. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
+1. **Urgent deployment secret remediation** — rotate the database credential exposed in `render.yml`, remove inline database values from the blueprint, and configure them only in Render's secret environment. This requires deployment/database authority.
+2. **OAuth configuration** — authorize the exact Google redirect URI used by the API, e.g. `http://localhost:4000/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback`, or set `API_BASE_URL` to the deployed API base and authorize that callback.
+3. **Worker operations** — ensure the worker queue process is running in local/dev when testing DNS TXT verification, otherwise jobs remain queued.
+4. **Choose the next product phase** — the committed operations-gap analysis recommends the admin fulfillment workflow as the first priority; Phase 5D remains the reporting alternative.
+5. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
    - Implement real GSC Search Analytics API calls in provider
    - Pagination, date windows, UPSERT logic, deduplication, retries
    - Historical data imports
    - Reporting API endpoints (`GET /websites/:id/metrics`)
    - SEO Metrics KPI cards (impressions, clicks, CTR, position) + trend charts
-2. **Phase 6** — Admin/Operations UI for platform-owned websites
-3. **Additional providers** — GA4, Bing Webmaster Tools
+6. **Phase 6** — Admin/Operations UI for platform-owned websites
+7. **Additional providers** — GA4, Bing Webmaster Tools
 
 ## Backlog (Future Cleanup)
 
@@ -124,4 +177,4 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Blockers
 
-None.
+- Database-secret rotation and Render environment remediation require operator access to the deployed database and Render project.

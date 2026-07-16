@@ -16,7 +16,7 @@ let runsTotal = 0
 
 export function createSettlementReleaseWorker() {
   return createObservableWorker(
-    QUEUES.SETTLEMENT,
+    QUEUES.SETTLEMENT_RELEASE,
     async (job) => {
       if (
         !verifyJobPayload(job.data, {

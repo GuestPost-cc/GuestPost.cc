@@ -6,3 +6,5 @@
 {"ts":"2026-07-02T22:26:38Z","type":"integration_cursor","tool":"cli","slug":"GuestPost.cc","summary":"cursor integration detected"}
 {"ts":"2026-07-02T22:26:38Z","type":"integration_claude","tool":"cli","slug":"GuestPost.cc","summary":"claude integration detected"}
 {"ts":"2026-07-02T22:26:38Z","type":"backfill","tool":"cli","slug":"GuestPost.cc","summary":"History backfill: 265 commits, 1 releases, 2 integrations","tags":["pre-claude-trailer-strip-backup"]}
+{"ts":"2026-07-16T10:43:04Z","type":"curated_catchup","tool":"codex","slug":"guestpost-platform","summary":"Reconciled 93 commits after d907b3d into durable Memory and Work notes","tags":["d907b3d","8cd5f2b"]}
+{"ts":"2026-07-16T10:38:44Z","type":"integration_codex","tool":"cli","slug":"GuestPost.cc","summary":"codex integration detected"}

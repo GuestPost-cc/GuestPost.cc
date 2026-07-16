@@ -1,6 +1,10 @@
 "use client"
 
-import type { OrderStatus, SettlementStatus } from "@guestpost/shared"
+import type {
+  AdminOrderDetailResponse,
+  AdminOrderTimelineEvent,
+} from "@guestpost/api-client"
+import type { OrderStatus } from "@guestpost/shared"
 import {
   Badge,
   Button,
@@ -126,13 +130,7 @@ const eventLabels: Record<string, string> = {
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-interface TimelineEvent {
-  id: string
-  eventType: string
-  message?: string | null
-  metadata: Record<string, unknown> | null
-  createdAt: string
-}
+type TimelineEvent = AdminOrderTimelineEvent
 
 function eventDetail(event: TimelineEvent): string | null {
   const m = (event.metadata ?? {}) as Record<string, any>
@@ -158,86 +156,28 @@ function eventDetail(event: TimelineEvent): string | null {
   return parts.length ? parts.join(" · ") : null
 }
 
-interface AdminOrderDetail {
-  id: string
-  status: OrderStatus
-  paymentStatus: string
-  totalAmount: number | null
-  currency: string
-  createdAt: string
-  updatedAt: string
-  autoAcceptAt: string | null
-  verifyMethod: string | null
-  deliveryAcceptedMethod: string | null
-  events: TimelineEvent[]
-  customer?: {
-    id: string
-    name: string | null
-    email: string
-    userType: string
-    organization?: { name: string } | null
-  } | null
-  website?: {
-    id: string
-    url: string
-    ownershipType?: string
-    managedBy?: {
-      id: string
-      name: string | null
-      email: string
-    } | null
-    publisher?: {
-      id: string
-      name: string | null
-      email: string | null
-      tier?: string
-      trustScore?: number | null
-    } | null
-  } | null
-  items?: Array<{
-    id: string
-    serviceType: string
-    title: string | null
-    instructions: string | null
-    targetUrl: string | null
-    anchorText: string | null
-    website: { id: string; url: string } | null
-  }>
-  activeDeliveryVersion?: {
-    id: string
-    status: string
-    publishedUrl: string | null
-    results: Record<string, any> | null
-    adminVerifiedBy?: { id: string; name: string | null } | null
-    adminOverrideReason: string | null
-    adminNotes: string | null
-    fraudFlags: Array<{
-      id: string
-      type: string
-      details: any
-      createdAt: string
-    }>
-    screenshotUrl: string | null
-    verifyMethod: string
-    verifiedAt: string | null
-  } | null
-  settlements?: Array<{
-    id: string
-    status: SettlementStatus
-    grossAmount: number
-    platformFee: number
-    publisherAmount: number
-    releasePolicy: string
-    reviewEndsAt: string | null
-    approvals?: Array<{
-      id: string
-      type: string
-      approvedBy: { name: string | null; email: string }
-      roleAtTime: string
-      createdAt: string
-    }>
-  }>
-  dispute?: { id: string; status: string } | null
+const SYSTEM_APPROVER_LABELS: Record<string, string> = {
+  SYSTEM_AUTO_APPROVE: "System auto-approval",
+  SYSTEM_AUTO_RELEASE: "System auto-release",
+}
+
+function approvalActorLabel(approval: {
+  type: string
+  approvedBy: string
+  approvedByUser: { name: string | null; email: string } | null
+}): string {
+  return (
+    approval.approvedByUser?.name ||
+    approval.approvedByUser?.email ||
+    SYSTEM_APPROVER_LABELS[approval.approvedBy] ||
+    (approval.type === "CUSTOMER" ? "Customer" : "Admin")
+  )
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "Time unavailable"
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? "Time unavailable" : format(date, "PPp")
 }
 
 // ─── Sub-components ─────────────────────────────────────────────────────────
@@ -487,9 +427,9 @@ export default function OrderDetailPage() {
     isLoading,
     error,
     refetch,
-  } = useQuery<AdminOrderDetail>({
+  } = useQuery<AdminOrderDetailResponse>({
     queryKey: ["admin", "order", id],
-    queryFn: () => api.admin.getOrderById(id) as Promise<AdminOrderDetail>,
+    queryFn: () => api.admin.getOrderById(id),
   })
 
   const refreshOrder = () => {
@@ -577,6 +517,7 @@ export default function OrderDetailPage() {
   const hasDispute = !!order.dispute
 
   const activeDelivery = order.activeDeliveryVersion
+  const latestEvidence = activeDelivery?.evidence?.[0] ?? null
   const settlements = order.settlements?.length ? order.settlements : null
 
   return (
@@ -688,13 +629,13 @@ export default function OrderDetailPage() {
                       {order.customer.userType.toLowerCase()}
                     </p>
                   </div>
-                  {order.customer.organization?.name && (
+                  {order.organization?.name && (
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">
                         Organization
                       </p>
                       <p className="text-sm font-medium">
-                        {order.customer.organization.name}
+                        {order.organization.name}
                       </p>
                     </div>
                   )}
@@ -759,13 +700,13 @@ export default function OrderDetailPage() {
                       </p>
                     </div>
                   )}
-                  {order.website.publisher.trustScore != null && (
+                  {order.website.publisher.profile?.trustScore != null && (
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">
                         Trust Score
                       </p>
                       <p className="text-sm font-medium">
-                        {order.website.publisher.trustScore}
+                        {order.website.publisher.profile.trustScore}
                       </p>
                     </div>
                   )}
@@ -791,9 +732,7 @@ export default function OrderDetailPage() {
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Service Type</p>
                   <p className="font-medium capitalize">
-                    {order.items?.[0]?.serviceType
-                      ?.replace(/_/g, " ")
-                      .toLowerCase() ?? "—"}
+                    {order.type.replace(/_/g, " ").toLowerCase()}
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -801,15 +740,15 @@ export default function OrderDetailPage() {
                     Amount + Currency
                   </p>
                   <p className="font-medium font-mono">
-                    {order.totalAmount != null
-                      ? `${order.currency} ${Number(order.totalAmount).toFixed(2)}`
+                    {order.amount != null
+                      ? `${order.currency} ${Number(order.amount).toFixed(2)}`
                       : "—"}
                   </p>
                 </div>
-                {order.items?.[0]?.title && (
+                {order.title && (
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Title</p>
-                    <p className="font-medium">{order.items[0].title}</p>
+                    <p className="font-medium">{order.title}</p>
                   </div>
                 )}
                 {order.items?.[0]?.targetUrl && (
@@ -871,11 +810,11 @@ export default function OrderDetailPage() {
                 </div>
               )}
 
-              {order.items?.[0]?.instructions && (
+              {order.instructions && (
                 <div className="space-y-1">
                   <p className="text-sm text-muted-foreground">Instructions</p>
                   <p className="whitespace-pre-wrap rounded-lg border bg-muted/30 p-3 text-sm">
-                    {order.items[0].instructions}
+                    {order.instructions}
                   </p>
                 </div>
               )}
@@ -900,9 +839,9 @@ export default function OrderDetailPage() {
                   Verification
                 </CardTitle>
                 <CardDescription>
-                  {activeDelivery.verifyMethod === "AUTO"
+                  {order.verifyMethod === "AUTO"
                     ? "Independently verified by the platform."
-                    : activeDelivery.verifyMethod === "MANUAL_ADMIN"
+                    : order.verifyMethod === "MANUAL_ADMIN"
                       ? "Manually verified by an admin."
                       : "Verified by customer confirmation."}
                 </CardDescription>
@@ -910,20 +849,30 @@ export default function OrderDetailPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">Status:</span>
-                  <StatusBadge status={activeDelivery.status} />
-                  {activeDelivery.verifyMethod && (
+                  <Badge
+                    variant={
+                      activeDelivery.verificationStatus === "VERIFIED"
+                        ? "success"
+                        : activeDelivery.verificationStatus === "FAILED"
+                          ? "destructive"
+                          : "warning"
+                    }
+                  >
+                    {activeDelivery.verificationStatus.replace(/_/g, " ")}
+                  </Badge>
+                  {order.verifyMethod && (
                     <span
                       className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        activeDelivery.verifyMethod === "AUTO"
+                        order.verifyMethod === "AUTO"
                           ? "bg-emerald-100 text-emerald-700"
-                          : activeDelivery.verifyMethod === "MANUAL_ADMIN"
+                          : order.verifyMethod === "MANUAL_ADMIN"
                             ? "bg-blue-100 text-blue-700"
                             : "bg-amber-100 text-amber-700"
                       }`}
                     >
-                      {activeDelivery.verifyMethod === "AUTO"
+                      {order.verifyMethod === "AUTO"
                         ? "Auto"
-                        : activeDelivery.verifyMethod === "MANUAL_ADMIN"
+                        : order.verifyMethod === "MANUAL_ADMIN"
                           ? "Admin"
                           : "Customer"}
                     </span>
@@ -947,19 +896,17 @@ export default function OrderDetailPage() {
                   </div>
                 )}
 
-                {activeDelivery.results && (
+                {latestEvidence && (
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     {[
-                      ["URL Reachable", activeDelivery.results.urlReachable],
-                      ["Link Found", activeDelivery.results.linkFound],
                       [
-                        "Target URL Matched",
-                        activeDelivery.results.targetUrlMatched,
+                        "URL Reachable",
+                        latestEvidence.httpStatus >= 200 &&
+                          latestEvidence.httpStatus < 400,
                       ],
-                      [
-                        "Anchor Verified",
-                        activeDelivery.results.anchorVerified,
-                      ],
+                      ["Link Found", latestEvidence.linkFound],
+                      ["Target URL Matched", latestEvidence.targetUrlMatched],
+                      ["Anchor Verified", latestEvidence.anchorFound],
                     ].map(([label, ok]) => (
                       <div
                         key={label as string}
@@ -998,11 +945,11 @@ export default function OrderDetailPage() {
                   </div>
                 )}
 
-                {activeDelivery.adminNotes && (
+                {activeDelivery.adminVerifiedNotes && (
                   <div className="space-y-1 text-sm">
                     <p className="text-muted-foreground">Admin notes</p>
                     <p className="rounded-md border bg-muted/30 px-2 py-1">
-                      {activeDelivery.adminNotes}
+                      {activeDelivery.adminVerifiedNotes}
                     </p>
                   </div>
                 )}
@@ -1046,10 +993,9 @@ export default function OrderDetailPage() {
                   </a>
                 )}
 
-                {activeDelivery.verifiedAt && (
+                {latestEvidence?.checkedAt && (
                   <p className="text-xs text-muted-foreground">
-                    Verified{" "}
-                    {format(new Date(activeDelivery.verifiedAt), "PPp")}
+                    Verified {formatDateTime(latestEvidence.checkedAt)}
                   </p>
                 )}
               </CardContent>
@@ -1057,137 +1003,133 @@ export default function OrderDetailPage() {
           )}
 
           {/* ── Settlement Card ───────────────────────────────────────────── */}
-          {settlements &&
-            settlements.map((s) => (
-              <Card key={s.id}>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <DollarSign className="h-4 w-4" /> Settlement
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      Status:
-                    </span>
-                    <Badge
-                      variant={getOrderBadgeVariant(
-                        s.status as unknown as OrderStatus,
-                      )}
-                    >
-                      {s.status.replace(/_/g, " ")}
-                    </Badge>
-                  </div>
+          {settlements?.map((s) => (
+            <Card key={s.id}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <DollarSign className="h-4 w-4" /> Settlement
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">Status:</span>
+                  <Badge
+                    variant={getOrderBadgeVariant(
+                      s.status as unknown as OrderStatus,
+                    )}
+                  >
+                    {s.status.replace(/_/g, " ")}
+                  </Badge>
+                </div>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        Gross Amount
-                      </p>
-                      <p className="text-sm font-medium font-mono">
-                        {order.currency} {Number(s.grossAmount).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        Platform Fee
-                      </p>
-                      <p className="text-sm font-medium font-mono">
-                        {order.currency} {Number(s.platformFee).toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">
-                        Publisher Amount
-                      </p>
-                      <p className="text-sm font-medium font-mono">
-                        {order.currency} {Number(s.publisherAmount).toFixed(2)}
-                      </p>
-                    </div>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Gross Amount
+                    </p>
+                    <p className="text-sm font-medium font-mono">
+                      {order.currency} {Number(s.grossAmount).toFixed(2)}
+                    </p>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">
-                      Release Policy:
-                    </span>
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        s.releasePolicy === "AUTO"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-amber-100 text-amber-700"
-                      }`}
-                    >
-                      {s.releasePolicy}
-                    </span>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Platform Fee
+                    </p>
+                    <p className="text-sm font-medium font-mono">
+                      {order.currency} {Number(s.platformFee).toFixed(2)}
+                    </p>
                   </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">
+                      Publisher Amount
+                    </p>
+                    <p className="text-sm font-medium font-mono">
+                      {order.currency} {Number(s.publisherAmount).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
 
-                  {s.reviewEndsAt && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-blue-600" />
-                      <span>
-                        Review ends at {format(new Date(s.reviewEndsAt), "PPp")}
-                        {["PENDING", "UNDER_REVIEW"].includes(s.status) &&
-                          (() => {
-                            const remaining = Math.ceil(
-                              (new Date(s.reviewEndsAt).getTime() -
-                                Date.now()) /
-                                (1000 * 60 * 60 * 24),
-                            )
-                            if (remaining <= 0)
-                              return (
-                                <span className="text-amber-600 font-medium">
-                                  {" "}
-                                  (due now)
-                                </span>
-                              )
-                            if (remaining === 1)
-                              return (
-                                <span className="text-amber-600 font-medium">
-                                  {" "}
-                                  (1 day remaining)
-                                </span>
-                              )
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">
+                    Release Policy:
+                  </span>
+                  <span
+                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                      s.releasePolicy === "AUTO"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {s.releasePolicy}
+                  </span>
+                </div>
+
+                {s.reviewEndsAt && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <span>
+                      Review ends at {format(new Date(s.reviewEndsAt), "PPp")}
+                      {["PENDING", "UNDER_REVIEW"].includes(s.status) &&
+                        (() => {
+                          const remaining = Math.ceil(
+                            (new Date(s.reviewEndsAt).getTime() - Date.now()) /
+                              (1000 * 60 * 60 * 24),
+                          )
+                          if (remaining <= 0)
                             return (
-                              <span className="text-muted-foreground">
+                              <span className="text-amber-600 font-medium">
                                 {" "}
-                                ({remaining} days remaining)
+                                (due now)
                               </span>
                             )
-                          })()}
-                      </span>
-                    </div>
-                  )}
-
-                  {s.approvals && s.approvals.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Approvals</p>
-                      <div className="space-y-2">
-                        {s.approvals.map((a) => (
-                          <div
-                            key={a.id}
-                            className="flex items-center justify-between rounded-lg border p-2 text-sm"
-                          >
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="h-4 w-4 text-green-600" />
-                              <span className="font-medium capitalize">
-                                {a.type.replace(/_/g, " ").toLowerCase()}
+                          if (remaining === 1)
+                            return (
+                              <span className="text-amber-600 font-medium">
+                                {" "}
+                                (1 day remaining)
                               </span>
-                            </div>
-                            <div className="text-right text-xs text-muted-foreground">
-                              <p>{a.approvedBy.name || a.approvedBy.email}</p>
-                              <p className="capitalize">
-                                {a.roleAtTime.replace(/_/g, " ").toLowerCase()}
-                              </p>
-                              <p>{format(new Date(a.createdAt), "PPp")}</p>
-                            </div>
+                            )
+                          return (
+                            <span className="text-muted-foreground">
+                              {" "}
+                              ({remaining} days remaining)
+                            </span>
+                          )
+                        })()}
+                    </span>
+                  </div>
+                )}
+
+                {s.approvals && s.approvals.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Approvals</p>
+                    <div className="space-y-2">
+                      {s.approvals.map((a) => (
+                        <div
+                          key={a.id}
+                          className="flex items-center justify-between rounded-lg border p-2 text-sm"
+                        >
+                          <div className="flex items-center gap-2">
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                            <span className="font-medium capitalize">
+                              {a.type.replace(/_/g, " ").toLowerCase()}
+                            </span>
                           </div>
-                        ))}
-                      </div>
+                          <div className="text-right text-xs text-muted-foreground">
+                            <p>{approvalActorLabel(a)}</p>
+                            <p className="capitalize">
+                              {a.roleAtTime.replace(/_/g, " ").toLowerCase()}
+                            </p>
+                            <p>{formatDateTime(a.approvedAt)}</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
         </div>
 
         {/* ── Right sidebar ──────────────────────────────────────────────── */}

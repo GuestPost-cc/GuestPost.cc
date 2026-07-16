@@ -986,8 +986,11 @@ export class AdminController {
     return this.admin.reassignPlatformWebsite(id, body, user)
   }
 
+  // Deliberately lives outside /users/:id. The old /users/ops path was
+  // shadowed by that earlier dynamic route, which treated "ops" as a user ID
+  // and returned 404 before this handler could run.
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  @Get("users/ops")
+  @Get("staff/operations")
   listOpsStaff() {
     return this.admin.listOperationsStaff()
   }

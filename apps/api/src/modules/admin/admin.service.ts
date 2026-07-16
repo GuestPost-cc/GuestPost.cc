@@ -382,6 +382,7 @@ export class AdminService {
               select: {
                 id: true,
                 name: true,
+                email: true,
                 tier: true,
                 profile: { select: { trustScore: true } },
               },
@@ -390,7 +391,9 @@ export class AdminService {
           },
         },
         items: {
-          include: { website: { select: { url: true, publisherId: true } } },
+          include: {
+            website: { select: { id: true, url: true, publisherId: true } },
+          },
         },
         events: { orderBy: { createdAt: "desc" } },
         activeDeliveryVersion: {
@@ -423,7 +426,34 @@ export class AdminService {
       },
     })
     if (!order) throw new NotFoundException(`Order ${id} not found`)
-    return order
+
+    const approverIds = [
+      ...new Set(
+        order.settlements.flatMap((settlement) =>
+          settlement.approvals
+            .map((approval) => approval.approvedBy)
+            .filter((approvedBy) => !approvedBy.startsWith("SYSTEM_")),
+        ),
+      ),
+    ]
+    const approvers = approverIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: approverIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : []
+    const approverById = new Map(approvers.map((user) => [user.id, user]))
+
+    return {
+      ...order,
+      settlements: order.settlements.map((settlement) => ({
+        ...settlement,
+        approvals: settlement.approvals.map((approval) => ({
+          ...approval,
+          approvedByUser: approverById.get(approval.approvedBy) ?? null,
+        })),
+      })),
+    }
   }
 
   async listPlatformOrders(status?: string, take = 50, skip = 0) {
@@ -1053,7 +1083,7 @@ export class AdminService {
   // List OPERATIONS staff for the admin reassignment picker.
   async listOperationsStaff() {
     const memberships = await this.prisma.staffMembership.findMany({
-      where: { role: "OPERATIONS" },
+      where: { role: "OPERATIONS", user: { banned: false } },
       include: { user: { select: { id: true, name: true, email: true } } },
       orderBy: { createdAt: "asc" },
     })

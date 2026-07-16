@@ -48,15 +48,6 @@ interface WalletData {
   version: number
 }
 
-interface Transaction {
-  id: string
-  type: string
-  amount: number
-  description: string | null
-  reference: string | null
-  createdAt: string
-}
-
 const transactionIcons: Record<string, React.ElementType> = {
   DEPOSIT: ArrowUpCircle,
   PURCHASE: ArrowDownCircle,
@@ -248,7 +239,6 @@ export default function BillingPage() {
     }
 
     return () => clearInterval(pollTimer.current)
-    // biome-ignore lint/correctness/useExhaustiveDependencies: router is used inside checkDeposit, not directly here
   }, [setValue, checkDeposit])
 
   const depositMutation = useMutation({
@@ -276,30 +266,23 @@ export default function BillingPage() {
     },
   })
 
-  const filteredTransactions = (transactionsData ?? []).filter(
-    (tx: Transaction) => {
-      if (!searchQuery) return true
-      const query = searchQuery.toLowerCase()
-      return (
-        tx.id.toLowerCase().includes(query) ||
-        tx.type.toLowerCase().includes(query) ||
-        tx.description?.toLowerCase().includes(query)
-      )
-    },
-  )
+  const filteredTransactions = (transactionsData ?? []).filter((tx) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    return (
+      tx.id.toLowerCase().includes(query) ||
+      tx.type.toLowerCase().includes(query) ||
+      tx.description?.toLowerCase().includes(query)
+    )
+  })
 
   const totalDeposits = (transactionsData ?? [])
-    .filter((tx: Transaction) => tx.type === "DEPOSIT")
-    .reduce((sum: number, tx: Transaction) => sum + Number(tx.amount), 0)
+    .filter((tx) => tx.type === "DEPOSIT")
+    .reduce((sum, tx) => sum + Number(tx.amount), 0)
 
   const _totalSpent = (transactionsData ?? [])
-    .filter(
-      (tx: Transaction) => tx.type === "PURCHASE" || tx.type === "RESERVATION",
-    )
-    .reduce(
-      (sum: number, tx: Transaction) => sum + Math.abs(Number(tx.amount)),
-      0,
-    )
+    .filter((tx) => tx.type === "PURCHASE" || tx.type === "RESERVATION")
+    .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
 
   // Combine errors from all queries
   const billingError = walletError || transactionsError || ordersError
@@ -467,7 +450,7 @@ export default function BillingPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredTransactions.map((tx: Transaction) => {
+              {filteredTransactions.map((tx) => {
                 const Icon = transactionIcons[tx.type] || FileText
                 const colorClass = transactionColors[tx.type] || ""
                 const isNegative =

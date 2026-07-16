@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: billing-payments
 project: guestpost-platform
-updated: 2026-06-11
+updated: 2026-07-16
 ---
 
 # Billing & Payments
@@ -24,21 +24,24 @@ Pattern: **reserve → capture → release** using Stripe integration.
 
 ### Stripe Integration
 
-- Stripe webhooks verified BEFORE queueing (HMAC `stripe-signature` t/v1, 300s tolerance, timing-safe via `STRIPE_PAYOUT_WEBHOOK_SECRET` / `STRIPE_WEBHOOK_SECRET`)
-- Bad sig → 401, missing config → 503, never enqueued
-- Stripe adapter: idempotency via `Idempotency-Key` HTTP header
+- Wallet deposits start as Stripe Checkout Sessions. There is no direct API credit path: only a verified `checkout.session.completed` webhook credits a wallet.
+- Stripe webhooks are signature-verified from the raw body before any wallet mutation. Missing webhook configuration fails closed.
+- A deposit ledger row is keyed by the Checkout session reference and also carries `provider: "stripe"` plus the PaymentIntent in `providerRef`.
+- The database enforces provider-aware uniqueness for non-null provider references. This prevents a replay under a different Checkout session ID from double-crediting the same Stripe payment.
 
 ### Money Safety
 
 - `splitPlatformFee` Decimal helper (fee-by-subtraction)
-- `Transaction.reference @@unique`: database-level duplicate prevention for webhooks
+- The buyer billing page consumes the API client's `TransactionResponse` contract directly. Transaction amounts may arrive as `string | number` and are converted with `Number(...)` only at arithmetic and display boundaries; avoid narrower page-local transaction interfaces.
+- `Transaction.reference @@unique` is the primary webhook idempotency key; provider-aware `providerRef` uniqueness is defence in depth.
 - Refunds are wallet-credit only (no Stripe refund-to-card yet)
-- Chargebacks handled via `charge.dispute.created` webhook + staff notifications
+- Chargebacks reserve the still-available portion of the originating deposit, record any shortfall, and notify staff. The dispute lookups use the same Stripe provider identity as the write path.
+- Platform-fee changes use an optimistic-lock update and an audit event containing the changed field, old value, new value, and staff-supplied reason.
 
 ## Key Models
 
 - `Wallet` — per-org wallet with `balance` Decimal (versioned)
-- `Transaction` — ledger row with `reference` unique constraint
+- `Transaction` — ledger row with `reference` unique constraint plus optional provider and provider reference
 
 ## Key Files
 

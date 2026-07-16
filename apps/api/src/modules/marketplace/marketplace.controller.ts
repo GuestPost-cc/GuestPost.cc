@@ -14,7 +14,6 @@ import {
 import { ActorType } from "../../common/decorators/actor-type.decorator"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
-import { Public } from "../../common/decorators/public.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import {
@@ -36,50 +35,43 @@ export class MarketplaceController {
   constructor(private readonly marketplaceService: MarketplaceService) {}
 
   // =============================================================================
-  // PUBLIC ENDPOINTS
+  // AUTHENTICATED DISCOVERY ENDPOINTS
   // =============================================================================
 
-  @Public()
   @Get("listings")
   async searchListings(@Query() query: SearchListingsDto) {
     return this.marketplaceService.searchListings(query)
   }
 
-  @Public()
   @Get("listings/:slug")
-  async getListing(@Param("slug") slug: string, @CurrentUser() user?: any) {
-    return this.marketplaceService.getListing(slug, user?.id)
+  async getListing(@Param("slug") slug: string, @CurrentUser() user: any) {
+    return this.marketplaceService.getListing(slug, user.id)
   }
 
   // Lightweight service-menu endpoint for the order-creation flow's service
   // picker — avoids re-fetching the full listing payload when the user has
   // already opened the detail page and just wants the (id, type, price, TAT,
   // availability) tuples to render the selector.
-  @Public()
   @Get("listings/:slug/services")
   async getListingServices(@Param("slug") slug: string) {
     return this.marketplaceService.getListingServices(slug)
   }
 
-  @Public()
   @Get("categories")
   async getCategories() {
     return this.marketplaceService.getCategories()
   }
 
-  @Public()
   @Get("tags")
   async getTags() {
     return this.marketplaceService.getTags()
   }
 
-  @Public()
   @Get("services")
   async getServices() {
     return this.marketplaceService.getServices()
   }
 
-  @Public()
   @Get("search")
   async searchPublishers(
     @Query("q") query?: string,
@@ -103,7 +95,6 @@ export class MarketplaceController {
     })
   }
 
-  @Public()
   @Get("stats")
   async getStats() {
     return this.marketplaceService.getMarketplaceStats()

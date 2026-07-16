@@ -1,3 +1,9 @@
+---
+note_type: project-memory
+project: guestpost-platform
+updated: 2026-07-16
+---
+
 # GuestPost.cc
 
 **Project**: GuestPost content marketplace — SaaS platform connecting publishers and buyers for guest post placements.

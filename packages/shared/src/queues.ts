@@ -11,6 +11,7 @@ export const QUEUES = {
   PAYOUT: "payout",
   RECONCILIATION: "reconciliation",
   SETTLEMENT: "settlement",
+  SETTLEMENT_RELEASE: "settlement-release",
   AUTO_ACCEPT: "auto-accept",
   INTEGRATION_SYNC: "integration-sync",
   INTEGRATION_DISCOVERY: "integration-discovery",
@@ -66,10 +67,12 @@ export const QUEUE_JOBS = {
     RUN: "reconciliation-run",
   },
   [QUEUES.SETTLEMENT]: {
-    // Phase 7.3 — the only job on this queue today. Repeatable; jobId
+    // Phase 7.3 — the only job on this queue. Repeatable; jobId
     // "settlement-auto-approve" dedups cluster-wide so only one instance
     // runs per cadence regardless of pod count.
     AUTO_APPROVE: "settlement-auto-approve",
+  },
+  [QUEUES.SETTLEMENT_RELEASE]: {
     // Phase 6 — auto-release sweep. Finds CUSTOMER_APPROVED settlements
     // with releasePolicy=AUTO and releases them (balance + order complete).
     AUTO_RELEASE: "settlement-auto-release",

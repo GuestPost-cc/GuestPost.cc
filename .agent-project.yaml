@@ -12,7 +12,7 @@ project:
 knowledge:
   vault_mode: local
   pointer_path: ./bedrock
-  real_path: /Users/shohan/Desktop/GuestPost/guestpost-platform/bedrock
+  real_path: /Users/shohan/Desktop/GuestPost/GuestPost.cc/bedrock
   ignore_file: ./.agentknowledgeignore
   memory_root: ./bedrock/Memory/PROJECT.md
   work_root: ./bedrock/Work
@@ -22,7 +22,7 @@ knowledge:
   obsidian_mode: lightweight
 
 onboarding:
-  status: pending
+  status: complete
 
 sync:
   bootstrap_on_connect: true

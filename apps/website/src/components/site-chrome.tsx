@@ -22,12 +22,6 @@ export function SiteHeader() {
         </Link>
         <nav className="flex items-center gap-8" aria-label="Main">
           <Link
-            href="/marketplace"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Marketplace
-          </Link>
-          <Link
             href="/publishers"
             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
@@ -79,11 +73,6 @@ export function SiteFooter() {
           <div>
             <h4 className="font-semibold mb-4">Product</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link href="/marketplace" className="hover:text-foreground">
-                  Marketplace
-                </Link>
-              </li>
               <li>
                 <Link href="/pricing" className="hover:text-foreground">
                   Pricing

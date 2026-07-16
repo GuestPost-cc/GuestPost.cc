@@ -26,6 +26,106 @@ export interface AdminUserResponse {
   createdAt: string
 }
 
+export interface AdminOrderTimelineEvent {
+  id: string
+  eventType: string
+  message?: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+}
+
+export interface AdminOrderDetailResponse {
+  id: string
+  type: string
+  title: string | null
+  instructions: string | null
+  status: OrderStatus
+  paymentStatus: string
+  amount: string | number | null
+  currency: string
+  createdAt: string
+  updatedAt: string
+  autoAcceptAt: string | null
+  verifyMethod: string | null
+  deliveryAcceptedMethod: string | null
+  organization?: { id: string; name: string; slug: string } | null
+  events: AdminOrderTimelineEvent[]
+  customer?: {
+    id: string
+    name: string | null
+    email: string
+    userType: string
+  } | null
+  website?: {
+    id: string
+    url: string
+    ownershipType?: string
+    managedBy?: {
+      id: string
+      name: string | null
+      email: string
+    } | null
+    publisher?: {
+      id: string
+      name: string | null
+      email: string | null
+      tier?: string
+      profile?: { trustScore: number | null } | null
+    } | null
+  } | null
+  items?: Array<{
+    id: string
+    targetUrl: string | null
+    anchorText: string | null
+    website: { id: string; url: string } | null
+  }>
+  activeDeliveryVersion?: {
+    id: string
+    publishedUrl: string
+    verificationStatus: string
+    adminVerifiedBy?: { id: string; name: string | null } | null
+    adminOverrideReason: string | null
+    adminVerifiedNotes: string | null
+    fraudFlags: Array<{
+      id: string
+      type: string
+      details: unknown
+      createdAt: string
+    }>
+    screenshotUrl: string | null
+    evidence: Array<{
+      id: string
+      httpStatus: number
+      anchorFound: boolean
+      linkFound: boolean
+      targetUrlMatched: boolean
+      checkedAt: string
+    }>
+  } | null
+  settlements?: Array<{
+    id: string
+    status: SettlementStatus
+    grossAmount: string | number
+    platformFee: string | number
+    publisherAmount: string | number
+    releasePolicy: string
+    reviewEndsAt: string | null
+    approvals?: Array<{
+      id: string
+      type: string
+      approvedBy: string
+      approvedByUser: {
+        id: string
+        name: string | null
+        email: string
+      } | null
+      roleAtTime: string
+      approvedAt: string
+    }>
+  }>
+  dispute?: { id: string; status: string } | null
+}
+
 export interface AdminOrderResponse {
   id: string
   type: string
@@ -38,6 +138,12 @@ export interface AdminOrderResponse {
   items?: Array<{
     website: { id: string; url: string } | null
   }>
+}
+
+export interface AdminOpsStaffResponse {
+  id: string
+  name: string | null
+  email: string
 }
 
 export interface AdminSettlementResponse {
@@ -117,7 +223,7 @@ export class AdminService {
   }
 
   getOrderById(id: string) {
-    return this.client.get<any>(`/admin/orders/${id}`)
+    return this.client.get<AdminOrderDetailResponse>(`/admin/orders/${id}`)
   }
   // Order interventions — verification/advancement is automated; staff only
   // force-cancel (SUPER_ADMIN) or refund (SUPER_ADMIN/FINANCE), reason required.
@@ -348,9 +454,7 @@ export class AdminService {
     return this.client.post<any>("/admin/websites", { json: data })
   }
   listOpsStaff() {
-    return this.client.get<
-      Array<{ id: string; name: string | null; email: string }>
-    >("/admin/users/ops")
+    return this.client.get<AdminOpsStaffResponse[]>("/admin/staff/operations")
   }
 
   createPlatformListing(data: {

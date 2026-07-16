@@ -57,7 +57,8 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 
 ### Critical / High that survived this batch
 
-- **No open Criticals remain.** Phase 7.6 closed #9 (mobile UX), the last one. The 2026-06-15 platform audit has zero open production-blocker findings.
+- **URGENT — Render blueprint contains an inline database credential.** `render.yml` claims secrets are excluded but defines `DATABASE_URL` values directly. Treat the credential as exposed: rotate it, remove the inline values, configure the secret only in Render, and assess whether Git history/repository access needs containment. Do not copy the credential into tickets, logs, or Bedrock notes.
+- The historical 2026-06-15 platform audit has zero open production-blocker findings, but the deployment-secret exposure above is a separate current risk.
 - **Zero open Medium findings.** Phase 7.9 closed #28 (status-color drift), #29 (unused shared components), #30 (hooks-rule violation). Phase 7.8 closed #25 + #26 + #27.
 - ~~**Drawer a11y polish gap (Phase 7.6.1)**~~ — **CLOSED** by Phase 7.9 (`8c9d868` + `e90ea34`). New `<Drawer>` component on `@radix-ui/react-dialog` gives all 3 dashboards focus trap, Escape close, body scroll-lock, focus restore, and `aria-modal` for free. Portal layout also gained the pathname-auto-close it was missing since Phase 7.6.
 - ~~Partial structured-logger sweep (Phase 7.7 B)~~ — **CLOSED** by Phase 7.7.x (PR #3, commit `5af902c`). All 8 worker files swept; allowlist at its forever-allowed steady state.
@@ -115,4 +116,3 @@ Documented in risks.md / backlog.md: YES
 
 ## Decisions framework
 When in doubt: closures land via a phase entry in the audit's §11 Remediation Log. This file should stay small — strategic risks only. If a risk decomposes into multiple findings, name them and link to the audit.
-

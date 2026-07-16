@@ -9,6 +9,7 @@
 // existing FulfillmentAssignment row keeps its current owner). Only new
 // orders + new tickets routed by `createTicket` route to the new owner.
 
+import type { AdminOpsStaffResponse } from "@guestpost/api-client"
 import {
   Badge,
   Button,
@@ -17,12 +18,6 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -31,9 +26,6 @@ import {
   DialogTitle,
   Input,
   Label,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   Skeleton,
   Table,
   TableBody,
@@ -43,7 +35,14 @@ import {
   TableRow,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { Plus } from "lucide-react"
+import {
+  AlertCircle,
+  Check,
+  Globe2,
+  Inbox,
+  Plus,
+  UserRound,
+} from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
@@ -65,7 +64,9 @@ export default function PlatformWebsitesPage() {
   const [reassignFor, setReassignFor] = useState<PlatformWebsiteRow | null>(
     null,
   )
-  const [pickedOwnerId, setPickedOwnerId] = useState<string>("")
+  const [pickedOwnerId, setPickedOwnerId] = useState<string | null | undefined>(
+    undefined,
+  )
   const [reason, setReason] = useState("")
 
   const websitesQ = useQuery({
@@ -76,7 +77,7 @@ export default function PlatformWebsitesPage() {
 
   // Ops staff for the picker — only loaded when the reassign dialog opens.
   const opsQ = useQuery({
-    queryKey: ["admin", "ops-staff"],
+    queryKey: ["admin", "operations-staff"],
     queryFn: () => api.admin.listOpsStaff(),
     enabled: !!reassignFor,
   })
@@ -95,7 +96,7 @@ export default function PlatformWebsitesPage() {
       qc.invalidateQueries({ queryKey: ["admin", "platform-websites"] })
       toast.success("Owner updated")
       setReassignFor(null)
-      setPickedOwnerId("")
+      setPickedOwnerId(undefined)
       setReason("")
     },
     onError: (e: Error) => toast.error(e.message || "Failed to reassign"),
@@ -146,30 +147,92 @@ export default function PlatformWebsitesPage() {
   })
 
   const canCreate = createForm.url.trim().length > 0
+  const websites = (websitesQ.data ?? []) as PlatformWebsiteRow[]
+  const assignedCount = websites.filter((website) => website.managedBy).length
+  const unassignedCount = websites.length - assignedCount
+  const currentOwnerId = reassignFor?.managedByUserId ?? null
+  const opsStaff = (opsQ.data ?? []) as AdminOpsStaffResponse[]
+  const ownerChanged =
+    pickedOwnerId !== undefined && pickedOwnerId !== currentOwnerId
+  const normalizedReason = reason.trim()
+  const reasonInvalid =
+    normalizedReason.length > 0 && normalizedReason.length < 10
+
+  const closeReassignDialog = () => {
+    setReassignFor(null)
+    setPickedOwnerId(undefined)
+    setReason("")
+    reassignMut.reset()
+  }
+
+  const openReassignDialog = (website: PlatformWebsiteRow) => {
+    setReassignFor(website)
+    setPickedOwnerId(website.managedByUserId ?? null)
+    setReason("")
+    reassignMut.reset()
+  }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Platform Websites</h1>
-        <p className="text-muted-foreground">
-          Reassign platform sites between Operations staff. In-flight orders are
-          not migrated; new orders + tickets route to the new owner.
-        </p>
-      </div>
-
-      <div className="flex items-center justify-end">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            Platform Websites
+          </h1>
+          <p className="mt-1 max-w-3xl text-muted-foreground">
+            Manage platform inventory ownership. Existing work stays with its
+            current assignee; new orders and support tickets route to the
+            selected Operations owner.
+          </p>
+        </div>
         <Button onClick={() => setShowCreate(true)} className="gap-2">
           <Plus className="h-4 w-4" />
           Create Website
         </Button>
       </div>
 
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="rounded-lg bg-primary/10 p-2 text-primary">
+              <Globe2 className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-2xl font-semibold">{websites.length}</p>
+              <p className="text-sm text-muted-foreground">Platform sites</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-600">
+              <UserRound className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-2xl font-semibold">{assignedCount}</p>
+              <p className="text-sm text-muted-foreground">Assigned</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 p-5">
+            <div className="rounded-lg bg-amber-500/10 p-2 text-amber-600">
+              <Inbox className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-2xl font-semibold">{unassignedCount}</p>
+              <p className="text-sm text-muted-foreground">Shared queue</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle>Ownership map</CardTitle>
           <CardDescription>
-            Click <strong>Reassign</strong> to change a site&apos;s manager.
-            Unassigned sites fall back to the shared Operations queue.
+            See who receives new work for every platform site. Unassigned sites
+            fall back to the shared Operations queue.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -178,6 +241,19 @@ export default function PlatformWebsitesPage() {
               {[...Array(4)].map((_, i) => (
                 <Skeleton key={i} className="h-10 w-full" />
               ))}
+            </div>
+          ) : websitesQ.isError ? (
+            <div className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+              <AlertCircle className="h-9 w-9 text-destructive" />
+              <div>
+                <p className="font-medium">Could not load platform websites</p>
+                <p className="text-sm text-muted-foreground">
+                  {(websitesQ.error as Error).message}
+                </p>
+              </div>
+              <Button variant="outline" onClick={() => websitesQ.refetch()}>
+                Try again
+              </Button>
             </div>
           ) : (
             <Table>
@@ -189,16 +265,28 @@ export default function PlatformWebsitesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {((websitesQ.data ?? []) as PlatformWebsiteRow[]).map((w) => (
+                {websites.map((w) => (
                   <TableRow key={w.id}>
-                    <TableCell className="font-medium">{w.url}</TableCell>
+                    <TableCell>
+                      <p className="font-medium">{w.url}</p>
+                      {w.domain && (
+                        <p className="text-xs text-muted-foreground">
+                          {w.domain}
+                        </p>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {w.managedBy ? (
-                        <span className="text-sm">
-                          {w.managedBy.name || w.managedBy.id}
-                        </span>
+                        <div>
+                          <p className="text-sm font-medium">
+                            {w.managedBy.name || w.managedBy.email}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {w.managedBy.email}
+                          </p>
+                        </div>
                       ) : (
-                        <Badge variant="outline">Unassigned</Badge>
+                        <Badge variant="warning">Shared Ops queue</Badge>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
@@ -206,12 +294,9 @@ export default function PlatformWebsitesPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            setReassignFor(w)
-                            setPickedOwnerId(w.managedByUserId ?? "")
-                          }}
+                          onClick={() => openReassignDialog(w)}
                         >
-                          Reassign
+                          Change owner
                         </Button>
                       ) : (
                         <span className="text-xs text-muted-foreground">
@@ -221,7 +306,7 @@ export default function PlatformWebsitesPage() {
                     </TableCell>
                   </TableRow>
                 ))}
-                {(websitesQ.data ?? []).length === 0 && (
+                {websites.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={3}
@@ -239,91 +324,235 @@ export default function PlatformWebsitesPage() {
 
       <Dialog
         open={!!reassignFor}
-        onOpenChange={(v) => !v && setReassignFor(null)}
+        onOpenChange={(open) => !open && closeReassignDialog()}
       >
-        <DialogContent>
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Reassign “{reassignFor?.url}”</DialogTitle>
+            <DialogTitle>Change website owner</DialogTitle>
             <DialogDescription>
-              The new owner sees new orders on this site in their inbox
-              automatically and is the default support assignee for new tickets.
+              Choose who receives new orders and support tickets for{" "}
+              <span className="font-medium text-foreground">
+                {reassignFor?.url}
+              </span>
+              . Existing assignments will not move.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label>New owner</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    className="w-full justify-between"
-                  >
-                    {pickedOwnerId && pickedOwnerId !== "__unassigned__"
-                      ? (opsQ.data ?? []).find((o) => o.id === pickedOwnerId)
-                          ?.name ||
-                        (opsQ.data ?? []).find((o) => o.id === pickedOwnerId)
-                          ?.email ||
-                        "Pick an Ops member"
-                      : pickedOwnerId === "__unassigned__"
-                        ? "Unassigned (shared queue)"
-                        : "Pick an Ops member"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0" align="start">
-                  <Command>
-                    <CommandInput placeholder="Search Ops members…" />
-                    <CommandList>
-                      <CommandEmpty>No Ops members found.</CommandEmpty>
-                      <CommandGroup>
-                        <CommandItem
-                          value="__unassigned__"
-                          onSelect={() => setPickedOwnerId("__unassigned__")}
-                        >
-                          — Unassigned (shared queue) —
-                        </CommandItem>
-                        {(opsQ.data ?? []).map((o) => (
-                          <CommandItem
-                            key={o.id}
-                            value={o.id}
-                            onSelect={() => setPickedOwnerId(o.id)}
-                          >
-                            {o.name || o.email}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+          <div className="space-y-5">
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Current routing owner
+              </p>
+              {reassignFor?.managedBy ? (
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="rounded-full bg-primary/10 p-2 text-primary">
+                    <UserRound className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">
+                      {reassignFor.managedBy.name ||
+                        reassignFor.managedBy.email}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {reassignFor.managedBy.email}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="rounded-full bg-amber-500/10 p-2 text-amber-600">
+                    <Inbox className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">Shared Ops queue</p>
+                    <p className="text-xs text-muted-foreground">
+                      No individual owner is currently assigned.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="space-y-1">
-              <Label>Reason (audit log)</Label>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label id="new-owner-label">New owner</Label>
+                <span className="text-xs text-muted-foreground">
+                  Active Operations staff only
+                </span>
+              </div>
+              <div
+                role="radiogroup"
+                aria-labelledby="new-owner-label"
+                className="max-h-72 space-y-2 overflow-y-auto rounded-lg border p-2"
+              >
+                {opsQ.isLoading &&
+                  [...Array(2)].map((_, index) => (
+                    <Skeleton key={index} className="h-16 w-full" />
+                  ))}
+
+                {opsQ.isError && (
+                  <div
+                    role="alert"
+                    className="rounded-md border border-destructive/30 bg-destructive/5 p-3"
+                  >
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">
+                          Could not load Operations staff
+                        </p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {(opsQ.error as Error).message}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => opsQ.refetch()}
+                      >
+                        Retry
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {!opsQ.isLoading && !opsQ.isError && opsStaff.length === 0 && (
+                  <div className="rounded-md border border-dashed p-4 text-center">
+                    <p className="text-sm font-medium">
+                      No active Operations staff found
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Add an Operations staff role before assigning an
+                      individual owner.
+                    </p>
+                  </div>
+                )}
+
+                {!opsQ.isLoading &&
+                  !opsQ.isError &&
+                  opsStaff.map((member) => {
+                    const selected = pickedOwnerId === member.id
+                    const current = currentOwnerId === member.id
+                    return (
+                      <button
+                        key={member.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        onClick={() => setPickedOwnerId(member.id)}
+                        className={
+                          selected
+                            ? "flex w-full items-center gap-3 rounded-md border border-primary bg-primary/5 p-3 text-left ring-1 ring-primary transition-colors"
+                            : "flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/50"
+                        }
+                      >
+                        <div className="rounded-full bg-primary/10 p-2 text-primary">
+                          <UserRound className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="truncate text-sm font-medium">
+                              {member.name || member.email}
+                            </p>
+                            {current && (
+                              <Badge variant="secondary">Current</Badge>
+                            )}
+                          </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {member.email}
+                          </p>
+                        </div>
+                        {selected && <Check className="h-4 w-4 text-primary" />}
+                      </button>
+                    )
+                  })}
+
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={pickedOwnerId === null}
+                  onClick={() => setPickedOwnerId(null)}
+                  className={
+                    pickedOwnerId === null
+                      ? "flex w-full items-center gap-3 rounded-md border border-primary bg-primary/5 p-3 text-left ring-1 ring-primary transition-colors"
+                      : "flex w-full items-center gap-3 rounded-md border p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted/50"
+                  }
+                >
+                  <div className="rounded-full bg-amber-500/10 p-2 text-amber-600">
+                    <Inbox className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">Shared Ops queue</p>
+                      {currentOwnerId === null && (
+                        <Badge variant="secondary">Current</Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      New work remains unassigned for the team to claim.
+                    </p>
+                  </div>
+                  {pickedOwnerId === null && (
+                    <Check className="h-4 w-4 text-primary" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="reassignment-reason">Reason (audit log)</Label>
+                <span className="text-xs text-muted-foreground">
+                  Optional · {normalizedReason.length}/200
+                </span>
+              </div>
               <Input
+                id="reassignment-reason"
                 placeholder="e.g. workload rebalance, vacation handoff"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 maxLength={200}
+                aria-invalid={reasonInvalid}
               />
+              {reasonInvalid && (
+                <p className="text-xs text-destructive">
+                  Use at least 10 characters so the audit reason is meaningful.
+                </p>
+              )}
             </div>
+
+            {reassignMut.isError && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/5 p-3"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+                <div>
+                  <p className="text-sm font-medium">Assignment not saved</p>
+                  <p className="text-xs text-muted-foreground">
+                    {(reassignMut.error as Error).message}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReassignFor(null)}>
+            <Button variant="outline" onClick={closeReassignDialog}>
               Cancel
             </Button>
             <Button
               onClick={() =>
                 reassignFor &&
+                pickedOwnerId !== undefined &&
                 reassignMut.mutate({
                   id: reassignFor.id,
-                  managedByUserId:
-                    pickedOwnerId === "__unassigned__" ? null : pickedOwnerId,
-                  reason,
+                  managedByUserId: pickedOwnerId,
+                  reason: normalizedReason,
                 })
               }
-              disabled={!pickedOwnerId || reassignMut.isPending}
+              disabled={!ownerChanged || reasonInvalid || reassignMut.isPending}
             >
-              {reassignMut.isPending ? "Saving..." : "Save"}
+              {reassignMut.isPending ? "Saving..." : "Save assignment"}
             </Button>
           </DialogFooter>
         </DialogContent>

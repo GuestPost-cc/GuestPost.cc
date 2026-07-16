@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: marketplace
 project: guestpost-platform
-updated: 2026-06-28
+updated: 2026-07-16
 ---
 
 # Marketplace
@@ -18,6 +18,8 @@ Customer flow (locked after listing-detail pick):
 2. Open listing → service picker shows AVAILABLE + WAITLIST rows.
 3. Pick a service → `listingServiceId` is locked. The order wizard collapses Service+Website into a read-only summary and cannot back-step.
 4. `POST /orders` body carries `listingServiceId` + `briefData` (per-service Zod-validated payload). Server snapshots `serviceType`, `amount`, `turnaroundDays`, `fulfillmentChannel`, `listingId`, `listingServiceId`, `briefData` onto the order — later listing edits never alter an in-flight contract.
+
+Marketplace discovery is authenticated. The marketing website has no `/marketplace` route or navigation link, and all marketplace browse endpoints (listings, detail, service picker, categories, tags, services, search, and stats) use the API's global session guard. Customer browsing remains at `/dashboard/marketplace` in the portal.
 
 ## Lifecycle phase (derived UI state)
 
@@ -46,6 +48,8 @@ Portal `<BriefForm serviceType={…}>` ([apps/portal/src/components/BriefForm.ts
 - PUBLISHER → publisher display name
 
 For PLATFORM sites, `Website.managedByUserId` points at the OPERATIONS staffer who owns the site. Set on `POST /admin/websites` when creator is OPERATIONS; mutable via `PATCH /admin/websites/:id/assign` (validates target role; audit-logs from/to). In-flight orders' `FulfillmentAssignment` rows are NOT migrated on reassignment — only new orders route to the new owner.
+
+The July platform-management update makes this assignment an access boundary: OPERATIONS staff can list only websites and marketplace listings assigned to them, while only `SUPER_ADMIN` can reassign a website. Staff marketplace listing filters also support `ownerType`.
 
 ## Per-service endpoints
 
@@ -98,6 +102,14 @@ For PLATFORM sites, `Website.managedByUserId` points at the OPERATIONS staffer w
 ## Marketplace Order Page (Portal)
 
 - Single-page order form at `/dashboard/marketplace/[slug]/order` bypasses 5-step wizard when coming from a listing. Listing summary card + BriefForm + campaign selector + Place Order → `POST /orders` → redirects to `/dashboard/orders/checkout/{id}`.
+
+## Buyer URL Visibility (2026-07-13)
+
+The buyer portal blurs a publisher website URL until the customer has made a successful deposit. A positive balance or any recorded `DEPOSIT` transaction unlocks it permanently; an order draft alone does not. This is a portal presentation rule, not a replacement for server-side authorization.
+
+## One Listing per Website (2026-07-13)
+
+The database enforces one marketplace listing per website. The publisher UI can search existing inventory and create/reorder the listing's services without creating a second listing for the same site.
 
 ## Features
 

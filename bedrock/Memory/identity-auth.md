@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: identity-auth
 project: guestpost-platform
-updated: 2026-07-10
+updated: 2026-07-16
 ---
 
 # Identity & Auth
@@ -31,6 +31,13 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 
 30s per-instance TTL cache (`common/auth-context-cache.ts`, 10K-entry cap). Session still verified every request. Explicit invalidation on context switch, membership invite/remove, role changes. `PermissionsGuard` (decrypt) deliberately uncached.
 
+## Mutation Security (2026-07-16)
+
+- `BETTER_AUTH_SECRET` is mandatory; the guard no longer has a fallback signing secret.
+- State-changing requests with an `Origin` or `Referer` must match the configured CORS-origin allowlist.
+- Email verification is required for state-changing operations by CUSTOMER, PUBLISHER, and STAFF actors. Read routes, sign-out, and verification/resend paths remain exempt so a user can recover access.
+- Session rotation creates the replacement session and deletes the old one in one transaction.
+
 ## Key Models
 
 - `User`, `Session`, `Account`, `Verification` — Better-Auth managed
@@ -48,6 +55,14 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 - `apps/publisher/src/app/page.tsx` is the PUBLISHER portal login/signup route. It preserves the publisher conversion flow through `/api/v1/identity/become-publisher`, validates `session.user.userType === "PUBLISHER"`, and redirects to the safe `returnTo` or `/dashboard`.
 - Both routes use shared `@guestpost/ui` auth presentation primitives (`AuthLayout`, `AuthCard`, `AuthProviders`, `LoginForm`, `SignupForm`) with app-specific marketing copy and submit labels.
 
+## Auth Input Validation (2026-07-16)
+
+- Login, signup, forgot-password, and reset-password forms use shared Zod schemas that reject missing and whitespace-only values, trim name/email input, and enforce explicit length limits.
+- `@guestpost/ui` uses a Zod 4-compatible `@hookform/resolvers` release for the shared auth forms; the previous v3 resolver rejected with an uncaught `ZodError` instead of populating React Hook Form field errors.
+- CUSTOMER and PUBLISHER email signup requires `termsAccepted: true` and displays a required Terms of Service checkbox. STAFF/admin has no signup flow and therefore no Terms checkbox.
+- The Better Auth request hook re-validates email login, email signup, and password-reset requests server-side. Terms acceptance is validated before account creation and then removed as a request-only field before the database adapter runs.
+- Auth transport errors map duplicate accounts, invalid email/password lengths, rate limits, and server failures to recoverable user-facing messages; form-level API errors use accessible alert semantics.
+
 ## Key Files
 
 - `apps/api/src/modules/active-context/`
@@ -57,6 +72,7 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 - `apps/api/src/common/decorators/`
 - `apps/api/src/common/auth-context-cache.ts`
 - `packages/auth/` — Better-Auth config
+- `packages/auth/src/request-validation.ts` — server-side validation for public email auth endpoints
 - `packages/ui/src/components/auth-layout.tsx` — shared split-screen auth layout used by app login/reset flows
 - `packages/ui/src/components/auth-card.tsx` — shared auth card shell
 - `packages/ui/src/components/login-form.tsx` and `packages/ui/src/components/signup-form.tsx` — shared email/password auth forms

@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: orders-fulfillment
 project: guestpost-platform
-updated: 2026-06-14
+updated: 2026-07-16
 ---
 
 # Orders & Fulfillment
@@ -49,6 +49,8 @@ At creation, the order locks in immutable references to the customer's pick. The
 
 When `OrdersService.create` resolves the snapshot and `fulfillmentChannel=PLATFORM`, the same txn creates a `FulfillmentAssignment` row (`assignedToUserId = website.managedByUserId`, status=ASSIGNED, metadata `{auto: true}`). If the site has no `managedByUserId` the order falls back to the shared unassigned-Ops queue surfaced by `operationsQueue()`.
 
+Admin ownership reassignment loads its eligible owner roster from the static `GET /admin/staff/operations` route. Keep this route outside the `/admin/users/*` namespace: a prior `/admin/users/ops` route was shadowed by `/admin/users/:id` and returned `User not found`. The roster includes only non-banned users with an active `OPERATIONS` staff membership. Reassignment changes routing for new work only; in-flight assignments remain unchanged.
+
 ## Audit metadata standard
 
 All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites spread the output of `packages/shared/src/audit/order-event-metadata.ts:orderEventMetadata(order)` into `metadata` — guarantees every audit row carries `{listingId, listingServiceId, serviceType, fulfillmentChannel, ownerType, websiteId, amount}`. Currently applied at SETTLEMENT_CREATED + ORDER_REFUNDED; more callsites to follow.
@@ -73,6 +75,14 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 - Critical statuses (PAID, ACCEPTED, VERIFIED, SETTLED, COMPLETED, REFUNDED) are system-only
 - `forceCancel` delegates refund to `RefundService`
 - `confirmDelivery`/settlement non-atomic fixed to single transaction
+
+## Delivery and Settlement Operations (2026-07-12)
+
+- The worker runs repeatable auto-accept and settlement auto-release sweeps; their payloads are signed and the registry guards against drift between scheduled jobs and processors.
+- Settlement review auto-approval consumes `QUEUES.SETTLEMENT`, while auto-release consumes the dedicated `QUEUES.SETTLEMENT_RELEASE`. BullMQ workers must not independently filter different job names from one shared queue because either worker can claim and discard the other's job; startup removes legacy auto-release repeatables from the old queue.
+- `SettlementApproval` timestamps are exposed as `approvedAt` (not `createdAt`), and `approvedBy` is a user ID or a `SYSTEM_*` actor token. The admin order-detail API enriches human approvers as `approvedByUser`; UI renderers must retain system-token labels and defensively handle missing/invalid timestamps.
+- Delivery verification can be reviewed from the staff queue, including evidence and intervention actions. Customer and staff views expose the review-window countdown.
+- Manual settlement approval requires a reason and is restricted to `SUPER_ADMIN`; automatic paths continue to follow the configured review-window policy.
 
 ## Key Models
 

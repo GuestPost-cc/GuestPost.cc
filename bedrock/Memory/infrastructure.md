@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-06-22
+updated: 2026-07-16
 ---
 
 # Infrastructure
@@ -12,6 +12,12 @@ updated: 2026-06-22
 Currently **laptop-only** for development. A 2GB VPS attempt at `103.42.5.163` (Ubuntu 24.04, BDIX-class provider) was provisioned + bootstrapped + populated with the full stack on 2026-06-14, then deleted same day — Next dev mode + nest --watch + tsx --watch + Docker (postgres/redis/mailpit) exceeded RAM and the first compiled request hung. The repo was scrubbed of VPS artifacts (`infrastructure/vps/`, `infrastructure/caddy/`, `infrastructure/docker/docker-compose.staging.yml`, per-app Dockerfiles, `scripts/vps-sync.sh`, `.env.vps.example`, README VPS section, plan-file Part 2 — all gone).
 
 Shared dev/testing host is an **open question** (see `bedrock/Work/open-questions.md`): bigger VPS, cloud sandbox (Railway/Fly/Render), or production-build (`next build` once + `next start`) instead of dev mode to cut RAM. The image-based staging path was NOT tried — would be significantly cheaper at runtime.
+
+## Render Blueprint (configuration only)
+
+`render.yml` defines the intended Render topology: one API, one worker, and four Next.js web services in the Singapore region, all built from the monorepo root. It is configuration, not evidence that a deployment is healthy.
+
+Secrets must be supplied by Render's environment configuration rather than committed to the blueprint. The current blueprint violates that rule for its database setting; the required rotation and removal are tracked in `Work/risks.md`.
 
 
 
@@ -47,7 +53,7 @@ Steps: checkout → pnpm install → build deps → migrate DB → typecheck →
 
 ## Dev Commands
 
-- `pnpm dev:all` — compose + all apps (stable local stack)
+- `pnpm dev:all` — compose + all apps (stable local stack); after the production build it removes only `apps/*/.next/dev` before starting Next dev servers so stale development route manifests cannot hide valid app-router pages.
 - `pnpm -F @guestpost/api test` — unit jest project only (fast feedback; ~5s for 47 suites / 652 tests)
 - `pnpm -F @guestpost/api test:integration` — integration jest project only (real-DB; ~3s/spec)
 - `pnpm -F @guestpost/api test:all` — both projects (48 suites / 653 tests as of 2026-06-22)

@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: publisher-payouts
 project: guestpost-platform
-updated: 2026-06-11
+updated: 2026-07-16
 ---
 
 # Publisher Payouts
@@ -20,9 +20,13 @@ Tier-based holds enforced at approval:
 
 Idempotency via `@@unique([publisherId, idempotencyKey])`. Ledger rows: `WITHDRAWAL` at request, `WITHDRAWAL_REVERSAL` at reject.
 
+Approval is a single transaction, not a pre-check followed by a mutation. It re-validates the pending status, tier hold, publisher ban, active membership, withdrawable balance, active payout method, and absence of an in-flight execution before a version-guarded transition. Every rejected precondition creates a `WITHDRAWAL_APPROVAL_BLOCKED` audit event with a structured reason code.
+
 ## Payout Methods
 
 Stored encrypted (AES-256-GCM) via `PayoutEncryptionService`. Types: bank_transfer, paypal, wise. Decrypt endpoint is permission-gated (`FINANCIAL_DATA_DECRYPT` permission + reason required).
+
+Decrypt audit context uses the server-resolved request IP and user agent; it does not trust a caller-supplied forwarding header.
 
 ## Payout Providers
 

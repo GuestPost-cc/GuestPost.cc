@@ -200,12 +200,26 @@ async function registerSettlementAutoApproveSweep(): Promise<RegisteredJob> {
 // settlements with releasePolicy=AUTO and releases them (balance update,
 // order complete, transactions). Default every 15 min, tunable via env.
 async function registerSettlementAutoReleaseSweep(): Promise<RegisteredJob> {
+  // Auto-approve and auto-release used to share QUEUES.SETTLEMENT even though
+  // they have separate workers. BullMQ distributes a queue's jobs across all
+  // workers, so the wrong processor could claim and skip a sweep. Remove any
+  // legacy repeatable release jobs from the shared queue before using the
+  // dedicated release queue.
+  await removeRepeatableJobsByName(QUEUES.SETTLEMENT, "settlement-auto-release")
+  await removeRepeatableJobsByName(
+    QUEUES.SETTLEMENT_RELEASE,
+    "settlement-auto-release",
+  )
+
   if (process.env.SETTLEMENT_AUTO_RELEASE_DISABLED === "true") {
     logger.info(
       "settlement auto-release disabled — skipping cron registration",
       { env: "SETTLEMENT_AUTO_RELEASE_DISABLED" },
     )
-    return { name: "settlement-auto-release", queue: QUEUES.SETTLEMENT }
+    return {
+      name: "settlement-auto-release",
+      queue: QUEUES.SETTLEMENT_RELEASE,
+    }
   }
   const everyMs = Math.max(
     Number(process.env.SETTLEMENT_AUTO_RELEASE_INTERVAL_MS ?? 15 * 60 * 1000),
@@ -215,10 +229,7 @@ async function registerSettlementAutoReleaseSweep(): Promise<RegisteredJob> {
     Math.max(Number(process.env.SETTLEMENT_AUTO_RELEASE_BATCH_SIZE) || 100, 1),
     10_000,
   )
-  const queue = new Queue(QUEUES.SETTLEMENT, { connection })
-  await queue
-    .removeRepeatable("settlement-auto-release", { every: everyMs })
-    .catch(() => {})
+  const queue = new Queue(QUEUES.SETTLEMENT_RELEASE, { connection })
   await queue.add("settlement-auto-release", signJobPayload({ batchSize }, 0), {
     repeat: { every: everyMs },
     jobId: "settlement-auto-release",
@@ -231,7 +242,27 @@ async function registerSettlementAutoReleaseSweep(): Promise<RegisteredJob> {
     intervalMin: everyMs / 60000,
     batchSize,
   })
-  return { name: "settlement-auto-release", queue: QUEUES.SETTLEMENT }
+  return {
+    name: "settlement-auto-release",
+    queue: QUEUES.SETTLEMENT_RELEASE,
+  }
+}
+
+async function removeRepeatableJobsByName(
+  queueName: string,
+  jobName: string,
+): Promise<void> {
+  const queue = new Queue(queueName, { connection })
+  try {
+    const jobs = await queue.getRepeatableJobs()
+    await Promise.all(
+      jobs
+        .filter((job) => job.name === jobName)
+        .map((job) => queue.removeRepeatableByKey(job.key)),
+    )
+  } finally {
+    await queue.close()
+  }
 }
 
 // Phase 1 — auto-accept sweep: processes orders past their review window.
