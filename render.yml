@@ -1,117 +1,234 @@
-# GuestPost.cc — Render Blueprint
+# GuestPost.cc Render Blueprint
 #
-# Six stateless services sharing one Postgres (Neon) and one Redis (Render KV).
-# All services use rootDir: "." so pnpm/turbo resolve the monorepo workspace.
+# Target environment: internal staging on guestpost.pro.bd.
+# External infrastructure is intentionally bring-your-own:
+# - Postgres: Neon
+# - Redis: Upstash
+# - Mail: Resend SMTP
+# - Object storage: Cloudflare R2
 #
-# NOTE: Secrets (JWT_SECRET, QUEUE_SIGNING_SECRET, R2 credentials, etc.) are
-# NOT stored in this file. Set them in each service's Render dashboard under
-# Environment -> Environment Variables after the initial deploy.
+# Do not place real credentials in this file. Values marked sync: false are
+# filled in the Render Dashboard during Blueprint creation/sync.
+
+previews:
+  generation: "off"
 
 services:
-  # ────────────────────────────────────────────────────────
-  # 1. BACKGROUND TASK ENGINE (apps/worker)
-  # ────────────────────────────────────────────────────────
-  - type: worker
-    name: guestpost-worker
-    runtime: node
-    plan: free
-    region: singapore
-    rootDir: .
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/worker
-    startCommand: cd apps/worker && node dist/index.js
-    envVars:
-      - key: NODE_ENV
-        value: development
-      - key: DATABASE_URL
-        value: postgresql://neondb_owner:npg_iPQ4u9csUmAV@ep-jolly-bonus-aoh6som9-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-
-  # ────────────────────────────────────────────────────────
-  # 2. CENTRAL BACKEND API (apps/api) -- NestJS
-  # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-api
     runtime: node
     plan: free
     region: singapore
+    branch: main
     rootDir: .
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/api
+    autoDeployTrigger: checksPass
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/api...
     startCommand: cd apps/api && node dist/main.js
     healthCheckPath: /api/v1/health
+    domains:
+      - api.guestpost.pro.bd
     envVars:
       - key: NODE_ENV
-        value: development
+        value: production
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: LOG_FORMAT
+        value: json
       - key: DATABASE_URL
-        value: postgresql://neondb_owner:npg_iPQ4u9csUmAV@ep-jolly-bonus-aoh6som9-pooler.c-2.ap-southeast-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-      - key: BETTER_AUTH_URL
-        value: https://api.guestpost.cc
-      - key: API_BASE_URL
-        value: https://api.guestpost.cc/api/v1
+        sync: false
+      - key: DIRECT_DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BETTER_AUTH_SECRET
+        generateValue: true
+      - key: QUEUE_SIGNING_SECRET
+        sync: false
+      - key: PAYOUT_ENCRYPTION_KEY
+        sync: false
+      - key: INTEGRATION_ENCRYPTION_KEY
+        sync: false
+      - key: TRUSTED_ORIGINS
+        value: https://guestpost.pro.bd,https://app.guestpost.pro.bd,https://publisher.guestpost.pro.bd,https://admin.guestpost.pro.bd,https://api.guestpost.pro.bd
       - key: CORS_ORIGIN
-        value: https://guestpost.cc,https://app.guestpost.cc,https://publisher.guestpost.cc,https://admin.guestpost.cc
+        value: https://guestpost.pro.bd,https://app.guestpost.pro.bd,https://publisher.guestpost.pro.bd,https://admin.guestpost.pro.bd
+      - key: BETTER_AUTH_URL
+        value: https://api.guestpost.pro.bd
+      - key: API_BASE_URL
+        value: https://api.guestpost.pro.bd/api/v1
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.guestpost.pro.bd
+      - key: NEXT_PUBLIC_WEBSITE_URL
+        value: https://guestpost.pro.bd
+      - key: NEXT_PUBLIC_PORTAL_URL
+        value: https://app.guestpost.pro.bd
+      - key: NEXT_PUBLIC_PUBLISHER_URL
+        value: https://publisher.guestpost.pro.bd
+      - key: OAUTH_STATE_COOKIE_SAMESITE
+        value: none
+      - key: OAUTH_STATE_COOKIE_SECURE
+        value: "true"
+      - key: PRISMA_POOL_MAX
+        value: "10"
+      - key: PLATFORM_FEE_PERCENT
+        value: "20"
+      - key: SMTP_HOST
+        value: smtp.resend.com
+      - key: SMTP_PORT
+        value: "2587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        value: resend
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        value: GuestPost <noreply@guestpost.pro.bd>
+      - key: R2_ENDPOINT
+        sync: false
+      - key: R2_BUCKET
+        value: guestpost-dev
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: staging
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.05"
 
-  # ────────────────────────────────────────────────────────
-  # 3. ADVERTISER / BUYER PORTAL (apps/portal) -- Next.js
-  # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-portal
     runtime: node
     plan: free
     region: singapore
+    branch: main
     rootDir: .
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/portal
-    startCommand: cd apps/portal && npx next start --port $PORT
+    autoDeployTrigger: checksPass
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/portal...
+    startCommand: cd apps/portal && npx next start --hostname 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    domains:
+      - app.guestpost.pro.bd
     envVars:
       - key: NODE_ENV
-        value: development
+        value: production
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: DATABASE_URL
+        sync: false
       - key: NEXT_PUBLIC_API_URL
-        value: https://api.guestpost.cc
+        value: https://api.guestpost.pro.bd
+      - key: NEXT_PUBLIC_WEBSITE_URL
+        value: https://guestpost.pro.bd
+      - key: NEXT_PUBLIC_PORTAL_URL
+        value: https://app.guestpost.pro.bd
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: staging
 
-  # ────────────────────────────────────────────────────────
-  # 4. PUBLISHER PORTAL (apps/publisher) -- Next.js
-  # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-publisher
     runtime: node
     plan: free
     region: singapore
+    branch: main
     rootDir: .
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/publisher
-    startCommand: cd apps/publisher && npx next start --port $PORT
+    autoDeployTrigger: checksPass
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/publisher...
+    startCommand: cd apps/publisher && npx next start --hostname 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    domains:
+      - publisher.guestpost.pro.bd
     envVars:
       - key: NODE_ENV
-        value: development
+        value: production
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: DATABASE_URL
+        sync: false
       - key: NEXT_PUBLIC_API_URL
-        value: https://api.guestpost.cc
+        value: https://api.guestpost.pro.bd
+      - key: NEXT_PUBLIC_WEBSITE_URL
+        value: https://guestpost.pro.bd
+      - key: NEXT_PUBLIC_PORTAL_URL
+        value: https://app.guestpost.pro.bd
+      - key: NEXT_PUBLIC_PUBLISHER_URL
+        value: https://publisher.guestpost.pro.bd
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: staging
 
-  # ────────────────────────────────────────────────────────
-  # 5. STAFF ADMIN SUITE (apps/admin) -- Next.js
-  # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-admin
     runtime: node
     plan: free
     region: singapore
+    branch: main
     rootDir: .
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/admin
-    startCommand: cd apps/admin && npx next start --port $PORT
+    autoDeployTrigger: checksPass
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/admin...
+    startCommand: cd apps/admin && npx next start --hostname 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    domains:
+      - admin.guestpost.pro.bd
     envVars:
       - key: NODE_ENV
-        value: development
+        value: production
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: DATABASE_URL
+        sync: false
       - key: NEXT_PUBLIC_API_URL
-        value: https://api.guestpost.cc
+        value: https://api.guestpost.pro.bd
+      - key: NEXT_PUBLIC_PORTAL_URL
+        value: https://app.guestpost.pro.bd
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: staging
 
-  # ────────────────────────────────────────────────────────
-  # 6. PUBLIC MARKETING WEBSITE (apps/website) -- Next.js
-  # ────────────────────────────────────────────────────────
   - type: web
     name: guestpost-website
     runtime: node
     plan: free
     region: singapore
+    branch: main
     rootDir: .
-    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/website
-    startCommand: cd apps/website && npx next start --port $PORT
+    autoDeployTrigger: checksPass
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm turbo build --filter=@guestpost/website...
+    startCommand: cd apps/website && npx next start --hostname 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    domains:
+      - guestpost.pro.bd
     envVars:
       - key: NODE_ENV
-        value: development
-
+        value: production
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: DATABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_API_URL
+        value: https://api.guestpost.pro.bd
+      - key: NEXT_PUBLIC_WEBSITE_URL
+        value: https://guestpost.pro.bd
+      - key: NEXT_PUBLIC_PORTAL_URL
+        value: https://app.guestpost.pro.bd
+      - key: NEXT_PUBLIC_PUBLISHER_URL
+        value: https://publisher.guestpost.pro.bd
+      - key: NEXT_PUBLIC_SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: staging
