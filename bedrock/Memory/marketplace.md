@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: marketplace
 project: guestpost-platform
-updated: 2026-07-16
+updated: 2026-07-18
 ---
 
 # Marketplace
@@ -73,16 +73,15 @@ The July platform-management update makes this assignment an access boundary: OP
 - Marketplace stats include `totalServices`, `activeServices`, `servicesByType` (per-`ServiceType` count + avg price)
 - Analytics: `MarketplaceListingClick.serviceType` + `MarketplaceSearchHistory.serviceType` capture which service the user picked / filtered
 
-## Publisher Portal UX (2026-06-28 — `apps/publisher/src/app/dashboard/listings/page.tsx`)
+## Publisher Inventory UX (updated 2026-07-18)
 
-- **Create dialog**: Legacy `type` dropdown + `price` input removed (Phase 7 no-ops). Added "Add a service now" checkbox with inline service form (type, price, TAT, revisions, warrantyDays, currency). `POST /marketplace/listings` accepts optional `services[]` — listing created with first service in one step.
-- **Edit listing modal** (NEW): Per-row "Edit" button opens modal for title/description via `PUT /marketplace/listings/:id`.
-- **Services dialog redesign**: 
-  - Inline "Edit" mode per service row — edits price, TAT, revisions, warrantyDays, currency (USD/EUR/GBP) with version-guarded PATCH
-  - Removed duplicate "Pause" button (availability dropdown is single source of truth)
-  - Added `warrantyDays` + `currency` columns to add-service form
-  - `revisionRounds` column added to service table
-- **Lifecycle**: REJECTED listings show "Resubmit for review" button (calls `submitListingForReview` which now accepts REJECTED → PENDING_REVIEW)
+Publisher inventory now follows the same aggregate boundary as platform inventory: the Enlist Website flow creates the publisher website and its single DRAFT listing atomically. The form captures URL/location/metrics, buyer-facing title, a required marketplace category, a description of at most 500 characters, and an optional first service. It redirects to the website workspace rather than exposing a second standalone listing-creation path.
+
+The publisher website detail page is the management home for its listing. It combines listing metadata, review-readiness checks, DNS ownership status, lifecycle actions, and the complete service menu. Service price, turnaround, revisions, warranty, currency, and availability remain version-guarded per row; historical orders retain their checkout snapshot. Submission requires a verified domain, category, 1–500 character description, and at least one AVAILABLE service. DRAFT, REJECTED, and ARCHIVED listings can enter moderation.
+
+The Listings page is a searchable overview with status, service, and category filters plus readiness and service-count summaries. It links into the website workspace for edits. Publisher metadata updates are server-allowlisted to title, description, category, tags, do-follow policy, and sample URL; publishers cannot change moderation status, featured/verified state, ownership, website association, metrics, or services through the general metadata endpoint.
+
+Buyer marketplace ownership labels use brand-separated colors everywhere: PLATFORM is purple and PUBLISHER is blue. Listing cards clamp descriptions to two lines with an ellipsis, while detail pages render the complete description. The buyer filter sidebar uses padded groups and additional label-to-control spacing.
 
 ## Admin Portal UX (2026-06-28 — `apps/admin/src/app/dashboard/marketplace/page.tsx` + `[slug]/page.tsx`)
 
@@ -107,9 +106,23 @@ The July platform-management update makes this assignment an access boundary: OP
 
 The buyer portal blurs a publisher website URL until the customer has made a successful deposit. A positive balance or any recorded `DEPOSIT` transaction unlocks it permanently; an order draft alone does not. This is a portal presentation rule, not a replacement for server-side authorization.
 
-## One Listing per Website (2026-07-13)
+## Buyer Marketplace Decision Flow (2026-07-18)
 
-The database enforces one marketplace listing per website. The publisher UI can search existing inventory and create/reorder the listing's services without creating a second listing for the same site.
+The customer marketplace is service-aware from discovery through checkout. Browse cards prioritize the information needed to compare a purchase: selected-service or starting price, service type, turnaround, DR, traffic, fulfillment attribution, review evidence, and URL-access state. Discovery supports deferred text search, quick service chips, category/service/budget/DR/traffic/turnaround/country/language filters, removable active-filter pills, mobile filters, and stable pagination.
+
+Filtering by a service makes each card quote that service rather than an unrelated listing minimum. Price sorting also operates on the minimum matching AVAILABLE `ListingService.price`; it no longer references the removed listing-level price column. Text search includes listing title/description/slug plus category and tag names, and country/language matching is case-insensitive.
+
+The detail page presents the service picker as the primary decision surface on mobile and a sticky purchase card on desktop. It preserves first-deposit URL protection, explains that access rule without rendering fake/blurred domain text, separates PLATFORM versus PUBLISHER fulfillment expectations, surfaces reviews and related inventory, and sends the chosen immutable `listingServiceId` into order creation. WAITLIST services create service-scoped favorites so a buyer can request availability notifications without making the service orderable.
+
+## One Listing per Domain (updated 2026-07-18)
+
+Canonical domains are globally unique across publisher and platform websites. Each website retains one listing (archived listings are restored/resubmitted rather than replaced), and every sellable offering is a `ListingService` beneath it. The active-listing database constraint remains the concurrency boundary while application workflows preserve the same listing id for its lifetime.
+
+Platform websites are created only from `/dashboard/websites`. Creation writes the PLATFORM website plus its single DRAFT listing atomically; Marketplace has no independent platform-listing creation path. Platform listings and their services are edited from the Platform Website detail page.
+
+`SUPER_ADMIN` controls platform website field edits, reassignment, pause/archive, featured/verified state, and publisher service corrections. `OPERATIONS` can create platform websites, which are always assigned to the creator, and can add/update/pause services only on assigned platform sites. Operations remains read-only for publisher listing services and can perform listing moderation (`APPROVED`, `REJECTED`, `PAUSED`).
+
+Platform websites start `VERIFIED` because DNS ownership verification is not required. GSC and GA4 remain separate OAuth performance-data links. Their credentials use `{ownerType: PLATFORM, ownerId: websiteId}`, so Super Admin and the assigned Operations owner can configure and sync a site without exposing another site's Google account. The chosen Google identity is independent of the GuestPost login identity.
 
 ## Features
 

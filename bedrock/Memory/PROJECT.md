@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # GuestPost.cc
@@ -36,7 +36,7 @@ Open/partial items require architectural design discussion.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 817 unit tests + integration tests
+- **apps/api** — NestJS REST API, 849 unit tests + integration tests
 - **apps/worker** — BullMQ queue processor
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard
@@ -57,6 +57,8 @@ Open/partial items require architectural design discussion.
 - Job signing with configurable secret (QUEUE_SIGNING_SECRET / JWT_SECRET fallback)
 - Publisher integrations are a top-level dashboard area at `/dashboard/integrations`, separate from Settings; sidebar active-state matching uses path-segment boundaries to avoid selecting Settings for integration pages.
 - Publisher website ownership is proven via DNS TXT verification, not Google Search Console. GSC links search performance data after OAuth. DNS verification jobs require the worker queue process, and GSC OAuth requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, plus an authorized redirect URI matching `${API_BASE_URL}/integrations/GOOGLE_SEARCH_CONSOLE/callback`.
+- Google OAuth identity is independent of the signed-in GuestPost identity. OAuth always presents Google's account chooser; credentials are encrypted and scoped by integration owner so the same Google account can be connected separately by a publisher and the platform. Callback return paths are app-relative and resolved server-side against the configured publisher/admin origins.
+- Platform websites skip DNS and are created with one DRAFT platform listing in the same transaction. An Operations-created site is forcibly assigned to its creator, and new platform orders use that assignment automatically. GSC/GA4 credentials are isolated by platform website; Super Admin and the assigned Operations owner can connect, link, unlink, and sync from the site page.
 - Order cancellation is a dedicated domain workflow, not a generic status mutation. `packages/shared/src/order-cancellation-policy.ts` owns the stage/channel decision matrix and `OrderCancellationRequest` retains structured case history.
 - Pre-acceptance exits are immediate; accepted work requires counterparty consent or Operations review plus Finance approval; published/delivered/completed work uses the dispute path. An active case holds fulfillment and increments `Order.version` to close transition races. Publisher actions require a publisher owner, and platform-fulfiller actions require the assigned Operations user (or Super Admin).
 - Paid refunds use one transaction-aware path that reverses platform revenue or publisher settlement, cancels active assignments, credits the organization wallet, transitions the order, and writes ledger/event/audit records together. `Order.refundResponsibility` prevents platform/customer-attributed refunds from lowering publisher trust.

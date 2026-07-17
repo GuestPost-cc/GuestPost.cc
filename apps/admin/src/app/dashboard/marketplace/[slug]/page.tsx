@@ -33,8 +33,8 @@ import Link from "next/link"
  * session gate), so the public view is rendered here from the same public
  * API the portal uses — what staff see is what customers see.
  *
- * Action visibility mirrors the backend guards exactly:
- * status/featured/verified mutations are SUPER_ADMIN + OPERATIONS routes.
+ * Action visibility mirrors the backend guards: Operations moderates status;
+ * inventory flags and service edits are Super Admin-only.
  */
 import { use, useState } from "react"
 import { toast } from "sonner"
@@ -79,6 +79,7 @@ function AdminListingPreviewPageInner({
   // Moderation is SUPER_ADMIN/OPERATIONS on the backend.
   const canModerate =
     user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
+  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
 
   const {
     data: listing,
@@ -384,7 +385,7 @@ function AdminListingPreviewPageInner({
                 Unpause
               </Button>
             )}
-            {listing.status !== "ARCHIVED" && (
+            {isSuperAdmin && listing.status !== "ARCHIVED" && (
               <Button
                 size="sm"
                 variant="outline"
@@ -394,22 +395,26 @@ function AdminListingPreviewPageInner({
                 Archive
               </Button>
             )}
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => featuredMutation.mutate(!listing.featured)}
-            >
-              {listing.featured ? "Remove Featured" : "Mark Featured"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => verifiedMutation.mutate(!listing.verified)}
-            >
-              {listing.verified ? "Remove Verified" : "Mark Verified"}
-            </Button>
+            {isSuperAdmin && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => featuredMutation.mutate(!listing.featured)}
+                >
+                  {listing.featured ? "Remove Featured" : "Mark Featured"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => verifiedMutation.mutate(!listing.verified)}
+                >
+                  {listing.verified ? "Remove Verified" : "Mark Verified"}
+                </Button>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
@@ -458,21 +463,23 @@ function AdminListingPreviewPageInner({
                     >
                       {s.availability.toLowerCase()}
                     </Badge>
-                    {canModerate && s.availability !== "PAUSED" && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => pauseServiceMut.mutate(s.id)}
-                      >
-                        Pause
-                      </Button>
-                    )}
+                    {isSuperAdmin &&
+                      listing.ownerType === "PUBLISHER" &&
+                      s.availability !== "PAUSED" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => pauseServiceMut.mutate(s.id)}
+                        >
+                          Pause
+                        </Button>
+                      )}
                   </div>
                 </div>
               ))}
             </div>
           )}
-          {canModerate && (
+          {isSuperAdmin && listing.ownerType === "PUBLISHER" && (
             <div className="mt-4 border-t pt-4 space-y-3">
               <p className="text-sm font-medium">Add a service</p>
               <div className="grid grid-cols-4 gap-3">
@@ -541,6 +548,15 @@ function AdminListingPreviewPageInner({
                   {addServiceMut.isPending ? "Adding..." : "Add"}
                 </Button>
               </div>
+            </div>
+          )}
+          {listing.ownerType === "PLATFORM" && (
+            <div className="mt-4 border-t pt-4">
+              <Button asChild size="sm" variant="outline">
+                <Link href={`/dashboard/websites/${listing.website?.id}`}>
+                  Open in Platform Websites
+                </Link>
+              </Button>
             </div>
           )}
         </CardContent>

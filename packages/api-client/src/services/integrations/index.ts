@@ -27,13 +27,18 @@ export class IntegrationsService {
 
   // ─── OAuth ────────────────────────────────────────────────────
 
-  connect(provider: string, returnUrl: string): Promise<ConnectResponse> {
+  connect(
+    provider: string,
+    returnUrl: string,
+    platformWebsiteId?: string,
+  ): Promise<ConnectResponse> {
     return this.client.post<ConnectResponse>(
       `/integrations/${provider}/connect`,
       {
         json: {
           provider: provider as ConnectRequest["provider"],
           returnUrl,
+          platformWebsiteId,
         } satisfies ConnectRequest,
       },
     )
@@ -44,31 +49,44 @@ export class IntegrationsService {
   list(params?: {
     page?: number
     pageSize?: number
+    platformWebsiteId?: string
   }): Promise<IntegrationListResponse> {
     return this.client.get<IntegrationListResponse>("/integrations", {
       params: params as Record<string, string | number | boolean | undefined>,
     })
   }
 
-  get(id: string): Promise<IntegrationSummary> {
-    return this.client.get<IntegrationSummary>(`/integrations/${id}`)
+  get(id: string, platformWebsiteId?: string): Promise<IntegrationSummary> {
+    return this.client.get<IntegrationSummary>(`/integrations/${id}`, {
+      params: { platformWebsiteId },
+    })
   }
 
-  disconnect(id: string): Promise<void> {
-    return this.client.delete(`/integrations/${id}`)
+  disconnect(id: string, platformWebsiteId?: string): Promise<void> {
+    return this.client.delete(`/integrations/${id}`, {
+      params: { platformWebsiteId },
+    })
   }
 
   // ─── Discovery & Resources ────────────────────────────────────
 
-  discoverResources(id: string): Promise<EnqueueDiscoveryResponse> {
+  discoverResources(
+    id: string,
+    platformWebsiteId?: string,
+  ): Promise<EnqueueDiscoveryResponse> {
     return this.client.post<EnqueueDiscoveryResponse>(
       `/integrations/${id}/discover`,
+      { params: { platformWebsiteId } },
     )
   }
 
-  listResources(id: string): Promise<DiscoverResourcesResponse> {
+  listResources(
+    id: string,
+    platformWebsiteId?: string,
+  ): Promise<DiscoverResourcesResponse> {
     return this.client.get<DiscoverResourcesResponse>(
       `/integrations/${id}/resources`,
+      { params: { platformWebsiteId } },
     )
   }
 
@@ -86,9 +104,11 @@ export class IntegrationsService {
   unlinkProperty(
     integrationId: string,
     websiteIntegrationId: string,
+    platformWebsiteId?: string,
   ): Promise<void> {
     return this.client.delete(
       `/integrations/${integrationId}/link/${websiteIntegrationId}`,
+      { params: { platformWebsiteId } },
     )
   }
 
@@ -100,6 +120,7 @@ export class IntegrationsService {
       websiteIntegrationId?: string
       startDate?: string
       endDate?: string
+      platformWebsiteId?: string
     },
   ): Promise<TriggerSyncResponse> {
     return this.client.post<TriggerSyncResponse>(
@@ -108,13 +129,19 @@ export class IntegrationsService {
     )
   }
 
-  getSyncStatus(syncId: string): Promise<SyncJob> {
-    return this.client.get<SyncJob>(`/integrations/syncs/${syncId}`)
+  getSyncStatus(syncId: string, platformWebsiteId?: string): Promise<SyncJob> {
+    return this.client.get<SyncJob>(`/integrations/syncs/${syncId}`, {
+      params: { platformWebsiteId },
+    })
   }
 
-  rediscoverConnection(connectionId: string): Promise<{ enqueued: boolean }> {
+  rediscoverConnection(
+    connectionId: string,
+    platformWebsiteId?: string,
+  ): Promise<{ enqueued: boolean }> {
     return this.client.post<{ enqueued: boolean }>(
       `/integrations/connections/${connectionId}/rediscover`,
+      { params: { platformWebsiteId } },
     )
   }
 
@@ -127,6 +154,7 @@ export class IntegrationsService {
       trigger?: string
       dateFrom?: string
       dateTo?: string
+      platformWebsiteId?: string
     },
   ): Promise<SyncHistoryResponse> {
     return this.client.get<SyncHistoryResponse>(

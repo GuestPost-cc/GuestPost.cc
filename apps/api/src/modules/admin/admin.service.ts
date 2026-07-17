@@ -1052,14 +1052,40 @@ export class AdminService {
     if (!Object.values(ListingStatus).includes(status as ListingStatus)) {
       throw new BadRequestException(`Invalid listing status: ${status}`)
     }
+    const operationsModerationStatuses: ListingStatus[] = [
+      ListingStatus.APPROVED,
+      ListingStatus.REJECTED,
+      ListingStatus.PAUSED,
+    ]
+    if (
+      user?.staffRole === "OPERATIONS" &&
+      !operationsModerationStatuses.includes(status as ListingStatus)
+    ) {
+      throw new ForbiddenException(
+        "Operations can approve, reject, or pause listings but cannot edit their lifecycle history",
+      )
+    }
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { id },
       include: {
         publisher: { select: { email: true } },
         website: { select: { verificationStatus: true, domain: true } },
+        services: {
+          where: { availability: "AVAILABLE" },
+          take: 1,
+          select: { id: true },
+        },
       },
     })
     if (!listing) throw new NotFoundException("Listing not found")
+
+    if (status === ListingStatus.APPROVED && listing.services.length === 0) {
+      throw new BadRequestException({
+        code: "NO_AVAILABLE_SERVICES",
+        message:
+          "Cannot approve: add at least one available service to the listing first.",
+      })
+    }
 
     // Domain ownership gate: a publisher listing cannot be APPROVED until its
     // website is VERIFIED. Platform listings have no website (or a VERIFIED one)
@@ -1212,23 +1238,24 @@ export class AdminService {
   // ─── WEBSITE MANAGEMENT ─────────────────────────────
 
   async createPlatformWebsite(dto: any, user: any) {
+    const isOperations = user?.staffRole === "OPERATIONS"
+    if (!isOperations) this.assertWebsiteInventoryWriteAccess(user)
+
     const domain = normalizeDomain(dto.url)
+    const canonicalDomain = domain
     const existing = await this.prisma.website.findFirst({
-      where: { OR: [{ url: dto.url }, { domain }] },
+      where: { OR: [{ url: dto.url }, { domain }, { canonicalDomain }] },
     })
     if (existing)
       throw new BadRequestException(
         `Website with this domain already exists (${existing.url})`,
       )
 
-    // Phase 6.5 default ownership: an OPERATIONS staffer who adds a site is
-    // its default manager — auto-assignment + ticket routing flow through
-    // them on every order to come. SUPER_ADMIN creates can pass an explicit
-    // managedByUserId; if omitted the site stays NULL (shared Ops queue).
+    // An Operations-created site is always assigned to its creator. A crafted
+    // managedByUserId cannot transfer inventory; only Super Admin can select a
+    // different owner or use the separate reassignment workflow.
     let managedByUserId: string | null = null
-    if (user.staffRole === "OPERATIONS") {
-      // An Operations user always owns a site they enlist. They cannot assign
-      // a new site to another operator by crafting managedByUserId.
+    if (isOperations) {
       managedByUserId = user.id
     } else if (dto.managedByUserId) {
       const target = await this.prisma.staffMembership.findUnique({
@@ -1245,58 +1272,66 @@ export class AdminService {
       managedByUserId = dto.managedByUserId
     }
 
-    const website = await this.prisma.website.create({
-      data: {
-        url: dto.url,
-        domain,
-        name: dto.name ?? null,
-        country: dto.country ?? null,
-        language: dto.language ?? null,
-        category: dto.category ?? null,
-        metrics: {
-          dr: dto.domainRating ?? 0,
-          traffic: dto.monthlyTraffic ?? 0,
-        },
-        ownershipType: WebsiteOwnershipType.PLATFORM,
-        isActive: true,
-        managedByUserId,
-        // Phase 7.12 (#24): platform-owned sites bypass DNS verification —
-        // the platform inherently owns them (matches the schema comment at
-        // schema.prisma:466-467 "Platform sites are created VERIFIED").
-        // Previously inherited the default PENDING_VERIFICATION which
-        // falsely flagged platform sites as unverified to listing-approval
-        // flows. Strongly typed via the Prisma-generated enum.
-        verificationStatus: WebsiteVerificationStatus.VERIFIED,
-      },
-    })
+    let website: any
+    try {
+      website = await this.prisma.$transaction(async (tx: any) => {
+        const createdWebsite = await tx.website.create({
+          data: {
+            url: dto.url,
+            domain,
+            canonicalDomain,
+            name: dto.name ?? null,
+            country: dto.country ?? null,
+            language: dto.language ?? null,
+            category: dto.category ?? null,
+            metrics: {
+              dr: dto.domainRating ?? 0,
+              traffic: dto.monthlyTraffic ?? 0,
+            },
+            ownershipType: WebsiteOwnershipType.PLATFORM,
+            isActive: true,
+            managedByUserId,
+            // Platform inventory intentionally bypasses DNS ownership checks.
+            // GSC/GA4 links are performance-data integrations, not ownership
+            // gates, and are managed separately from the listing lifecycle.
+            verificationStatus: WebsiteVerificationStatus.VERIFIED,
+          },
+        })
 
-    // Phase 7: the legacy listing-level type/price/turnaroundDays columns
-    // are dropped. We still auto-create a listing row so the website appears
-    // on the marketplace (admin can edit + add services from the Manage
-    // Services dialog), but no longer write the deprecated fields.
-    await this.prisma.marketplaceListing.create({
-      data: {
-        title: dto.url,
-        slug: `platform-${website.id.slice(0, 8)}`,
-        description: dto.name ?? dto.url,
-        // Phase 7.12 (#24): start in DRAFT — admin must explicitly add
-        // services + approve before going live on the public marketplace.
-        // The previous APPROVED default shipped zero-service listings live,
-        // surfacing "no services available" to customers.
-        status: ListingStatus.DRAFT,
-        fulfillmentType: "INTERNAL",
-        currency: "USD",
-        domainRating: dto.domainRating ?? 0,
-        traffic: dto.monthlyTraffic ?? 0,
-        country: dto.country ?? null,
-        language: dto.language ?? null,
-        websiteUrl: dto.url,
-        websiteId: website.id,
-        organizationId: user.organizationId ?? null,
-        publisherId: null,
-        ownerType: "PLATFORM",
-      },
-    })
+        // A platform website and its single draft marketplace listing are one
+        // aggregate. Creating them transactionally prevents orphan sites and
+        // removes the old second listing-creation path from Marketplace.
+        const listing = await tx.marketplaceListing.create({
+          data: {
+            title: dto.name ?? dto.url,
+            slug: `platform-${createdWebsite.id}`,
+            description: dto.name ?? dto.url,
+            status: ListingStatus.DRAFT,
+            fulfillmentType: "INTERNAL",
+            currency: "USD",
+            domainRating: dto.domainRating ?? 0,
+            traffic: dto.monthlyTraffic ?? 0,
+            country: dto.country ?? null,
+            language: dto.language ?? null,
+            websiteUrl: dto.url,
+            websiteId: createdWebsite.id,
+            organizationId: null,
+            publisherId: null,
+            ownerType: "PLATFORM",
+          },
+        })
+
+        return { ...createdWebsite, listing }
+      })
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        throw new BadRequestException({
+          code: "DOMAIN_ALREADY_REGISTERED",
+          message: `Domain ${canonicalDomain} is already registered`,
+        })
+      }
+      throw error
+    }
 
     await this.audit.log({
       action: "PLATFORM_WEBSITE_CREATED",
@@ -1388,16 +1423,10 @@ export class AdminService {
     }))
   }
 
-  private assertWebsiteManagementAccess(
-    website: { managedByUserId: string | null },
-    user: any,
-  ) {
-    if (
-      user?.staffRole === "OPERATIONS" &&
-      website.managedByUserId !== user.id
-    ) {
+  private assertWebsiteInventoryWriteAccess(user: any) {
+    if (user?.staffRole !== "SUPER_ADMIN") {
       throw new ForbiddenException(
-        "Operations can only manage platform websites assigned to them",
+        "Only Super Admin can edit platform website inventory",
       )
     }
   }
@@ -1409,7 +1438,7 @@ export class AdminService {
       throw new BadRequestException(
         "Only platform websites can be updated via admin",
       )
-    this.assertWebsiteManagementAccess(website, user)
+    this.assertWebsiteInventoryWriteAccess(user)
 
     const updated = await this.prisma.website.update({
       where: { id },
@@ -1435,12 +1464,11 @@ export class AdminService {
       await this.prisma.marketplaceListing.update({
         where: { id: listing.id },
         data: {
-          title: dto.url ?? listing.title,
+          title: dto.name ?? listing.title,
           domainRating: dto.domainRating ?? listing.domainRating,
           traffic: dto.monthlyTraffic ?? listing.traffic,
           country: dto.country ?? listing.country,
           language: dto.language ?? listing.language,
-          websiteUrl: dto.url ?? listing.websiteUrl,
         },
       })
     }
@@ -1474,14 +1502,27 @@ export class AdminService {
         skip,
         include: {
           marketplaceListings: {
-            where: { status: { not: ListingStatus.ARCHIVED } },
             take: 1,
+            orderBy: { createdAt: "desc" },
+            include: {
+              services: {
+                orderBy: [{ availability: "asc" }, { price: "asc" }],
+              },
+            },
           },
           publisher: { select: { id: true, name: true } },
           // Phase 6.5: surface the platform-site owner so the admin
           // websites page can render the "Managed by" column without a
           // second round-trip per row.
-          managedBy: { select: { id: true, name: true } },
+          managedBy: { select: { id: true, name: true, email: true } },
+          websiteIntegrations: {
+            where: { status: { not: "REMOVED" } },
+            include: {
+              integration: {
+                select: { id: true, provider: true, status: true },
+              },
+            },
+          },
         },
       }),
       this.prisma.website.count({ where }),
@@ -1502,7 +1543,25 @@ export class AdminService {
         managedBy: w.managedBy,
         metrics: w.metrics,
         publisher: w.publisher,
-        listing: w.marketplaceListings[0] ?? null,
+        listing: w.marketplaceListings[0]
+          ? {
+              ...w.marketplaceListings[0],
+              services: w.marketplaceListings[0].services.map((service) => ({
+                ...service,
+                price: Number(service.price),
+              })),
+            }
+          : null,
+        integrations: w.websiteIntegrations.map((linked) => ({
+          id: linked.id,
+          integrationId: linked.integrationId,
+          provider: linked.integration.provider,
+          integrationStatus: linked.integration.status,
+          status: linked.status,
+          externalResourceId: linked.externalResourceId,
+          externalResourceName: linked.externalResourceName,
+          syncedAt: linked.syncedAt?.toISOString() ?? null,
+        })),
         createdAt: w.createdAt.toISOString(),
       })),
       pagination: { take, skip, total },
@@ -1519,10 +1578,25 @@ export class AdminService {
       },
       include: {
         marketplaceListings: {
-          where: { status: { not: ListingStatus.ARCHIVED } },
-          include: { category: true },
+          take: 1,
+          orderBy: { createdAt: "desc" },
+          include: {
+            category: true,
+            services: {
+              orderBy: [{ availability: "asc" }, { price: "asc" }],
+            },
+          },
         },
         publisher: true,
+        managedBy: { select: { id: true, name: true, email: true } },
+        websiteIntegrations: {
+          where: { status: { not: "REMOVED" } },
+          include: {
+            integration: {
+              select: { id: true, provider: true, status: true },
+            },
+          },
+        },
         orders: {
           take: 10,
           orderBy: { createdAt: "desc" },
@@ -1531,7 +1605,44 @@ export class AdminService {
       },
     })
     if (!website) throw new NotFoundException("Website not found")
-    return website
+    const listing = website.marketplaceListings[0] ?? null
+    return {
+      id: website.id,
+      url: website.url,
+      name: website.name,
+      domain: website.domain,
+      category: website.category,
+      language: website.language,
+      country: website.country,
+      isActive: website.isActive,
+      ownershipType: website.ownershipType,
+      managedByUserId: website.managedByUserId,
+      managedBy: website.managedBy,
+      metrics: website.metrics,
+      publisher: website.publisher,
+      listing: listing
+        ? {
+            ...listing,
+            services: listing.services.map((service) => ({
+              ...service,
+              price: Number(service.price),
+            })),
+          }
+        : null,
+      integrations: website.websiteIntegrations.map((linked) => ({
+        id: linked.id,
+        integrationId: linked.integrationId,
+        provider: linked.integration.provider,
+        integrationStatus: linked.integration.status,
+        status: linked.status,
+        externalResourceId: linked.externalResourceId,
+        externalResourceName: linked.externalResourceName,
+        syncedAt: linked.syncedAt?.toISOString() ?? null,
+      })),
+      orders: website.orders,
+      createdAt: website.createdAt.toISOString(),
+      updatedAt: website.updatedAt.toISOString(),
+    }
   }
 
   async pauseWebsite(id: string, paused: boolean, user: any) {
@@ -1540,7 +1651,7 @@ export class AdminService {
     if (website.ownershipType !== "PLATFORM") {
       throw new BadRequestException("Only platform websites can be paused")
     }
-    this.assertWebsiteManagementAccess(website, user)
+    this.assertWebsiteInventoryWriteAccess(user)
 
     const updated = await this.prisma.website.update({
       where: { id },
@@ -1578,7 +1689,7 @@ export class AdminService {
       throw new BadRequestException(
         "Only platform websites can be deleted via admin",
       )
-    this.assertWebsiteManagementAccess(website, user)
+    this.assertWebsiteInventoryWriteAccess(user)
 
     const updated = await this.prisma.website.update({
       where: { id },

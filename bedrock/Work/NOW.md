@@ -1,10 +1,27 @@
 # Current Status
 
-**Phase**: Operations fulfillment, staff monitoring, and RBAC realignment are implemented and verified locally; staging lifecycle verification remains.
+**Phase**: Platform inventory, assigned-Operations management, and website-scoped Google integrations are implemented and verified locally; migration plus staging OAuth/sync validation remain.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Publisher Inventory And Service Management Redesign
+
+- Consolidated publisher website enlistment and listing creation into one atomic flow with category, a server-enforced 500-character description, and an optional initial service.
+- Made the publisher website detail page the workspace for listing metadata, DNS/review readiness, lifecycle transitions, and version-safe service management.
+- Rebuilt the publisher Listings overview with actionable summaries and search/status/service/category filters; standalone listing creation now routes through website enlistment.
+- Allowlisted publisher metadata writes so lifecycle, ownership, verification, featured state, website association, metrics, and service rows cannot be changed through the general listing update endpoint.
+- Updated buyer marketplace cards/details with blue Publisher-managed and purple Platform-managed badges, two-line description truncation, full detail copy, and more comfortable filter spacing.
+- Validation: API/API-client builds, publisher/portal typecheck and lint, both production builds, Biome, scoped whitespace checks, and all 75 API unit suites (855 tests) pass.
+
+### Buyer Marketplace Decision Flow Redesign
+
+- Rebuilt portal discovery around buyer comparison: service-aware pricing, turnaround, authority/traffic metrics, review evidence, fulfillment attribution, URL-access clarity, quick service chips, and a responsive filter system.
+- Expanded search to category/tag names and case-insensitive location fields, and corrected price sorting to use the minimum matching AVAILABLE service instead of the removed listing-level price.
+- Rebuilt listing detail around a mobile-first/sticky service picker, explicit fulfillment and deposit-gated URL guidance, service-scoped waitlist notifications, buyer reviews, and related listings.
+- Preserved service-id locking into order creation and all existing publisher ownership, availability, and URL-disclosure rules.
+- Validation: portal production build, portal typecheck/lint, API and API-client builds, Biome, scoped whitespace checks, and all 74 API unit suites (851 tests) pass.
 
 ### GitHub CI/CD Consolidation And Security Gate
 
@@ -133,15 +150,6 @@
 - Moved wallet funding to Stripe Checkout with a webhook-only credit path; added financial transaction and withdrawal-approval hardening.
 - Tightened mutation authentication: mandatory session secret, origin validation, all-actor verification gates, and atomic session rotation.
 
-### Portal Marketplace Redesign
-
-- Redesigned marketplace browsing page with cleaner cards (rounded corners, subtle shadows, better typography, reduced visual noise).
-- Simplified filter/search bar: removed redundant type filter and view-mode toggle, consolidated into a cleaner layout.
-- Improved pagination with page number buttons.
-- Redesigned listing detail page with deposit-gated URL visibility: customers who have never deposited see a blurred/blocker overlay on "Visit Website" with a "Deposit to reveal" tooltip.
-- Added wallet/deposit check hook to determine URL visibility.
-- Build verified: portal passes with no TS errors.
-
 ### Publisher Listings UI Modernization
 
 - Replaced dense table-based listing view with modern cards showing site, service summary, lifecycle guidance, and contextual primary action buttons (submit/pause/unpause/archive).
@@ -212,12 +220,23 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
-The cancellation and Operations fulfillment implementations are code-complete,
-and the local development database is current. The next in-scope action is a
-staging lifecycle pass covering claim contention, content review, publication,
-verification, cancellation, staff monitoring, and the related money records.
+Platform website/listing inventory and website-scoped Google performance integrations
+are code-complete locally. The release is gated on migration
+`20260718120000_platform_domain_and_integration_ownership`, worker deployment,
+and real-Google staging validation. The migration also applies the previously
+missing integration-model transition required by the publisher flow.
 
-**Phase 5C remains functionally complete.** DNS TXT verification is the website ownership gate; Google Search Console and GA4 are separate performance-data integrations. Search Analytics ingestion and reporting remain a future phase after production OAuth configuration is authorized.
+Publisher DNS verification remains unchanged. Platform sites skip DNS, while
+both ownership types can explicitly link one GSC property and one GA4 property
+to their single website/listing aggregate. Google account selection is
+independent from GuestPost login identity.
+
+Operations can create platform websites from the admin portal; the API always
+assigns those sites to the creator and existing order creation automatically
+creates the matching fulfillment assignment for new platform orders. On an
+assigned site, Operations can add/edit/pause listing services and connect,
+link, unlink, or sync GSC/GA4. Publisher services and unassigned platform sites
+remain inaccessible to Operations.
 
 The July 14 Operations fulfillment gap is now implemented locally. Staging
 validation should cover claim contention, customer review, publication,
@@ -232,8 +251,8 @@ data.
 
 ## Next Actions
 
-1. **Staging lifecycle verification** — Render staging is live on `guestpost.pro.bd` with API readiness green and schema current. Run the claim contention, customer review, publication, verification, cancellation, staff monitoring, and money-record lifecycle pass against production-like staging data.
-2. **Migration release gate** — Until Render is upgraded for pre-deploy/one-off migration jobs, run `prisma migrate status` and `prisma migrate deploy` against Neon before deploying API/worker changes that read new schema.
+1. **Migration release gate** — inspect any duplicate canonical domains or duplicate provider/website property mappings, then run `prisma migrate status` and `prisma migrate deploy` against Neon before deploying API/worker code. The new migration intentionally stops rather than guessing how to merge conflicting ownership/history.
+2. **Google integration staging pass** — deploy the worker, authorize the production callback URI, connect a Google account different from the GuestPost login, discover/link GSC and GA4 properties for one publisher and one platform site, then verify daily rows are written only to the selected website mappings.
 3. **Auth IP warning follow-up** — Render logs now show Better Auth falling back to a shared per-path rate-limit bucket when no trusted client IP header is resolved; configure Better Auth trusted proxy/IP headers before production hardening.
 4. **Worker operations** — the worker is not deployed on Render yet; run it locally when testing DNS TXT verification, GSC sync, cancellation/settlement sweeps, or other queue-backed flows.
 5. **OAuth configuration** — authorize the deployed Google redirect URI `https://api.guestpost.pro.bd/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback` plus any localhost callback still needed for development.
@@ -244,8 +263,7 @@ data.
    - Historical data imports
    - Reporting API endpoints (`GET /websites/:id/metrics`)
    - SEO Metrics KPI cards (impressions, clicks, CTR, position) + trend charts
-8. **Phase 6** — Admin/Operations UI for platform-owned websites
-9. **Additional providers** — GA4, Bing Webmaster Tools
+8. **Additional providers** — Bing Webmaster Tools
 
 ## Backlog (Future Cleanup)
 

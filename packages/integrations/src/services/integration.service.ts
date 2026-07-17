@@ -3,7 +3,11 @@ import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
 import {
   IntegrationNotFoundError,
   NoActiveCredentialError,
+  PropertyAlreadyLinkedError,
+  PropertyNotFoundError,
   ProviderError,
+  WebsiteAlreadyLinkedError,
+  WebsiteIntegrationNotFoundError,
 } from "../errors"
 import { getProvider } from "../providers"
 import type { OwnerContext } from "../types"
@@ -88,19 +92,23 @@ export class IntegrationService {
     // 2. Fetch Google user info to get externalUserId
     const userInfo = await this.fetchGoogleUserInfo(tokens.accessToken)
 
-    // 3. Upsert ExternalAccount with encrypted tokens
-    //    One Google identity = one ExternalAccount. If the account already
-    //    exists (e.g. reconnecting with new scopes), update tokens in place.
+    // 3. Upsert an owner-scoped ExternalAccount. The same Google identity may
+    //    be used by a publisher and the platform, but encrypted credentials
+    //    are never shared or overwritten across those trust boundaries.
     await (db as any).externalAccount.upsert({
       where: {
-        provider_externalUserId: {
+        provider_externalUserId_ownerType_ownerId: {
           provider,
           externalUserId: userInfo.id,
+          ownerType: owner.ownerType,
+          ownerId: owner.ownerId,
         },
       },
       create: {
         provider,
         externalUserId: userInfo.id,
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
         email: userInfo.email ?? null,
         displayName: userInfo.name ?? null,
         encryptedAccessToken: encryption.encrypt({
@@ -133,9 +141,11 @@ export class IntegrationService {
     //    + WebsiteIntegration for each Google service that has resources.
     const account = await (db as any).externalAccount.findUniqueOrThrow({
       where: {
-        provider_externalUserId: {
+        provider_externalUserId_ownerType_ownerId: {
           provider,
           externalUserId: userInfo.id,
+          ownerType: owner.ownerType,
+          ownerId: owner.ownerId,
         },
       },
     })
@@ -156,6 +166,8 @@ export class IntegrationService {
               email: true,
               displayName: true,
               status: true,
+              grantedScopes: true,
+              lastDiscoveryAt: true,
             },
           },
           websiteIntegrations: {
@@ -259,6 +271,9 @@ export class IntegrationService {
         email: integration.connection.email,
         displayName: integration.connection.displayName,
         status: integration.connection.status,
+        grantedScopes: integration.connection.grantedScopes ?? [],
+        lastDiscoveryAt:
+          integration.connection.lastDiscoveryAt?.toISOString() ?? null,
         tokenExpiresAt: integration.connection.tokenExpiresAt.toISOString(),
       },
       status: integration.status,
@@ -284,6 +299,203 @@ export class IntegrationService {
       createdAt: integration.createdAt.toISOString(),
       updatedAt: integration.updatedAt.toISOString(),
     }
+  }
+
+  async discover(
+    owner: OwnerContext,
+    integrationId: string,
+  ): Promise<{ enqueued: boolean }> {
+    const integration = await (db as any).publisherIntegration.findFirst({
+      where: {
+        id: integrationId,
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
+      },
+      select: { connectionId: true },
+    })
+    if (!integration) throw new IntegrationNotFoundError()
+
+    const { DiscoveryService } = await import("./discovery.service")
+    return new DiscoveryService().enqueueDiscovery(
+      owner,
+      integration.connectionId,
+    )
+  }
+
+  async listResources(owner: OwnerContext, integrationId: string) {
+    const integration = await this.findOwnedIntegration(owner, integrationId)
+    const accessToken = await this.getActiveAccessToken(
+      integration.connectionId,
+    )
+    const registration = getProvider(integration.provider)
+    if (!registration?.discoveryProvider) {
+      throw new ProviderError(
+        `Provider ${integration.provider} does not support discovery`,
+        "DISCOVERY_NOT_SUPPORTED",
+      )
+    }
+
+    const resources =
+      await registration.discoveryProvider.discoverResources(accessToken)
+    const discoveredAt = new Date()
+    await (db as any).externalAccount.update({
+      where: { id: integration.connectionId },
+      data: { lastDiscoveryAt: discoveredAt, lastUsedAt: discoveredAt },
+    })
+
+    return {
+      resources: resources.map((resource) => ({
+        externalResourceId: resource.externalResourceId,
+        externalResourceName: resource.externalResourceName ?? null,
+        metadata: resource.metadata ?? null,
+      })),
+      discoveredAt: discoveredAt.toISOString(),
+      isStale: false,
+    }
+  }
+
+  async linkProperty(
+    owner: OwnerContext,
+    integrationId: string,
+    websiteId: string,
+    externalResourceId: string,
+  ) {
+    const integration = await this.findOwnedIntegration(owner, integrationId)
+    if (owner.ownerType === "PLATFORM" && websiteId !== owner.ownerId) {
+      throw new WebsiteIntegrationNotFoundError()
+    }
+    const website = await (db as any).website.findFirst({
+      where:
+        owner.ownerType === "PLATFORM"
+          ? {
+              // Platform credentials are owned by exactly one website. Keep
+              // this invariant here as defense in depth even though the API
+              // owner resolver already checks staff assignment.
+              id: owner.ownerId,
+              ownershipType: "PLATFORM",
+            }
+          : {
+              id: websiteId,
+              ownershipType: "PUBLISHER",
+              publisherId: owner.ownerId,
+            },
+      select: { id: true, url: true },
+    })
+    if (!website) throw new WebsiteIntegrationNotFoundError()
+
+    const existingProperty = await (db as any).websiteIntegration.findUnique({
+      where: {
+        integrationId_externalResourceId: {
+          integrationId,
+          externalResourceId,
+        },
+      },
+      include: { website: { select: { id: true, url: true } } },
+    })
+    if (existingProperty) {
+      if (existingProperty.websiteId !== websiteId) {
+        throw new PropertyAlreadyLinkedError(existingProperty.website?.url)
+      }
+      return {
+        externalResourceId: existingProperty.externalResourceId,
+        externalResourceName: existingProperty.externalResourceName,
+        alreadyLinked: true,
+        linkedWebsiteId: website.id,
+        linkedWebsiteUrl: website.url,
+      }
+    }
+
+    const existingWebsite = await (db as any).websiteIntegration.findFirst({
+      where: {
+        integrationId,
+        websiteId,
+        status: { not: "REMOVED" },
+      },
+      select: { externalResourceName: true, externalResourceId: true },
+    })
+    if (existingWebsite) {
+      throw new WebsiteAlreadyLinkedError(
+        existingWebsite.externalResourceName ??
+          existingWebsite.externalResourceId,
+      )
+    }
+
+    // Validate the caller-selected property against the provider immediately;
+    // clients cannot forge an arbitrary resource id and make workers query it.
+    const accessToken = await this.getActiveAccessToken(
+      integration.connectionId,
+    )
+    const registration = getProvider(integration.provider)
+    if (!registration?.discoveryProvider) throw new PropertyNotFoundError()
+    const resources =
+      await registration.discoveryProvider.discoverResources(accessToken)
+    const resource = resources.find(
+      (candidate) => candidate.externalResourceId === externalResourceId,
+    )
+    if (!resource) throw new PropertyNotFoundError()
+
+    let linked: any
+    try {
+      linked = await (db as any).websiteIntegration.create({
+        data: {
+          integrationId,
+          websiteId,
+          externalResourceId: resource.externalResourceId,
+          externalResourceName: resource.externalResourceName ?? null,
+          metadata: resource.metadata ?? undefined,
+          status: "CONNECTED",
+        },
+      })
+    } catch (error: any) {
+      if (error?.code === "P2002") {
+        throw new WebsiteAlreadyLinkedError()
+      }
+      throw error
+    }
+
+    return {
+      externalResourceId: linked.externalResourceId,
+      externalResourceName: linked.externalResourceName,
+      alreadyLinked: false,
+      linkedWebsiteId: website.id,
+      linkedWebsiteUrl: website.url,
+    }
+  }
+
+  async unlinkProperty(
+    owner: OwnerContext,
+    integrationId: string,
+    websiteIntegrationId: string,
+  ): Promise<void> {
+    await this.findOwnedIntegration(owner, integrationId)
+    const linked = await (db as any).websiteIntegration.findFirst({
+      where: { id: websiteIntegrationId, integrationId },
+      select: { id: true },
+    })
+    if (!linked) throw new WebsiteIntegrationNotFoundError()
+
+    // The daily metric tables retain their source ids as historical snapshots;
+    // deleting only the active mapping allows the property to be linked again.
+    await (db as any).websiteIntegration.delete({
+      where: { id: websiteIntegrationId },
+    })
+  }
+
+  private async findOwnedIntegration(
+    owner: OwnerContext,
+    integrationId: string,
+  ): Promise<any> {
+    const integration = await (db as any).publisherIntegration.findFirst({
+      where: {
+        id: integrationId,
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
+      },
+      include: { connection: true },
+    })
+    if (!integration) throw new IntegrationNotFoundError()
+    if (!integration.connection) throw new NoActiveCredentialError()
+    return integration
   }
 
   async getActiveAccessToken(connectionId: string): Promise<string> {

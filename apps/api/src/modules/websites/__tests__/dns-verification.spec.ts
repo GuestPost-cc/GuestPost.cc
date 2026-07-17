@@ -474,7 +474,12 @@ describe("WebsitesService.submitForReview verification gate", () => {
         }),
       },
       marketplaceListing: {
-        findFirst: jest.fn().mockResolvedValue({ id: "l1" }),
+        findFirst: jest.fn().mockResolvedValue({
+          id: "l1",
+          categoryId: "category-1",
+          description: "A complete buyer-facing marketplace description.",
+          services: [{ id: "service-1" }],
+        }),
         update: jest.fn().mockResolvedValue({ id: "l1" }),
       },
     }
@@ -526,6 +531,7 @@ describe("AdminService.updateListingStatus verification gate", () => {
       organizationId: "org1",
       publisherId: "pub1",
       publisher: { email: "p@test" },
+      services: [{ id: "service-1" }],
       website: websiteStatus
         ? { verificationStatus: websiteStatus, domain: "example.com" }
         : null,
@@ -579,6 +585,20 @@ describe("AdminService.updateListingStatus verification gate", () => {
       role: "OPERATIONS",
     })
     expect(res.status).toBe("APPROVED")
+  })
+
+  it("blocks approval when the listing has no available services", async () => {
+    prisma.marketplaceListing.findUnique.mockResolvedValue({
+      ...makeListing(null),
+      services: [],
+    })
+    await expect(
+      admin.updateListingStatus("l1", "APPROVED", {
+        id: "admin1",
+        staffRole: "OPERATIONS",
+      }),
+    ).rejects.toMatchObject({ response: { code: "NO_AVAILABLE_SERVICES" } })
+    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
   })
 
   it("refuses force override from a non-SUPER_ADMIN", async () => {

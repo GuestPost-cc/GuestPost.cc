@@ -51,6 +51,7 @@ export class GoogleSearchConsoleProvider
     externalResourceId: string,
     startDate?: Date,
     endDate?: Date,
+    websiteIntegrationId?: string,
   ): Promise<SyncResult> {
     const startMs = Date.now()
 
@@ -58,9 +59,13 @@ export class GoogleSearchConsoleProvider
     // Default: last 3 days if no start date provided
     const start = startDate ?? new Date(end.getTime() - 3 * 24 * 60 * 60 * 1000)
 
-    // Find all website integrations for this external resource
+    // Scope writes to the exact mapping authorized by SyncService. Provider
+    // property ids are not tenant ids and can appear in multiple contexts.
     const websiteIntegrations = await (db.websiteIntegration as any).findMany({
-      where: { externalResourceId },
+      where: {
+        externalResourceId,
+        ...(websiteIntegrationId ? { id: websiteIntegrationId } : {}),
+      },
     })
 
     if (websiteIntegrations.length === 0) {

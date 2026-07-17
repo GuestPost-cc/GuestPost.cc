@@ -129,8 +129,8 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       { method: "updateStaffRole", expected: ["SUPER_ADMIN"] },
       { method: "createStaff", expected: ["SUPER_ADMIN"] },
       { method: "staffPerformance", expected: ["SUPER_ADMIN"] },
-      { method: "deleteListing", expected: ["SUPER_ADMIN", "OPERATIONS"] },
-      { method: "deleteWebsite", expected: ["SUPER_ADMIN", "OPERATIONS"] },
+      { method: "deleteListing", expected: ["SUPER_ADMIN"] },
+      { method: "deleteWebsite", expected: ["SUPER_ADMIN"] },
       { method: "listAuditLogs", expected: ["SUPER_ADMIN"] },
       // Site reassignment is a SUPER_ADMIN-only trust action: OPERATIONS can
       // manage listings on sites already assigned to them, but transferring
@@ -177,7 +177,7 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     }
   })
 
-  it("every operational-write route includes OPERATIONS (manual verify, accept, content lifecycle, listing moderation, dispute review/resolve, website management, verification queue)", () => {
+  it("every operational workflow route includes OPERATIONS (manual verify, fulfillment, listing status moderation, disputes, verification queue)", () => {
     const opsWrites = [
       "manualVerify",
       "acceptPlatformOrder",
@@ -189,11 +189,6 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       "reviewDispute",
       "resolveDispute",
       "updateListingStatus",
-      "toggleListingFeatured",
-      "toggleListingVerified",
-      "createWebsite",
-      "updateWebsite",
-      "pauseWebsite",
       "recomputePublisherTrust",
       "recomputeTrust",
       "bulkRetryVerification",
@@ -210,6 +205,46 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       const roles =
         (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
       expect([method, roles.includes("OPERATIONS")]).toEqual([method, true])
+    }
+  })
+
+  it("allows Operations to edit platform listing services", () => {
+    const platformServiceWrites = [
+      "addPlatformListingService",
+      "updatePlatformListingService",
+      "pausePlatformListingService",
+    ]
+    for (const method of platformServiceWrites) {
+      const handler = (AdminController.prototype as any)[method]
+      const roles =
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      expect([method, roles]).toEqual([method, ["SUPER_ADMIN", "OPERATIONS"]])
+    }
+  })
+
+  it("lets Operations create an auto-assigned platform website", () => {
+    const handler = (AdminController.prototype as any).createWebsite
+    const roles =
+      (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+    expect(roles).toEqual(["SUPER_ADMIN", "OPERATIONS"])
+  })
+
+  it("keeps other marketplace and platform-website inventory edits SUPER_ADMIN-only", () => {
+    const inventoryWrites = [
+      "toggleListingFeatured",
+      "toggleListingVerified",
+      "deleteListing",
+      "updateWebsite",
+      "pauseWebsite",
+      "deleteWebsite",
+      "assignWebsite",
+    ]
+
+    for (const method of inventoryWrites) {
+      const handler = (AdminController.prototype as any)[method]
+      const roles =
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      expect([method, roles]).toEqual([method, ["SUPER_ADMIN"]])
     }
   })
 

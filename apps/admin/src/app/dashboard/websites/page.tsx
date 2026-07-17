@@ -9,7 +9,10 @@
 // existing FulfillmentAssignment row keeps its current owner). Only new
 // orders + new tickets routed by `createTicket` route to the new owner.
 
-import type { AdminOpsStaffResponse } from "@guestpost/api-client"
+import type {
+  AdminOpsStaffResponse,
+  AdminPlatformWebsiteResponse,
+} from "@guestpost/api-client"
 import {
   Badge,
   Button,
@@ -43,20 +46,12 @@ import {
   Plus,
   UserRound,
 } from "lucide-react"
+import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
-
-interface PlatformWebsiteRow {
-  id: string
-  url: string
-  domain: string | null
-  ownershipType: "PLATFORM" | "PUBLISHER"
-  managedByUserId: string | null
-  managedBy?: { id: string; name: string | null; email: string } | null
-}
 
 export default function PlatformWebsitesPage() {
   const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
@@ -69,9 +64,8 @@ function PlatformWebsitesPageInner() {
   const { user } = useAuth()
   const qc = useQueryClient()
   const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
-  const [reassignFor, setReassignFor] = useState<PlatformWebsiteRow | null>(
-    null,
-  )
+  const [reassignFor, setReassignFor] =
+    useState<AdminPlatformWebsiteResponse | null>(null)
   const [pickedOwnerId, setPickedOwnerId] = useState<string | null | undefined>(
     undefined,
   )
@@ -79,8 +73,7 @@ function PlatformWebsitesPageInner() {
 
   const websitesQ = useQuery({
     queryKey: ["admin", "platform-websites"],
-    queryFn: () =>
-      api.admin.listPlatformWebsites() as Promise<PlatformWebsiteRow[]>,
+    queryFn: () => api.admin.listPlatformWebsites(),
   })
 
   // Ops staff for the picker — only loaded when the reassign dialog opens.
@@ -155,7 +148,7 @@ function PlatformWebsitesPageInner() {
   })
 
   const canCreate = createForm.url.trim().length > 0
-  const websites = (websitesQ.data ?? []) as PlatformWebsiteRow[]
+  const websites = websitesQ.data ?? []
   const assignedCount = websites.filter((website) => website.managedBy).length
   const unassignedCount = websites.length - assignedCount
   const currentOwnerId = reassignFor?.managedByUserId ?? null
@@ -173,7 +166,7 @@ function PlatformWebsitesPageInner() {
     reassignMut.reset()
   }
 
-  const openReassignDialog = (website: PlatformWebsiteRow) => {
+  const openReassignDialog = (website: AdminPlatformWebsiteResponse) => {
     setReassignFor(website)
     setPickedOwnerId(website.managedByUserId ?? null)
     setReason("")
@@ -189,8 +182,8 @@ function PlatformWebsitesPageInner() {
           </h1>
           <p className="mt-1 max-w-3xl text-muted-foreground">
             {isSuperAdmin
-              ? "Manage platform inventory ownership. Existing work stays with its current assignee; new work routes to the selected Operations owner."
-              : "Manage platform sites assigned to you. Sites you enlist are assigned to you automatically, including their new orders and support tickets."}
+              ? "Create each domain once, manage its single listing and services, connect Google data, and route new work to Operations."
+              : "Create platform websites assigned to you, manage their listing services and Google data, and receive their new orders automatically."}
           </p>
         </div>
         <Button onClick={() => setShowCreate(true)} className="gap-2">
@@ -237,10 +230,11 @@ function PlatformWebsitesPageInner() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Ownership map</CardTitle>
+          <CardTitle>Platform inventory</CardTitle>
           <CardDescription>
-            See who receives new work for every platform site. Unassigned sites
-            fall back to the shared Operations queue.
+            One website owns one marketplace listing; all service offerings sit
+            under that listing. Google integrations are data sources and do not
+            require DNS verification.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -268,6 +262,8 @@ function PlatformWebsitesPageInner() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Website</TableHead>
+                  <TableHead>Listing</TableHead>
+                  <TableHead>Google data</TableHead>
                   <TableHead>Managed by</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -284,6 +280,37 @@ function PlatformWebsitesPageInner() {
                       )}
                     </TableCell>
                     <TableCell>
+                      {w.listing ? (
+                        <div className="space-y-1">
+                          <Badge variant="outline">{w.listing.status}</Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {w.listing.services.length} service
+                            {w.listing.services.length === 1 ? "" : "s"}
+                          </p>
+                        </div>
+                      ) : (
+                        <Badge variant="destructive">Missing listing</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {w.integrations.map((integration) => (
+                          <Badge key={integration.id} variant="secondary">
+                            {integration.provider === "GOOGLE_SEARCH_CONSOLE"
+                              ? "GSC"
+                              : integration.provider === "GOOGLE_ANALYTICS"
+                                ? "GA4"
+                                : integration.provider}
+                          </Badge>
+                        ))}
+                        {w.integrations.length === 0 && (
+                          <span className="text-xs text-muted-foreground">
+                            Not linked
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
                       {w.managedBy ? (
                         <div>
                           <p className="text-sm font-medium">
@@ -298,26 +325,29 @@ function PlatformWebsitesPageInner() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {isSuperAdmin ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openReassignDialog(w)}
-                        >
-                          Change owner
+                      <div className="flex justify-end gap-2">
+                        {isSuperAdmin && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openReassignDialog(w)}
+                          >
+                            Change owner
+                          </Button>
+                        )}
+                        <Button asChild size="sm">
+                          <Link href={`/dashboard/websites/${w.id}`}>
+                            Manage
+                          </Link>
                         </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {w.managedBy?.name || w.managedBy?.id || "—"}
-                        </span>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
                 {websites.length === 0 && (
                   <TableRow>
                     <TableCell
-                      colSpan={3}
+                      colSpan={5}
                       className="text-center text-muted-foreground py-6"
                     >
                       No platform websites.
@@ -572,8 +602,11 @@ function PlatformWebsitesPageInner() {
           <DialogHeader>
             <DialogTitle>Create Platform Website</DialogTitle>
             <DialogDescription>
-              Add a website the platform owns. DNS verification is automatic for
-              platform-owned sites.
+              Add a platform-owned domain and its single draft listing in one
+              transaction. DNS verification is not required; Google data can be
+              linked after creation.
+              {!isSuperAdmin &&
+                " The site and every new order placed through it will be assigned to you automatically."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">

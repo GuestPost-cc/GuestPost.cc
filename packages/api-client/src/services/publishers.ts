@@ -1,20 +1,112 @@
 import type { HttpClient } from "../client"
 
+export interface PublisherWebsiteService {
+  id: string
+  serviceType: string
+  price: number
+  currency: string
+  turnaroundDays: number
+  revisionRounds: number
+  warrantyDays?: number | null
+  availability: "AVAILABLE" | "PAUSED" | "WAITLIST"
+  version: number
+}
+
+export interface PublisherWebsiteListing {
+  id: string
+  title: string
+  slug: string
+  description: string
+  status: string
+  ownerType: "PUBLISHER"
+  category?: { id: string; name: string; slug: string } | null
+  services: PublisherWebsiteService[]
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface PublisherWebsiteResponse {
+  id: string
+  url: string
+  domain?: string | null
+  name?: string | null
+  country?: string | null
+  language?: string | null
+  category?: string | null
+  metrics?: { dr?: number; traffic?: number } | null
+  isActive: boolean
+  verificationStatus:
+    | "PENDING_VERIFICATION"
+    | "VERIFIED"
+    | "VERIFICATION_FAILED"
+    | "REVOKED"
+  verifiedAt?: string | null
+  verificationFailureReason?: string | null
+  lastVerificationRequestAt?: string | null
+  lastVerificationCheckAt?: string | null
+  verificationInstructions?: {
+    type: string
+    host: string
+    value: string
+    note?: string
+  } | null
+  listing?: PublisherWebsiteListing | null
+  marketplaceListings?: PublisherWebsiteListing[]
+  seoIntegration?: any
+  gscIntegration?: any
+  gscAccountExists?: boolean
+  websiteIntegrations?: any[]
+}
+
+export interface CreatePublisherWebsiteInput {
+  url: string
+  name?: string
+  country?: string
+  language?: string
+  category?: string
+  categoryId?: string
+  listingTitle?: string
+  description?: string
+  domainRating?: number
+  monthlyTraffic?: number
+  initialService?: {
+    serviceType: string
+    price: number
+    currency?: "USD" | "EUR" | "GBP"
+    turnaroundDays: number
+    revisionRounds?: number
+    warrantyDays?: number
+  }
+}
+
 export class PublishersService {
   constructor(private client: HttpClient) {}
 
-  getWebsites(publisherId: string): Promise<any[]> {
-    return this.client.get(`/publishers/${publisherId}/websites`)
+  getWebsites(publisherId: string): Promise<PublisherWebsiteResponse[]> {
+    return this.client.get<PublisherWebsiteResponse[]>(
+      `/publishers/${publisherId}/websites`,
+    )
   }
 
-  getWebsite(publisherId: string, websiteId: string): Promise<any> {
-    return this.client.get(`/publishers/${publisherId}/websites/${websiteId}`)
+  getWebsite(
+    publisherId: string,
+    websiteId: string,
+  ): Promise<PublisherWebsiteResponse> {
+    return this.client.get<PublisherWebsiteResponse>(
+      `/publishers/${publisherId}/websites/${websiteId}`,
+    )
   }
 
-  addWebsite(publisherId: string, data: any): Promise<any> {
-    return this.client.post(`/publishers/${publisherId}/websites`, {
-      json: data,
-    })
+  addWebsite(
+    publisherId: string,
+    data: CreatePublisherWebsiteInput,
+  ): Promise<PublisherWebsiteResponse> {
+    return this.client.post<PublisherWebsiteResponse>(
+      `/publishers/${publisherId}/websites`,
+      {
+        json: data as unknown as Record<string, unknown>,
+      },
+    )
   }
 
   updateWebsite(

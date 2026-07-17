@@ -1,113 +1,66 @@
 "use client"
 
+import type {
+  ListingServiceOption,
+  MarketplaceListing,
+} from "@guestpost/api-client"
 import {
   Avatar,
   AvatarFallback,
   Badge,
   Button,
-  Card,
-  CardContent,
   ErrorState,
   Skeleton,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   AlertCircle,
   ArrowLeft,
-  Clock,
+  ArrowRight,
+  Bell,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
   ExternalLink,
-  Globe,
+  FileCheck2,
+  Globe2,
   Heart,
   Languages,
-  Lock,
+  LockKeyhole,
+  RefreshCcw,
   ShieldCheck,
   Star,
-  TrendingUp,
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { useParams, useRouter, useSearchParams } from "next/navigation"
+import { useParams, useSearchParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
+import { toast } from "sonner"
+import { MarketplaceListingCard } from "../../../../components/marketplace/marketplace-listing-card"
+import {
+  displayWebsiteHost,
+  formatCompactNumber,
+  formatMoney,
+  fulfillmentBadgeClass,
+  fulfillmentLabel,
+  serviceDescription,
+  serviceLabel,
+} from "../../../../components/marketplace/marketplace-ui"
 import { api } from "../../../../lib/api"
-import { useAuth } from "../../../../lib/auth"
 import { useCustomerAccess } from "../../../../lib/hooks/use-customer-access"
-
-interface Listing {
-  id: string
-  title: string
-  slug: string
-  description: string
-  shortDescription?: string
-  type?: string
-  status: string
-  price?: number
-  currency: string
-  priceType: string
-  minPrice?: number
-  maxPrice?: number
-  domainRating?: number
-  domainAuthority?: number
-  traffic?: number
-  referringDomains?: number
-  spamScore?: number
-  country?: string
-  language?: string
-  turnaroundDays?: number
-  revisionRounds?: number
-  featured: boolean
-  verified: boolean
-  fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
-  doFollowOnly: boolean
-  websiteUrl?: string
-  websiteId?: string | null
-  sampleUrl?: string
-  category?: { id: string; name: string; slug: string }
-  tags: Array<{ id: string; name: string; slug: string }>
-  images: Array<{ url: string; isPrimary: boolean }>
-  reviews: Array<{
-    id: string
-    rating: number
-    title?: string
-    content: string
-    user: { name?: string; image?: string }
-    createdAt: string
-  }>
-  publisher?: {
-    id: string
-    name: string
-    profile?: { rating?: number; totalReviews?: number; responseTime?: number }
-  }
-  avgRating?: number
-  reviewCount: number
-  isFavorited?: boolean
-  relatedListings: any[]
-  ownerType?: "PUBLISHER" | "PLATFORM"
-  attribution?: { kind: "PUBLISHER" | "PLATFORM"; label: string }
-  services?: Array<{
-    id: string
-    serviceType: string
-    price: number
-    currency: string
-    turnaroundDays: number
-    revisionRounds: number
-    warrantyDays?: number | null
-    requirements?: Record<string, unknown> | null
-    availability: "AVAILABLE" | "PAUSED" | "WAITLIST"
-  }>
-}
 
 export default function ListingDetailPage() {
   const params = useParams()
-  const router = useRouter()
-  const { user } = useAuth()
+  const searchParams = useSearchParams()
+  const requestedService = searchParams?.get("service")
   const queryClient = useQueryClient()
   const [activeImage, setActiveImage] = useState(0)
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(
     null,
+  )
+  const [subscribedServices, setSubscribedServices] = useState<Set<string>>(
+    new Set(),
   )
 
   const {
@@ -115,90 +68,80 @@ export default function ListingDetailPage() {
     isLoading,
     error,
     refetch,
-  } = useQuery<Listing>({
+  } = useQuery<MarketplaceListing>({
     queryKey: ["listing", params.slug],
-    queryFn: () =>
-      api.marketplace
-        .getListing(params.slug as string)
-        .then((r) => r as unknown as Listing),
-    enabled: !!params.slug,
+    queryFn: () => api.marketplace.getListing(params.slug as string),
+    enabled: Boolean(params.slug),
   })
 
-  // URL visibility: blurred for customers with no balance, deposits, or orders
-  const { canViewUrls: canViewUrl } = useCustomerAccess()
-
-  const searchParams = useSearchParams()
+  const { canViewUrls } = useCustomerAccess()
   const services = listing?.services ?? []
   const orderableServices = useMemo(
-    () => services.filter((s) => s.availability === "AVAILABLE"),
+    () => services.filter((service) => service.availability === "AVAILABLE"),
     [services],
   )
   const selectedService = useMemo(
-    () => services.find((s) => s.id === selectedServiceId) ?? null,
-    [services, selectedServiceId],
+    () =>
+      orderableServices.find((service) => service.id === selectedServiceId) ??
+      null,
+    [orderableServices, selectedServiceId],
   )
 
   useEffect(() => {
-    if (!listing || services.length === 0) return
-    const requested = searchParams?.get("service")
-    if (selectedServiceId && services.some((s) => s.id === selectedServiceId)) {
-      if (!requested || selectedService?.serviceType === requested) return
-    }
-    const fromUrl = requested
-      ? services.find(
-          (s) => s.serviceType === requested && s.availability === "AVAILABLE",
+    if (!listing || orderableServices.length === 0) return
+    const fromUrl = requestedService
+      ? orderableServices.find(
+          (service) =>
+            service.id === requestedService ||
+            service.serviceType === requestedService,
         )
       : null
-    const fallback = orderableServices[0] ?? null
-    const picked = fromUrl ?? fallback
-    if (picked) setSelectedServiceId(picked.id)
-  }, [
-    listing,
-    services,
-    orderableServices,
-    searchParams,
-    selectedServiceId,
-    selectedService,
-  ])
+    setSelectedServiceId((current) => {
+      if (fromUrl) return fromUrl.id
+      if (
+        current &&
+        orderableServices.some((service) => service.id === current)
+      ) {
+        return current
+      }
+      return orderableServices[0].id
+    })
+  }, [listing, orderableServices, requestedService])
 
-  const { mutate: toggleFavorite, isPending: favoriting } = useMutation({
+  const favoriteMut = useMutation({
     mutationFn: () => {
-      if (!listing) throw new Error("No listing loaded")
+      if (!listing) throw new Error("Listing is unavailable")
       return listing.isFavorited
         ? api.marketplace.removeFavorite(listing.id)
         : api.marketplace.addFavorite(listing.id)
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["listing", params.slug] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["listing", params.slug] })
+      toast.success(
+        listing?.isFavorited ? "Removed from favorites" : "Saved to favorites",
+      )
+    },
+    onError: (mutationError: Error) => toast.error(mutationError.message),
   })
 
-  function formatPrice(price: number, currency: string = "USD") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-    }).format(price)
-  }
+  const waitlistMut = useMutation({
+    mutationFn: (serviceType: string) => {
+      if (!listing) throw new Error("Listing is unavailable")
+      return api.marketplace.addFavorite(listing.id, serviceType)
+    },
+    onSuccess: (_result, serviceType) => {
+      setSubscribedServices((current) => new Set(current).add(serviceType))
+      toast.success("You’ll be notified when this service is available")
+    },
+    onError: (mutationError: Error) => toast.error(mutationError.message),
+  })
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-9 w-40" />
-        <div className="grid lg:grid-cols-2 gap-8">
-          <Skeleton className="aspect-[4/3] rounded-xl" />
-          <div className="space-y-4">
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-6 w-1/3" />
-            <Skeleton className="h-28 w-full rounded-xl" />
-          </div>
-        </div>
-      </div>
-    )
-  }
+  if (isLoading) return <ListingDetailSkeleton />
 
   if (error) {
     return (
       <ErrorState
-        title="Failed to load listing"
+        title="This listing could not be loaded"
         description={(error as Error).message}
         onRetry={() => refetch()}
       />
@@ -207,529 +150,764 @@ export default function ListingDetailPage() {
 
   if (!listing) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 text-center">
-        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Listing Not Found</h2>
-        <p className="text-muted-foreground mb-5">
-          This listing doesn't exist or has been removed.
+      <div className="mx-auto max-w-xl py-20 text-center">
+        <AlertCircle className="mx-auto h-10 w-10 text-destructive" />
+        <h1 className="mt-4 text-xl font-semibold">Listing not found</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          It may have been paused, archived, or removed from the marketplace.
         </p>
-        <Button asChild>
-          <Link href="/dashboard/marketplace">Back to Marketplace</Link>
+        <Button asChild className="mt-6">
+          <Link href="/dashboard/marketplace">Browse marketplace</Link>
         </Button>
       </div>
     )
   }
 
-  const images =
-    listing.images.length > 0 ? listing.images : [{ url: "", isPrimary: true }]
+  const images = (listing.images ?? []).filter((image) => Boolean(image.url))
+  const relatedListings = listing.relatedListings ?? []
+  const attribution =
+    listing.attribution?.label ??
+    (listing.ownerType === "PLATFORM"
+      ? "GuestPost.cc"
+      : (listing.publisher?.name ?? "Verified publisher"))
 
   return (
-    <div className="space-y-6">
-      {/* Top bar */}
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-1.5" />
-          Back
-        </Button>
+    <div className="mx-auto max-w-[1450px] space-y-7">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <nav
+          aria-label="Breadcrumb"
+          className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground"
+        >
+          <Link
+            href="/dashboard/marketplace"
+            className="inline-flex items-center gap-1.5 hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" /> Marketplace
+          </Link>
+          <ChevronRight className="h-3.5 w-3.5" />
+          <span className="truncate">
+            {listing.category?.name ?? "Listing details"}
+          </span>
+        </nav>
         <Button
           variant="outline"
           size="sm"
-          onClick={() => toggleFavorite()}
-          disabled={favoriting}
-          className="gap-1.5"
+          onClick={() => favoriteMut.mutate()}
+          disabled={favoriteMut.isPending}
         >
           <Heart
-            className={`h-4 w-4 ${listing.isFavorited ? "fill-red-500 text-red-500" : ""}`}
+            className={`mr-2 h-4 w-4 ${
+              listing.isFavorited ? "fill-rose-500 text-rose-500" : ""
+            }`}
           />
-          {listing.isFavorited ? "Saved" : "Save"}
+          {listing.isFavorited ? "Saved" : "Save listing"}
         </Button>
       </div>
 
-      {/* Main content grid */}
-      <div className="grid lg:grid-cols-5 gap-8">
-        {/* Left: Image gallery */}
-        <div className="lg:col-span-3 space-y-3">
-          <div className="relative aspect-[16/10] bg-muted rounded-xl overflow-hidden">
-            {images[activeImage]?.url ? (
-              <Image
-                fill
-                unoptimized
-                priority
-                src={images[activeImage].url}
-                alt={listing.title}
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, 60vw"
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
-                <span className="text-6xl font-bold text-primary/15">
-                  {listing.title[0]}
-                </span>
-              </div>
-            )}
-            {listing.featured && (
-              <span className="absolute left-4 top-4 rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground shadow-sm">
-                Featured
-              </span>
-            )}
-          </div>
-          {images.length > 1 && (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {images.map((img, i) => (
-                <button
-                  key={i}
-                  onClick={() => setActiveImage(i)}
-                  className={`relative h-16 w-16 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-colors ${
-                    i === activeImage
-                      ? "border-primary"
-                      : "border-transparent hover:border-muted-foreground/30"
-                  }`}
-                >
-                  <Image
-                    fill
-                    unoptimized
-                    src={img.url}
-                    alt=""
-                    className="object-cover"
-                    sizes="64px"
-                  />
-                </button>
-              ))}
-            </div>
+      <header className="rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
+        <div className="flex flex-wrap items-center gap-2">
+          {listing.category && (
+            <Badge variant="secondary">{listing.category.name}</Badge>
           )}
+          <Badge variant="outline" className={fulfillmentBadgeClass(listing)}>
+            {fulfillmentLabel(listing)}
+          </Badge>
+          {listing.verified && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+              <CheckCircle2 className="h-4 w-4" /> Verified listing
+            </span>
+          )}
+          {listing.featured && <Badge>Featured</Badge>}
         </div>
-
-        {/* Right: Purchase panel */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Title + badges */}
+        <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
           <div>
-            <div className="flex flex-wrap items-center gap-2 mb-3">
-              {listing.category && (
-                <Badge variant="secondary" className="text-xs">
-                  {listing.category.name}
-                </Badge>
-              )}
-              {listing.fulfillmentType && (
-                <Badge variant="outline" className="text-xs">
-                  {listing.fulfillmentType === "INTERNAL"
-                    ? "Platform"
-                    : listing.fulfillmentType === "HYBRID"
-                      ? "Hybrid"
-                      : "Publisher"}
-                </Badge>
-              )}
-              {listing.verified && (
-                <span className="flex items-center gap-1 text-xs font-medium text-green-600">
-                  <ShieldCheck className="h-3.5 w-3.5" /> Verified
-                </span>
-              )}
-            </div>
-            <h1 className="text-2xl font-bold leading-tight">
+            <h1 className="max-w-4xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
               {listing.title}
             </h1>
-
-            {/* Rating */}
-            {listing.avgRating && (
-              <div className="mt-2 flex items-center gap-2">
-                <div className="flex">
-                  {Array.from({ length: 5 }).map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`h-4 w-4 ${
-                        i < Math.round(listing.avgRating!)
-                          ? "fill-yellow-400 text-yellow-400"
-                          : "text-gray-300"
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm font-medium">
+            <p className="mt-3 max-w-3xl text-base leading-7 text-muted-foreground">
+              {listing.shortDescription || listing.description}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+            {listing.avgRating != null && listing.reviewCount > 0 ? (
+              <div className="flex items-center gap-2">
+                <RatingStars rating={listing.avgRating} />
+                <span className="font-semibold">
                   {listing.avgRating.toFixed(1)}
                 </span>
-                <span className="text-sm text-muted-foreground">
-                  ({listing.reviewCount} reviews)
+                <span className="text-muted-foreground">
+                  {listing.reviewCount} review
+                  {listing.reviewCount === 1 ? "" : "s"}
                 </span>
               </div>
+            ) : (
+              <span className="text-muted-foreground">
+                New to the marketplace
+              </span>
             )}
+            <span className="hidden h-4 w-px bg-border sm:block" />
+            <span className="text-muted-foreground">
+              Fulfilled by{" "}
+              <strong className="font-semibold text-foreground">
+                {attribution}
+              </strong>
+            </span>
           </div>
+        </div>
+      </header>
 
-          {/* Pricing card with stats + service picker */}
-          <Card>
-            <CardContent className="p-5 space-y-4">
-              {/* Price */}
-              <div className="flex items-baseline justify-between">
-                <span className="text-3xl font-bold">
-                  {formatPrice(
-                    selectedService?.price ??
-                      (listing as any).priceFrom ??
-                      listing.price ??
-                      0,
-                    listing.currency,
-                  )}
-                </span>
-                {(listing as any).priceFrom != null && !selectedService && (
-                  <span className="text-sm text-muted-foreground">
-                    starting at
-                  </span>
-                )}
-              </div>
-
-              {/* Quick stats */}
-              <div className="grid grid-cols-3 gap-2">
-                {listing.domainRating && (
-                  <div className="rounded-lg bg-muted p-2.5 text-center">
-                    <div className="text-xl font-bold">
-                      {listing.domainRating}
+      <div className="grid items-start gap-7 lg:grid-cols-[minmax(0,1fr)_390px]">
+        <main className="min-w-0 space-y-7">
+          <section aria-label="Listing media">
+            <div className="relative aspect-[16/8.5] overflow-hidden rounded-3xl border bg-muted">
+              {images[activeImage]?.url ? (
+                <Image
+                  fill
+                  unoptimized
+                  priority
+                  src={images[activeImage].url}
+                  alt={listing.title}
+                  className="object-cover"
+                  sizes="(max-width: 1024px) 100vw, 70vw"
+                />
+              ) : (
+                <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-700 text-white">
+                  <div className="text-center">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
+                      <Globe2 className="h-8 w-8" />
                     </div>
-                    <div className="text-[10px] text-muted-foreground">DR</div>
+                    <p className="mt-4 text-sm font-medium text-slate-300">
+                      Verified marketplace placement
+                    </p>
                   </div>
-                )}
-                {listing.traffic && (
-                  <div className="rounded-lg bg-muted p-2.5 text-center">
-                    <div className="text-xl font-bold">
-                      {listing.traffic.toLocaleString()}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Traffic / mo
-                    </div>
-                  </div>
-                )}
-                {listing.referringDomains && (
-                  <div className="rounded-lg bg-muted p-2.5 text-center">
-                    <div className="text-xl font-bold">
-                      {listing.referringDomains.toLocaleString()}
-                    </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      Ref domains
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Service picker */}
-              {services.length > 0 && (
-                <div
-                  className="space-y-1.5"
-                  role="radiogroup"
-                  aria-label="Choose a service"
-                >
-                  <div className="text-sm font-medium">Choose a service</div>
-                  {services.map((svc) => {
-                    const isSelected = svc.id === selectedServiceId
-                    const isWaitlist = svc.availability === "WAITLIST"
-                    return (
-                      <button
-                        key={svc.id}
-                        role="radio"
-                        aria-checked={isSelected}
-                        disabled={isWaitlist}
-                        onClick={() => setSelectedServiceId(svc.id)}
-                        className={`w-full text-left p-3 border rounded-lg transition-colors ${isSelected ? "border-primary ring-1 ring-primary bg-primary/5" : "border-border hover:border-primary/50"} ${isWaitlist ? "opacity-60 cursor-not-allowed" : ""}`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <div className="text-sm font-medium">
-                              {svc.serviceType.replace(/_/g, " ")}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {svc.turnaroundDays}d · {svc.revisionRounds}{" "}
-                              revisions
-                              {isWaitlist && (
-                                <span className="ml-1.5 text-amber-600">
-                                  · Waitlist
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <div className="font-semibold">
-                            {formatPrice(svc.price, svc.currency)}
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })}
                 </div>
               )}
-
-              {/* Order CTA */}
-              <Button
-                className="w-full"
-                size="lg"
-                disabled={services.length > 0 && !selectedService}
-                asChild
-              >
-                <Link
-                  href={
-                    selectedService
-                      ? `/dashboard/marketplace/${listing?.slug}/order?service=${selectedService.id}`
-                      : "#"
-                  }
-                >
-                  {services.length > 0 && !selectedService
-                    ? "Select a service to continue"
-                    : "Order Now"}
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
-
-          {/* Info row */}
-          <div className="space-y-2.5 rounded-xl border p-4">
-            {(() => {
-              const td =
-                selectedService?.turnaroundDays ??
-                services.find((s) => s.availability === "AVAILABLE")
-                  ?.turnaroundDays ??
-                listing.turnaroundDays
-              return td ? (
-                <div className="flex items-center gap-2.5 text-sm">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <span>{td} days turnaround</span>
-                </div>
-              ) : null
-            })()}
-            {listing.country && (
-              <div className="flex items-center gap-2.5 text-sm">
-                <Globe className="h-4 w-4 text-muted-foreground" />
-                <span>{listing.country}</span>
-              </div>
-            )}
-            {listing.language && (
-              <div className="flex items-center gap-2.5 text-sm">
-                <Languages className="h-4 w-4 text-muted-foreground" />
-                <span>{listing.language}</span>
-              </div>
-            )}
-            {(() => {
-              const rr =
-                selectedService?.revisionRounds ??
-                services.find((s) => s.availability === "AVAILABLE")
-                  ?.revisionRounds ??
-                listing.revisionRounds
-              return rr != null ? (
-                <div className="flex items-center gap-2.5 text-sm">
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  <span>{rr} revision rounds included</span>
-                </div>
-              ) : null
-            })()}
-            {listing.websiteUrl && canViewUrl ? (
-              <a
-                href={listing.websiteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2.5 text-sm text-primary hover:underline"
-              >
-                <ExternalLink className="h-4 w-4" />
-                <span className="truncate">{listing.websiteUrl}</span>
-              </a>
-            ) : listing.websiteUrl ? (
-              <div
-                className="group relative"
-                title="Deposit funds or place an order to reveal the site URL"
-              >
-                <div className="flex items-center gap-2.5 text-sm text-muted-foreground blur-sm">
-                  <ExternalLink className="h-4 w-4" />
-                  <span>{listing.websiteUrl}</span>
-                </div>
-                <div className="absolute inset-0 flex items-center gap-1.5">
-                  <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs text-muted-foreground">
-                    Deposit to reveal URL
-                  </span>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          {/* Publisher card */}
-          {listing.publisher && (
-            <div className="flex items-center gap-3 rounded-xl border p-4">
-              <Avatar>
-                <AvatarFallback>{listing.publisher.name[0]}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <div className="truncate font-medium">
-                  {listing.publisher.name}
-                </div>
-                {listing.publisher.profile && (
-                  <div className="text-sm text-muted-foreground">
-                    {listing.publisher.profile.rating && (
-                      <span className="inline-flex items-center gap-1 mr-3">
-                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        {listing.publisher.profile.rating.toFixed(1)}
-                      </span>
-                    )}
-                    {listing.publisher.profile.totalReviews && (
-                      <span>
-                        {listing.publisher.profile.totalReviews} reviews
-                      </span>
-                    )}
-                    {listing.publisher.profile.responseTime && (
-                      <span className="ml-3">
-                        ~{listing.publisher.profile.responseTime}h response
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
             </div>
-          )}
-        </div>
-      </div>
+            {images.length > 1 && (
+              <div
+                role="group"
+                className="mt-3 flex gap-2 overflow-x-auto pb-1"
+                aria-label="Listing images"
+              >
+                {images.map((image, index) => (
+                  <button
+                    key={image.url}
+                    type="button"
+                    onClick={() => setActiveImage(index)}
+                    aria-label={`Show image ${index + 1}`}
+                    aria-pressed={activeImage === index}
+                    className={`relative h-16 w-20 shrink-0 overflow-hidden rounded-xl border-2 transition ${
+                      activeImage === index
+                        ? "border-foreground"
+                        : "border-transparent opacity-70 hover:opacity-100"
+                    }`}
+                  >
+                    <Image
+                      fill
+                      unoptimized
+                      src={image.url}
+                      alt=""
+                      className="object-cover"
+                      sizes="80px"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
 
-      {/* Tabs: Description, Pricing, Reviews */}
-      <Tabs defaultValue="description" className="mt-6">
-        <TabsList>
-          <TabsTrigger value="description">Description</TabsTrigger>
-          <TabsTrigger value="pricing">Pricing</TabsTrigger>
-          <TabsTrigger value="reviews">
-            Reviews ({listing.reviewCount})
-          </TabsTrigger>
-        </TabsList>
+          <WebsiteAccessCard listing={listing} canViewUrls={canViewUrls} />
 
-        {/* Description tab */}
-        <TabsContent value="description" className="mt-4 space-y-4">
-          <div className="prose prose-sm max-w-none dark:prose-invert">
-            <p>{listing.description}</p>
-          </div>
-          {listing.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-2">
+          <section
+            aria-labelledby="performance-heading"
+            className="rounded-3xl border bg-card p-6"
+          >
+            <div>
+              <h2
+                id="performance-heading"
+                className="text-xl font-semibold tracking-tight"
+              >
+                Performance snapshot
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Compare the site-level signals that matter for placement
+                quality.
+              </p>
+            </div>
+            <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Metric
+                label="Domain rating"
+                value={
+                  listing.domainRating != null
+                    ? String(listing.domainRating)
+                    : "—"
+                }
+                note="Authority signal"
+              />
+              <Metric
+                label="Monthly traffic"
+                value={
+                  listing.traffic != null
+                    ? formatCompactNumber(listing.traffic)
+                    : "—"
+                }
+                note="Estimated visits"
+              />
+              <Metric
+                label="Referring domains"
+                value={
+                  listing.referringDomains != null
+                    ? formatCompactNumber(listing.referringDomains)
+                    : "—"
+                }
+                note="Linking websites"
+              />
+              <Metric
+                label="Spam score"
+                value={
+                  listing.spamScore != null ? `${listing.spamScore}%` : "—"
+                }
+                note="Risk indicator"
+              />
+            </dl>
+          </section>
+
+          <section
+            aria-labelledby="about-heading"
+            className="rounded-3xl border bg-card p-6 sm:p-7"
+          >
+            <h2
+              id="about-heading"
+              className="text-xl font-semibold tracking-tight"
+            >
+              About this placement
+            </h2>
+            <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-muted-foreground">
+              {listing.description}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              {listing.country && (
+                <Badge variant="outline" className="gap-1.5">
+                  <Globe2 className="h-3.5 w-3.5" /> {listing.country}
+                </Badge>
+              )}
+              {listing.language && (
+                <Badge variant="outline" className="gap-1.5">
+                  <Languages className="h-3.5 w-3.5" /> {listing.language}
+                </Badge>
+              )}
+              {listing.doFollowOnly && (
+                <Badge variant="outline" className="gap-1.5">
+                  <Check className="h-3.5 w-3.5" /> Do-follow only
+                </Badge>
+              )}
               {listing.tags.map((tag) => (
                 <Badge key={tag.id} variant="secondary">
                   {tag.name}
                 </Badge>
               ))}
             </div>
-          )}
-        </TabsContent>
+          </section>
 
-        {/* Pricing tab */}
-        <TabsContent value="pricing" className="mt-4">
-          {services.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {services.map((svc) => (
-                <div
-                  key={svc.id}
-                  className="rounded-xl border p-5 transition-colors hover:border-primary/30"
-                >
-                  <h3 className="font-semibold capitalize">
-                    {svc.serviceType.replace(/_/g, " ")}
-                  </h3>
-                  <div className="mt-2 text-2xl font-bold">
-                    {formatPrice(svc.price, svc.currency)}
-                  </div>
-                  <p className="mt-1.5 text-sm text-muted-foreground">
-                    {svc.turnaroundDays}d turnaround · {svc.revisionRounds}{" "}
-                    revisions
-                  </p>
-                  {svc.availability === "WAITLIST" && (
-                    <p className="mt-2 text-xs text-amber-600">
-                      Currently waitlisted
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border p-6 text-center">
-              <p className="text-lg font-medium">
-                {formatPrice(listing.price ?? 0, listing.currency)}
+          {selectedService && (
+            <SelectedServiceDetails service={selectedService} />
+          )}
+
+          <FulfillmentCard listing={listing} />
+
+          <ReviewsSection listing={listing} />
+        </main>
+
+        <aside className="order-first lg:order-last lg:sticky lg:top-6">
+          <div className="overflow-hidden rounded-3xl border bg-card shadow-lg shadow-slate-950/5">
+            <div className="border-b bg-muted/30 p-5 sm:p-6">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Available services
               </p>
-              <p className="text-muted-foreground">Fixed price</p>
+              <div className="mt-2 flex items-end justify-between gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Starting at</p>
+                  <p className="text-3xl font-bold tracking-tight">
+                    {formatMoney(
+                      selectedService?.price ?? listing.priceFrom ?? 0,
+                      selectedService?.currency ?? listing.currency,
+                    )}
+                  </p>
+                </div>
+                <Badge variant="outline">
+                  {orderableServices.length} available
+                </Badge>
+              </div>
             </div>
-          )}
-        </TabsContent>
 
-        {/* Reviews tab */}
-        <TabsContent value="reviews" className="mt-4">
-          {listing.reviews.length > 0 ? (
-            <div className="space-y-4">
-              {/* Rating Summary */}
-              {listing.avgRating && (
-                <div className="flex items-center gap-4 rounded-xl border p-4">
-                  <div className="text-center">
-                    <div className="text-4xl font-bold">
-                      {listing.avgRating.toFixed(1)}
+            <div className="space-y-3 p-5 sm:p-6">
+              {services.map((service) => {
+                const selected = service.id === selectedServiceId
+                const waitlisted = service.availability === "WAITLIST"
+                if (waitlisted) {
+                  const subscribed = subscribedServices.has(service.serviceType)
+                  return (
+                    <div
+                      key={service.id}
+                      className="rounded-2xl border border-dashed p-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-semibold">
+                            {serviceLabel(service.serviceType)}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {serviceDescription(service.serviceType)}
+                          </p>
+                        </div>
+                        <Badge variant="secondary">Waitlist</Badge>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full"
+                        disabled={subscribed || waitlistMut.isPending}
+                        onClick={() => waitlistMut.mutate(service.serviceType)}
+                      >
+                        {subscribed ? (
+                          <>
+                            <Check className="mr-2 h-4 w-4" /> Notification set
+                          </>
+                        ) : (
+                          <>
+                            <Bell className="mr-2 h-4 w-4" /> Notify me
+                          </>
+                        )}
+                      </Button>
                     </div>
-                    <div className="mt-1 flex justify-center">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`h-4 w-4 ${
-                            i < Math.round(listing.avgRating!)
-                              ? "fill-yellow-400 text-yellow-400"
-                              : "text-gray-300"
-                          }`}
-                        />
-                      ))}
+                  )
+                }
+
+                return (
+                  <button
+                    key={service.id}
+                    type="button"
+                    onClick={() => setSelectedServiceId(service.id)}
+                    aria-pressed={selected}
+                    className={`w-full rounded-2xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      selected
+                        ? "border-foreground bg-foreground text-background shadow-sm"
+                        : "hover:border-foreground/30 hover:bg-muted/30"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold">
+                            {serviceLabel(service.serviceType)}
+                          </p>
+                          {selected && (
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-background text-foreground">
+                              <Check className="h-3 w-3" />
+                            </span>
+                          )}
+                        </div>
+                        <p
+                          className={`mt-1 text-xs leading-5 ${selected ? "text-background/70" : "text-muted-foreground"}`}
+                        >
+                          {service.turnaroundDays} days ·{" "}
+                          {service.revisionRounds} revision
+                          {service.revisionRounds === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                      <p className="shrink-0 font-bold">
+                        {formatMoney(service.price, service.currency)}
+                      </p>
                     </div>
-                  </div>
-                  <div className="h-12 w-px bg-border" />
-                  <div>
-                    <div className="text-sm font-medium">
-                      {listing.reviewCount} review
-                      {listing.reviewCount !== 1 ? "s" : ""}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      Based on verified orders
-                    </div>
-                  </div>
+                  </button>
+                )
+              })}
+
+              {services.length === 0 && (
+                <div className="rounded-2xl border border-dashed p-5 text-center">
+                  <Clock3 className="mx-auto h-5 w-5 text-muted-foreground" />
+                  <p className="mt-2 text-sm font-medium">
+                    No service is available
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Check back later for new placement options.
+                  </p>
                 </div>
               )}
 
-              {/* Individual reviews */}
-              {listing.reviews.map((review) => (
-                <div key={review.id} className="rounded-xl border p-4">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Avatar className="h-8 w-8">
-                      <AvatarFallback className="text-xs">
-                        {review.user.name?.[0] || "U"}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <div className="text-sm font-medium">
-                        {review.user.name || "Anonymous"}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {new Date(review.createdAt).toLocaleDateString()}
-                      </div>
-                    </div>
-                    <div className="flex">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`h-3.5 w-3.5 ${
-                            i < review.rating
-                              ? "fill-yellow-400 text-yellow-400"
-                              : "text-gray-300"
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  {review.title && (
-                    <h4 className="font-medium mb-1">{review.title}</h4>
-                  )}
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {review.content}
-                  </p>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <div className="rounded-full bg-muted p-3 mb-3">
-                <Star className="h-6 w-6 text-muted-foreground" />
+              {selectedService ? (
+                <Button asChild size="lg" className="mt-2 w-full">
+                  <Link
+                    href={`/dashboard/marketplace/${listing.slug}/order?service=${selectedService.id}`}
+                  >
+                    Continue with {serviceLabel(selectedService.serviceType)}
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button size="lg" className="mt-2 w-full" disabled>
+                  Select an available service
+                </Button>
+              )}
+
+              <div className="space-y-2.5 border-t pt-4 text-xs text-muted-foreground">
+                <p className="flex items-start gap-2">
+                  <FileCheck2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  Review your campaign brief before payment.
+                </p>
+                <p className="flex items-start gap-2">
+                  <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  Price and delivery terms are locked when the order is created.
+                </p>
               </div>
-              <h3 className="text-sm font-semibold">No reviews yet</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                Reviews appear after verified orders are completed.
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {relatedListings.length > 0 && (
+        <section aria-labelledby="related-heading" className="border-t pt-8">
+          <div className="flex items-end justify-between gap-4">
+            <div>
+              <h2
+                id="related-heading"
+                className="text-2xl font-semibold tracking-tight"
+              >
+                Similar placements
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Compare other sites with related categories or services.
               </p>
             </div>
+            <Button asChild variant="outline" className="hidden sm:inline-flex">
+              <Link href="/dashboard/marketplace">
+                View all <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+          <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {relatedListings.map((related) => (
+              <MarketplaceListingCard
+                key={related.id}
+                listing={related}
+                canViewUrls={canViewUrls}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}
+
+function WebsiteAccessCard({
+  listing,
+  canViewUrls,
+}: {
+  listing: MarketplaceListing
+  canViewUrls: boolean
+}) {
+  if (!listing.websiteUrl) return null
+
+  if (canViewUrls) {
+    return (
+      <div className="flex flex-col gap-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-5 dark:border-emerald-900 dark:bg-emerald-950/20 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300">
+            <Globe2 className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="font-semibold">Website address unlocked</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {displayWebsiteHost(listing.websiteUrl)}
+            </p>
+          </div>
+        </div>
+        <Button asChild variant="outline" className="bg-background">
+          <a
+            href={listing.websiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Visit website <ExternalLink className="ml-2 h-4 w-4" />
+          </a>
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 p-5 dark:border-amber-900 dark:bg-amber-950/20">
+      <div className="rounded-xl bg-amber-100 p-2 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+        <LockKeyhole className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="font-semibold">Website address protected</p>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          Your organization can view publisher website addresses after its first
+          successful deposit. All decision metrics and service terms remain
+          visible now.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+function Metric({
+  label,
+  value,
+  note,
+}: {
+  label: string
+  value: string
+  note: string
+}) {
+  return (
+    <div className="rounded-2xl border bg-muted/20 p-4">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-2 text-2xl font-bold tracking-tight">{value}</dd>
+      <p className="mt-1 text-[11px] text-muted-foreground">{note}</p>
+    </div>
+  )
+}
+
+function SelectedServiceDetails({
+  service,
+}: {
+  service: ListingServiceOption
+}) {
+  const facts = [
+    {
+      icon: Clock3,
+      label: "Delivery estimate",
+      value: `${service.turnaroundDays} days`,
+    },
+    {
+      icon: RefreshCcw,
+      label: "Included revisions",
+      value: `${service.revisionRounds} round${service.revisionRounds === 1 ? "" : "s"}`,
+    },
+    ...(service.warrantyDays
+      ? [
+          {
+            icon: ShieldCheck,
+            label: "Placement warranty",
+            value: `${service.warrantyDays} days`,
+          },
+        ]
+      : []),
+  ]
+
+  return (
+    <section
+      aria-labelledby="selected-service-heading"
+      className="rounded-3xl border bg-slate-950 p-6 text-white sm:p-7"
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+        Selected service
+      </p>
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 id="selected-service-heading" className="text-2xl font-semibold">
+            {serviceLabel(service.serviceType)}
+          </h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-300">
+            {serviceDescription(service.serviceType)}
+          </p>
+        </div>
+        <p className="text-2xl font-bold">
+          {formatMoney(service.price, service.currency)}
+        </p>
+      </div>
+      <dl className="mt-6 grid gap-3 sm:grid-cols-3">
+        {facts.map((fact) => {
+          const Icon = fact.icon
+          return (
+            <div
+              key={fact.label}
+              className="rounded-2xl border border-white/10 bg-white/5 p-4"
+            >
+              <Icon className="h-4 w-4 text-slate-400" />
+              <dt className="mt-3 text-xs text-slate-400">{fact.label}</dt>
+              <dd className="mt-1 font-semibold">{fact.value}</dd>
+            </div>
+          )
+        })}
+      </dl>
+    </section>
+  )
+}
+
+function FulfillmentCard({ listing }: { listing: MarketplaceListing }) {
+  const platformManaged =
+    listing.ownerType === "PLATFORM" || listing.fulfillmentType === "INTERNAL"
+  const name = platformManaged
+    ? "GuestPost.cc fulfillment team"
+    : (listing.publisher?.name ?? "Verified publisher")
+
+  return (
+    <section
+      aria-labelledby="fulfillment-heading"
+      className="rounded-3xl border bg-card p-6"
+    >
+      <div className="flex items-start gap-4">
+        <Avatar className="h-12 w-12">
+          <AvatarFallback>{platformManaged ? "GP" : name[0]}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 id="fulfillment-heading" className="font-semibold">
+              {name}
+            </h2>
+            <Badge variant="outline" className={fulfillmentBadgeClass(listing)}>
+              {platformManaged ? "Platform managed" : "Publisher managed"}
+            </Badge>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {platformManaged
+              ? "GuestPost Operations manages the order, content handoff, publication, and delivery verification."
+              : "The verified publisher manages content acceptance and publication, while GuestPost tracks the order and delivery workflow."}
+          </p>
+          {listing.publisher?.profile && (
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-muted-foreground">
+              {listing.publisher.profile.rating != null && (
+                <span className="inline-flex items-center gap-1">
+                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                  {listing.publisher.profile.rating.toFixed(1)} publisher rating
+                </span>
+              )}
+              {listing.publisher.profile.responseTime != null && (
+                <span>
+                  Typically responds in {listing.publisher.profile.responseTime}
+                  h
+                </span>
+              )}
+            </div>
           )}
-        </TabsContent>
-      </Tabs>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function ReviewsSection({ listing }: { listing: MarketplaceListing }) {
+  const reviews = listing.reviews ?? []
+  return (
+    <section
+      aria-labelledby="reviews-heading"
+      className="rounded-3xl border bg-card p-6 sm:p-7"
+    >
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2
+            id="reviews-heading"
+            className="text-xl font-semibold tracking-tight"
+          >
+            Buyer reviews
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Feedback from completed and verified marketplace orders.
+          </p>
+        </div>
+        {listing.avgRating != null && reviews.length > 0 && (
+          <div className="flex items-center gap-2">
+            <RatingStars rating={listing.avgRating} />
+            <span className="font-semibold">
+              {listing.avgRating.toFixed(1)}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {reviews.length > 0 ? (
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          {reviews.map((review) => (
+            <article
+              key={review.id}
+              className="rounded-2xl border bg-muted/20 p-5"
+            >
+              <div className="flex items-center gap-3">
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="text-xs">
+                    {review.user.name?.[0] || "B"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {review.user.name || "Verified buyer"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {new Date(review.createdAt).toLocaleDateString(undefined, {
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </p>
+                </div>
+                <RatingStars rating={review.rating} compact />
+              </div>
+              {review.title && (
+                <h3 className="mt-4 font-semibold">{review.title}</h3>
+              )}
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {review.content}
+              </p>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="mt-6 rounded-2xl border border-dashed bg-muted/20 px-5 py-10 text-center">
+          <Star className="mx-auto h-6 w-6 text-muted-foreground" />
+          <p className="mt-3 font-medium">No buyer reviews yet</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Completed orders will build this listing’s review history.
+          </p>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function RatingStars({
+  rating,
+  compact = false,
+}: {
+  rating: number
+  compact?: boolean
+}) {
+  return (
+    <span
+      role="img"
+      className="flex"
+      aria-label={`${rating.toFixed(1)} out of 5 stars`}
+    >
+      {Array.from({ length: 5 }).map((_, index) => (
+        <Star
+          key={index}
+          className={`${compact ? "h-3 w-3" : "h-4 w-4"} ${
+            index < Math.round(rating)
+              ? "fill-amber-400 text-amber-400"
+              : "text-muted-foreground/30"
+          }`}
+        />
+      ))}
+    </span>
+  )
+}
+
+function ListingDetailSkeleton() {
+  return (
+    <div className="mx-auto max-w-[1450px] space-y-7">
+      <Skeleton className="h-9 w-48" />
+      <Skeleton className="h-44 rounded-3xl" />
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_390px]">
+        <div className="space-y-6">
+          <Skeleton className="aspect-[16/8.5] rounded-3xl" />
+          <Skeleton className="h-32 rounded-3xl" />
+          <Skeleton className="h-72 rounded-3xl" />
+        </div>
+        <Skeleton className="h-[620px] rounded-3xl" />
+      </div>
     </div>
   )
 }

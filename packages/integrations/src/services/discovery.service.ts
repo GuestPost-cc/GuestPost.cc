@@ -40,7 +40,11 @@ export class DiscoveryService {
     externalAccountId: string,
   ): Promise<{ enqueued: boolean }> {
     const account = await (db as any).externalAccount.findFirst({
-      where: { id: externalAccountId },
+      where: {
+        id: externalAccountId,
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
+      },
     })
     if (!account) throw new IntegrationNotFoundError()
 
@@ -52,7 +56,11 @@ export class DiscoveryService {
     externalAccountId: string,
   ): Promise<{ enqueued: boolean }> {
     const account = await (db as any).externalAccount.findFirst({
-      where: { id: externalAccountId },
+      where: {
+        id: externalAccountId,
+        ownerType: owner.ownerType,
+        ownerId: owner.ownerId,
+      },
     })
     if (!account) throw new IntegrationNotFoundError()
 
@@ -101,7 +109,11 @@ export class DiscoveryService {
       const account = await (db as any).externalAccount.findUnique({
         where: { id: externalAccountId },
       })
-      if (!account) {
+      if (
+        !account ||
+        account.ownerType !== ownerType ||
+        account.ownerId !== ownerId
+      ) {
         return { success: false, error: "ExternalAccount not found" }
       }
 
@@ -171,63 +183,41 @@ export class DiscoveryService {
             })
           }
 
-          // Upsert WebsiteIntegration rows in a transaction
-          let created = 0
-          await (db as any).$transaction(async (tx: any) => {
-            const existingResources = await tx.websiteIntegration.findMany({
-              where: { integrationId: integration.id },
-              select: { externalResourceId: true },
-            })
-            const existingIds = new Set(
-              existingResources.map((r: any) => r.externalResourceId as string),
-            )
-            const foundIds = new Set(resources.map((r) => r.externalResourceId))
-
-            // Upsert found resources
-            for (const resource of resources) {
-              await tx.websiteIntegration.upsert({
-                where: {
-                  integrationId_externalResourceId: {
-                    integrationId: integration.id,
-                    externalResourceId: resource.externalResourceId,
-                  },
-                },
-                update: {
-                  externalResourceName: resource.externalResourceName,
-                  metadata: resource.metadata ?? undefined,
-                  status: "CONNECTED",
-                },
-                create: {
-                  integrationId: integration.id,
-                  websiteId: "",
-                  externalResourceId: resource.externalResourceId,
-                  externalResourceName: resource.externalResourceName,
-                  metadata: resource.metadata ?? undefined,
-                  status: "CONNECTED",
-                },
-              })
-              if (!existingIds.has(resource.externalResourceId)) {
-                created++
-              }
-            }
-
-            // Mark resources that disappeared as INACCESSIBLE
-            for (const existingId of Array.from(existingIds)) {
-              if (!foundIds.has(existingId as string)) {
-                await tx.websiteIntegration.updateMany({
-                  where: {
-                    integrationId: integration.id,
-                    externalResourceId: existingId,
-                  },
-                  data: { status: "INACCESSIBLE" },
-                })
-              }
-            }
+          // WebsiteIntegration represents an explicit website-to-property
+          // link. Discovery must never create placeholder rows with a blank
+          // websiteId (that violates the FK and was the reason discovery did
+          // not complete). Refresh only links the owner already confirmed;
+          // unlinked resources are returned live by GET /resources.
+          let refreshed = 0
+          const foundById = new Map(
+            resources.map((resource) => [
+              resource.externalResourceId,
+              resource,
+            ]),
+          )
+          const linked = await (db as any).websiteIntegration.findMany({
+            where: { integrationId: integration.id },
           })
+          for (const websiteIntegration of linked) {
+            const resource = foundById.get(
+              websiteIntegration.externalResourceId,
+            )
+            await (db as any).websiteIntegration.update({
+              where: { id: websiteIntegration.id },
+              data: resource
+                ? {
+                    externalResourceName: resource.externalResourceName,
+                    metadata: resource.metadata ?? undefined,
+                    status: "CONNECTED",
+                  }
+                : { status: "INACCESSIBLE" },
+            })
+            if (resource) refreshed++
+          }
 
           results[provider] = {
             found: resources.length,
-            created,
+            created: refreshed,
           }
 
           if (isNew) {

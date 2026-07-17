@@ -12,20 +12,33 @@ import {
 
 export const connectRequestSchema = z.object({
   provider: z.nativeEnum(IntegrationProvider),
-  returnUrl: z.string().optional().default("/dashboard"),
+  platformWebsiteId: z.string().cuid().optional(),
+  returnUrl: z
+    .string()
+    .refine(
+      (value) => value.startsWith("/") && !value.startsWith("//"),
+      "returnUrl must be an application-relative path",
+    )
+    .optional()
+    .default("/dashboard"),
 })
 
-export const connectCallbackRequestSchema = z.object({
-  code: z.string().min(1),
-  state: z.string().min(1),
-  error: z.string().optional(),
-})
+export const connectCallbackRequestSchema = z
+  .object({
+    code: z.string().min(1).optional(),
+    state: z.string().min(1),
+    error: z.string().min(1).optional(),
+  })
+  .refine((value) => Boolean(value.code || value.error), {
+    message: "OAuth callback must include a code or error",
+  })
 
 export const listIntegrationsRequestSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(20),
   status: z.nativeEnum(IntegrationStatus).optional(),
   provider: z.nativeEnum(IntegrationProvider).optional(),
+  platformWebsiteId: z.string().cuid().optional(),
 })
 
 export const linkPropertyRequestSchema = z.object({
@@ -42,6 +55,7 @@ export const triggerSyncRequestSchema = z.object({
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
   websiteIntegrationId: z.string().optional(),
+  platformWebsiteId: z.string().cuid().optional(),
 })
 
 export const getSyncHistoryRequestSchema = z.object({

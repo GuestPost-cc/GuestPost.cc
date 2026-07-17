@@ -608,7 +608,8 @@ model Website {
   consecutiveFailures          Int                       @default(0)
   verificationFailureReason    String?
   // Canonical apex domain (protocol/path/www stripped, lowercase, punycode).
-  // Unique per non-platform site — one verified domain = one publisher.
+  // Unique across publisher and platform inventory. This is the durable
+  // domain identity used to ensure one site/listing family per domain.
   canonicalDomain              String?
   // Internal moderation trust score 0-100 (never exposed publicly).
   trustScore                   Int?
@@ -2030,6 +2031,11 @@ model ExternalAccount {
   id             String  @id @default(cuid())
   provider       String // GOOGLE, MICROSOFT
   externalUserId String
+  // Credential ownership is explicit so the same Google identity can be
+  // connected independently by a publisher and by the platform without
+  // sharing or overwriting encrypted tokens across trust boundaries.
+  ownerType      IntegrationOwnerType @default(PUBLISHER)
+  ownerId        String
   email          String?
   displayName    String?
 
@@ -2046,7 +2052,8 @@ model ExternalAccount {
 
   integrations PublisherIntegration[]
 
-  @@unique([provider, externalUserId])
+  @@unique([provider, externalUserId, ownerType, ownerId])
+  @@index([ownerType, ownerId])
   @@index([status])
 }
 
@@ -2120,6 +2127,9 @@ model WebsiteIntegration {
   website     Website              @relation(fields: [websiteId], references: [id], onDelete: Cascade)
 
   @@unique([integrationId, externalResourceId])
+  // One property per provider integration per website. GSC and GA4 use
+  // different integrationIds, so a website can (and should) link one of each.
+  @@unique([integrationId, websiteId])
   @@index([websiteId])
   @@index([status])
 }

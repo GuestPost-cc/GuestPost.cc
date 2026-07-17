@@ -1,4 +1,5 @@
 import { ForbiddenException } from "@nestjs/common"
+import { MarketplaceService } from "../../marketplace/marketplace.service"
 import { AdminService } from "../admin.service"
 
 describe("AdminService RBAC scoping", () => {
@@ -8,6 +9,9 @@ describe("AdminService RBAC scoping", () => {
 
   beforeEach(() => {
     prisma = {
+      $transaction: jest.fn(async (callback: (tx: any) => unknown) =>
+        callback(prisma),
+      ),
       order: {
         findMany: jest.fn().mockResolvedValue([]),
         count: jest.fn().mockResolvedValue(0),
@@ -18,7 +22,11 @@ describe("AdminService RBAC scoping", () => {
         create: jest.fn().mockResolvedValue({ id: "site-1" }),
         update: jest.fn(),
       },
-      marketplaceListing: { create: jest.fn() },
+      marketplaceListing: {
+        create: jest.fn().mockResolvedValue({ id: "listing-1" }),
+        findUnique: jest.fn(),
+      },
+      auditLog: { create: jest.fn().mockResolvedValue({}) },
       staffMembership: { findUnique: jest.fn() },
     }
     audit = { log: jest.fn().mockResolvedValue(undefined) }
@@ -72,7 +80,12 @@ describe("AdminService RBAC scoping", () => {
     expect(prisma.order.count).toHaveBeenCalledWith({ where })
   })
 
-  it("always assigns an Operations-enlisted site to its creator", async () => {
+  it("auto-assigns an Operations-created website and listing to its creator", async () => {
+    prisma.website.create.mockResolvedValue({
+      id: "site-1",
+      url: "https://ops-example.com",
+    })
+
     await service.createPlatformWebsite(
       {
         url: "https://ops-example.com",
@@ -83,16 +96,49 @@ describe("AdminService RBAC scoping", () => {
 
     expect(prisma.staffMembership.findUnique).not.toHaveBeenCalled()
     expect(prisma.website.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ managedByUserId: "ops-1" }),
-    })
-    expect(audit.log).toHaveBeenCalledWith(
-      expect.objectContaining({
-        metadata: expect.objectContaining({ managedByUserId: "ops-1" }),
+      data: expect.objectContaining({
+        ownershipType: "PLATFORM",
+        managedByUserId: "ops-1",
       }),
-    )
+    })
+    expect(prisma.marketplaceListing.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        websiteId: "site-1",
+        ownerType: "PLATFORM",
+      }),
+    })
   })
 
-  it("blocks Operations from mutating another operator's site", async () => {
+  it("creates the platform website and its only listing atomically", async () => {
+    prisma.website.create.mockResolvedValue({
+      id: "site-1",
+      url: "https://platform-example.com",
+    })
+
+    await service.createPlatformWebsite(
+      { url: "https://platform-example.com" },
+      { id: "admin-1", staffRole: "SUPER_ADMIN" },
+    )
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(prisma.website.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        domain: "platform-example.com",
+        canonicalDomain: "platform-example.com",
+        ownershipType: "PLATFORM",
+        verificationStatus: "VERIFIED",
+      }),
+    })
+    expect(prisma.marketplaceListing.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        websiteId: "site-1",
+        ownerType: "PLATFORM",
+        status: "DRAFT",
+      }),
+    })
+  })
+
+  it("blocks Operations from editing platform website inventory", async () => {
     prisma.website.findUnique.mockResolvedValue({
       id: "site-2",
       ownershipType: "PLATFORM",
@@ -107,5 +153,111 @@ describe("AdminService RBAC scoping", () => {
       ),
     ).rejects.toThrow(ForbiddenException)
     expect(prisma.website.update).not.toHaveBeenCalled()
+  })
+
+  it("limits Operations listing writes to moderation transitions", async () => {
+    await expect(
+      service.updateListingStatus("listing-1", "ARCHIVED", {
+        id: "ops-1",
+        staffRole: "OPERATIONS",
+      }),
+    ).rejects.toThrow(ForbiddenException)
+  })
+
+  it("allows Operations to edit services on an assigned platform website", async () => {
+    prisma.marketplaceListing.findUnique.mockResolvedValue({
+      id: "listing-1",
+      publisherId: null,
+      organizationId: null,
+      ownerType: "PLATFORM",
+      websiteId: "site-1",
+    })
+    prisma.listingService = {
+      create: jest.fn().mockResolvedValue({
+        id: "service-1",
+        serviceType: "GUEST_POST",
+        price: { toString: () => "100" },
+      }),
+    }
+    prisma.website.findFirst.mockResolvedValue({ id: "site-1" })
+    const marketplace = new MarketplaceService(prisma, {} as any)
+
+    await marketplace.addServiceToListing(
+      {
+        userId: "ops-1",
+        isStaff: true,
+        staffRole: "OPERATIONS",
+      },
+      "listing-1",
+      {
+        serviceType: "GUEST_POST",
+        price: 100,
+        turnaroundDays: 7,
+      },
+    )
+
+    expect(prisma.website.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "site-1",
+        ownershipType: "PLATFORM",
+        managedByUserId: "ops-1",
+      },
+      select: { id: true },
+    })
+    expect(prisma.listingService.create).toHaveBeenCalled()
+  })
+
+  it("blocks Operations from publisher and unassigned platform services", async () => {
+    prisma.listingService = { create: jest.fn() }
+    const marketplace = new MarketplaceService(prisma, {} as any)
+
+    prisma.marketplaceListing.findUnique.mockResolvedValueOnce({
+      id: "publisher-listing",
+      publisherId: "publisher-1",
+      organizationId: "org-1",
+      ownerType: "PUBLISHER",
+      websiteId: "publisher-site",
+    })
+    await expect(
+      marketplace.addServiceToListing(
+        {
+          userId: "ops-1",
+          isStaff: true,
+          staffRole: "OPERATIONS",
+        },
+        "publisher-listing",
+        {
+          serviceType: "GUEST_POST",
+          price: 100,
+          turnaroundDays: 7,
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException)
+
+    prisma.marketplaceListing.findUnique.mockResolvedValueOnce({
+      id: "platform-listing",
+      publisherId: null,
+      organizationId: null,
+      ownerType: "PLATFORM",
+      websiteId: "site-2",
+    })
+    prisma.website.findFirst.mockResolvedValue(null)
+    await expect(
+      marketplace.addServiceToListing(
+        {
+          userId: "ops-1",
+          isStaff: true,
+          staffRole: "OPERATIONS",
+        },
+        "platform-listing",
+        {
+          serviceType: "GUEST_POST",
+          price: 100,
+          turnaroundDays: 7,
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException)
+
+    expect(prisma.listingService.create).not.toHaveBeenCalled()
   })
 })

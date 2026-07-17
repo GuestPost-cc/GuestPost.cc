@@ -11,6 +11,11 @@ import {
   ErrorState,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
   Table,
   TableBody,
@@ -72,6 +77,8 @@ interface Website {
     | "REVOKED"
   verifiedAt?: string | null
   verificationFailureReason?: string | null
+  marketplaceStatus?: string
+  serviceCount?: number
 }
 
 interface VerifyInstructions {
@@ -246,9 +253,9 @@ function WebsiteDialog({
 export default function WebsitesPage() {
   const router = useRouter()
   const [search, setSearch] = useState("")
-  const [showAddDialog, setShowAddDialog] = useState(false)
   const [editingWebsite, setEditingWebsite] = useState<Website | null>(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [verificationFilter, setVerificationFilter] = useState("all")
   const [verifyTarget, setVerifyTarget] = useState<Website | null>(null)
   const [verifyInstructions, setVerifyInstructions] =
     useState<VerifyInstructions | null>(null)
@@ -265,43 +272,31 @@ export default function WebsitesPage() {
     queryFn: async () => {
       if (!publisherId) return []
       const sites = (await api.publishers.getWebsites(publisherId)) as any[]
-      return sites.map((s: any) => ({
-        id: s.id,
-        url: s.url || "",
-        domainRating: s.metrics?.dr || 0,
-        monthlyTraffic: s.metrics?.traffic || 0,
-        country: s.country || "",
-        language: s.language || "",
-        price: s.marketplaceListings?.[0]?.price || 0,
-        niche: s.category || "",
-        status: s.isActive ? "ACTIVE" : "ARCHIVED",
-        marketplaceStatus: s.marketplaceListings?.[0]?.status || "PENDING",
-        verificationStatus: s.verificationStatus || "PENDING_VERIFICATION",
-        verifiedAt: s.verifiedAt || null,
-        verificationFailureReason: s.verificationFailureReason || null,
-      })) as (Website & { marketplaceStatus: string })[]
-    },
-  })
-
-  const addMutation = useMutation({
-    mutationFn: async (data: WebsiteFormData) => {
-      if (!publisherId) throw new Error("Not authenticated")
-      return api.publishers.addWebsite(publisherId, {
-        url: data.url,
-        category: data.niche,
-        language: data.language,
-        country: data.country,
-        domainRating: data.domainRating,
-        monthlyTraffic: data.monthlyTraffic,
-        price: data.price,
-      })
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
-      toast.success("Website added successfully")
-    },
-    onError: () => {
-      toast.error("Failed to add website")
+      return sites.map((s: any) => {
+        const listing = s.marketplaceListings?.[0]
+        const availableServices = (listing?.services ?? []).filter(
+          (service: any) => service.availability === "AVAILABLE",
+        )
+        const prices = availableServices.map((service: any) =>
+          Number(service.price),
+        )
+        return {
+          id: s.id,
+          url: s.url || "",
+          domainRating: s.metrics?.dr || 0,
+          monthlyTraffic: s.metrics?.traffic || 0,
+          country: s.country || "",
+          language: s.language || "",
+          price: prices.length > 0 ? Math.min(...prices) : 0,
+          niche: listing?.category?.name || s.category || "",
+          status: s.isActive ? "ACTIVE" : "ARCHIVED",
+          marketplaceStatus: listing?.status || "DRAFT",
+          serviceCount: listing?.services?.length ?? 0,
+          verificationStatus: s.verificationStatus || "PENDING_VERIFICATION",
+          verifiedAt: s.verifiedAt || null,
+          verificationFailureReason: s.verificationFailureReason || null,
+        }
+      }) as Website[]
     },
   })
 
@@ -380,7 +375,10 @@ export default function WebsitesPage() {
       site.url.toLowerCase().includes(search.toLowerCase()) ||
       site.niche?.toLowerCase().includes(search.toLowerCase())
     const matchesArchived = showArchived ? true : site.status === "ACTIVE"
-    return matchesSearch && matchesArchived
+    const matchesVerification =
+      verificationFilter === "all" ||
+      site.verificationStatus === verificationFilter
+    return matchesSearch && matchesArchived && matchesVerification
   })
 
   if (error)
@@ -423,21 +421,43 @@ export default function WebsitesPage() {
             Manage your website inventory for guest posting
           </p>
         </div>
-        <Button onClick={() => setShowAddDialog(true)}>
+        <Button onClick={() => router.push("/dashboard/websites/new")}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Website
+          Enlist Website
         </Button>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search websites..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+      <div className="grid gap-4 rounded-xl border bg-card p-4 sm:grid-cols-[minmax(220px,1fr)_190px_auto] sm:items-end">
+        <div className="space-y-2">
+          <Label htmlFor="website-search">Search websites</Label>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="website-search"
+              placeholder="Search websites..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+        <div className="space-y-2">
+          <Label>Verification</Label>
+          <Select
+            value={verificationFilter}
+            onValueChange={setVerificationFilter}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All verification states</SelectItem>
+              <SelectItem value="VERIFIED">Verified</SelectItem>
+              <SelectItem value="PENDING_VERIFICATION">Pending</SelectItem>
+              <SelectItem value="VERIFICATION_FAILED">Failed</SelectItem>
+              <SelectItem value="REVOKED">Revoked</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <Button
           variant={showArchived ? "secondary" : "outline"}
@@ -458,14 +478,17 @@ export default function WebsitesPage() {
               : "Add your first website to get started"}
           </p>
           {!search && (
-            <Button className="mt-4" onClick={() => setShowAddDialog(true)}>
+            <Button
+              className="mt-4"
+              onClick={() => router.push("/dashboard/websites/new")}
+            >
               <Plus className="mr-2 h-4 w-4" />
-              Add Website
+              Enlist Website
             </Button>
           )}
         </div>
       ) : (
-        <div className="rounded-lg border">
+        <div className="overflow-x-auto rounded-lg border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -474,8 +497,9 @@ export default function WebsitesPage() {
                 <TableHead>Traffic</TableHead>
                 <TableHead>Country</TableHead>
                 <TableHead>Language</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Services</TableHead>
+                <TableHead>Starting price</TableHead>
+                <TableHead>Marketplace</TableHead>
                 <TableHead>Verification</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -527,18 +551,23 @@ export default function WebsitesPage() {
                   </TableCell>
                   <TableCell>{site.country ?? "—"}</TableCell>
                   <TableCell>{site.language ?? "—"}</TableCell>
+                  <TableCell>{site.serviceCount ?? 0}</TableCell>
                   <TableCell>{site.price ? `$${site.price}` : "—"}</TableCell>
                   <TableCell>
                     <Badge
                       variant={
-                        site.status === "ACTIVE"
+                        site.marketplaceStatus === "APPROVED"
                           ? "success"
-                          : site.status === "ARCHIVED"
-                            ? "secondary"
-                            : "warning"
+                          : site.marketplaceStatus === "REJECTED"
+                            ? "destructive"
+                            : site.marketplaceStatus === "PENDING_REVIEW"
+                              ? "warning"
+                              : site.marketplaceStatus === "ARCHIVED"
+                                ? "secondary"
+                                : "outline"
                       }
                     >
-                      {site.status}
+                      {(site.marketplaceStatus ?? "DRAFT").replace(/_/g, " ")}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -624,12 +653,6 @@ export default function WebsitesPage() {
           </Table>
         </div>
       )}
-
-      <WebsiteDialog
-        open={showAddDialog}
-        onOpenChange={setShowAddDialog}
-        onSubmit={(data) => addMutation.mutate(data)}
-      />
 
       <WebsiteDialog
         open={!!editingWebsite}
