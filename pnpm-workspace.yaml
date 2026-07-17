@@ -1,6 +1,9 @@
 packages:
   - "apps/*"
   - "packages/*"
+overrides:
+  "@hono/node-server": 1.19.13
+  postcss: 8.5.10
 # pnpm v11 build-script approvals (map form); onlyBuiltDependencies kept for
 # older pnpm compatibility.
 allowBuilds:

@@ -1,42 +1,43 @@
 # CI/CD
 
-## Pipelines
+## GitHub Actions gate
 
-### `ci.yml` (push to main + PR)
+`.github/workflows/ci.yml` is the single required CI workflow. It runs for
+pull requests targeting `main`, pushes to `main`, and manual dispatches.
+Render services retain `autoDeployTrigger: checksPass`, so a push is deployed
+only after this workflow succeeds.
 
-Runs on every push to `main` and every pull request:
-1. Build shared dependencies
-2. Run database migrations
-3. Biome check (format + lint + imports)
-4. ESLint (React Hooks + TS rules)
-5. Dependency graph validation (dependency-cruiser)
-6. TypeScript type check
-7. API unit tests (+ UI coverage)
-8. Full production build
+The `CI / build-and-test` check performs:
 
-### `pr.yml` (PR only)
+1. Frozen pnpm installation and a moderate-or-higher production dependency audit
+2. Prisma migration deployment and status validation against PostgreSQL 17
+3. Integration-test template database creation and migration
+4. TypeScript, Biome, ESLint, and dependency-graph validation
+5. API unit and database-backed integration tests
+6. Shared package and UI coverage tests
+7. A complete production build of every workspace target
 
-Lightweight PR gate:
-1. Build shared dependencies
-2. Run database migrations
-3. TypeScript type check
-4. Biome check
-5. ESLint
-6. Dependency graph validation
-7. API unit tests
+The workflow has read-only repository permissions, does not persist checkout
+credentials, does not expose deployment secrets, pins third-party Actions and
+service images, cancels superseded runs, and has a 60-minute timeout.
 
-## Secrets
+## Deployment boundary
 
-| Secret | Purpose |
-|--------|---------|
-| `SENTRY_AUTH_TOKEN` | Source map upload (optional — build succeeds without) |
-| `SENTRY_ORG` | Sentry org |
-| `SENTRY_PROJECT` | Sentry project |
+GitHub Actions validates code but does not hold staging or production
+credentials and does not deploy directly. Render watches `main` and deploys the
+commit after GitHub checks pass. While Render staging is on the free plan,
+schema-changing releases still require `prisma migrate deploy` against Neon
+before the API or worker starts using the new schema. Move that command to a
+Render pre-deploy step when the paid plan is enabled.
 
-## Local CI simulation
+## Local verification
+
+Run the code-quality gate locally with:
 
 ```bash
 pnpm check
 ```
 
-This runs the same checks as CI.
+Before pushing a release-sensitive change, also run the affected tests and
+builds. The GitHub workflow remains authoritative because it provisions clean
+PostgreSQL and Redis services and runs the complete suite.

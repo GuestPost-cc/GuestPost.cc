@@ -38,3 +38,14 @@ if (!process.env.OAUTH_STATE_COOKIE_SAMESITE) {
 if (!process.env.OAUTH_STATE_COOKIE_SECURE) {
   process.env.OAUTH_STATE_COOKIE_SECURE = "false"
 }
+
+// The integrations provider registry is evaluated when AppModule is imported.
+// Integration specs do not call Google, but the provider intentionally fails
+// closed when its runtime credentials are absent. Use inert test-only values so
+// the full application graph can be constructed without real OAuth secrets.
+if (!process.env.GOOGLE_CLIENT_ID) {
+  process.env.GOOGLE_CLIENT_ID = "ci-google-client-id"
+}
+if (!process.env.GOOGLE_CLIENT_SECRET) {
+  process.env.GOOGLE_CLIENT_SECRET = "ci-google-client-secret"
+}

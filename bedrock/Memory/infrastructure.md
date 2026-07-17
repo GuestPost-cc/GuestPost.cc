@@ -23,6 +23,10 @@ The API build is compile-only (`pnpm turbo build --filter=@guestpost/api...`) be
 
 Auth is served from `api.guestpost.pro.bd` while dashboards run on sibling subdomains. Staging sets `AUTH_COOKIE_DOMAIN=guestpost.pro.bd` so Better Auth issues a shared secure session cookie that Next middleware on `app`, `publisher`, and `admin` can see. Middleware must accept both `guestpost.session_token` (dev) and `__Secure-guestpost.session_token` (production).
 
+Staging incident note (2026-07-18): deployed API commit `a5edf8a` returned 500s for customer orders/billing and admin operations because the Neon staging schema was three migrations behind (`20260713120000_listing_per_website_unique`, `20260716030403_fin02_transaction_provider_unique`, `20260716120000_order_cancellation_workflow`). Applying `prisma migrate deploy` against Neon fixed the missing `OrderCancellationRequest` table and restored customer, publisher, and admin API reads. Render free web services block Shell and One-Off Jobs, so migrations currently require a local/direct Neon run or a temporary Render plan upgrade.
+
+Staging Redis note (2026-07-18): `packages/integrations` queue producers previously ignored `REDIS_URL` and fell back to `REDIS_HOST`/`REDIS_PORT` (`localhost:6379`), causing Render API startup log noise and broken integration enqueue paths even while `/health/ready` was green. Commit `19c7024` added an integration Redis helper that uses `REDIS_URL` first, matching Upstash/Render configuration.
+
 The historical Blueprint contained an inline Neon database credential. The active Blueprint has removed inline database values, and the Neon role password was rotated during staging setup, but the old credential still exists in git history.
 
 
@@ -45,11 +49,23 @@ The historical Blueprint contained an inline Neon database credential. The activ
 
 ## CI/CD
 
-GitHub Actions:
-- **main.yml** — on push to `main`: build, typecheck, test
-- **pr.yml** — on PR to `main`: same checks
+`.github/workflows/ci.yml` is the single GitHub Actions gate for pull requests
+to `main`, pushes to `main`, and manual runs. The stable required check name is
+`CI / build-and-test`; the older duplicate `main.yml` and `pr.yml` workflows
+were removed.
 
-Steps: checkout → pnpm install → build deps → migrate DB → typecheck → Jest tests → build all
+The workflow uses read-only repository permissions, non-persistent checkout
+credentials, immutable action and service-image SHAs, superseded-run
+cancellation, and no deployment secrets. It installs from the frozen lockfile,
+blocks moderate-or-higher production dependency advisories, applies and checks
+all migrations on PostgreSQL 17, provisions the integration-test template,
+runs type/lint/dependency checks plus API/package/UI tests, and builds all 12
+production targets.
+
+Render remains the deployment owner. Every Blueprint service uses
+`autoDeployTrigger: checksPass`, so pushes to `main` deploy only after the
+GitHub gate succeeds. GitHub Actions does not receive Neon, Upstash, Render, R2,
+Resend, Google, or Sentry deployment credentials.
 
 ## Build System
 

@@ -7,16 +7,16 @@ import {
   SyncNotFoundError,
 } from "../errors"
 import { getProvider } from "../providers"
+import { INTEGRATION_QUEUES } from "../queue-names"
 import { createIntegrationQueueConnection } from "../redis"
 import type { OwnerContext, SyncResult } from "../types"
 import { IntegrationSyncJobType } from "../types"
-import { QUEUES } from "../workers"
 
 const db = createPrismaClient()
 const encryption = new IntegrationEncryptionService()
 
 function createSyncQueue(): Queue {
-  return new Queue(QUEUES.SYNC, {
+  return new Queue(INTEGRATION_QUEUES.SYNC, {
     connection: createIntegrationQueueConnection(),
     defaultJobOptions: {
       attempts: 3,

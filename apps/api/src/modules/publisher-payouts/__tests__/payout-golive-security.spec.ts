@@ -17,6 +17,7 @@ import {
 const ORIGINAL_ENV = { ...process.env }
 
 afterEach(() => {
+  jest.useRealTimers()
   process.env = { ...ORIGINAL_ENV }
 })
 
@@ -211,10 +212,11 @@ describe("PayoutWebhookController — signature verification", () => {
     expect(queueMock.addJob).toHaveBeenCalled()
   })
 
-  // Precise ±300s boundary tested in webhook-timestamp.spec.ts (shared helper
-  // with deterministic fake timers). Controller test uses a safe 10ms buffer
-  // to avoid sub-ms timing drift between timestamp creation and execution.
-  it("accepts Wise webhook with timestamp at the 300s tolerance boundary (with 10ms buffer)", async () => {
+  it("accepts Wise webhook at the exact 300s tolerance boundary", async () => {
+    const now = new Date("2026-07-18T00:00:00.000Z")
+    jest.useFakeTimers()
+    jest.setSystemTime(now)
+
     const { publicKey, privateKey } = generateKeyPairSync("rsa", {
       modulusLength: 2048,
     })
@@ -223,7 +225,7 @@ describe("PayoutWebhookController — signature verification", () => {
       .toString()
 
     const body = JSON.stringify({
-      occurred_at: new Date(Date.now() - 299_990).toISOString(),
+      occurred_at: new Date(now.getTime() - 300_000).toISOString(),
       data: { id: "transfer-300", status: "COMPLETED" },
       event: "transfer.state-change",
     })

@@ -6,6 +6,21 @@
 
 ## Recently Completed
 
+### GitHub CI/CD Consolidation And Security Gate
+
+- Replaced the overlapping `CI`, `Main`, and `PR` workflows with one authoritative `CI / build-and-test` gate for PRs, `main` pushes, and manual runs; Render still deploys only after checks pass.
+- Added least-privilege permissions, immutable action and service-image pins, non-persistent checkout credentials, superseded-run cancellation, a 60-minute timeout, migration status checks, all package tests, and a complete production build.
+- Added a moderate-or-higher production dependency audit and patched the discovered Multer, Hono server, and PostCSS advisories; the audit now reports no known production vulnerabilities.
+- Fixed the integration queue circular dependency, deterministic webhook timestamp-boundary coverage, test-only Google OAuth bootstrap, and the Operations claim-race fixture exposed by the restored full gate.
+- Validation: dependency graph has zero errors, 833 API unit tests pass, 16 database-backed integration tests pass, package/UI tests pass, and all 12 production targets build.
+
+### Render Staging 500 Recovery
+
+- Recovered deployed customer, publisher, and admin dashboard API 500s by applying the three pending Neon staging migrations through `20260716120000_order_cancellation_workflow`.
+- Verified deployed API readiness plus authenticated customer `orders`/`billing`, publisher `orders`, and admin orders/fulfillment/cancellation/marketplace endpoints return HTTP 200.
+- Fixed the secondary Render Redis issue where integration queue producers fell back to `localhost:6379` instead of Upstash `REDIS_URL`; deployed API commit `19c7024` is live.
+- Confirmed Render free tier blocks Shell and One-Off Jobs, so staging migrations still need a local/direct Neon run until Render is upgraded.
+
 ### Admin Verification Navigation And Queue Recovery
 
 - Renamed the DNS ownership surface to Domain Verification while retaining
@@ -217,14 +232,12 @@ data.
 
 ## Next Actions
 
-1. **Staging lifecycle verification** — Render staging is live on `guestpost.pro.bd` with API readiness green. Run the claim contention, customer review, publication, verification, cancellation, staff monitoring, and money-record lifecycle pass against production-like staging data.
-2. **Migration discipline on Render free tier** — the API build is compile-only. Before any deploy that requires new schema, run `prisma migrate deploy` manually/one-off with `DIRECT_DATABASE_URL`, then deploy. Move this to Render predeploy when the workspace upgrades.
-3. **Worker operations** — the worker is not deployed on Render yet; run it locally when testing DNS TXT verification, GSC sync, cancellation/settlement sweeps, or other queue-backed flows.
-4. **OAuth configuration** — authorize the deployed Google redirect URI `https://api.guestpost.pro.bd/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback` plus any localhost callback still needed for development.
-5. **Historical credential containment** — the exposed Neon password was rotated, but the old value remains in git history. Assess whether repository history/access containment is needed before production.
-6. **Operations staging verification** — run concurrent claim attempts and the
-   full assigned/claimed fulfillment lifecycle, then reconcile staff metrics
-   with assignment, audit, and order records.
+1. **Staging lifecycle verification** — Render staging is live on `guestpost.pro.bd` with API readiness green and schema current. Run the claim contention, customer review, publication, verification, cancellation, staff monitoring, and money-record lifecycle pass against production-like staging data.
+2. **Migration release gate** — Until Render is upgraded for pre-deploy/one-off migration jobs, run `prisma migrate status` and `prisma migrate deploy` against Neon before deploying API/worker changes that read new schema.
+3. **Auth IP warning follow-up** — Render logs now show Better Auth falling back to a shared per-path rate-limit bucket when no trusted client IP header is resolved; configure Better Auth trusted proxy/IP headers before production hardening.
+4. **Worker operations** — the worker is not deployed on Render yet; run it locally when testing DNS TXT verification, GSC sync, cancellation/settlement sweeps, or other queue-backed flows.
+5. **OAuth configuration** — authorize the deployed Google redirect URI `https://api.guestpost.pro.bd/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback` plus any localhost callback still needed for development.
+6. **Historical credential containment** — the exposed Neon password was rotated, but the old value remains in git history. Assess whether repository history/access containment is needed before production.
 7. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
    - Implement real GSC Search Analytics API calls in provider
    - Pagination, date windows, UPSERT logic, deduplication, retries

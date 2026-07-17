@@ -1,4 +1,5 @@
 import { Job, Worker } from "bullmq"
+import { INTEGRATION_QUEUES } from "../queue-names"
 import type { DiscoveryJobPayload } from "../services/discovery.service"
 import { DiscoveryService } from "../services/discovery.service"
 import type { SyncJobPayload } from "../services/sync.service"
@@ -13,10 +14,7 @@ const logger = {
 let syncWorker: Worker | null = null
 let discoveryWorker: Worker | null = null
 
-export const QUEUES = {
-  SYNC: "integration-sync",
-  DISCOVERY: "integration-discovery",
-} as const
+export { INTEGRATION_QUEUES as QUEUES } from "../queue-names"
 
 export function createSyncWorker(connection: Record<string, unknown>) {
   if (syncWorker) return syncWorker
@@ -24,7 +22,7 @@ export function createSyncWorker(connection: Record<string, unknown>) {
   const service = new SyncService()
 
   syncWorker = new Worker<SyncJobPayload>(
-    QUEUES.SYNC,
+    INTEGRATION_QUEUES.SYNC,
     async (job: Job<SyncJobPayload>) => {
       logger.log(
         `Processing sync job ${job.id} for integration ${job.data.integrationId}`,
@@ -62,7 +60,7 @@ export function createDiscoveryWorker(connection: Record<string, unknown>) {
   const service = new DiscoveryService()
 
   discoveryWorker = new Worker<DiscoveryJobPayload>(
-    QUEUES.DISCOVERY,
+    INTEGRATION_QUEUES.DISCOVERY,
     async (job: Job<DiscoveryJobPayload>) => {
       logger.log(
         `Processing discovery job ${job.id} for account ${job.data.externalAccountId}`,

@@ -4,33 +4,41 @@ on:
   push:
     branches: [main]
   pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 env:
+  CI: "true"
   NODE_ENV: test
   DATABASE_URL: postgresql://guestpost:guestpost@localhost:5432/guestpost?schema=public
   REDIS_URL: redis://localhost:6379
   JWT_SECRET: ci-only-jwt-secret-not-used-in-prod-0123456789
+  BETTER_AUTH_SECRET: ci-only-auth-secret-not-used-in-prod-0123456789
   QUEUE_SIGNING_SECRET: ci-only-queue-secret-not-used-in-prod-012345
   BETTER_AUTH_URL: http://localhost:3000
+  TRUSTED_ORIGINS: http://localhost:3000
   CORS_ORIGIN: http://localhost:3000
-  OAUTH_STATE_COOKIE_SAMESITE: none
+  GOOGLE_CLIENT_ID: ci-google-client-id
+  GOOGLE_CLIENT_SECRET: ci-google-client-secret
+  OAUTH_STATE_COOKIE_SAMESITE: lax
   OAUTH_STATE_COOKIE_SECURE: "false"
-  # Phase 7.7 C — Sentry source-map upload. When SENTRY_AUTH_TOKEN is
-  # configured as a repo secret, `pnpm build` uploads source maps for
-  # each Next.js app's bundle so production Sentry traces show source-
-  # line + filename instead of minified offsets. When the secret is
-  # unset (e.g. forks, PRs from external contributors), the upload step
-  # is silently skipped and the build still succeeds.
-  SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-  SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-  SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    name: build-and-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:17-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
         env:
           POSTGRES_USER: guestpost
           POSTGRES_PASSWORD: guestpost
@@ -42,91 +50,94 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       redis:
-        image: redis:7-alpine
+        image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
         ports: ["6379:6379"]
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+
     steps:
-      - uses: actions/checkout@v7
-      # Version comes from `packageManager: pnpm@11.5.1` in package.json.
-      # Specifying `version:` here ALSO triggers pnpm/action-setup@v6 to error
-      # with "Multiple versions of pnpm specified" — package.json is the
-      # single source of truth.
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          node-version: 22
+          persist-credentials: false
+
+      # package.json is the single source of truth for the pnpm version.
+      - name: Set up pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.22.0
           cache: pnpm
-      - run: pnpm install --frozen-lockfile
 
-      # Build every workspace package the Next.js apps import at compile time.
-      # Without ui + api-client built, tsc --noEmit on the apps fails with
-      # "Cannot find module '@guestpost/ui'" because the dist/ outputs don't
-      # exist yet for TypeScript path resolution.
-      - run: pnpm run build
-        name: Build dependencies
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Apply migrations
-        run: npx prisma migrate deploy
-        working-directory: packages/database
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=moderate
 
-      # Phase 7.10.2.1 — Integration test template database (idempotent)
-      - name: Install psql if missing
-        run: command -v psql || sudo apt-get update && sudo apt-get install -y --no-install-recommends postgresql-client
+      - name: Install PostgreSQL client if missing
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends postgresql-client
+          fi
 
-      - name: Create integration test template database (idempotent)
+      - name: Apply migrations to CI database
+        run: pnpm --filter @guestpost/database exec prisma migrate deploy
+
+      - name: Verify migration state
+        run: pnpm --filter @guestpost/database exec prisma migrate status
+
+      - name: Create integration-test template database
         env:
           PGPASSWORD: guestpost
         run: |
-          psql -h localhost -U guestpost -d postgres -c "DROP DATABASE IF EXISTS guestpost_test_template WITH (FORCE)"
-          psql -h localhost -U guestpost -d postgres -c "CREATE DATABASE guestpost_test_template"
+          psql -h localhost -U guestpost -d postgres -v ON_ERROR_STOP=1 \
+            -c "DROP DATABASE IF EXISTS guestpost_test_template WITH (FORCE)"
+          psql -h localhost -U guestpost -d postgres -v ON_ERROR_STOP=1 \
+            -c "CREATE DATABASE guestpost_test_template"
 
-      - name: Apply migrations to template database
-        run: DATABASE_URL=postgresql://guestpost:guestpost@localhost:5432/guestpost_test_template npx prisma migrate deploy
+      - name: Apply migrations to integration-test template
         working-directory: packages/database
-
-      - name: Verify template database exists
         env:
-          PGPASSWORD: guestpost
-        run: |
-          EXISTS=$(psql -h localhost -U guestpost -d postgres -t -A -c "SELECT COUNT(*) FROM pg_database WHERE datname='guestpost_test_template'")
-          if [ "$EXISTS" != "1" ]; then echo "template DB missing" && exit 1; fi
+          DATABASE_URL: postgresql://guestpost:guestpost@localhost:5432/guestpost_test_template
+        run: pnpm exec prisma migrate deploy
 
       - name: TypeScript check
-        run: pnpm run typecheck
+        run: pnpm typecheck
 
-      # Phase 7.9 #30 — ESLint with react-hooks/rules-of-hooks across the
-      # 3 frontend apps. Tight rule set (see eslint.config.mjs): only
-      # @eslint/js recommended + typescript-eslint recommended +
-      # rules-of-hooks. Catches the next #30-class regression at PR time.
-      - name: Biome check (format + lint + imports)
-        run: pnpm run lint:format
+      - name: Biome check
+        run: pnpm lint:format
 
-      - name: ESLint (hooks + TS)
-        run: pnpm run lint
+      - name: ESLint
+        run: pnpm lint
 
       - name: Dependency graph validation
-        run: pnpm depcruise apps packages scripts e2e --include-only '^(apps|packages|scripts|e2e)/'
+        run: pnpm repo:health
 
       - name: API unit tests
-        run: pnpm test
-        working-directory: apps/api
+        run: pnpm --filter @guestpost/api test
 
-      - name: API integration tests (Jest, ephemeral DB per spec)
+      - name: API integration tests
         env:
           PGPASSWORD: guestpost
-        run: pnpm test:integration
-        working-directory: apps/api
+        run: pnpm --filter @guestpost/api test:integration
 
-      - name: UI component tests (coverage)
-        run: pnpm test:coverage
-        working-directory: packages/ui
+      - name: Package unit tests
+        run: >-
+          pnpm --filter @guestpost/shared
+          --filter @guestpost/auth
+          --filter @guestpost/integrations
+          --filter @guestpost/api-client
+          test
 
-      - name: Build all targets
+      - name: UI component tests with coverage
+        run: pnpm --filter @guestpost/ui test:coverage
+
+      - name: Build all production targets
         run: pnpm build
-
-      # Playwright journeys need the full app stack; they run in the
-      # heavier nightly job / locally via `npx playwright test`.

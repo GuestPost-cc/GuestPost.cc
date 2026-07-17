@@ -58,6 +58,12 @@ describe("[INTEGRATION] Phase 7.14 #23 — FulfillmentAssignment claim race", ()
         makeUser(prisma, { userType: "STAFF" }),
         makeUser(prisma, { userType: "STAFF" }),
       ])
+      await prisma.staffMembership.createMany({
+        data: opUsers.map((user) => ({
+          userId: user.id,
+          role: "OPERATIONS",
+        })),
+      })
       console.timeEnd("[claim-race] seed")
 
       // ── 3. Fire 5 concurrent claim() calls via the service directly ──

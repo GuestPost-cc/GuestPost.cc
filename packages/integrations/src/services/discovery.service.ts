@@ -3,15 +3,15 @@ import { Queue } from "bullmq"
 import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
 import { DiscoveryInProgressError, IntegrationNotFoundError } from "../errors"
 import { getProvider } from "../providers"
+import { INTEGRATION_QUEUES } from "../queue-names"
 import { createIntegrationQueueConnection } from "../redis"
 import type { OwnerContext } from "../types"
-import { QUEUES } from "../workers"
 
 const db = createPrismaClient()
 const encryption = new IntegrationEncryptionService()
 
 function createDiscoveryQueue(): Queue {
-  return new Queue(QUEUES.DISCOVERY, {
+  return new Queue(INTEGRATION_QUEUES.DISCOVERY, {
     connection: createIntegrationQueueConnection(),
     defaultJobOptions: {
       attempts: 2,
