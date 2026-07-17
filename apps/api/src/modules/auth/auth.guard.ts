@@ -254,6 +254,7 @@ export class AuthGuard implements CanActivate {
       const cookieName = isProduction
         ? "__Secure-guestpost.session_token"
         : "guestpost.session_token"
+      const authCookieDomain = process.env.AUTH_COOKIE_DOMAIN?.trim()
 
       const response = context.switchToHttp().getResponse()
       response.cookie(cookieName, signedValue, {
@@ -262,6 +263,7 @@ export class AuthGuard implements CanActivate {
         sameSite: "lax",
         path: "/",
         maxAge: SESSION_EXPIRES_IN_SEC * 1000,
+        ...(authCookieDomain ? { domain: authCookieDomain } : {}),
       })
       response.setHeader("X-Session-Token", newToken)
 

@@ -78,8 +78,16 @@ describe("hasAuthCredentials", () => {
       const cookie = `guestpost.session_token=${REAL_SHAPED_VALUE}`
       expect(hasAuthCredentials(req({ cookie }))).toBe(true)
     })
+    it("accepts secure dot-form name (production Better Auth format)", () => {
+      const cookie = `__Secure-guestpost.session_token=${REAL_SHAPED_VALUE}`
+      expect(hasAuthCredentials(req({ cookie }))).toBe(true)
+    })
     it("accepts dash-form name (Better Auth fallback)", () => {
       const cookie = `guestpost-session_token=${REAL_SHAPED_VALUE}`
+      expect(hasAuthCredentials(req({ cookie }))).toBe(true)
+    })
+    it("accepts secure dash-form name (Better Auth fallback)", () => {
+      const cookie = `__Secure-guestpost-session_token=${REAL_SHAPED_VALUE}`
       expect(hasAuthCredentials(req({ cookie }))).toBe(true)
     })
     it("accepts URL-encoded value (transport form)", () => {

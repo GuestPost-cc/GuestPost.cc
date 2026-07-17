@@ -29,7 +29,9 @@ export class CsrfMiddleware implements NestMiddleware {
     const cookies = req.headers.cookie ?? ""
     const hasSessionCookie =
       cookies.includes("guestpost.session_token") ||
-      cookies.includes("guestpost-session_token")
+      cookies.includes("__Secure-guestpost.session_token") ||
+      cookies.includes("guestpost-session_token") ||
+      cookies.includes("__Secure-guestpost-session_token")
     if (!hasSessionCookie) {
       next()
       return

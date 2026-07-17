@@ -278,6 +278,8 @@ const validateAuthRequestMiddleware = createAuthMiddleware(async (ctx) => {
  * `createAuth(opts) → betterAuth(buildAuthOptions(opts))`.
  */
 export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
+  const authCookieDomain = process.env.AUTH_COOKIE_DOMAIN?.trim()
+
   return {
     baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:4000",
     basePath: "/api/v1/auth",
@@ -416,6 +418,12 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
     advanced: {
       cookiePrefix: "guestpost",
       useSecureCookies: process.env.NODE_ENV === "production",
+      crossSubDomainCookies: authCookieDomain
+        ? {
+            enabled: true,
+            domain: authCookieDomain,
+          }
+        : undefined,
       cookies: {
         oauth_state: {
           attributes: {

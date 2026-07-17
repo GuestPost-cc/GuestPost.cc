@@ -56,6 +56,8 @@ services:
         value: https://guestpost.pro.bd,https://app.guestpost.pro.bd,https://publisher.guestpost.pro.bd,https://admin.guestpost.pro.bd
       - key: BETTER_AUTH_URL
         value: https://api.guestpost.pro.bd
+      - key: AUTH_COOKIE_DOMAIN
+        value: guestpost.pro.bd
       - key: API_BASE_URL
         value: https://api.guestpost.pro.bd/api/v1
       - key: NEXT_PUBLIC_API_URL

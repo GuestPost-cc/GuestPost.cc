@@ -217,21 +217,22 @@ data.
 
 ## Next Actions
 
-1. **Urgent deployment secret remediation** — rotate the database credential exposed in `render.yml`, remove inline database values from the blueprint, and configure them only in Render's secret environment. This requires deployment/database authority.
-2. **Cancellation staging cutover** — apply migration `20260716120000_order_cancellation_workflow` before starting the updated API and worker, verify both new repeatable sweeps, and execute the scenario checklist in `docs/ORDER_CANCELLATION.md`. The local development database has already completed this cutover.
-3. **OAuth configuration** — authorize the exact Google redirect URI used by the API, e.g. `http://localhost:4000/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback`, or set `API_BASE_URL` to the deployed API base and authorize that callback.
-4. **Worker operations** — ensure the worker queue process is running in local/dev when testing DNS TXT verification, otherwise jobs remain queued.
-5. **Operations staging verification** — run concurrent claim attempts and the
+1. **Staging lifecycle verification** — Render staging is live on `guestpost.pro.bd` with API readiness green. Run the claim contention, customer review, publication, verification, cancellation, staff monitoring, and money-record lifecycle pass against production-like staging data.
+2. **Migration discipline on Render free tier** — the API build is compile-only. Before any deploy that requires new schema, run `prisma migrate deploy` manually/one-off with `DIRECT_DATABASE_URL`, then deploy. Move this to Render predeploy when the workspace upgrades.
+3. **Worker operations** — the worker is not deployed on Render yet; run it locally when testing DNS TXT verification, GSC sync, cancellation/settlement sweeps, or other queue-backed flows.
+4. **OAuth configuration** — authorize the deployed Google redirect URI `https://api.guestpost.pro.bd/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback` plus any localhost callback still needed for development.
+5. **Historical credential containment** — the exposed Neon password was rotated, but the old value remains in git history. Assess whether repository history/access containment is needed before production.
+6. **Operations staging verification** — run concurrent claim attempts and the
    full assigned/claimed fulfillment lifecycle, then reconcile staff metrics
    with assignment, audit, and order records.
-6. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
+7. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
    - Implement real GSC Search Analytics API calls in provider
    - Pagination, date windows, UPSERT logic, deduplication, retries
    - Historical data imports
    - Reporting API endpoints (`GET /websites/:id/metrics`)
    - SEO Metrics KPI cards (impressions, clicks, CTR, position) + trend charts
-7. **Phase 6** — Admin/Operations UI for platform-owned websites
-8. **Additional providers** — GA4, Bing Webmaster Tools
+8. **Phase 6** — Admin/Operations UI for platform-owned websites
+9. **Additional providers** — GA4, Bing Webmaster Tools
 
 ## Backlog (Future Cleanup)
 

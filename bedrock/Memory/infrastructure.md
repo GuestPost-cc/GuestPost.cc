@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-07-16
+updated: 2026-07-17
 ---
 
 # Infrastructure
@@ -15,9 +15,15 @@ Shared dev/testing host is an **open question** (see `bedrock/Work/open-question
 
 ## Render Blueprint (configuration only)
 
-`render.yml` defines the intended Render topology: one API, one worker, and four Next.js web services in the Singapore region, all built from the monorepo root. It is configuration, not evidence that a deployment is healthy.
+`render.yml` defines the active Render staging topology for `guestpost.pro.bd`: one NestJS API and four Next.js web services in the Singapore region, all built from the monorepo root. The worker is intentionally not deployed on Render while the workspace is on free-tier testing; run it locally for queue processing.
 
-Secrets must be supplied by Render's environment configuration rather than committed to the blueprint. The current blueprint violates that rule for its database setting; the required rotation and removal are tracked in `Work/risks.md`.
+External infrastructure is bring-your-own for staging: Neon Postgres, Upstash Redis, Resend SMTP, Cloudflare R2, Sentry, and ReadyBD DNS. Render uses `sync: false` or `generateValue` for secrets so active credentials are not committed. Web services are configured on Render's free instance type for internal testing.
+
+The API build is compile-only (`pnpm turbo build --filter=@guestpost/api...`) because Render free web services cannot use `preDeployCommand`, and running Prisma migrations in the build phase was unreliable with Neon. Prisma config supports `DIRECT_DATABASE_URL` for direct Neon migrations; run migrations manually/one-off before deploys that require schema changes, or move this to Render predeploy once the workspace upgrades.
+
+Auth is served from `api.guestpost.pro.bd` while dashboards run on sibling subdomains. Staging sets `AUTH_COOKIE_DOMAIN=guestpost.pro.bd` so Better Auth issues a shared secure session cookie that Next middleware on `app`, `publisher`, and `admin` can see. Middleware must accept both `guestpost.session_token` (dev) and `__Secure-guestpost.session_token` (production).
+
+The historical Blueprint contained an inline Neon database credential. The active Blueprint has removed inline database values, and the Neon role password was rotated during staging setup, but the old credential still exists in git history.
 
 
 

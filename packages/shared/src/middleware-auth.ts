@@ -1,12 +1,35 @@
 /**
- * The single source of truth for the session cookie name.
+ * Better Auth cookie names accepted by browser middleware.
  *
- * Better Auth sets `{cookiePrefix}.session_token` = `guestpost.session_token`.
- * All middlewares and server-side credential-checkers MUST use this constant
- * rather than hard-coding the string, otherwise login redirects loop.
- * @see https://github.com/anomalyco/GuestPost.cc-work/blob/main/bedrock/Memory/SECURITY.md
+ * Development uses `guestpost.session_token`; production secure cookies use
+ * `__Secure-guestpost.session_token`. Better Auth also accepts the historical
+ * dash form, so middleware should tolerate it during migrations.
  */
 export const SESSION_COOKIE_NAME = "guestpost.session_token"
+export const SECURE_SESSION_COOKIE_NAME = "__Secure-guestpost.session_token"
+export const LEGACY_SESSION_COOKIE_NAME = "guestpost-session_token"
+export const SECURE_LEGACY_SESSION_COOKIE_NAME =
+  "__Secure-guestpost-session_token"
+
+export const SESSION_COOKIE_NAMES = [
+  SECURE_SESSION_COOKIE_NAME,
+  SESSION_COOKIE_NAME,
+  SECURE_LEGACY_SESSION_COOKIE_NAME,
+  LEGACY_SESSION_COOKIE_NAME,
+] as const
+
+type CookieLookupResult = { value?: string } | string | null | undefined
+
+export function getSessionCookieValue(
+  getCookie: (name: string) => CookieLookupResult,
+): string | null {
+  for (const name of SESSION_COOKIE_NAMES) {
+    const cookie = getCookie(name)
+    const value = typeof cookie === "string" ? cookie : cookie?.value
+    if (value) return value
+  }
+  return null
+}
 
 export interface MiddlewareAuthConfig {
   signInPath: string

@@ -1,7 +1,7 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-06-20
+updated: 2026-07-17
 ---
 
 # Risks
@@ -57,7 +57,8 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 
 ### Critical / High that survived this batch
 
-- **URGENT — Render blueprint contains an inline database credential.** `render.yml` claims secrets are excluded but defines `DATABASE_URL` values directly. Treat the credential as exposed: rotate it, remove the inline values, configure the secret only in Render, and assess whether Git history/repository access needs containment. Do not copy the credential into tickets, logs, or Bedrock notes.
+- **URGENT — historical Render blueprint exposed a database credential.** The active `render.yml` uses Render secret prompts for `DATABASE_URL`, but an earlier committed Blueprint revision contained an inline Neon credential. Treat that credential as exposed: it was rotated in Neon during staging setup, and the new value must remain only in Render. Assess whether Git history/repository access needs containment before production. Do not copy the credential into tickets, logs, or Bedrock notes.
+- **Worker is local-only on free-tier staging.** The active Render Blueprint intentionally excludes `guestpost-worker` while the workspace is on free-tier testing. Queue-backed flows (email delivery, DNS/GSC verification, cancellation/settlement sweeps, payout jobs) require a local worker until Render worker capacity is available.
 - The historical 2026-06-15 platform audit has zero open production-blocker findings, but the deployment-secret exposure above is a separate current risk.
 - **Zero open Medium findings.** Phase 7.9 closed #28 (status-color drift), #29 (unused shared components), #30 (hooks-rule violation). Phase 7.8 closed #25 + #26 + #27.
 - ~~**Drawer a11y polish gap (Phase 7.6.1)**~~ — **CLOSED** by Phase 7.9 (`8c9d868` + `e90ea34`). New `<Drawer>` component on `@radix-ui/react-dialog` gives all 3 dashboards focus trap, Escape close, body scroll-lock, focus restore, and `aria-modal` for free. Portal layout also gained the pathname-auto-close it was missing since Phase 7.6.
