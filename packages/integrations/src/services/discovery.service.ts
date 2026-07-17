@@ -3,6 +3,7 @@ import { Queue } from "bullmq"
 import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
 import { DiscoveryInProgressError, IntegrationNotFoundError } from "../errors"
 import { getProvider } from "../providers"
+import { createIntegrationQueueConnection } from "../redis"
 import type { OwnerContext } from "../types"
 import { QUEUES } from "../workers"
 
@@ -11,10 +12,7 @@ const encryption = new IntegrationEncryptionService()
 
 function createDiscoveryQueue(): Queue {
   return new Queue(QUEUES.DISCOVERY, {
-    connection: {
-      host: process.env.REDIS_HOST ?? "localhost",
-      port: Number(process.env.REDIS_PORT ?? 6379),
-    },
+    connection: createIntegrationQueueConnection(),
     defaultJobOptions: {
       attempts: 2,
       backoff: { type: "exponential", delay: 30_000 },

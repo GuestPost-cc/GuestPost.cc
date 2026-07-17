@@ -7,6 +7,7 @@ import {
   SyncNotFoundError,
 } from "../errors"
 import { getProvider } from "../providers"
+import { createIntegrationQueueConnection } from "../redis"
 import type { OwnerContext, SyncResult } from "../types"
 import { IntegrationSyncJobType } from "../types"
 import { QUEUES } from "../workers"
@@ -16,10 +17,7 @@ const encryption = new IntegrationEncryptionService()
 
 function createSyncQueue(): Queue {
   return new Queue(QUEUES.SYNC, {
-    connection: {
-      host: process.env.REDIS_HOST ?? "localhost",
-      port: Number(process.env.REDIS_PORT ?? 6379),
-    },
+    connection: createIntegrationQueueConnection(),
     defaultJobOptions: {
       attempts: 3,
       backoff: { type: "exponential", delay: 60_000 },
