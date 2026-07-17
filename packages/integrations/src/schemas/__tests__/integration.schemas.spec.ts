@@ -17,9 +17,11 @@ describe("connectRequestSchema", () => {
     const result = connectRequestSchema.parse({
       provider: IntegrationProvider.GOOGLE_SEARCH_CONSOLE,
       returnUrl: "/dashboard",
+      platformWebsiteId: "clx123abc",
     })
     expect(result.provider).toBe(IntegrationProvider.GOOGLE_SEARCH_CONSOLE)
     expect(result.returnUrl).toBe("/dashboard")
+    expect(result.platformWebsiteId).toBe("clx123abc")
   })
 
   it("uses default returnUrl when not provided", () => {
@@ -35,12 +37,19 @@ describe("connectRequestSchema", () => {
     ).toThrow()
   })
 
-  it("accepts arbitrary returnUrl strings (relative or absolute)", () => {
-    const result = connectRequestSchema.parse({
-      provider: IntegrationProvider.GOOGLE_SEARCH_CONSOLE,
-      returnUrl: "not-a-url",
-    })
-    expect(result.returnUrl).toBe("not-a-url")
+  it("rejects external and protocol-relative return URLs", () => {
+    for (const returnUrl of [
+      "https://attacker.example/callback",
+      "//attacker.example/callback",
+      "not-a-path",
+    ]) {
+      expect(() =>
+        connectRequestSchema.parse({
+          provider: IntegrationProvider.GOOGLE_SEARCH_CONSOLE,
+          returnUrl,
+        }),
+      ).toThrow()
+    }
   })
 })
 
@@ -57,14 +66,13 @@ describe("connectCallbackRequestSchema", () => {
 
   it("parses error when present", () => {
     const result = connectCallbackRequestSchema.parse({
-      code: "auth-code",
       state: "state",
       error: "access_denied",
     })
     expect(result.error).toBe("access_denied")
   })
 
-  it("rejects missing code", () => {
+  it("rejects a callback without a code or error", () => {
     expect(() =>
       connectCallbackRequestSchema.parse({ state: "nonce" }),
     ).toThrow()
@@ -109,9 +117,11 @@ describe("listIntegrationsRequestSchema", () => {
     const result = listIntegrationsRequestSchema.parse({
       page: "3",
       pageSize: "50",
+      platformWebsiteId: "clx123abc",
     })
     expect(result.page).toBe(3)
     expect(result.pageSize).toBe(50)
+    expect(result.platformWebsiteId).toBe("clx123abc")
   })
 
   it("rejects page less than 1", () => {
@@ -142,9 +152,11 @@ describe("triggerSyncRequestSchema", () => {
     const result = triggerSyncRequestSchema.parse({
       startDate: "2026-07-01T00:00:00Z",
       endDate: "2026-07-07T00:00:00Z",
+      platformWebsiteId: "clx123abc",
     })
     expect(result.startDate).toBe("2026-07-01T00:00:00Z")
     expect(result.endDate).toBe("2026-07-07T00:00:00Z")
+    expect(result.platformWebsiteId).toBe("clx123abc")
   })
 })
 

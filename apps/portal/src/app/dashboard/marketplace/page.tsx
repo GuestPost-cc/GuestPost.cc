@@ -1,10 +1,15 @@
 "use client"
 
+import type {
+  Category,
+  MarketplaceListing,
+  SearchFilters,
+} from "@guestpost/api-client"
 import {
-  Badge,
   Button,
   ErrorState,
   Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -13,65 +18,57 @@ import {
   Skeleton,
 } from "@guestpost/ui"
 import { useQuery } from "@tanstack/react-query"
-import { Lock, Search, SlidersHorizontal, Star, X } from "lucide-react"
-import Image from "next/image"
+import {
+  ArrowLeft,
+  ArrowRight,
+  Bookmark,
+  Heart,
+  Search,
+  SlidersHorizontal,
+  Sparkles,
+  X,
+} from "lucide-react"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useCallback, useDeferredValue, useMemo, useState } from "react"
+import { MarketplaceListingCard } from "../../../components/marketplace/marketplace-listing-card"
+import {
+  SERVICE_OPTIONS,
+  serviceLabel,
+  visiblePaginationPages,
+} from "../../../components/marketplace/marketplace-ui"
 import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
 import { useCustomerAccess } from "../../../lib/hooks/use-customer-access"
 
-interface Listing {
-  id: string
-  title: string
-  slug: string
-  description: string
-  shortDescription?: string
-  type?: string
-  fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
-  price?: number
-  priceFrom?: number | null
-  serviceTypes?: string[]
-  currency: string
-  domainRating?: number
-  traffic?: number
-  country?: string
-  language?: string
-  turnaroundDays?: number
-  featured: boolean
-  verified: boolean
-  category?: { id: string; name: string; slug: string }
-  tags: Array<{ id: string; name: string; slug: string }>
-  image?: string
-  avgRating?: number
-  reviewCount: number
-  websiteUrl?: string
+interface FilterState {
+  minDR: string
+  maxDR: string
+  minPrice: string
+  maxPrice: string
+  minTraffic: string
+  country: string
+  language: string
+  maxTurnaroundDays: string
 }
 
-interface Category {
-  id: string
-  name: string
-  slug: string
-  icon?: string
-  children?: Category[]
+const EMPTY_FILTERS: FilterState = {
+  minDR: "",
+  maxDR: "",
+  minPrice: "",
+  maxPrice: "",
+  minTraffic: "",
+  country: "",
+  language: "",
+  maxTurnaroundDays: "",
 }
 
 export default function MarketplacePage() {
-  const { user } = useAuth()
   const [searchQuery, setSearchQuery] = useState("")
+  const deferredSearchQuery = useDeferredValue(searchQuery)
   const [selectedCategory, setSelectedCategory] = useState("all")
-  const [sortBy, setSortBy] = useState("recommended")
-  const [showFilters, setShowFilters] = useState(false)
-  const [filters, setFilters] = useState({
-    minDR: "",
-    maxDR: "",
-    minPrice: "",
-    maxPrice: "",
-    minTraffic: "",
-    country: "",
-    language: "",
-    maxTurnaroundDays: "",
-  })
+  const [selectedService, setSelectedService] = useState("all")
+  const [sortBy, setSortBy] = useState<SearchFilters["sortBy"]>("recommended")
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+  const [filters, setFilters] = useState<FilterState>(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
 
   const {
@@ -83,25 +80,36 @@ export default function MarketplacePage() {
     queryFn: () => api.marketplace.getCategories(),
   })
 
-  const searchParams = useMemo(() => {
-    const params: any = { page, limit: 20, sortBy }
-    if (searchQuery) params.query = searchQuery
+  const searchParams = useMemo<SearchFilters>(() => {
+    const params: SearchFilters = { page, limit: 18, sortBy }
+    const query = deferredSearchQuery.trim()
+    if (query) params.query = query
     if (selectedCategory !== "all") params.category = selectedCategory
+    if (selectedService !== "all") params.type = selectedService
     if (filters.minDR) params.minDR = Number(filters.minDR)
     if (filters.maxDR) params.maxDR = Number(filters.maxDR)
     if (filters.minPrice) params.minPrice = Number(filters.minPrice)
     if (filters.maxPrice) params.maxPrice = Number(filters.maxPrice)
     if (filters.minTraffic) params.minTraffic = Number(filters.minTraffic)
-    if (filters.country) params.country = filters.country
-    if (filters.language) params.language = filters.language
-    if (filters.maxTurnaroundDays)
+    if (filters.country.trim()) params.country = filters.country.trim()
+    if (filters.language.trim()) params.language = filters.language.trim()
+    if (filters.maxTurnaroundDays) {
       params.maxTurnaroundDays = Number(filters.maxTurnaroundDays)
+    }
     return params
-  }, [searchQuery, selectedCategory, sortBy, filters, page])
+  }, [
+    deferredSearchQuery,
+    filters,
+    page,
+    selectedCategory,
+    selectedService,
+    sortBy,
+  ])
 
   const {
     data: searchResult,
     isLoading,
+    isFetching,
     error: searchError,
     refetch: refetchSearch,
   } = useQuery({
@@ -109,481 +117,669 @@ export default function MarketplacePage() {
     queryFn: () => api.marketplace.searchListings(searchParams),
   })
 
-  const listings: Listing[] = searchResult?.listings || []
-  const pagination = searchResult?.pagination || {
+  const listings: MarketplaceListing[] = searchResult?.listings ?? []
+  const pagination = searchResult?.pagination ?? {
     page: 1,
-    limit: 20,
+    limit: 18,
     total: 0,
     totalPages: 0,
   }
-
   const { canViewUrls } = useCustomerAccess()
 
-  function formatPrice(price: number, currency: string = "USD") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-    }).format(price)
+  const resetFilters = () => {
+    setFilters(EMPTY_FILTERS)
+    setSelectedCategory("all")
+    setSelectedService("all")
+    setSearchQuery("")
+    setPage(1)
   }
 
-  const marketplaceError = categoriesError || searchError
+  const updateFilter = useCallback((key: keyof FilterState, value: string) => {
+    setFilters((current) => ({ ...current, [key]: value }))
+    setPage(1)
+  }, [])
 
-  if (marketplaceError) {
+  const categoryName = categories.find(
+    (category) => category.slug === selectedCategory,
+  )?.name
+
+  const activeFilters = useMemo(() => {
+    const active: Array<{ key: string; label: string; clear: () => void }> = []
+    if (selectedService !== "all") {
+      active.push({
+        key: "service",
+        label: serviceLabel(selectedService),
+        clear: () => {
+          setSelectedService("all")
+          setPage(1)
+        },
+      })
+    }
+    if (selectedCategory !== "all") {
+      active.push({
+        key: "category",
+        label: categoryName ?? selectedCategory,
+        clear: () => {
+          setSelectedCategory("all")
+          setPage(1)
+        },
+      })
+    }
+    if (filters.minPrice || filters.maxPrice) {
+      active.push({
+        key: "price",
+        label: `$${filters.minPrice || "0"}–$${filters.maxPrice || "any"}`,
+        clear: () => {
+          setFilters((current) => ({
+            ...current,
+            minPrice: "",
+            maxPrice: "",
+          }))
+          setPage(1)
+        },
+      })
+    }
+    if (filters.minDR || filters.maxDR) {
+      active.push({
+        key: "dr",
+        label: `DR ${filters.minDR || "1"}–${filters.maxDR || "100"}`,
+        clear: () => {
+          setFilters((current) => ({
+            ...current,
+            minDR: "",
+            maxDR: "",
+          }))
+          setPage(1)
+        },
+      })
+    }
+    if (filters.minTraffic) {
+      active.push({
+        key: "traffic",
+        label: `${Number(filters.minTraffic).toLocaleString()}+ traffic`,
+        clear: () => updateFilter("minTraffic", ""),
+      })
+    }
+    if (filters.maxTurnaroundDays) {
+      active.push({
+        key: "turnaround",
+        label: `Up to ${filters.maxTurnaroundDays} days`,
+        clear: () => updateFilter("maxTurnaroundDays", ""),
+      })
+    }
+    if (filters.country) {
+      active.push({
+        key: "country",
+        label: filters.country,
+        clear: () => updateFilter("country", ""),
+      })
+    }
+    if (filters.language) {
+      active.push({
+        key: "language",
+        label: filters.language,
+        clear: () => updateFilter("language", ""),
+      })
+    }
+    return active
+  }, [categoryName, filters, selectedCategory, selectedService, updateFilter])
+
+  if (searchError) {
     return (
       <ErrorState
-        title="Failed to load marketplace"
-        description={(marketplaceError as Error).message}
-        onRetry={() => {
-          refetchCategories()
-          refetchSearch()
-        }}
+        title="The marketplace could not be loaded"
+        description={(searchError as Error).message}
+        onRetry={() => refetchSearch()}
       />
     )
   }
 
-  function resetFilters() {
-    setFilters({
-      minDR: "",
-      maxDR: "",
-      minPrice: "",
-      maxPrice: "",
-      minTraffic: "",
-      country: "",
-      language: "",
-      maxTurnaroundDays: "",
-    })
-    setSelectedCategory("all")
-    setSearchQuery("")
-  }
-
-  const hasActiveFilters =
-    filters.minDR ||
-    filters.maxDR ||
-    filters.minPrice ||
-    filters.maxPrice ||
-    filters.minTraffic ||
-    filters.country ||
-    filters.language ||
-    filters.maxTurnaroundDays
+  const filterPanel = (
+    <FilterPanel
+      categories={categories}
+      categoriesError={categoriesError as Error | null}
+      selectedCategory={selectedCategory}
+      onCategoryChange={(value) => {
+        setSelectedCategory(value)
+        setPage(1)
+      }}
+      filters={filters}
+      onFilterChange={updateFilter}
+      onReset={resetFilters}
+      onRetryCategories={() => refetchCategories()}
+      activeCount={activeFilters.length}
+    />
+  )
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Marketplace</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Browse guest post opportunities from verified publishers
-        </p>
-      </div>
+    <div className="mx-auto max-w-[1500px] space-y-7">
+      <section className="relative overflow-hidden rounded-3xl bg-slate-950 px-5 py-8 text-white shadow-sm sm:px-8 sm:py-10 lg:px-10">
+        <div className="absolute -right-20 -top-28 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl" />
+        <div className="absolute -bottom-32 left-1/3 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl" />
+        <div className="relative max-w-4xl">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
+                <Sparkles className="h-3.5 w-3.5" /> Buyer marketplace
+              </p>
+              <h1 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+                Find the right placement for every campaign
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                Compare verified sites by service, authority, traffic, delivery
+                time, and price before you place an order.
+              </p>
+            </div>
+            <div className="hidden gap-2 sm:flex">
+              <Button
+                asChild
+                variant="outline"
+                className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              >
+                <Link href="/dashboard/marketplace/favorites">
+                  <Heart className="mr-2 h-4 w-4" /> Favorites
+                </Link>
+              </Button>
+              <Button
+                asChild
+                variant="outline"
+                className="border-white/20 bg-white/5 text-white hover:bg-white/10 hover:text-white"
+              >
+                <Link href="/dashboard/marketplace/saved-lists">
+                  <Bookmark className="mr-2 h-4 w-4" /> Saved lists
+                </Link>
+              </Button>
+            </div>
+          </div>
 
-      {/* Search + Controls */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by title, niche, or keyword..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Categories</SelectItem>
-              {categories.map((cat) => (
-                <SelectItem key={cat.id} value={cat.slug}>
-                  {cat.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="recommended">Recommended</SelectItem>
-              <SelectItem value="dr">Highest DR</SelectItem>
-              <SelectItem value="price_asc">Lowest Price</SelectItem>
-              <SelectItem value="price_desc">Highest Price</SelectItem>
-              <SelectItem value="newest">Newest</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button
-            variant={showFilters ? "secondary" : "outline"}
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className="gap-1.5"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filters
-            {hasActiveFilters && (
-              <span className="ml-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground">
-                !
-              </span>
+          <div className="relative mt-7 max-w-3xl">
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+            <Input
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value)
+                setPage(1)
+              }}
+              placeholder="Search a niche, site, category, or keyword"
+              aria-label="Search marketplace listings"
+              className="h-13 border-white/15 bg-white pl-12 pr-12 text-base text-slate-950 shadow-xl placeholder:text-slate-400 focus-visible:ring-white"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearchQuery("")
+                  setPage(1)
+                }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-900"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="service-filter-heading">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <h2 id="service-filter-heading" className="text-sm font-semibold">
+              What do you need?
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Pick a service to see listings that offer it now.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+          <Button
+            variant={selectedService === "all" ? "default" : "outline"}
+            size="sm"
+            className="shrink-0 rounded-full"
+            onClick={() => {
+              setSelectedService("all")
+              setPage(1)
+            }}
+          >
+            All services
           </Button>
-        </div>
-      </div>
-
-      {/* Filters Panel */}
-      {showFilters && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-4 border rounded-lg bg-card sm:grid-cols-3 lg:grid-cols-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Domain Rating
-            </label>
-            <div className="flex items-center gap-1.5">
-              <Input
-                type="number"
-                placeholder="Min"
-                value={filters.minDR}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, minDR: e.target.value }))
-                }
-              />
-              <span className="text-muted-foreground text-xs">—</span>
-              <Input
-                type="number"
-                placeholder="Max"
-                value={filters.maxDR}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, maxDR: e.target.value }))
-                }
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Price Range
-            </label>
-            <div className="flex items-center gap-1.5">
-              <Input
-                type="number"
-                placeholder="Min"
-                value={filters.minPrice}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, minPrice: e.target.value }))
-                }
-              />
-              <span className="text-muted-foreground text-xs">—</span>
-              <Input
-                type="number"
-                placeholder="Max"
-                value={filters.maxPrice}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, maxPrice: e.target.value }))
-                }
-              />
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Min Traffic / mo
-            </label>
-            <Input
-              type="number"
-              placeholder="e.g. 10,000"
-              value={filters.minTraffic}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, minTraffic: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Max Turnaround
-            </label>
-            <Input
-              type="number"
-              placeholder="Days"
-              value={filters.maxTurnaroundDays}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, maxTurnaroundDays: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Country
-            </label>
-            <Input
-              placeholder="e.g. US"
-              value={filters.country}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, country: e.target.value }))
-              }
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Language
-            </label>
-            <Input
-              placeholder="e.g. English"
-              value={filters.language}
-              onChange={(e) =>
-                setFilters((f) => ({ ...f, language: e.target.value }))
-              }
-            />
-          </div>
-          <div className="col-span-full flex items-center justify-end pt-1">
+          {SERVICE_OPTIONS.map((service) => (
             <Button
-              variant="ghost"
+              key={service.value}
+              variant={
+                selectedService === service.value ? "default" : "outline"
+              }
               size="sm"
-              onClick={resetFilters}
-              className="gap-1.5 text-muted-foreground"
+              className="shrink-0 rounded-full"
+              onClick={() => {
+                setSelectedService(service.value)
+                setPage(1)
+              }}
             >
-              <X className="h-3.5 w-3.5" />
-              Reset filters
+              {service.label}
             </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Listing Results */}
-      {isLoading ? (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="space-y-3">
-              <Skeleton className="aspect-[4/3] w-full rounded-xl" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
-            </div>
           ))}
         </div>
-      ) : listings.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="rounded-full bg-muted p-5 mb-5">
-            <Search className="h-10 w-10 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-semibold">No listings found</h3>
-          <p className="text-sm text-muted-foreground mt-1 mb-5 max-w-sm">
-            Try adjusting your search query or filters to find what you're
-            looking for.
-          </p>
-          <Button variant="outline" onClick={resetFilters}>
-            Reset all filters
-          </Button>
+      </section>
+
+      <div className="flex items-center justify-between gap-3 xl:hidden">
+        <Button
+          variant="outline"
+          onClick={() => setShowMobileFilters((current) => !current)}
+          aria-expanded={showMobileFilters}
+        >
+          <SlidersHorizontal className="mr-2 h-4 w-4" />
+          Filters
+          {activeFilters.length > 0 && (
+            <span className="ml-2 rounded-full bg-primary px-1.5 py-0.5 text-[10px] text-primary-foreground">
+              {activeFilters.length}
+            </span>
+          )}
+        </Button>
+        <Select
+          value={sortBy}
+          onValueChange={(value) => {
+            setSortBy(value as SearchFilters["sortBy"])
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-[175px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SortOptions />
+          </SelectContent>
+        </Select>
+      </div>
+
+      {showMobileFilters && (
+        <div className="rounded-2xl border bg-card p-6 xl:hidden">
+          {filterPanel}
         </div>
-      ) : (
-        <>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {listings.map((listing) => (
-              <Link
-                key={listing.id}
-                href={`/dashboard/marketplace/${listing.slug}`}
-                className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:shadow-lg hover:border-primary/30"
-              >
-                {/* Image */}
-                <div className="relative aspect-[16/10] overflow-hidden bg-muted">
-                  {listing.image ? (
-                    <Image
-                      fill
-                      unoptimized
-                      src={listing.image}
-                      alt={listing.title}
-                      className="object-cover group-hover:scale-105 transition-transform duration-500"
-                      sizes="(max-width: 768px) 50vw, 33vw"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
-                      <span className="text-5xl font-bold text-primary/15">
-                        {listing.title[0]}
-                      </span>
-                    </div>
-                  )}
-                  {listing.featured && (
-                    <span className="absolute left-3 top-3 rounded-full bg-primary px-2.5 py-0.5 text-[11px] font-semibold text-primary-foreground shadow-sm">
-                      Featured
-                    </span>
-                  )}
-                  {listing.verified && (
-                    <span className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full bg-green-500 text-white shadow-sm">
-                      <svg
-                        className="h-3.5 w-3.5"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={3}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                    </span>
-                  )}
-                </div>
+      )}
 
-                {/* Content */}
-                <div className="flex flex-1 flex-col p-4">
-                  {/* Category + Fulfillment badges */}
-                  <div className="mb-2 flex items-center gap-1.5">
-                    {listing.category && (
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] px-1.5 py-0 font-medium"
-                      >
-                        {listing.category.name}
-                      </Badge>
-                    )}
-                    {listing.fulfillmentType && (
-                      <span className="text-[10px] text-muted-foreground">
-                        {listing.fulfillmentType === "INTERNAL"
-                          ? "Platform"
-                          : listing.fulfillmentType === "HYBRID"
-                            ? "Hybrid"
-                            : "Publisher"}
-                      </span>
-                    )}
-                  </div>
+      <div className="grid items-start gap-7 xl:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="sticky top-6 hidden rounded-2xl border bg-card p-6 xl:block">
+          {filterPanel}
+        </aside>
 
-                  {/* Title */}
-                  <h3 className="font-semibold leading-snug line-clamp-2 group-hover:text-primary transition-colors">
-                    {listing.title}
-                  </h3>
-
-                  {/* Website URL (blurred if not eligible) */}
-                  {listing.websiteUrl && (
-                    <div className="mt-1.5 text-xs">
-                      {canViewUrls ? (
-                        <span className="truncate text-muted-foreground">
-                          {listing.websiteUrl}
-                        </span>
-                      ) : (
-                        <span className="relative inline-block">
-                          <span className="select-none text-muted-foreground blur-sm">
-                            {listing.websiteUrl}
-                          </span>
-                          <Lock className="absolute left-0 top-0 h-3 w-3 text-muted-foreground" />
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Stats row */}
-                  <div className="mt-3 flex items-center gap-3 text-xs">
-                    {listing.domainRating && (
-                      <span className="font-semibold text-foreground">
-                        DR {listing.domainRating}
-                      </span>
-                    )}
-                    {listing.traffic && (
-                      <span className="text-muted-foreground">
-                        {listing.traffic.toLocaleString()}/mo
-                      </span>
-                    )}
-                    {listing.avgRating && (
-                      <span className="flex items-center gap-0.5 text-muted-foreground">
-                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                        {listing.avgRating.toFixed(1)}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Service type chips */}
-                  {(listing as any).serviceTypes?.length > 0 && (
-                    <div className="mt-2.5 flex flex-wrap gap-1">
-                      {((listing as any).serviceTypes as string[])
-                        .slice(0, 2)
-                        .map((t) => (
-                          <span
-                            key={t}
-                            className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground"
-                          >
-                            {t.replace(/_/g, " ")}
-                          </span>
-                        ))}
-                    </div>
-                  )}
-
-                  {/* Price — pinned to bottom */}
-                  <div className="mt-auto flex items-center justify-between border-t pt-3 mt-4">
-                    <span className="text-lg font-bold">
-                      {(listing as any).priceFrom != null ? (
-                        <span className="flex items-baseline gap-1">
-                          <span className="text-[11px] text-muted-foreground font-normal">
-                            from
-                          </span>
-                          {formatPrice(
-                            (listing as any).priceFrom,
-                            listing.currency,
-                          )}
-                        </span>
-                      ) : (
-                        formatPrice(listing.price ?? 0, listing.currency)
-                      )}
-                    </span>
-                    {listing.reviewCount > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        {listing.reviewCount} review
-                        {listing.reviewCount !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2 pt-4">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pagination.page === 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                Previous
-              </Button>
-              <div className="flex items-center gap-1">
-                {Array.from(
-                  { length: Math.min(pagination.totalPages, 5) },
-                  (_, i) => {
-                    const pageNum = i + 1
-                    return (
-                      <Button
-                        key={pageNum}
-                        variant={
-                          pagination.page === pageNum ? "default" : "ghost"
-                        }
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => setPage(pageNum)}
-                      >
-                        {pageNum}
-                      </Button>
-                    )
-                  },
-                )}
-                {pagination.totalPages > 5 && (
-                  <span className="px-1 text-xs text-muted-foreground">
-                    … {pagination.totalPages}
-                  </span>
+        <div className="min-w-0">
+          <div className="mb-5 flex flex-col gap-3 border-b pb-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-semibold tracking-tight">
+                  {deferredSearchQuery.trim()
+                    ? `Results for “${deferredSearchQuery.trim()}”`
+                    : "Available placements"}
+                </h2>
+                {isFetching && !isLoading && (
+                  <span
+                    role="status"
+                    className="h-2 w-2 animate-pulse rounded-full bg-primary"
+                    aria-label="Updating results"
+                  />
                 )}
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pagination.page === pagination.totalPages}
-                onClick={() => setPage((p) => p + 1)}
+              <p className="mt-1 text-sm text-muted-foreground">
+                {pagination.total.toLocaleString()} matching listing
+                {pagination.total === 1 ? "" : "s"}
+              </p>
+            </div>
+            <div className="hidden items-center gap-2 xl:flex">
+              <Label
+                htmlFor="marketplace-sort"
+                className="text-xs text-muted-foreground"
               >
-                Next
-              </Button>
+                Sort by
+              </Label>
+              <Select
+                value={sortBy}
+                onValueChange={(value) => {
+                  setSortBy(value as SearchFilters["sortBy"])
+                  setPage(1)
+                }}
+              >
+                <SelectTrigger id="marketplace-sort" className="w-[185px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SortOptions />
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {activeFilters.length > 0 && (
+            <div
+              role="group"
+              className="mb-5 flex flex-wrap items-center gap-2"
+              aria-label="Active filters"
+            >
+              {activeFilters.map((filter) => (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={filter.clear}
+                  className="inline-flex items-center gap-1.5 rounded-full border bg-secondary px-3 py-1.5 text-xs font-medium transition hover:bg-secondary/70"
+                >
+                  {filter.label}
+                  <X className="h-3 w-3" />
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                Clear all
+              </button>
             </div>
           )}
-        </>
-      )}
+
+          {isLoading ? (
+            <MarketplaceSkeleton />
+          ) : listings.length === 0 ? (
+            <div className="rounded-2xl border border-dashed bg-muted/20 px-6 py-16 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-background shadow-sm">
+                <Search className="h-5 w-5 text-muted-foreground" />
+              </div>
+              <h3 className="mt-5 text-lg font-semibold">
+                No placements match yet
+              </h3>
+              <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-muted-foreground">
+                Remove one or two filters, broaden the search, or browse all
+                services to see more options.
+              </p>
+              <Button variant="outline" className="mt-5" onClick={resetFilters}>
+                Clear search and filters
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+                {listings.map((listing) => (
+                  <MarketplaceListingCard
+                    key={listing.id}
+                    listing={listing}
+                    canViewUrls={canViewUrls}
+                    serviceTypeFilter={
+                      selectedService === "all" ? undefined : selectedService
+                    }
+                  />
+                ))}
+              </div>
+
+              {pagination.totalPages > 1 && (
+                <nav
+                  aria-label="Marketplace pagination"
+                  className="mt-8 flex flex-wrap items-center justify-center gap-1"
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pagination.page === 1}
+                    onClick={() =>
+                      setPage((current) => Math.max(1, current - 1))
+                    }
+                    className="mr-2"
+                  >
+                    <ArrowLeft className="mr-1.5 h-4 w-4" /> Previous
+                  </Button>
+                  {visiblePaginationPages(
+                    pagination.page,
+                    pagination.totalPages,
+                  ).map((item, index) =>
+                    item === "ellipsis" ? (
+                      <span
+                        key={`ellipsis-${index}`}
+                        className="flex h-9 w-8 items-center justify-center text-sm text-muted-foreground"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <Button
+                        key={item}
+                        variant={pagination.page === item ? "default" : "ghost"}
+                        size="sm"
+                        className="h-9 w-9 p-0"
+                        aria-current={
+                          pagination.page === item ? "page" : undefined
+                        }
+                        onClick={() => setPage(item)}
+                      >
+                        {item}
+                      </Button>
+                    ),
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={pagination.page === pagination.totalPages}
+                    onClick={() => setPage((current) => current + 1)}
+                    className="ml-2"
+                  >
+                    Next <ArrowRight className="ml-1.5 h-4 w-4" />
+                  </Button>
+                </nav>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SortOptions() {
+  return (
+    <>
+      <SelectItem value="recommended">Best match</SelectItem>
+      <SelectItem value="dr">Highest authority</SelectItem>
+      <SelectItem value="traffic">Most traffic</SelectItem>
+      <SelectItem value="price_asc">Lowest starting price</SelectItem>
+      <SelectItem value="price_desc">Highest starting price</SelectItem>
+      <SelectItem value="best_rated">Most reviewed</SelectItem>
+      <SelectItem value="newest">Newest listings</SelectItem>
+    </>
+  )
+}
+
+function FilterPanel({
+  categories,
+  categoriesError,
+  selectedCategory,
+  onCategoryChange,
+  filters,
+  onFilterChange,
+  onReset,
+  onRetryCategories,
+  activeCount,
+}: {
+  categories: Category[]
+  categoriesError: Error | null
+  selectedCategory: string
+  onCategoryChange: (value: string) => void
+  filters: FilterState
+  onFilterChange: (key: keyof FilterState, value: string) => void
+  onReset: () => void
+  onRetryCategories: () => void
+  activeCount: number
+}) {
+  return (
+    <div className="space-y-7">
+      <div className="flex items-center justify-between border-b px-1 pb-4">
+        <div>
+          <h2 className="font-semibold">Refine results</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {activeCount > 0 ? `${activeCount} active` : "All placements"}
+          </p>
+        </div>
+        {activeCount > 0 && (
+          <Button variant="ghost" size="sm" onClick={onReset}>
+            Reset
+          </Button>
+        )}
+      </div>
+
+      <div className="space-y-3 px-1">
+        <Label htmlFor="marketplace-category">Category</Label>
+        <Select value={selectedCategory} onValueChange={onCategoryChange}>
+          <SelectTrigger id="marketplace-category" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All categories</SelectItem>
+            {categories.map((category) => (
+              <SelectItem key={category.id} value={category.slug}>
+                {category.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {categoriesError && (
+          <button
+            type="button"
+            onClick={onRetryCategories}
+            className="text-left text-xs text-destructive hover:underline"
+          >
+            Categories unavailable. Try again.
+          </button>
+        )}
+      </div>
+
+      <fieldset className="space-y-3 px-1">
+        <legend className="text-sm font-medium">Budget</legend>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label htmlFor="minimum-price" className="sr-only">
+              Minimum price
+            </Label>
+            <Input
+              id="minimum-price"
+              type="number"
+              min={0}
+              placeholder="Min $"
+              value={filters.minPrice}
+              onChange={(event) =>
+                onFilterChange("minPrice", event.target.value)
+              }
+            />
+          </div>
+          <div>
+            <Label htmlFor="maximum-price" className="sr-only">
+              Maximum price
+            </Label>
+            <Input
+              id="maximum-price"
+              type="number"
+              min={0}
+              placeholder="Max $"
+              value={filters.maxPrice}
+              onChange={(event) =>
+                onFilterChange("maxPrice", event.target.value)
+              }
+            />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset className="space-y-3 px-1">
+        <legend className="text-sm font-medium">Domain rating</legend>
+        <div className="grid grid-cols-2 gap-2">
+          <Input
+            aria-label="Minimum domain rating"
+            type="number"
+            min={1}
+            max={100}
+            placeholder="Min DR"
+            value={filters.minDR}
+            onChange={(event) => onFilterChange("minDR", event.target.value)}
+          />
+          <Input
+            aria-label="Maximum domain rating"
+            type="number"
+            min={1}
+            max={100}
+            placeholder="Max DR"
+            value={filters.maxDR}
+            onChange={(event) => onFilterChange("maxDR", event.target.value)}
+          />
+        </div>
+      </fieldset>
+
+      <div className="space-y-3 px-1">
+        <Label htmlFor="minimum-traffic">Minimum monthly traffic</Label>
+        <Input
+          id="minimum-traffic"
+          type="number"
+          min={0}
+          placeholder="e.g. 10,000"
+          value={filters.minTraffic}
+          onChange={(event) => onFilterChange("minTraffic", event.target.value)}
+        />
+      </div>
+
+      <div className="space-y-3 px-1">
+        <Label htmlFor="maximum-turnaround">Maximum delivery time</Label>
+        <Select
+          value={filters.maxTurnaroundDays || "any"}
+          onValueChange={(value) =>
+            onFilterChange("maxTurnaroundDays", value === "any" ? "" : value)
+          }
+        >
+          <SelectTrigger id="maximum-turnaround" className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="any">Any delivery time</SelectItem>
+            <SelectItem value="3">Up to 3 days</SelectItem>
+            <SelectItem value="7">Up to 7 days</SelectItem>
+            <SelectItem value="14">Up to 14 days</SelectItem>
+            <SelectItem value="30">Up to 30 days</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 px-1 xl:grid-cols-1">
+        <div className="space-y-3">
+          <Label htmlFor="marketplace-country">Country</Label>
+          <Input
+            id="marketplace-country"
+            placeholder="e.g. US"
+            value={filters.country}
+            onChange={(event) => onFilterChange("country", event.target.value)}
+          />
+        </div>
+        <div className="space-y-3">
+          <Label htmlFor="marketplace-language">Language</Label>
+          <Input
+            id="marketplace-language"
+            placeholder="e.g. English"
+            value={filters.language}
+            onChange={(event) => onFilterChange("language", event.target.value)}
+          />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MarketplaceSkeleton() {
+  return (
+    <div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="overflow-hidden rounded-2xl border">
+          <Skeleton className="aspect-[16/9] w-full rounded-none" />
+          <div className="space-y-4 p-5">
+            <Skeleton className="h-3 w-1/3" />
+            <Skeleton className="h-6 w-4/5" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-16 w-full rounded-xl" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

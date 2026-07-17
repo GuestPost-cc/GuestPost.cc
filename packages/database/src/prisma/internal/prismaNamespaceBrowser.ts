@@ -1170,6 +1170,8 @@ export const ExternalAccountScalarFieldEnum = {
   id: 'id',
   provider: 'provider',
   externalUserId: 'externalUserId',
+  ownerType: 'ownerType',
+  ownerId: 'ownerId',
   email: 'email',
   displayName: 'displayName',
   encryptedAccessToken: 'encryptedAccessToken',

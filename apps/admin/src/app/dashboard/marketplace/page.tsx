@@ -10,8 +10,6 @@ import {
   CardTitle,
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
   DropdownMenu,
@@ -21,7 +19,6 @@ import {
   ErrorState,
   getListingStatusPresentation,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -111,16 +108,6 @@ const verifyBadge: Record<string, string> = {
 // `verifyBadge` above maps the WebsiteVerificationStatus enum (a different
 // enum, not in scope for the Phase 7.9 sweep — kept inline for now).
 
-const LISTING_TYPES = [
-  "GUEST_POST",
-  "NICHE_EDIT",
-  "EDITORIAL_LINK",
-  "SPONSORED_CONTENT",
-  "DIGITAL_PR",
-  "BLOG_ARTICLE",
-  "SEO_CONTENT",
-] as const
-
 export default function AdminMarketplacePage() {
   const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
   if (loading) return null
@@ -137,95 +124,8 @@ function AdminMarketplacePageInner() {
   const [typeFilter, setTypeFilter] = useState("all")
   const [ownerTypeFilter, setOwnerTypeFilter] = useState("all")
   const [page, setPage] = useState(1)
-  // Moderation + platform-listing creation are SUPER_ADMIN/OPERATIONS
-  const canManage =
+  const canModerate =
     user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
-  const [showCreate, setShowCreate] = useState(false)
-  // ── Reassign listing owner state ──
-  const [reassignFor, setReassignFor] = useState<{
-    listingId: string
-    listingTitle: string
-    websiteId: string | null
-    currentOwner: string | null
-  } | null>(null)
-  const [pickedOwnerId, setPickedOwnerId] = useState("")
-  const [reassignReason, setReassignReason] = useState("")
-
-  const opsQ = useQuery({
-    queryKey: ["admin", "ops-staff"],
-    queryFn: () => api.admin.listOpsStaff(),
-    enabled: isSuperAdmin && !!reassignFor,
-  })
-
-  const reassignMut = useMutation({
-    mutationFn: (vars: {
-      websiteId: string
-      managedByUserId: string | null
-      reason?: string
-    }) =>
-      api.admin.assignWebsite(vars.websiteId, {
-        managedByUserId: vars.managedByUserId,
-        reason: vars.reason,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["admin-marketplace-listings"],
-      })
-      toast.success("Listing owner updated")
-      setReassignFor(null)
-      setPickedOwnerId("")
-      setReassignReason("")
-    },
-    onError: (e: Error) =>
-      toast.error(e.message || "Failed to reassign listing"),
-  })
-
-  const [pform, setPform] = useState({
-    title: "",
-    description: "",
-    type: "GUEST_POST",
-    price: "",
-    websiteId: "",
-  })
-
-  const platformWebsitesQ = useQuery({
-    queryKey: ["admin", "platform-websites"],
-    queryFn: () => api.admin.listPlatformWebsites(),
-    enabled: showCreate,
-  })
-
-  const createPlatformMutation = useMutation({
-    mutationFn: () =>
-      api.admin.createPlatformListing({
-        title: pform.title.trim(),
-        description: pform.description.trim(),
-        type: pform.type,
-        price: Number(pform.price),
-        websiteId: pform.websiteId || undefined,
-        status: "APPROVED",
-      }),
-    onSuccess: () => {
-      toast.success("Platform listing created")
-      queryClient.invalidateQueries({
-        queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
-      setShowCreate(false)
-      setPform({
-        title: "",
-        description: "",
-        type: "GUEST_POST",
-        price: "",
-        websiteId: "",
-      })
-    },
-    onError: (e: Error) =>
-      toast.error(e.message || "Failed to create platform listing"),
-  })
-  const canSubmitPlatform =
-    pform.title.trim().length >= 3 &&
-    pform.description.trim().length >= 1 &&
-    Number(pform.price) > 0
 
   const {
     data,
@@ -349,6 +249,7 @@ function AdminMarketplacePageInner() {
   const [servicesForListing, setServicesForListing] = useState<{
     id: string
     title: string
+    ownerType: "PUBLISHER" | "PLATFORM"
     services: ListingServiceRow[]
   } | null>(null)
   const [newAdminService, setNewAdminService] = useState({
@@ -361,6 +262,8 @@ function AdminMarketplacePageInner() {
   // Services dialog reads directly from the listing row data (included in
   // the listings response). No separate API query needed.
   const dialogServices = servicesForListing?.services ?? []
+  const canEditDialogServices =
+    isSuperAdmin && servicesForListing?.ownerType === "PUBLISHER"
 
   const addAdminServiceMut = useMutation({
     mutationFn: (vars: {
@@ -458,131 +361,11 @@ function AdminMarketplacePageInner() {
             Marketplace Management
           </h1>
           <p className="text-muted-foreground">
-            Publisher and platform-owned listings
+            Review and moderate publisher and platform-owned listings. Platform
+            inventory is edited from Platform Websites.
           </p>
         </div>
-        {canManage && (
-          <Button onClick={() => setShowCreate(true)}>
-            <Store className="mr-2 h-4 w-4" />
-            New Platform Listing
-          </Button>
-        )}
       </div>
-
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New Platform Listing</DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            Platform-owned listing fulfilled by your team (no publisher). Attach
-            an optional platform website.
-          </p>
-          <div className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Title</label>
-              <Input
-                value={pform.title}
-                onChange={(e) => setPform({ ...pform, title: e.target.value })}
-                maxLength={200}
-                placeholder="e.g. Premium editorial placement"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">Description</label>
-              <Input
-                value={pform.description}
-                onChange={(e) =>
-                  setPform({ ...pform, description: e.target.value })
-                }
-                maxLength={1000}
-                placeholder="What the buyer gets"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Type</label>
-                <Select
-                  value={pform.type}
-                  onValueChange={(v) => setPform({ ...pform, type: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LISTING_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium">Price (USD)</label>
-                <Input
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  value={pform.price}
-                  onChange={(e) =>
-                    setPform({ ...pform, price: e.target.value })
-                  }
-                  placeholder="500"
-                />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">
-                Platform website (optional)
-              </label>
-              <Select
-                value={pform.websiteId || "none"}
-                onValueChange={(v) =>
-                  setPform({ ...pform, websiteId: v === "none" ? "" : v })
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      platformWebsitesQ.isLoading
-                        ? "Loading..."
-                        : "No website (service listing)"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    No website (service listing)
-                  </SelectItem>
-                  {(platformWebsitesQ.data ?? []).map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {w.name ?? w.url}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Only platform-owned websites are selectable. Create them under
-                Websites.
-              </p>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setShowCreate(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => createPlatformMutation.mutate()}
-              disabled={!canSubmitPlatform || createPlatformMutation.isPending}
-            >
-              {createPlatformMutation.isPending
-                ? "Creating..."
-                : "Create Listing"}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
@@ -845,9 +628,9 @@ function AdminMarketplacePageInner() {
                       <ToggleRight className="h-5 w-5 text-primary" />
                     ) : (
                       <ToggleLeft
-                        className={`h-5 w-5 ${canManage ? "text-muted-foreground cursor-pointer" : "text-muted-foreground"}`}
+                        className={`h-5 w-5 ${isSuperAdmin ? "text-muted-foreground cursor-pointer" : "text-muted-foreground"}`}
                         onClick={() =>
-                          canManage &&
+                          isSuperAdmin &&
                           toggleFeatured.mutate({
                             id: listing.id,
                             featured: true,
@@ -874,7 +657,7 @@ function AdminMarketplacePageInner() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {canManage && (
+                        {isSuperAdmin && (
                           <>
                             <DropdownMenuItem
                               onClick={() =>
@@ -909,21 +692,22 @@ function AdminMarketplacePageInner() {
                             View Public Page
                           </a>
                         </DropdownMenuItem>
-                        {/* Manage services — visible for all listings; the
-                            server enforces staff-only for PUBLISHER-owned
-                            (admin can edit any listing's services from here). */}
                         <DropdownMenuItem
                           onClick={() =>
                             setServicesForListing({
                               id: listing.id,
                               title: listing.title,
+                              ownerType: listing.ownerType ?? "PUBLISHER",
                               services: listing.services ?? [],
                             })
                           }
                         >
-                          Manage Services ({listing.services?.length ?? 0})
+                          {isSuperAdmin && listing.ownerType === "PUBLISHER"
+                            ? "Manage"
+                            : "View"}{" "}
+                          Services ({listing.services?.length ?? 0})
                         </DropdownMenuItem>
-                        {canManage && listing.status !== "ARCHIVED" && (
+                        {canModerate && listing.status !== "ARCHIVED" && (
                           <>
                             {(() => {
                               const blocked =
@@ -994,36 +778,14 @@ function AdminMarketplacePageInner() {
                             >
                               Pause / Suspend
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => deleteListing.mutate(listing.id)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                            {/* Reassign listing owner — only for platform listings, SUPER_ADMIN only */}
-                            {listing.ownerType === "PLATFORM" &&
-                              isSuperAdmin && (
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    setReassignFor({
-                                      listingId: listing.id,
-                                      listingTitle: listing.title,
-                                      websiteId:
-                                        (listing as any).websiteId ?? null,
-                                      currentOwner:
-                                        listing.websiteManagedBy?.name ??
-                                        listing.websiteManagedBy?.email ??
-                                        null,
-                                    })
-                                    setPickedOwnerId(
-                                      (listing as any).websiteManagedBy?.id ??
-                                        "",
-                                    )
-                                  }}
-                                >
-                                  Reassign Owner
-                                </DropdownMenuItem>
-                              )}
+                            {isSuperAdmin && (
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => deleteListing.mutate(listing.id)}
+                              >
+                                Archive listing
+                              </DropdownMenuItem>
+                            )}
                           </>
                         )}
                       </DropdownMenuContent>
@@ -1075,8 +837,11 @@ function AdminMarketplacePageInner() {
             <DialogTitle>Services on “{servicesForListing?.title}”</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
-            Per-service prices, turnarounds, and availability. Pausing a service
-            keeps it linked to historical orders.
+            {canEditDialogServices
+              ? "Super Admin may correct publisher service pricing and availability here."
+              : servicesForListing?.ownerType === "PLATFORM"
+                ? "Platform services are read-only here and are managed from Platform Websites."
+                : "Operations can inspect publisher services for moderation but cannot edit them."}
           </p>
           <div className="space-y-4">
             <Table>
@@ -1111,228 +876,160 @@ function AdminMarketplacePageInner() {
                       </TableCell>
                       <TableCell>{s.turnaroundDays}d</TableCell>
                       <TableCell>
-                        <Select
-                          value={s.availability}
-                          onValueChange={(v) =>
-                            updateAdminServiceMut.mutate({
-                              listingId: servicesForListing!.id,
-                              serviceId: s.id,
-                              data: {
-                                version: s.version,
-                                availability: v as
-                                  | "AVAILABLE"
-                                  | "PAUSED"
-                                  | "WAITLIST",
-                              },
-                            })
-                          }
-                        >
-                          <SelectTrigger className="h-8 w-[110px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="AVAILABLE">Available</SelectItem>
-                            <SelectItem value="PAUSED">Paused</SelectItem>
-                            <SelectItem value="WAITLIST">Waitlist</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        {canEditDialogServices ? (
+                          <Select
+                            value={s.availability}
+                            onValueChange={(v) =>
+                              updateAdminServiceMut.mutate({
+                                listingId: servicesForListing!.id,
+                                serviceId: s.id,
+                                data: {
+                                  version: s.version,
+                                  availability: v as
+                                    | "AVAILABLE"
+                                    | "PAUSED"
+                                    | "WAITLIST",
+                                },
+                              })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[110px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="AVAILABLE">
+                                Available
+                              </SelectItem>
+                              <SelectItem value="PAUSED">Paused</SelectItem>
+                              <SelectItem value="WAITLIST">Waitlist</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant="outline">
+                            {s.availability.replace(/_/g, " ")}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            pauseAdminServiceMut.mutate({
-                              listingId: servicesForListing!.id,
-                              serviceId: s.id,
-                            })
-                          }
-                          disabled={s.availability === "PAUSED"}
-                        >
-                          Pause
-                        </Button>
+                        {canEditDialogServices && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              pauseAdminServiceMut.mutate({
+                                listingId: servicesForListing!.id,
+                                serviceId: s.id,
+                              })
+                            }
+                            disabled={s.availability === "PAUSED"}
+                          >
+                            Pause
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
-            <div className="border-t pt-4 space-y-3">
-              <div className="text-sm font-medium">Add a service</div>
-              <div className="grid grid-cols-4 gap-3">
-                <Select
-                  value={newAdminService.serviceType}
-                  onValueChange={(v) =>
-                    setNewAdminService({ ...newAdminService, serviceType: v })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Service" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(
-                      [
-                        "GUEST_POST",
-                        "NICHE_EDIT",
-                        "EDITORIAL_LINK",
-                        "OUTREACH_LINK",
-                        "LOCAL_CITATION",
-                        "FOUNDATION_LINK",
-                        "BLOG_ARTICLE",
-                        "SEO_CONTENT",
-                      ] as const
-                    ).map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t.replace(/_/g, " ")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  min={1}
-                  step="0.01"
-                  placeholder="Price"
-                  value={newAdminService.price}
-                  onChange={(e) =>
-                    setNewAdminService({
-                      ...newAdminService,
-                      price: e.target.value,
-                    })
-                  }
-                />
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="TAT (days)"
-                  value={newAdminService.turnaroundDays}
-                  onChange={(e) =>
-                    setNewAdminService({
-                      ...newAdminService,
-                      turnaroundDays: e.target.value,
-                    })
-                  }
-                />
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="Revisions"
-                  value={newAdminService.revisionRounds}
-                  onChange={(e) =>
-                    setNewAdminService({
-                      ...newAdminService,
-                      revisionRounds: e.target.value,
-                    })
-                  }
-                />
-              </div>
-              <Button
-                size="sm"
-                disabled={
-                  !servicesForListing ||
-                  !newAdminService.price ||
-                  Number(newAdminService.price) <= 0 ||
-                  addAdminServiceMut.isPending
-                }
-                onClick={() =>
-                  servicesForListing &&
-                  addAdminServiceMut.mutate({
-                    listingId: servicesForListing.id,
-                    data: {
-                      serviceType: newAdminService.serviceType,
-                      price: Number(newAdminService.price),
-                      turnaroundDays:
-                        Number(newAdminService.turnaroundDays) || 7,
-                      revisionRounds:
-                        Number(newAdminService.revisionRounds) || 2,
-                    },
-                  })
-                }
-              >
-                {addAdminServiceMut.isPending ? "Adding..." : "Add service"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Reassign listing owner dialog */}
-      <Dialog
-        open={!!reassignFor}
-        onOpenChange={(v) => !v && setReassignFor(null)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              Reassign owner{reassignFor ? `: ${reassignFor.listingTitle}` : ""}
-            </DialogTitle>
-            <DialogDescription>
-              The new owner will be the default assignee for new orders and
-              support tickets on this listing&apos;s website.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-1">
-              <Label>Current owner</Label>
-              <div className="text-sm text-muted-foreground">
-                {reassignFor?.currentOwner ?? "Unassigned (shared queue)"}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label>New owner</Label>
-              <Select value={pickedOwnerId} onValueChange={setPickedOwnerId}>
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      opsQ.isLoading ? "Loading…" : "Pick an Ops member"
+            {canEditDialogServices && (
+              <div className="border-t pt-4 space-y-3">
+                <div className="text-sm font-medium">Add a service</div>
+                <div className="grid grid-cols-4 gap-3">
+                  <Select
+                    value={newAdminService.serviceType}
+                    onValueChange={(v) =>
+                      setNewAdminService({ ...newAdminService, serviceType: v })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Service" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(
+                        [
+                          "GUEST_POST",
+                          "NICHE_EDIT",
+                          "EDITORIAL_LINK",
+                          "OUTREACH_LINK",
+                          "LOCAL_CITATION",
+                          "FOUNDATION_LINK",
+                          "BLOG_ARTICLE",
+                          "SEO_CONTENT",
+                        ] as const
+                      ).map((t) => (
+                        <SelectItem key={t} value={t}>
+                          {t.replace(/_/g, " ")}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    min={1}
+                    step="0.01"
+                    placeholder="Price"
+                    value={newAdminService.price}
+                    onChange={(e) =>
+                      setNewAdminService({
+                        ...newAdminService,
+                        price: e.target.value,
+                      })
                     }
                   />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__unassigned__">
-                    — Unassigned (shared queue) —
-                  </SelectItem>
-                  {(opsQ.data ?? []).map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.name || o.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>Reason (audit log)</Label>
-              <Input
-                placeholder="e.g. workload rebalance, vacation handoff"
-                value={reassignReason}
-                onChange={(e) => setReassignReason(e.target.value)}
-                maxLength={200}
-              />
-            </div>
+                  <Input
+                    type="number"
+                    min={1}
+                    placeholder="TAT (days)"
+                    value={newAdminService.turnaroundDays}
+                    onChange={(e) =>
+                      setNewAdminService({
+                        ...newAdminService,
+                        turnaroundDays: e.target.value,
+                      })
+                    }
+                  />
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="Revisions"
+                    value={newAdminService.revisionRounds}
+                    onChange={(e) =>
+                      setNewAdminService({
+                        ...newAdminService,
+                        revisionRounds: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+                <Button
+                  size="sm"
+                  disabled={
+                    !servicesForListing ||
+                    !newAdminService.price ||
+                    Number(newAdminService.price) <= 0 ||
+                    addAdminServiceMut.isPending
+                  }
+                  onClick={() =>
+                    servicesForListing &&
+                    addAdminServiceMut.mutate({
+                      listingId: servicesForListing.id,
+                      data: {
+                        serviceType: newAdminService.serviceType,
+                        price: Number(newAdminService.price),
+                        turnaroundDays:
+                          Number(newAdminService.turnaroundDays) || 7,
+                        revisionRounds:
+                          Number(newAdminService.revisionRounds) || 2,
+                      },
+                    })
+                  }
+                >
+                  {addAdminServiceMut.isPending ? "Adding..." : "Add service"}
+                </Button>
+              </div>
+            )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setReassignFor(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() =>
-                reassignFor?.websiteId &&
-                reassignMut.mutate({
-                  websiteId: reassignFor.websiteId,
-                  managedByUserId:
-                    pickedOwnerId === "__unassigned__" ? null : pickedOwnerId,
-                  reason: reassignReason || undefined,
-                })
-              }
-              disabled={
-                !pickedOwnerId ||
-                !reassignFor?.websiteId ||
-                reassignMut.isPending
-              }
-            >
-              {reassignMut.isPending ? "Saving..." : "Save"}
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

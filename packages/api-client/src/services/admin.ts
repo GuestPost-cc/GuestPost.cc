@@ -393,6 +393,51 @@ export interface AdminOpsStaffResponse {
   email: string
 }
 
+export interface AdminPlatformListingServiceResponse {
+  id: string
+  serviceType: string
+  price: number
+  currency: string
+  turnaroundDays: number
+  revisionRounds: number
+  warrantyDays: number | null
+  availability: string
+  version: number
+}
+
+export interface AdminPlatformWebsiteResponse {
+  id: string
+  url: string
+  name: string | null
+  domain: string | null
+  category: string | null
+  language: string | null
+  country: string | null
+  isActive: boolean
+  ownershipType: "PLATFORM" | "PUBLISHER"
+  managedByUserId: string | null
+  managedBy: { id: string; name: string | null; email: string } | null
+  listing: {
+    id: string
+    title: string
+    slug: string
+    description: string
+    status: string
+    services: AdminPlatformListingServiceResponse[]
+  } | null
+  integrations: Array<{
+    id: string
+    integrationId: string
+    provider: string
+    integrationStatus: string
+    status: string
+    externalResourceId: string
+    externalResourceName: string | null
+    syncedAt: string | null
+  }>
+  createdAt: string
+}
+
 export interface AdminSettlementResponse {
   id: string
   orderId: string
@@ -732,31 +777,18 @@ export class AdminService {
     })
   }
 
-  // Platform-owned websites (for attaching platform listings + ownership
-  // management). Phase 6.5: response carries managedByUserId + managedBy
-  // for the ownership picker.
+  // Platform website aggregates include their single listing, service menu,
+  // Google-link health, and Operations routing owner.
   async listPlatformWebsites() {
     const res = await this.client.get<{
-      websites: Array<{
-        id: string
-        url: string
-        name: string | null
-        domain?: string | null
-        ownershipType: "PLATFORM" | "PUBLISHER"
-        managedByUserId?: string | null
-        managedBy?: { id: string; name: string | null } | null
-      }>
+      websites: AdminPlatformWebsiteResponse[]
     }>("/admin/websites", {
       params: { ownershipType: "PLATFORM" } as Record<string, string>,
     })
     return res.websites ?? []
   }
 
-  // Create a PLATFORM-owned marketplace listing (no publisher, INTERNAL
-  // fulfillment). websiteId must be a platform-owned website or omitted.
-  // Phase 2: accepts an optional services[] for the multi-service shape;
-  // legacy clients pass type+price and the API shims a single service row.
-  // Phase 6.5: site-ownership reassignment + OPS staff picker.
+  // Site-ownership reassignment remains separate from listing/service edits.
   assignWebsite(
     websiteId: string,
     data: { managedByUserId: string | null; reason?: string },
@@ -773,38 +805,33 @@ export class AdminService {
     country?: string
     domainRating?: number
     monthlyTraffic?: number
-    price?: number
-    turnaroundDays?: number
     managedByUserId?: string
   }) {
     return this.client.post<any>("/admin/websites", { json: data })
   }
-  listOpsStaff() {
-    return this.client.get<AdminOpsStaffResponse[]>("/admin/staff/operations")
+  getPlatformWebsite(websiteId: string) {
+    return this.client.get<AdminPlatformWebsiteResponse>(
+      `/admin/websites/${websiteId}`,
+    )
   }
-
-  createPlatformListing(data: {
-    title: string
-    description: string
-    type: string
-    price: number
-    turnaroundDays?: number
-    websiteId?: string
-    status?: string
-    services?: Array<{
-      serviceType: string
-      price: number
-      turnaroundDays: number
-      currency?: string
-      revisionRounds?: number
-      warrantyDays?: number
-      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
-    }>
-  }) {
-    return this.client.post<{ id: string; slug: string; status: string }>(
-      "/admin/marketplace/listings",
+  updatePlatformWebsite(
+    websiteId: string,
+    data: {
+      name?: string
+      category?: string
+      language?: string
+      country?: string
+      domainRating?: number
+      monthlyTraffic?: number
+    },
+  ) {
+    return this.client.put<AdminPlatformWebsiteResponse>(
+      `/admin/websites/${websiteId}`,
       { json: data },
     )
+  }
+  listOpsStaff() {
+    return this.client.get<AdminOpsStaffResponse[]>("/admin/staff/operations")
   }
 
   updateListingStatus(listingId: string, status: string, force?: boolean) {

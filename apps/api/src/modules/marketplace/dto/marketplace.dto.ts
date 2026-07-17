@@ -227,7 +227,8 @@ export class CreateListingDto {
   title!: string
 
   @IsString()
-  @MaxLength(1000)
+  @MinLength(1)
+  @MaxLength(500)
   description!: string
 
   @IsOptional()
@@ -349,6 +350,7 @@ export class CreateListingDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   categoryId?: string
 
   @IsOptional()
@@ -375,10 +377,39 @@ export class CreateListingDto {
   services?: ListingServiceInput[]
 }
 
-export class UpdateListingDto extends CreateListingDto {
+export class UpdateListingDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(200)
+  title!: string
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(500)
+  description!: string
+
   @IsOptional()
-  @IsEnum(ListingStatus)
-  status?: ListingStatus
+  @IsString()
+  @MaxLength(500)
+  shortDescription?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  categoryId?: string
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[]
+
+  @IsOptional()
+  @IsBoolean()
+  doFollowOnly?: boolean
+
+  @IsOptional()
+  @IsUrl()
+  sampleUrl?: string
 }
 
 export class CreateReviewDto {

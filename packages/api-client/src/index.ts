@@ -18,6 +18,8 @@ export type {
   AdminOrderDetailResponse,
   AdminOrderResponse,
   AdminOrderTimelineEvent,
+  AdminPlatformListingServiceResponse,
+  AdminPlatformWebsiteResponse,
   AdminSettlementResponse,
   AdminStaffPerformanceItem,
   AdminStaffPerformanceResponse,
@@ -36,6 +38,15 @@ export { CampaignsService } from "./services/campaigns"
 export { IdentityService } from "./services/identity"
 export { IntegrationsService } from "./services/integrations"
 export { integrationKeys } from "./services/integrations/keys"
+export type {
+  Category,
+  ListingAttribution,
+  ListingServiceOption,
+  MarketplaceListing,
+  SearchFilters,
+  SearchResult,
+  UpdateMarketplaceListingInput,
+} from "./services/marketplace"
 export { MarketplaceService } from "./services/marketplace"
 export type {
   NotificationItem,
@@ -58,6 +69,12 @@ export type {
   WithdrawalResponse,
 } from "./services/publisher-payouts"
 export { PublisherPayoutsService } from "./services/publisher-payouts"
+export type {
+  CreatePublisherWebsiteInput,
+  PublisherWebsiteListing,
+  PublisherWebsiteResponse,
+  PublisherWebsiteService,
+} from "./services/publishers"
 export { PublishersService } from "./services/publishers"
 export { ReportingService } from "./services/reporting"
 export type { SettlementResponse } from "./services/settlements"

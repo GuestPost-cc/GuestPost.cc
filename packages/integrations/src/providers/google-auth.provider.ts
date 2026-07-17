@@ -49,7 +49,11 @@ export class GoogleAuthProvider implements OAuthProvider {
       scope: allScopes.join(" "),
       access_type: "offline",
       state,
-      prompt: "consent",
+      // GuestPost identity and Google data ownership are independent. Always
+      // show Google's account chooser so the actor can connect the account
+      // that owns the GSC/GA4 properties, even when it differs from their
+      // signed-in GuestPost email.
+      prompt: "select_account consent",
     })
     return `https://accounts.google.com/o/oauth2/v2/auth?${params}`
   }

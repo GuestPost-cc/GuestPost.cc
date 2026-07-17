@@ -48,8 +48,8 @@ export class WebsitesService {
     const domain = normalizeDomain(dto.url)
     const canonicalDomain = domain
 
-    // Platform-wide ownership uniqueness: one canonical domain = one publisher
-    // website. Platform-owned inventory is exempt (partial unique index).
+    // Platform-wide inventory uniqueness: one canonical domain maps to one
+    // Website aggregate, regardless of publisher/platform ownership.
     const existingWebsite = await this.prisma.website.findFirst({
       where: { OR: [{ url: dto.url }, { domain }, { canonicalDomain }] },
     })
@@ -84,6 +84,34 @@ export class WebsitesService {
     // DNS TXT record and the worker validates it.
     const verificationToken = generateVerificationToken()
 
+    const marketplaceCategory = dto.categoryId
+      ? await this.prisma.marketplaceCategory.findUnique({
+          where: { id: dto.categoryId },
+          select: { id: true, name: true },
+        })
+      : null
+    if (dto.categoryId && !marketplaceCategory) {
+      throw new BadRequestException({
+        code: "INVALID_MARKETPLACE_CATEGORY",
+        message: "Select a valid marketplace category",
+      })
+    }
+
+    // New clients send the first service as a nested, validated object. Keep
+    // the legacy price fields as a compatibility bridge, but never create an
+    // AVAILABLE zero-price service.
+    const initialService =
+      dto.initialService ??
+      (dto.price != null && dto.price > 0
+        ? {
+            serviceType: "GUEST_POST" as const,
+            price: dto.price,
+            currency: "USD",
+            turnaroundDays: dto.turnaroundDays ?? 7,
+            revisionRounds: 2,
+          }
+        : null)
+
     let website
     try {
       const result = await this.prisma.$transaction(async (tx: any) => {
@@ -94,7 +122,7 @@ export class WebsitesService {
             canonicalDomain,
             country: dto.country,
             language: dto.language,
-            category: dto.category,
+            category: marketplaceCategory?.name ?? dto.category,
             metrics: {
               dr: dto.domainRating,
               traffic: dto.monthlyTraffic,
@@ -116,9 +144,11 @@ export class WebsitesService {
 
         await tx.marketplaceListing.create({
           data: {
-            title: dto.url,
+            title: dto.listingTitle?.trim() || dto.name?.trim() || domain,
             slug,
-            description: `Guest posting placement on ${dto.url}`,
+            description:
+              dto.description?.trim() ||
+              `Guest posting placement opportunities on ${domain}.`,
             status: ListingStatus.DRAFT,
             fulfillmentType: ListingFulfillmentType.PUBLISHER,
             currency: "USD",
@@ -131,17 +161,22 @@ export class WebsitesService {
             websiteId: w.id,
             organizationId,
             ownerType: "PUBLISHER",
-            services: {
-              create: [
-                {
-                  serviceType: "GUEST_POST",
-                  price: dto.price ?? 0,
-                  currency: "USD",
-                  turnaroundDays: dto.turnaroundDays ?? 7,
-                  availability: "AVAILABLE",
-                },
-              ],
-            },
+            categoryId: marketplaceCategory?.id ?? null,
+            services: initialService
+              ? {
+                  create: [
+                    {
+                      serviceType: initialService.serviceType,
+                      price: initialService.price,
+                      currency: initialService.currency ?? "USD",
+                      turnaroundDays: initialService.turnaroundDays,
+                      revisionRounds: initialService.revisionRounds ?? 2,
+                      warrantyDays: initialService.warrantyDays,
+                      availability: "AVAILABLE",
+                    },
+                  ],
+                }
+              : undefined,
           },
         })
 
@@ -153,7 +188,7 @@ export class WebsitesService {
       // duplicate-domain race that slips past the findFirst check above.
       if (
         err?.code === "P2002" ||
-        /Website_canonicalDomain_publisher_key/.test(err?.message ?? "")
+        /Website_canonicalDomain_(?:publisher_)?key/.test(err?.message ?? "")
       ) {
         await this.audit.log({
           action: "WEBSITE_DUPLICATE_DOMAIN_ATTEMPT",
@@ -365,7 +400,6 @@ export class WebsitesService {
       await this.prisma.marketplaceListing.update({
         where: { id: listing.id },
         data: {
-          title: dto.url,
           domainRating: dto.domainRating,
           traffic: dto.monthlyTraffic,
           country: dto.country,
@@ -416,6 +450,16 @@ export class WebsitesService {
         websiteIntegrations: {
           include: {
             integration: true,
+          },
+        },
+        marketplaceListings: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          include: {
+            category: true,
+            services: {
+              orderBy: [{ availability: "asc" }, { price: "asc" }],
+            },
           },
         },
       },
@@ -480,7 +524,8 @@ export class WebsitesService {
         }
       : null
 
-    const { websiteIntegrations, ...rest } = website
+    const { websiteIntegrations, marketplaceListings, ...rest } = website
+    const listing = marketplaceListings?.[0]
 
     return {
       ...rest,
@@ -516,6 +561,19 @@ export class WebsitesService {
           status: wi.integration.status,
         },
       })),
+      listing: listing
+        ? {
+            ...listing,
+            services: listing.services.map((service) => ({
+              ...service,
+              price: Number(service.price),
+              createdAt: service.createdAt.toISOString(),
+              updatedAt: service.updatedAt.toISOString(),
+            })),
+            createdAt: listing.createdAt.toISOString(),
+            updatedAt: listing.updatedAt.toISOString(),
+          }
+        : null,
       seoIntegration,
       gscAccountExists,
       gscIntegration: gscIntegrationRecord
@@ -544,10 +602,27 @@ export class WebsitesService {
         // price/TAT directly.
         marketplaceListings: {
           select: {
+            id: true,
+            title: true,
+            slug: true,
+            description: true,
             status: true,
+            ownerType: true,
+            category: {
+              select: { id: true, name: true, slug: true },
+            },
             services: {
-              where: { availability: "AVAILABLE" },
-              select: { serviceType: true, price: true, turnaroundDays: true },
+              select: {
+                id: true,
+                serviceType: true,
+                price: true,
+                currency: true,
+                turnaroundDays: true,
+                revisionRounds: true,
+                warrantyDays: true,
+                availability: true,
+                version: true,
+              },
             },
           },
         },
@@ -629,14 +704,45 @@ export class WebsitesService {
 
     const listing = await this.prisma.marketplaceListing.findFirst({
       where: { websiteId: id, status: ListingStatus.DRAFT },
+      include: {
+        services: {
+          where: { availability: "AVAILABLE" },
+          select: { id: true },
+          take: 1,
+        },
+      },
     })
 
-    if (listing) {
-      await this.prisma.marketplaceListing.update({
-        where: { id: listing.id },
-        data: { status: ListingStatus.PENDING_REVIEW },
+    if (!listing) {
+      throw new BadRequestException({
+        code: "LISTING_NOT_READY",
+        message: "This website does not have a draft listing to submit",
       })
     }
+    if (listing.services.length === 0) {
+      throw new BadRequestException({
+        code: "NO_AVAILABLE_SERVICES",
+        message: "Add at least one available service before submitting",
+      })
+    }
+    if (!listing.categoryId) {
+      throw new BadRequestException({
+        code: "LISTING_CATEGORY_REQUIRED",
+        message: "Choose a marketplace category before submitting",
+      })
+    }
+    if (!listing.description.trim() || listing.description.length > 500) {
+      throw new BadRequestException({
+        code: "LISTING_DESCRIPTION_REQUIRED",
+        message:
+          "Add a listing description of no more than 500 characters before submitting",
+      })
+    }
+
+    await this.prisma.marketplaceListing.update({
+      where: { id: listing.id },
+      data: { status: ListingStatus.PENDING_REVIEW },
+    })
 
     await this.audit.log({
       action: "WEBSITE_SUBMITTED_FOR_REVIEW",

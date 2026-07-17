@@ -68,6 +68,8 @@ services:
         value: https://app.guestpost.pro.bd
       - key: NEXT_PUBLIC_PUBLISHER_URL
         value: https://publisher.guestpost.pro.bd
+      - key: NEXT_PUBLIC_ADMIN_URL
+        value: https://admin.guestpost.pro.bd
       - key: OAUTH_STATE_COOKIE_SAMESITE
         value: none
       - key: OAUTH_STATE_COOKIE_SECURE

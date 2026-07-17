@@ -283,6 +283,7 @@ describe("WebsitesService hardening", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       marketplaceListing: { create: jest.fn().mockResolvedValue({}) },
+      marketplaceCategory: { findUnique: jest.fn() },
       auditLog: { count: jest.fn().mockResolvedValue(0) },
     }
     svc = new WebsitesService(prisma as any, audit as any, queue as any)
@@ -303,6 +304,69 @@ describe("WebsitesService hardening", () => {
       expect.objectContaining({ action: "WEBSITE_DUPLICATE_DOMAIN_ATTEMPT" }),
     )
     expect(prisma.website.create).not.toHaveBeenCalled()
+  })
+
+  it("creates the publisher website, listing metadata, and first service atomically", async () => {
+    prisma.website.findFirst.mockResolvedValue(null)
+    prisma.marketplaceCategory.findUnique.mockResolvedValue({
+      id: "category-1",
+      name: "Technology",
+    })
+    const websiteCreate = jest.fn().mockResolvedValue({
+      id: "website-1",
+      url: "https://example.com",
+    })
+    const listingCreate = jest.fn().mockResolvedValue({ id: "listing-1" })
+    prisma.$transaction = jest.fn((callback) =>
+      callback({
+        website: { create: websiteCreate },
+        marketplaceListing: { create: listingCreate },
+      }),
+    )
+
+    await svc.createWebsite(
+      "p1",
+      "o1",
+      {
+        url: "https://example.com",
+        categoryId: "category-1",
+        listingTitle: "Example technology placements",
+        description: "A focused technology publication for software buyers.",
+        initialService: {
+          serviceType: "GUEST_POST",
+          price: 175,
+          currency: "USD",
+          turnaroundDays: 7,
+          revisionRounds: 2,
+        },
+      } as any,
+      { id: "u1" },
+    )
+
+    expect(websiteCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ category: "Technology" }),
+      }),
+    )
+    expect(listingCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: "Example technology placements",
+          description: "A focused technology publication for software buyers.",
+          categoryId: "category-1",
+          ownerType: "PUBLISHER",
+          services: {
+            create: [
+              expect.objectContaining({
+                serviceType: "GUEST_POST",
+                price: 175,
+                availability: "AVAILABLE",
+              }),
+            ],
+          },
+        }),
+      }),
+    )
   })
 
   it("rate-limits verification within the cooldown window", async () => {

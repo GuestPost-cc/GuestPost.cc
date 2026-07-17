@@ -6797,6 +6797,8 @@ export const ExternalAccountScalarFieldEnum = {
   id: 'id',
   provider: 'provider',
   externalUserId: 'externalUserId',
+  ownerType: 'ownerType',
+  ownerId: 'ownerId',
   email: 'email',
   displayName: 'displayName',
   encryptedAccessToken: 'encryptedAccessToken',
@@ -7304,14 +7306,14 @@ export type ListEnumFulfillmentChannelFieldRefInput<$PrismaModel> = FieldRefInpu
  * Reference to a field of type 'CancellationResponsibility'
  */
 export type EnumCancellationResponsibilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationResponsibility'>
-
+    
 
 
 /**
  * Reference to a field of type 'CancellationResponsibility[]'
  */
 export type ListEnumCancellationResponsibilityFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationResponsibility[]'>
-
+    
 
 
 /**
@@ -7374,56 +7376,56 @@ export type ListEnumDisputeStatusFieldRefInput<$PrismaModel> = FieldRefInputType
  * Reference to a field of type 'CancellationRequesterType'
  */
 export type EnumCancellationRequesterTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationRequesterType'>
-
+    
 
 
 /**
  * Reference to a field of type 'CancellationRequesterType[]'
  */
 export type ListEnumCancellationRequesterTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationRequesterType[]'>
-
+    
 
 
 /**
  * Reference to a field of type 'CancellationReasonCode'
  */
 export type EnumCancellationReasonCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationReasonCode'>
-
+    
 
 
 /**
  * Reference to a field of type 'CancellationReasonCode[]'
  */
 export type ListEnumCancellationReasonCodeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationReasonCode[]'>
-
+    
 
 
 /**
  * Reference to a field of type 'CancellationRequestStatus'
  */
 export type EnumCancellationRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationRequestStatus'>
-
+    
 
 
 /**
  * Reference to a field of type 'CancellationRequestStatus[]'
  */
 export type ListEnumCancellationRequestStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationRequestStatus[]'>
-
+    
 
 
 /**
  * Reference to a field of type 'CancellationResolution'
  */
 export type EnumCancellationResolutionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationResolution'>
-
+    
 
 
 /**
  * Reference to a field of type 'CancellationResolution[]'
  */
 export type ListEnumCancellationResolutionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'CancellationResolution[]'>
-
+    
 
 
 /**
@@ -7721,20 +7723,6 @@ export type ListFloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMode
 
 
 /**
- * Reference to a field of type 'ExternalAccountStatus'
- */
-export type EnumExternalAccountStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ExternalAccountStatus'>
-    
-
-
-/**
- * Reference to a field of type 'ExternalAccountStatus[]'
- */
-export type ListEnumExternalAccountStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ExternalAccountStatus[]'>
-    
-
-
-/**
  * Reference to a field of type 'IntegrationOwnerType'
  */
 export type EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'IntegrationOwnerType'>
@@ -7745,6 +7733,20 @@ export type EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel> = FieldRefInputT
  * Reference to a field of type 'IntegrationOwnerType[]'
  */
 export type ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'IntegrationOwnerType[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ExternalAccountStatus'
+ */
+export type EnumExternalAccountStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ExternalAccountStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'ExternalAccountStatus[]'
+ */
+export type ListEnumExternalAccountStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ExternalAccountStatus[]'>
     
 
 
@@ -8074,3 +8076,4 @@ export type PrismaAction =
  * `PrismaClient` proxy available in interactive transactions.
  */
 export type TransactionClient = Omit<DefaultPrismaClient, runtime.ITXClientDenyList>
+

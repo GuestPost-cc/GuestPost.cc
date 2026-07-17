@@ -48,6 +48,8 @@ export class SyncService {
     integrationId: string,
     trigger: string = "MANUAL",
     websiteIntegrationId?: string,
+    startDate?: string,
+    endDate?: string,
   ): Promise<{ syncId: string; websiteIntegrationIds: string[] }> {
     const integration = await (db as any).publisherIntegration.findFirst({
       where: {
@@ -88,6 +90,8 @@ export class SyncService {
       integrationId,
       websiteIntegrationId: websiteIntegrationId ?? undefined,
       trigger,
+      startDate,
+      endDate,
     } satisfies SyncJobPayload)
 
     return {
@@ -125,7 +129,7 @@ export class SyncService {
           connection: true,
           websiteIntegrations: websiteIntegrationId
             ? { where: { id: websiteIntegrationId } }
-            : { take: 1 },
+            : { where: { status: { in: ["CONNECTED", "OUT_OF_SYNC"] } } },
         },
       })
 
@@ -156,6 +160,7 @@ export class SyncService {
           wi.externalResourceId,
           payload.startDate ? new Date(payload.startDate) : undefined,
           payload.endDate ? new Date(payload.endDate) : undefined,
+          wi.id,
         )
         progress.recordsProcessed += result.recordsProcessed
 
@@ -299,9 +304,15 @@ export class SyncService {
     }
   }
 
-  async getSyncStatus(syncId: string) {
-    const sync = await (db as any).integrationSync.findUnique({
-      where: { id: syncId },
+  async getSyncStatus(owner: OwnerContext, syncId: string) {
+    const sync = await (db as any).integrationSync.findFirst({
+      where: {
+        id: syncId,
+        integration: {
+          ownerType: owner.ownerType,
+          ownerId: owner.ownerId,
+        },
+      },
     })
     if (!sync) throw new SyncNotFoundError()
     return {

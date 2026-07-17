@@ -20,6 +20,7 @@ export interface SyncProvider {
     externalResourceId: string,
     startDate?: Date,
     endDate?: Date,
+    websiteIntegrationId?: string,
   ): Promise<SyncResult>
 }
 

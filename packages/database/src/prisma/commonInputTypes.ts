@@ -1279,11 +1279,28 @@ export type FloatNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedFloatNullableFilter<$PrismaModel>
 }
 
+export type EnumIntegrationOwnerTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel> | $Enums.IntegrationOwnerType
+}
+
 export type EnumExternalAccountStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.ExternalAccountStatus | Prisma.EnumExternalAccountStatusFieldRefInput<$PrismaModel>
   in?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
   notIn?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel> | $Enums.ExternalAccountStatus
+}
+
+export type EnumIntegrationOwnerTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationOwnerTypeWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationOwnerType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel>
 }
 
 export type EnumExternalAccountStatusWithAggregatesFilter<$PrismaModel = never> = {
@@ -1294,13 +1311,6 @@ export type EnumExternalAccountStatusWithAggregatesFilter<$PrismaModel = never> 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel>
-}
-
-export type EnumIntegrationOwnerTypeFilter<$PrismaModel = never> = {
-  equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel> | $Enums.IntegrationOwnerType
 }
 
 export type EnumIntegrationProviderFilter<$PrismaModel = never> = {
@@ -1315,16 +1325,6 @@ export type EnumIntegrationStatusFilter<$PrismaModel = never> = {
   in?: $Enums.IntegrationStatus[] | Prisma.ListEnumIntegrationStatusFieldRefInput<$PrismaModel>
   notIn?: $Enums.IntegrationStatus[] | Prisma.ListEnumIntegrationStatusFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumIntegrationStatusFilter<$PrismaModel> | $Enums.IntegrationStatus
-}
-
-export type EnumIntegrationOwnerTypeWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumIntegrationOwnerTypeWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationOwnerType
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel>
 }
 
 export type EnumIntegrationProviderWithAggregatesFilter<$PrismaModel = never> = {
@@ -2617,11 +2617,28 @@ export type NestedFloatNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedFloatNullableFilter<$PrismaModel>
 }
 
+export type NestedEnumIntegrationOwnerTypeFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel> | $Enums.IntegrationOwnerType
+}
+
 export type NestedEnumExternalAccountStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.ExternalAccountStatus | Prisma.EnumExternalAccountStatusFieldRefInput<$PrismaModel>
   in?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
   notIn?: $Enums.ExternalAccountStatus[] | Prisma.ListEnumExternalAccountStatusFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel> | $Enums.ExternalAccountStatus
+}
+
+export type NestedEnumIntegrationOwnerTypeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumIntegrationOwnerTypeWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationOwnerType
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel>
 }
 
 export type NestedEnumExternalAccountStatusWithAggregatesFilter<$PrismaModel = never> = {
@@ -2632,13 +2649,6 @@ export type NestedEnumExternalAccountStatusWithAggregatesFilter<$PrismaModel = n
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumExternalAccountStatusFilter<$PrismaModel>
-}
-
-export type NestedEnumIntegrationOwnerTypeFilter<$PrismaModel = never> = {
-  equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel> | $Enums.IntegrationOwnerType
 }
 
 export type NestedEnumIntegrationProviderFilter<$PrismaModel = never> = {
@@ -2653,16 +2663,6 @@ export type NestedEnumIntegrationStatusFilter<$PrismaModel = never> = {
   in?: $Enums.IntegrationStatus[] | Prisma.ListEnumIntegrationStatusFieldRefInput<$PrismaModel>
   notIn?: $Enums.IntegrationStatus[] | Prisma.ListEnumIntegrationStatusFieldRefInput<$PrismaModel>
   not?: Prisma.NestedEnumIntegrationStatusFilter<$PrismaModel> | $Enums.IntegrationStatus
-}
-
-export type NestedEnumIntegrationOwnerTypeWithAggregatesFilter<$PrismaModel = never> = {
-  equals?: $Enums.IntegrationOwnerType | Prisma.EnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  in?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  notIn?: $Enums.IntegrationOwnerType[] | Prisma.ListEnumIntegrationOwnerTypeFieldRefInput<$PrismaModel>
-  not?: Prisma.NestedEnumIntegrationOwnerTypeWithAggregatesFilter<$PrismaModel> | $Enums.IntegrationOwnerType
-  _count?: Prisma.NestedIntFilter<$PrismaModel>
-  _min?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel>
-  _max?: Prisma.NestedEnumIntegrationOwnerTypeFilter<$PrismaModel>
 }
 
 export type NestedEnumIntegrationProviderWithAggregatesFilter<$PrismaModel = never> = {

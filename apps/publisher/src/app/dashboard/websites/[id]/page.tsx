@@ -44,6 +44,7 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import { PublisherListingManager } from "../../../../components/marketplace/publisher-listing-manager"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
 import {
@@ -324,6 +325,34 @@ export default function WebsiteDetailPage() {
           </div>
         </div>
       </div>
+
+      {website.listing ? (
+        <PublisherListingManager
+          listing={website.listing}
+          verificationStatus={website.verificationStatus}
+          onChanged={() => {
+            queryClient.invalidateQueries({ queryKey: ["website", websiteId] })
+            queryClient.invalidateQueries({
+              queryKey: ["publisher-websites"],
+            })
+            queryClient.invalidateQueries({
+              queryKey: ["publisher-listings"],
+            })
+          }}
+        />
+      ) : (
+        <Card id="marketplace" className="border-destructive/30">
+          <CardHeader>
+            <CardTitle className="text-base">
+              Marketplace listing missing
+            </CardTitle>
+            <CardDescription>
+              This website should have exactly one listing. Contact support so
+              the aggregate can be repaired without creating a duplicate.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
 
       {/* Domain ownership section */}
       <section className="space-y-4">

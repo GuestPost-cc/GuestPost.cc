@@ -23,7 +23,6 @@ import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { PermissionsGuard } from "../../common/guards/permissions.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
 import {
-  CreateListingDto,
   ListingServiceInput,
   UpdateListingServiceInput,
 } from "../marketplace/dto/marketplace.dto"
@@ -138,10 +137,9 @@ const parsePagination = (take?: string, skip?: string) => ({
 //                                cancel, withdrawal lifecycle, payout
 //                                execute / decrypt) + Finance-only reads
 //                                (publishers, settlements, withdrawals)
-//   SUPER_ADMIN + OPERATIONS  — fulfillment + inventory writes (accept /
-//                                submit-content / mark-published, listing
-//                                moderation, listing service CRUD, website
-//                                management, manual verify, dispute resolve)
+//   SUPER_ADMIN + OPERATIONS  — fulfillment, listing moderation, manual
+//                                verification, and dispute resolution
+//   SUPER_ADMIN only          — website/listing inventory and service edits
 //   ALL THREE                 — contextual order, dispute, cancellation,
 //                                support, and platform-settings reads. These
 //                                may include the minimum customer / publisher
@@ -977,20 +975,10 @@ export class AdminController {
     return this.marketplace.getListingForStaff(slug)
   }
 
-  // Create a PLATFORM-owned listing (no publisher, INTERNAL fulfillment).
-  // Service rejects publisher-owned websites so ownership can't be spoofed.
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  @Post("marketplace/listings")
-  createPlatformListing(
-    @Body() body: CreateListingDto & { websiteId?: string },
-    @CurrentUser() user: any,
-  ) {
-    return this.marketplace.createPlatformListing(user.id, body, user)
-  }
-
-  // Per-service endpoints for PLATFORM-owned listings. Mirror of the publisher
-  // endpoints (marketplace.controller.ts) but gated to staff. assertListingWriteAccess
-  // skips the publisher-membership check when isStaff=true.
+  // Platform service inventory may be maintained by the assigned Operations
+  // owner or Super Admin. MarketplaceService re-checks listing ownership and
+  // assignment so this broader route role never grants Operations access to
+  // publisher listings or another operator's platform site.
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Post("marketplace/listings/:id/services")
   addPlatformListingService(
@@ -999,7 +987,7 @@ export class AdminController {
     @CurrentUser() user: any,
   ) {
     return this.marketplace.addServiceToListing(
-      { userId: user.id, isStaff: true },
+      { userId: user.id, isStaff: true, staffRole: user.staffRole },
       listingId,
       body,
     )
@@ -1014,7 +1002,7 @@ export class AdminController {
     @CurrentUser() user: any,
   ) {
     return this.marketplace.updateServiceOnListing(
-      { userId: user.id, isStaff: true },
+      { userId: user.id, isStaff: true, staffRole: user.staffRole },
       listingId,
       serviceId,
       body,
@@ -1029,7 +1017,7 @@ export class AdminController {
     @CurrentUser() user: any,
   ) {
     return this.marketplace.pauseServiceOnListing(
-      { userId: user.id, isStaff: true },
+      { userId: user.id, isStaff: true, staffRole: user.staffRole },
       listingId,
       serviceId,
     )
@@ -1045,7 +1033,7 @@ export class AdminController {
     return this.admin.updateListingStatus(id, body.status, user, body.force)
   }
 
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   @Patch("marketplace/listings/:id/featured")
   toggleListingFeatured(
     @Param("id") id: string,
@@ -1055,7 +1043,7 @@ export class AdminController {
     return this.admin.toggleListingFeatured(id, body.featured, user)
   }
 
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   @Patch("marketplace/listings/:id/verified")
   toggleListingVerified(
     @Param("id") id: string,
@@ -1065,7 +1053,7 @@ export class AdminController {
     return this.admin.toggleListingVerified(id, body.verified, user)
   }
 
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   @Delete("marketplace/listings/:id")
   deleteListing(@Param("id") id: string, @CurrentUser() user: any) {
     return this.admin.deleteListing(id, user)
@@ -1082,7 +1070,7 @@ export class AdminController {
     return this.admin.createPlatformWebsite(body, user)
   }
 
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   @Put("websites/:id")
   updateWebsite(
     @Param("id") id: string,
@@ -1093,8 +1081,9 @@ export class AdminController {
   }
 
   // Phase 6.5: site-ownership reassignment + OPS staff picker for the admin
-  // UI. Only SUPER_ADMIN can reassign; OPERATIONS can manage listings on
-  // their assigned sites but cannot transfer ownership.
+  // UI. Only SUPER_ADMIN can reassign or edit website fields; OPERATIONS may
+  // create sites (auto-assigned to themselves) and manage the attached listing
+  // services and integrations from the scoped site page.
   @StaffRoles("SUPER_ADMIN")
   @Patch("websites/:id/assign")
   assignWebsite(
@@ -1131,7 +1120,7 @@ export class AdminController {
     return this.admin.getWebsite(id, user)
   }
 
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   @Patch("websites/:id/pause")
   pauseWebsite(
     @Param("id") id: string,
@@ -1142,7 +1131,7 @@ export class AdminController {
     return this.admin.pauseWebsite(id, paused, user)
   }
 
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   @Delete("websites/:id")
   deleteWebsite(@Param("id") id: string, @CurrentUser() user: any) {
     return this.admin.deleteWebsite(id, user)

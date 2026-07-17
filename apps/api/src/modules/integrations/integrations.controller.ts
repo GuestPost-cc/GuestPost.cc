@@ -2,6 +2,7 @@ import {
   connectCallbackRequestSchema,
   connectRequestSchema,
   IntegrationError,
+  linkPropertyRequestSchema,
   triggerSyncRequestSchema,
 } from "@guestpost/integrations"
 import {
@@ -41,9 +42,9 @@ export class IntegrationsController {
         issues: parsed.error.issues,
       })
     }
-    const { returnUrl } = parsed.data
+    const { returnUrl, platformWebsiteId } = parsed.data
     return this.service.initiateConnect(
-      this.ownerResolver.resolve(req),
+      await this.ownerResolver.resolve(req, platformWebsiteId),
       provider,
       returnUrl ?? "/dashboard",
     )
@@ -64,33 +65,28 @@ export class IntegrationsController {
     }
     const { code, state, error } = parsed.data
 
-    // Redirect errors back to the publisher integrations page
     if (error) {
-      return res.redirect(
-        `/dashboard/integrations?error=${encodeURIComponent(error)}`,
+      const result = await this.service.handleCallbackError(
+        provider,
+        state!,
+        error,
       )
+      return res.redirect(result.redirectUrl)
     }
 
-    try {
-      const result = await this.service.handleCallback(provider, code!, state!)
-      // Redirect to the publisher app — discovery runs in the background
-      return res.redirect(
-        `${result.returnUrl}?connected=${result.externalAccountId}`,
-      )
-    } catch (err: any) {
-      const msg = encodeURIComponent(err?.message ?? "OAuth callback failed")
-      return res.redirect(`/dashboard/integrations?error=${msg}`)
-    }
+    const result = await this.service.handleCallback(provider, code!, state!)
+    return res.redirect(result.redirectUrl)
   }
 
   @Get()
   async listIntegrations(
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
+    @Query("platformWebsiteId") platformWebsiteId?: string,
     @Req() req?: Request,
   ) {
     return this.service.listIntegrations(
-      this.ownerResolver.resolve(req!),
+      await this.ownerResolver.resolve(req!, platformWebsiteId),
       page ? Number(page) : 1,
       pageSize ? Number(pageSize) : 20,
     )
@@ -99,10 +95,11 @@ export class IntegrationsController {
   @Get(":integrationId")
   async getIntegration(
     @Param("integrationId") integrationId: string,
+    @Query("platformWebsiteId") platformWebsiteId: string | undefined,
     @Req() req: Request,
   ) {
     return this.service.getIntegration(
-      this.ownerResolver.resolve(req),
+      await this.ownerResolver.resolve(req, platformWebsiteId),
       integrationId,
     )
   }
@@ -111,11 +108,72 @@ export class IntegrationsController {
   @HttpCode(HttpStatus.ACCEPTED)
   async rediscover(
     @Param("externalAccountId") externalAccountId: string,
+    @Query("platformWebsiteId") platformWebsiteId: string | undefined,
     @Req() req: Request,
   ) {
     return this.service.rediscover(
-      this.ownerResolver.resolve(req),
+      await this.ownerResolver.resolve(req, platformWebsiteId),
       externalAccountId,
+    )
+  }
+
+  @Post(":integrationId/discover")
+  @HttpCode(HttpStatus.ACCEPTED)
+  async discover(
+    @Param("integrationId") integrationId: string,
+    @Query("platformWebsiteId") platformWebsiteId: string | undefined,
+    @Req() req: Request,
+  ) {
+    return this.service.discover(
+      await this.ownerResolver.resolve(req, platformWebsiteId),
+      integrationId,
+    )
+  }
+
+  @Get(":integrationId/resources")
+  async listResources(
+    @Param("integrationId") integrationId: string,
+    @Query("platformWebsiteId") platformWebsiteId: string | undefined,
+    @Req() req: Request,
+  ) {
+    return this.service.listResources(
+      await this.ownerResolver.resolve(req, platformWebsiteId),
+      integrationId,
+    )
+  }
+
+  @Post(":integrationId/link")
+  async linkProperty(
+    @Param("integrationId") integrationId: string,
+    @Body() body: unknown,
+    @Req() req: Request,
+  ) {
+    const parsed = linkPropertyRequestSchema.safeParse(body)
+    if (!parsed.success) {
+      throw new IntegrationError("INVALID_REQUEST", "Invalid request body", {
+        issues: parsed.error.issues,
+      })
+    }
+    return this.service.linkProperty(
+      await this.ownerResolver.resolve(req, parsed.data.websiteId),
+      integrationId,
+      parsed.data.websiteId!,
+      parsed.data.externalResourceId!,
+    )
+  }
+
+  @Delete(":integrationId/link/:websiteIntegrationId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async unlinkProperty(
+    @Param("integrationId") integrationId: string,
+    @Param("websiteIntegrationId") websiteIntegrationId: string,
+    @Query("platformWebsiteId") platformWebsiteId: string | undefined,
+    @Req() req: Request,
+  ) {
+    await this.service.unlinkProperty(
+      await this.ownerResolver.resolve(req, platformWebsiteId),
+      integrationId,
+      websiteIntegrationId,
     )
   }
 
@@ -132,9 +190,15 @@ export class IntegrationsController {
         issues: parsed.error.issues,
       })
     }
-    const { trigger, websiteIntegrationId, startDate, endDate } = parsed.data
+    const {
+      trigger,
+      websiteIntegrationId,
+      startDate,
+      endDate,
+      platformWebsiteId,
+    } = parsed.data
     return this.service.triggerSync(
-      this.ownerResolver.resolve(req),
+      await this.ownerResolver.resolve(req, platformWebsiteId),
       integrationId,
       {
         trigger: trigger!,
@@ -154,10 +218,11 @@ export class IntegrationsController {
     @Query("trigger") trigger?: string,
     @Query("dateFrom") dateFrom?: string,
     @Query("dateTo") dateTo?: string,
+    @Query("platformWebsiteId") platformWebsiteId?: string,
     @Req() req?: Request,
   ) {
     return this.service.getSyncHistory(
-      this.ownerResolver.resolve(req!),
+      await this.ownerResolver.resolve(req!, platformWebsiteId),
       integrationId,
       {
         page: page ? Number(page) : 1,
@@ -168,18 +233,26 @@ export class IntegrationsController {
   }
 
   @Get("syncs/:syncId")
-  async getSyncStatus(@Param("syncId") syncId: string) {
-    return this.service.getSyncStatus(syncId)
+  async getSyncStatus(
+    @Param("syncId") syncId: string,
+    @Query("platformWebsiteId") platformWebsiteId: string | undefined,
+    @Req() req: Request,
+  ) {
+    return this.service.getSyncStatus(
+      await this.ownerResolver.resolve(req, platformWebsiteId),
+      syncId,
+    )
   }
 
   @Delete(":integrationId")
   @HttpCode(HttpStatus.NO_CONTENT)
   async disconnect(
     @Param("integrationId") integrationId: string,
+    @Query("platformWebsiteId") platformWebsiteId: string | undefined,
     @Req() req: Request,
   ) {
     await this.service.disconnect(
-      this.ownerResolver.resolve(req),
+      await this.ownerResolver.resolve(req, platformWebsiteId),
       integrationId,
     )
   }

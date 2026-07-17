@@ -43,6 +43,7 @@ export class GoogleAnalyticsProvider
     externalResourceId: string,
     startDate?: Date,
     endDate?: Date,
+    websiteIntegrationId?: string,
   ): Promise<SyncResult> {
     const startedAt = new Date()
     const propertyId = `properties/${externalResourceId}`
@@ -89,10 +90,14 @@ export class GoogleAnalyticsProvider
       const data: any = await response.json()
       const rows = data.rows ?? []
 
-      // Find all website integrations linked to this GA4 property
+      // Scope writes to the exact mapping authorized by SyncService. Provider
+      // property ids are not tenant ids and can appear in multiple contexts.
       const websiteIntegrations = await (db.websiteIntegration as any).findMany(
         {
-          where: { externalResourceId },
+          where: {
+            externalResourceId,
+            ...(websiteIntegrationId ? { id: websiteIntegrationId } : {}),
+          },
         },
       )
 

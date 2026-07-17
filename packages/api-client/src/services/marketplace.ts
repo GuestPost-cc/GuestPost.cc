@@ -13,6 +13,7 @@ export interface ListingServiceOption {
   warrantyDays?: number | null
   requirements?: Record<string, unknown> | null
   availability: "AVAILABLE" | "PAUSED" | "WAITLIST"
+  version: number
 }
 
 export interface ListingAttribution {
@@ -47,12 +48,15 @@ export interface MarketplaceListing {
   domainRating?: number
   domainAuthority?: number
   traffic?: number
+  referringDomains?: number
+  spamScore?: number
   country?: string
   language?: string
   turnaroundDays?: number
   revisionRounds?: number
   featured: boolean
   verified: boolean
+  doFollowOnly?: boolean
   websiteUrl?: string
   // Fulfillment website — order items must reference this, not the listing id
   websiteId?: string | null
@@ -131,6 +135,16 @@ export interface SearchFilters {
     | "most_ordered"
   page?: number
   limit?: number
+}
+
+export interface UpdateMarketplaceListingInput {
+  title: string
+  description: string
+  shortDescription?: string
+  categoryId?: string
+  tags?: string[]
+  doFollowOnly?: boolean
+  sampleUrl?: string
 }
 
 export interface SearchResult {
@@ -264,8 +278,10 @@ export class MarketplaceService {
     return this.client.get("/marketplace/favorites")
   }
 
-  addFavorite(listingId: string): Promise<any> {
-    return this.client.post("/marketplace/favorites", { json: { listingId } })
+  addFavorite(listingId: string, serviceType?: string): Promise<any> {
+    return this.client.post("/marketplace/favorites", {
+      json: { listingId, serviceType },
+    })
   }
 
   removeFavorite(listingId: string): Promise<any> {
@@ -336,8 +352,14 @@ export class MarketplaceService {
     return this.client.post("/marketplace/listings", { json: data })
   }
 
-  updateListing(listingId: string, data: any): Promise<any> {
-    return this.client.put(`/marketplace/listings/${listingId}`, { json: data })
+  updateListing(
+    listingId: string,
+    data: UpdateMarketplaceListingInput,
+  ): Promise<MarketplaceListing> {
+    return this.client.put<MarketplaceListing>(
+      `/marketplace/listings/${listingId}`,
+      { json: data as unknown as Record<string, unknown> },
+    )
   }
 
   deleteListing(listingId: string): Promise<any> {
