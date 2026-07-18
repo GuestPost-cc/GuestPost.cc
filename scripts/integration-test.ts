@@ -7,6 +7,7 @@
  * Requires: API on :4000, seeded users (pnpm seed), publisher tier VERIFIED.
  */
 import { prisma } from "../packages/database/src"
+import { fundExistingWalletForTest } from "./test-wallet-funding"
 
 const API = process.env.API_URL ?? "http://localhost:4000"
 const H = {
@@ -104,10 +105,12 @@ async function main() {
   // Fund the run relative to the actual listing price — a flat amount goes
   // stale as listings change and the shared dev wallet drains across runs
   const fundAmount = price + 100
-  await call("POST", `/billing/wallet/${walletId}/deposit`, client, {
-    amount: fundAmount,
-    reference: `itest-${Date.now()}`,
-  })
+  await fundExistingWalletForTest(
+    prisma,
+    walletId,
+    fundAmount,
+    `itest-${Date.now()}`,
+  )
 
   // Order lifecycle
   const order = (

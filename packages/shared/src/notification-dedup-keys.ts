@@ -116,6 +116,22 @@ function trustTierChange(
 }
 
 /**
+ * Refund clawback created publisher debt. One explanation per refunded order
+ * and recipient, even when a cancellation/dispute workflow is retried.
+ */
+function publisherDebt(orderId: string, userId: string): string {
+  return check(`publisher-debt:${orderId}:${userId}`)
+}
+
+/**
+ * Settlement release result. The message may include a debt offset, so it must
+ * be emitted exactly once per settlement and recipient.
+ */
+function settlementReleased(settlementId: string, userId: string): string {
+  return check(`settlement-released:${settlementId}:${userId}`)
+}
+
+/**
  * Returns today's UTC date as `YYYY-MM-DD`. Useful for `reconDrift`'s dateBucket.
  * Pure helper — caller passes if they want time-frozen behavior in tests.
  */
@@ -132,6 +148,8 @@ export const notificationDedupKey = {
   listingStatus,
   supportMessage,
   trustTierChange,
+  publisherDebt,
+  settlementReleased,
   utcDateBucket,
 }
 

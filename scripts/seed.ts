@@ -2,10 +2,10 @@
  * Full development seed: users, roles, publisher inventory, marketplace
  * listings, and a funded customer wallet.
  *
- * Auth-sensitive steps go through the real API (better-auth password hashing,
- * role endpoints, dev deposit). The SUPER_ADMIN bootstrap and demo content go
- * directly through Prisma — there is intentionally no API path that lets a
- * user self-promote to staff.
+ * Auth-sensitive steps go through the real API (better-auth password hashing
+ * and role endpoints). The SUPER_ADMIN bootstrap, test funding, and demo
+ * content go directly through Prisma — there is intentionally no API path
+ * that lets a user self-promote to staff.
  *
  * Usage: pnpm tsx scripts/seed.ts   (API must be running on :4000)
  */
@@ -218,7 +218,7 @@ async function main() {
     )
 
     console.log(
-      "── Phase 5: fund customer wallet via DB (no API deposit endpoint available by default)",
+      "── Phase 5: fund customer wallet via DB (no direct-deposit API exists)",
     )
     const custUser = await prisma.user.findUnique({
       where: { email: "client@guestpost.local" },

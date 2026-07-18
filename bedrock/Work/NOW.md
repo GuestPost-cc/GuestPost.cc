@@ -1,10 +1,30 @@
 # Current Status
 
-**Phase**: Publisher, customer, Super Admin, Finance, and Operations workbenches are implemented and verified locally; marketplace taxonomy and Google metric migrations are current locally and on Neon. Real-Google sync validation and worker deployment remain.
+**Phase**: Publisher, customer, Super Admin, Finance, and Operations workbenches are implemented and verified locally. Financial and authorization hardening is CI-verified; marketplace taxonomy and Google metric migrations are current locally and on Neon. Real-Google sync validation and worker deployment remain.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Financial And Authorization Hardening
+
+- Removed the direct wallet-credit HTTP endpoint, API-client method, feature
+  flag, and production service mutation. Seed/load/integration/concurrency
+  funding is isolated in test-only Prisma scripts with a production kill
+  switch.
+- Made order ownership deny-by-default for staff and future actor types, and
+  constrained generic order detail/event routes to customer and publisher
+  actors.
+- Added a partial unique index and conflict-retry path for personal wallets;
+  the migration merges any historical duplicate balances and ledger links.
+- Added deterministic Wise/Stripe Connect webhook queue IDs even when the
+  provider execution ID is absent.
+- Added idempotent publisher debt notifications, debt-aware settlement-release
+  messages, and fail-closed publisher-balance invariant checks.
+- Validation: all 85 API unit suites (890 tests), all 9 API integration suites
+  (17 tests), package tests, 65 UI tests with coverage, Prisma validation and
+  full migration replay, repository pre-submit checks, and all 12 production
+  builds pass.
 
 ### Operations Assignment And Support Workbench
 

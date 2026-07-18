@@ -9,11 +9,15 @@
 //   - jobId = `payout-webhook:${provider}:${providerExecutionId}` — matches
 //     the repo's BullMQ jobId convention (delivery-verify, website-verify,
 //     trust-recompute, payout-check-status-poll, settlement-auto-approve).
-//   - Non-transfer events with no derivable providerExecutionId fall through
-//     with no jobId override (preserves pre-fix behavior; logger.warn fires
-//     so payload-shape drift is visible).
+//   - Events with no derivable providerExecutionId use a provider event id or
+//     verified raw-payload hash so retries still collapse to one queue job.
 
-import { createHmac, createSign, generateKeyPairSync } from "node:crypto"
+import {
+  createHash,
+  createHmac,
+  createSign,
+  generateKeyPairSync,
+} from "node:crypto"
 import { PayoutWebhookController } from "../payout-webhook.controller"
 
 const ORIGINAL_ENV = { ...process.env }
@@ -138,14 +142,13 @@ describe("Phase 8.3 — payout-webhook BullMQ jobId dedup (audit #3)", () => {
     expect(jobId2).toBe(jobId1)
   })
 
-  // ─── d) Non-transfer payload falls through with no jobId override ───
+  // ─── d) Non-transfer payload falls back to a deterministic event key ───
 
-  it("non-transfer Stripe webhook (no data.object.id) falls through with no jobId override", async () => {
+  it("non-transfer Stripe webhook uses its event id as a deterministic fallback", async () => {
     process.env.STRIPE_PAYOUT_WEBHOOK_SECRET = "whsec_phase83"
     // account.updated has no data.object.id — Stripe sends account-shape data
-    // there. Our normalizer returns providerExecutionId=null; we fall back to
-    // auto-id (no jobId override). Worker's status-check guard handles any
-    // logical replay from this path.
+    // there. The controller hashes evt_no_id rather than trusting provider text
+    // directly in BullMQ's job id.
     const payload = JSON.stringify({
       id: "evt_no_id",
       type: "account.updated",
@@ -161,9 +164,46 @@ describe("Phase 8.3 — payout-webhook BullMQ jobId dedup (audit #3)", () => {
     )
 
     expect(queueMock.addJob).toHaveBeenCalledTimes(1)
-    // 4th arg should be undefined (no override) — preserves the pre-fix
-    // behavior for events that don't carry a transfer id.
     const jobIdArg = queueMock.addJob.mock.calls[0][3]
-    expect(jobIdArg).toBeUndefined()
+    const eventHash = createHash("sha256").update("evt_no_id").digest("hex")
+    expect(jobIdArg).toEqual({
+      jobId: `payout-webhook:stripe_connect:event-${eventHash}`,
+    })
+  })
+
+  it("Wise webhook without an execution or event id dedupes by verified raw payload", async () => {
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", {
+      modulusLength: 2048,
+    })
+    process.env.WISE_WEBHOOK_PUBLIC_KEY = publicKey
+      .export({ type: "spki", format: "pem" })
+      .toString()
+    const payload = JSON.stringify({
+      event_type: "balances#credit",
+      occurred_at: new Date().toISOString(),
+      data: { current_state: "processing" },
+    })
+    const rawBody = Buffer.from(payload, "utf8")
+    const signature = signWise(rawBody, privateKey)
+
+    await controller.handleWebhook(
+      "wise",
+      { "x-signature-sha256": signature },
+      { rawBody } as any,
+    )
+    await controller.handleWebhook(
+      "wise",
+      { "x-signature-sha256": signature },
+      { rawBody } as any,
+    )
+
+    const payloadHash = createHash("sha256").update(rawBody).digest("hex")
+    const first = queueMock.addJob.mock.calls[0]
+    const second = queueMock.addJob.mock.calls[1]
+    expect(first[2].event).toBe("balances#credit")
+    expect(first[3]).toEqual({
+      jobId: `payout-webhook:wise:payload-${payloadHash}`,
+    })
+    expect(second[3]).toEqual(first[3])
   })
 })

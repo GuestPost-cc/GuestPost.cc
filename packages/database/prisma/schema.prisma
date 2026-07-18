@@ -1328,6 +1328,9 @@ model Wallet {
 
   @@unique([organizationId])
   @@index([userId])
+  // Partial unique index for legacy personal wallets only. A global userId
+  // unique would break users who create wallets for multiple organizations.
+  // See migration 20260719120000_wallet_personal_user_unique.
 }
 
 enum TransactionType {

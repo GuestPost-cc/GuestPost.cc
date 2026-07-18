@@ -1,4 +1,9 @@
-import { createHmac, createVerify, timingSafeEqual } from "node:crypto"
+import {
+  createHash,
+  createHmac,
+  createVerify,
+  timingSafeEqual,
+} from "node:crypto"
 import {
   assertWebhookTimestampFresh,
   normalizeProviderWebhook,
@@ -64,7 +69,7 @@ export class PayoutWebhookController {
       throw new BadRequestException("Invalid JSON body")
     }
 
-    const eventType = body.type ?? body.event ?? "unknown"
+    const eventType = body.type ?? body.event_type ?? body.event ?? "unknown"
     const data = body.data ?? body
 
     // Wise webhook timestamp replay protection — mirrors Stripe's 5-minute
@@ -100,17 +105,21 @@ export class PayoutWebhookController {
       (provider === "stripe_connect" || provider === "wise")
     ) {
       // Drift visibility: signature already passed, payload is genuine, but
-      // we couldn't pull a transfer id. Probably a non-transfer event type
-      // (account.updated, payout.created without object.id, etc.). Log so
-      // drift is investigable; fall through with auto-id (current behavior).
+      // we couldn't pull a transfer id. The payload still receives a stable
+      // event/hash key below so provider retries cannot fan out duplicate jobs.
       this.logger.warn(
         `unable to derive payout webhook dedup key (provider=${provider} eventType=${eventType})`,
       )
     }
 
-    const jobIdOverride = providerExecutionId
-      ? { jobId: `payout-webhook:${provider}:${providerExecutionId}` }
-      : undefined
+    const providerEventId = body.id ?? body.event_id ?? body.eventId ?? null
+    const fallbackIdentity = providerEventId
+      ? `event-${createHash("sha256").update(String(providerEventId)).digest("hex")}`
+      : `payload-${createHash("sha256").update(rawBody).digest("hex")}`
+    const jobIdentity = providerExecutionId ?? fallbackIdentity
+    const jobIdOverride = {
+      jobId: `payout-webhook:${provider}:${jobIdentity}`,
+    }
 
     const job = await this.queue.addJob(
       QUEUES.PAYOUT,

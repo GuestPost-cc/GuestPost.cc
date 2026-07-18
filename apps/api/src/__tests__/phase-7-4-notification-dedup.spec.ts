@@ -98,6 +98,12 @@ describe("Phase 7.4 — notificationDedupKey builders", () => {
     expect(
       notificationDedupKey.trustTierChange("pub-1", "NEW", "TRUSTED"),
     ).toBe("trust-tier:pub-1:NEW-TRUSTED")
+    expect(notificationDedupKey.publisherDebt("order-1", "u-1")).toBe(
+      "publisher-debt:order-1:u-1",
+    )
+    expect(notificationDedupKey.settlementReleased("set-1", "u-1")).toBe(
+      "settlement-released:set-1:u-1",
+    )
   })
 
   it("throws on overlong input (≤256 char DB column would silently truncate otherwise)", () => {

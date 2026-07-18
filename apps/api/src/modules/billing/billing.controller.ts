@@ -4,7 +4,6 @@ import {
   Controller,
   Get,
   Headers,
-  NotFoundException,
   Param,
   Post,
   Query,
@@ -32,27 +31,6 @@ export class BillingController {
   @ActorType("CUSTOMER")
   getWallet(@CurrentUser() user: any) {
     return this.billing.getWallet(user.organizationId ?? null, user.id)
-  }
-
-  @Post("wallet/:id/deposit")
-  @UseGuards(ActorTypeGuard, MemberRolesGuard)
-  @ActorType("CUSTOMER")
-  @MemberRoles("OWNER")
-  deposit(
-    @Param("id") walletId: string,
-    @Body() body: DepositDto,
-    @CurrentUser() user: any,
-  ) {
-    // Direct balance manipulation — dev/test convenience only.
-    // Production deposits must go through Stripe checkout + webhook.
-    // Controlled by explicit feature flag, not NODE_ENV, so staging or
-    // misconfigured envs cannot accidentally expose it.
-    if (!process.env.ENABLE_DIRECT_DEPOSIT) {
-      throw new NotFoundException(
-        "Direct deposits are disabled — use the checkout flow",
-      )
-    }
-    return this.billing.deposit(walletId, body.amount, user, body.reference)
   }
 
   @Post("wallet/:id/checkout")

@@ -32,18 +32,6 @@ export class BillingService {
     return this.client.get<WalletResponse>("/billing/wallet")
   }
 
-  deposit(data: { walletId: string; amount: number; reference?: string }) {
-    return this.client.post<WalletResponse>(
-      `/billing/wallet/${data.walletId}/deposit`,
-      {
-        json: {
-          amount: data.amount,
-          ...(data.reference ? { reference: data.reference } : {}),
-        },
-      },
-    )
-  }
-
   createCheckoutSession(data: { walletId: string; amount: number }) {
     return this.client.post<{ url: string }>(
       `/billing/wallet/${data.walletId}/checkout`,

@@ -33,6 +33,8 @@ describe("BillingService", () => {
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
         findFirst: jest.fn(),
+        create: jest.fn(),
+        upsert: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
       },
@@ -47,76 +49,56 @@ describe("BillingService", () => {
     service = new BillingService(prismaMock as any, auditMock as any)
   })
 
-  describe("deposit", () => {
-    it("increments available balance", async () => {
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        prismaMock.wallet.updateMany.mockResolvedValue({ count: 1 })
-        prismaMock.wallet.findUniqueOrThrow
-          .mockResolvedValueOnce(mockWallet)
-          .mockResolvedValueOnce({
-            ...mockWallet,
-            availableBalance: new Decimal(1500),
-            version: 2,
-          })
-        return cb(prismaMock)
+  describe("getWallet", () => {
+    it("uses organization upsert when an active organization is present", async () => {
+      prismaMock.wallet.upsert.mockResolvedValue(mockWallet)
+
+      await expect(service.getWallet("org-1", "user-1")).resolves.toBe(
+        mockWallet,
+      )
+      expect(prismaMock.wallet.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId: "org-1" } }),
+      )
+      expect(prismaMock.wallet.findFirst).not.toHaveBeenCalled()
+    })
+
+    it("creates one personal wallet scoped to organizationId null", async () => {
+      prismaMock.wallet.findFirst.mockResolvedValue(null)
+      prismaMock.wallet.create.mockResolvedValue({
+        ...mockWallet,
+        organizationId: null,
       })
 
-      const result = await service.deposit("wallet-1", 500, mockUser, "ref-1")
+      await service.getWallet(null, "user-1")
 
-      expect(Number(result.availableBalance)).toBe(1500)
-      expect(result.version).toBe(2)
-      expect(prismaMock.wallet.updateMany).toHaveBeenCalledWith(
+      expect(prismaMock.wallet.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: "wallet-1", version: 1 },
-          data: expect.objectContaining({
-            version: { increment: 1 },
-          }),
+          where: { userId: "user-1", organizationId: null },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         }),
       )
-      expect(auditMock.log).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: "WALLET_DEPOSIT",
-          entityId: "wallet-1",
-        }),
+      expect(prismaMock.wallet.create).toHaveBeenCalledTimes(1)
+    })
+
+    it("recovers from a concurrent personal-wallet unique violation", async () => {
+      const winner = { ...mockWallet, organizationId: null }
+      prismaMock.wallet.findFirst
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce(winner)
+      prismaMock.wallet.create.mockRejectedValue({ code: "P2002" })
+
+      await expect(service.getWallet(null, "user-1")).resolves.toBe(winner)
+      expect(prismaMock.wallet.findFirst).toHaveBeenCalledTimes(2)
+    })
+
+    it("does not swallow unrelated personal-wallet create failures", async () => {
+      prismaMock.wallet.findFirst.mockResolvedValue(null)
+      prismaMock.wallet.create.mockRejectedValue(new Error("database offline"))
+
+      await expect(service.getWallet(null, "user-1")).rejects.toThrow(
+        "database offline",
       )
-    })
-
-    it("rejects duplicate reference", async () => {
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.transaction.findFirst.mockResolvedValue({
-          id: "existing-tx",
-        })
-        return cb(prismaMock)
-      })
-
-      await expect(
-        service.deposit("wallet-1", 500, mockUser, "ref-1"),
-      ).rejects.toThrow(BadRequestException)
-    })
-
-    it("rejects unowned wallet", async () => {
-      const otherUser = { id: "user-2", organizationId: "org-2" }
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        return cb(prismaMock)
-      })
-
-      await expect(
-        service.deposit("wallet-1", 500, otherUser, "ref-2"),
-      ).rejects.toThrow(ForbiddenException)
-    })
-
-    it("throws ConflictException on version mismatch", async () => {
-      prismaMock.$transaction.mockImplementation(async (cb: any) => {
-        prismaMock.wallet.findUniqueOrThrow.mockResolvedValue(mockWallet)
-        prismaMock.wallet.updateMany.mockResolvedValue({ count: 0 })
-        return cb(prismaMock)
-      })
-
-      await expect(service.deposit("wallet-1", 500, mockUser)).rejects.toThrow(
-        ConflictException,
-      )
+      expect(prismaMock.wallet.findFirst).toHaveBeenCalledTimes(1)
     })
   })
 

@@ -1,4 +1,14 @@
 import { Logger } from "@nestjs/common"
+import { Decimal } from "@prisma/client/runtime/client"
+
+export class PublisherBalanceInvariantError extends Error {
+  constructor(context: string, violations: string[]) {
+    super(
+      `Publisher balance invariant failed in ${context}: ${violations.join(", ")}`,
+    )
+    this.name = "PublisherBalanceInvariantError"
+  }
+}
 
 export function checkPublisherBalanceInvariant(
   balance: {
@@ -10,28 +20,27 @@ export function checkPublisherBalanceInvariant(
   context: string,
 ) {
   if (!balance) return
-  const w = Number(balance.withdrawableBalance ?? 0)
-  const d = Number(balance.debtBalance ?? 0)
-  if (w < 0) {
-    logger.warn(
-      {
-        publisherId: balance.publisherId,
-        withdrawableBalance: w,
-        debtBalance: d,
-        context,
-      },
-      "invariant: withdrawableBalance below zero",
-    )
+  const withdrawable = new Decimal(balance.withdrawableBalance ?? 0)
+  const debt = new Decimal(balance.debtBalance ?? 0)
+  const violations: string[] = []
+
+  if (!withdrawable.isFinite() || withdrawable.isNegative()) {
+    violations.push("withdrawableBalance must be finite and non-negative")
   }
-  if (d < 0) {
-    logger.warn(
-      {
-        publisherId: balance.publisherId,
-        withdrawableBalance: w,
-        debtBalance: d,
-        context,
-      },
-      "invariant: debtBalance below zero",
-    )
+  if (!debt.isFinite() || debt.isNegative()) {
+    violations.push("debtBalance must be finite and non-negative")
   }
+  if (violations.length === 0) return
+
+  logger.error(
+    {
+      publisherId: balance.publisherId,
+      withdrawableBalance: withdrawable.toString(),
+      debtBalance: debt.toString(),
+      context,
+      violations,
+    },
+    "publisher balance invariant violation",
+  )
+  throw new PublisherBalanceInvariantError(context, violations)
 }

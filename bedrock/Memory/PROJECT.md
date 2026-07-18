@@ -52,7 +52,10 @@ Open/partial items require architectural design discussion.
 - Controllers are thin; business logic lives in dedicated services
 - Stripe webhook timestamp validation via shared `assertWebhookTimestampFresh`
 - Redis pub/sub for cross-pod auth context invalidation
-- Feature flags via `ENABLE_DIRECT_DEPOSIT` env var
+- Wallet credits have no direct HTTP or API-client mutation surface. Customer
+  funding is accepted only through Stripe checkout/webhook verification;
+  seed, integration, concurrency, and load setup use test-only Prisma helpers
+  that refuse to run with `NODE_ENV=production`.
 - Worker deliveries verified via shared `delivery-verification` module (24 tests)
 - Job signing with configurable secret (QUEUE_SIGNING_SECRET / JWT_SECRET fallback)
 - Publisher integrations are a top-level dashboard area at `/dashboard/integrations`, separate from Settings; sidebar active-state matching uses path-segment boundaries to avoid selecting Settings for integration pages.
@@ -63,6 +66,20 @@ Open/partial items require architectural design discussion.
 - Order cancellation is a dedicated domain workflow, not a generic status mutation. `packages/shared/src/order-cancellation-policy.ts` owns the stage/channel decision matrix and `OrderCancellationRequest` retains structured case history.
 - Pre-acceptance exits are immediate; accepted work requires counterparty consent or Operations review plus Finance approval; published/delivered/completed work uses the dispute path. An active case holds fulfillment and increments `Order.version` to close transition races. Publisher actions require a publisher owner, and platform-fulfiller actions require the assigned Operations user (or Super Admin).
 - Paid refunds use one transaction-aware path that reverses platform revenue or publisher settlement, cancels active assignments, credits the organization wallet, transitions the order, and writes ledger/event/audit records together. `Order.refundResponsibility` prevents platform/customer-attributed refunds from lowering publisher trust.
+- Refund clawbacks that create publisher debt write an idempotent in-app
+  explanation in the same transaction. Later settlement-release notifications
+  state the exact amount applied to debt and the amount credited as
+  withdrawable funds.
+- Publisher-balance invariant checks throw on negative or non-finite
+  withdrawable/debt balances so their enclosing financial transaction rolls
+  back; PostgreSQL CHECK constraints remain the final data-layer backstop.
+- Legacy personal wallets are unique per user through the partial
+  `Wallet_userId_personal_key` index (`organizationId IS NULL`). The migration
+  safely merges historical duplicates, while organization wallets may retain
+  the same creator `userId`.
+- Wise/Stripe Connect payout webhooks always receive a deterministic BullMQ
+  job ID: provider execution ID first, then a hashed provider event ID, then a
+  verified raw-payload hash.
 - Platform-fulfilled orders create platform revenue and complete directly rather than creating publisher settlements. Worker sweeps enforce the acceptance and cancellation-response deadlines. Dispute refunds require Finance/Super Admin plus explicit responsibility rather than inferring fault from the listing channel.
 - Prisma migrations are an API/worker release prerequisite. Generate the client from the migrated schema, apply migrations before serving requests that select new fields, and verify `prisma migrate status` during the release; otherwise shared reads such as order and billing queries can fail together with HTTP 500 responses.
 - The customer portal is an order-focused workbench. Its dashboard uses exact server totals for attention, active work, and delivered results; `/dashboard/orders` is a server-paginated queue with stage, campaign, service, search, and sort controls; campaign and report totals page through the complete tenant-scoped data set rather than silently truncating at the API page limit.
@@ -78,4 +95,5 @@ Open/partial items require architectural design discussion.
 - Uses `scripts/env.ts` `loadRootEnv()` to load `.env.development`, stripping inline `#` comments (dotenv-compatible)
 - API must be running on `:4000`
 - Phases: (1) sign-up users via API, (1b) verify emails via DB, (2) staff bootstrap, (3) roles via admin API, (4) orgs + invites, (5) fund wallet via DB, (6) publisher inventory + marketplace listings (with `ListingService` rows), (7) payout providers
-- Wallet funding bypasses API deposit endpoint (gated behind `ENABLE_DIRECT_DEPOSIT`) and writes directly via Prisma
+- Wallet funding is test/seed-only and writes the balance plus ledger row
+  directly through Prisma; no direct-deposit API endpoint or feature flag exists.

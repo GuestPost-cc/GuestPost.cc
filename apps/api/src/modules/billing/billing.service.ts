@@ -666,9 +666,13 @@ export class BillingService {
       })
     }
 
-    // userId has no unique constraint — fall back to find/create with conflict retry
+    // Legacy customer accounts without an active organization use a personal
+    // wallet. A partial unique index covers only these rows
+    // (organizationId IS NULL), preserving multi-organization wallets that may
+    // legitimately share the same creator userId.
     let wallet = await this.prisma.wallet.findFirst({
-      where: { userId },
+      where: { userId, organizationId: null },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       include,
     })
     if (!wallet) {
@@ -683,78 +687,18 @@ export class BillingService {
           include,
         })
       } catch (err) {
+        if (!isUniqueViolation(err)) throw err
+        // Another request created the same personal wallet after our read.
+        // Re-read the row protected by Wallet_userId_personal_key.
         wallet = await this.prisma.wallet.findFirst({
-          where: { userId },
+          where: { userId, organizationId: null },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
           include,
         })
         if (!wallet) throw err
       }
     }
     return wallet
-  }
-
-  async deposit(
-    walletId: string,
-    amount: number,
-    user: any,
-    reference?: string,
-  ) {
-    const result = await this.prisma.$transaction(async (tx: any) => {
-      if (reference) {
-        const existing = await tx.transaction.findFirst({
-          where: { reference, type: "DEPOSIT" },
-        })
-        if (existing) {
-          this.logger.warn(`Duplicate deposit detected: ${reference}`)
-          throw new BadRequestException(
-            "Deposit with this reference already exists",
-          )
-        }
-      }
-      const wallet = await tx.wallet.findUniqueOrThrow({
-        where: { id: walletId },
-      })
-      this.assertWalletOwned(wallet, user)
-
-      const updated = await tx.wallet.updateMany({
-        where: { id: walletId, version: wallet.version },
-        data: {
-          availableBalance: { increment: amount },
-          version: { increment: 1 },
-        },
-      })
-      if (updated.count === 0) {
-        throw new ConflictException(
-          "Wallet was modified by another request. Retry.",
-        )
-      }
-
-      const fresh = await tx.wallet.findUniqueOrThrow({
-        where: { id: walletId },
-      })
-
-      await tx.transaction.create({
-        data: {
-          walletId,
-          amount,
-          type: "DEPOSIT",
-          reference,
-          description: `Deposit of ${amount}`,
-        },
-      })
-      return fresh
-    })
-
-    await this.audit.log({
-      action: "WALLET_DEPOSIT",
-      entityType: "Wallet",
-      entityId: walletId,
-      metadata: { amount, reference },
-      userId: user.id,
-      organizationId: user.organizationId,
-    })
-
-    return result
   }
 
   async withdraw(

@@ -6,6 +6,7 @@
  * Run: pnpm tsx scripts/concurrency-test.ts  (API on :4000, seeded DB)
  */
 import { prisma } from "../packages/database/src"
+import { fundExistingWalletForTest } from "./test-wallet-funding"
 
 const API = process.env.API_URL ?? "http://localhost:4000"
 const H = {
@@ -117,10 +118,12 @@ async function main() {
 
   // ── Attack 1: double payment — N parallel submit-payment on ONE order ──
   console.log(`── Attack 1: ${PAR} parallel submit-payment on one order`)
-  await call("POST", `/billing/wallet/${wallet.id}/deposit`, client, {
-    amount: price * 2,
-    reference: `ctest-a1-${Date.now()}`,
-  })
+  await fundExistingWalletForTest(
+    prisma,
+    wallet.id,
+    price * 2,
+    `ctest-a1-${Date.now()}`,
+  )
   const w0 = Number(
     (await call("GET", "/billing/wallet", client)).data.availableBalance,
   )
@@ -202,10 +205,12 @@ async function main() {
 
   // ── Attack 3: settlement double-release — N parallel admin-approve ──
   console.log(`── Attack 3: ${PAR} parallel admin-approve on one settlement`)
-  await call("POST", `/billing/wallet/${wallet.id}/deposit`, client, {
-    amount: price,
-    reference: `ctest-a3-${Date.now()}`,
-  })
+  await fundExistingWalletForTest(
+    prisma,
+    wallet.id,
+    price,
+    `ctest-a3-${Date.now()}`,
+  )
   const { settlementId } = await orderToSettlement(
     client,
     publisher,
@@ -276,10 +281,12 @@ async function main() {
     `── Attack 5: ${PAR} parallel withdrawals with the same idempotency key`,
   )
   // give publisher fresh funds via another settlement
-  await call("POST", `/billing/wallet/${wallet.id}/deposit`, client, {
-    amount: price,
-    reference: `ctest-a5-${Date.now()}`,
-  })
+  await fundExistingWalletForTest(
+    prisma,
+    wallet.id,
+    price,
+    `ctest-a5-${Date.now()}`,
+  )
   const s2 = await orderToSettlement(client, publisher, admin, site?.id)
   await call("POST", `/settlements/${s2.settlementId}/customer-approve`, client)
   await call(

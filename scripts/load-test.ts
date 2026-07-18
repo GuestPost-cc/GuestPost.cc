@@ -12,6 +12,7 @@
 
 import { randomBytes } from "node:crypto"
 import { prisma } from "../packages/database/src"
+import { fundOrganizationWalletForTest } from "./test-wallet-funding"
 
 const API = process.env.API_URL ?? "http://localhost:4000"
 const H = {
@@ -85,40 +86,6 @@ async function provisionUserWithSession(
   return { token, orgId: org.id }
 }
 
-// Fund a wallet directly. The /billing deposit endpoint is rate-limited
-// (correct production defense) and would throttle bulk setup from one IP.
-// This writes a deposit transaction + balance, the same shape getWallet/deposit
-// would produce, so reconciliation stays consistent.
-async function fundWalletDirect(
-  orgId: string,
-  userId: string,
-  amount: number,
-  reference: string,
-) {
-  await prisma.$transaction(async (tx: any) => {
-    const wallet = await tx.wallet.upsert({
-      where: { organizationId: orgId },
-      create: {
-        organizationId: orgId,
-        userId,
-        availableBalance: amount,
-        reservedBalance: 0,
-        currency: "USD",
-      },
-      update: { availableBalance: { increment: amount } },
-    })
-    await tx.transaction.create({
-      data: {
-        walletId: wallet.id,
-        amount,
-        type: "DEPOSIT",
-        description: `Deposit ${reference}`,
-        reference,
-      },
-    })
-  })
-}
-
 /** Run async tasks with a bounded concurrency pool. */
 async function pool<T>(
   items: T[],
@@ -165,7 +132,12 @@ async function main() {
     )
     const userId = (await prisma.user.findUniqueOrThrow({ where: { email } }))
       .id
-    await fundWalletDirect(orgId, userId, price, `load-${runId}-${i}`)
+    await fundOrganizationWalletForTest(prisma, {
+      organizationId: orgId,
+      userId,
+      amount: price,
+      reference: `load-${runId}-${i}`,
+    })
     users[i] = { token, email }
   })
   console.log(

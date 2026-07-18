@@ -27,7 +27,12 @@ export class OrderOwnershipGuard implements CanActivate {
     const user = request.user
     const paramId = request.params.id
 
-    if (!paramId) return true
+    if (!user) {
+      throw new ForbiddenException("Authentication required")
+    }
+    if (!paramId) {
+      throw new ForbiddenException("Order identifier is required")
+    }
 
     // Phase 6.5: also pull fulfillmentChannel so we can refuse access when
     // a publisher's website later gets reassigned out from under them.
@@ -84,6 +89,10 @@ export class OrderOwnershipGuard implements CanActivate {
       return true
     }
 
-    return true
+    // Fail closed. STAFF use the dedicated /admin order surfaces, which apply
+    // role- and assignment-aware scoping. Letting staff (or a future userType)
+    // fall through here would bypass those narrower policies on the generic
+    // customer/publisher routes.
+    throw new ForbiddenException("Order access is not available for this actor")
   }
 }

@@ -50,6 +50,13 @@ describe("RefundService", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         create: jest.fn().mockResolvedValue({}),
       },
+      publisher: {
+        findUnique: jest.fn().mockResolvedValue({
+          organizationId: "publisher-org-1",
+          publisherMemberships: [{ userId: "publisher-user-1" }],
+        }),
+      },
+      notification: { upsert: jest.fn().mockResolvedValue({}) },
       wallet: {
         findFirst: jest.fn().mockResolvedValue(wallet),
         findUnique: jest.fn().mockResolvedValue(wallet),
@@ -200,12 +207,55 @@ describe("RefundService", () => {
     expect(balanceCall.data.debtBalance.increment.equals(new Decimal(50))).toBe(
       true,
     )
+    expect(prismaMock.notification.upsert).toHaveBeenCalledWith({
+      where: {
+        userId_dedupKey: {
+          userId: "publisher-user-1",
+          dedupKey: "publisher-debt:order-1:publisher-user-1",
+        },
+      },
+      create: expect.objectContaining({
+        userId: "publisher-user-1",
+        organizationId: "publisher-org-1",
+        type: "PUBLISHER_DEBT_CREATED",
+        message: expect.stringContaining("50.00 USD"),
+        dedupKey: "publisher-debt:order-1:publisher-user-1",
+      }),
+      update: {},
+    })
 
     // Customer still gets the FULL refund regardless of publisher debt
     expect(prismaMock.wallet.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           availableBalance: { increment: new Decimal(100) },
+        }),
+      }),
+    )
+  })
+
+  it("records and explains full debt when the publisher has no balance row", async () => {
+    prismaMock.order.findUnique.mockResolvedValue(baseOrder)
+    prismaMock.settlement.findFirst.mockResolvedValue({
+      id: "set-1",
+      status: "RELEASED",
+      version: 2,
+      publisherId: "pub-1",
+      publisherAmount: new Decimal(80),
+    })
+    prismaMock.$queryRaw.mockResolvedValue([])
+
+    await service.refundOrder("order-1", "dispute", "admin-1", undefined, {
+      responsibility: "PUBLISHER",
+    })
+
+    expect(prismaMock.publisherBalance.create).toHaveBeenCalledWith({
+      data: { publisherId: "pub-1", debtBalance: new Decimal(80) },
+    })
+    expect(prismaMock.notification.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          message: expect.stringContaining("80.00 USD"),
         }),
       }),
     )

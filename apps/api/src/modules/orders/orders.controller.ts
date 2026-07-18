@@ -124,6 +124,7 @@ export class OrdersController {
 
   @Get(":id")
   @UseGuards(OrderOwnershipGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
   get(@Param("id") id: string, @CurrentUser() user: any) {
     // Publishers have no organizationId — the ownership guard above is their
@@ -136,6 +137,7 @@ export class OrdersController {
 
   @Get(":id/events")
   @UseGuards(OrderOwnershipGuard)
+  @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
   async getEvents(@Param("id") id: string, @CurrentUser() user: any) {
     const order = await this.orders.getOrder(

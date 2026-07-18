@@ -1,4 +1,5 @@
 import {
+  notificationDedupKey,
   orderEventMetadata,
   REFUNDABLE_ORDER_STATUSES,
 } from "@guestpost/shared"
@@ -289,6 +290,14 @@ export class RefundService {
               },
             })
           }
+          if (newDebt.greaterThan(0)) {
+            await this.createPublisherDebtNotifications(tx, {
+              publisherId: activeSettlement.publisherId,
+              orderId: order.id,
+              amount: newDebt,
+              currency: order.currency ?? "USD",
+            })
+          }
         } else {
           // No balance row at all — full amount becomes debt
           await tx.publisherBalance.create({
@@ -296,6 +305,12 @@ export class RefundService {
               publisherId: activeSettlement.publisherId,
               debtBalance: owed,
             },
+          })
+          await this.createPublisherDebtNotifications(tx, {
+            publisherId: activeSettlement.publisherId,
+            orderId: order.id,
+            amount: owed,
+            currency: order.currency ?? "USD",
           })
         }
 
@@ -420,6 +435,49 @@ export class RefundService {
     return {
       order: updated,
       refundTransactionId: refundTransaction.id,
+    }
+  }
+
+  private async createPublisherDebtNotifications(
+    tx: any,
+    args: {
+      publisherId: string
+      orderId: string
+      amount: Decimal
+      currency: string
+    },
+  ) {
+    const publisher = await tx.publisher.findUnique({
+      where: { id: args.publisherId },
+      select: {
+        organizationId: true,
+        publisherMemberships: { select: { userId: true } },
+      },
+    })
+    if (!publisher) {
+      throw new ConflictException(
+        "Publisher account is missing for settlement clawback",
+      )
+    }
+
+    for (const membership of publisher.publisherMemberships) {
+      const dedupKey = notificationDedupKey.publisherDebt(
+        args.orderId,
+        membership.userId,
+      )
+      await tx.notification.upsert({
+        where: {
+          userId_dedupKey: { userId: membership.userId, dedupKey },
+        },
+        create: {
+          userId: membership.userId,
+          organizationId: publisher.organizationId,
+          type: "PUBLISHER_DEBT_CREATED",
+          message: `${args.amount.toFixed(2)} ${args.currency} was recorded as outstanding debt after the refund for order ${args.orderId}. Future settlement earnings will repay this debt before funds become withdrawable.`,
+          dedupKey,
+        },
+        update: {},
+      })
     }
   }
 }
