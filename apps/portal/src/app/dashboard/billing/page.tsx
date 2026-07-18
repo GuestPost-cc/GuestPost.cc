@@ -33,20 +33,15 @@ import {
   Search,
   Wallet,
 } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { api } from "../../../lib/api"
-
-interface WalletData {
-  id: string
-  availableBalance: number
-  reservedBalance: number
-  currency: string
-  version: number
-}
+import { useAuth } from "../../../lib/auth"
+import { formatCustomerMoney } from "../../../lib/customer-order-workflow"
 
 const transactionIcons: Record<string, React.ElementType> = {
   DEPOSIT: ArrowUpCircle,
@@ -95,9 +90,18 @@ const depositSchema = z.object({
 
 type DepositForm = z.infer<typeof depositSchema>
 
+function safeDashboardReturn(value: string | null) {
+  if (!value?.startsWith("/dashboard/") || value.startsWith("//")) {
+    return null
+  }
+  return value
+}
+
 export default function BillingPage() {
   const queryClient = useQueryClient()
   const router = useRouter()
+  const { user } = useAuth()
+  const isOwner = user?.customerRole === "OWNER"
   const [showDepositDialog, setShowDepositDialog] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [processingPayment, setProcessingPayment] = useState(false)
@@ -110,9 +114,7 @@ export default function BillingPage() {
   const {
     register,
     handleSubmit,
-    watch,
     setValue,
-    reset,
     formState: { errors },
   } = useForm<DepositForm>({
     resolver: zodResolver(depositSchema),
@@ -127,6 +129,7 @@ export default function BillingPage() {
   } = useQuery({
     queryKey: ["wallet"],
     queryFn: () => api.billing.getWallet(),
+    enabled: isOwner,
   })
 
   const {
@@ -137,24 +140,8 @@ export default function BillingPage() {
   } = useQuery({
     queryKey: ["transactions"],
     queryFn: () => api.billing.listTransactions(),
+    enabled: isOwner,
   })
-
-  const {
-    data: ordersData,
-    error: ordersError,
-    refetch: refetchOrders,
-  } = useQuery({
-    queryKey: ["orders"],
-    queryFn: () => api.orders.list() as Promise<any[]>,
-  })
-
-  // Reserved balance: sum of amounts on DRAFT/SUBMITTED orders
-  const reservedBalance = (ordersData ?? [])
-    .filter(
-      (o: any) =>
-        o.status === "DRAFT" || o.status === "SUBMITTED" || o.status === "PAID",
-    )
-    .reduce((sum: number, o: any) => sum + (o.totalAmount || 0), 0)
 
   // ── Post-Stripe redirect: poll wallet until webhook credits it ──────
   // The webhook is the ONLY code path that credits the wallet. The frontend
@@ -187,7 +174,9 @@ export default function BillingPage() {
         toast.success("Deposit successful!")
         queryClient.invalidateQueries({ queryKey: ["wallet"] })
         queryClient.invalidateQueries({ queryKey: ["transactions"] })
-        const pendingReturn = sessionStorage.getItem("deposit_returnTo")
+        const pendingReturn = safeDashboardReturn(
+          sessionStorage.getItem("deposit_returnTo"),
+        )
         if (pendingReturn) {
           sessionStorage.removeItem("deposit_returnTo")
           router.replace(pendingReturn)
@@ -206,7 +195,7 @@ export default function BillingPage() {
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search)
     const amt = Number(sp.get("deposit"))
-    const ret = sp.get("returnTo")
+    const ret = safeDashboardReturn(sp.get("returnTo"))
     if (amt > 0) {
       setShowDepositDialog(true)
       setValue("amount", Math.ceil(amt), { shouldValidate: true })
@@ -280,12 +269,28 @@ export default function BillingPage() {
     .filter((tx) => tx.type === "DEPOSIT")
     .reduce((sum, tx) => sum + Number(tx.amount), 0)
 
-  const _totalSpent = (transactionsData ?? [])
-    .filter((tx) => tx.type === "PURCHASE" || tx.type === "RESERVATION")
-    .reduce((sum, tx) => sum + Math.abs(Number(tx.amount)), 0)
-
   // Combine errors from all queries
-  const billingError = walletError || transactionsError || ordersError
+  const billingError = walletError || transactionsError
+
+  if (user && !isOwner) {
+    return (
+      <Card className="mx-auto max-w-2xl rounded-2xl shadow-sm">
+        <CardContent className="flex min-h-72 flex-col items-center justify-center p-8 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <Wallet className="h-6 w-6" />
+          </div>
+          <h1 className="mt-4 text-xl font-semibold">Owner access required</h1>
+          <p className="mt-2 max-w-md text-sm text-muted-foreground">
+            Organization owners manage deposits and the complete transaction
+            ledger. You can still create and manage your own orders.
+          </p>
+          <Button className="mt-5" asChild>
+            <Link href="/dashboard">Return to work queue</Link>
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (processingPayment) {
     return (
@@ -312,7 +317,6 @@ export default function BillingPage() {
           onRetry={() => {
             refetchWallet()
             refetchTransactions()
-            refetchOrders()
           }}
         />
       </div>
@@ -335,17 +339,16 @@ export default function BillingPage() {
       </div>
 
       {/* Wallet Cards */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         {walletLoading ? (
           <>
-            <WalletSkeleton />
             <WalletSkeleton />
             <WalletSkeleton />
             <WalletSkeleton />
           </>
         ) : walletData ? (
           <>
-            <Card>
+            <Card className="rounded-2xl shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Available Balance
@@ -354,7 +357,10 @@ export default function BillingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold font-mono">
-                  ${Number(walletData.availableBalance).toFixed(2)}
+                  {formatCustomerMoney(
+                    walletData.availableBalance,
+                    walletData.currency,
+                  )}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Ready to spend
@@ -362,7 +368,7 @@ export default function BillingPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-2xl shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Reserved Balance
@@ -371,7 +377,10 @@ export default function BillingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold font-mono">
-                  ${reservedBalance.toFixed(2)}
+                  {formatCustomerMoney(
+                    walletData.reservedBalance,
+                    walletData.currency,
+                  )}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   In pending orders
@@ -379,7 +388,7 @@ export default function BillingPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-2xl shadow-sm">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Total Deposited
@@ -388,27 +397,10 @@ export default function BillingPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold font-mono">
-                  ${totalDeposits.toFixed(2)}
+                  {formatCustomerMoney(totalDeposits, walletData.currency)}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
                   All time deposits
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Version
-                </CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold font-mono">
-                  {walletData.version}
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Optimistic lock counter
                 </p>
               </CardContent>
             </Card>
@@ -417,7 +409,7 @@ export default function BillingPage() {
       </div>
 
       {/* Transactions */}
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle>Transaction History</CardTitle>
@@ -453,10 +445,9 @@ export default function BillingPage() {
               {filteredTransactions.map((tx) => {
                 const Icon = transactionIcons[tx.type] || FileText
                 const colorClass = transactionColors[tx.type] || ""
+                const isHold = tx.type === "RESERVATION"
                 const isNegative =
-                  tx.type === "PURCHASE" ||
-                  tx.type === "RESERVATION" ||
-                  tx.type === "WITHDRAWAL"
+                  tx.type === "PURCHASE" || tx.type === "WITHDRAWAL"
                 return (
                   <div
                     key={tx.id}
@@ -483,11 +474,18 @@ export default function BillingPage() {
                     <div className="text-right">
                       <p
                         className={`text-sm font-mono font-medium ${
-                          isNegative ? "text-red-600" : "text-emerald-600"
+                          isHold
+                            ? "text-amber-600"
+                            : isNegative
+                              ? "text-red-600"
+                              : "text-emerald-600"
                         }`}
                       >
-                        {isNegative ? "-" : "+"}$
-                        {Math.abs(Number(tx.amount)).toFixed(2)}
+                        {isHold ? "Held " : isNegative ? "-" : "+"}
+                        {formatCustomerMoney(
+                          Math.abs(Number(tx.amount)),
+                          tx.currency,
+                        )}
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {formatDistanceToNow(new Date(tx.createdAt), {

@@ -1,5 +1,6 @@
 "use client"
 
+import type { TicketListItem } from "@guestpost/api-client"
 import type { TicketStatus } from "@guestpost/database"
 import {
   Badge,
@@ -38,6 +39,7 @@ import {
   HeadphonesIcon,
   Plus,
   Search,
+  ShieldAlert,
 } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
@@ -52,25 +54,9 @@ const createTicketSchema = z.object({
     .string()
     .min(10, "Message must be at least 10 characters")
     .max(5000),
-  priority: z.string().optional(),
 })
 
 type CreateTicketForm = z.infer<typeof createTicketSchema>
-
-interface Ticket {
-  id: string
-  subject: string
-  status: string
-  priority?: string
-  createdAt: string
-  updatedAt: string
-  messages?: Array<{
-    id: string
-    content: string
-    author: string
-    createdAt: string
-  }>
-}
 
 // Phase 7.9 #28 — color + label live in @guestpost/ui's STATUS_PRESENTATION
 // (see getTicketStatusPresentation). This local map only keeps the page-
@@ -122,18 +108,13 @@ function CreateTicketDialog({
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-    watch,
-    setValue,
   } = useForm<CreateTicketForm>({
     resolver: zodResolver(createTicketSchema),
   })
 
   const createMutation = useMutation({
-    mutationFn: (data: {
-      subject: string
-      message: string
-      priority?: string
-    }) => api.support.createTicket(data),
+    mutationFn: (data: { subject: string; message: string }) =>
+      api.support.createTicket(data),
     onSuccess: () => {
       toast.success("Support ticket created successfully")
       queryClient.invalidateQueries({ queryKey: ["tickets"] })
@@ -149,7 +130,6 @@ function CreateTicketDialog({
     createMutation.mutate({
       subject: data.subject,
       message: data.message,
-      priority: data.priority,
     })
   }
 
@@ -192,22 +172,12 @@ function CreateTicketDialog({
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="priority">Priority (Optional)</Label>
-            <Select
-              value={watch("priority") || ""}
-              onValueChange={(value) => setValue("priority", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select priority" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="LOW">Low</SelectItem>
-                <SelectItem value="MEDIUM">Medium</SelectItem>
-                <SelectItem value="HIGH">High</SelectItem>
-                <SelectItem value="URGENT">Urgent</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              Never include passwords, API keys, full card numbers, or other
+              sensitive credentials in a support ticket.
+            </p>
           </div>
 
           <DialogFooter>
@@ -229,7 +199,6 @@ function CreateTicketDialog({
 }
 
 export default function SupportPage() {
-  const _queryClient = useQueryClient()
   const [showCreateTicket, setShowCreateTicket] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("")
@@ -239,30 +208,44 @@ export default function SupportPage() {
     isLoading,
     error,
     refetch,
-  } = useQuery<Ticket[]>({
+  } = useQuery<TicketListItem[]>({
     queryKey: ["tickets"],
-    queryFn: () => api.support.listTickets() as Promise<Ticket[]>,
+    queryFn: () => api.support.listTickets(),
   })
 
-  const filteredTickets = (ticketsData ?? []).filter((ticket: Ticket) => {
-    if (
-      statusFilter &&
-      statusFilter !== "all" &&
-      ticket.status !== statusFilter
-    )
-      return false
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      return (
-        ticket.subject.toLowerCase().includes(query) ||
-        ticket.id.toLowerCase().includes(query)
+  const filteredTickets = (ticketsData ?? [])
+    .filter((ticket) => {
+      if (
+        statusFilter &&
+        statusFilter !== "all" &&
+        ticket.status !== statusFilter
       )
-    }
-    return true
-  })
+        return false
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase()
+        return (
+          ticket.subject.toLowerCase().includes(query) ||
+          ticket.id.toLowerCase().includes(query) ||
+          ticket.order?.id.toLowerCase().includes(query)
+        )
+      }
+      return true
+    })
+    .sort((left, right) => {
+      const leftNeedsReply = left.status === "WAITING_ON_CUSTOMER" ? 0 : 1
+      const rightNeedsReply = right.status === "WAITING_ON_CUSTOMER" ? 0 : 1
+      if (leftNeedsReply !== rightNeedsReply)
+        return leftNeedsReply - rightNeedsReply
+      return (
+        new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+      )
+    })
 
-  const openTickets = (ticketsData ?? []).filter((t: Ticket) =>
-    ["OPEN", "IN_PROGRESS", "WAITING_ON_CUSTOMER"].includes(t.status),
+  const openTickets = (ticketsData ?? []).filter((ticket) =>
+    ["OPEN", "IN_PROGRESS"].includes(ticket.status),
+  ).length
+  const waitingTickets = (ticketsData ?? []).filter(
+    (ticket) => ticket.status === "WAITING_ON_CUSTOMER",
   ).length
 
   if (error)
@@ -284,23 +267,23 @@ export default function SupportPage() {
           </div>
         </div>
         <div className="grid gap-6 md:grid-cols-3">
-          <Card>
+          <Card className="rounded-2xl shadow-sm">
             <CardContent className="pt-6">
               <Skeleton className="h-16 w-full" />
             </CardContent>
           </Card>
-          <Card>
+          <Card className="rounded-2xl shadow-sm">
             <CardContent className="pt-6">
               <Skeleton className="h-16 w-full" />
             </CardContent>
           </Card>
-          <Card>
+          <Card className="rounded-2xl shadow-sm">
             <CardContent className="pt-6">
               <Skeleton className="h-16 w-full" />
             </CardContent>
           </Card>
         </div>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader>
             <Skeleton className="h-6 w-32" />
           </CardHeader>
@@ -326,17 +309,19 @@ export default function SupportPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Tickets
+              Waiting on you
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{ticketsData?.length ?? 0}</div>
+            <div className="text-2xl font-bold text-amber-700">
+              {waitingTickets}
+            </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Open Tickets
@@ -346,7 +331,7 @@ export default function SupportPage() {
             <div className="text-2xl font-bold">{openTickets}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Resolved
@@ -356,8 +341,8 @@ export default function SupportPage() {
             <div className="text-2xl font-bold">
               {
                 (ticketsData ?? []).filter(
-                  (t: Ticket) =>
-                    t.status === "RESOLVED" || t.status === "CLOSED",
+                  (ticket) =>
+                    ticket.status === "RESOLVED" || ticket.status === "CLOSED",
                 ).length
               }
             </div>
@@ -365,7 +350,7 @@ export default function SupportPage() {
         </Card>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -423,7 +408,7 @@ export default function SupportPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {filteredTickets.map((ticket: Ticket) => {
+              {filteredTickets.map((ticket) => {
                 const p = getTicketStatusPresentation(
                   ticket.status as TicketStatus,
                 )
@@ -433,7 +418,7 @@ export default function SupportPage() {
                 return (
                   <div
                     key={ticket.id}
-                    className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                    className="flex flex-col justify-between gap-3 rounded-2xl border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center"
                   >
                     <div className="flex items-center gap-4">
                       <div
@@ -443,7 +428,7 @@ export default function SupportPage() {
                       </div>
                       <div>
                         <p className="font-medium">{ticket.subject}</p>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
                           <span className="text-sm text-muted-foreground">
                             #{ticket.id.slice(0, 8)}
                           </span>
@@ -455,6 +440,19 @@ export default function SupportPage() {
                               addSuffix: true,
                             })}
                           </span>
+                          {ticket.order ? (
+                            <>
+                              <span className="text-sm text-muted-foreground">
+                                •
+                              </span>
+                              <Link
+                                href={`/dashboard/orders/${ticket.order.id}`}
+                                className="text-sm font-medium text-primary hover:underline"
+                              >
+                                Order #{ticket.order.id.slice(0, 8)}
+                              </Link>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -476,7 +474,7 @@ export default function SupportPage() {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <CardTitle>FAQ</CardTitle>
           <CardDescription>Frequently asked questions</CardDescription>

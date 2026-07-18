@@ -7,7 +7,10 @@ import { SettlementsModule } from "../settlements/settlements.module"
 import { SupportModule } from "../support/support.module"
 import { AdminController } from "./admin.controller"
 import { AdminService } from "./admin.service"
+import { CommandCenterService } from "./command-center.service"
 import { RevenueService } from "./finance/revenue.service"
+import { FinanceWorkbenchService } from "./finance-workbench.service"
+import { OperationsWorkbenchService } from "./operations-workbench.service"
 import { ReconciliationService } from "./reconciliation.service"
 import { AdminVerificationQueueService } from "./verification-queue.service"
 import { WebsiteVerificationService } from "./website-verification.service"
@@ -23,6 +26,9 @@ import { WebsiteVerificationService } from "./website-verification.service"
   controllers: [AdminController],
   providers: [
     AdminService,
+    CommandCenterService,
+    FinanceWorkbenchService,
+    OperationsWorkbenchService,
     AdminVerificationQueueService,
     ReconciliationService,
     RevenueService,

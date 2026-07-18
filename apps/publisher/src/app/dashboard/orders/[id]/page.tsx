@@ -3,6 +3,7 @@
 import type { CancellationReasonCode } from "@guestpost/api-client"
 import type { OrderStatus } from "@guestpost/shared"
 import {
+  BriefRenderer,
   Button,
   Card,
   CardContent,
@@ -33,17 +34,16 @@ import { format, formatDistanceToNow } from "date-fns"
 import {
   AlertCircle,
   ArrowLeft,
+  ArrowRight,
   Check,
   CheckCircle,
   Clock,
   DollarSign,
-  Download,
   ExternalLink,
   FileText,
   MessageSquare,
   RefreshCw,
   ShieldCheck,
-  Upload,
   XCircle,
 } from "lucide-react"
 import Link from "next/link"
@@ -51,6 +51,11 @@ import { useParams } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../../lib/api"
+import {
+  formatPublisherMoney,
+  getOrderDueState,
+  getPublisherNextAction,
+} from "../../../../lib/publisher-order-workflow"
 
 const VARIANT_CIRCLE_BG: Record<string, string> = {
   default: "bg-primary/10 text-primary",
@@ -248,7 +253,6 @@ export default function OrderDetailPage() {
   const queryClient = useQueryClient()
   const [publishedUrl, setPublishedUrl] = useState("")
   const [content, setContent] = useState("")
-  const [attachments, setAttachments] = useState<File[]>([])
   const [showCancellationDialog, setShowCancellationDialog] = useState(false)
   const [cancellationReason, setCancellationReason] =
     useState<CancellationReasonCode>("CAPACITY_UNAVAILABLE")
@@ -383,7 +387,6 @@ export default function OrderDetailPage() {
       toast.success("Content submitted")
       refreshOrder()
       setContent("")
-      setAttachments([])
     },
     onError: (e: any) => toast.error(e?.message ?? "Failed to submit"),
   })
@@ -401,6 +404,8 @@ export default function OrderDetailPage() {
   if (isLoading || !order) return <OrderDetailSkeleton />
 
   const s = order.status
+  const due = getOrderDueState(order)
+  const nextAction = getPublisherNextAction(order)
   const canAccept = s === "SUBMITTED"
   const canSubmitContent = [
     "ACCEPTED",
@@ -418,52 +423,132 @@ export default function OrderDetailPage() {
     icon: Clock,
     description: s.replace(/_/g, " "),
   }
+  const statusPresentation = getOrderStatusPresentation(s as OrderStatus)
   const CurrentIcon = currentStatusConfig.icon
+  const websiteUrl =
+    order.website?.url ??
+    order.items?.[0]?.website?.url ??
+    "Website unavailable"
+  const latestRevision = [...(order.revisions ?? [])].sort(
+    (left: any, right: any) =>
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+  )[0]
   const allEvents = [
     ...(events.length > 0 ? events : (order.events ?? [])),
   ].sort(
     (a: any, b: any) =>
       new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   )
+  const hasPrimaryAction =
+    canAccept ||
+    canSubmitContent ||
+    canMarkPublished ||
+    (cancellationPreview?.activeRequest?.status === "REQUESTED" &&
+      cancellationPreview.activeRequest.requesterType === "CUSTOMER")
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/dashboard/orders">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div className="flex items-center gap-3 flex-1">
-          <div
-            className={`flex h-10 w-10 items-center justify-center rounded-full ${VARIANT_CIRCLE_BG[s] ?? "bg-primary/10"}`}
-          >
-            <CurrentIcon className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold tracking-tight">
-                Order #{orderId.slice(0, 8)}
-              </h1>
-              <StatusBadge status={s} />
+      <Card className="overflow-hidden rounded-2xl shadow-sm">
+        <CardContent className="p-0">
+          <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+              <Button variant="ghost" size="icon" className="shrink-0" asChild>
+                <Link href="/dashboard/orders" aria-label="Back to orders">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+              </Button>
+              <div
+                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${VARIANT_CIRCLE_BG[statusPresentation.variant] ?? "bg-primary/10 text-primary"}`}
+              >
+                <CurrentIcon className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                    Order #{orderId.slice(0, 8)}
+                  </h1>
+                  <StatusBadge status={s} />
+                </div>
+                <p className="mt-1 truncate text-sm text-muted-foreground">
+                  {websiteUrl} · {order.type.replaceAll("_", " ").toLowerCase()}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {currentStatusConfig.description} · Created{" "}
+                  {formatDistanceToNow(new Date(order.createdAt), {
+                    addSuffix: true,
+                  })}
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground">
-              {currentStatusConfig.description} &middot; Created{" "}
-              {formatDistanceToNow(new Date(order.createdAt), {
-                addSuffix: true,
-              })}
-            </p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:min-w-[430px]">
+              <div className="rounded-xl border bg-muted/30 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Order value
+                </p>
+                <p className="mt-1 font-semibold tabular-nums">
+                  {formatPublisherMoney(order.totalAmount, order.currency)}
+                </p>
+              </div>
+              <div className="rounded-xl border bg-muted/30 p-3">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Deadline
+                </p>
+                <p
+                  className={`mt-1 text-sm font-semibold ${
+                    due.risk === "overdue"
+                      ? "text-red-700"
+                      : due.risk === "soon"
+                        ? "text-amber-700"
+                        : ""
+                  }`}
+                >
+                  {due.label}
+                </p>
+              </div>
+              <div className="col-span-2 rounded-xl border bg-muted/30 p-3 sm:col-span-1">
+                <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  Turnaround
+                </p>
+                <p className="mt-1 text-sm font-semibold">
+                  {order.turnaroundDays
+                    ? `${order.turnaroundDays} days`
+                    : "Not specified"}
+                </p>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
+          <div className="flex flex-col gap-3 border-t bg-muted/30 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Next step
+              </p>
+              <p className="mt-0.5 font-semibold">{nextAction.label}</p>
+            </div>
+            {hasPrimaryAction ? (
+              <Button asChild>
+                <a href="#order-action">
+                  Continue workflow <ArrowRight className="ml-2 h-4 w-4" />
+                </a>
+              </Button>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No action is required from you right now.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Progress */}
       <OrderProgress status={s} />
 
       {cancellationPreview?.activeRequest?.status === "REQUESTED" &&
         cancellationPreview.activeRequest.requesterType === "CUSTOMER" && (
-          <Card className="border-amber-300 bg-amber-50/50">
+          <Card
+            id="order-action"
+            className="scroll-mt-24 border-amber-300 bg-amber-50/50"
+          >
             <CardHeader>
               <CardTitle className="text-base">
                 Cancellation response needed
@@ -521,81 +606,36 @@ export default function OrderDetailPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">
           {/* Order Details */}
-          <Card>
+          <Card className="rounded-2xl shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <FileText className="h-4 w-4" /> Order Details
+                <FileText className="h-4 w-4" /> Order brief
               </CardTitle>
+              <CardDescription>
+                Review every requirement before accepting or publishing this
+                order.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Service Type</p>
-                  <p className="text-sm font-medium">
-                    {order.type?.replace(/_/g, " ") ?? "—"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Price</p>
-                  <p className="text-sm font-medium">
-                    {order.totalAmount != null
-                      ? `${order.currency ?? "USD"} ${Number(order.totalAmount).toFixed(2)}`
-                      : "—"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Website</p>
-                  <p className="text-sm font-medium">
-                    {order.items?.[0]?.website?.url ?? "—"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Topic / Title</p>
-                  <p className="text-sm font-medium">
-                    {order.items?.[0]?.topic ?? order.title ?? "—"}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Target URL</p>
-                  {order.targetUrl ? (
-                    <a
-                      href={order.targetUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-                    >
-                      {order.targetUrl} <ExternalLink className="h-3 w-3" />
-                    </a>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">—</p>
-                  )}
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Anchor Text</p>
-                  <p className="text-sm font-medium">
-                    {order.anchorText ?? "—"}
-                  </p>
-                </div>
-              </div>
-              {order.instructions && (
-                <>
-                  <hr className="border-border" />
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">
-                      Instructions
-                    </p>
-                    <p className="text-sm whitespace-pre-wrap">
-                      {order.instructions}
-                    </p>
-                  </div>
-                </>
-              )}
+            <CardContent>
+              <BriefRenderer
+                serviceType={order.type}
+                briefData={order.briefData}
+                fallback={{
+                  title: order.title,
+                  instructions: order.instructions,
+                  targetUrl: order.targetUrl ?? order.items?.[0]?.targetUrl,
+                  anchorText: order.anchorText ?? order.items?.[0]?.anchorText,
+                }}
+              />
             </CardContent>
           </Card>
 
           {/* Accept Order */}
           {canAccept && (
-            <Card>
+            <Card
+              id="order-action"
+              className="scroll-mt-24 rounded-2xl border-primary/20 shadow-sm"
+            >
               <CardHeader>
                 <CardTitle className="text-base">Accept Order</CardTitle>
               </CardHeader>
@@ -625,7 +665,10 @@ export default function OrderDetailPage() {
 
           {/* Submit Content */}
           {canSubmitContent && (
-            <Card>
+            <Card
+              id="order-action"
+              className="scroll-mt-24 rounded-2xl border-primary/20 shadow-sm"
+            >
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <FileText className="h-4 w-4" /> Submit Content
@@ -635,6 +678,19 @@ export default function OrderDetailPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                {latestRevision?.notes &&
+                  ["REQUESTED", "CHANGES_REQUESTED"].includes(
+                    latestRevision.status,
+                  ) && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-sm font-semibold text-amber-900">
+                        Requested changes
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap text-sm text-amber-800">
+                        {latestRevision.notes}
+                      </p>
+                    </div>
+                  )}
                 <div className="space-y-2">
                   <Label htmlFor="content">Content</Label>
                   <Textarea
@@ -644,27 +700,6 @@ export default function OrderDetailPage() {
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label>Attachments</Label>
-                  <div className="flex items-center gap-4">
-                    <label className="flex h-10 cursor-pointer items-center gap-2 rounded-md border bg-background px-4 text-sm hover:bg-accent">
-                      <Upload className="h-4 w-4" /> Upload Files
-                      <input
-                        type="file"
-                        multiple
-                        className="hidden"
-                        onChange={(e) =>
-                          setAttachments(Array.from(e.target.files ?? []))
-                        }
-                      />
-                    </label>
-                    {attachments.length > 0 && (
-                      <span className="text-sm text-muted-foreground">
-                        {attachments.length} file(s)
-                      </span>
-                    )}
-                  </div>
                 </div>
                 <Button
                   onClick={() => contentSubmitMutation.mutate({ content })}
@@ -680,7 +715,10 @@ export default function OrderDetailPage() {
 
           {/* Mark Published */}
           {canMarkPublished && (
-            <Card>
+            <Card
+              id="order-action"
+              className="scroll-mt-24 rounded-2xl border-primary/20 shadow-sm"
+            >
               <CardHeader>
                 <CardTitle className="text-base">Mark as Published</CardTitle>
               </CardHeader>
@@ -958,7 +996,7 @@ export default function OrderDetailPage() {
                 asChild
               >
                 <Link
-                  href={`/dashboard/support?new=true&subject=Order%20${orderId}`}
+                  href={`/dashboard/support?new=true&orderId=${encodeURIComponent(orderId)}&subject=${encodeURIComponent(`Order ${orderId.slice(0, 8)}`)}`}
                 >
                   <MessageSquare className="mr-2 h-4 w-4" /> Contact Support
                 </Link>
@@ -972,35 +1010,6 @@ export default function OrderDetailPage() {
                   <XCircle className="mr-2 h-4 w-4" /> Request Cancellation
                 </Button>
               )}
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => {
-                  const blob = new Blob(
-                    [
-                      JSON.stringify(
-                        {
-                          orderId,
-                          amount: order.totalAmount,
-                          date: order.createdAt,
-                        },
-                        null,
-                        2,
-                      ),
-                    ],
-                    { type: "application/json" },
-                  )
-                  const url = URL.createObjectURL(blob)
-                  const a = document.createElement("a")
-                  a.href = url
-                  a.download = `invoice-${orderId.slice(0, 8)}.json`
-                  a.click()
-                  URL.revokeObjectURL(url)
-                  toast.success("Invoice downloaded")
-                }}
-              >
-                <Download className="mr-2 h-4 w-4" /> Download Invoice
-              </Button>
             </CardContent>
           </Card>
         </div>

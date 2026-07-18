@@ -13,7 +13,20 @@ export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, clearToken, getToken, HttpClient, setToken } from "./client"
 export type {
   AdminCancellationRequestResponse,
+  AdminCommandCenterAction,
+  AdminCommandCenterActionType,
+  AdminCommandCenterPriority,
+  AdminCommandCenterResponse,
   AdminDeliveryVerificationQueueItem,
+  AdminFinancePipelineStage,
+  AdminFinanceWorkbenchAction,
+  AdminFinanceWorkbenchActionType,
+  AdminFinanceWorkbenchPriority,
+  AdminFinanceWorkbenchResponse,
+  AdminOperationsWorkbenchAction,
+  AdminOperationsWorkbenchActionType,
+  AdminOperationsWorkbenchPriority,
+  AdminOperationsWorkbenchResponse,
   AdminOpsStaffResponse,
   AdminOrderDetailResponse,
   AdminOrderResponse,
@@ -34,6 +47,7 @@ export { AdminService } from "./services/admin"
 export type { ApiKeyCreatedResponse, ApiKeyResponse } from "./services/api-keys"
 export { ApiKeysService } from "./services/api-keys"
 export { BillingService } from "./services/billing"
+export type { Campaign } from "./services/campaigns"
 export { CampaignsService } from "./services/campaigns"
 export { IdentityService } from "./services/identity"
 export { IntegrationsService } from "./services/integrations"
@@ -79,6 +93,11 @@ export { PublishersService } from "./services/publishers"
 export { ReportingService } from "./services/reporting"
 export type { SettlementResponse } from "./services/settlements"
 export { SettlementsService } from "./services/settlements"
+export type {
+  TicketDetail,
+  TicketListItem,
+  TicketMessageDto,
+} from "./services/support"
 export { SupportService } from "./services/support"
 
 import { type ApiClientConfig, HttpClient } from "./client"

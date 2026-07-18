@@ -95,6 +95,8 @@ export type WithdrawalStatus =
   | "PROCESSING"
   | "COMPLETED"
   | "REJECTED"
+  | "FAILED"
+  | "REVERSED"
 
 export type PublisherTier = "NEW" | "TRUSTED" | "VERIFIED"
 

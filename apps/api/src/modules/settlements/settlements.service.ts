@@ -1,3 +1,4 @@
+import type { Prisma, SettlementStatus } from "@guestpost/database"
 import {
   buildSettlementEligibilitySnapshot,
   checkSeparationOfDuties,
@@ -270,8 +271,16 @@ export class SettlementsService {
     return settlement
   }
 
-  async listSettlements(organizationId?: string, take = 50, skip = 0) {
-    const where = organizationId ? { order: { organizationId } } : {}
+  async listSettlements(
+    organizationId?: string,
+    take = 50,
+    skip = 0,
+    statuses?: SettlementStatus[],
+  ) {
+    const where: Prisma.SettlementWhereInput = {
+      ...(organizationId ? { order: { organizationId } } : {}),
+      ...(statuses?.length ? { status: { in: statuses } } : {}),
+    }
     const [items, total] = await this.prisma.$transaction([
       this.prisma.settlement.findMany({
         where,

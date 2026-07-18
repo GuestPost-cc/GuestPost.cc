@@ -1,5 +1,6 @@
 "use client"
 
+import type { OrderResponse } from "@guestpost/api-client"
 import {
   Badge,
   Button,
@@ -37,31 +38,10 @@ import {
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
-
-interface ReportOrder {
-  id: string
-  status: string
-  items: Array<{
-    serviceType: string
-    topic: string | null
-    targetUrl?: string | null
-    anchorText?: string | null
-    website: { id: string; url: string } | null
-    publications?: Array<{
-      id: string
-      publishedUrl?: string
-      publishedAt?: string
-    }>
-  }>
-  amount?: number | null
-  totalAmount?: number | null
-  createdAt: string
-  updatedAt: string
-  events: Array<{
-    eventType: string
-    createdAt: string
-  }>
-}
+import {
+  CUSTOMER_RESULT_STATUSES,
+  formatCustomerMoney,
+} from "../../../lib/customer-order-workflow"
 
 const dateRangeOptions = [
   { value: "7", label: "Last 7 days" },
@@ -117,14 +97,38 @@ const escapeHtml = (value: string) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;")
 
-function getFirstPublishedUrl(order: ReportOrder): string | null {
+function getFirstPublishedUrl(order: OrderResponse): string | null {
   const pub = order.items?.[0]?.publications?.[0]
   return pub?.publishedUrl || null
 }
 
-function getFirstPublishedDate(order: ReportOrder): string | null {
+function getFirstPublishedDate(order: OrderResponse): string | null {
   const pub = order.items?.[0]?.publications?.[0]
-  return pub?.publishedAt || null
+  return pub?.publicationDate || null
+}
+
+function safeHostname(value: string) {
+  try {
+    return new URL(value).hostname
+  } catch {
+    return value
+  }
+}
+
+async function listAllReportOrders() {
+  const orders: OrderResponse[] = []
+  let skip = 0
+  let total = Number.POSITIVE_INFINITY
+
+  while (skip < total) {
+    const page = await api.orders.listPaginated({ take: 100, skip })
+    orders.push(...page.items)
+    total = page.total
+    if (page.items.length === 0) break
+    skip += page.items.length
+  }
+
+  return orders
 }
 
 export default function ReportsPage() {
@@ -137,9 +141,9 @@ export default function ReportsPage() {
     isLoading,
     error,
     refetch,
-  } = useQuery<ReportOrder[]>({
-    queryKey: ["orders"],
-    queryFn: () => api.orders.list() as Promise<ReportOrder[]>,
+  } = useQuery<OrderResponse[]>({
+    queryKey: ["customer-report-orders"],
+    queryFn: listAllReportOrders,
   })
 
   const filteredOrders = useMemo(() => {
@@ -149,22 +153,20 @@ export default function ReportsPage() {
     let orders = ordersData
 
     if (range) {
-      orders = orders.filter((order: ReportOrder) => {
+      orders = orders.filter((order) => {
         const created = new Date(order.createdAt)
         return created >= range.start && created <= range.end
       })
     }
 
     if (statusFilter && statusFilter !== "all") {
-      orders = orders.filter(
-        (order: ReportOrder) => order.status === statusFilter,
-      )
+      orders = orders.filter((order) => order.status === statusFilter)
     }
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       orders = orders.filter(
-        (order: ReportOrder) =>
+        (order) =>
           order.id.toLowerCase().includes(query) ||
           order.items?.[0]?.topic?.toLowerCase().includes(query) ||
           order.items?.[0]?.website?.url?.toLowerCase().includes(query),
@@ -174,27 +176,25 @@ export default function ReportsPage() {
     return orders
   }, [ordersData, dateRange, statusFilter, searchQuery])
 
-  const publishedOrders = filteredOrders.filter((o: ReportOrder) =>
-    ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status),
+  const publishedOrders = filteredOrders.filter((order) =>
+    CUSTOMER_RESULT_STATUSES.includes(order.status),
   )
 
   const stats = useMemo(() => {
     const orders = filteredOrders
     return {
       totalOrders: orders.length,
-      published: orders.filter((o: ReportOrder) =>
-        ["PUBLISHED", "COMPLETED", "VERIFIED"].includes(o.status),
+      published: orders.filter((order) =>
+        CUSTOMER_RESULT_STATUSES.includes(order.status),
       ).length,
       totalSpend: orders.reduce(
-        (sum: number, o: ReportOrder) =>
-          sum + Number(o.amount || o.totalAmount || 0),
+        (sum, order) => sum + Number(order.totalAmount || 0),
         0,
       ),
       avgOrderValue:
         orders.length > 0
           ? orders.reduce(
-              (sum: number, o: ReportOrder) =>
-                sum + Number(o.amount || o.totalAmount || 0),
+              (sum, order) => sum + Number(order.totalAmount || 0),
               0,
             ) / orders.length
           : 0,
@@ -212,7 +212,7 @@ export default function ReportsPage() {
       "Publish Date",
       "Price",
     ]
-    const rows = publishedOrders.map((order: ReportOrder) => {
+    const rows = publishedOrders.map((order) => {
       const item = order.items?.[0]
       const publishedUrl = getFirstPublishedUrl(order)
       const publishedDate = getFirstPublishedDate(order)
@@ -224,7 +224,7 @@ export default function ReportsPage() {
         item?.serviceType?.replace(/_/g, " ") || "",
         order.status,
         publishedDate ? format(new Date(publishedDate), "yyyy-MM-dd") : "",
-        Number(order.amount || order.totalAmount || 0).toFixed(2),
+        Number(order.totalAmount || 0).toFixed(2),
       ]
     })
 
@@ -245,7 +245,7 @@ export default function ReportsPage() {
       return
     }
     const rows = publishedOrders
-      .map((order: ReportOrder) => {
+      .map((order) => {
         const item = order.items?.[0]
         const publishedUrl = getFirstPublishedUrl(order)
         const publishedDate = getFirstPublishedDate(order)
@@ -255,7 +255,7 @@ export default function ReportsPage() {
         <td>${escapeHtml(item?.anchorText || "—")}</td>
         <td>${escapeHtml(order.status)}</td>
         <td>${publishedDate ? format(new Date(publishedDate), "PP") : "—"}</td>
-        <td style="text-align:right">$${(Number(order.amount || order.totalAmount || 0)).toFixed(2)}</td>
+        <td style="text-align:right">${escapeHtml(formatCustomerMoney(order.totalAmount, order.currency))}</td>
       </tr>`
       })
       .join("")
@@ -277,7 +277,7 @@ export default function ReportsPage() {
       "Publish Date",
       "Price",
     ]
-    const rows = publishedOrders.map((order: ReportOrder) => {
+    const rows = publishedOrders.map((order) => {
       const item = order.items?.[0]
       const publishedUrl = getFirstPublishedUrl(order)
       const publishedDate = getFirstPublishedDate(order)
@@ -289,7 +289,7 @@ export default function ReportsPage() {
         item?.serviceType?.replace(/_/g, " ") || "",
         order.status,
         publishedDate ? format(new Date(publishedDate), "yyyy-MM-dd") : "",
-        Number(order.amount || order.totalAmount || 0).toFixed(2),
+        Number(order.totalAmount || 0).toFixed(2),
       ]
     })
     const xls = [
@@ -349,7 +349,7 @@ export default function ReportsPage() {
             </p>
           </div>
         </div>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader>
             <Skeleton className="h-6 w-32" />
           </CardHeader>
@@ -387,7 +387,7 @@ export default function ReportsPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-4">
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Orders
@@ -398,7 +398,7 @@ export default function ReportsPage() {
             <p className="text-xs text-muted-foreground">in selected period</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Published
@@ -417,12 +417,12 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">
-              ${stats.totalSpend.toFixed(2)}
+              {formatCustomerMoney(stats.totalSpend)}
             </div>
             <p className="text-xs text-muted-foreground">in selected period</p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Avg Order Value
@@ -430,14 +430,14 @@ export default function ReportsPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">
-              ${stats.avgOrderValue.toFixed(2)}
+              {formatCustomerMoney(stats.avgOrderValue)}
             </div>
             <p className="text-xs text-muted-foreground">per order</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -476,9 +476,10 @@ export default function ReportsPage() {
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
                   <SelectItem value="PUBLISHED">Published</SelectItem>
-                  <SelectItem value="COMPLETED">Completed</SelectItem>
                   <SelectItem value="VERIFIED">Verified</SelectItem>
-                  <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
+                  <SelectItem value="DELIVERED">Delivered</SelectItem>
+                  <SelectItem value="SETTLED">Settled</SelectItem>
+                  <SelectItem value="COMPLETED">Completed</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -511,7 +512,7 @@ export default function ReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {publishedOrders.map((order: ReportOrder) => {
+                  {publishedOrders.map((order) => {
                     const item = order.items?.[0]
                     const publishedUrl = getFirstPublishedUrl(order)
                     const publishedDate = getFirstPublishedDate(order)
@@ -525,7 +526,7 @@ export default function ReportsPage() {
                               rel="noopener noreferrer"
                               className="flex items-center gap-1 text-primary hover:underline"
                             >
-                              {new URL(publishedUrl).hostname}
+                              {safeHostname(publishedUrl)}
                               <ExternalLink className="h-3 w-3" />
                             </a>
                           ) : (
@@ -549,7 +550,7 @@ export default function ReportsPage() {
                         <TableCell>
                           <span className="text-sm">
                             {item?.website?.url
-                              ? new URL(item.website.url).hostname
+                              ? safeHostname(item.website.url)
                               : "—"}
                           </span>
                         </TableCell>
@@ -564,10 +565,10 @@ export default function ReportsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          $
-                          {Number(
-                            order.amount || order.totalAmount || 0,
-                          ).toFixed(2)}
+                          {formatCustomerMoney(
+                            order.totalAmount,
+                            order.currency,
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button

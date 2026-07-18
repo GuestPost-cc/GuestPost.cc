@@ -46,11 +46,14 @@ import { useAuth } from "../../../lib/auth"
 export default function AdminSupportPage() {
   const { user } = useAuth()
   const isFinance = user?.staffRole === "FINANCE"
+  const isOperations = user?.staffRole === "OPERATIONS"
 
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [channelFilter, setChannelFilter] = useState<string>("all")
-  const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
+  const [assigneeFilter, setAssigneeFilter] = useState<string>(
+    isOperations && user?.id ? user.id : "all",
+  )
   const [page, setPage] = useState(1)
 
   const { data, isLoading, error, refetch } = useQuery({
@@ -105,11 +108,19 @@ export default function AdminSupportPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Support</h1>
+          <h1 className="text-3xl font-bold tracking-tight">
+            {isFinance
+              ? "Finance Support"
+              : isOperations
+                ? "Operations Support"
+                : "Support"}
+          </h1>
           <p className="text-muted-foreground">
             {isFinance
               ? "Publisher-ticket replies and internal notes. Platform tickets are read-only except for internal notes."
-              : "Customer support ticket queue"}
+              : isOperations
+                ? "Support for platform listings and orders assigned to you. Unassigned platform tickets remain read-only until assigned."
+                : "Customer support ticket queue"}
           </p>
         </div>
       </div>

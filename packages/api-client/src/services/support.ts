@@ -85,12 +85,7 @@ export class SupportService {
   // Backend stores the body as `description` — the previous `message`/`priority`
   // keys were silently dropped, so tickets were created with no detail. Map
   // explicitly and allow linking an order.
-  createTicket(data: {
-    subject: string
-    message: string
-    priority?: string
-    orderId?: string
-  }) {
+  createTicket(data: { subject: string; message: string; orderId?: string }) {
     return this.client.post<{ id: string; status: string }>(
       "/support/tickets",
       {

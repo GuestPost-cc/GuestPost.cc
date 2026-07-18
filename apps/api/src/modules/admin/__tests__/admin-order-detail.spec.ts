@@ -7,7 +7,7 @@ describe("AdminService — order detail", () => {
 
   beforeEach(() => {
     prisma = {
-      order: { findUnique: jest.fn() },
+      order: { findFirst: jest.fn() },
       user: { findMany: jest.fn() },
     }
     service = new AdminService(prisma, {} as any, {} as any)
@@ -16,7 +16,7 @@ describe("AdminService — order detail", () => {
   it("enriches human settlement approvers and preserves approval timestamps", async () => {
     const customerApprovedAt = new Date("2026-07-13T19:49:15.163Z")
     const systemApprovedAt = new Date("2026-07-13T20:09:11.283Z")
-    prisma.order.findUnique.mockResolvedValue({
+    prisma.order.findFirst.mockResolvedValue({
       id: "order-completed",
       status: "COMPLETED",
       settlements: [
@@ -75,7 +75,7 @@ describe("AdminService — order detail", () => {
   })
 
   it("does not query approvers when the order does not exist", async () => {
-    prisma.order.findUnique.mockResolvedValue(null)
+    prisma.order.findFirst.mockResolvedValue(null)
 
     await expect(service.getOrder("missing-order")).rejects.toThrow(
       NotFoundException,

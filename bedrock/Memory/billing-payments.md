@@ -33,6 +33,7 @@ Pattern: **reserve → capture → release** using Stripe integration.
 
 - `splitPlatformFee` Decimal helper (fee-by-subtraction)
 - The buyer billing page consumes the API client's `TransactionResponse` contract directly. Transaction amounts may arrive as `string | number` and are converted with `Number(...)` only at arithmetic and display boundaries; avoid narrower page-local transaction interfaces.
+- Customer Billing is an OWNER-only portal surface. The sidebar omits it for MEMBER users and the page independently fails closed on a direct member URL. Available and reserved balances come directly from `GET /billing/wallet`; reservation rows are labeled as held funds rather than duplicate spend. Dashboard and checkout expose the same authoritative balance fields without changing wallet, deposit, capture, refund, or settlement behavior.
 - `Transaction.reference @@unique` is the primary webhook idempotency key; provider-aware `providerRef` uniqueness is defence in depth.
 - Refunds are wallet-credit only (no Stripe refund-to-card yet)
 - Chargebacks reserve the still-available portion of the originating deposit, record any shortfall, and notify staff. The dispute lookups use the same Stripe provider identity as the write path.

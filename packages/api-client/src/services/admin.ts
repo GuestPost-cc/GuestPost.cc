@@ -70,6 +70,203 @@ export interface AdminStaffPerformanceResponse {
   items: AdminStaffPerformanceItem[]
 }
 
+export type AdminCommandCenterPriority = "CRITICAL" | "HIGH" | "MEDIUM"
+
+export type AdminCommandCenterActionType =
+  | "RECONCILIATION"
+  | "CANCELLATION"
+  | "DISPUTE"
+  | "DELIVERY_VERIFICATION"
+  | "FULFILLMENT"
+  | "SETTLEMENT"
+  | "WITHDRAWAL"
+  | "SUPPORT"
+
+export interface AdminCommandCenterAction {
+  id: string
+  type: AdminCommandCenterActionType
+  priority: AdminCommandCenterPriority
+  title: string
+  description: string
+  owner: "Operations" | "Finance" | "Resolution" | "Support"
+  href: string
+  createdAt: string
+  deadlineAt: string | null
+  amount: string | null
+  currency: string | null
+}
+
+export interface AdminCommandCenterResponse {
+  generatedAt: string
+  overview: {
+    needsAction: number
+    activeOrders: number
+    financeExceptions: number
+    verificationIssues: number
+  }
+  actionQueue: AdminCommandCenterAction[]
+  lifecycle: Array<{
+    key: string
+    label: string
+    count: number
+  }>
+  health: {
+    unassignedFulfillment: number
+    overdueFulfillment: number
+    activeDisputes: number
+    activeCancellations: number
+    unassignedSupport: number
+    domainVerificationIssues: number
+    marketplacePendingReview: number
+  }
+  finance: {
+    currency: string
+    gmv: string
+    netRevenue: string
+    settlementsInReview: number
+    withdrawalsPending: number
+    failedWithdrawals: number
+    failedPayouts: number
+    reconciliation: {
+      available: boolean
+      ok: boolean
+      critical: number
+      warning: number
+      totalIssues: number
+      ranAt: string | null
+    }
+  }
+  recentActivity: Array<{
+    id: string
+    action: string
+    entity: string
+    entityId: string | null
+    actorName: string
+    createdAt: string
+  }>
+}
+
+export type AdminFinanceWorkbenchPriority = "CRITICAL" | "HIGH" | "MEDIUM"
+
+export type AdminFinanceWorkbenchActionType =
+  | "RECONCILIATION"
+  | "SUPPORT"
+  | "PAYOUT"
+  | "WITHDRAWAL"
+  | "CANCELLATION"
+  | "DISPUTE"
+  | "SETTLEMENT"
+
+export interface AdminFinanceWorkbenchAction {
+  id: string
+  type: AdminFinanceWorkbenchActionType
+  priority: AdminFinanceWorkbenchPriority
+  title: string
+  description: string
+  href: string
+  createdAt: string
+  deadlineAt: string | null
+  amount: string | null
+  currency: string | null
+}
+
+export interface AdminFinanceWorkbenchResponse {
+  generatedAt: string
+  currency: "USD"
+  overview: {
+    readyForDecision: number
+    activeSupport: number
+    fundsInFlight: string
+    financialExceptions: number
+    netRevenue30d: string
+  }
+  actionQueue: AdminFinanceWorkbenchAction[]
+  support: {
+    active: number
+    overdue: number
+    items: Array<{
+      id: string
+      subject: string
+      status: TicketStatus
+      channel: "PUBLISHER" | "PLATFORM" | null
+      replyMode: "PUBLIC_AND_INTERNAL" | "INTERNAL_ONLY"
+      requesterName: string | null
+      publisherName: string | null
+      order: {
+        id: string
+        title: string | null
+        status: string
+        amount: string | null
+        currency: string
+      } | null
+      createdAt: string
+      updatedAt: string
+      overdue: boolean
+    }>
+  }
+  pipeline: {
+    settlements: AdminFinancePipelineStage[]
+    withdrawals: AdminFinancePipelineStage[]
+    payouts: AdminFinancePipelineStage[]
+  }
+  decisions: {
+    settlementsReady: number
+    withdrawalsEligible: number
+    cancellationsPendingFinance: number
+    activeDisputes: number
+  }
+  reconciliation: {
+    available: boolean
+    ok: boolean
+    critical: number
+    warning: number
+    totalIssues: number
+    ranAt: string | null
+  }
+  revenue:
+    | {
+        available: true
+        current: RevenueTotalsSlice
+        previous: RevenueTotalsSlice | null
+        deltaPct: RevenueDeltaPct | null
+        currencyMismatch: {
+          rowCount: number
+          distinctCurrencies: string[]
+        } | null
+      }
+    | {
+        available: false
+        current: null
+        previous: null
+        deltaPct: null
+        currencyMismatch: null
+      }
+  publisherRisk: {
+    publishersWithDebt: number
+    totalDebt: string
+    items: Array<{
+      publisherId: string
+      publisherName: string | null
+      debtBalance: string
+    }>
+  }
+  recentActivity: Array<{
+    id: string
+    action: string
+    entity: string
+    entityId: string | null
+    actorName: string
+    href: string
+    createdAt: string
+  }>
+}
+
+export interface AdminFinancePipelineStage {
+  status: string
+  count: number
+  amount: string
+}
+
 export type OperationsInboxView =
   | "active"
   | "available"
@@ -149,6 +346,84 @@ export interface OperationsInboxResponse
     completed: number
     salesByCurrency: MoneyByCurrency
   } | null
+}
+
+export type AdminOperationsWorkbenchPriority = "CRITICAL" | "HIGH" | "MEDIUM"
+
+export type AdminOperationsWorkbenchActionType =
+  | "SUPPORT"
+  | "FULFILLMENT"
+  | "CANCELLATION"
+  | "DISPUTE"
+  | "DELIVERY_VERIFICATION"
+  | "DOMAIN_VERIFICATION"
+  | "MODERATION"
+  | "INVENTORY"
+
+export interface AdminOperationsWorkbenchAction {
+  id: string
+  type: AdminOperationsWorkbenchActionType
+  priority: AdminOperationsWorkbenchPriority
+  title: string
+  description: string
+  href: string
+  createdAt: string
+  deadlineAt: string | null
+  claimable: boolean
+}
+
+export interface AdminOperationsWorkbenchResponse {
+  generatedAt: string
+  overview: {
+    needsAttention: number
+    myActive: number
+    available: number
+    readyToPublish: number
+    verificationIssues: number
+    assignedSupport: number
+  }
+  actionQueue: AdminOperationsWorkbenchAction[]
+  support: {
+    assigned: number
+    overdue: number
+    items: Array<{
+      id: string
+      subject: string
+      status: TicketStatus
+      order: {
+        id: string
+        title: string | null
+        status: OrderStatus
+        websiteName: string | null
+      } | null
+      createdAt: string
+      updatedAt: string
+      overdue: boolean
+    }>
+  }
+  fulfillment: {
+    myActive: number
+    available: number
+    waitingCustomer: number
+    readyToPublish: number
+    overdue: number
+    verificationTotal: number
+    totalAssigned: number
+    claimed: number
+    completed: number
+    salesByCurrency: MoneyByCurrency
+  }
+  resolution: {
+    cancellations: number
+    disputes: number
+    deliveryVerification: number
+    domainVerification: number
+  }
+  inventory: {
+    pendingModeration: number
+    assignedListingIssues: number
+    integrationIssues: number
+  }
 }
 
 export interface OperationsOrderDetail extends OperationsInboxOrder {
@@ -460,28 +735,53 @@ export interface AdminSettlementResponse {
   id: string
   orderId: string
   publisherId: string
-  amount: number
-  currency: string
+  grossAmount: string | number
+  platformFee: string | number
+  publisherAmount: string | number
   status: SettlementStatus
-  reviewWindowEndsAt: string | null
+  reviewEndsAt: string | null
+  releasePolicy: string
   createdAt: string
+  order: {
+    id: string
+    title: string | null
+    currency: string
+  }
   publisher: { id: string; name: string | null; email: string }
 }
 
 export interface AdminWithdrawalResponse {
   id: string
   publisherId: string
-  amount: number
-  currency: string
+  amount: string | number
   status: WithdrawalStatus
   availableAt: string | null
-  note: string | null
   createdAt: string
-  publisher: { id: string; name: string | null; email: string }
+  publisher: {
+    id: string
+    name: string | null
+    email: string
+    tier: string
+  }
+  payoutMethod: {
+    id: string
+    type: string
+    label: string
+  } | null
 }
 
 export class AdminService {
   constructor(private client: HttpClient) {}
+
+  getCommandCenter() {
+    return this.client.get<AdminCommandCenterResponse>("/admin/command-center")
+  }
+
+  getFinanceWorkbench() {
+    return this.client.get<AdminFinanceWorkbenchResponse>(
+      "/admin/finance-workbench",
+    )
+  }
 
   listUsers(params?: {
     search?: string
@@ -627,11 +927,11 @@ export class AdminService {
     })
   }
 
-  listSettlements(take?: number, skip?: number) {
+  listSettlements(take?: number, skip?: number, statuses?: SettlementStatus[]) {
     return this.client.get<PaginatedResponse<AdminSettlementResponse>>(
       "/admin/settlements",
       {
-        params: { take, skip },
+        params: { take, skip, status: statuses?.join(",") },
       } as RequestOptions,
     )
   }
@@ -648,11 +948,11 @@ export class AdminService {
     })
   }
 
-  listWithdrawals(take?: number, skip?: number) {
+  listWithdrawals(take?: number, skip?: number, statuses?: WithdrawalStatus[]) {
     return this.client.get<PaginatedResponse<AdminWithdrawalResponse>>(
       "/admin/withdrawals",
       {
-        params: { take, skip },
+        params: { take, skip, status: statuses?.join(",") },
       } as RequestOptions,
     )
   }
@@ -997,6 +1297,11 @@ export class AdminService {
     return this.client.get<OperationsInboxResponse>("/operations/fulfillment", {
       params: params as Record<string, string | number | boolean | undefined>,
     } as RequestOptions)
+  }
+  getOperationsWorkbench() {
+    return this.client.get<AdminOperationsWorkbenchResponse>(
+      "/admin/operations-workbench",
+    )
   }
   operationsOrder(orderId: string) {
     return this.client.get<OperationsOrderDetail>(

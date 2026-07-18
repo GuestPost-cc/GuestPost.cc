@@ -157,10 +157,19 @@ export class CampaignsService {
         orderBy: { createdAt: "desc" },
         take,
         skip,
+        include: { _count: { select: { orders: true } } },
       }),
       this.prisma.campaign.count({ where }),
     ])
-    return { items, total, take, skip }
+    return {
+      items: items.map(({ _count, ...campaign }) => ({
+        ...campaign,
+        orderCount: _count.orders,
+      })),
+      total,
+      take,
+      skip,
+    }
   }
 
   async getCampaign(id: string, organizationId: string) {

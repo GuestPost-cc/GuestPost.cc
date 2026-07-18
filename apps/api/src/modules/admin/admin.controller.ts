@@ -1,4 +1,8 @@
-import { CancellationRequestStatus } from "@guestpost/database"
+import {
+  CancellationRequestStatus,
+  SettlementStatus,
+  WithdrawalStatus,
+} from "@guestpost/database"
 import {
   BadRequestException,
   Body,
@@ -48,6 +52,7 @@ import { SettlementsService } from "../settlements/settlements.service"
 import { AddTicketMessageDto } from "../support/dto/add-ticket-message.dto"
 import { SupportActor, SupportService } from "../support/support.service"
 import { AdminService } from "./admin.service"
+import { CommandCenterService } from "./command-center.service"
 import {
   BanUserDto,
   BulkRetryVerificationDto,
@@ -79,6 +84,8 @@ import {
 import { GetRevenueQueryDto } from "./dto/get-revenue-query.dto"
 import { buildRevenueCsvFilename, streamRevenueCsv } from "./finance/csv-stream"
 import { RevenueService } from "./finance/revenue.service"
+import { FinanceWorkbenchService } from "./finance-workbench.service"
+import { OperationsWorkbenchService } from "./operations-workbench.service"
 import { ReconciliationService } from "./reconciliation.service"
 import { AdminVerificationQueueService } from "./verification-queue.service"
 import { WebsiteVerificationService } from "./website-verification.service"
@@ -164,7 +171,37 @@ export class AdminController {
     private readonly support: SupportService,
     private readonly revenue: RevenueService,
     private readonly verificationQueue: AdminVerificationQueueService,
+    private readonly commandCenter: CommandCenterService,
+    private readonly financeWorkbench: FinanceWorkbenchService,
+    private readonly operationsWorkbench: OperationsWorkbenchService,
   ) {}
+
+  @Get("command-center")
+  @StaffRoles("SUPER_ADMIN")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
+  getCommandCenter() {
+    return this.commandCenter.getCommandCenter()
+  }
+
+  @Get("finance-workbench")
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
+  getFinanceWorkbench(@CurrentUser() user: any) {
+    return this.financeWorkbench.getWorkbench(user.staffRole)
+  }
+
+  @Get("operations-workbench")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @Header("Cache-Control", "private, no-store, no-cache, must-revalidate")
+  @Header("Pragma", "no-cache")
+  getOperationsWorkbench(@CurrentUser() user: any) {
+    return this.operationsWorkbench.getWorkbench({
+      id: user.id,
+      staffRole: user.staffRole,
+    })
+  }
 
   // Recompute a publisher's trust score + tier from their full track record.
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
@@ -174,7 +211,7 @@ export class AdminController {
   }
 
   // ── Verification governance + review center ────────────────────────────────
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN")
   @Get("websites/force-approved")
   forceApprovedReport(@CurrentUser() user: any) {
     return this.websiteVerification.forceApprovedReport(user.id)
@@ -351,8 +388,8 @@ export class AdminController {
 
   @Get("orders/:id")
   @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
-  getOrder(@Param("id") id: string) {
-    return this.admin.getOrder(id)
+  getOrder(@Param("id") id: string, @CurrentUser() user: any) {
+    return this.admin.getOrder(id, user)
   }
 
   @Post("orders/:id/manual-verify")
@@ -627,9 +664,31 @@ export class AdminController {
 
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   @Get("settlements")
-  listSettlements(@Query("take") take?: string, @Query("skip") skip?: string) {
+  listSettlements(
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+    @Query("status") status?: string,
+  ) {
     const { take: t, skip: s } = parsePagination(take, skip)
-    return this.settlements.listSettlements(undefined, t, s)
+    const statuses = status
+      ? status
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : []
+    const allowed = new Set(Object.values(SettlementStatus))
+    const invalid = statuses.find(
+      (value) => !allowed.has(value as SettlementStatus),
+    )
+    if (invalid) {
+      throw new BadRequestException(`Invalid settlement status: ${invalid}`)
+    }
+    return this.settlements.listSettlements(
+      undefined,
+      t,
+      s,
+      statuses as SettlementStatus[],
+    )
   }
 
   @StaffRoles("SUPER_ADMIN", "FINANCE")
@@ -690,9 +749,31 @@ export class AdminController {
 
   @StaffRoles("SUPER_ADMIN", "FINANCE")
   @Get("withdrawals")
-  listWithdrawals(@Query("take") take?: string, @Query("skip") skip?: string) {
+  listWithdrawals(
+    @Query("take") take?: string,
+    @Query("skip") skip?: string,
+    @Query("status") status?: string,
+  ) {
     const { take: t, skip: s } = parsePagination(take, skip)
-    return this.payouts.listWithdrawals(undefined, t, s)
+    const statuses = status
+      ? status
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : []
+    const allowed = new Set(Object.values(WithdrawalStatus))
+    const invalid = statuses.find(
+      (value) => !allowed.has(value as WithdrawalStatus),
+    )
+    if (invalid) {
+      throw new BadRequestException(`Invalid withdrawal status: ${invalid}`)
+    }
+    return this.payouts.listWithdrawals(
+      undefined,
+      t,
+      s,
+      statuses as WithdrawalStatus[],
+    )
   }
 
   @Patch("withdrawals/:id/approve")

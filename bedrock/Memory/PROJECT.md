@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # GuestPost.cc
@@ -36,7 +36,7 @@ Open/partial items require architectural design discussion.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 849 unit tests + integration tests
+- **apps/api** — NestJS REST API, 876 unit tests + integration tests
 - **apps/worker** — BullMQ queue processor
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard
@@ -65,6 +65,11 @@ Open/partial items require architectural design discussion.
 - Paid refunds use one transaction-aware path that reverses platform revenue or publisher settlement, cancels active assignments, credits the organization wallet, transitions the order, and writes ledger/event/audit records together. `Order.refundResponsibility` prevents platform/customer-attributed refunds from lowering publisher trust.
 - Platform-fulfilled orders create platform revenue and complete directly rather than creating publisher settlements. Worker sweeps enforce the acceptance and cancellation-response deadlines. Dispute refunds require Finance/Super Admin plus explicit responsibility rather than inferring fault from the listing channel.
 - Prisma migrations are an API/worker release prerequisite. Generate the client from the migrated schema, apply migrations before serving requests that select new fields, and verify `prisma migrate status` during the release; otherwise shared reads such as order and billing queries can fail together with HTTP 500 responses.
+- The customer portal is an order-focused workbench. Its dashboard uses exact server totals for attention, active work, and delivered results; `/dashboard/orders` is a server-paginated queue with stage, campaign, service, search, and sort controls; campaign and report totals page through the complete tenant-scoped data set rather than silently truncating at the API page limit.
+- Customer actions are role-aware in the UI but remain server-authorized. An organization OWNER can act across the organization and manage Billing; a MEMBER can mutate only orders they created. Billing is hidden from member navigation and direct member access fails closed. Wallet display uses authoritative available and reserved balances from the billing API; no payment, refund, payout, or settlement behavior is derived in the client.
+- The Super Admin overview is a read-only command center backed by `GET /admin/command-center`. It returns exact server-side workflow counts, a bounded priority queue, lifecycle/health/finance summaries, and sanitized audit activity. The route is `SUPER_ADMIN`-only, sends private no-store headers, excludes audit metadata and decrypted payout data, and leaves all high-impact decisions in the existing reasoned and audited workspaces. Operations and Finance keep their separate role-focused overviews.
+- The Finance overview is a Support-first money-operations workbench backed by `GET /admin/finance-workbench`. It is restricted to Finance and Super Admin, uses exact database aggregates and Prisma Decimal money math, returns a bounded server-prioritized decision queue, and exposes only allowlisted/sanitized finance activity. Payout credentials, provider configuration, raw execution errors, audit metadata, and decrypted payout data never enter the overview response; all money mutations remain in the existing reasoned and audited Finance workspaces.
+- The Operations overview is an assignment-focused workbench backed by `GET /admin/operations-workbench`. It is restricted to Operations and Super Admin and combines assigned/claimable platform fulfillment, assigned platform Support, operational cancellations and disputes, delivery/domain verification, moderation, and assigned-site readiness into one bounded server-prioritized queue. Only fulfillment is claimable inline; all other decisions deep-link to their existing authorized workspaces. Operations order list/detail reads use the same assignment, assigned-Support, and operational-exception scope and return sanitized contextual identities rather than global-directory or finance data.
 
 ## Seed Script (`scripts/seed.ts`)
 

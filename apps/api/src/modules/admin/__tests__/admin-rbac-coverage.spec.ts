@@ -132,6 +132,8 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       { method: "deleteListing", expected: ["SUPER_ADMIN"] },
       { method: "deleteWebsite", expected: ["SUPER_ADMIN"] },
       { method: "listAuditLogs", expected: ["SUPER_ADMIN"] },
+      { method: "getCommandCenter", expected: ["SUPER_ADMIN"] },
+      { method: "forceApprovedReport", expected: ["SUPER_ADMIN"] },
       // Site reassignment is a SUPER_ADMIN-only trust action: OPERATIONS can
       // manage listings on sites already assigned to them, but transferring
       // ownership of a platform website is reserved for SUPER_ADMIN (see the
@@ -272,6 +274,22 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
     ).sort()
     expect(roles).toEqual(["FINANCE", "SUPER_ADMIN"])
+  })
+
+  it("keeps the Finance workbench restricted to Finance and Super Admin", () => {
+    const handler = (AdminController.prototype as any).getFinanceWorkbench
+    const roles = (
+      (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+    ).sort()
+    expect(roles).toEqual(["FINANCE", "SUPER_ADMIN"])
+  })
+
+  it("keeps the Operations workbench restricted to Operations and Super Admin", () => {
+    const handler = (AdminController.prototype as any).getOperationsWorkbench
+    const roles = (
+      (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+    ).sort()
+    expect(roles).toEqual(["OPERATIONS", "SUPER_ADMIN"])
   })
 
   it("inventory reads are available to Operations but not Finance", () => {
