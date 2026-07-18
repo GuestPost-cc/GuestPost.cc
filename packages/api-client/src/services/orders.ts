@@ -73,6 +73,12 @@ interface RawOrder {
   autoAcceptAt: string | null
   verifyMethod: string | null
   deliveryAcceptedMethod: string | null
+  turnaroundDays: number | null
+  submittedAt: string | null
+  acceptedAt: string | null
+  fulfillmentDueAt: string | null
+  warrantyEndsAt: string | null
+  briefData: Record<string, unknown> | null
   website?: { id: string; url: string; name?: string | null } | null
   items?: RawOrderItem[]
   events?: Array<{
@@ -165,6 +171,12 @@ export interface OrderResponse {
   autoAcceptAt: string | null
   verifyMethod: string | null
   deliveryAcceptedMethod: string | null
+  turnaroundDays: number | null
+  submittedAt: string | null
+  acceptedAt: string | null
+  fulfillmentDueAt: string | null
+  warrantyEndsAt: string | null
+  briefData: Record<string, unknown> | null
   settlements?: unknown[]
   dispute?: unknown
   fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
@@ -301,6 +313,12 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
     autoAcceptAt: raw.autoAcceptAt ?? null,
     verifyMethod: raw.verifyMethod ?? null,
     deliveryAcceptedMethod: raw.deliveryAcceptedMethod ?? null,
+    turnaroundDays: raw.turnaroundDays ?? null,
+    submittedAt: raw.submittedAt ?? null,
+    acceptedAt: raw.acceptedAt ?? null,
+    fulfillmentDueAt: raw.fulfillmentDueAt ?? null,
+    warrantyEndsAt: raw.warrantyEndsAt ?? null,
+    briefData: raw.briefData ?? null,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
     events: (raw.events ?? []).map((e) => ({

@@ -1,540 +1,531 @@
 "use client"
 
-import { Badge, getOrderStatusPresentation } from "@guestpost/ui"
+import type { OrderResponse } from "@guestpost/api-client"
+import {
+  Button,
+  Card,
+  CardContent,
+  ErrorState,
+  getOrderStatusPresentation,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+  StatusBadge,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@guestpost/ui"
 import { useQuery } from "@tanstack/react-query"
-import { formatDistanceToNow } from "date-fns"
+import { format, formatDistanceToNow } from "date-fns"
 import {
   AlertCircle,
   ArrowRight,
-  Check,
-  CheckCircle,
-  Clock,
+  Clock3,
   ExternalLink,
-  FileText,
-  LayoutGrid,
-  List,
+  Filter,
   RefreshCw,
   Search,
 } from "lucide-react"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useSearchParams } from "next/navigation"
+import { Suspense, useMemo, useState } from "react"
 import { api } from "../../../lib/api"
+import {
+  formatPublisherMoney,
+  getOrderDueState,
+  getPublisherNextAction,
+  getPublisherOrderStage,
+  isOpenPublisherOrder,
+  orderNeedsPublisherAttention,
+  PUBLISHER_ORDER_STAGE_GROUPS,
+  sortOrdersByOperationalPriority,
+} from "../../../lib/publisher-order-workflow"
 
-// Workflow steps matching the publisher order detail page
-const WORKFLOW_STEPS = [
-  { label: "Accept", statuses: ["SUBMITTED"] },
-  {
-    label: "Create",
-    statuses: [
-      "ACCEPTED",
-      "CONTENT_REQUESTED",
-      "CONTENT_CREATION",
-      "CONTENT_READY",
-    ],
-  },
-  { label: "Review", statuses: ["CUSTOMER_REVIEW", "APPROVED"] },
-  { label: "Publish", statuses: ["PUBLISHED", "VERIFIED"] },
-  { label: "Complete", statuses: ["DELIVERED", "SETTLED", "COMPLETED"] },
-]
+type SortMode = "priority" | "deadline" | "newest" | "payout"
+type DueFilter = "all" | "overdue" | "48h" | "7d"
 
-// Status groups for the quick-filter bar
-const STATUS_GROUPS = [
-  {
-    key: "active",
-    label: "Active",
-    statuses: [
-      "SUBMITTED",
-      "ACCEPTED",
-      "CONTENT_REQUESTED",
-      "CONTENT_CREATION",
-      "CONTENT_READY",
-      "CUSTOMER_REVIEW",
-      "APPROVED",
-    ],
-  },
-  { key: "published", label: "Published", statuses: ["PUBLISHED", "VERIFIED"] },
-  { key: "delivered", label: "Delivered", statuses: ["DELIVERED"] },
-  { key: "complete", label: "Complete", statuses: ["SETTLED", "COMPLETED"] },
-  {
-    key: "closed",
-    label: "Closed",
-    statuses: ["CANCELLED", "REFUNDED", "DISPUTED"],
-  },
-]
-
-function getWorkflowStep(status: string): number {
-  const idx = WORKFLOW_STEPS.findIndex((s) => s.statuses.includes(status))
-  return idx === -1 ? 0 : idx
+function orderWebsite(order: OrderResponse) {
+  return (
+    order.website?.url ?? order.items[0]?.website?.url ?? "Website unavailable"
+  )
 }
 
-function isTerminal(status: string): boolean {
-  return ["CANCELLED", "REFUNDED", "DISPUTED"].includes(status)
+function orderTitle(order: OrderResponse) {
+  return order.title || order.type.replaceAll("_", " ").toLowerCase()
 }
 
-function getGroupForStatus(status: string): string {
-  return STATUS_GROUPS.find((g) => g.statuses.includes(status))?.key ?? "active"
+function dueBadgeClass(order: OrderResponse) {
+  const risk = getOrderDueState(order).risk
+  if (risk === "overdue") return "border-red-200 bg-red-50 text-red-700"
+  if (risk === "soon") return "border-amber-200 bg-amber-50 text-amber-700"
+  return "border-border bg-muted/40 text-muted-foreground"
 }
 
-function OrderCard({ order }: { order: any }) {
-  const status = order.status ?? "DRAFT"
-  const p = getOrderStatusPresentation(status)
-  const currentStep = getWorkflowStep(status)
-  const terminal = isTerminal(status)
+function OrderMobileCard({ order }: { order: OrderResponse }) {
+  const status = getOrderStatusPresentation(order.status)
+  const due = getOrderDueState(order)
+  const action = getPublisherNextAction(order)
 
   return (
-    <Link
-      href={`/dashboard/orders/${order.id}`}
-      className="group block rounded-xl border bg-card transition-all hover:shadow-md hover:border-primary/20"
-    >
-      <div className="p-5">
-        {/* Header row: ID + status */}
-        <div className="flex items-center justify-between mb-4">
-          <span className="font-mono text-xs text-muted-foreground">
-            #{order.id.slice(0, 8)}
-          </span>
-          <Badge variant={p.variant as any}>{p.label}</Badge>
+    <Card className="rounded-2xl shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-mono text-xs text-muted-foreground">
+              #{order.id.slice(0, 8)}
+            </p>
+            <Link
+              href={`/dashboard/orders/${order.id}`}
+              className="mt-1 block truncate font-semibold capitalize hover:text-primary"
+            >
+              {orderTitle(order)}
+            </Link>
+          </div>
+          <StatusBadge variant={status.variant}>{status.label}</StatusBadge>
         </div>
-
-        {/* Service + customer */}
-        <div className="mb-3">
-          <h3 className="font-semibold leading-snug">
-            {(order.items?.[0]?.serviceType ?? order.type ?? "Order").replace(
-              /_/g,
-              " ",
-            )}
-          </h3>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {order.customer?.name ?? order.customer?.email ?? "—"}
-          </p>
-        </div>
-
-        {/* Website + amount */}
-        <div className="flex items-center justify-between text-sm mb-4">
-          <span className="flex items-center gap-1 text-muted-foreground truncate max-w-[60%]">
-            <ExternalLink className="h-3 w-3 shrink-0" />
-            <span className="truncate">
-              {order.items?.[0]?.website?.url ?? order.website?.url ?? "—"}
-            </span>
+        <p className="mt-3 flex items-center gap-1 truncate text-sm text-muted-foreground">
+          <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{orderWebsite(order)}</span>
+        </p>
+        <div className="mt-4 flex items-center justify-between gap-3 border-y py-3 text-sm">
+          <span
+            className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium ${dueBadgeClass(order)}`}
+          >
+            <Clock3 className="h-3 w-3" /> {due.label}
           </span>
           <span className="font-semibold tabular-nums">
-            $
-            {Number(order.totalAmount ?? order.items?.[0]?.budget ?? 0).toFixed(
-              2,
-            )}
+            {formatPublisherMoney(order.totalAmount, order.currency)}
           </span>
         </div>
-
-        {/* Progress bar */}
-        {terminal ? (
-          <div className="flex items-center gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-            <AlertCircle className="h-4 w-4 shrink-0" />
-            <span className="font-medium capitalize">
-              {status.toLowerCase()}
-            </span>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="flex items-center gap-1">
-              {WORKFLOW_STEPS.map((step, i) => (
-                <div key={step.label} className="flex items-center flex-1">
-                  <div
-                    className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-medium ${
-                      i < currentStep
-                        ? "bg-emerald-100 text-emerald-700"
-                        : i === currentStep
-                          ? "bg-primary/10 text-primary ring-2 ring-primary/30"
-                          : "bg-muted text-muted-foreground"
-                    }`}
-                  >
-                    {i < currentStep ? <Check className="h-3 w-3" /> : i + 1}
-                  </div>
-                  {i < WORKFLOW_STEPS.length - 1 && (
-                    <div
-                      className={`h-0.5 flex-1 mx-1 ${
-                        i < currentStep
-                          ? "bg-emerald-300"
-                          : "bg-muted-foreground/20"
-                      }`}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground px-0.5">
-              {WORKFLOW_STEPS.map((step, i) => (
-                <span
-                  key={step.label}
-                  className={
-                    i === currentStep ? "font-medium text-foreground" : ""
-                  }
-                >
-                  {step.label}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-          <span className="flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            {formatDistanceToNow(new Date(order.createdAt), {
-              addSuffix: true,
-            })}
-          </span>
-          <span className="flex items-center gap-0.5 font-medium text-foreground group-hover:text-primary transition-colors">
-            Details <ArrowRight className="h-3 w-3" />
-          </span>
-        </div>
-      </div>
-    </Link>
+        <Button
+          className="mt-4 w-full"
+          variant={action.tone === "urgent" ? "default" : "outline"}
+          asChild
+        >
+          <Link href={`/dashboard/orders/${order.id}`}>
+            {action.label} <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </CardContent>
+    </Card>
   )
 }
 
-function OrderTableRow({ order }: { order: any }) {
-  const status = order.status ?? "DRAFT"
-  const p = getOrderStatusPresentation(status)
-  const currentStep = getWorkflowStep(status)
-  const terminal = isTerminal(status)
-
+function OrdersSkeleton() {
   return (
-    <tr
-      className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
-      onClick={() => (window.location.href = `/dashboard/orders/${order.id}`)}
-    >
-      <td className="py-3 pl-4">
-        <span className="font-mono text-xs text-muted-foreground">
-          #{order.id.slice(0, 8)}
-        </span>
-      </td>
-      <td className="py-3">
-        <span className="text-sm font-medium">
-          {(order.items?.[0]?.serviceType ?? order.type ?? "Order").replace(
-            /_/g,
-            " ",
-          )}
-        </span>
-      </td>
-      <td className="py-3 text-sm text-muted-foreground">
-        {order.customer?.name ?? order.customer?.email ?? "—"}
-      </td>
-      <td className="py-3">
-        <Badge variant={p.variant as any}>{p.label}</Badge>
-      </td>
-      <td className="py-3">
-        {terminal ? (
-          <span className="text-xs text-red-600 capitalize">
-            {status.toLowerCase()}
-          </span>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            {WORKFLOW_STEPS.map((step, i) => (
-              <div key={step.label} className="flex items-center">
-                <div
-                  className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-medium ${
-                    i <= currentStep
-                      ? "bg-emerald-100 text-emerald-700"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {i < currentStep ? <Check className="h-2.5 w-2.5" /> : i + 1}
-                </div>
-                {i < WORKFLOW_STEPS.length - 1 && (
-                  <div
-                    className={`h-px w-3 mx-0.5 ${
-                      i < currentStep
-                        ? "bg-emerald-300"
-                        : "bg-muted-foreground/20"
-                    }`}
-                  />
-                )}
-              </div>
-            ))}
+    <div className="space-y-3">
+      {[1, 2, 3, 4, 5].map((row) => (
+        <div
+          key={row}
+          className="flex items-center gap-4 rounded-xl border bg-background p-4"
+        >
+          <Skeleton className="h-10 w-10 rounded-lg" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-44" />
+            <Skeleton className="h-3 w-64 max-w-full" />
           </div>
-        )}
-      </td>
-      <td className="py-3 text-sm font-medium tabular-nums text-right">
-        ${Number(order.totalAmount ?? order.items?.[0]?.budget ?? 0).toFixed(2)}
-      </td>
-      <td className="py-3 pr-4 text-right">
-        <Link
-          href={`/dashboard/orders/${order.id}`}
-          className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-        >
-          View <ArrowRight className="h-3 w-3" />
-        </Link>
-      </td>
-    </tr>
-  )
-}
-
-function FilterBar({
-  active,
-  onChange,
-}: {
-  active: string
-  onChange: (key: string) => void
-}) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      <button
-        onClick={() => onChange("all")}
-        className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-          active === "all"
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted text-muted-foreground hover:bg-muted/80"
-        }`}
-      >
-        All
-      </button>
-      {STATUS_GROUPS.map((group) => (
-        <button
-          key={group.key}
-          onClick={() => onChange(group.key)}
-          className={`rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
-            active === group.key
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted text-muted-foreground hover:bg-muted/80"
-          }`}
-        >
-          {group.label}
-        </button>
+          <Skeleton className="h-8 w-28" />
+        </div>
       ))}
     </div>
   )
 }
 
-function StatCard({
-  label,
-  count,
-  icon: Icon,
-  color,
-}: {
-  label: string
-  count: number
-  icon: React.ElementType
-  color: string
-}) {
-  return (
-    <div className="rounded-xl border bg-card p-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground">{label}</p>
-          <p className="text-2xl font-bold mt-1">{count}</p>
-        </div>
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-full ${color}`}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-    </div>
-  )
-}
+function OrdersContent() {
+  const searchParams = useSearchParams()
+  const initialView = searchParams.get("view") ?? "all"
+  const [view, setView] = useState(initialView)
+  const [query, setQuery] = useState("")
+  const [website, setWebsite] = useState("all")
+  const [dueFilter, setDueFilter] = useState<DueFilter>("all")
+  const [sortMode, setSortMode] = useState<SortMode>("priority")
 
-export default function OrdersPage() {
-  const [viewMode, setViewMode] = useState<"grid" | "table">("grid")
-  const [filter, setFilter] = useState("all")
-
-  const {
-    data: orders = [],
-    isLoading,
-    refetch,
-    error,
-  } = useQuery({
+  const ordersQuery = useQuery({
     queryKey: ["publisher-orders"],
     queryFn: () => api.orders.list(),
   })
+  const orders = ordersQuery.data ?? []
 
-  const stats = useMemo(() => {
-    const total = orders.length
-    const active = orders.filter(
-      (o: any) => getGroupForStatus(o.status) === "active",
-    ).length
-    const published = orders.filter(
-      (o: any) => o.status === "PUBLISHED" || o.status === "VERIFIED",
-    ).length
-    const complete = orders.filter(
-      (o: any) => o.status === "COMPLETED" || o.status === "SETTLED",
-    ).length
-    return { total, active, published, complete }
+  const websiteOptions = useMemo(
+    () =>
+      [...new Set(orders.map(orderWebsite))].sort((a, b) => a.localeCompare(b)),
+    [orders],
+  )
+
+  const counts = useMemo(() => {
+    const result: Record<string, number> = {
+      all: orders.length,
+      attention: orders.filter(orderNeedsPublisherAttention).length,
+    }
+    for (const group of PUBLISHER_ORDER_STAGE_GROUPS) {
+      result[group.key] = orders.filter((order) =>
+        group.statuses.some((status) => status === order.status),
+      ).length
+    }
+    return result
   }, [orders])
 
   const filteredOrders = useMemo(() => {
-    if (filter === "all") return orders
-    const group = STATUS_GROUPS.find((g) => g.key === filter)
-    if (!group) return orders
-    return orders.filter((o: any) => group.statuses.includes(o.status))
-  }, [orders, filter])
+    const normalizedQuery = query.trim().toLowerCase()
+    const now = Date.now()
+    const result = orders.filter((order) => {
+      if (view === "attention" && !orderNeedsPublisherAttention(order))
+        return false
+      if (
+        view !== "all" &&
+        view !== "attention" &&
+        getPublisherOrderStage(order.status).key !== view
+      )
+        return false
+      if (website !== "all" && orderWebsite(order) !== website) return false
 
-  if (error) {
+      const due = getOrderDueState(order, now)
+      if (dueFilter === "overdue" && due.risk !== "overdue") return false
+      if (dueFilter === "48h" && !["overdue", "soon"].includes(due.risk))
+        return false
+      if (
+        dueFilter === "7d" &&
+        due.millisecondsRemaining > 7 * 24 * 60 * 60 * 1000
+      )
+        return false
+
+      if (normalizedQuery) {
+        const searchable = [
+          order.id,
+          orderTitle(order),
+          orderWebsite(order),
+          order.type,
+          order.status,
+        ]
+          .join(" ")
+          .toLowerCase()
+        if (!searchable.includes(normalizedQuery)) return false
+      }
+      return true
+    })
+
+    return result.sort((left, right) => {
+      if (sortMode === "priority")
+        return sortOrdersByOperationalPriority(left, right)
+      if (sortMode === "deadline")
+        return (
+          getOrderDueState(left, now).millisecondsRemaining -
+          getOrderDueState(right, now).millisecondsRemaining
+        )
+      if (sortMode === "payout")
+        return Number(right.totalAmount ?? 0) - Number(left.totalAmount ?? 0)
+      return (
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+      )
+    })
+  }, [dueFilter, orders, query, sortMode, view, website])
+
+  if (ordersQuery.error) {
     return (
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage your guest post orders
-          </p>
-        </div>
-        <div className="flex flex-col items-center justify-center rounded-xl border py-16">
-          <AlertCircle className="mb-3 h-10 w-10 text-destructive" />
-          <p className="font-medium">Failed to load orders</p>
-          <p className="text-sm text-muted-foreground mb-4">
-            {(error as Error).message}
-          </p>
-          <button
-            onClick={() => refetch()}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            <RefreshCw className="h-4 w-4" /> Try again
-          </button>
-        </div>
-      </div>
+      <ErrorState
+        title="Failed to load orders"
+        description={(ordersQuery.error as Error).message}
+        onRetry={() => ordersQuery.refetch()}
+      />
     )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage your guest post orders and content fulfillment
+          <p className="text-sm font-medium text-muted-foreground">
+            Order management
+          </p>
+          <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">
+            Fulfillment queue
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
+            Work from the nearest deadline and keep every placement moving.
           </p>
         </div>
-        <div className="flex items-center gap-1 rounded-lg border p-0.5">
-          <button
-            onClick={() => setViewMode("grid")}
-            className={`rounded-md p-2 transition-colors ${viewMode === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            title="Grid view"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setViewMode("table")}
-            className={`rounded-md p-2 transition-colors ${viewMode === "table" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-            title="Table view"
-          >
-            <List className="h-4 w-4" />
-          </button>
+        <Button
+          variant="outline"
+          onClick={() => ordersQuery.refetch()}
+          disabled={ordersQuery.isFetching}
+        >
+          <RefreshCw
+            className={`mr-2 h-4 w-4 ${ordersQuery.isFetching ? "animate-spin" : ""}`}
+          />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border bg-background p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Needs attention
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">
+            {counts.attention ?? 0}
+          </p>
+        </div>
+        <div className="rounded-2xl border bg-background p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Open orders
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">
+            {orders.filter(isOpenPublisherOrder).length}
+          </p>
+        </div>
+        <div className="rounded-2xl border bg-background p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Delivered
+          </p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">
+            {counts.delivered ?? 0}
+          </p>
         </div>
       </div>
 
-      {/* Stats row */}
-      {!isLoading && orders.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            label="Total Orders"
-            count={stats.total}
-            icon={FileText}
-            color="bg-blue-100 text-blue-700"
-          />
-          <StatCard
-            label="Active"
-            count={stats.active}
-            icon={Clock}
-            color="bg-amber-100 text-amber-700"
-          />
-          <StatCard
-            label="Published"
-            count={stats.published}
-            icon={CheckCircle}
-            color="bg-emerald-100 text-emerald-700"
-          />
-          <StatCard
-            label="Completed"
-            count={stats.complete}
-            icon={Check}
-            color="bg-green-100 text-green-700"
-          />
-        </div>
-      )}
-
-      {/* Filter bar */}
-      <FilterBar active={filter} onChange={setFilter} />
-
-      {/* Content */}
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              className="rounded-xl border bg-card p-5 space-y-4 animate-pulse"
-            >
-              <div className="flex justify-between">
-                <div className="h-3 w-20 rounded bg-muted" />
-                <div className="h-5 w-16 rounded-full bg-muted" />
-              </div>
-              <div className="space-y-2">
-                <div className="h-5 w-3/4 rounded bg-muted" />
-                <div className="h-4 w-1/2 rounded bg-muted" />
-              </div>
-              <div className="flex justify-between">
-                <div className="h-4 w-2/5 rounded bg-muted" />
-                <div className="h-4 w-14 rounded bg-muted" />
-              </div>
-              <div className="h-8 rounded bg-muted" />
-              <div className="flex justify-between">
-                <div className="h-3 w-24 rounded bg-muted" />
-                <div className="h-3 w-12 rounded bg-muted" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : filteredOrders.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border py-20">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted mb-4">
-            <Search className="h-6 w-6 text-muted-foreground" />
+      <Card className="rounded-2xl shadow-sm">
+        <CardContent className="space-y-4 p-4 sm:p-5">
+          <div
+            className="flex flex-wrap gap-2"
+            role="group"
+            aria-label="Order stage filters"
+          >
+            {[
+              { key: "all", label: "All" },
+              { key: "attention", label: "Needs attention" },
+              ...PUBLISHER_ORDER_STAGE_GROUPS,
+            ].map((filter) => (
+              <button
+                key={filter.key}
+                type="button"
+                onClick={() => setView(filter.key)}
+                aria-pressed={view === filter.key}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                  view === filter.key
+                    ? "bg-foreground text-background"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {filter.label}
+                <span className="ml-1.5 opacity-70">
+                  {counts[filter.key] ?? 0}
+                </span>
+              </button>
+            ))}
           </div>
-          <p className="text-lg font-medium">No orders found</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {filter === "all"
-              ? "Orders will appear here when assigned to you"
-              : `No orders in the "${STATUS_GROUPS.find((g) => g.key === filter)?.label ?? filter}" group`}
-          </p>
-        </div>
-      ) : viewMode === "grid" ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredOrders.map((order: any) => (
-            <OrderCard key={order.id} order={order} />
-          ))}
-        </div>
+
+          <div className="grid gap-3 lg:grid-cols-[minmax(240px,1fr)_220px_180px_180px]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Search order, website, or topic"
+                className="pl-9"
+                aria-label="Search orders"
+              />
+            </div>
+            <Select value={website} onValueChange={setWebsite}>
+              <SelectTrigger aria-label="Filter by website">
+                <SelectValue placeholder="All websites" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All websites</SelectItem>
+                {websiteOptions.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={dueFilter}
+              onValueChange={(value) => setDueFilter(value as DueFilter)}
+            >
+              <SelectTrigger aria-label="Filter by deadline">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any deadline</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="48h">Due in 48 hours</SelectItem>
+                <SelectItem value="7d">Due in 7 days</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={sortMode}
+              onValueChange={(value) => setSortMode(value as SortMode)}
+            >
+              <SelectTrigger aria-label="Sort orders">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="priority">Priority</SelectItem>
+                <SelectItem value="deadline">Deadline</SelectItem>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="payout">Order value</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {ordersQuery.isLoading ? (
+        <OrdersSkeleton />
+      ) : filteredOrders.length === 0 ? (
+        <Card className="rounded-2xl border-dashed shadow-none">
+          <CardContent className="flex flex-col items-center justify-center px-6 py-16 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+              <Search className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="mt-4 font-semibold">No matching orders</p>
+            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+              Clear a filter or try a different order ID, website, or topic.
+            </p>
+            <Button
+              className="mt-4"
+              variant="outline"
+              onClick={() => {
+                setView("all")
+                setQuery("")
+                setWebsite("all")
+                setDueFilter("all")
+              }}
+            >
+              Clear filters
+            </Button>
+          </CardContent>
+        </Card>
       ) : (
-        <div className="overflow-hidden rounded-xl border">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="py-3 pl-4 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Order
-                </th>
-                <th className="py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Service
-                </th>
-                <th className="py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Progress
-                </th>
-                <th className="py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="py-3 pr-4 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider" />
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map((order: any) => (
-                <OrderTableRow key={order.id} order={order} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="grid gap-4 md:hidden">
+            {filteredOrders.map((order) => (
+              <OrderMobileCard key={order.id} order={order} />
+            ))}
+          </div>
+
+          <div className="hidden overflow-hidden rounded-2xl border bg-background shadow-sm md:block">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead>Order</TableHead>
+                  <TableHead>Website</TableHead>
+                  <TableHead>Stage</TableHead>
+                  <TableHead>Deadline</TableHead>
+                  <TableHead className="text-right">Value</TableHead>
+                  <TableHead className="text-right">Next action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.map((order) => {
+                  const status = getOrderStatusPresentation(order.status)
+                  const stage = getPublisherOrderStage(order.status)
+                  const due = getOrderDueState(order)
+                  const action = getPublisherNextAction(order)
+                  return (
+                    <TableRow key={order.id} className="group">
+                      <TableCell>
+                        <Link
+                          href={`/dashboard/orders/${order.id}`}
+                          className="block"
+                        >
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            #{order.id.slice(0, 8)}
+                          </span>
+                          <span className="mt-1 block max-w-[260px] truncate text-sm font-semibold capitalize group-hover:text-primary">
+                            {orderTitle(order)}
+                          </span>
+                          <span className="mt-0.5 block text-xs capitalize text-muted-foreground">
+                            {order.type.replaceAll("_", " ").toLowerCase()}
+                          </span>
+                        </Link>
+                      </TableCell>
+                      <TableCell>
+                        <span className="block max-w-[220px] truncate text-sm">
+                          {orderWebsite(order)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          Updated{" "}
+                          {formatDistanceToNow(new Date(order.updatedAt), {
+                            addSuffix: true,
+                          })}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge variant={status.variant}>
+                          {status.label}
+                        </StatusBadge>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          {stage.label}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs font-medium ${dueBadgeClass(order)}`}
+                        >
+                          <Clock3 className="h-3 w-3" /> {due.label}
+                        </span>
+                        {due.date && (
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            {format(due.date, "MMM d, h:mm a")}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold tabular-nums">
+                        {formatPublisherMoney(
+                          order.totalAmount,
+                          order.currency,
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          size="sm"
+                          variant={
+                            action.tone === "urgent" ? "default" : "outline"
+                          }
+                          asChild
+                        >
+                          <Link href={`/dashboard/orders/${order.id}`}>
+                            {action.label}{" "}
+                            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>
+              Showing {filteredOrders.length} of {orders.length} orders
+            </span>
+            {orders.length >= 50 && (
+              <span className="inline-flex items-center gap-1">
+                <AlertCircle className="h-4 w-4" /> Showing the 50 most recent
+                orders
+              </span>
+            )}
+          </div>
+        </>
       )}
     </div>
+  )
+}
+
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={<OrdersSkeleton />}>
+      <OrdersContent />
+    </Suspense>
   )
 }

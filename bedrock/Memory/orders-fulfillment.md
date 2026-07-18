@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: orders-fulfillment
 project: guestpost-platform
-updated: 2026-07-17
+updated: 2026-07-18
 ---
 
 # Orders & Fulfillment
@@ -16,6 +16,31 @@ DRAFT → SUBMITTED → ACCEPTED → CONTENT_CREATION → CONTENT_READY → CUST
 ```
 
 Cancellation/dispute paths branch off at various states.
+
+## Publisher Workbench
+
+- The publisher dashboard at `/dashboard` is an operational work queue rather
+  than a reporting-first overview. It prioritizes new orders, requested
+  changes, cancellations, publishing tasks, and fulfillment deadlines while
+  keeping withdrawable funds and lifetime earnings visible.
+- `/dashboard/orders` uses one shared publisher workflow mapping for stage
+  filters, server status presentation, deadline risk, and next-action copy.
+  Desktop uses a compact table; mobile uses action cards. Search and filters
+  never grant actions: every mutation still goes through the ownership/RBAC and
+  current-status checks on the dedicated order endpoints.
+- The typed order client exposes the existing `turnaroundDays`,
+  `fulfillmentDueAt`, `warrantyEndsAt`, accepted/submitted timestamps, and
+  structured `briefData` fields. The order workspace renders briefs with the
+  shared registry-backed `BriefRenderer` and never treats client-derived stage
+  labels as authorization.
+- Publisher support is available at `/dashboard/support`; order links carry an
+  order ID into the actor-scoped support API. The UI explicitly warns against
+  sending passwords, keys, or payout credentials.
+- File attachments remain unavailable until there is a private, validated
+  upload pipeline. The former file selector was removed because it retained
+  browser `File` objects without sending or securing them. The former JSON
+  “invoice” download was also removed because it was not a real financial
+  document.
 
 ### Business-Action Endpoints
 
