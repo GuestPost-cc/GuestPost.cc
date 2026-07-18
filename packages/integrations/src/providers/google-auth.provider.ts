@@ -20,20 +20,13 @@ interface GoogleErrorResponse {
  * Implements OAuthProvider using Google OAuth2 endpoints.
  */
 export class GoogleAuthProvider implements OAuthProvider {
-  private readonly clientId: string
-  private readonly clientSecret: string
-
-  constructor(private readonly scopes: string[]) {
-    this.clientId = GoogleAuthProvider.getRequiredEnv("GOOGLE_CLIENT_ID")
-    this.clientSecret = GoogleAuthProvider.getRequiredEnv(
-      "GOOGLE_CLIENT_SECRET",
-    )
-  }
+  constructor(private readonly scopes: string[]) {}
 
   async getAuthorizationUrl(
     state: string,
     redirectUri: string,
   ): Promise<string> {
+    const clientId = GoogleAuthProvider.getRequiredEnv("GOOGLE_CLIENT_ID")
     // Always include openid/email/profile alongside the service-specific
     // scopes so we can fetch the user's Google identity via userinfo endpoint.
     const allScopes = [
@@ -43,7 +36,7 @@ export class GoogleAuthProvider implements OAuthProvider {
       ...this.scopes,
     ]
     const params = new URLSearchParams({
-      client_id: this.clientId,
+      client_id: clientId,
       redirect_uri: redirectUri,
       response_type: "code",
       scope: allScopes.join(" "),
@@ -62,6 +55,10 @@ export class GoogleAuthProvider implements OAuthProvider {
     code: string,
     redirectUri: string,
   ): Promise<CredentialTokens> {
+    const clientId = GoogleAuthProvider.getRequiredEnv("GOOGLE_CLIENT_ID")
+    const clientSecret = GoogleAuthProvider.getRequiredEnv(
+      "GOOGLE_CLIENT_SECRET",
+    )
     const response = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -69,8 +66,8 @@ export class GoogleAuthProvider implements OAuthProvider {
         grant_type: "authorization_code",
         code,
         redirect_uri: redirectUri,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
+        client_id: clientId,
+        client_secret: clientSecret,
       }),
     })
 
@@ -92,14 +89,18 @@ export class GoogleAuthProvider implements OAuthProvider {
   }
 
   async refreshTokens(refreshToken: string): Promise<CredentialTokens> {
+    const clientId = GoogleAuthProvider.getRequiredEnv("GOOGLE_CLIENT_ID")
+    const clientSecret = GoogleAuthProvider.getRequiredEnv(
+      "GOOGLE_CLIENT_SECRET",
+    )
     const response = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         grant_type: "refresh_token",
         refresh_token: refreshToken,
-        client_id: this.clientId,
-        client_secret: this.clientSecret,
+        client_id: clientId,
+        client_secret: clientSecret,
       }),
     })
 

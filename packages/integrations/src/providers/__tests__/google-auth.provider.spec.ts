@@ -30,4 +30,20 @@ describe("GoogleAuthProvider account selection", () => {
     expect(params.get("scope")).toContain("webmasters.readonly")
     expect(params.get("scope")).toContain("analytics.readonly")
   })
+
+  it("defers Google credential validation until an OAuth operation is used", async () => {
+    delete process.env.GOOGLE_CLIENT_ID
+    delete process.env.GOOGLE_CLIENT_SECRET
+
+    const provider = new GoogleAuthProvider([
+      "https://www.googleapis.com/auth/webmasters.readonly",
+    ])
+
+    await expect(
+      provider.getAuthorizationUrl(
+        "state-token",
+        "https://api.example.com/callback",
+      ),
+    ).rejects.toThrow("Google OAuth is not configured")
+  })
 })
