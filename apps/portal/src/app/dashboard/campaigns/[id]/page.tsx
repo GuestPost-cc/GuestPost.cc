@@ -1,8 +1,8 @@
 "use client"
 
+import type { OrderResponse } from "@guestpost/api-client"
 import type { CampaignStatus } from "@guestpost/database"
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -11,6 +11,7 @@ import {
   CardTitle,
   ErrorState,
   getCampaignStatusPresentation,
+  getOrderStatusPresentation,
   Skeleton,
   StatusBadge,
   Table,
@@ -26,27 +27,26 @@ import { AlertCircle, ArrowLeft, Eye, FileText, Plus } from "lucide-react"
 import Link from "next/link"
 import { use } from "react"
 import { api } from "../../../../lib/api"
+import { formatCustomerMoney } from "../../../../lib/customer-order-workflow"
 
-interface Campaign {
-  id: string
-  name: string
-  status: string
-  description?: string
-  organizationId: string
-  createdAt: string
-  updatedAt?: string
-  orderCount?: number
-}
+async function listAllCampaignOrders(campaignId: string) {
+  const orders: OrderResponse[] = []
+  let skip = 0
+  let total = Number.POSITIVE_INFINITY
 
-interface Order {
-  id: string
-  status: string
-  items: Array<{
-    serviceType: string
-    topic: string | null
-  }>
-  totalAmount: number | null
-  createdAt: string
+  while (skip < total) {
+    const page = await api.orders.listPaginated({
+      campaignId,
+      take: 100,
+      skip,
+    })
+    orders.push(...page.items)
+    total = page.total
+    if (page.items.length === 0) break
+    skip += page.items.length
+  }
+
+  return orders
 }
 
 function CampaignDetailSkeleton() {
@@ -82,23 +82,23 @@ export default function CampaignDetailPage({
   const resolvedParams = use(params)
 
   const {
-    data: campaignsData,
+    data: campaign,
     isLoading: campaignsLoading,
     error: campaignsError,
     refetch: refetchCampaigns,
   } = useQuery({
-    queryKey: ["campaigns"],
-    queryFn: () => api.campaigns.listCampaigns(),
+    queryKey: ["campaign", resolvedParams.id],
+    queryFn: () => api.campaigns.getCampaign(resolvedParams.id),
   })
 
   const {
-    data: ordersData,
+    data: campaignOrders = [],
     isLoading: ordersLoading,
     error: ordersError,
     refetch: refetchOrders,
   } = useQuery({
-    queryKey: ["orders"],
-    queryFn: () => api.orders.list(),
+    queryKey: ["customer-orders", "campaign", resolvedParams.id],
+    queryFn: () => listAllCampaignOrders(resolvedParams.id),
   })
 
   const campaignDetailError = campaignsError || ordersError
@@ -118,23 +118,15 @@ export default function CampaignDetailPage({
 
   const isLoading = campaignsLoading || ordersLoading
 
-  const campaign = campaignsData?.find(
-    (c: Campaign) => c.id === resolvedParams.id,
-  )
-  const campaignOrders =
-    ordersData?.filter((o: Order) => {
-      const order = o as any
-      return order.campaignId === resolvedParams.id
-    }) ?? []
-
   const activeOrders = campaignOrders.filter(
-    (o: Order) => !["COMPLETED", "CANCELLED"].includes(o.status),
+    (order: OrderResponse) =>
+      !["COMPLETED", "CANCELLED", "REFUNDED", "SETTLED"].includes(order.status),
   ).length
   const completedOrders = campaignOrders.filter(
-    (o: Order) => o.status === "COMPLETED",
+    (order: OrderResponse) => order.status === "COMPLETED",
   ).length
   const totalSpend = campaignOrders.reduce(
-    (sum: number, o: Order) => sum + (o.totalAmount || 0),
+    (sum: number, order: OrderResponse) => sum + (order.totalAmount || 0),
     0,
   )
 
@@ -203,8 +195,8 @@ export default function CampaignDetailPage({
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
-        <Card>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Orders
@@ -214,7 +206,7 @@ export default function CampaignDetailPage({
             <div className="text-2xl font-bold">{campaignOrders.length}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Active Orders
@@ -224,7 +216,7 @@ export default function CampaignDetailPage({
             <div className="text-2xl font-bold">{activeOrders}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Completed
@@ -234,7 +226,7 @@ export default function CampaignDetailPage({
             <div className="text-2xl font-bold">{completedOrders}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="rounded-2xl shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
               Total Spend
@@ -242,13 +234,13 @@ export default function CampaignDetailPage({
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">
-              ${totalSpend.toFixed(2)}
+              {formatCustomerMoney(totalSpend)}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
@@ -287,41 +279,48 @@ export default function CampaignDetailPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {campaignOrders.map((order: Order) => (
-                  <TableRow key={order.id}>
-                    <TableCell className="font-mono text-xs">
-                      <Link
-                        href={`/dashboard/orders/${order.id}`}
-                        className="hover:text-primary"
-                      >
-                        #{order.id.slice(0, 8)}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      {order.items?.[0]?.serviceType?.replace(/_/g, " ") ?? "—"}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="capitalize">
-                        {order.status.replace(/_/g, " ").toLowerCase()}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {order.totalAmount != null
-                        ? `$${order.totalAmount.toFixed(2)}`
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {format(new Date(order.createdAt), "PP")}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/dashboard/orders/${order.id}`}>
-                          <Eye className="h-4 w-4" />
+                {campaignOrders.map((order: OrderResponse) => {
+                  const presentation = getOrderStatusPresentation(order.status)
+                  return (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-mono text-xs">
+                        <Link
+                          href={`/dashboard/orders/${order.id}`}
+                          className="hover:text-primary"
+                        >
+                          #{order.id.slice(0, 8)}
                         </Link>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        {order.items?.[0]?.serviceType?.replace(/_/g, " ") ??
+                          "—"}
+                      </TableCell>
+                      <TableCell>
+                        <StatusBadge variant={presentation.variant}>
+                          {presentation.label}
+                        </StatusBadge>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {order.totalAmount != null
+                          ? formatCustomerMoney(
+                              order.totalAmount,
+                              order.currency,
+                            )
+                          : "—"}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {format(new Date(order.createdAt), "PP")}
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/dashboard/orders/${order.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}

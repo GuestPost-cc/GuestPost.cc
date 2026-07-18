@@ -58,6 +58,7 @@ interface RawOrderItem {
 
 interface RawOrder {
   id: string
+  customerId: string
   version: number
   type: ServiceType
   status: OrderStatus
@@ -70,6 +71,7 @@ interface RawOrder {
   anchorText: string | null
   publishedUrl: string | null
   campaignId: string | null
+  campaign?: { id: string; name: string } | null
   autoAcceptAt: string | null
   verifyMethod: string | null
   deliveryAcceptedMethod: string | null
@@ -112,6 +114,7 @@ interface RawOrder {
 
 export interface OrderResponse {
   id: string
+  customerId: string
   version: number
   type: ServiceType
   status: OrderStatus
@@ -120,6 +123,7 @@ export interface OrderResponse {
   instructions: string | null
   publishedUrl: string | null
   campaignId: string | null
+  campaign: { id: string; name: string } | null
   website: { id: string; url: string; name?: string | null } | null
   items: Array<{
     id: string
@@ -264,6 +268,7 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
   const orderWebsite = raw.website ?? null
   return {
     id: raw.id,
+    customerId: raw.customerId,
     version: raw.version,
     type: raw.type,
     status: raw.status,
@@ -272,6 +277,7 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
     instructions: raw.instructions ?? null,
     publishedUrl: raw.publishedUrl ?? null,
     campaignId: raw.campaignId ?? null,
+    campaign: raw.campaign ?? null,
     website: orderWebsite,
     items: (raw.items ?? []).map((item) => ({
       id: item.id,
@@ -345,18 +351,68 @@ export class OrdersService {
     return normalizeOrder(raw)
   }
 
-  // GET /orders returns a paginated envelope { items, total, take, skip };
-  // unwrap to the array all callers expect.
-  async list(params?: {
+  async listPaginated(params?: {
     status?: OrderStatus
+    statuses?: OrderStatus[]
     campaignId?: string
-  }): Promise<OrderResponse[]> {
+    serviceType?: ServiceType
+    search?: string
+    needsAction?: boolean
+    sort?: "priority" | "deadline" | "newest" | "value"
+    take?: number
+    skip?: number
+  }): Promise<{
+    items: OrderResponse[]
+    total: number
+    take: number
+    skip: number
+  }> {
+    const requestParams = {
+      ...params,
+      statuses: params?.statuses?.join(","),
+    }
     const res = await this.client.get<{ items: RawOrder[] } | RawOrder[]>(
       "/orders",
-      { params },
+      { params: requestParams },
     )
-    const rows = Array.isArray(res) ? res : (res?.items ?? [])
-    return rows.map(normalizeOrder)
+    if (Array.isArray(res)) {
+      return {
+        items: res.map(normalizeOrder),
+        total: res.length,
+        take: res.length,
+        skip: 0,
+      }
+    }
+    const envelope = res as {
+      items: RawOrder[]
+      total?: number
+      take?: number
+      skip?: number
+    }
+    return {
+      items: (envelope.items ?? []).map(normalizeOrder),
+      total: envelope.total ?? envelope.items?.length ?? 0,
+      take: envelope.take ?? params?.take ?? 50,
+      skip: envelope.skip ?? params?.skip ?? 0,
+    }
+  }
+
+  // Most existing consumers need only the current page. Keep the compact
+  // array contract while the workbench and queues use listPaginated for
+  // authoritative totals and server paging.
+  async list(params?: {
+    status?: OrderStatus
+    statuses?: OrderStatus[]
+    campaignId?: string
+    serviceType?: ServiceType
+    search?: string
+    needsAction?: boolean
+    sort?: "priority" | "deadline" | "newest" | "value"
+    take?: number
+    skip?: number
+  }): Promise<OrderResponse[]> {
+    const result = await this.listPaginated(params)
+    return result.items
   }
 
   async getById(id: string) {

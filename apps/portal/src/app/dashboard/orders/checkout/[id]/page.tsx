@@ -16,6 +16,11 @@ import Link from "next/link"
 import { use } from "react"
 import { toast } from "sonner"
 import { api } from "../../../../../lib/api"
+import { useAuth } from "../../../../../lib/auth"
+import {
+  customerCanMutateOrder,
+  formatCustomerMoney,
+} from "../../../../../lib/customer-order-workflow"
 
 export default function CheckoutPage({
   params,
@@ -24,6 +29,7 @@ export default function CheckoutPage({
 }) {
   const resolvedParams = use(params)
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   const { data: order, isLoading: orderLoading } = useQuery({
     queryKey: ["order", resolvedParams.id],
@@ -78,10 +84,13 @@ export default function CheckoutPage({
 
   const amount = order.totalAmount || 0
   const balance = Number((wallet as any)?.availableBalance ?? 0)
+  const reserved = Number((wallet as any)?.reservedBalance ?? 0)
   const hasSufficientBalance = balance >= amount
+  const canPay = customerCanMutateOrder(order, user)
+  const postPaymentBalance = Math.max(0, balance - amount)
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="mx-auto max-w-3xl space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="icon" asChild>
           <Link href="/dashboard/orders">
@@ -96,7 +105,7 @@ export default function CheckoutPage({
         </div>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <CardTitle>Order Summary</CardTitle>
           <CardDescription>Details of your order</CardDescription>
@@ -143,17 +152,17 @@ export default function CheckoutPage({
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader>
           <CardTitle>Payment</CardTitle>
           <CardDescription>Pay using your wallet balance</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="rounded-lg border p-4 space-y-3">
+          <div className="space-y-3 rounded-2xl border bg-muted/20 p-4">
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Order Total</span>
               <span className="text-xl font-bold font-mono">
-                ${amount.toFixed(2)}
+                {formatCustomerMoney(amount, order.currency)}
               </span>
             </div>
             <div className="flex items-center justify-between">
@@ -162,7 +171,15 @@ export default function CheckoutPage({
                 Available Balance
               </span>
               <span className="font-medium font-mono">
-                ${(balance ?? 0).toFixed(2)}
+                {formatCustomerMoney(balance, order.currency)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">
+                Currently Reserved
+              </span>
+              <span className="font-medium font-mono">
+                {formatCustomerMoney(reserved, order.currency)}
               </span>
             </div>
             <div className="border-t pt-3">
@@ -171,10 +188,20 @@ export default function CheckoutPage({
                 <span
                   className={`text-lg font-bold font-mono ${hasSufficientBalance ? "text-primary" : "text-destructive"}`}
                 >
-                  ${amount.toFixed(2)}
+                  {formatCustomerMoney(amount, order.currency)}
                 </span>
               </div>
             </div>
+            {hasSufficientBalance && (
+              <div className="flex items-center justify-between border-t pt-3">
+                <span className="text-sm font-medium">
+                  Balance After Payment
+                </span>
+                <span className="font-semibold font-mono">
+                  {formatCustomerMoney(postPaymentBalance, order.currency)}
+                </span>
+              </div>
+            )}
           </div>
 
           {!hasSufficientBalance && (
@@ -183,32 +210,52 @@ export default function CheckoutPage({
               <div>
                 <p className="font-medium">Insufficient Balance</p>
                 <p className="mt-1 text-amber-700">
-                  You need ${(amount - balance).toFixed(2)} more. Please deposit
-                  funds first.
+                  You need{" "}
+                  {formatCustomerMoney(amount - balance, order.currency)} more.{" "}
+                  {user?.customerRole === "OWNER"
+                    ? "Deposit the difference to continue."
+                    : "Ask an organization owner to add funds."}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!canPay && (
+            <div className="flex items-start gap-3 rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium text-foreground">
+                  Payment permission required
+                </p>
+                <p className="mt-1">
+                  Only an organization owner or the member who created this
+                  draft can submit its payment.
                 </p>
               </div>
             </div>
           )}
 
           <div className="flex gap-3">
-            <Button
-              variant={hasSufficientBalance ? "outline" : "default"}
-              className="flex-1"
-              asChild
-            >
-              <Link
-                href={
-                  hasSufficientBalance
-                    ? "/dashboard/billing"
-                    : `/dashboard/billing?deposit=${Math.ceil(amount - balance)}&returnTo=${encodeURIComponent(`/dashboard/orders/checkout/${resolvedParams.id}`)}`
-                }
+            {user?.customerRole === "OWNER" && (
+              <Button
+                variant={hasSufficientBalance ? "outline" : "default"}
+                className="flex-1"
+                asChild
               >
-                {hasSufficientBalance
-                  ? "Deposit More"
-                  : `Deposit $${Math.ceil(amount - balance).toLocaleString()} to continue`}
-              </Link>
-            </Button>
-            {hasSufficientBalance && (
+                <Link
+                  href={
+                    hasSufficientBalance
+                      ? "/dashboard/billing"
+                      : `/dashboard/billing?deposit=${Math.ceil(amount - balance)}&returnTo=${encodeURIComponent(`/dashboard/orders/checkout/${resolvedParams.id}`)}`
+                  }
+                >
+                  {hasSufficientBalance
+                    ? "Deposit More"
+                    : `Deposit ${formatCustomerMoney(Math.ceil(amount - balance), order.currency)} to continue`}
+                </Link>
+              </Button>
+            )}
+            {hasSufficientBalance && canPay && (
               <Button
                 className="flex-1"
                 disabled={isProcessing || order?.status !== "DRAFT"}

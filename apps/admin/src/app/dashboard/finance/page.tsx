@@ -29,6 +29,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import {
   AlertCircle,
+  ArrowRight,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
@@ -42,7 +43,9 @@ import {
   Users,
   XCircle,
 } from "lucide-react"
-import { useState } from "react"
+import Link from "next/link"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import { Suspense, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
@@ -546,9 +549,10 @@ function TabNav({
   badges?: Partial<Record<Tab, number>>
 }) {
   return (
-    <div className="border-b flex gap-6">
+    <div className="flex gap-6 overflow-x-auto border-b">
       {tabs.map((tab) => (
         <button
+          type="button"
           key={tab}
           onClick={() => onChange(tab)}
           className={`relative pb-2.5 text-sm font-medium capitalize transition-colors ${
@@ -576,14 +580,38 @@ export default function FinancePage() {
   const { allowed, loading } = useRequireRole("SUPER_ADMIN", "FINANCE")
   if (loading) return null
   if (!allowed) return <ForbiddenPage requires="Finance or Super Admin" />
-  return <FinancePageInner />
+  return (
+    <Suspense fallback={<Skeleton className="h-72 w-full" />}>
+      <FinancePageInner />
+    </Suspense>
+  )
 }
 
 function FinancePageInner() {
-  const [activeTab, setActiveTab] = useState<Tab>("settlements")
+  const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const requestedTab = searchParams.get("tab")
+  const activeTab: Tab = TABS.includes(requestedTab as Tab)
+    ? (requestedTab as Tab)
+    : "settlements"
   const [settlementPage, setSettlementPage] = useState(1)
   const [withdrawalPage, setWithdrawalPage] = useState(1)
+  const [payoutPage, setPayoutPage] = useState(1)
   const queryClient = useQueryClient()
+
+  const setActiveTab = (tab: Tab) => {
+    const next = new URLSearchParams(searchParams.toString())
+    next.set("tab", tab)
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false })
+  }
+
+  const workbenchQ = useQuery({
+    queryKey: ["admin", "finance-workbench"],
+    queryFn: () => api.admin.getFinanceWorkbench(),
+    staleTime: 30_000,
+    retry: 1,
+  })
 
   const settlementsQ = useQuery({
     queryKey: ["settlements", settlementPage],
@@ -594,6 +622,16 @@ function FinancePageInner() {
     queryKey: ["withdrawals", withdrawalPage],
     queryFn: () =>
       api.admin.listWithdrawals(PAGE_SIZE, (withdrawalPage - 1) * PAGE_SIZE),
+  })
+  const payoutsQ = useQuery({
+    queryKey: ["withdrawals", "payouts", payoutPage],
+    queryFn: () =>
+      api.admin.listWithdrawals(PAGE_SIZE, (payoutPage - 1) * PAGE_SIZE, [
+        "APPROVED",
+        "PROCESSING",
+        "FAILED",
+      ]),
+    enabled: activeTab === "payouts",
   })
   const reconciliationQ = useQuery({
     queryKey: ["reconciliation"],
@@ -735,22 +773,45 @@ function FinancePageInner() {
   const withdrawalTotal = withdrawalsQ.data?.total ?? 0
   const withdrawalPages = Math.max(1, Math.ceil(withdrawalTotal / PAGE_SIZE))
 
-  const payable = withdrawals.filter((w: any) =>
-    ["APPROVED", "PROCESSING", "FAILED"].includes(w.status),
-  )
+  const payable = payoutsQ.data?.items ?? []
+  const payoutTotal = payoutsQ.data?.total ?? 0
+  const payoutPages = Math.max(1, Math.ceil(payoutTotal / PAGE_SIZE))
   const recon = reconciliationQ.data
+  const exactPayoutWork =
+    workbenchQ.data?.pipeline.withdrawals
+      .filter((row) =>
+        ["APPROVED", "PROCESSING", "FAILED"].includes(row.status),
+      )
+      .reduce((total, row) => total + row.count, 0) ?? 0
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Finance</h1>
+      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Finance Center</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review evidence, approve eligible funds, execute payouts, and
+            investigate financial integrity.
+          </p>
+        </div>
+        <Button variant="outline" asChild>
+          <Link href="/dashboard">
+            Finance workbench
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
       </div>
 
       <TabNav
         tabs={TABS}
         active={activeTab}
         onChange={setActiveTab}
-        badges={{ payouts: payable.length }}
+        badges={{
+          settlements: workbenchQ.data?.decisions.settlementsReady,
+          withdrawals: workbenchQ.data?.decisions.withdrawalsEligible,
+          payouts: exactPayoutWork,
+          reconciliation: workbenchQ.data?.reconciliation.totalIssues,
+        }}
       />
 
       {activeTab === "settlements" && (
@@ -1078,8 +1139,13 @@ function FinancePageInner() {
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
-            {withdrawalsQ.isLoading ? (
+            {payoutsQ.isLoading ? (
               <LoadingRows />
+            ) : payoutsQ.error ? (
+              <ErrorBlock
+                label="Failed to load payout queue"
+                onRetry={() => payoutsQ.refetch()}
+              />
             ) : payable.length === 0 ? (
               <EmptyBlock label="No approved withdrawals waiting for payout" />
             ) : (
@@ -1149,6 +1215,13 @@ function FinancePageInner() {
               </Table>
             )}
           </CardContent>
+          <PaginationBar
+            page={payoutPage}
+            totalPages={payoutPages}
+            total={payoutTotal}
+            pageSize={PAGE_SIZE}
+            onPageChange={setPayoutPage}
+          />
         </Card>
       )}
 

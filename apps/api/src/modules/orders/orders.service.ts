@@ -1,4 +1,4 @@
-import { Prisma } from "@guestpost/database"
+import { OrderStatus, Prisma, ServiceType } from "@guestpost/database"
 import { UnknownServiceTypeError, validateBrief } from "@guestpost/shared"
 import {
   BadRequestException,
@@ -566,16 +566,91 @@ export class OrdersService {
 
   async listOrders(
     organizationId: string,
-    campaignId?: string,
-    take = 50,
-    skip = 0,
+    filters: {
+      campaignId?: string
+      serviceType?: ServiceType
+      statuses?: OrderStatus[]
+      search?: string
+      needsAction?: boolean
+      actionableCustomerId?: string
+      sort?: "priority" | "deadline" | "newest" | "value"
+      take?: number
+      skip?: number
+    } = {},
   ) {
-    const where: any = { organizationId }
-    if (campaignId) where.campaignId = campaignId
+    const take = filters.take ?? 50
+    const skip = filters.skip ?? 0
+    const where: Prisma.OrderWhereInput = {
+      organizationId,
+      ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
+      ...(filters.serviceType ? { type: filters.serviceType } : {}),
+      ...(filters.statuses?.length ? { status: { in: filters.statuses } } : {}),
+    }
+
+    const constraints: Prisma.OrderWhereInput[] = []
+    if (filters.search) {
+      constraints.push({
+        OR: [
+          { id: { contains: filters.search, mode: "insensitive" } },
+          { title: { contains: filters.search, mode: "insensitive" } },
+          {
+            website: {
+              is: { url: { contains: filters.search, mode: "insensitive" } },
+            },
+          },
+          {
+            campaign: {
+              is: { name: { contains: filters.search, mode: "insensitive" } },
+            },
+          },
+        ],
+      })
+    }
+    if (filters.needsAction) {
+      constraints.push({
+        ...(filters.actionableCustomerId
+          ? { customerId: filters.actionableCustomerId }
+          : {}),
+        OR: [
+          {
+            status: {
+              in: [
+                OrderStatus.DRAFT,
+                OrderStatus.PENDING_PAYMENT,
+                OrderStatus.CUSTOMER_REVIEW,
+                OrderStatus.VERIFIED,
+              ],
+            },
+          },
+          {
+            cancellationRequests: {
+              some: {
+                status: "REQUESTED",
+                requesterType: { not: "CUSTOMER" },
+              },
+            },
+          },
+        ],
+      })
+    }
+    if (constraints.length) where.AND = constraints
+
+    const orderBy: Prisma.OrderOrderByWithRelationInput[] =
+      filters.sort === "deadline"
+        ? [{ fulfillmentDueAt: "asc" }, { updatedAt: "desc" }]
+        : filters.sort === "value"
+          ? [{ amount: "desc" }, { createdAt: "desc" }]
+          : filters.sort === "priority"
+            ? [
+                { autoAcceptAt: { sort: "asc", nulls: "last" } },
+                { fulfillmentDueAt: { sort: "asc", nulls: "last" } },
+                { updatedAt: "desc" },
+              ]
+            : [{ createdAt: "desc" }]
     const [items, total] = await this.prisma.$transaction([
       this.prisma.order.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         take,
         skip,
         include: {

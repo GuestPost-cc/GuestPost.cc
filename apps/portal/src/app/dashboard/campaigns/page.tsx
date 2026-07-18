@@ -1,5 +1,6 @@
 "use client"
 
+import type { Campaign } from "@guestpost/api-client"
 import type { CampaignStatus } from "@guestpost/database"
 import {
   Button,
@@ -45,7 +46,6 @@ import { useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { api } from "../../../lib/api"
-import { useAuth } from "../../../lib/auth"
 
 const createCampaignSchema = z.object({
   // Mirrors CreateCampaignDto (MinLength 3 / MaxLength 200) so users get an
@@ -57,17 +57,6 @@ const createCampaignSchema = z.object({
 })
 
 type CreateCampaignForm = z.infer<typeof createCampaignSchema>
-
-interface Campaign {
-  id: string
-  name: string
-  status: string
-  description?: string
-  organizationId: string
-  createdAt: string
-  updatedAt?: string
-  orderCount?: number
-}
 
 function CampaignsTableSkeleton() {
   return (
@@ -88,7 +77,6 @@ function CampaignsTableSkeleton() {
 }
 
 export default function CampaignsPage() {
-  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [showCreateCampaign, setShowCreateCampaign] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(
@@ -105,17 +93,7 @@ export default function CampaignsPage() {
     refetch: refetchCampaigns,
   } = useQuery({
     queryKey: ["campaigns"],
-    queryFn: () => api.campaigns.listCampaigns(),
-  })
-
-  const {
-    data: ordersData,
-    isLoading: ordersLoading,
-    error: ordersError,
-    refetch: refetchOrders,
-  } = useQuery({
-    queryKey: ["orders"],
-    queryFn: () => api.orders.list() as Promise<any[]>,
+    queryFn: () => api.campaigns.listAllCampaigns(),
   })
 
   const {
@@ -145,7 +123,6 @@ export default function CampaignsPage() {
     onSuccess: () => {
       toast.success("Campaign deleted successfully")
       queryClient.invalidateQueries({ queryKey: ["campaigns"] })
-      queryClient.invalidateQueries({ queryKey: ["orders"] })
       setShowDeleteConfirm(null)
     },
     onError: () => {
@@ -207,29 +184,17 @@ export default function CampaignsPage() {
     campaign.name.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const getOrderCount = (campaignId: string) => {
-    return (
-      ordersData?.filter((order: any) => order.campaignId === campaignId)
-        .length ?? 0
-    )
-  }
-
-  const campaignsErrorCombined = campaignsError || ordersError
-
-  if (campaignsErrorCombined) {
+  if (campaignsError) {
     return (
       <ErrorState
         title="Failed to load campaigns"
-        description={(campaignsErrorCombined as Error).message}
-        onRetry={() => {
-          refetchCampaigns()
-          refetchOrders()
-        }}
+        description={(campaignsError as Error).message}
+        onRetry={() => refetchCampaigns()}
       />
     )
   }
 
-  if (isLoading || ordersLoading) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -267,7 +232,7 @@ export default function CampaignsPage() {
         </Button>
       </div>
 
-      <Card>
+      <Card className="rounded-2xl shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -313,7 +278,7 @@ export default function CampaignsPage() {
               {filteredCampaigns.map((campaign) => (
                 <div
                   key={campaign.id}
-                  className="flex items-center justify-between rounded-lg border p-4 hover:bg-muted/50 transition-colors"
+                  className="flex flex-col justify-between gap-4 rounded-2xl border p-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-center"
                 >
                   <div className="flex items-center gap-4">
                     <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
@@ -328,8 +293,8 @@ export default function CampaignsPage() {
                       </Link>
                       <div className="flex items-center gap-3 mt-1">
                         <span className="text-sm text-muted-foreground">
-                          {getOrderCount(campaign.id)} order
-                          {getOrderCount(campaign.id) !== 1 ? "s" : ""}
+                          {campaign.orderCount ?? 0} order
+                          {(campaign.orderCount ?? 0) !== 1 ? "s" : ""}
                         </span>
                         <span className="text-sm text-muted-foreground">
                           Created {format(new Date(campaign.createdAt), "PP")}

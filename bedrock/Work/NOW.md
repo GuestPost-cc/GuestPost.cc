@@ -1,10 +1,74 @@
 # Current Status
 
-**Phase**: Publisher order workbench is implemented and verified locally; marketplace taxonomy and Google metric migrations are current locally and on Neon. Real-Google sync validation and worker deployment remain.
+**Phase**: Publisher, customer, Super Admin, Finance, and Operations workbenches are implemented and verified locally; marketplace taxonomy and Google metric migrations are current locally and on Neon. Real-Google sync validation and worker deployment remain.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Operations Assignment And Support Workbench
+
+- Replaced the generic Operations overview with an assignment-focused
+  workbench for active/claimable fulfillment, assigned platform Support,
+  operational cancellations/disputes, delivery/domain verification,
+  marketplace moderation, and assigned-site readiness.
+- Added the private/no-store `GET /admin/operations-workbench` endpoint with
+  exact server counts and a bounded server-prioritized queue. Support assigned
+  to the operator is guaranteed visibility within an equal severity band;
+  only safely claimable fulfillment can mutate inline.
+- Scoped the Operations order monitor and direct order detail to assigned or
+  claimable fulfillment, orders with Support assigned to the operator, and
+  active operational exception contexts. Direct-ID probing fails as not found,
+  and Operations responses omit emails, finance data, audit metadata, and
+  provider details.
+- Added role-aware admin branding and navigation. Operations sees GuestPost
+  Operations, Finance sees GuestPost Finance, and GuestPost Administration is
+  reserved for Super Admin. Operations Support opens on Assigned to me, and
+  the force-approval verification report is Super Admin-only.
+- Validation: all 82 API unit suites and 876 tests pass; Admin lint/typecheck,
+  API/API-client builds, Biome, whitespace checks, and signed-in browser QA for
+  the workbench, assigned Support, domain verification, and order monitor pass.
+
+### Finance Money Operations Workbench
+
+- Replaced the generic Finance overview with a Support-first workbench for
+  settlement, withdrawal, payout, cancellation, dispute, reconciliation, and
+  publisher-debt decisions. The bounded server-prioritized queue guarantees
+  that active Support remains visible without outranking critical integrity
+  failures.
+- Added exact Finance KPIs and pipeline totals through the dedicated,
+  private/no-store `GET /admin/finance-workbench` endpoint. Money aggregation
+  stays in Prisma Decimal; the response excludes payout credentials, provider
+  configuration, raw execution errors, audit metadata, and decrypt output.
+- Reorganized Finance Center into URL-backed Settlements, Withdrawals, Payouts,
+  Reconciliation, and Revenue tabs. Settlement/withdrawal status filtering and
+  pagination are server-side, and high-impact mutations remain in their
+  existing reasoned and audited detail workflows.
+- Validation: all 81 API unit suites and 870 tests pass; Admin lint/typecheck,
+  API/API-client/shared builds, the complete 12-target production build, and
+  whitespace checks pass. The live endpoint is registered and rejects an
+  unauthenticated request with HTTP 401.
+
+### Customer Order Workbench
+
+- Rebuilt the customer shell around Work, Discover, Results & Finance, and
+  Account, with owner-only Billing visibility and longest-route active-state
+  matching.
+- Replaced the overview with an action-first dashboard showing authoritative
+  attention, active-order, delivered-result, wallet, campaign, and in-progress
+  summaries.
+- Rebuilt Orders as a server-paginated operational queue and reorganized order
+  detail and checkout around value, deadline, turnaround, next action, delivery
+  proof, and role-aware controls. OWNER can oversee the organization; MEMBER
+  actions remain limited to orders the member created.
+- Updated campaign counts/detail, complete report exports, wallet ledger copy,
+  and support triage without changing deposit, payment, refund, payout, or
+  settlement behavior.
+- Validation: portal lint/typecheck and production build pass; publisher
+  lint/typecheck pass; API/API-client builds pass; all 77 API unit suites and
+  860 tests pass. Signed-in browser QA passed for owner Work Queue, Orders,
+  Order Detail, Billing, secure order-linked Support, and the member Billing
+  deep-link guard.
 
 ### Publisher Order Workbench
 
@@ -249,12 +313,35 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
-The publisher order workbench is code-complete on
-`agent/publisher-order-workbench` and locally validated against the seeded
-publisher account. The redesign does not change payment, payout, order-state,
-ownership, or cancellation authorization; it consumes existing secured
-endpoints and exposes existing order deadline/brief fields through the typed
-client.
+The Operations assignment and Support workbench is code-complete and locally
+verified. `GET /admin/operations-workbench` supplies exact workflow counts and
+a bounded action queue spanning assigned/claimable fulfillment, assigned
+Support, resolution/trust, moderation, and assigned-site readiness. Operations
+order reads are server-scoped to actionable or assigned-support contexts and
+sanitized before return; claim remains race-safe through the existing
+fulfillment assignment service. Role-specific branding and navigation now
+identify Super Admin, Operations, and Finance without changing their API
+authority.
+
+The Finance money-operations workbench is code-complete and locally verified.
+The admin shell keeps the established grouped navigation while giving Finance
+a role-specific Workbench, Finance Center, Evidence Review, and first-position
+Support entry. `GET /admin/finance-workbench` supplies exact decision counts,
+a bounded Support-aware priority queue, pipeline/reconciliation/revenue/debt
+health, and sanitized allowlisted activity. The endpoint is Finance/Super
+Admin-only, no-store, and read-only; payout decryption, raw provider failures,
+and every high-impact money mutation stay separately permissioned and audited.
+The in-app browser client blocked localhost navigation, but the live endpoint
+is registered and authentication-protected, and all automated validation is
+green.
+
+The customer order workbench is code-complete on
+`agent/customer-order-workbench` and locally validated against seeded OWNER
+and MEMBER accounts. The publisher workbench is preserved in the parent
+commit. Neither redesign changes payment, payout, order-state, ownership, or
+cancellation authorization; both consume existing secured endpoints and expose
+existing snapshot, deadline, brief, balance, and earnings fields through the
+typed client.
 
 Platform/publisher inventory, the reviewed marketplace taxonomy and placement
 policy, and website-scoped Google marketplace summaries are code-complete. Both
@@ -288,7 +375,7 @@ data.
 
 ## Next Actions
 
-1. **Publisher workbench release** — review, commit, push, and open the publisher workbench PR; confirm the full GitHub CI gate before merging.
+1. **Customer workbench release** — review, commit, push, and open the customer workbench PR (stacked on the publisher workbench commit); confirm the full GitHub CI gate before merging.
 2. **Google integration staging pass** — deploy the worker, authorize the production callback URI, connect a Google account different from the GuestPost login, discover/link GSC and GA4 properties for one publisher and one platform site, then verify daily rows and their buyer-safe 30-day listing summaries are written only to the selected website mappings.
 3. **Auth IP warning follow-up** — Render logs now show Better Auth falling back to a shared per-path rate-limit bucket when no trusted client IP header is resolved; configure Better Auth trusted proxy/IP headers before production hardening.
 4. **Worker operations** — the worker is not deployed on Render yet; run it locally when testing DNS TXT verification, GSC sync, cancellation/settlement sweeps, or other queue-backed flows.

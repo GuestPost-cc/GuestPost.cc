@@ -1,3 +1,4 @@
+import type { Prisma, WithdrawalStatus } from "@guestpost/database"
 import {
   getWithdrawalHoldDays,
   type PublisherTier,
@@ -891,8 +892,16 @@ export class PublisherPayoutsService {
     return result
   }
 
-  async listWithdrawals(publisherId?: string, take = 50, skip = 0) {
-    const where = publisherId ? { publisherId } : {}
+  async listWithdrawals(
+    publisherId?: string,
+    take = 50,
+    skip = 0,
+    statuses?: WithdrawalStatus[],
+  ) {
+    const where: Prisma.WithdrawalWhereInput = {
+      ...(publisherId ? { publisherId } : {}),
+      ...(statuses?.length ? { status: { in: statuses } } : {}),
+    }
     const [items, total] = await this.prisma.$transaction([
       this.prisma.withdrawal.findMany({
         where,

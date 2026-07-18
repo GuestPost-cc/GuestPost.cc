@@ -1,6 +1,7 @@
 import { hashPassword } from "@better-auth/utils/password"
 import {
   ListingStatus,
+  type Prisma,
   WebsiteOwnershipType,
   WebsiteVerificationStatus,
 } from "@guestpost/database"
@@ -677,21 +678,101 @@ export class AdminService {
     })
   }
 
-  async listOrders(take = 50, skip = 0, _user?: any) {
+  private operationsOrderScope(userId: string): Prisma.OrderWhereInput {
+    const platformChannel: Prisma.OrderWhereInput = {
+      OR: [
+        { fulfillmentChannel: "PLATFORM" },
+        {
+          fulfillmentChannel: null,
+          website: { ownershipType: "PLATFORM" },
+        },
+      ],
+    }
+    const activeAssignment = { status: { in: ["ASSIGNED", "IN_PROGRESS"] } }
+    const claimableStatuses = [
+      "SUBMITTED",
+      "ACCEPTED",
+      "CONTENT_REQUESTED",
+      "CONTENT_CREATION",
+      "CONTENT_READY",
+      "CUSTOMER_REVIEW",
+      "APPROVED",
+    ]
+
+    return {
+      OR: [
+        {
+          AND: [
+            platformChannel,
+            {
+              OR: [
+                {
+                  fulfillmentAssignments: {
+                    some: { assignedToUserId: userId },
+                  },
+                },
+                {
+                  AND: [
+                    { status: { in: claimableStatuses as any } },
+                    {
+                      fulfillmentAssignments: { none: activeAssignment as any },
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+        { tickets: { some: { assignedToUserId: userId } } },
+        {
+          dispute: {
+            is: { status: { in: ["OPEN", "UNDER_REVIEW"] } },
+          },
+        },
+        {
+          cancellationRequests: {
+            some: {
+              status: { in: ["REQUESTED", "UNDER_REVIEW", "ESCALATED"] },
+            },
+          },
+        },
+        {
+          activeDeliveryVersion: {
+            is: { verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] } },
+          },
+        },
+      ],
+    }
+  }
+
+  async listOrders(take = 50, skip = 0, user?: any) {
     // Phase 6.7 — explicit projection. The previous `include: { website: true }`
     // leaked Website.verificationToken (the DNS-TXT verification secret) to
     // every Finance/Ops staffer. Customer is also narrowed (no banReason,
     // no emailVerified internal field). Org excludes the opaque `settings`
     // JSON. None of these are required for refund / dispute / fulfillment
     // investigations — they exist on the Order row directly via FKs.
+    const isOperations = user?.staffRole === "OPERATIONS"
+
     return this.prisma.order.findMany({
+      where: isOperations ? this.operationsOrderScope(user.id) : undefined,
       orderBy: { createdAt: "desc" },
       take,
       skip,
       include: {
-        organization: { select: { id: true, name: true, slug: true } },
+        organization: {
+          select: {
+            id: true,
+            name: true,
+            ...(!isOperations && { slug: true }),
+          },
+        },
         customer: {
-          select: { id: true, name: true, email: true, userType: true },
+          select: {
+            id: true,
+            name: true,
+            ...(!isOperations && { email: true, userType: true }),
+          },
         },
         website: {
           select: {
@@ -706,9 +787,14 @@ export class AdminService {
     })
   }
 
-  async getOrder(id: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id },
+  async getOrder(id: string, user?: any) {
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id,
+        ...(user?.staffRole === "OPERATIONS"
+          ? { AND: [this.operationsOrderScope(user.id)] }
+          : {}),
+      },
       include: {
         organization: { select: { id: true, name: true, slug: true } },
         customer: {
@@ -769,6 +855,65 @@ export class AdminService {
       },
     })
     if (!order) throw new NotFoundException(`Order ${id} not found`)
+
+    if (user?.staffRole === "OPERATIONS") {
+      return {
+        ...order,
+        organization: order.organization
+          ? { id: order.organization.id, name: order.organization.name }
+          : null,
+        customer: order.customer
+          ? { id: order.customer.id, name: order.customer.name }
+          : null,
+        website: order.website
+          ? {
+              id: order.website.id,
+              url: order.website.url,
+              name: order.website.name,
+              ownershipType: order.website.ownershipType,
+              verificationStatus: order.website.verificationStatus,
+              publisher: order.website.publisher
+                ? {
+                    id: order.website.publisher.id,
+                    name: order.website.publisher.name,
+                  }
+                : null,
+              managedBy: order.website.managedBy
+                ? {
+                    id: order.website.managedBy.id,
+                    name: order.website.managedBy.name,
+                  }
+                : null,
+            }
+          : null,
+        items: order.items.map((item) => ({
+          ...item,
+          website: item.website
+            ? { id: item.website.id, url: item.website.url }
+            : null,
+        })),
+        events: order.events.map((event) => ({
+          id: event.id,
+          eventType: event.eventType,
+          actorId: event.actorId,
+          message: event.message,
+          createdAt: event.createdAt,
+        })),
+        activeDeliveryVersion: order.activeDeliveryVersion
+          ? {
+              ...order.activeDeliveryVersion,
+              adminVerifiedBy: order.activeDeliveryVersion.adminVerifiedBy
+                ? {
+                    id: order.activeDeliveryVersion.adminVerifiedBy.id,
+                    name: order.activeDeliveryVersion.adminVerifiedBy.name,
+                  }
+                : null,
+            }
+          : null,
+        settlements: [],
+        platformRevenue: null,
+      }
+    }
 
     const approverIds = [
       ...new Set(

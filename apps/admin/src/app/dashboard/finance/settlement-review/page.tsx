@@ -2,6 +2,7 @@
 
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -19,6 +20,7 @@ import { useQuery } from "@tanstack/react-query"
 import { format } from "date-fns"
 import {
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Scale,
   ShieldAlert,
@@ -35,6 +37,14 @@ const vBadge: Record<string, { variant: any; Icon: any }> = {
   RETRYING: { variant: "warning", Icon: ShieldAlert },
   MANUAL_REVIEW: { variant: "warning", Icon: ShieldAlert },
 }
+
+const PAGE_SIZE = 20
+const REVIEWABLE_STATUSES = [
+  "PENDING",
+  "UNDER_REVIEW",
+  "CUSTOMER_APPROVED",
+  "ADMIN_APPROVED",
+] as const
 
 // Per-settlement delivery evidence + computed settlement eligibility. Finance
 // sees exactly why a settlement is (in)eligible before releasing.
@@ -96,9 +106,13 @@ function DeliveryRow({ orderId }: { orderId: string }) {
 
 export default function SettlementReviewPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
   const { data, isLoading, error } = useQuery({
-    queryKey: ["finance-settlements"],
-    queryFn: () => api.admin.listSettlements(100, 0),
+    queryKey: ["admin", "finance-settlements", "reviewable", page],
+    queryFn: () =>
+      api.admin.listSettlements(PAGE_SIZE, (page - 1) * PAGE_SIZE, [
+        ...REVIEWABLE_STATUSES,
+      ]),
   })
 
   if (error)
@@ -110,11 +124,8 @@ export default function SettlementReviewPage() {
     )
 
   const settlements = data?.items ?? []
-  const reviewable = settlements.filter((s: any) =>
-    ["PENDING", "UNDER_REVIEW", "CUSTOMER_APPROVED", "ADMIN_APPROVED"].includes(
-      s.status,
-    ),
-  )
+  const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
     <div className="space-y-6">
@@ -131,13 +142,13 @@ export default function SettlementReviewPage() {
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">
-            Settlements awaiting review ({reviewable.length})
+            Settlements awaiting review ({total})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <Skeleton className="h-48 w-full" />
-          ) : reviewable.length === 0 ? (
+          ) : settlements.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               None awaiting review.
             </p>
@@ -154,7 +165,7 @@ export default function SettlementReviewPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reviewable.map((s: any) => (
+                {settlements.map((s) => (
                   <Fragment key={s.id}>
                     <TableRow
                       className="cursor-pointer"
@@ -176,7 +187,7 @@ export default function SettlementReviewPage() {
                         {s.publisher?.name ?? s.publisher?.email}
                       </TableCell>
                       <TableCell>
-                        {s.currency} {s.amount}
+                        {s.order.currency} {s.publisherAmount}
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline">{s.status}</Badge>
@@ -198,6 +209,37 @@ export default function SettlementReviewPage() {
             </Table>
           )}
         </CardContent>
+        {totalPages > 1 ? (
+          <div className="flex items-center justify-between gap-4 border-t px-4 py-3">
+            <p className="text-xs text-muted-foreground">
+              Page {page} of {totalPages} · {total} settlements
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => {
+                  setExpanded(null)
+                  setPage((current) => Math.max(1, current - 1))
+                }}
+              >
+                <ChevronLeft className="mr-1 h-4 w-4" /> Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => {
+                  setExpanded(null)
+                  setPage((current) => Math.min(totalPages, current + 1))
+                }}
+              >
+                Next <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </Card>
     </div>
   )

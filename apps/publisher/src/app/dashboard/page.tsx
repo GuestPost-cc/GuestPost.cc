@@ -12,7 +12,6 @@ import {
   ErrorState,
   getOrderStatusPresentation,
   Skeleton,
-  StatusBadge,
 } from "@guestpost/ui"
 import { useQuery } from "@tanstack/react-query"
 import type { LucideIcon } from "lucide-react"
@@ -32,6 +31,7 @@ import {
 import Link from "next/link"
 import { api } from "../../lib/api"
 import { useAuth } from "../../lib/auth"
+import { getPublisherOrderBadgeVariant } from "../../lib/order-status-badge-variant"
 import {
   formatPublisherMoney,
   getOrderDueState,
@@ -124,9 +124,9 @@ function OrderWorkRow({ order }: { order: OrderResponse }) {
           <span className="font-mono text-xs text-muted-foreground">
             #{order.id.slice(0, 8)}
           </span>
-          <StatusBadge variant={presentation.variant}>
+          <Badge variant={getPublisherOrderBadgeVariant(order.status)}>
             {presentation.label}
-          </StatusBadge>
+          </Badge>
           <DueLabel order={order} />
         </div>
         <p className="mt-2 truncate text-sm font-semibold capitalize">

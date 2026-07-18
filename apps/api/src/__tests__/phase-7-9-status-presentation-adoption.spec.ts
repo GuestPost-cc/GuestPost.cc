@@ -53,7 +53,7 @@ describe("Phase 7.9 — STATUS_PRESENTATION adoption (audit #21)", () => {
   describe("architecture regression guards", () => {
     const targets: Array<{ file: string; helper: string }> = [
       {
-        file: "apps/admin/src/app/dashboard/page.tsx",
+        file: "apps/admin/src/app/dashboard/_components/operations-workbench.tsx",
         helper: "getOrderBadgeVariant",
       },
       {

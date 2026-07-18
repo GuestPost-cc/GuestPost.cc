@@ -1,4 +1,6 @@
+import { OrderStatus, ServiceType } from "@guestpost/database"
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -64,6 +66,12 @@ export class OrdersController {
   @Get()
   list(
     @Query("campaignId") campaignId?: string,
+    @Query("serviceType") serviceType?: string,
+    @Query("status") status?: string,
+    @Query("statuses") statuses?: string,
+    @Query("search") search?: string,
+    @Query("needsAction") needsAction?: string,
+    @Query("sort") sort?: string,
     @Query("take") take?: string,
     @Query("skip") skip?: string,
     @CurrentUser() user?: any,
@@ -72,7 +80,46 @@ export class OrdersController {
     const s = Math.max(0, parseInt(skip ?? "0", 10) || 0)
     if (user.userType === "PUBLISHER")
       return this.orders.listPublisherOrders(user.publisherId, t, s)
-    return this.orders.listOrders(user.organizationId, campaignId, t, s)
+
+    const requestedStatuses = [
+      ...(status ? [status] : []),
+      ...(statuses ? statuses.split(",") : []),
+    ].filter(Boolean)
+    const allowedStatuses = new Set<string>(Object.values(OrderStatus))
+    const invalidStatus = requestedStatuses.find(
+      (candidate) => !allowedStatuses.has(candidate),
+    )
+    if (invalidStatus) {
+      throw new BadRequestException(`Invalid order status: ${invalidStatus}`)
+    }
+    if (search && search.length > 200) {
+      throw new BadRequestException("Search must be 200 characters or fewer")
+    }
+    if (
+      serviceType &&
+      !new Set<string>(Object.values(ServiceType)).has(serviceType)
+    ) {
+      throw new BadRequestException(`Invalid service type: ${serviceType}`)
+    }
+    const allowedSorts = new Set(["priority", "deadline", "newest", "value"])
+    if (sort && !allowedSorts.has(sort)) {
+      throw new BadRequestException(`Invalid order sort: ${sort}`)
+    }
+
+    return this.orders.listOrders(user.organizationId, {
+      campaignId,
+      serviceType: serviceType as ServiceType | undefined,
+      statuses: requestedStatuses as OrderStatus[],
+      search: search?.trim() || undefined,
+      needsAction: needsAction === "true",
+      actionableCustomerId:
+        needsAction === "true" && user.customerRole !== "OWNER"
+          ? user.id
+          : undefined,
+      sort: (sort as "priority" | "deadline" | "newest" | "value") ?? "newest",
+      take: t,
+      skip: s,
+    })
   }
 
   @Get(":id")

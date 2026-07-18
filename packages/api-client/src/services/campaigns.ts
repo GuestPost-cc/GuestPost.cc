@@ -43,6 +43,22 @@ export class CampaignsService {
     return res.items
   }
 
+  async listAllCampaigns() {
+    const campaigns: Campaign[] = []
+    let skip = 0
+    let total = Number.POSITIVE_INFINITY
+
+    while (skip < total) {
+      const page = await this.listCampaignsPaginated({ take: 100, skip })
+      campaigns.push(...page.items)
+      total = page.total
+      if (page.items.length === 0) break
+      skip += page.items.length
+    }
+
+    return campaigns
+  }
+
   listCampaignsPaginated(params?: PaginationParams) {
     return this.client.get<Paginated<Campaign>>("/campaigns", { params })
   }

@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: orders-fulfillment
 project: guestpost-platform
-updated: 2026-07-18
+updated: 2026-07-19
 ---
 
 # Orders & Fulfillment
@@ -41,6 +41,30 @@ Cancellation/dispute paths branch off at various states.
   browser `File` objects without sending or securing them. The former JSON
   “invoice” download was also removed because it was not a real financial
   document.
+
+## Customer Workbench
+
+- The customer dashboard at `/dashboard` prioritizes payments, content review,
+  delivery confirmation, and counterparty cancellation responses. KPI totals
+  come from tenant-scoped count queries rather than the length of one page.
+- `/dashboard/orders` is a 20-row server-paginated queue with stage, campaign,
+  service, full-text, and operational sort controls. The API validates every
+  filter, caps page size at 100, and always includes `organizationId` in its
+  Prisma predicate. Member attention queries additionally scope results to the
+  member's own `customerId`; owners retain organization-wide oversight.
+- Customer order detail and checkout display the snapshot value, turnaround,
+  fulfillment/review deadline, and one next action. OWNER or order creator is
+  the client-side action rule, but dedicated endpoints and ownership guards
+  remain authoritative for payment, review, delivery, cancellation, and
+  dispute mutations.
+- Campaign lists expose an authoritative server-side `orderCount`. Campaign
+  detail and Reports page through all matching order pages before computing
+  totals or exports. Result reporting consistently includes PUBLISHED,
+  VERIFIED, DELIVERED, SETTLED, and COMPLETED.
+- Support tickets linked to an order are prioritized when waiting on the
+  customer, and ticket forms warn users never to send passwords, API keys,
+  complete card details, or other credentials. The unsupported priority input
+  was removed because the API never persisted it.
 
 ### Business-Action Endpoints
 
@@ -95,6 +119,22 @@ covers accept, draft/save, atomic content submission for customer review,
 revision, publication, verification, and structured cancellation. Mutations
 re-check the active assignment and its version inside the same transaction;
 another operator's order is hidden from direct-ID access.
+
+`GET /admin/operations-workbench` is the read-only Operations landing summary.
+It combines fulfillment with Support assigned to the current operator,
+operational cancellations and disputes, delivery/domain verification,
+moderation, and assigned-site listing/integration readiness. The server ranks a
+bounded action queue and guarantees assigned Support visibility within an equal
+severity band; only an unassigned platform fulfillment item can be claimed
+inline, using the existing race-safe claim path.
+
+Operations order-monitor and direct order-detail reads are scoped to work the
+operator can act on or support: assigned or safely claimable platform orders,
+orders with Support assigned to the operator, and active operational
+dispute/cancellation or delivery-verification contexts. Guessed unrelated IDs
+fail as not found. Contextual customer, publisher, and assignee names are
+sanitized; finance records, audit metadata, emails, and provider details are
+not returned to Operations.
 
 Operations performance distinguishes assignment history, explicit self-claims,
 delivered work, and delivered sales grouped by currency. Active assignments

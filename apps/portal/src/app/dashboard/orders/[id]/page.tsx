@@ -1,6 +1,9 @@
 "use client"
 
-import type { CancellationReasonCode } from "@guestpost/api-client"
+import type {
+  CancellationReasonCode,
+  OrderResponse,
+} from "@guestpost/api-client"
 import type { OrderStatus } from "@guestpost/database"
 import {
   BriefRenderer,
@@ -58,6 +61,13 @@ import { useRouter } from "next/navigation"
 import { use, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../../lib/api"
+import { useAuth } from "../../../../lib/auth"
+import {
+  customerCanMutateOrder,
+  formatCustomerMoney,
+  getCustomerNextAction,
+  getCustomerOrderDeadline,
+} from "../../../../lib/customer-order-workflow"
 
 // Phase 7.9 #28 — color + label live in the central STATUS_PRESENTATION
 // table now (@guestpost/ui). This local map keeps only the page-specific
@@ -153,53 +163,6 @@ function eventDetail(event: TimelineEvent): string | null {
     parts.push(`Publisher payout: $${m.publisherAmount.toLocaleString()}`)
   if (m.version != null && url == null) parts.push(`Revision v${m.version}`)
   return parts.length ? parts.join(" · ") : null
-}
-
-// Mirrors the api-client OrderResponse (normalized from the real API payload)
-interface OrderDetail {
-  id: string
-  version: number
-  status: string
-  paymentStatus: string
-  items: Array<{
-    id: string
-    serviceType: string
-    topic: string | null
-    instructions: string | null
-    budget: number | null
-    website: { id: string; url: string } | null
-    publications?: Array<{
-      id: string
-      publishedUrl: string | null
-      targetUrl: string | null
-      anchorText: string | null
-      screenshotUrl: string | null
-      publicationDate: string | null
-      verificationStatus: string
-    }>
-  }>
-  submittedContent?: {
-    title: string | null
-    brief: string | null
-    deliverable: string | null
-    status: string
-  } | null
-  revisions?: Array<{
-    id: string
-    notes: string | null
-    files: unknown
-    status: string
-    createdAt: string
-  }>
-  publishedUrl?: string | null
-  totalAmount: number | null
-  currency: string
-  createdAt: string
-  updatedAt: string
-  autoAcceptAt: string | null
-  verifyMethod: string | null
-  deliveryAcceptedMethod: string | null
-  events: TimelineEvent[]
 }
 
 // Publisher-submitted content is rendered in the customer's browser — sanitize
@@ -478,6 +441,7 @@ export default function OrderDetailPage({
   params: Promise<{ id: string }>
 }) {
   const resolvedParams = use(params)
+  const { user } = useAuth()
   const queryClient = useQueryClient()
   const [showRevisionDialog, setShowRevisionDialog] = useState(false)
   const [showCancelDialog, setShowCancelDialog] = useState(false)
@@ -499,10 +463,9 @@ export default function OrderDetailPage({
     isLoading,
     error,
     refetch,
-  } = useQuery<OrderDetail>({
+  } = useQuery<OrderResponse>({
     queryKey: ["order", resolvedParams.id],
-    queryFn: () =>
-      api.orders.getById(resolvedParams.id) as Promise<OrderDetail>,
+    queryFn: () => api.orders.getById(resolvedParams.id),
   })
 
   const { data: cancellationPreview, isLoading: cancellationPreviewLoading } =
@@ -759,26 +722,38 @@ export default function OrderDetailPage({
 
   // Customer is reviewing the publisher's draft content
   // Draft orders only enter the publisher/ops queue after payment.
-  const canPay = order.status === "DRAFT" || order.status === "PENDING_PAYMENT"
-  const canApproveContent = order.status === "CUSTOMER_REVIEW"
-  const _canRequestRevision = order.status === "CUSTOMER_REVIEW"
+  const actorCanMutate = customerCanMutateOrder(order, user)
+  const canPay =
+    actorCanMutate &&
+    (order.status === "DRAFT" || order.status === "PENDING_PAYMENT")
+  const canApproveContent = actorCanMutate && order.status === "CUSTOMER_REVIEW"
+  const _canRequestRevision = canApproveContent
   // Platform verified the live placement — customer confirms to complete + settle
-  const canConfirmDelivery = order.status === "VERIFIED"
+  const canConfirmDelivery = actorCanMutate && order.status === "VERIFIED"
   // System check is primary; manual accept is the fallback only when the
   // automated check failed or needs review (and not already accepted).
   const autoUnverified =
     proof?.hasDelivery &&
     ["FAILED", "MANUAL_REVIEW"].includes(proof.verificationStatus) &&
     proof.interventionStatus === "NONE"
-  const canManualAccept = order.status === "PUBLISHED" && autoUnverified
+  const canManualAccept =
+    actorCanMutate && order.status === "PUBLISHED" && autoUnverified
   const verifyInProgress =
     order.status === "PUBLISHED" &&
     proof?.hasDelivery &&
     ["PENDING", "RETRYING"].includes(proof.verificationStatus)
-  const canCancel =
-    cancellationPreview?.action === "CANCEL_NOW" ||
-    cancellationPreview?.action === "REQUEST_CANCELLATION"
-  const canDispute = cancellationPreview?.action === "OPEN_DISPUTE"
+  const canCancel = Boolean(
+    cancellationPreview?.actorCanMutate &&
+      ["CANCEL_NOW", "REQUEST_CANCELLATION"].includes(
+        cancellationPreview.action,
+      ),
+  )
+  const canDispute = Boolean(
+    cancellationPreview?.actorCanMutate &&
+      cancellationPreview.action === "OPEN_DISPUTE",
+  )
+  const nextAction = getCustomerNextAction(order, user)
+  const deadline = getCustomerOrderDeadline(order)
 
   return (
     <div className="space-y-6">
@@ -828,6 +803,63 @@ export default function OrderDetailPage({
             </Button>
           )}
         </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Order value
+            </p>
+            <p className="mt-1 text-xl font-bold tabular-nums">
+              {formatCustomerMoney(order.totalAmount, order.currency)}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {deadline.kind}
+            </p>
+            <p
+              className={`mt-1 text-sm font-semibold ${
+                deadline.risk === "overdue"
+                  ? "text-red-700"
+                  : deadline.risk === "soon"
+                    ? "text-amber-700"
+                    : "text-foreground"
+              }`}
+            >
+              {deadline.label}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Turnaround
+            </p>
+            <p className="mt-1 text-sm font-semibold">
+              {order.turnaroundDays
+                ? `${order.turnaroundDays} days`
+                : "Not specified"}
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-primary/30 bg-primary/5 shadow-sm">
+          <CardContent className="p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Next step
+            </p>
+            <p
+              className={`mt-1 text-sm font-semibold ${
+                nextAction.tone === "urgent" ? "text-amber-700" : "text-primary"
+              }`}
+            >
+              {nextAction.label}
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       <Card>
@@ -1646,6 +1678,10 @@ export default function OrderDetailPage({
                 maxLength={5000}
               />
             </div>
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              Never include passwords, API keys, full card numbers, or other
+              sensitive credentials in a support ticket.
+            </p>
           </div>
           <DialogFooter>
             <Button

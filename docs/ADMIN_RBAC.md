@@ -21,8 +21,9 @@ inherit this sensitive permission automatically.
 
 Operations owns platform inventory and platform fulfillment. It can enlist and
 manage its platform sites, claim available platform orders, complete assigned
-orders through the publisher-equivalent delivery flow, and perform operational
-verification and moderation.
+orders through the publisher-equivalent delivery flow, support platform
+listings and orders assigned to it, and perform operational verification and
+moderation.
 
 Operations is not a platform-wide people or tenant administrator. It cannot
 browse global Users, Organizations, Publishers, other Operations staff, or
@@ -42,6 +43,7 @@ platform inventory or fulfillment.
 
 | Area | Super Admin | Operations | Finance |
 |---|---|---|---|
+| Command center governance summary | Full cross-domain read | No access | No access |
 | Global Users | Full read and management | No access | No access |
 | Staff account creation | Create Super Admin, Operations, and Finance | No access | No access |
 | Customer Organizations | Full directory read | No access | No access |
@@ -51,13 +53,13 @@ platform inventory or fulfillment.
 | Marketplace inventory | Full moderation and platform inventory management | Operational moderation and inventory management | No admin marketplace access |
 | Platform fulfillment queue | View all, claim as break-glass, assign/reassign | Assigned orders plus unassigned claimable orders; claim self | No access |
 | Platform delivery | Full break-glass progression | Deliver only with an active assignment to self | Read only where required for a financial work item |
-| Orders, disputes, cancellations | Full | Operational actions and contextual reads | Financial actions and contextual reads |
+| Orders, disputes, cancellations | Full | Assigned/claimable fulfillment, assigned-Support orders, and active operational exception contexts | Financial actions and contextual reads |
 | Settlements | Full, including force approval | No settlement list/detail | List/detail, normal approval, cancellation and review |
 | Withdrawals and payouts | Full | No access | Full finance lifecycle |
 | Revenue and reconciliation | Full | No access | Full read/reconciliation |
 | Publisher tier | Read/update | No access | Read/update |
 | Platform fee | Read/update | Read only | Read/update |
-| Support | Full | Platform operational workflow | Publisher replies; platform tickets are read-only except internal notes |
+| Support | Full | Assigned platform listing/order workflow; unassigned platform pool remains read-only until assigned | Publisher replies; platform tickets are read-only except internal notes |
 | Domain verification | Full | Operational domain ownership verification | Contextual evidence only when needed for finance work |
 | Delivery verification | Full | Review failed and manual-review deliveries | Contextual evidence only when needed for finance work |
 | Audit logs | Full | No access | No access |
@@ -80,7 +82,10 @@ platform inventory or fulfillment.
 ## Platform Fulfillment
 
 - Operations sees only orders actively assigned to them and platform orders
-  with no active assignment that are available to claim.
+  with no active assignment that are available to claim. The order monitor may
+  also show an order when its platform Support is assigned to the operator or
+  it has an active dispute, cancellation, or delivery-verification context the
+  operator is authorized to resolve.
 - The Operations dashboard and Fulfillment page refresh active and claimable
   work every five seconds and on window focus. A new order becomes available
   independently; claiming one order never reserves or suppresses later orders
@@ -105,10 +110,50 @@ platform inventory or fulfillment.
 - Active cancellation requests block incompatible fulfillment mutations until
   the request is resolved. Delivered history remains visible to the operator
   who completed it, while another operator's direct order ID is hidden.
+- Operations direct-order reads apply the same scope as the order monitor.
+  Unrelated guessed IDs return not found, and the response omits customer and
+  staff emails, settlements, platform revenue, event metadata, and other
+  finance or audit-only details.
 - A platform-fulfilled order recognizes the full order amount as platform
   revenue. It does not create a publisher settlement or publisher payout.
 
 ## Staff Administration And Monitoring
+
+- The Super Admin command center is a read-only governance surface. It uses a
+  dedicated `SUPER_ADMIN` endpoint for exact cross-domain counts, a bounded
+  server-prioritized exception queue, sanitized audit activity, and financial
+  integrity summaries. It never exposes decrypted payout data and never moves
+  break-glass mutations out of their dedicated reasoned and audited workflows.
+- The Finance workbench is a read-only money-operations surface available only
+  to Finance and Super Admin. Its exact server-side KPIs and bounded action
+  queue cover settlements, withdrawals, payouts, reconciliation, cancellation
+  decisions, disputes, publisher debt, and Support. Support is first within an
+  equal severity band and is guaranteed a place in the bounded queue, while
+  critical financial-integrity failures retain the highest severity.
+- Finance Support obeys the existing role contract: Finance may reply to
+  publisher/general tickets and add internal notes to platform tickets; Super
+  Admin retains full reply capability. The overview never broadens those
+  permissions.
+- Finance activity is selected from a fixed action allowlist and excludes raw
+  audit metadata, request/IP details, provider configuration, execution error
+  payloads, payout credentials, and decrypted payout data. All financial
+  mutations stay in the dedicated reasoned and audited workflows.
+- The Operations workbench is a read-only assignment surface available only to
+  Operations and Super Admin. `GET /admin/operations-workbench` combines exact
+  counts and a bounded server-prioritized queue for assigned/claimable
+  fulfillment, assigned platform Support, operational cancellations and
+  disputes, verification, moderation, and assigned-site readiness. Assigned
+  Support is guaranteed a queue place within an equal severity band.
+- Only safely claimable fulfillment can mutate inline from the workbench, and
+  it uses the existing transactional claim path. Every other item deep-links
+  to its existing role-checked workspace. The workbench does not expose emails,
+  credentials, audit metadata, raw provider errors, settlements, or revenue.
+- Operations Support opens on the current user assignment by default;
+  unassigned platform tickets remain read-only until assignment. Force-approval
+  verification reporting is restricted to Super Admin.
+- Access to one role-focused overview endpoint is not implied by access to any
+  other overview or to contextual orders, disputes, cancellations, support, or
+  financial records.
 
 - Only Super Admin can open the Users & Staff area or create staff accounts.
   Staff creation supports `SUPER_ADMIN`, `OPERATIONS`, and `FINANCE` and creates
@@ -167,6 +212,7 @@ pageable substitute for a forbidden global directory.
 
 - `apps/api/src/modules/admin/admin.controller.ts`
 - `apps/api/src/modules/admin/admin.service.ts`
+- `apps/api/src/modules/admin/operations-workbench.service.ts`
 - `apps/api/src/modules/orders/deliveries.controller.ts`
 - `apps/api/src/modules/orders/services/order-fulfillment-assignment.service.ts`
 - `apps/api/src/modules/orders/services/order-operations.service.ts`

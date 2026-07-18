@@ -37,6 +37,7 @@ import {
 import { useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
+import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 
 const statusBadge: Record<string, { variant: any; Icon: any }> = {
@@ -60,6 +61,8 @@ export default function VerificationCenterPage() {
 }
 
 function VerificationCenterPageInner() {
+  const { user } = useAuth()
+  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
   const qc = useQueryClient()
   const [tab, setTab] = useState<"review" | "force">("review")
   const [domain, setDomain] = useState("")
@@ -78,7 +81,7 @@ function VerificationCenterPageInner() {
   const { data: force } = useQuery({
     queryKey: ["force-approved"],
     queryFn: () => api.admin.forceApprovedReport(),
-    enabled: tab === "force",
+    enabled: isSuperAdmin && tab === "force",
   })
 
   const bulkRetry = useMutation({
@@ -144,8 +147,9 @@ function VerificationCenterPageInner() {
           <ShieldCheck className="h-7 w-7" /> Domain Verification
         </h1>
         <p className="text-muted-foreground">
-          Domain ownership operations, trust scoring, and force-approval
-          governance.
+          {isSuperAdmin
+            ? "Domain ownership operations, trust scoring, and force-approval governance."
+            : "Domain ownership operations and trust scoring."}
         </p>
       </div>
 
@@ -156,13 +160,15 @@ function VerificationCenterPageInner() {
         >
           Review Center
         </Button>
-        <Button
-          variant={tab === "force" ? "default" : "outline"}
-          onClick={() => setTab("force")}
-        >
-          <Gavel className="h-4 w-4 mr-1" />
-          Force Approvals
-        </Button>
+        {isSuperAdmin ? (
+          <Button
+            variant={tab === "force" ? "default" : "outline"}
+            onClick={() => setTab("force")}
+          >
+            <Gavel className="h-4 w-4 mr-1" />
+            Force Approvals
+          </Button>
+        ) : null}
       </div>
 
       {tab === "review" ? (

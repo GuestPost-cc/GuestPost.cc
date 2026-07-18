@@ -1,4 +1,4 @@
-import { ForbiddenException } from "@nestjs/common"
+import { ForbiddenException, NotFoundException } from "@nestjs/common"
 import { MarketplaceService } from "../../marketplace/marketplace.service"
 import { AdminService } from "../admin.service"
 
@@ -14,6 +14,7 @@ describe("AdminService RBAC scoping", () => {
       ),
       order: {
         findMany: jest.fn().mockResolvedValue([]),
+        findFirst: jest.fn().mockResolvedValue(null),
         count: jest.fn().mockResolvedValue(0),
       },
       website: {
@@ -85,6 +86,49 @@ describe("AdminService RBAC scoping", () => {
       },
     ])
     expect(prisma.order.count).toHaveBeenCalledWith({ where })
+  })
+
+  it("scopes the shared Operations order monitor to assigned or contextual work", async () => {
+    await service.listOrders(20, 0, {
+      id: "ops-1",
+      staffRole: "OPERATIONS",
+    })
+
+    const where = prisma.order.findMany.mock.calls[0][0].where
+    const include = prisma.order.findMany.mock.calls[0][0].include
+    expect(JSON.stringify(where)).toContain("ops-1")
+    expect(where.OR).toEqual(
+      expect.arrayContaining([
+        { tickets: { some: { assignedToUserId: "ops-1" } } },
+        {
+          activeDeliveryVersion: {
+            is: {
+              verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] },
+            },
+          },
+        },
+      ]),
+    )
+    expect(include.customer.select).toEqual({ id: true, name: true })
+    expect(include.organization.select).toEqual({ id: true, name: true })
+  })
+
+  it("returns not found when Operations guesses an unrelated order id", async () => {
+    await expect(
+      service.getOrder("unrelated-order", {
+        id: "ops-1",
+        staffRole: "OPERATIONS",
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException)
+
+    expect(prisma.order.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "unrelated-order",
+          AND: expect.any(Array),
+        }),
+      }),
+    )
   })
 
   it("auto-assigns an Operations-created website and listing to its creator", async () => {
