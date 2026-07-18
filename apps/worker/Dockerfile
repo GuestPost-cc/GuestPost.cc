@@ -6,9 +6,10 @@ WORKDIR /repo
 ENV NODE_OPTIONS=--max-old-space-size=2048 \
     PNPM_VERIFY_DEPS_BEFORE_RUN=false
 
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json turbo.json tsconfig.base.json ./
 COPY apps/worker/package.json apps/worker/
 COPY packages/database/package.json packages/database/
+COPY packages/integrations/package.json packages/integrations/
 COPY packages/shared/package.json packages/shared/
 RUN pnpm install --frozen-lockfile --filter @guestpost/worker...
 
