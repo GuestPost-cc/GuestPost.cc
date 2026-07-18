@@ -14,8 +14,10 @@ RUN pnpm install --frozen-lockfile --filter @guestpost/worker...
 
 COPY packages packages
 COPY apps/worker apps/worker
-RUN pnpm --filter @guestpost/database exec prisma generate \
- && pnpm --filter @guestpost/worker... build
+# Prisma only needs a syntactically valid URL to generate the client; it does
+# not connect to the database here. Keep the real DATABASE_URL runtime-only.
+RUN DATABASE_URL=postgresql://guestpost:guestpost@127.0.0.1:5432/guestpost \
+    pnpm --filter @guestpost/worker... build
 
 FROM node:22-alpine
 RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
