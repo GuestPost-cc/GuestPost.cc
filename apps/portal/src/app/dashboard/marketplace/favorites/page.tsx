@@ -22,10 +22,11 @@ interface FavoriteListing {
     priceFrom?: number | null
     serviceTypes?: string[]
     currency: string
-    domainRating?: number
     traffic?: number
     image?: string
     category?: { name: string }
+    categories?: { name: string }[]
+    language?: string
     avgRating?: number
     reviewCount: number
   }
@@ -159,10 +160,16 @@ export default function FavoritesPage() {
                 </h3>
               </Link>
               <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                {fav.listing.category && (
-                  <span>{fav.listing.category.name}</span>
-                )}
-                <span>•</span>
+                <span>
+                  {(
+                    fav.listing.categories ??
+                    (fav.listing.category ? [fav.listing.category] : [])
+                  )
+                    .map((category) => category.name)
+                    .slice(0, 2)
+                    .join(", ")}
+                </span>
+                {fav.listing.language && <span>• {fav.listing.language}</span>}
                 {/* Phase 7: read service type from the first AVAILABLE
                     service, fall back to deprecated listing.type. */}
                 <span>
@@ -172,12 +179,6 @@ export default function FavoritesPage() {
                     ""
                   ).replace(/_/g, " ")}
                 </span>
-                {fav.listing.domainRating && (
-                  <>
-                    <span>•</span>
-                    <span>DR {fav.listing.domainRating}</span>
-                  </>
-                )}
               </div>
               <div className="flex items-center gap-4 mt-2">
                 {fav.listing.avgRating && (
@@ -191,7 +192,7 @@ export default function FavoritesPage() {
                 )}
                 {fav.listing.traffic && (
                   <span className="text-sm text-muted-foreground">
-                    {fav.listing.traffic.toLocaleString()} visitors/mo
+                    {fav.listing.traffic.toLocaleString()} GA4 sessions/mo
                   </span>
                 )}
               </div>

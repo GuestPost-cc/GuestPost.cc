@@ -1603,6 +1603,21 @@ enum ListingFulfillmentType {
   HYBRID
 }
 
+enum ListingLinkType {
+  DOFOLLOW
+  NOFOLLOW
+  SPONSORED
+  UGC
+}
+
+enum ListingLinkValidity {
+  PERMANENT
+  FIVE_YEARS
+  ONE_YEAR
+  SIX_MONTHS
+  THREE_MONTHS
+}
+
 model MarketplaceCategory {
   id          String   @id @default(cuid())
   name        String
@@ -1617,7 +1632,7 @@ model MarketplaceCategory {
 
   parent   MarketplaceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
   children MarketplaceCategory[] @relation("CategoryHierarchy")
-  listings MarketplaceListing[]
+  listings MarketplaceListingCategory[]
 
   @@index([slug])
   @@index([parentId])
@@ -1675,6 +1690,19 @@ model MarketplaceListing {
   // listings encode service availability via the ListingService child table.
   doFollowOnly Boolean @default(false)
 
+  // Placement-policy attributes are site/listing-level facts. Each listing
+  // stores exactly one value for every policy; NULL is retained only for
+  // pre-migration inventory until it is reviewed and resubmitted.
+  sportsGamingAllowed   Boolean?
+  pharmacyAllowed       Boolean?
+  cryptoAllowed         Boolean?
+  backlinkCount         Int?
+  linkType              ListingLinkType?
+  linkValidity          ListingLinkValidity?
+  googleNews            Boolean?
+  markedSponsored       Boolean?
+  foreignLanguageAllowed Boolean?
+
   // URLs
   websiteUrl String?
   sampleUrl  String?
@@ -1705,7 +1733,7 @@ model MarketplaceListing {
   publisher    Publisher?           @relation(fields: [publisherId], references: [id])
   website      Website?             @relation(fields: [websiteId], references: [id])
   organization Organization?        @relation(fields: [organizationId], references: [id])
-  category     MarketplaceCategory? @relation(fields: [categoryId], references: [id])
+  categories   MarketplaceListingCategory[]
 
   tags       MarketplaceListingTag[]
   images     MarketplaceListingImage[]
@@ -1719,7 +1747,6 @@ model MarketplaceListing {
   services   ListingService[]
   orders     Order[]
 
-  categoryId String?
   // Phase X: Partial unique index `MarketplaceListing_websiteId_active_key`
   // exists at the DB level via custom migration 20260713120000. Not represented
   // in Prisma @@unique syntax because it is a partial index (WHERE clause).
@@ -1729,13 +1756,27 @@ model MarketplaceListing {
   // Phase 7: @@index([type]) dropped alongside MarketplaceListing.type.
   @@index([status])
   @@index([publisherId])
-  @@index([categoryId])
   @@index([featured])
   @@index([createdAt])
   // Phase 7: @@index([price]) dropped alongside MarketplaceListing.price.
   // Sorting/filtering by price now hits the ListingService(availability,
   // serviceType, price) composite index.
   @@index([ownerType, status])
+}
+
+// A site can cover several niches, but marketplace quality controls cap the
+// selection at seven in every API write path. The database join table keeps
+// category filtering normalized and prevents duplicate selections.
+model MarketplaceListingCategory {
+  listingId  String
+  categoryId String
+  createdAt  DateTime @default(now())
+
+  listing  MarketplaceListing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  category MarketplaceCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@id([listingId, categoryId])
+  @@index([categoryId, listingId])
 }
 
 // A purchasable service offering on a MarketplaceListing. One listing can

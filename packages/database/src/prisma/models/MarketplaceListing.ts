@@ -34,6 +34,7 @@ export type MarketplaceListingAvgAggregateOutputType = {
   traffic: number | null
   referringDomains: number | null
   spamScore: number | null
+  backlinkCount: number | null
 }
 
 export type MarketplaceListingSumAggregateOutputType = {
@@ -44,6 +45,7 @@ export type MarketplaceListingSumAggregateOutputType = {
   traffic: number | null
   referringDomains: number | null
   spamScore: number | null
+  backlinkCount: number | null
 }
 
 export type MarketplaceListingMinAggregateOutputType = {
@@ -69,6 +71,15 @@ export type MarketplaceListingMinAggregateOutputType = {
   featured: boolean | null
   verified: boolean | null
   doFollowOnly: boolean | null
+  sportsGamingAllowed: boolean | null
+  pharmacyAllowed: boolean | null
+  cryptoAllowed: boolean | null
+  backlinkCount: number | null
+  linkType: $Enums.ListingLinkType | null
+  linkValidity: $Enums.ListingLinkValidity | null
+  googleNews: boolean | null
+  markedSponsored: boolean | null
+  foreignLanguageAllowed: boolean | null
   websiteUrl: string | null
   sampleUrl: string | null
   signupUrl: string | null
@@ -79,7 +90,6 @@ export type MarketplaceListingMinAggregateOutputType = {
   expiresAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
-  categoryId: string | null
 }
 
 export type MarketplaceListingMaxAggregateOutputType = {
@@ -105,6 +115,15 @@ export type MarketplaceListingMaxAggregateOutputType = {
   featured: boolean | null
   verified: boolean | null
   doFollowOnly: boolean | null
+  sportsGamingAllowed: boolean | null
+  pharmacyAllowed: boolean | null
+  cryptoAllowed: boolean | null
+  backlinkCount: number | null
+  linkType: $Enums.ListingLinkType | null
+  linkValidity: $Enums.ListingLinkValidity | null
+  googleNews: boolean | null
+  markedSponsored: boolean | null
+  foreignLanguageAllowed: boolean | null
   websiteUrl: string | null
   sampleUrl: string | null
   signupUrl: string | null
@@ -115,7 +134,6 @@ export type MarketplaceListingMaxAggregateOutputType = {
   expiresAt: Date | null
   createdAt: Date | null
   updatedAt: Date | null
-  categoryId: string | null
 }
 
 export type MarketplaceListingCountAggregateOutputType = {
@@ -143,6 +161,15 @@ export type MarketplaceListingCountAggregateOutputType = {
   featured: number
   verified: number
   doFollowOnly: number
+  sportsGamingAllowed: number
+  pharmacyAllowed: number
+  cryptoAllowed: number
+  backlinkCount: number
+  linkType: number
+  linkValidity: number
+  googleNews: number
+  markedSponsored: number
+  foreignLanguageAllowed: number
   websiteUrl: number
   sampleUrl: number
   signupUrl: number
@@ -156,7 +183,6 @@ export type MarketplaceListingCountAggregateOutputType = {
   expiresAt: number
   createdAt: number
   updatedAt: number
-  categoryId: number
   _all: number
 }
 
@@ -169,6 +195,7 @@ export type MarketplaceListingAvgAggregateInputType = {
   traffic?: true
   referringDomains?: true
   spamScore?: true
+  backlinkCount?: true
 }
 
 export type MarketplaceListingSumAggregateInputType = {
@@ -179,6 +206,7 @@ export type MarketplaceListingSumAggregateInputType = {
   traffic?: true
   referringDomains?: true
   spamScore?: true
+  backlinkCount?: true
 }
 
 export type MarketplaceListingMinAggregateInputType = {
@@ -204,6 +232,15 @@ export type MarketplaceListingMinAggregateInputType = {
   featured?: true
   verified?: true
   doFollowOnly?: true
+  sportsGamingAllowed?: true
+  pharmacyAllowed?: true
+  cryptoAllowed?: true
+  backlinkCount?: true
+  linkType?: true
+  linkValidity?: true
+  googleNews?: true
+  markedSponsored?: true
+  foreignLanguageAllowed?: true
   websiteUrl?: true
   sampleUrl?: true
   signupUrl?: true
@@ -214,7 +251,6 @@ export type MarketplaceListingMinAggregateInputType = {
   expiresAt?: true
   createdAt?: true
   updatedAt?: true
-  categoryId?: true
 }
 
 export type MarketplaceListingMaxAggregateInputType = {
@@ -240,6 +276,15 @@ export type MarketplaceListingMaxAggregateInputType = {
   featured?: true
   verified?: true
   doFollowOnly?: true
+  sportsGamingAllowed?: true
+  pharmacyAllowed?: true
+  cryptoAllowed?: true
+  backlinkCount?: true
+  linkType?: true
+  linkValidity?: true
+  googleNews?: true
+  markedSponsored?: true
+  foreignLanguageAllowed?: true
   websiteUrl?: true
   sampleUrl?: true
   signupUrl?: true
@@ -250,7 +295,6 @@ export type MarketplaceListingMaxAggregateInputType = {
   expiresAt?: true
   createdAt?: true
   updatedAt?: true
-  categoryId?: true
 }
 
 export type MarketplaceListingCountAggregateInputType = {
@@ -278,6 +322,15 @@ export type MarketplaceListingCountAggregateInputType = {
   featured?: true
   verified?: true
   doFollowOnly?: true
+  sportsGamingAllowed?: true
+  pharmacyAllowed?: true
+  cryptoAllowed?: true
+  backlinkCount?: true
+  linkType?: true
+  linkValidity?: true
+  googleNews?: true
+  markedSponsored?: true
+  foreignLanguageAllowed?: true
   websiteUrl?: true
   sampleUrl?: true
   signupUrl?: true
@@ -291,7 +344,6 @@ export type MarketplaceListingCountAggregateInputType = {
   expiresAt?: true
   createdAt?: true
   updatedAt?: true
-  categoryId?: true
   _all?: true
 }
 
@@ -406,6 +458,15 @@ export type MarketplaceListingGroupByOutputType = {
   featured: boolean
   verified: boolean
   doFollowOnly: boolean
+  sportsGamingAllowed: boolean | null
+  pharmacyAllowed: boolean | null
+  cryptoAllowed: boolean | null
+  backlinkCount: number | null
+  linkType: $Enums.ListingLinkType | null
+  linkValidity: $Enums.ListingLinkValidity | null
+  googleNews: boolean | null
+  markedSponsored: boolean | null
+  foreignLanguageAllowed: boolean | null
   websiteUrl: string | null
   sampleUrl: string | null
   signupUrl: string | null
@@ -419,7 +480,6 @@ export type MarketplaceListingGroupByOutputType = {
   expiresAt: Date | null
   createdAt: Date
   updatedAt: Date
-  categoryId: string | null
   _count: MarketplaceListingCountAggregateOutputType | null
   _avg: MarketplaceListingAvgAggregateOutputType | null
   _sum: MarketplaceListingSumAggregateOutputType | null
@@ -470,6 +530,15 @@ export type MarketplaceListingWhereInput = {
   featured?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   verified?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   doFollowOnly?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
+  sportsGamingAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  pharmacyAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  cryptoAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  backlinkCount?: Prisma.IntNullableFilter<"MarketplaceListing"> | number | null
+  linkType?: Prisma.EnumListingLinkTypeNullableFilter<"MarketplaceListing"> | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.EnumListingLinkValidityNullableFilter<"MarketplaceListing"> | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  markedSponsored?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  foreignLanguageAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
   websiteUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   sampleUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   signupUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
@@ -483,11 +552,10 @@ export type MarketplaceListingWhereInput = {
   expiresAt?: Prisma.DateTimeNullableFilter<"MarketplaceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceListing"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MarketplaceListing"> | Date | string
-  categoryId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   publisher?: Prisma.XOR<Prisma.PublisherNullableScalarRelationFilter, Prisma.PublisherWhereInput> | null
   website?: Prisma.XOR<Prisma.WebsiteNullableScalarRelationFilter, Prisma.WebsiteWhereInput> | null
   organization?: Prisma.XOR<Prisma.OrganizationNullableScalarRelationFilter, Prisma.OrganizationWhereInput> | null
-  category?: Prisma.XOR<Prisma.MarketplaceCategoryNullableScalarRelationFilter, Prisma.MarketplaceCategoryWhereInput> | null
+  categories?: Prisma.MarketplaceListingCategoryListRelationFilter
   tags?: Prisma.MarketplaceListingTagListRelationFilter
   images?: Prisma.MarketplaceListingImageListRelationFilter
   reviews?: Prisma.MarketplaceReviewListRelationFilter
@@ -524,6 +592,15 @@ export type MarketplaceListingOrderByWithRelationInput = {
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
+  sportsGamingAllowed?: Prisma.SortOrderInput | Prisma.SortOrder
+  pharmacyAllowed?: Prisma.SortOrderInput | Prisma.SortOrder
+  cryptoAllowed?: Prisma.SortOrderInput | Prisma.SortOrder
+  backlinkCount?: Prisma.SortOrderInput | Prisma.SortOrder
+  linkType?: Prisma.SortOrderInput | Prisma.SortOrder
+  linkValidity?: Prisma.SortOrderInput | Prisma.SortOrder
+  googleNews?: Prisma.SortOrderInput | Prisma.SortOrder
+  markedSponsored?: Prisma.SortOrderInput | Prisma.SortOrder
+  foreignLanguageAllowed?: Prisma.SortOrderInput | Prisma.SortOrder
   websiteUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   sampleUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   signupUrl?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -537,11 +614,10 @@ export type MarketplaceListingOrderByWithRelationInput = {
   expiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
-  categoryId?: Prisma.SortOrderInput | Prisma.SortOrder
   publisher?: Prisma.PublisherOrderByWithRelationInput
   website?: Prisma.WebsiteOrderByWithRelationInput
   organization?: Prisma.OrganizationOrderByWithRelationInput
-  category?: Prisma.MarketplaceCategoryOrderByWithRelationInput
+  categories?: Prisma.MarketplaceListingCategoryOrderByRelationAggregateInput
   tags?: Prisma.MarketplaceListingTagOrderByRelationAggregateInput
   images?: Prisma.MarketplaceListingImageOrderByRelationAggregateInput
   reviews?: Prisma.MarketplaceReviewOrderByRelationAggregateInput
@@ -581,6 +657,15 @@ export type MarketplaceListingWhereUniqueInput = Prisma.AtLeast<{
   featured?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   verified?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   doFollowOnly?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
+  sportsGamingAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  pharmacyAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  cryptoAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  backlinkCount?: Prisma.IntNullableFilter<"MarketplaceListing"> | number | null
+  linkType?: Prisma.EnumListingLinkTypeNullableFilter<"MarketplaceListing"> | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.EnumListingLinkValidityNullableFilter<"MarketplaceListing"> | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  markedSponsored?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  foreignLanguageAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
   websiteUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   sampleUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   signupUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
@@ -594,11 +679,10 @@ export type MarketplaceListingWhereUniqueInput = Prisma.AtLeast<{
   expiresAt?: Prisma.DateTimeNullableFilter<"MarketplaceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceListing"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MarketplaceListing"> | Date | string
-  categoryId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   publisher?: Prisma.XOR<Prisma.PublisherNullableScalarRelationFilter, Prisma.PublisherWhereInput> | null
   website?: Prisma.XOR<Prisma.WebsiteNullableScalarRelationFilter, Prisma.WebsiteWhereInput> | null
   organization?: Prisma.XOR<Prisma.OrganizationNullableScalarRelationFilter, Prisma.OrganizationWhereInput> | null
-  category?: Prisma.XOR<Prisma.MarketplaceCategoryNullableScalarRelationFilter, Prisma.MarketplaceCategoryWhereInput> | null
+  categories?: Prisma.MarketplaceListingCategoryListRelationFilter
   tags?: Prisma.MarketplaceListingTagListRelationFilter
   images?: Prisma.MarketplaceListingImageListRelationFilter
   reviews?: Prisma.MarketplaceReviewListRelationFilter
@@ -635,6 +719,15 @@ export type MarketplaceListingOrderByWithAggregationInput = {
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
+  sportsGamingAllowed?: Prisma.SortOrderInput | Prisma.SortOrder
+  pharmacyAllowed?: Prisma.SortOrderInput | Prisma.SortOrder
+  cryptoAllowed?: Prisma.SortOrderInput | Prisma.SortOrder
+  backlinkCount?: Prisma.SortOrderInput | Prisma.SortOrder
+  linkType?: Prisma.SortOrderInput | Prisma.SortOrder
+  linkValidity?: Prisma.SortOrderInput | Prisma.SortOrder
+  googleNews?: Prisma.SortOrderInput | Prisma.SortOrder
+  markedSponsored?: Prisma.SortOrderInput | Prisma.SortOrder
+  foreignLanguageAllowed?: Prisma.SortOrderInput | Prisma.SortOrder
   websiteUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   sampleUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   signupUrl?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -648,7 +741,6 @@ export type MarketplaceListingOrderByWithAggregationInput = {
   expiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
-  categoryId?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.MarketplaceListingCountOrderByAggregateInput
   _avg?: Prisma.MarketplaceListingAvgOrderByAggregateInput
   _max?: Prisma.MarketplaceListingMaxOrderByAggregateInput
@@ -684,6 +776,15 @@ export type MarketplaceListingScalarWhereWithAggregatesInput = {
   featured?: Prisma.BoolWithAggregatesFilter<"MarketplaceListing"> | boolean
   verified?: Prisma.BoolWithAggregatesFilter<"MarketplaceListing"> | boolean
   doFollowOnly?: Prisma.BoolWithAggregatesFilter<"MarketplaceListing"> | boolean
+  sportsGamingAllowed?: Prisma.BoolNullableWithAggregatesFilter<"MarketplaceListing"> | boolean | null
+  pharmacyAllowed?: Prisma.BoolNullableWithAggregatesFilter<"MarketplaceListing"> | boolean | null
+  cryptoAllowed?: Prisma.BoolNullableWithAggregatesFilter<"MarketplaceListing"> | boolean | null
+  backlinkCount?: Prisma.IntNullableWithAggregatesFilter<"MarketplaceListing"> | number | null
+  linkType?: Prisma.EnumListingLinkTypeNullableWithAggregatesFilter<"MarketplaceListing"> | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.EnumListingLinkValidityNullableWithAggregatesFilter<"MarketplaceListing"> | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.BoolNullableWithAggregatesFilter<"MarketplaceListing"> | boolean | null
+  markedSponsored?: Prisma.BoolNullableWithAggregatesFilter<"MarketplaceListing"> | boolean | null
+  foreignLanguageAllowed?: Prisma.BoolNullableWithAggregatesFilter<"MarketplaceListing"> | boolean | null
   websiteUrl?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
   sampleUrl?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
   signupUrl?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
@@ -697,7 +798,6 @@ export type MarketplaceListingScalarWhereWithAggregatesInput = {
   expiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"MarketplaceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"MarketplaceListing"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"MarketplaceListing"> | Date | string
-  categoryId?: Prisma.StringNullableWithAggregatesFilter<"MarketplaceListing"> | string | null
 }
 
 export type MarketplaceListingCreateInput = {
@@ -725,6 +825,15 @@ export type MarketplaceListingCreateInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -738,7 +847,7 @@ export type MarketplaceListingCreateInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -775,6 +884,15 @@ export type MarketplaceListingUncheckedCreateInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -788,7 +906,7 @@ export type MarketplaceListingUncheckedCreateInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -825,6 +943,15 @@ export type MarketplaceListingUpdateInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -838,7 +965,7 @@ export type MarketplaceListingUpdateInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -875,6 +1002,15 @@ export type MarketplaceListingUncheckedUpdateInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -888,7 +1024,7 @@ export type MarketplaceListingUncheckedUpdateInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -925,6 +1061,15 @@ export type MarketplaceListingCreateManyInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -938,7 +1083,6 @@ export type MarketplaceListingCreateManyInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
 }
 
 export type MarketplaceListingUpdateManyMutationInput = {
@@ -966,6 +1110,15 @@ export type MarketplaceListingUpdateManyMutationInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1003,6 +1156,15 @@ export type MarketplaceListingUncheckedUpdateManyInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1016,7 +1178,6 @@ export type MarketplaceListingUncheckedUpdateManyInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type MarketplaceListingListRelationFilter = {
@@ -1067,6 +1228,15 @@ export type MarketplaceListingCountOrderByAggregateInput = {
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
+  sportsGamingAllowed?: Prisma.SortOrder
+  pharmacyAllowed?: Prisma.SortOrder
+  cryptoAllowed?: Prisma.SortOrder
+  backlinkCount?: Prisma.SortOrder
+  linkType?: Prisma.SortOrder
+  linkValidity?: Prisma.SortOrder
+  googleNews?: Prisma.SortOrder
+  markedSponsored?: Prisma.SortOrder
+  foreignLanguageAllowed?: Prisma.SortOrder
   websiteUrl?: Prisma.SortOrder
   sampleUrl?: Prisma.SortOrder
   signupUrl?: Prisma.SortOrder
@@ -1080,7 +1250,6 @@ export type MarketplaceListingCountOrderByAggregateInput = {
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
-  categoryId?: Prisma.SortOrder
 }
 
 export type MarketplaceListingAvgOrderByAggregateInput = {
@@ -1091,6 +1260,7 @@ export type MarketplaceListingAvgOrderByAggregateInput = {
   traffic?: Prisma.SortOrder
   referringDomains?: Prisma.SortOrder
   spamScore?: Prisma.SortOrder
+  backlinkCount?: Prisma.SortOrder
 }
 
 export type MarketplaceListingMaxOrderByAggregateInput = {
@@ -1116,6 +1286,15 @@ export type MarketplaceListingMaxOrderByAggregateInput = {
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
+  sportsGamingAllowed?: Prisma.SortOrder
+  pharmacyAllowed?: Prisma.SortOrder
+  cryptoAllowed?: Prisma.SortOrder
+  backlinkCount?: Prisma.SortOrder
+  linkType?: Prisma.SortOrder
+  linkValidity?: Prisma.SortOrder
+  googleNews?: Prisma.SortOrder
+  markedSponsored?: Prisma.SortOrder
+  foreignLanguageAllowed?: Prisma.SortOrder
   websiteUrl?: Prisma.SortOrder
   sampleUrl?: Prisma.SortOrder
   signupUrl?: Prisma.SortOrder
@@ -1126,7 +1305,6 @@ export type MarketplaceListingMaxOrderByAggregateInput = {
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
-  categoryId?: Prisma.SortOrder
 }
 
 export type MarketplaceListingMinOrderByAggregateInput = {
@@ -1152,6 +1330,15 @@ export type MarketplaceListingMinOrderByAggregateInput = {
   featured?: Prisma.SortOrder
   verified?: Prisma.SortOrder
   doFollowOnly?: Prisma.SortOrder
+  sportsGamingAllowed?: Prisma.SortOrder
+  pharmacyAllowed?: Prisma.SortOrder
+  cryptoAllowed?: Prisma.SortOrder
+  backlinkCount?: Prisma.SortOrder
+  linkType?: Prisma.SortOrder
+  linkValidity?: Prisma.SortOrder
+  googleNews?: Prisma.SortOrder
+  markedSponsored?: Prisma.SortOrder
+  foreignLanguageAllowed?: Prisma.SortOrder
   websiteUrl?: Prisma.SortOrder
   sampleUrl?: Prisma.SortOrder
   signupUrl?: Prisma.SortOrder
@@ -1162,7 +1349,6 @@ export type MarketplaceListingMinOrderByAggregateInput = {
   expiresAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
-  categoryId?: Prisma.SortOrder
 }
 
 export type MarketplaceListingSumOrderByAggregateInput = {
@@ -1173,6 +1359,7 @@ export type MarketplaceListingSumOrderByAggregateInput = {
   traffic?: Prisma.SortOrder
   referringDomains?: Prisma.SortOrder
   spamScore?: Prisma.SortOrder
+  backlinkCount?: Prisma.SortOrder
 }
 
 export type MarketplaceListingScalarRelationFilter = {
@@ -1322,48 +1509,6 @@ export type MarketplaceListingUpdateOneWithoutOrdersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.MarketplaceListingUpdateToOneWithWhereWithoutOrdersInput, Prisma.MarketplaceListingUpdateWithoutOrdersInput>, Prisma.MarketplaceListingUncheckedUpdateWithoutOrdersInput>
 }
 
-export type MarketplaceListingCreateNestedManyWithoutCategoryInput = {
-  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoryInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput> | Prisma.MarketplaceListingCreateWithoutCategoryInput[] | Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput[]
-  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput | Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput[]
-  createMany?: Prisma.MarketplaceListingCreateManyCategoryInputEnvelope
-  connect?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-}
-
-export type MarketplaceListingUncheckedCreateNestedManyWithoutCategoryInput = {
-  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoryInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput> | Prisma.MarketplaceListingCreateWithoutCategoryInput[] | Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput[]
-  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput | Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput[]
-  createMany?: Prisma.MarketplaceListingCreateManyCategoryInputEnvelope
-  connect?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-}
-
-export type MarketplaceListingUpdateManyWithoutCategoryNestedInput = {
-  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoryInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput> | Prisma.MarketplaceListingCreateWithoutCategoryInput[] | Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput[]
-  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput | Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput[]
-  upsert?: Prisma.MarketplaceListingUpsertWithWhereUniqueWithoutCategoryInput | Prisma.MarketplaceListingUpsertWithWhereUniqueWithoutCategoryInput[]
-  createMany?: Prisma.MarketplaceListingCreateManyCategoryInputEnvelope
-  set?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-  disconnect?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-  delete?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-  connect?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-  update?: Prisma.MarketplaceListingUpdateWithWhereUniqueWithoutCategoryInput | Prisma.MarketplaceListingUpdateWithWhereUniqueWithoutCategoryInput[]
-  updateMany?: Prisma.MarketplaceListingUpdateManyWithWhereWithoutCategoryInput | Prisma.MarketplaceListingUpdateManyWithWhereWithoutCategoryInput[]
-  deleteMany?: Prisma.MarketplaceListingScalarWhereInput | Prisma.MarketplaceListingScalarWhereInput[]
-}
-
-export type MarketplaceListingUncheckedUpdateManyWithoutCategoryNestedInput = {
-  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoryInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput> | Prisma.MarketplaceListingCreateWithoutCategoryInput[] | Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput[]
-  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput | Prisma.MarketplaceListingCreateOrConnectWithoutCategoryInput[]
-  upsert?: Prisma.MarketplaceListingUpsertWithWhereUniqueWithoutCategoryInput | Prisma.MarketplaceListingUpsertWithWhereUniqueWithoutCategoryInput[]
-  createMany?: Prisma.MarketplaceListingCreateManyCategoryInputEnvelope
-  set?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-  disconnect?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-  delete?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-  connect?: Prisma.MarketplaceListingWhereUniqueInput | Prisma.MarketplaceListingWhereUniqueInput[]
-  update?: Prisma.MarketplaceListingUpdateWithWhereUniqueWithoutCategoryInput | Prisma.MarketplaceListingUpdateWithWhereUniqueWithoutCategoryInput[]
-  updateMany?: Prisma.MarketplaceListingUpdateManyWithWhereWithoutCategoryInput | Prisma.MarketplaceListingUpdateManyWithWhereWithoutCategoryInput[]
-  deleteMany?: Prisma.MarketplaceListingScalarWhereInput | Prisma.MarketplaceListingScalarWhereInput[]
-}
-
 export type MarketplaceListingCreatecountriesInput = {
   set: string[]
 }
@@ -1388,6 +1533,32 @@ export type MarketplaceListingUpdatecountriesInput = {
 export type MarketplaceListingUpdatelanguagesInput = {
   set?: string[]
   push?: string | string[]
+}
+
+export type NullableBoolFieldUpdateOperationsInput = {
+  set?: boolean | null
+}
+
+export type NullableEnumListingLinkTypeFieldUpdateOperationsInput = {
+  set?: $Enums.ListingLinkType | null
+}
+
+export type NullableEnumListingLinkValidityFieldUpdateOperationsInput = {
+  set?: $Enums.ListingLinkValidity | null
+}
+
+export type MarketplaceListingCreateNestedOneWithoutCategoriesInput = {
+  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoriesInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoriesInput>
+  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutCategoriesInput
+  connect?: Prisma.MarketplaceListingWhereUniqueInput
+}
+
+export type MarketplaceListingUpdateOneRequiredWithoutCategoriesNestedInput = {
+  create?: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoriesInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoriesInput>
+  connectOrCreate?: Prisma.MarketplaceListingCreateOrConnectWithoutCategoriesInput
+  upsert?: Prisma.MarketplaceListingUpsertWithoutCategoriesInput
+  connect?: Prisma.MarketplaceListingWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.MarketplaceListingUpdateToOneWithWhereWithoutCategoriesInput, Prisma.MarketplaceListingUpdateWithoutCategoriesInput>, Prisma.MarketplaceListingUncheckedUpdateWithoutCategoriesInput>
 }
 
 export type MarketplaceListingCreateNestedOneWithoutServicesInput = {
@@ -1527,6 +1698,15 @@ export type MarketplaceListingCreateWithoutOrganizationInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -1539,7 +1719,7 @@ export type MarketplaceListingCreateWithoutOrganizationInput = {
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -1576,6 +1756,15 @@ export type MarketplaceListingUncheckedCreateWithoutOrganizationInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -1588,7 +1777,7 @@ export type MarketplaceListingUncheckedCreateWithoutOrganizationInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -1654,6 +1843,15 @@ export type MarketplaceListingScalarWhereInput = {
   featured?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   verified?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
   doFollowOnly?: Prisma.BoolFilter<"MarketplaceListing"> | boolean
+  sportsGamingAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  pharmacyAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  cryptoAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  backlinkCount?: Prisma.IntNullableFilter<"MarketplaceListing"> | number | null
+  linkType?: Prisma.EnumListingLinkTypeNullableFilter<"MarketplaceListing"> | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.EnumListingLinkValidityNullableFilter<"MarketplaceListing"> | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  markedSponsored?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
+  foreignLanguageAllowed?: Prisma.BoolNullableFilter<"MarketplaceListing"> | boolean | null
   websiteUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   sampleUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
   signupUrl?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
@@ -1667,7 +1865,6 @@ export type MarketplaceListingScalarWhereInput = {
   expiresAt?: Prisma.DateTimeNullableFilter<"MarketplaceListing"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"MarketplaceListing"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"MarketplaceListing"> | Date | string
-  categoryId?: Prisma.StringNullableFilter<"MarketplaceListing"> | string | null
 }
 
 export type MarketplaceListingCreateWithoutPublisherInput = {
@@ -1695,6 +1892,15 @@ export type MarketplaceListingCreateWithoutPublisherInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -1707,7 +1913,7 @@ export type MarketplaceListingCreateWithoutPublisherInput = {
   updatedAt?: Date | string
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -1744,6 +1950,15 @@ export type MarketplaceListingUncheckedCreateWithoutPublisherInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -1756,7 +1971,7 @@ export type MarketplaceListingUncheckedCreateWithoutPublisherInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -1819,6 +2034,15 @@ export type MarketplaceListingCreateWithoutWebsiteInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -1831,7 +2055,7 @@ export type MarketplaceListingCreateWithoutWebsiteInput = {
   updatedAt?: Date | string
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -1868,6 +2092,15 @@ export type MarketplaceListingUncheckedCreateWithoutWebsiteInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -1880,7 +2113,7 @@ export type MarketplaceListingUncheckedCreateWithoutWebsiteInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -1943,6 +2176,15 @@ export type MarketplaceListingCreateWithoutOrdersInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -1956,7 +2198,7 @@ export type MarketplaceListingCreateWithoutOrdersInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -1992,6 +2234,15 @@ export type MarketplaceListingUncheckedCreateWithoutOrdersInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2005,7 +2256,7 @@ export type MarketplaceListingUncheckedCreateWithoutOrdersInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -2057,6 +2308,15 @@ export type MarketplaceListingUpdateWithoutOrdersInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2070,7 +2330,7 @@ export type MarketplaceListingUpdateWithoutOrdersInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -2106,6 +2366,15 @@ export type MarketplaceListingUncheckedUpdateWithoutOrdersInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2119,7 +2388,7 @@ export type MarketplaceListingUncheckedUpdateWithoutOrdersInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -2130,7 +2399,7 @@ export type MarketplaceListingUncheckedUpdateWithoutOrdersInput = {
   services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
 }
 
-export type MarketplaceListingCreateWithoutCategoryInput = {
+export type MarketplaceListingCreateWithoutCategoriesInput = {
   id?: string
   title: string
   slug: string
@@ -2155,6 +2424,15 @@ export type MarketplaceListingCreateWithoutCategoryInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2179,7 +2457,7 @@ export type MarketplaceListingCreateWithoutCategoryInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutListingInput
 }
 
-export type MarketplaceListingUncheckedCreateWithoutCategoryInput = {
+export type MarketplaceListingUncheckedCreateWithoutCategoriesInput = {
   id?: string
   title: string
   slug: string
@@ -2204,6 +2482,15 @@ export type MarketplaceListingUncheckedCreateWithoutCategoryInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2228,30 +2515,136 @@ export type MarketplaceListingUncheckedCreateWithoutCategoryInput = {
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutListingInput
 }
 
-export type MarketplaceListingCreateOrConnectWithoutCategoryInput = {
+export type MarketplaceListingCreateOrConnectWithoutCategoriesInput = {
   where: Prisma.MarketplaceListingWhereUniqueInput
-  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoryInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput>
+  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoriesInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoriesInput>
 }
 
-export type MarketplaceListingCreateManyCategoryInputEnvelope = {
-  data: Prisma.MarketplaceListingCreateManyCategoryInput | Prisma.MarketplaceListingCreateManyCategoryInput[]
-  skipDuplicates?: boolean
+export type MarketplaceListingUpsertWithoutCategoriesInput = {
+  update: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutCategoriesInput, Prisma.MarketplaceListingUncheckedUpdateWithoutCategoriesInput>
+  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoriesInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoriesInput>
+  where?: Prisma.MarketplaceListingWhereInput
 }
 
-export type MarketplaceListingUpsertWithWhereUniqueWithoutCategoryInput = {
-  where: Prisma.MarketplaceListingWhereUniqueInput
-  update: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutCategoryInput, Prisma.MarketplaceListingUncheckedUpdateWithoutCategoryInput>
-  create: Prisma.XOR<Prisma.MarketplaceListingCreateWithoutCategoryInput, Prisma.MarketplaceListingUncheckedCreateWithoutCategoryInput>
+export type MarketplaceListingUpdateToOneWithWhereWithoutCategoriesInput = {
+  where?: Prisma.MarketplaceListingWhereInput
+  data: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutCategoriesInput, Prisma.MarketplaceListingUncheckedUpdateWithoutCategoriesInput>
 }
 
-export type MarketplaceListingUpdateWithWhereUniqueWithoutCategoryInput = {
-  where: Prisma.MarketplaceListingWhereUniqueInput
-  data: Prisma.XOR<Prisma.MarketplaceListingUpdateWithoutCategoryInput, Prisma.MarketplaceListingUncheckedUpdateWithoutCategoryInput>
+export type MarketplaceListingUpdateWithoutCategoriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
+  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  priceType?: Prisma.StringFieldUpdateOperationsInput | string
+  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
+  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
+  organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
+  tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
+  images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
+  reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
+  favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
+  savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
+  views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
+  clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
 }
 
-export type MarketplaceListingUpdateManyWithWhereWithoutCategoryInput = {
-  where: Prisma.MarketplaceListingScalarWhereInput
-  data: Prisma.XOR<Prisma.MarketplaceListingUpdateManyMutationInput, Prisma.MarketplaceListingUncheckedUpdateManyWithoutCategoryInput>
+export type MarketplaceListingUncheckedUpdateWithoutCategoriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  slug?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.StringFieldUpdateOperationsInput | string
+  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
+  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
+  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  priceType?: Prisma.StringFieldUpdateOperationsInput | string
+  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
+  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
+  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
+  images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
+  reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
+  favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
+  savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
+  views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
+  clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
+  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
 }
 
 export type MarketplaceListingCreateWithoutServicesInput = {
@@ -2279,6 +2672,15 @@ export type MarketplaceListingCreateWithoutServicesInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2292,7 +2694,7 @@ export type MarketplaceListingCreateWithoutServicesInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -2328,6 +2730,15 @@ export type MarketplaceListingUncheckedCreateWithoutServicesInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2341,7 +2752,7 @@ export type MarketplaceListingUncheckedCreateWithoutServicesInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -2393,6 +2804,15 @@ export type MarketplaceListingUpdateWithoutServicesInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2406,7 +2826,7 @@ export type MarketplaceListingUpdateWithoutServicesInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -2442,6 +2862,15 @@ export type MarketplaceListingUncheckedUpdateWithoutServicesInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2455,7 +2884,7 @@ export type MarketplaceListingUncheckedUpdateWithoutServicesInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -2491,6 +2920,15 @@ export type MarketplaceListingCreateWithoutTagsInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2504,7 +2942,7 @@ export type MarketplaceListingCreateWithoutTagsInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
@@ -2540,6 +2978,15 @@ export type MarketplaceListingUncheckedCreateWithoutTagsInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2553,7 +3000,7 @@ export type MarketplaceListingUncheckedCreateWithoutTagsInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
@@ -2605,6 +3052,15 @@ export type MarketplaceListingUpdateWithoutTagsInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2618,7 +3074,7 @@ export type MarketplaceListingUpdateWithoutTagsInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
@@ -2654,6 +3110,15 @@ export type MarketplaceListingUncheckedUpdateWithoutTagsInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2667,7 +3132,7 @@ export type MarketplaceListingUncheckedUpdateWithoutTagsInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
@@ -2703,6 +3168,15 @@ export type MarketplaceListingCreateWithoutImagesInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2716,7 +3190,7 @@ export type MarketplaceListingCreateWithoutImagesInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
@@ -2752,6 +3226,15 @@ export type MarketplaceListingUncheckedCreateWithoutImagesInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2765,7 +3248,7 @@ export type MarketplaceListingUncheckedCreateWithoutImagesInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
@@ -2817,6 +3300,15 @@ export type MarketplaceListingUpdateWithoutImagesInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2830,7 +3322,7 @@ export type MarketplaceListingUpdateWithoutImagesInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
@@ -2866,6 +3358,15 @@ export type MarketplaceListingUncheckedUpdateWithoutImagesInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2879,7 +3380,7 @@ export type MarketplaceListingUncheckedUpdateWithoutImagesInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
@@ -2915,6 +3416,15 @@ export type MarketplaceListingCreateWithoutReviewsInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2928,7 +3438,7 @@ export type MarketplaceListingCreateWithoutReviewsInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutListingInput
@@ -2964,6 +3474,15 @@ export type MarketplaceListingUncheckedCreateWithoutReviewsInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -2977,7 +3496,7 @@ export type MarketplaceListingUncheckedCreateWithoutReviewsInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutListingInput
@@ -3029,6 +3548,15 @@ export type MarketplaceListingUpdateWithoutReviewsInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3042,7 +3570,7 @@ export type MarketplaceListingUpdateWithoutReviewsInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
@@ -3078,6 +3606,15 @@ export type MarketplaceListingUncheckedUpdateWithoutReviewsInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3091,7 +3628,7 @@ export type MarketplaceListingUncheckedUpdateWithoutReviewsInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
@@ -3127,6 +3664,15 @@ export type MarketplaceListingCreateWithoutFavoritesInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -3140,7 +3686,7 @@ export type MarketplaceListingCreateWithoutFavoritesInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -3176,6 +3722,15 @@ export type MarketplaceListingUncheckedCreateWithoutFavoritesInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -3189,7 +3744,7 @@ export type MarketplaceListingUncheckedCreateWithoutFavoritesInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -3241,6 +3796,15 @@ export type MarketplaceListingUpdateWithoutFavoritesInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3254,7 +3818,7 @@ export type MarketplaceListingUpdateWithoutFavoritesInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -3290,6 +3854,15 @@ export type MarketplaceListingUncheckedUpdateWithoutFavoritesInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3303,7 +3876,7 @@ export type MarketplaceListingUncheckedUpdateWithoutFavoritesInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -3339,6 +3912,15 @@ export type MarketplaceListingCreateWithoutSavedListsInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -3352,7 +3934,7 @@ export type MarketplaceListingCreateWithoutSavedListsInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -3388,6 +3970,15 @@ export type MarketplaceListingUncheckedCreateWithoutSavedListsInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -3401,7 +3992,7 @@ export type MarketplaceListingUncheckedCreateWithoutSavedListsInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -3453,6 +4044,15 @@ export type MarketplaceListingUpdateWithoutSavedListsInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3466,7 +4066,7 @@ export type MarketplaceListingUpdateWithoutSavedListsInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -3502,6 +4102,15 @@ export type MarketplaceListingUncheckedUpdateWithoutSavedListsInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3515,7 +4124,7 @@ export type MarketplaceListingUncheckedUpdateWithoutSavedListsInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -3551,6 +4160,15 @@ export type MarketplaceListingCreateWithoutViewsInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -3564,7 +4182,7 @@ export type MarketplaceListingCreateWithoutViewsInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -3600,6 +4218,15 @@ export type MarketplaceListingUncheckedCreateWithoutViewsInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -3613,7 +4240,7 @@ export type MarketplaceListingUncheckedCreateWithoutViewsInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -3665,6 +4292,15 @@ export type MarketplaceListingUpdateWithoutViewsInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3678,7 +4314,7 @@ export type MarketplaceListingUpdateWithoutViewsInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -3714,6 +4350,15 @@ export type MarketplaceListingUncheckedUpdateWithoutViewsInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3727,7 +4372,7 @@ export type MarketplaceListingUncheckedUpdateWithoutViewsInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -3763,6 +4408,15 @@ export type MarketplaceListingCreateWithoutClicksInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -3776,7 +4430,7 @@ export type MarketplaceListingCreateWithoutClicksInput = {
   publisher?: Prisma.PublisherCreateNestedOneWithoutMarketplaceListingsInput
   website?: Prisma.WebsiteCreateNestedOneWithoutMarketplaceListingsInput
   organization?: Prisma.OrganizationCreateNestedOneWithoutMarketplaceListingsInput
-  category?: Prisma.MarketplaceCategoryCreateNestedOneWithoutListingsInput
+  categories?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutListingInput
@@ -3812,6 +4466,15 @@ export type MarketplaceListingUncheckedCreateWithoutClicksInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -3825,7 +4488,7 @@ export type MarketplaceListingUncheckedCreateWithoutClicksInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutListingInput
   tags?: Prisma.MarketplaceListingTagUncheckedCreateNestedManyWithoutListingInput
   images?: Prisma.MarketplaceListingImageUncheckedCreateNestedManyWithoutListingInput
   reviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutListingInput
@@ -3877,6 +4540,15 @@ export type MarketplaceListingUpdateWithoutClicksInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3890,7 +4562,7 @@ export type MarketplaceListingUpdateWithoutClicksInput = {
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -3926,6 +4598,15 @@ export type MarketplaceListingUncheckedUpdateWithoutClicksInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -3939,7 +4620,7 @@ export type MarketplaceListingUncheckedUpdateWithoutClicksInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -3975,6 +4656,15 @@ export type MarketplaceListingCreateManyOrganizationInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -3987,7 +4677,6 @@ export type MarketplaceListingCreateManyOrganizationInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
 }
 
 export type MarketplaceListingUpdateWithoutOrganizationInput = {
@@ -4015,6 +4704,15 @@ export type MarketplaceListingUpdateWithoutOrganizationInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4027,7 +4725,7 @@ export type MarketplaceListingUpdateWithoutOrganizationInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -4064,6 +4762,15 @@ export type MarketplaceListingUncheckedUpdateWithoutOrganizationInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4076,7 +4783,7 @@ export type MarketplaceListingUncheckedUpdateWithoutOrganizationInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -4113,6 +4820,15 @@ export type MarketplaceListingUncheckedUpdateManyWithoutOrganizationInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4125,7 +4841,6 @@ export type MarketplaceListingUncheckedUpdateManyWithoutOrganizationInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type MarketplaceListingCreateManyPublisherInput = {
@@ -4153,6 +4868,15 @@ export type MarketplaceListingCreateManyPublisherInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -4165,7 +4889,6 @@ export type MarketplaceListingCreateManyPublisherInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
 }
 
 export type MarketplaceListingUpdateWithoutPublisherInput = {
@@ -4193,6 +4916,15 @@ export type MarketplaceListingUpdateWithoutPublisherInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4205,7 +4937,7 @@ export type MarketplaceListingUpdateWithoutPublisherInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -4242,6 +4974,15 @@ export type MarketplaceListingUncheckedUpdateWithoutPublisherInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4254,7 +4995,7 @@ export type MarketplaceListingUncheckedUpdateWithoutPublisherInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -4291,6 +5032,15 @@ export type MarketplaceListingUncheckedUpdateManyWithoutPublisherInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4303,7 +5053,6 @@ export type MarketplaceListingUncheckedUpdateManyWithoutPublisherInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
 }
 
 export type MarketplaceListingCreateManyWebsiteInput = {
@@ -4331,6 +5080,15 @@ export type MarketplaceListingCreateManyWebsiteInput = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: $Enums.ListingLinkType | null
+  linkValidity?: $Enums.ListingLinkValidity | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   websiteUrl?: string | null
   sampleUrl?: string | null
   signupUrl?: string | null
@@ -4343,7 +5101,6 @@ export type MarketplaceListingCreateManyWebsiteInput = {
   expiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
-  categoryId?: string | null
 }
 
 export type MarketplaceListingUpdateWithoutWebsiteInput = {
@@ -4371,6 +5128,15 @@ export type MarketplaceListingUpdateWithoutWebsiteInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4383,7 +5149,7 @@ export type MarketplaceListingUpdateWithoutWebsiteInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
   organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  category?: Prisma.MarketplaceCategoryUpdateOneWithoutListingsNestedInput
+  categories?: Prisma.MarketplaceListingCategoryUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
@@ -4420,6 +5186,15 @@ export type MarketplaceListingUncheckedUpdateWithoutWebsiteInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4432,7 +5207,7 @@ export type MarketplaceListingUncheckedUpdateWithoutWebsiteInput = {
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  categories?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutListingNestedInput
   tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
   images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
   reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
@@ -4469,6 +5244,15 @@ export type MarketplaceListingUncheckedUpdateManyWithoutWebsiteInput = {
   featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
   verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
   doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  sportsGamingAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  pharmacyAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  cryptoAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  backlinkCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  linkType?: Prisma.NullableEnumListingLinkTypeFieldUpdateOperationsInput | $Enums.ListingLinkType | null
+  linkValidity?: Prisma.NullableEnumListingLinkValidityFieldUpdateOperationsInput | $Enums.ListingLinkValidity | null
+  googleNews?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  markedSponsored?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  foreignLanguageAllowed?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
   websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -4476,185 +5260,6 @@ export type MarketplaceListingUncheckedUpdateManyWithoutWebsiteInput = {
   trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  categoryId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-}
-
-export type MarketplaceListingCreateManyCategoryInput = {
-  id?: string
-  title: string
-  slug: string
-  description: string
-  shortDescription?: string | null
-  status?: $Enums.ListingStatus
-  fulfillmentType?: $Enums.ListingFulfillmentType
-  ownerType?: $Enums.WebsiteOwnershipType
-  currency?: string
-  priceType?: string
-  minPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  maxPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  domainRating?: number | null
-  domainAuthority?: number | null
-  traffic?: number | null
-  referringDomains?: number | null
-  spamScore?: number | null
-  country?: string | null
-  language?: string | null
-  countries?: Prisma.MarketplaceListingCreatecountriesInput | string[]
-  languages?: Prisma.MarketplaceListingCreatelanguagesInput | string[]
-  featured?: boolean
-  verified?: boolean
-  doFollowOnly?: boolean
-  websiteUrl?: string | null
-  sampleUrl?: string | null
-  signupUrl?: string | null
-  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  publisherId?: string | null
-  websiteId?: string | null
-  organizationId?: string | null
-  publishedAt?: Date | string | null
-  expiresAt?: Date | string | null
-  createdAt?: Date | string
-  updatedAt?: Date | string
-}
-
-export type MarketplaceListingUpdateWithoutCategoryInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  title?: Prisma.StringFieldUpdateOperationsInput | string
-  slug?: Prisma.StringFieldUpdateOperationsInput | string
-  description?: Prisma.StringFieldUpdateOperationsInput | string
-  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
-  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
-  currency?: Prisma.StringFieldUpdateOperationsInput | string
-  priceType?: Prisma.StringFieldUpdateOperationsInput | string
-  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
-  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  publisher?: Prisma.PublisherUpdateOneWithoutMarketplaceListingsNestedInput
-  website?: Prisma.WebsiteUpdateOneWithoutMarketplaceListingsNestedInput
-  organization?: Prisma.OrganizationUpdateOneWithoutMarketplaceListingsNestedInput
-  tags?: Prisma.MarketplaceListingTagUpdateManyWithoutListingNestedInput
-  images?: Prisma.MarketplaceListingImageUpdateManyWithoutListingNestedInput
-  reviews?: Prisma.MarketplaceReviewUpdateManyWithoutListingNestedInput
-  favorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutListingNestedInput
-  savedLists?: Prisma.MarketplaceSavedListItemUpdateManyWithoutListingNestedInput
-  views?: Prisma.MarketplaceListingViewUpdateManyWithoutListingNestedInput
-  clicks?: Prisma.MarketplaceListingClickUpdateManyWithoutListingNestedInput
-  services?: Prisma.ListingServiceUpdateManyWithoutListingNestedInput
-  orders?: Prisma.OrderUpdateManyWithoutListingNestedInput
-}
-
-export type MarketplaceListingUncheckedUpdateWithoutCategoryInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  title?: Prisma.StringFieldUpdateOperationsInput | string
-  slug?: Prisma.StringFieldUpdateOperationsInput | string
-  description?: Prisma.StringFieldUpdateOperationsInput | string
-  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
-  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
-  currency?: Prisma.StringFieldUpdateOperationsInput | string
-  priceType?: Prisma.StringFieldUpdateOperationsInput | string
-  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
-  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
-  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  tags?: Prisma.MarketplaceListingTagUncheckedUpdateManyWithoutListingNestedInput
-  images?: Prisma.MarketplaceListingImageUncheckedUpdateManyWithoutListingNestedInput
-  reviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutListingNestedInput
-  favorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutListingNestedInput
-  savedLists?: Prisma.MarketplaceSavedListItemUncheckedUpdateManyWithoutListingNestedInput
-  views?: Prisma.MarketplaceListingViewUncheckedUpdateManyWithoutListingNestedInput
-  clicks?: Prisma.MarketplaceListingClickUncheckedUpdateManyWithoutListingNestedInput
-  services?: Prisma.ListingServiceUncheckedUpdateManyWithoutListingNestedInput
-  orders?: Prisma.OrderUncheckedUpdateManyWithoutListingNestedInput
-}
-
-export type MarketplaceListingUncheckedUpdateManyWithoutCategoryInput = {
-  id?: Prisma.StringFieldUpdateOperationsInput | string
-  title?: Prisma.StringFieldUpdateOperationsInput | string
-  slug?: Prisma.StringFieldUpdateOperationsInput | string
-  description?: Prisma.StringFieldUpdateOperationsInput | string
-  shortDescription?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  status?: Prisma.EnumListingStatusFieldUpdateOperationsInput | $Enums.ListingStatus
-  fulfillmentType?: Prisma.EnumListingFulfillmentTypeFieldUpdateOperationsInput | $Enums.ListingFulfillmentType
-  ownerType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
-  currency?: Prisma.StringFieldUpdateOperationsInput | string
-  priceType?: Prisma.StringFieldUpdateOperationsInput | string
-  minPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  maxPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  domainRating?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  domainAuthority?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  traffic?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  referringDomains?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  spamScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
-  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  countries?: Prisma.MarketplaceListingUpdatecountriesInput | string[]
-  languages?: Prisma.MarketplaceListingUpdatelanguagesInput | string[]
-  featured?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  verified?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  doFollowOnly?: Prisma.BoolFieldUpdateOperationsInput | boolean
-  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  sampleUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  signupUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  metricsData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  trafficData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  semrushData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
-  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   organizationId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   expiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -4668,6 +5273,7 @@ export type MarketplaceListingUncheckedUpdateManyWithoutCategoryInput = {
  */
 
 export type MarketplaceListingCountOutputType = {
+  categories: number
   tags: number
   images: number
   reviews: number
@@ -4680,6 +5286,7 @@ export type MarketplaceListingCountOutputType = {
 }
 
 export type MarketplaceListingCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  categories?: boolean | MarketplaceListingCountOutputTypeCountCategoriesArgs
   tags?: boolean | MarketplaceListingCountOutputTypeCountTagsArgs
   images?: boolean | MarketplaceListingCountOutputTypeCountImagesArgs
   reviews?: boolean | MarketplaceListingCountOutputTypeCountReviewsArgs
@@ -4699,6 +5306,13 @@ export type MarketplaceListingCountOutputTypeDefaultArgs<ExtArgs extends runtime
    * Select specific fields to fetch from the MarketplaceListingCountOutputType
    */
   select?: Prisma.MarketplaceListingCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * MarketplaceListingCountOutputType without action
+ */
+export type MarketplaceListingCountOutputTypeCountCategoriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.MarketplaceListingCategoryWhereInput
 }
 
 /**
@@ -4790,6 +5404,15 @@ export type MarketplaceListingSelect<ExtArgs extends runtime.Types.Extensions.In
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean
+  pharmacyAllowed?: boolean
+  cryptoAllowed?: boolean
+  backlinkCount?: boolean
+  linkType?: boolean
+  linkValidity?: boolean
+  googleNews?: boolean
+  markedSponsored?: boolean
+  foreignLanguageAllowed?: boolean
   websiteUrl?: boolean
   sampleUrl?: boolean
   signupUrl?: boolean
@@ -4803,11 +5426,10 @@ export type MarketplaceListingSelect<ExtArgs extends runtime.Types.Extensions.In
   expiresAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
-  categoryId?: boolean
   publisher?: boolean | Prisma.MarketplaceListing$publisherArgs<ExtArgs>
   website?: boolean | Prisma.MarketplaceListing$websiteArgs<ExtArgs>
   organization?: boolean | Prisma.MarketplaceListing$organizationArgs<ExtArgs>
-  category?: boolean | Prisma.MarketplaceListing$categoryArgs<ExtArgs>
+  categories?: boolean | Prisma.MarketplaceListing$categoriesArgs<ExtArgs>
   tags?: boolean | Prisma.MarketplaceListing$tagsArgs<ExtArgs>
   images?: boolean | Prisma.MarketplaceListing$imagesArgs<ExtArgs>
   reviews?: boolean | Prisma.MarketplaceListing$reviewsArgs<ExtArgs>
@@ -4845,6 +5467,15 @@ export type MarketplaceListingSelectCreateManyAndReturn<ExtArgs extends runtime.
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean
+  pharmacyAllowed?: boolean
+  cryptoAllowed?: boolean
+  backlinkCount?: boolean
+  linkType?: boolean
+  linkValidity?: boolean
+  googleNews?: boolean
+  markedSponsored?: boolean
+  foreignLanguageAllowed?: boolean
   websiteUrl?: boolean
   sampleUrl?: boolean
   signupUrl?: boolean
@@ -4858,11 +5489,9 @@ export type MarketplaceListingSelectCreateManyAndReturn<ExtArgs extends runtime.
   expiresAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
-  categoryId?: boolean
   publisher?: boolean | Prisma.MarketplaceListing$publisherArgs<ExtArgs>
   website?: boolean | Prisma.MarketplaceListing$websiteArgs<ExtArgs>
   organization?: boolean | Prisma.MarketplaceListing$organizationArgs<ExtArgs>
-  category?: boolean | Prisma.MarketplaceListing$categoryArgs<ExtArgs>
 }, ExtArgs["result"]["marketplaceListing"]>
 
 export type MarketplaceListingSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -4890,6 +5519,15 @@ export type MarketplaceListingSelectUpdateManyAndReturn<ExtArgs extends runtime.
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean
+  pharmacyAllowed?: boolean
+  cryptoAllowed?: boolean
+  backlinkCount?: boolean
+  linkType?: boolean
+  linkValidity?: boolean
+  googleNews?: boolean
+  markedSponsored?: boolean
+  foreignLanguageAllowed?: boolean
   websiteUrl?: boolean
   sampleUrl?: boolean
   signupUrl?: boolean
@@ -4903,11 +5541,9 @@ export type MarketplaceListingSelectUpdateManyAndReturn<ExtArgs extends runtime.
   expiresAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
-  categoryId?: boolean
   publisher?: boolean | Prisma.MarketplaceListing$publisherArgs<ExtArgs>
   website?: boolean | Prisma.MarketplaceListing$websiteArgs<ExtArgs>
   organization?: boolean | Prisma.MarketplaceListing$organizationArgs<ExtArgs>
-  category?: boolean | Prisma.MarketplaceListing$categoryArgs<ExtArgs>
 }, ExtArgs["result"]["marketplaceListing"]>
 
 export type MarketplaceListingSelectScalar = {
@@ -4935,6 +5571,15 @@ export type MarketplaceListingSelectScalar = {
   featured?: boolean
   verified?: boolean
   doFollowOnly?: boolean
+  sportsGamingAllowed?: boolean
+  pharmacyAllowed?: boolean
+  cryptoAllowed?: boolean
+  backlinkCount?: boolean
+  linkType?: boolean
+  linkValidity?: boolean
+  googleNews?: boolean
+  markedSponsored?: boolean
+  foreignLanguageAllowed?: boolean
   websiteUrl?: boolean
   sampleUrl?: boolean
   signupUrl?: boolean
@@ -4948,15 +5593,14 @@ export type MarketplaceListingSelectScalar = {
   expiresAt?: boolean
   createdAt?: boolean
   updatedAt?: boolean
-  categoryId?: boolean
 }
 
-export type MarketplaceListingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "slug" | "description" | "shortDescription" | "status" | "fulfillmentType" | "ownerType" | "currency" | "priceType" | "minPrice" | "maxPrice" | "domainRating" | "domainAuthority" | "traffic" | "referringDomains" | "spamScore" | "country" | "language" | "countries" | "languages" | "featured" | "verified" | "doFollowOnly" | "websiteUrl" | "sampleUrl" | "signupUrl" | "metricsData" | "trafficData" | "semrushData" | "publisherId" | "websiteId" | "organizationId" | "publishedAt" | "expiresAt" | "createdAt" | "updatedAt" | "categoryId", ExtArgs["result"]["marketplaceListing"]>
+export type MarketplaceListingOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "title" | "slug" | "description" | "shortDescription" | "status" | "fulfillmentType" | "ownerType" | "currency" | "priceType" | "minPrice" | "maxPrice" | "domainRating" | "domainAuthority" | "traffic" | "referringDomains" | "spamScore" | "country" | "language" | "countries" | "languages" | "featured" | "verified" | "doFollowOnly" | "sportsGamingAllowed" | "pharmacyAllowed" | "cryptoAllowed" | "backlinkCount" | "linkType" | "linkValidity" | "googleNews" | "markedSponsored" | "foreignLanguageAllowed" | "websiteUrl" | "sampleUrl" | "signupUrl" | "metricsData" | "trafficData" | "semrushData" | "publisherId" | "websiteId" | "organizationId" | "publishedAt" | "expiresAt" | "createdAt" | "updatedAt", ExtArgs["result"]["marketplaceListing"]>
 export type MarketplaceListingInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.MarketplaceListing$publisherArgs<ExtArgs>
   website?: boolean | Prisma.MarketplaceListing$websiteArgs<ExtArgs>
   organization?: boolean | Prisma.MarketplaceListing$organizationArgs<ExtArgs>
-  category?: boolean | Prisma.MarketplaceListing$categoryArgs<ExtArgs>
+  categories?: boolean | Prisma.MarketplaceListing$categoriesArgs<ExtArgs>
   tags?: boolean | Prisma.MarketplaceListing$tagsArgs<ExtArgs>
   images?: boolean | Prisma.MarketplaceListing$imagesArgs<ExtArgs>
   reviews?: boolean | Prisma.MarketplaceListing$reviewsArgs<ExtArgs>
@@ -4972,13 +5616,11 @@ export type MarketplaceListingIncludeCreateManyAndReturn<ExtArgs extends runtime
   publisher?: boolean | Prisma.MarketplaceListing$publisherArgs<ExtArgs>
   website?: boolean | Prisma.MarketplaceListing$websiteArgs<ExtArgs>
   organization?: boolean | Prisma.MarketplaceListing$organizationArgs<ExtArgs>
-  category?: boolean | Prisma.MarketplaceListing$categoryArgs<ExtArgs>
 }
 export type MarketplaceListingIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.MarketplaceListing$publisherArgs<ExtArgs>
   website?: boolean | Prisma.MarketplaceListing$websiteArgs<ExtArgs>
   organization?: boolean | Prisma.MarketplaceListing$organizationArgs<ExtArgs>
-  category?: boolean | Prisma.MarketplaceListing$categoryArgs<ExtArgs>
 }
 
 export type $MarketplaceListingPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -4987,7 +5629,7 @@ export type $MarketplaceListingPayload<ExtArgs extends runtime.Types.Extensions.
     publisher: Prisma.$PublisherPayload<ExtArgs> | null
     website: Prisma.$WebsitePayload<ExtArgs> | null
     organization: Prisma.$OrganizationPayload<ExtArgs> | null
-    category: Prisma.$MarketplaceCategoryPayload<ExtArgs> | null
+    categories: Prisma.$MarketplaceListingCategoryPayload<ExtArgs>[]
     tags: Prisma.$MarketplaceListingTagPayload<ExtArgs>[]
     images: Prisma.$MarketplaceListingImagePayload<ExtArgs>[]
     reviews: Prisma.$MarketplaceReviewPayload<ExtArgs>[]
@@ -5023,6 +5665,15 @@ export type $MarketplaceListingPayload<ExtArgs extends runtime.Types.Extensions.
     featured: boolean
     verified: boolean
     doFollowOnly: boolean
+    sportsGamingAllowed: boolean | null
+    pharmacyAllowed: boolean | null
+    cryptoAllowed: boolean | null
+    backlinkCount: number | null
+    linkType: $Enums.ListingLinkType | null
+    linkValidity: $Enums.ListingLinkValidity | null
+    googleNews: boolean | null
+    markedSponsored: boolean | null
+    foreignLanguageAllowed: boolean | null
     websiteUrl: string | null
     sampleUrl: string | null
     signupUrl: string | null
@@ -5036,7 +5687,6 @@ export type $MarketplaceListingPayload<ExtArgs extends runtime.Types.Extensions.
     expiresAt: Date | null
     createdAt: Date
     updatedAt: Date
-    categoryId: string | null
   }, ExtArgs["result"]["marketplaceListing"]>
   composites: {}
 }
@@ -5434,7 +6084,7 @@ export interface Prisma__MarketplaceListingClient<T, Null = never, ExtArgs exten
   publisher<T extends Prisma.MarketplaceListing$publisherArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$publisherArgs<ExtArgs>>): Prisma.Prisma__PublisherClient<runtime.Types.Result.GetResult<Prisma.$PublisherPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   website<T extends Prisma.MarketplaceListing$websiteArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$websiteArgs<ExtArgs>>): Prisma.Prisma__WebsiteClient<runtime.Types.Result.GetResult<Prisma.$WebsitePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   organization<T extends Prisma.MarketplaceListing$organizationArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$organizationArgs<ExtArgs>>): Prisma.Prisma__OrganizationClient<runtime.Types.Result.GetResult<Prisma.$OrganizationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-  category<T extends Prisma.MarketplaceListing$categoryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$categoryArgs<ExtArgs>>): Prisma.Prisma__MarketplaceCategoryClient<runtime.Types.Result.GetResult<Prisma.$MarketplaceCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  categories<T extends Prisma.MarketplaceListing$categoriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$categoriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingCategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tags<T extends Prisma.MarketplaceListing$tagsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$tagsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingTagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   images<T extends Prisma.MarketplaceListing$imagesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$imagesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingImagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   reviews<T extends Prisma.MarketplaceListing$reviewsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceListing$reviewsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceReviewPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -5497,6 +6147,15 @@ export interface MarketplaceListingFieldRefs {
   readonly featured: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
   readonly verified: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
   readonly doFollowOnly: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
+  readonly sportsGamingAllowed: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
+  readonly pharmacyAllowed: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
+  readonly cryptoAllowed: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
+  readonly backlinkCount: Prisma.FieldRef<"MarketplaceListing", 'Int'>
+  readonly linkType: Prisma.FieldRef<"MarketplaceListing", 'ListingLinkType'>
+  readonly linkValidity: Prisma.FieldRef<"MarketplaceListing", 'ListingLinkValidity'>
+  readonly googleNews: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
+  readonly markedSponsored: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
+  readonly foreignLanguageAllowed: Prisma.FieldRef<"MarketplaceListing", 'Boolean'>
   readonly websiteUrl: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly sampleUrl: Prisma.FieldRef<"MarketplaceListing", 'String'>
   readonly signupUrl: Prisma.FieldRef<"MarketplaceListing", 'String'>
@@ -5510,7 +6169,6 @@ export interface MarketplaceListingFieldRefs {
   readonly expiresAt: Prisma.FieldRef<"MarketplaceListing", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"MarketplaceListing", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"MarketplaceListing", 'DateTime'>
-  readonly categoryId: Prisma.FieldRef<"MarketplaceListing", 'String'>
 }
     
 
@@ -5969,22 +6627,27 @@ export type MarketplaceListing$organizationArgs<ExtArgs extends runtime.Types.Ex
 }
 
 /**
- * MarketplaceListing.category
+ * MarketplaceListing.categories
  */
-export type MarketplaceListing$categoryArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+export type MarketplaceListing$categoriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
-   * Select specific fields to fetch from the MarketplaceCategory
+   * Select specific fields to fetch from the MarketplaceListingCategory
    */
-  select?: Prisma.MarketplaceCategorySelect<ExtArgs> | null
+  select?: Prisma.MarketplaceListingCategorySelect<ExtArgs> | null
   /**
-   * Omit specific fields from the MarketplaceCategory
+   * Omit specific fields from the MarketplaceListingCategory
    */
-  omit?: Prisma.MarketplaceCategoryOmit<ExtArgs> | null
+  omit?: Prisma.MarketplaceListingCategoryOmit<ExtArgs> | null
   /**
    * Choose, which related nodes to fetch as well
    */
-  include?: Prisma.MarketplaceCategoryInclude<ExtArgs> | null
-  where?: Prisma.MarketplaceCategoryWhereInput
+  include?: Prisma.MarketplaceListingCategoryInclude<ExtArgs> | null
+  where?: Prisma.MarketplaceListingCategoryWhereInput
+  orderBy?: Prisma.MarketplaceListingCategoryOrderByWithRelationInput | Prisma.MarketplaceListingCategoryOrderByWithRelationInput[]
+  cursor?: Prisma.MarketplaceListingCategoryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.MarketplaceListingCategoryScalarFieldEnum | Prisma.MarketplaceListingCategoryScalarFieldEnum[]
 }
 
 /**

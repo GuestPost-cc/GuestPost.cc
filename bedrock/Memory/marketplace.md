@@ -9,7 +9,7 @@ updated: 2026-07-18
 
 ## Listing → Service architecture (post-Phase-7)
 
-A `MarketplaceListing` represents a **website** (or an INTERNAL_SERVICE bundle). It owns site-level fields only — title, slug, description, metrics (DR/traffic/RD), category/tags, country/language, `featured` / `verified`. The legacy listing-level `type` / `price` / `turnaroundDays` / `revisionRounds` / `warrantyDays` columns + the `ListingType` enum were **dropped in migration `20260615130000_phase7_listing_columns`** — every per-service attribute now lives on the child `ListingService` row.
+A `MarketplaceListing` represents a **website** (or an INTERNAL_SERVICE bundle). It owns site-level fields only — title, slug, description, reviewed categories, one primary language, placement policy, Google-sourced performance summaries, country, tags, and `featured` / `verified`. The legacy listing-level `type` / `price` / `turnaroundDays` / `revisionRounds` / `warrantyDays` columns + the `ListingType` enum were **dropped in migration `20260615130000_phase7_listing_columns`** — every per-service attribute now lives on the child `ListingService` row.
 
 `ListingService` is the orderable unit: `(listingId, serviceType, price, currency, turnaroundDays, revisionRounds, warrantyDays?, requirements?, fulfillmentSettings?, availability, version)`. One listing exposes N services; unique on `(listingId, serviceType)`. Availability: `AVAILABLE` (orderable), `PAUSED` (hidden from buyers, kept for historical order references), `WAITLIST` (visible, not orderable; favorites with matching serviceType get notified on flip to AVAILABLE).
 
@@ -20,6 +20,16 @@ Customer flow (locked after listing-detail pick):
 4. `POST /orders` body carries `listingServiceId` + `briefData` (per-service Zod-validated payload). Server snapshots `serviceType`, `amount`, `turnaroundDays`, `fulfillmentChannel`, `listingId`, `listingServiceId`, `briefData` onto the order — later listing edits never alter an in-flight contract.
 
 Marketplace discovery is authenticated. The marketing website has no `/marketplace` route or navigation link, and all marketplace browse endpoints (listings, detail, service picker, categories, tags, services, search, and stats) use the API's global session guard. Customer browsing remains at `/dashboard/marketplace` in the portal.
+
+## Taxonomy, language, and placement policy (2026-07-18)
+
+Migration `20260718180000_marketplace_taxonomy_and_listing_policies` replaces the single `categoryId` with explicit `MarketplaceListingCategory` rows. A listing must select 1–7 unique active categories from the reviewed 87-category taxonomy. DTO validation, active-category lookup, a compound join-table primary key, and a serialized database trigger jointly enforce the invariant. Marketplace filters may select multiple categories, while a listing editor cannot select more than seven.
+
+A listing stores exactly one controlled primary language. Search can select multiple languages. The following listing attributes also store one value each: Sports/Gaming allowed, Pharmacy allowed, Crypto allowed, number of backlinks (1/2/3), link type (DoFollow/NoFollow/Sponsored/UGC), link validity (Permanent/5 years/1 year/6 months/3 months), Google News, Marked as Sponsored, and Foreign-language content allowed. These values are required in publisher and platform creation/edit flows and before submission or approval; existing migrated rows remain nullable until an inventory owner reviews them rather than receiving guessed policy values.
+
+Buyer cards/details expose categories, primary language, link policy, and buyer-safe 30-day performance summaries. Filters are multi-select for categories, languages, backlink count, link type, and validity, plus Any/Yes/No selectors for boolean policies. Public projections never expose raw GSC/GA4 provider rows.
+
+GSC sync denormalizes 30-day clicks and impressions into the listing summary. GA4 sync denormalizes 30-day sessions, users, and pageviews and uses sessions for marketplace traffic filtering/ranking. Publisher and platform listing forms do not accept self-reported authority or traffic values.
 
 ## Lifecycle phase (derived UI state)
 
@@ -67,7 +77,7 @@ The July platform-management update makes this assignment an access boundary: OP
 - Reviews and favorites for social proof (favorites can now be scoped per-serviceType for waitlist notifications)
 - Saved lists for user curation
 - Per-service prices on `ListingService`. Listing-level price/range fields removed in Phase 7
-- SEO metrics: domain rating (DR), traffic, referring domains, spam score
+- Verified marketplace performance summaries: GSC clicks/impressions and GA4 sessions/users/pageviews
 - AI-powered recommendations (`MarketplaceRecommendation`) — now match on AVAILABLE-service overlap, not the dropped listing-level `type`
 - Fraud detection flags (`MarketplaceFlag`)
 - Marketplace stats include `totalServices`, `activeServices`, `servicesByType` (per-`ServiceType` count + avg price)
@@ -75,11 +85,11 @@ The July platform-management update makes this assignment an access boundary: OP
 
 ## Publisher Inventory UX (updated 2026-07-18)
 
-Publisher inventory now follows the same aggregate boundary as platform inventory: the Enlist Website flow creates the publisher website and its single DRAFT listing atomically. The form captures URL/location/metrics, buyer-facing title, a required marketplace category, a description of at most 500 characters, and an optional first service. It redirects to the website workspace rather than exposing a second standalone listing-creation path.
+Publisher inventory now follows the same aggregate boundary as platform inventory: the Enlist Website flow creates the publisher website and its single DRAFT listing atomically. The form captures URL/location, buyer-facing title, 1–7 required marketplace categories, one primary language, every placement-policy value, a description of at most 500 characters, and an optional first service. GSC/GA4 supply performance metrics after integration; the form accepts no self-reported metrics. It redirects to the website workspace rather than exposing a second standalone listing-creation path.
 
 The publisher website detail page is the management home for its listing. It combines listing metadata, review-readiness checks, DNS ownership status, lifecycle actions, and the complete service menu. Service price, turnaround, revisions, warranty, currency, and availability remain version-guarded per row; historical orders retain their checkout snapshot. Submission requires a verified domain, category, 1–500 character description, and at least one AVAILABLE service. DRAFT, REJECTED, and ARCHIVED listings can enter moderation.
 
-The Listings page is a searchable overview with status, service, and category filters plus readiness and service-count summaries. It links into the website workspace for edits. Publisher metadata updates are server-allowlisted to title, description, category, tags, do-follow policy, and sample URL; publishers cannot change moderation status, featured/verified state, ownership, website association, metrics, or services through the general metadata endpoint.
+The Listings page is a searchable overview with status, service, and category filters plus readiness and service-count summaries. It links into the website workspace for edits. Publisher metadata updates are server-allowlisted to title, description, categories, primary language, placement policy, tags, do-follow policy, and sample URL; publishers cannot change moderation status, featured/verified state, ownership, website association, metrics, or services through the general metadata endpoint.
 
 Buyer marketplace ownership labels use brand-separated colors everywhere: PLATFORM is purple and PUBLISHER is blue. Listing cards clamp descriptions to two lines with an ellipsis, while detail pages render the complete description. The buyer filter sidebar uses padded groups and additional label-to-control spacing.
 
@@ -108,7 +118,7 @@ The buyer portal blurs a publisher website URL until the customer has made a suc
 
 ## Buyer Marketplace Decision Flow (2026-07-18)
 
-The customer marketplace is service-aware from discovery through checkout. Browse cards prioritize the information needed to compare a purchase: selected-service or starting price, service type, turnaround, DR, traffic, fulfillment attribution, review evidence, and URL-access state. Discovery supports deferred text search, quick service chips, category/service/budget/DR/traffic/turnaround/country/language filters, removable active-filter pills, mobile filters, and stable pagination.
+The customer marketplace is service-aware from discovery through checkout. Browse cards prioritize the information needed to compare a purchase: selected-service or starting price, service type, turnaround, categories, primary language, placement policy, GA4 traffic, fulfillment attribution, review evidence, and URL-access state. Discovery supports deferred text search, quick service chips, category/language/policy/service/budget/GA4-traffic/turnaround/country filters, removable active-filter pills, mobile filters, and stable pagination.
 
 Filtering by a service makes each card quote that service rather than an unrelated listing minimum. Price sorting also operates on the minimum matching AVAILABLE `ListingService.price`; it no longer references the removed listing-level price column. Text search includes listing title/description/slug plus category and tag names, and country/language matching is case-insensitive.
 
@@ -130,7 +140,7 @@ Platform websites start `VERIFIED` because DNS ownership verification is not req
 - Reviews and favorites for social proof (favorites can now be scoped per-serviceType for waitlist notifications)
 - Saved lists for user curation
 - Per-service prices on `ListingService`. Listing-level price/range fields removed in Phase 7
-- SEO metrics: domain rating (DR), traffic, referring domains, spam score
+- Verified marketplace performance summaries: GSC clicks/impressions and GA4 sessions/users/pageviews
 - AI-powered recommendations (`MarketplaceRecommendation`) — now match on AVAILABLE-service overlap, not the dropped listing-level `type`
 - Fraud detection flags (`MarketplaceFlag`)
 - Marketplace stats include `totalServices`, `activeServices`, `servicesByType` (per-`ServiceType` count + avg price)
@@ -138,7 +148,7 @@ Platform websites start `VERIFIED` because DNS ownership verification is not req
 
 ## Key Models
 
-`MarketplaceCategory`, `MarketplaceTag`, `MarketplaceListing` (+ `ownerType`), **`ListingService`**, `MarketplaceListingTag`, `MarketplaceListingImage`, `MarketplaceReview`, `MarketplaceFavorite` (+ optional `serviceType` for waitlist scope), `MarketplaceSavedList`, `MarketplaceSavedListItem`, `MarketplaceListingView`, `MarketplaceListingClick` (+ `serviceType`), `MarketplaceSearchHistory` (+ `serviceType`), `MarketplaceRecommendation`, `MarketplaceFlag`, `ListingFulfillmentRule`, `PublisherProfile`. **Dropped**: `MarketplacePricingTier` (Phase 5), `Service` (Phase 7 part 1), `ListingType` enum + 5 listing columns (Phase 7 part 2).
+`MarketplaceCategory`, `MarketplaceListingCategory`, `MarketplaceTag`, `MarketplaceListing` (+ `ownerType`, placement policy, `ListingLinkType`, `ListingLinkValidity`), **`ListingService`**, `MarketplaceListingTag`, `MarketplaceListingImage`, `MarketplaceReview`, `MarketplaceFavorite` (+ optional `serviceType` for waitlist scope), `MarketplaceSavedList`, `MarketplaceSavedListItem`, `MarketplaceListingView`, `MarketplaceListingClick` (+ `serviceType`), `MarketplaceSearchHistory` (+ `serviceType`), `MarketplaceRecommendation`, `MarketplaceFlag`, `ListingFulfillmentRule`, `PublisherProfile`. **Dropped**: `MarketplacePricingTier` (Phase 5), `Service` (Phase 7 part 1), `ListingType` enum + 5 listing columns (Phase 7 part 2), and the listing's legacy single `categoryId` (taxonomy migration).
 
 ## Key Files
 

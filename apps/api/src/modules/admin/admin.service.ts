@@ -15,6 +15,11 @@ import {
 import { invalidateAuthContext } from "../../common/auth-context-cache"
 import { normalizeDomain } from "../../common/domain"
 import { PrismaService } from "../../common/prisma.service"
+import {
+  hasCompleteListingPolicy,
+  isMarketplaceLanguage,
+  requireActiveMarketplaceCategories,
+} from "../../common/utils/marketplace-categories"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 
@@ -943,7 +948,11 @@ export class AdminService {
         skip: (page - 1) * limit,
         take: limit,
         include: {
-          category: { select: { name: true } },
+          categories: {
+            include: {
+              category: { select: { id: true, name: true, slug: true } },
+            },
+          },
           organization: { select: { name: true } },
           publisher: { select: { name: true } },
           website: {
@@ -996,7 +1005,8 @@ export class AdminService {
           fulfillmentType: l.fulfillmentType,
           featured: l.featured,
           verified: l.verified,
-          category: l.category,
+          categories: l.categories.map((item) => item.category),
+          category: l.categories[0]?.category ?? null,
           organization: l.organization,
           publisher: l.publisher,
           websiteVerificationStatus: l.website?.verificationStatus ?? null,
@@ -1070,6 +1080,7 @@ export class AdminService {
       include: {
         publisher: { select: { email: true } },
         website: { select: { verificationStatus: true, domain: true } },
+        categories: { select: { categoryId: true } },
         services: {
           where: { availability: "AVAILABLE" },
           take: 1,
@@ -1084,6 +1095,19 @@ export class AdminService {
         code: "NO_AVAILABLE_SERVICES",
         message:
           "Cannot approve: add at least one available service to the listing first.",
+      })
+    }
+    if (
+      status === ListingStatus.APPROVED &&
+      (listing.categories.length < 1 ||
+        listing.categories.length > 7 ||
+        !isMarketplaceLanguage(listing.language) ||
+        !hasCompleteListingPolicy(listing))
+    ) {
+      throw new BadRequestException({
+        code: "LISTING_METADATA_INCOMPLETE",
+        message:
+          "Cannot approve: choose 1-7 categories, one primary language, and every listing policy value first.",
       })
     }
 
@@ -1251,6 +1275,11 @@ export class AdminService {
         `Website with this domain already exists (${existing.url})`,
       )
 
+    const marketplaceCategories = await requireActiveMarketplaceCategories(
+      this.prisma,
+      dto.categoryIds,
+    )
+
     // An Operations-created site is always assigned to its creator. A crafted
     // managedByUserId cannot transfer inventory; only Super Admin can select a
     // different owner or use the separate reassignment workflow.
@@ -1282,12 +1311,10 @@ export class AdminService {
             canonicalDomain,
             name: dto.name ?? null,
             country: dto.country ?? null,
-            language: dto.language ?? null,
-            category: dto.category ?? null,
-            metrics: {
-              dr: dto.domainRating ?? 0,
-              traffic: dto.monthlyTraffic ?? 0,
-            },
+            language: dto.language,
+            category: marketplaceCategories
+              .map((category) => category.name)
+              .join(", "),
             ownershipType: WebsiteOwnershipType.PLATFORM,
             isActive: true,
             managedByUserId,
@@ -1303,21 +1330,33 @@ export class AdminService {
         // removes the old second listing-creation path from Marketplace.
         const listing = await tx.marketplaceListing.create({
           data: {
-            title: dto.name ?? dto.url,
+            title: dto.listingTitle.trim(),
             slug: `platform-${createdWebsite.id}`,
-            description: dto.name ?? dto.url,
+            description: dto.description.trim(),
             status: ListingStatus.DRAFT,
             fulfillmentType: "INTERNAL",
             currency: "USD",
-            domainRating: dto.domainRating ?? 0,
-            traffic: dto.monthlyTraffic ?? 0,
             country: dto.country ?? null,
-            language: dto.language ?? null,
+            language: dto.language,
             websiteUrl: dto.url,
             websiteId: createdWebsite.id,
             organizationId: null,
             publisherId: null,
             ownerType: "PLATFORM",
+            sportsGamingAllowed: dto.sportsGamingAllowed,
+            pharmacyAllowed: dto.pharmacyAllowed,
+            cryptoAllowed: dto.cryptoAllowed,
+            backlinkCount: dto.backlinkCount,
+            linkType: dto.linkType,
+            linkValidity: dto.linkValidity,
+            googleNews: dto.googleNews,
+            markedSponsored: dto.markedSponsored,
+            foreignLanguageAllowed: dto.foreignLanguageAllowed,
+            categories: {
+              create: marketplaceCategories.map((category) => ({
+                category: { connect: { id: category.id } },
+              })),
+            },
           },
         })
 
@@ -1440,17 +1479,19 @@ export class AdminService {
       )
     this.assertWebsiteInventoryWriteAccess(user)
 
+    const marketplaceCategories = dto.categoryIds
+      ? await requireActiveMarketplaceCategories(this.prisma, dto.categoryIds)
+      : null
+
     const updated = await this.prisma.website.update({
       where: { id },
       data: {
         name: dto.name ?? website.name,
         country: dto.country ?? website.country,
         language: dto.language ?? website.language,
-        category: dto.category ?? website.category,
-        metrics: {
-          dr: dto.domainRating ?? (website.metrics as any)?.dr ?? 0,
-          traffic: dto.monthlyTraffic ?? (website.metrics as any)?.traffic ?? 0,
-        },
+        category:
+          marketplaceCategories?.map((category) => category.name).join(", ") ??
+          website.category,
       },
     })
 
@@ -1464,11 +1505,45 @@ export class AdminService {
       await this.prisma.marketplaceListing.update({
         where: { id: listing.id },
         data: {
-          title: dto.name ?? listing.title,
-          domainRating: dto.domainRating ?? listing.domainRating,
-          traffic: dto.monthlyTraffic ?? listing.traffic,
+          title: dto.listingTitle ?? dto.name ?? listing.title,
+          description: dto.description ?? listing.description,
           country: dto.country ?? listing.country,
           language: dto.language ?? listing.language,
+          ...(dto.sportsGamingAllowed !== undefined
+            ? { sportsGamingAllowed: dto.sportsGamingAllowed }
+            : {}),
+          ...(dto.pharmacyAllowed !== undefined
+            ? { pharmacyAllowed: dto.pharmacyAllowed }
+            : {}),
+          ...(dto.cryptoAllowed !== undefined
+            ? { cryptoAllowed: dto.cryptoAllowed }
+            : {}),
+          ...(dto.backlinkCount !== undefined
+            ? { backlinkCount: dto.backlinkCount }
+            : {}),
+          ...(dto.linkType !== undefined ? { linkType: dto.linkType } : {}),
+          ...(dto.linkValidity !== undefined
+            ? { linkValidity: dto.linkValidity }
+            : {}),
+          ...(dto.googleNews !== undefined
+            ? { googleNews: dto.googleNews }
+            : {}),
+          ...(dto.markedSponsored !== undefined
+            ? { markedSponsored: dto.markedSponsored }
+            : {}),
+          ...(dto.foreignLanguageAllowed !== undefined
+            ? { foreignLanguageAllowed: dto.foreignLanguageAllowed }
+            : {}),
+          ...(marketplaceCategories
+            ? {
+                categories: {
+                  deleteMany: {},
+                  create: marketplaceCategories.map((category) => ({
+                    category: { connect: { id: category.id } },
+                  })),
+                },
+              }
+            : {}),
         },
       })
     }
@@ -1505,6 +1580,7 @@ export class AdminService {
             take: 1,
             orderBy: { createdAt: "desc" },
             include: {
+              categories: { include: { category: true } },
               services: {
                 orderBy: [{ availability: "asc" }, { price: "asc" }],
               },
@@ -1546,6 +1622,11 @@ export class AdminService {
         listing: w.marketplaceListings[0]
           ? {
               ...w.marketplaceListings[0],
+              categories: w.marketplaceListings[0].categories.map(
+                (item) => item.category,
+              ),
+              category:
+                w.marketplaceListings[0].categories[0]?.category ?? null,
               services: w.marketplaceListings[0].services.map((service) => ({
                 ...service,
                 price: Number(service.price),
@@ -1581,7 +1662,7 @@ export class AdminService {
           take: 1,
           orderBy: { createdAt: "desc" },
           include: {
-            category: true,
+            categories: { include: { category: true } },
             services: {
               orderBy: [{ availability: "asc" }, { price: "asc" }],
             },
@@ -1623,6 +1704,8 @@ export class AdminService {
       listing: listing
         ? {
             ...listing,
+            categories: listing.categories.map((item) => item.category),
+            category: listing.categories[0]?.category ?? null,
             services: listing.services.map((service) => ({
               ...service,
               price: Number(service.price),

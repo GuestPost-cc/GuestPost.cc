@@ -12,6 +12,11 @@ import {
 } from "@nestjs/common"
 import { normalizeDomain } from "../../common/domain"
 import { PrismaService } from "../../common/prisma.service"
+import {
+  hasCompleteListingPolicy,
+  isMarketplaceLanguage,
+  requireActiveMarketplaceCategories,
+} from "../../common/utils/marketplace-categories"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
@@ -84,33 +89,15 @@ export class WebsitesService {
     // DNS TXT record and the worker validates it.
     const verificationToken = generateVerificationToken()
 
-    const marketplaceCategory = dto.categoryId
-      ? await this.prisma.marketplaceCategory.findUnique({
-          where: { id: dto.categoryId },
-          select: { id: true, name: true },
-        })
-      : null
-    if (dto.categoryId && !marketplaceCategory) {
-      throw new BadRequestException({
-        code: "INVALID_MARKETPLACE_CATEGORY",
-        message: "Select a valid marketplace category",
-      })
-    }
+    const marketplaceCategories = await requireActiveMarketplaceCategories(
+      this.prisma,
+      dto.categoryIds,
+    )
 
     // New clients send the first service as a nested, validated object. Keep
     // the legacy price fields as a compatibility bridge, but never create an
     // AVAILABLE zero-price service.
-    const initialService =
-      dto.initialService ??
-      (dto.price != null && dto.price > 0
-        ? {
-            serviceType: "GUEST_POST" as const,
-            price: dto.price,
-            currency: "USD",
-            turnaroundDays: dto.turnaroundDays ?? 7,
-            revisionRounds: 2,
-          }
-        : null)
+    const initialService = dto.initialService ?? null
 
     let website
     try {
@@ -122,11 +109,9 @@ export class WebsitesService {
             canonicalDomain,
             country: dto.country,
             language: dto.language,
-            category: marketplaceCategory?.name ?? dto.category,
-            metrics: {
-              dr: dto.domainRating,
-              traffic: dto.monthlyTraffic,
-            },
+            category: marketplaceCategories
+              .map((category) => category.name)
+              .join(", "),
             publisherId,
             verificationStatus: "PENDING_VERIFICATION",
             verificationMethod: "DNS_TXT",
@@ -152,8 +137,6 @@ export class WebsitesService {
             status: ListingStatus.DRAFT,
             fulfillmentType: ListingFulfillmentType.PUBLISHER,
             currency: "USD",
-            domainRating: dto.domainRating,
-            traffic: dto.monthlyTraffic,
             country: dto.country,
             language: dto.language,
             websiteUrl: dto.url,
@@ -161,7 +144,20 @@ export class WebsitesService {
             websiteId: w.id,
             organizationId,
             ownerType: "PUBLISHER",
-            categoryId: marketplaceCategory?.id ?? null,
+            sportsGamingAllowed: dto.sportsGamingAllowed,
+            pharmacyAllowed: dto.pharmacyAllowed,
+            cryptoAllowed: dto.cryptoAllowed,
+            backlinkCount: dto.backlinkCount,
+            linkType: dto.linkType,
+            linkValidity: dto.linkValidity,
+            googleNews: dto.googleNews,
+            markedSponsored: dto.markedSponsored,
+            foreignLanguageAllowed: dto.foreignLanguageAllowed,
+            categories: {
+              create: marketplaceCategories.map((category) => ({
+                category: { connect: { id: category.id } },
+              })),
+            },
             services: initialService
               ? {
                   create: [
@@ -372,15 +368,11 @@ export class WebsitesService {
     const updated = await this.prisma.website.update({
       where: { id },
       data: {
-        url: dto.url,
+        ...(dto.url !== undefined ? { url: dto.url } : {}),
         domain,
-        country: dto.country,
-        language: dto.language,
-        category: dto.category,
-        metrics: {
-          dr: dto.domainRating,
-          traffic: dto.monthlyTraffic,
-        },
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.country !== undefined ? { country: dto.country } : {}),
+        ...(dto.language !== undefined ? { language: dto.language } : {}),
       },
     })
 
@@ -400,31 +392,18 @@ export class WebsitesService {
       await this.prisma.marketplaceListing.update({
         where: { id: listing.id },
         data: {
-          domainRating: dto.domainRating,
-          traffic: dto.monthlyTraffic,
-          country: dto.country,
-          language: dto.language,
-          websiteUrl: dto.url,
+          ...(dto.country !== undefined ? { country: dto.country } : {}),
+          ...(dto.language !== undefined ? { language: dto.language } : {}),
+          ...(dto.url !== undefined ? { websiteUrl: dto.url } : {}),
         },
       })
-      if (dto.price != null || dto.turnaroundDays != null) {
-        await this.prisma.listingService.updateMany({
-          where: { listingId: listing.id },
-          data: {
-            ...(dto.price != null ? { price: dto.price } : {}),
-            ...(dto.turnaroundDays != null
-              ? { turnaroundDays: dto.turnaroundDays }
-              : {}),
-          },
-        })
-      }
     }
 
     await this.audit.log({
       action: "WEBSITE_UPDATED",
       entityType: "Website",
       entityId: id,
-      metadata: { url: dto.url },
+      metadata: { url: dto.url ?? website.url },
       userId: user.id,
       organizationId,
     })
@@ -456,7 +435,7 @@ export class WebsitesService {
           orderBy: { createdAt: "desc" },
           take: 1,
           include: {
-            category: true,
+            categories: { include: { category: true } },
             services: {
               orderBy: [{ availability: "asc" }, { price: "asc" }],
             },
@@ -564,6 +543,8 @@ export class WebsitesService {
       listing: listing
         ? {
             ...listing,
+            categories: listing.categories.map((item) => item.category),
+            category: listing.categories[0]?.category ?? null,
             services: listing.services.map((service) => ({
               ...service,
               price: Number(service.price),
@@ -594,7 +575,7 @@ export class WebsitesService {
     if (!publisher || publisher.organizationId !== organizationId) {
       throw new NotFoundException("Publisher not found")
     }
-    return this.prisma.website.findMany({
+    const websites = await this.prisma.website.findMany({
       where: { publisherId },
       include: {
         // Phase 7: legacy price + turnaroundDays selectors were dropped.
@@ -608,8 +589,10 @@ export class WebsitesService {
             description: true,
             status: true,
             ownerType: true,
-            category: {
-              select: { id: true, name: true, slug: true },
+            categories: {
+              select: {
+                category: { select: { id: true, name: true, slug: true } },
+              },
             },
             services: {
               select: {
@@ -629,6 +612,13 @@ export class WebsitesService {
       },
       orderBy: { createdAt: "desc" },
     })
+    return websites.map((website) => ({
+      ...website,
+      marketplaceListings: website.marketplaceListings.map((listing) => {
+        const categories = listing.categories.map((item) => item.category)
+        return { ...listing, categories, category: categories[0] ?? null }
+      }),
+    }))
   }
 
   async deleteWebsite(
@@ -705,6 +695,7 @@ export class WebsitesService {
     const listing = await this.prisma.marketplaceListing.findFirst({
       where: { websiteId: id, status: ListingStatus.DRAFT },
       include: {
+        categories: { select: { categoryId: true } },
         services: {
           where: { availability: "AVAILABLE" },
           select: { id: true },
@@ -725,10 +716,21 @@ export class WebsitesService {
         message: "Add at least one available service before submitting",
       })
     }
-    if (!listing.categoryId) {
+    if (listing.categories.length < 1 || listing.categories.length > 7) {
       throw new BadRequestException({
-        code: "LISTING_CATEGORY_REQUIRED",
-        message: "Choose a marketplace category before submitting",
+        code: "LISTING_CATEGORIES_REQUIRED",
+        message:
+          "Choose between 1 and 7 marketplace categories before submitting",
+      })
+    }
+    if (
+      !isMarketplaceLanguage(listing.language) ||
+      !hasCompleteListingPolicy(listing)
+    ) {
+      throw new BadRequestException({
+        code: "LISTING_POLICY_REQUIRED",
+        message:
+          "Choose a primary language and complete every listing policy before submitting",
       })
     }
     if (!listing.description.trim() || listing.description.length > 500) {

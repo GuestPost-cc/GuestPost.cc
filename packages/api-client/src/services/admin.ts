@@ -423,6 +423,24 @@ export interface AdminPlatformWebsiteResponse {
     slug: string
     description: string
     status: string
+    categories: Array<{ id: string; name: string; slug: string }>
+    category?: { id: string; name: string; slug: string } | null
+    language?: string | null
+    sportsGamingAllowed?: boolean | null
+    pharmacyAllowed?: boolean | null
+    cryptoAllowed?: boolean | null
+    backlinkCount?: number | null
+    linkType?: "DOFOLLOW" | "NOFOLLOW" | "SPONSORED" | "UGC" | null
+    linkValidity?:
+      | "PERMANENT"
+      | "FIVE_YEARS"
+      | "ONE_YEAR"
+      | "SIX_MONTHS"
+      | "THREE_MONTHS"
+      | null
+    googleNews?: boolean | null
+    markedSponsored?: boolean | null
+    foreignLanguageAllowed?: boolean | null
     services: AdminPlatformListingServiceResponse[]
   } | null
   integrations: Array<{
@@ -800,11 +818,25 @@ export class AdminService {
   createPlatformWebsite(data: {
     url: string
     name?: string
-    category?: string
-    language?: string
+    listingTitle: string
+    description: string
+    categoryIds: string[]
+    language: string
     country?: string
-    domainRating?: number
-    monthlyTraffic?: number
+    sportsGamingAllowed: boolean
+    pharmacyAllowed: boolean
+    cryptoAllowed: boolean
+    backlinkCount: number
+    linkType: "DOFOLLOW" | "NOFOLLOW" | "SPONSORED" | "UGC"
+    linkValidity:
+      | "PERMANENT"
+      | "FIVE_YEARS"
+      | "ONE_YEAR"
+      | "SIX_MONTHS"
+      | "THREE_MONTHS"
+    googleNews: boolean
+    markedSponsored: boolean
+    foreignLanguageAllowed: boolean
     managedByUserId?: string
   }) {
     return this.client.post<any>("/admin/websites", { json: data })
@@ -818,11 +850,25 @@ export class AdminService {
     websiteId: string,
     data: {
       name?: string
-      category?: string
+      listingTitle?: string
+      description?: string
+      categoryIds?: string[]
       language?: string
       country?: string
-      domainRating?: number
-      monthlyTraffic?: number
+      sportsGamingAllowed?: boolean
+      pharmacyAllowed?: boolean
+      cryptoAllowed?: boolean
+      backlinkCount?: number
+      linkType?: "DOFOLLOW" | "NOFOLLOW" | "SPONSORED" | "UGC"
+      linkValidity?:
+        | "PERMANENT"
+        | "FIVE_YEARS"
+        | "ONE_YEAR"
+        | "SIX_MONTHS"
+        | "THREE_MONTHS"
+      googleNews?: boolean
+      markedSponsored?: boolean
+      foreignLanguageAllowed?: boolean
     },
   ) {
     return this.client.put<AdminPlatformWebsiteResponse>(

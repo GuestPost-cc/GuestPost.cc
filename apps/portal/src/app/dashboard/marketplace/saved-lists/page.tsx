@@ -32,9 +32,10 @@ interface SavedListItem {
     priceFrom?: number | null
     serviceTypes?: string[]
     currency: string
-    domainRating?: number
     image?: string
     category?: { name: string }
+    categories?: { name: string }[]
+    language?: string
     avgRating?: number
     reviewCount: number
   }
@@ -303,14 +304,19 @@ export default function SavedListsPage() {
                         </h3>
                       </Link>
                       <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                        {item.listing.category && (
-                          <span>{item.listing.category.name}</span>
-                        )}
-                        {item.listing.domainRating && (
-                          <>
-                            <span>•</span>
-                            <span>DR {item.listing.domainRating}</span>
-                          </>
+                        <span>
+                          {(
+                            item.listing.categories ??
+                            (item.listing.category
+                              ? [item.listing.category]
+                              : [])
+                          )
+                            .map((category) => category.name)
+                            .slice(0, 2)
+                            .join(", ")}
+                        </span>
+                        {item.listing.language && (
+                          <span>• {item.listing.language}</span>
                         )}
                       </div>
                       {item.note && (

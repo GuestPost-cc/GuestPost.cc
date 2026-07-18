@@ -317,20 +317,20 @@ async function main() {
 
     const categories = [
       {
-        name: "Technology",
-        slug: "technology",
+        name: "Technology & Gadgets",
+        slug: "technology-and-gadgets",
         description: "Tech blogs and publications",
         sortOrder: 1,
       },
       {
-        name: "Health & Wellness",
-        slug: "health-wellness",
+        name: "Health & Fitness",
+        slug: "health-and-fitness",
         description: "Health publications",
         sortOrder: 2,
       },
       {
-        name: "Finance",
-        slug: "finance",
+        name: "Banking & Finance",
+        slug: "banking-and-finance",
         description: "Finance and investing sites",
         sortOrder: 3,
       },
@@ -359,24 +359,8 @@ async function main() {
         domainRating: 72,
         traffic: 145000,
         country: "US",
-        language: "en",
-        categoryId: catIds.technology,
-        websiteId: siteIds[0],
-      },
-      {
-        title: "Niche Edit on Tech Insider",
-        slug: "niche-edit-tech-insider",
-        description:
-          "Contextual link inserted into existing aged article on Tech Insider.",
-        shortDescription: "Link insert in aged content",
-        services: [
-          { serviceType: "NICHE_EDIT" as const, price: 180, turnaroundDays: 5 },
-        ],
-        domainRating: 72,
-        traffic: 145000,
-        country: "US",
-        language: "en",
-        categoryId: catIds.technology,
+        language: "English",
+        categoryIds: [catIds["technology-and-gadgets"]],
         websiteId: siteIds[0],
       },
       {
@@ -395,8 +379,8 @@ async function main() {
         domainRating: 64,
         traffic: 89000,
         country: "UK",
-        language: "en",
-        categoryId: catIds["health-wellness"],
+        language: "English",
+        categoryIds: [catIds["health-and-fitness"]],
         websiteId: siteIds[1],
       },
       {
@@ -415,13 +399,13 @@ async function main() {
         domainRating: 78,
         traffic: 210000,
         country: "US",
-        language: "en",
-        categoryId: catIds.finance,
+        language: "English",
+        categoryIds: [catIds["banking-and-finance"]],
         websiteId: siteIds[2],
       },
     ]
     for (const l of listings) {
-      const { services, ...listingFields } = l
+      const { services, categoryIds, ...listingFields } = l
       await prisma.marketplaceListing.upsert({
         where: { slug: l.slug },
         create: {
@@ -430,6 +414,18 @@ async function main() {
           fulfillmentType: "PUBLISHER",
           publisherId,
           publishedAt: new Date(),
+          sportsGamingAllowed: false,
+          pharmacyAllowed: false,
+          cryptoAllowed: false,
+          backlinkCount: 1,
+          linkType: "DOFOLLOW",
+          linkValidity: "PERMANENT",
+          googleNews: false,
+          markedSponsored: false,
+          foreignLanguageAllowed: false,
+          categories: {
+            create: categoryIds.map((categoryId) => ({ categoryId })),
+          },
           services: {
             create: services.map((s) => ({
               serviceType: s.serviceType,
@@ -440,7 +436,25 @@ async function main() {
             })),
           },
         },
-        update: { status: "APPROVED", publisherId, websiteId: l.websiteId },
+        update: {
+          status: "APPROVED",
+          publisherId,
+          websiteId: l.websiteId,
+          language: l.language,
+          sportsGamingAllowed: false,
+          pharmacyAllowed: false,
+          cryptoAllowed: false,
+          backlinkCount: 1,
+          linkType: "DOFOLLOW",
+          linkValidity: "PERMANENT",
+          googleNews: false,
+          markedSponsored: false,
+          foreignLanguageAllowed: false,
+          categories: {
+            deleteMany: {},
+            create: categoryIds.map((categoryId) => ({ categoryId })),
+          },
+        },
       })
       console.log(`  listing: ${l.title}`)
     }

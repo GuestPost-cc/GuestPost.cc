@@ -127,6 +127,11 @@ export {
 export { LoadingState } from "./components/loading-state"
 export type { LoginFormProps } from "./components/login-form"
 export { LoginForm } from "./components/login-form"
+export type {
+  MultiSelectOption,
+  MultiSelectProps,
+} from "./components/multi-select"
+export { MultiSelect } from "./components/multi-select"
 export type { NavItemProps } from "./components/nav-item"
 export { NavItem } from "./components/nav-item"
 export type {

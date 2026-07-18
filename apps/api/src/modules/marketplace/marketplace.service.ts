@@ -12,6 +12,11 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
+import {
+  hasCompleteListingPolicy,
+  isMarketplaceLanguage,
+  requireActiveMarketplaceCategories,
+} from "../../common/utils/marketplace-categories"
 import { slugify } from "../../common/utils/slugify"
 import { QueueService } from "../queues/queue.service"
 import {
@@ -59,8 +64,13 @@ export class MarketplaceService {
       services,
       website,
       status,
+      categories: categoryLinks,
       ...rest
     } = listing
+
+    const categories = Array.isArray(categoryLinks)
+      ? categoryLinks.map((link: any) => link.category ?? link)
+      : []
 
     // Phase 6 derived UI phase. Computed from (status, ownerType, website
     // verification, count of AVAILABLE services) — single source of truth
@@ -85,6 +95,25 @@ export class MarketplaceService {
     const serviceTypes = Array.from(
       new Set(availableServices.map((s: any) => s.serviceType)),
     )
+    const gscMetrics =
+      metricsData &&
+      typeof metricsData === "object" &&
+      (metricsData as any).source === "GSC"
+        ? {
+            clicks: Number((metricsData as any).clicks ?? 0),
+            impressions: Number((metricsData as any).impressions ?? 0),
+          }
+        : undefined
+    const ga4Metrics =
+      trafficData &&
+      typeof trafficData === "object" &&
+      (trafficData as any).source === "GA4"
+        ? {
+            sessions: Number((trafficData as any).sessions ?? 0),
+            users: Number((trafficData as any).users ?? 0),
+            pageviews: Number((trafficData as any).pageviews ?? 0),
+          }
+        : undefined
 
     return {
       ...rest,
@@ -92,6 +121,14 @@ export class MarketplaceService {
       lifecyclePhase,
       priceFrom,
       serviceTypes,
+      categories,
+      // Temporary compatibility projection for older card/detail consumers.
+      // New writes and filters use categories[] exclusively.
+      category: categories[0] ?? null,
+      siteMetrics:
+        gscMetrics || ga4Metrics
+          ? { periodDays: 30, gsc: gscMetrics, ga4: ga4Metrics }
+          : undefined,
       // Listing-level attribution: PLATFORM-owned listings render as
       // "Listed by GuestPost.cc"; PUBLISHER-owned expose the publisher card.
       ownerType,
@@ -137,6 +174,13 @@ export class MarketplaceService {
     return rest
   }
 
+  private withCategoryProjection(listing: any) {
+    const categories = Array.isArray(listing?.categories)
+      ? listing.categories.map((link: any) => link.category ?? link)
+      : []
+    return { ...listing, categories, category: categories[0] ?? null }
+  }
+
   // Lightweight read used by the order-creation UI to power the service
   // picker on the listing detail page. Returns AVAILABLE + WAITLIST rows
   // only; PAUSED is hidden from buyers. Listing must be APPROVED — drafts
@@ -171,10 +215,21 @@ export class MarketplaceService {
     const {
       query,
       category,
+      categories,
       type,
       tags,
       country,
       language,
+      languages,
+      sportsGamingAllowed,
+      pharmacyAllowed,
+      cryptoAllowed,
+      backlinkCounts,
+      linkTypes,
+      linkValidities,
+      googleNews,
+      markedSponsored,
+      foreignLanguageAllowed,
       minPrice,
       maxPrice,
       minDR,
@@ -191,8 +246,15 @@ export class MarketplaceService {
       status: ListingStatus.APPROVED,
     }
 
-    if (category) {
-      where.category = { slug: category }
+    const categorySlugs = categories?.length
+      ? categories
+      : category
+        ? [category]
+        : []
+    if (categorySlugs.length > 0) {
+      where.categories = {
+        some: { category: { slug: { in: categorySlugs } } },
+      }
     }
 
     if (ownershipType) {
@@ -203,9 +265,26 @@ export class MarketplaceService {
       where.country = { equals: country, mode: "insensitive" }
     }
 
-    if (language) {
-      where.language = { equals: language, mode: "insensitive" }
+    const languageValues = languages?.length
+      ? languages
+      : language
+        ? [language]
+        : []
+    if (languageValues.length > 0) {
+      where.language = { in: languageValues, mode: "insensitive" }
     }
+
+    if (sportsGamingAllowed !== undefined)
+      where.sportsGamingAllowed = sportsGamingAllowed
+    if (pharmacyAllowed !== undefined) where.pharmacyAllowed = pharmacyAllowed
+    if (cryptoAllowed !== undefined) where.cryptoAllowed = cryptoAllowed
+    if (backlinkCounts?.length) where.backlinkCount = { in: backlinkCounts }
+    if (linkTypes?.length) where.linkType = { in: linkTypes }
+    if (linkValidities?.length) where.linkValidity = { in: linkValidities }
+    if (googleNews !== undefined) where.googleNews = googleNews
+    if (markedSponsored !== undefined) where.markedSponsored = markedSponsored
+    if (foreignLanguageAllowed !== undefined)
+      where.foreignLanguageAllowed = foreignLanguageAllowed
 
     // ── Phase 6 service-level filtering ──────────────────────────────────
     // The customer's price / TAT / serviceType picker keys off
@@ -248,7 +327,13 @@ export class MarketplaceService {
         { title: { contains: query, mode: "insensitive" } },
         { description: { contains: query, mode: "insensitive" } },
         { slug: { contains: query, mode: "insensitive" } },
-        { category: { name: { contains: query, mode: "insensitive" } } },
+        {
+          categories: {
+            some: {
+              category: { name: { contains: query, mode: "insensitive" } },
+            },
+          },
+        },
         {
           tags: {
             some: { tag: { name: { contains: query, mode: "insensitive" } } },
@@ -281,11 +366,11 @@ export class MarketplaceService {
         orderBy = [{ reviews: { _count: "desc" } }]
         break
       default:
-        orderBy = [{ featured: "desc" }, { domainRating: "desc" }]
+        orderBy = [{ featured: "desc" }, { traffic: "desc" }]
     }
 
     const include = {
-      category: true,
+      categories: { include: { category: true } },
       tags: { include: { tag: true } },
       images: { where: { isPrimary: true }, take: 1 },
       reviews: { where: { status: "APPROVED" }, select: { rating: true } },
@@ -371,12 +456,20 @@ export class MarketplaceService {
       Prisma.sql`service."availability" = ${ServiceAvailability.AVAILABLE}::"ServiceAvailability"`,
     ]
 
-    if (dto.category) {
+    const categorySlugs = dto.categories?.length
+      ? dto.categories
+      : dto.category
+        ? [dto.category]
+        : []
+    if (categorySlugs.length > 0) {
       listingConditions.push(
         Prisma.sql`EXISTS (
-          SELECT 1 FROM "MarketplaceCategory" category
-          WHERE category."id" = listing."categoryId"
-            AND category."slug" = ${dto.category}
+          SELECT 1
+          FROM "MarketplaceListingCategory" listing_category
+          JOIN "MarketplaceCategory" category
+            ON category."id" = listing_category."categoryId"
+          WHERE listing_category."listingId" = listing."id"
+            AND category."slug" IN (${Prisma.join(categorySlugs)})
         )`,
       )
     }
@@ -392,9 +485,61 @@ export class MarketplaceService {
     if (dto.country) {
       listingConditions.push(Prisma.sql`listing."country" ILIKE ${dto.country}`)
     }
-    if (dto.language) {
+    const languages = dto.languages?.length
+      ? dto.languages
+      : dto.language
+        ? [dto.language]
+        : []
+    if (languages.length > 0) {
       listingConditions.push(
-        Prisma.sql`listing."language" ILIKE ${dto.language}`,
+        Prisma.sql`lower(listing."language") IN (${Prisma.join(
+          languages.map((value) => value.toLowerCase()),
+        )})`,
+      )
+    }
+    if (dto.sportsGamingAllowed !== undefined) {
+      listingConditions.push(
+        Prisma.sql`listing."sportsGamingAllowed" = ${dto.sportsGamingAllowed}`,
+      )
+    }
+    if (dto.pharmacyAllowed !== undefined) {
+      listingConditions.push(
+        Prisma.sql`listing."pharmacyAllowed" = ${dto.pharmacyAllowed}`,
+      )
+    }
+    if (dto.cryptoAllowed !== undefined) {
+      listingConditions.push(
+        Prisma.sql`listing."cryptoAllowed" = ${dto.cryptoAllowed}`,
+      )
+    }
+    if (dto.backlinkCounts?.length) {
+      listingConditions.push(
+        Prisma.sql`listing."backlinkCount" IN (${Prisma.join(dto.backlinkCounts)})`,
+      )
+    }
+    if (dto.linkTypes?.length) {
+      listingConditions.push(
+        Prisma.sql`listing."linkType"::text IN (${Prisma.join(dto.linkTypes)})`,
+      )
+    }
+    if (dto.linkValidities?.length) {
+      listingConditions.push(
+        Prisma.sql`listing."linkValidity"::text IN (${Prisma.join(dto.linkValidities)})`,
+      )
+    }
+    if (dto.googleNews !== undefined) {
+      listingConditions.push(
+        Prisma.sql`listing."googleNews" = ${dto.googleNews}`,
+      )
+    }
+    if (dto.markedSponsored !== undefined) {
+      listingConditions.push(
+        Prisma.sql`listing."markedSponsored" = ${dto.markedSponsored}`,
+      )
+    }
+    if (dto.foreignLanguageAllowed !== undefined) {
+      listingConditions.push(
+        Prisma.sql`listing."foreignLanguageAllowed" = ${dto.foreignLanguageAllowed}`,
       )
     }
     if (dto.minDR !== undefined) {
@@ -425,8 +570,11 @@ export class MarketplaceService {
           OR listing."description" ILIKE ${pattern}
           OR listing."slug" ILIKE ${pattern}
           OR EXISTS (
-            SELECT 1 FROM "MarketplaceCategory" category
-            WHERE category."id" = listing."categoryId"
+            SELECT 1
+            FROM "MarketplaceListingCategory" listing_category
+            JOIN "MarketplaceCategory" category
+              ON category."id" = listing_category."categoryId"
+            WHERE listing_category."listingId" = listing."id"
               AND category."name" ILIKE ${pattern}
           )
           OR EXISTS (
@@ -491,7 +639,7 @@ export class MarketplaceService {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { slug },
       include: {
-        category: true,
+        categories: { include: { category: true } },
         tags: { include: { tag: true } },
         images: { orderBy: { sortOrder: "asc" } },
         reviews: {
@@ -507,14 +655,14 @@ export class MarketplaceService {
       },
     })
     if (!listing) throw new NotFoundException("Listing not found")
-    return { ...listing, relatedListings: [] }
+    return { ...this.withCategoryProjection(listing), relatedListings: [] }
   }
 
   async getListing(slug: string, userId?: string) {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { slug },
       include: {
-        category: true,
+        categories: { include: { category: true } },
         tags: { include: { tag: true } },
         images: { orderBy: { sortOrder: "asc" } },
         reviews: {
@@ -562,12 +710,21 @@ export class MarketplaceService {
     const ownServiceTypes = (listing.services ?? [])
       .filter((s: any) => s.availability === "AVAILABLE")
       .map((s: any) => s.serviceType)
+    const ownCategoryIds = listing.categories.map((link) => link.categoryId)
     const relatedListings = await this.prisma.marketplaceListing.findMany({
       where: {
         id: { not: listing.id },
         status: ListingStatus.APPROVED,
         OR: [
-          { categoryId: listing.categoryId },
+          ...(ownCategoryIds.length > 0
+            ? [
+                {
+                  categories: {
+                    some: { categoryId: { in: ownCategoryIds } },
+                  },
+                },
+              ]
+            : []),
           ...(ownServiceTypes.length > 0
             ? [
                 {
@@ -584,7 +741,7 @@ export class MarketplaceService {
       },
       take: 4,
       include: {
-        category: true,
+        categories: { include: { category: true } },
         images: { where: { isPrimary: true }, take: 1 },
         tags: { include: { tag: true } },
         reviews: {
@@ -726,6 +883,12 @@ export class MarketplaceService {
     const data: any = { ...dto }
     delete data.tags
     delete data.services
+    delete data.categoryIds
+
+    const categories = await requireActiveMarketplaceCategories(
+      this.prisma,
+      dto.categoryIds,
+    )
 
     const services = this.resolveServicesInput(dto)
 
@@ -745,9 +908,14 @@ export class MarketplaceService {
             }
           : undefined,
         services: this.listingServicesCreateMany(services),
+        categories: {
+          create: categories.map((category) => ({
+            category: { connect: { id: category.id } },
+          })),
+        },
       },
       include: {
-        category: true,
+        categories: { include: { category: true } },
         tags: { include: { tag: true } },
         services: true,
       },
@@ -764,7 +932,7 @@ export class MarketplaceService {
       },
     )
 
-    return listing
+    return this.withCategoryProjection(listing)
   }
 
   async updateListing(
@@ -809,53 +977,72 @@ export class MarketplaceService {
       }
     }
 
-    if (dto.categoryId) {
-      const category = await this.prisma.marketplaceCategory.findUnique({
-        where: { id: dto.categoryId },
-        select: { id: true },
-      })
-      if (!category) {
-        throw new BadRequestException({
-          code: "INVALID_MARKETPLACE_CATEGORY",
-          message: "Select a valid marketplace category",
-        })
-      }
-    }
+    const categories = await requireActiveMarketplaceCategories(
+      this.prisma,
+      dto.categoryIds,
+    )
 
     // Publisher metadata writes are deliberately allowlisted. Lifecycle,
     // ownership, verification, featured state, website association, metrics,
     // and service rows are controlled by their dedicated workflows and cannot
     // be smuggled through this general update endpoint.
-    const updateData: Prisma.MarketplaceListingUncheckedUpdateInput = {
+    const updateData: Prisma.MarketplaceListingUpdateInput = {
       title: dto.title.trim(),
       description: dto.description.trim(),
+      language: dto.language,
+      sportsGamingAllowed: dto.sportsGamingAllowed,
+      pharmacyAllowed: dto.pharmacyAllowed,
+      cryptoAllowed: dto.cryptoAllowed,
+      backlinkCount: dto.backlinkCount,
+      linkType: dto.linkType,
+      linkValidity: dto.linkValidity,
+      googleNews: dto.googleNews,
+      markedSponsored: dto.markedSponsored,
+      foreignLanguageAllowed: dto.foreignLanguageAllowed,
       ...(dto.shortDescription !== undefined
         ? { shortDescription: dto.shortDescription.trim() || null }
         : {}),
-      ...(dto.categoryId !== undefined ? { categoryId: dto.categoryId } : {}),
       ...(dto.doFollowOnly !== undefined
         ? { doFollowOnly: dto.doFollowOnly }
         : {}),
       ...(dto.sampleUrl !== undefined ? { sampleUrl: dto.sampleUrl } : {}),
     }
 
-    const updated = await this.prisma.marketplaceListing.update({
-      where: { id: listingId },
-      data: {
-        ...updateData,
-        tags: dto.tags
-          ? {
-              deleteMany: {},
-              create: dto.tags.map((tagId) => ({
-                tag: { connect: { id: tagId } },
-              })),
-            }
-          : undefined,
-      },
-      include: {
-        category: true,
-        tags: { include: { tag: true } },
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.marketplaceListing.update({
+        where: { id: listingId },
+        data: {
+          ...updateData,
+          categories: {
+            deleteMany: {},
+            create: categories.map((category) => ({
+              category: { connect: { id: category.id } },
+            })),
+          },
+          tags: dto.tags
+            ? {
+                deleteMany: {},
+                create: dto.tags.map((tagId) => ({
+                  tag: { connect: { id: tagId } },
+                })),
+              }
+            : undefined,
+        },
+        include: {
+          categories: { include: { category: true } },
+          tags: { include: { tag: true } },
+        },
+      })
+      if (listing.websiteId) {
+        await tx.website.update({
+          where: { id: listing.websiteId },
+          data: {
+            language: dto.language,
+            category: categories.map((category) => category.name).join(", "),
+          },
+        })
+      }
+      return row
     })
 
     await this.createAuditLog(
@@ -867,8 +1054,10 @@ export class MarketplaceService {
         changes: [
           "title",
           "description",
+          "categoryIds",
+          "language",
+          "listingPolicy",
           ...(dto.shortDescription !== undefined ? ["shortDescription"] : []),
-          ...(dto.categoryId !== undefined ? ["categoryId"] : []),
           ...(dto.tags !== undefined ? ["tags"] : []),
           ...(dto.doFollowOnly !== undefined ? ["doFollowOnly"] : []),
           ...(dto.sampleUrl !== undefined ? ["sampleUrl"] : []),
@@ -876,7 +1065,7 @@ export class MarketplaceService {
       },
     )
 
-    return updated
+    return this.withCategoryProjection(updated)
   }
 
   // ── ListingService helpers (Phase 2 dual-write) ────────────────────────
@@ -1212,10 +1401,21 @@ export class MarketplaceService {
           "Add at least one available service before submitting for review.",
       })
     }
-    if (!listing.categoryId) {
+    if (listing.categories.length < 1 || listing.categories.length > 7) {
       throw new BadRequestException({
-        code: "LISTING_CATEGORY_REQUIRED",
-        message: "Choose a marketplace category before submitting for review.",
+        code: "LISTING_CATEGORIES_REQUIRED",
+        message:
+          "Choose between 1 and 7 marketplace categories before submitting for review.",
+      })
+    }
+    if (
+      !isMarketplaceLanguage(listing.language) ||
+      !hasCompleteListingPolicy(listing)
+    ) {
+      throw new BadRequestException({
+        code: "LISTING_POLICY_REQUIRED",
+        message:
+          "Choose a primary language and complete every listing policy before submitting for review.",
       })
     }
     if (!listing.description.trim() || listing.description.length > 500) {
@@ -1363,6 +1563,7 @@ export class MarketplaceService {
       where: { id: listingId },
       include: {
         website: { select: { verificationStatus: true, ownershipType: true } },
+        categories: { select: { categoryId: true } },
       },
     })
     if (!listing) throw new NotFoundException("Listing not found")
@@ -1508,12 +1709,12 @@ export class MarketplaceService {
   // =============================================================================
 
   async getFavorites(userId: string) {
-    return this.prisma.marketplaceFavorite.findMany({
+    const favorites = await this.prisma.marketplaceFavorite.findMany({
       where: { userId },
       include: {
         listing: {
           include: {
-            category: true,
+            categories: { include: { category: true } },
             images: { where: { isPrimary: true }, take: 1 },
             tags: { include: { tag: true } },
             // Phase 7.12 (#20): include services so the favorites page can
@@ -1540,6 +1741,10 @@ export class MarketplaceService {
         },
       },
     })
+    return favorites.map((favorite) => ({
+      ...favorite,
+      listing: this.withCategoryProjection(favorite.listing),
+    }))
   }
 
   async addFavorite(
@@ -1639,14 +1844,14 @@ export class MarketplaceService {
   // =============================================================================
 
   async getSavedLists(userId: string) {
-    return this.prisma.marketplaceSavedList.findMany({
+    const lists = await this.prisma.marketplaceSavedList.findMany({
       where: { userId },
       include: {
         items: {
           include: {
             listing: {
               include: {
-                category: true,
+                categories: { include: { category: true } },
                 images: { where: { isPrimary: true }, take: 1 },
               },
             },
@@ -1655,6 +1860,13 @@ export class MarketplaceService {
         },
       },
     })
+    return lists.map((list) => ({
+      ...list,
+      items: list.items.map((item) => ({
+        ...item,
+        listing: this.withCategoryProjection(item.listing),
+      })),
+    }))
   }
 
   async createSavedList(userId: string, dto: CreateSavedListDto) {
@@ -1722,19 +1934,20 @@ export class MarketplaceService {
     // ListingType column. Now: any APPROVED listing with INTERNAL
     // fulfillment that offers ≥1 AVAILABLE service qualifies — the
     // listing-level `type` is gone.
-    return this.prisma.marketplaceListing.findMany({
+    const listings = await this.prisma.marketplaceListing.findMany({
       where: {
         status: ListingStatus.APPROVED,
         fulfillmentType: "INTERNAL",
         services: { some: { availability: "AVAILABLE" } },
       },
       include: {
-        category: true,
+        categories: { include: { category: true } },
         images: { where: { isPrimary: true }, take: 1 },
         services: { where: { availability: "AVAILABLE" } },
       },
       orderBy: { featured: "desc" },
     })
+    return listings.map((listing) => this.withCategoryProjection(listing))
   }
 
   // =============================================================================
@@ -1767,7 +1980,7 @@ export class MarketplaceService {
     const listings = await this.prisma.marketplaceListing.findMany({
       where,
       include: {
-        category: true,
+        categories: { include: { category: true } },
         images: { where: { isPrimary: true }, take: 1 },
         tags: { include: { tag: true } },
         reviews: { where: { status: "APPROVED" }, select: { rating: true } },
@@ -1830,7 +2043,7 @@ export class MarketplaceService {
       const listings = await this.prisma.marketplaceListing.findMany({
         where: { id: { in: listingIds } },
         include: {
-          category: true,
+          categories: { include: { category: true } },
           images: { where: { isPrimary: true }, take: 1 },
           tags: { include: { tag: true } },
         },
@@ -1843,7 +2056,7 @@ export class MarketplaceService {
           const listing = listingMap.get(r.listingId)
           if (!listing) return null
           return {
-            ...listing,
+            ...this.withCategoryProjection(listing),
             tags: listing.tags.map((t: any) => t.tag),
             image: listing.images[0]?.url || null,
             recommendationScore: r.score,
@@ -1869,6 +2082,7 @@ export class MarketplaceService {
       const listing = await this.prisma.marketplaceListing.findUnique({
         where: { id: listingId },
         include: {
+          categories: { select: { categoryId: true } },
           services: {
             where: { availability: "AVAILABLE" },
             select: { serviceType: true },
@@ -1877,13 +2091,22 @@ export class MarketplaceService {
       })
       if (!listing) return []
       const ownServiceTypes = listing.services.map((s) => s.serviceType)
+      const ownCategoryIds = listing.categories.map((item) => item.categoryId)
 
-      return this.prisma.marketplaceListing.findMany({
+      const recommendations = await this.prisma.marketplaceListing.findMany({
         where: {
           id: { not: listingId },
           status: ListingStatus.APPROVED,
           OR: [
-            { categoryId: listing.categoryId },
+            ...(ownCategoryIds.length > 0
+              ? [
+                  {
+                    categories: {
+                      some: { categoryId: { in: ownCategoryIds } },
+                    },
+                  },
+                ]
+              : []),
             ...(ownServiceTypes.length > 0
               ? [
                   {
@@ -1900,13 +2123,19 @@ export class MarketplaceService {
           ],
         },
         include: {
-          category: true,
+          categories: { include: { category: true } },
           images: { where: { isPrimary: true }, take: 1 },
           tags: { include: { tag: true } },
         },
         take: limit,
-        orderBy: { domainRating: "desc" },
+        orderBy: { traffic: "desc" },
       })
+
+      return recommendations.map((recommendation) => ({
+        ...this.withCategoryProjection(recommendation),
+        tags: recommendation.tags.map((tag) => tag.tag),
+        image: recommendation.images[0]?.url || null,
+      }))
     }
 
     // Trending - get most viewed in last 7 days
@@ -1926,7 +2155,7 @@ export class MarketplaceService {
         status: ListingStatus.APPROVED,
       },
       include: {
-        category: true,
+        categories: { include: { category: true } },
         images: { where: { isPrimary: true }, take: 1 },
         tags: { include: { tag: true } },
       },
@@ -1938,7 +2167,7 @@ export class MarketplaceService {
         const listing = listings.find((l) => l.id === t.listingId)
         if (!listing) return null
         return {
-          ...listing,
+          ...this.withCategoryProjection(listing),
           tags: listing.tags.map((tag) => tag.tag),
           image: listing.images[0]?.url || null,
         }
@@ -1985,21 +2214,20 @@ export class MarketplaceService {
       }),
     ])
 
-    const topCategories = await this.prisma.marketplaceListing.groupBy({
+    const topCategories = await this.prisma.marketplaceListingCategory.groupBy({
       by: ["categoryId"],
-      where: { status: ListingStatus.APPROVED, categoryId: { not: null } },
-      _count: { id: true },
-      orderBy: { _count: { id: "desc" } },
+      where: { listing: { status: ListingStatus.APPROVED } },
+      _count: { listingId: true },
+      orderBy: { _count: { listingId: "desc" } },
       take: 5,
     })
 
     const categoryData = await Promise.all(
       topCategories.map(async (c) => {
-        if (!c.categoryId) return null
         const category = await this.prisma.marketplaceCategory.findUnique({
           where: { id: c.categoryId },
         })
-        return { category, count: c._count.id }
+        return { category, count: c._count.listingId }
       }),
     )
 

@@ -3,8 +3,17 @@
 import type {
   AdminPlatformListingServiceResponse,
   AdminPlatformWebsiteResponse,
+  Category,
   IntegrationListResponse,
 } from "@guestpost/api-client"
+import {
+  LISTING_LINK_TYPE_LABELS,
+  LISTING_LINK_TYPES,
+  LISTING_LINK_VALIDITIES,
+  LISTING_LINK_VALIDITY_LABELS,
+  MARKETPLACE_CATEGORY_LIMIT,
+  MARKETPLACE_LANGUAGES,
+} from "@guestpost/shared"
 import {
   Badge,
   Button,
@@ -15,6 +24,7 @@ import {
   CardTitle,
   Input,
   Label,
+  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -27,6 +37,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -40,7 +51,7 @@ import {
   Unlink,
 } from "lucide-react"
 import Link from "next/link"
-import { use, useState } from "react"
+import { use, useEffect, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
@@ -59,6 +70,96 @@ const SERVICE_TYPES = [
 
 type GoogleProvider = "GOOGLE_SEARCH_CONSOLE" | "GOOGLE_ANALYTICS"
 type PlatformIntegrationSummary = { id: string; provider: string }
+
+function platformListingDetails(
+  listing: NonNullable<AdminPlatformWebsiteResponse["listing"]>,
+) {
+  return {
+    title: listing.title,
+    description: listing.description,
+    categoryIds:
+      listing.categories?.map((category) => category.id) ??
+      (listing.category ? [listing.category.id] : []),
+    language: listing.language ?? "English",
+    sportsGamingAllowed: listing.sportsGamingAllowed ?? false,
+    pharmacyAllowed: listing.pharmacyAllowed ?? false,
+    cryptoAllowed: listing.cryptoAllowed ?? false,
+    backlinkCount: listing.backlinkCount ?? 1,
+    linkType: listing.linkType ?? ("DOFOLLOW" as const),
+    linkValidity: listing.linkValidity ?? ("PERMANENT" as const),
+    googleNews: listing.googleNews ?? false,
+    markedSponsored: listing.markedSponsored ?? false,
+    foreignLanguageAllowed: listing.foreignLanguageAllowed ?? false,
+  }
+}
+
+const YES_NO_OPTIONS = [
+  { value: "no", label: "No" },
+  { value: "yes", label: "Yes" },
+]
+
+function MetadataField({
+  label,
+  children,
+}: {
+  label: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      {children}
+    </div>
+  )
+}
+
+function MetadataSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: readonly { value: string; label: string }[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <MetadataField label={label}>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </MetadataField>
+  )
+}
+
+function BooleanMetadataSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: boolean
+  onChange: (value: boolean) => void
+}) {
+  return (
+    <MetadataSelect
+      label={label}
+      value={value ? "yes" : "no"}
+      options={YES_NO_OPTIONS}
+      onChange={(next) => onChange(next === "yes")}
+    />
+  )
+}
 
 export default function PlatformWebsiteDetailPage({
   params,
@@ -181,6 +282,7 @@ function PlatformWebsiteDetailPageInner({
             <PlatformListingManager
               website={website}
               canEditServices={canManageAssignedSite}
+              canEditMetadata={isSuperAdmin}
               onChanged={invalidateWebsite}
             />
           ) : (
@@ -232,13 +334,16 @@ function PlatformWebsiteDetailPageInner({
 function PlatformListingManager({
   website,
   canEditServices,
+  canEditMetadata,
   onChanged,
 }: {
   website: AdminPlatformWebsiteResponse
   canEditServices: boolean
+  canEditMetadata: boolean
   onChanged: () => void
 }) {
   const listing = website.listing!
+  const [details, setDetails] = useState(() => platformListingDetails(listing))
   const [newService, setNewService] = useState({
     serviceType: "GUEST_POST",
     price: "",
@@ -251,6 +356,38 @@ function PlatformListingManager({
     price: "",
     turnaroundDays: "",
     revisionRounds: "",
+  })
+
+  useEffect(() => setDetails(platformListingDetails(listing)), [listing])
+
+  const categoriesQ = useQuery<Category[]>({
+    queryKey: ["marketplace-categories"],
+    queryFn: () => api.marketplace.getCategories(),
+    enabled: canEditMetadata,
+  })
+
+  const updateDetailsMut = useMutation({
+    mutationFn: () =>
+      api.admin.updatePlatformWebsite(website.id, {
+        listingTitle: details.title.trim(),
+        description: details.description.trim(),
+        categoryIds: details.categoryIds,
+        language: details.language,
+        sportsGamingAllowed: details.sportsGamingAllowed,
+        pharmacyAllowed: details.pharmacyAllowed,
+        cryptoAllowed: details.cryptoAllowed,
+        backlinkCount: details.backlinkCount,
+        linkType: details.linkType,
+        linkValidity: details.linkValidity,
+        googleNews: details.googleNews,
+        markedSponsored: details.markedSponsored,
+        foreignLanguageAllowed: details.foreignLanguageAllowed,
+      }),
+    onSuccess: () => {
+      onChanged()
+      toast.success("Listing details updated")
+    },
+    onError: (error: Error) => toast.error(error.message),
   })
 
   const startEditing = (service: AdminPlatformListingServiceResponse) => {
@@ -333,6 +470,198 @@ function PlatformListingManager({
 
   return (
     <div className="space-y-5">
+      <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
+        <div>
+          <p className="font-medium">Listing details & placement policy</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            One primary language and policy value per listing; choose 1–7
+            categories. Metrics come from linked GSC/GA4 properties.
+          </p>
+        </div>
+        {canEditMetadata ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-2">
+              <MetadataField label="Listing title">
+                <Input
+                  maxLength={200}
+                  value={details.title}
+                  onChange={(event) =>
+                    setDetails((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))
+                  }
+                />
+              </MetadataField>
+              <MetadataField label="Categories">
+                <MultiSelect
+                  options={(categoriesQ.data ?? []).map((category) => ({
+                    value: category.id,
+                    label: category.name,
+                  }))}
+                  value={details.categoryIds}
+                  onValueChange={(categoryIds) =>
+                    setDetails((current) => ({ ...current, categoryIds }))
+                  }
+                  maxSelected={MARKETPLACE_CATEGORY_LIMIT}
+                  placeholder="Choose 1–7 categories"
+                  searchPlaceholder="Search categories..."
+                  disabled={categoriesQ.isLoading || categoriesQ.isError}
+                />
+              </MetadataField>
+            </div>
+            <MetadataField label="Buyer description">
+              <Textarea
+                rows={4}
+                maxLength={500}
+                value={details.description}
+                onChange={(event) =>
+                  setDetails((current) => ({
+                    ...current,
+                    description: event.target.value,
+                  }))
+                }
+              />
+            </MetadataField>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <MetadataSelect
+                label="Primary language"
+                value={details.language}
+                options={MARKETPLACE_LANGUAGES.map((value) => ({
+                  value,
+                  label: value,
+                }))}
+                onChange={(language) =>
+                  setDetails((current) => ({ ...current, language }))
+                }
+              />
+              <BooleanMetadataSelect
+                label="Sports/Gaming allowed?"
+                value={details.sportsGamingAllowed}
+                onChange={(sportsGamingAllowed) =>
+                  setDetails((current) => ({
+                    ...current,
+                    sportsGamingAllowed,
+                  }))
+                }
+              />
+              <BooleanMetadataSelect
+                label="Pharmacy allowed?"
+                value={details.pharmacyAllowed}
+                onChange={(pharmacyAllowed) =>
+                  setDetails((current) => ({ ...current, pharmacyAllowed }))
+                }
+              />
+              <BooleanMetadataSelect
+                label="Crypto allowed?"
+                value={details.cryptoAllowed}
+                onChange={(cryptoAllowed) =>
+                  setDetails((current) => ({ ...current, cryptoAllowed }))
+                }
+              />
+              <MetadataSelect
+                label="Number of backlinks"
+                value={String(details.backlinkCount)}
+                options={[1, 2, 3].map((value) => ({
+                  value: String(value),
+                  label: String(value),
+                }))}
+                onChange={(value) =>
+                  setDetails((current) => ({
+                    ...current,
+                    backlinkCount: Number(value),
+                  }))
+                }
+              />
+              <MetadataSelect
+                label="Link type"
+                value={details.linkType}
+                options={LISTING_LINK_TYPES.map((value) => ({
+                  value,
+                  label: LISTING_LINK_TYPE_LABELS[value],
+                }))}
+                onChange={(value) =>
+                  setDetails((current) => ({
+                    ...current,
+                    linkType: value as typeof current.linkType,
+                  }))
+                }
+              />
+              <MetadataSelect
+                label="Link validity"
+                value={details.linkValidity}
+                options={LISTING_LINK_VALIDITIES.map((value) => ({
+                  value,
+                  label: LISTING_LINK_VALIDITY_LABELS[value],
+                }))}
+                onChange={(value) =>
+                  setDetails((current) => ({
+                    ...current,
+                    linkValidity: value as typeof current.linkValidity,
+                  }))
+                }
+              />
+              <BooleanMetadataSelect
+                label="Google News?"
+                value={details.googleNews}
+                onChange={(googleNews) =>
+                  setDetails((current) => ({ ...current, googleNews }))
+                }
+              />
+              <BooleanMetadataSelect
+                label="Marked as sponsored?"
+                value={details.markedSponsored}
+                onChange={(markedSponsored) =>
+                  setDetails((current) => ({ ...current, markedSponsored }))
+                }
+              />
+              <BooleanMetadataSelect
+                label="Foreign-language content allowed?"
+                value={details.foreignLanguageAllowed}
+                onChange={(foreignLanguageAllowed) =>
+                  setDetails((current) => ({
+                    ...current,
+                    foreignLanguageAllowed,
+                  }))
+                }
+              />
+            </div>
+            <Button
+              onClick={() => updateDetailsMut.mutate()}
+              disabled={
+                updateDetailsMut.isPending ||
+                details.title.trim().length < 3 ||
+                details.description.trim().length < 1 ||
+                details.description.length > 500 ||
+                details.categoryIds.length < 1 ||
+                details.categoryIds.length > MARKETPLACE_CATEGORY_LIMIT ||
+                categoriesQ.isError
+              }
+            >
+              {updateDetailsMut.isPending
+                ? "Saving..."
+                : "Save listing details"}
+            </Button>
+          </>
+        ) : (
+          <div className="flex flex-wrap gap-2 text-sm">
+            {(listing.categories ?? []).map((category) => (
+              <Badge key={category.id} variant="secondary">
+                {category.name}
+              </Badge>
+            ))}
+            <Badge variant="outline">
+              {listing.language ?? "Language missing"}
+            </Badge>
+            <Badge variant="outline">
+              {listing.linkType ?? "Link type missing"}
+            </Badge>
+            <Badge variant="outline">
+              {listing.backlinkCount ?? "—"} backlink(s)
+            </Badge>
+          </div>
+        )}
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
         <div>
           <p className="font-medium">{listing.title}</p>

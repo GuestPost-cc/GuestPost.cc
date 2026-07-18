@@ -1,8 +1,22 @@
-import { ServiceType } from "@guestpost/database"
+import {
+  ListingLinkType,
+  ListingLinkValidity,
+  ServiceType,
+} from "@guestpost/database"
+import {
+  MARKETPLACE_CATEGORY_LIMIT,
+  MARKETPLACE_LANGUAGES,
+} from "@guestpost/shared"
 import { Type } from "class-transformer"
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
   IsEnum,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -62,19 +76,16 @@ export class CreateWebsiteDto {
   country?: string
 
   @IsString()
-  @IsOptional()
+  @IsIn(MARKETPLACE_LANGUAGES)
   @MaxLength(50)
-  language?: string
+  language!: string
 
-  @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  category?: string
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(64)
-  categoryId?: string
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MARKETPLACE_CATEGORY_LIMIT)
+  @ArrayUnique()
+  @IsString({ each: true })
+  categoryIds!: string[]
 
   @IsString()
   @IsOptional()
@@ -89,34 +100,60 @@ export class CreateWebsiteDto {
   description?: string
 
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  domainRating?: number
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  monthlyTraffic?: number
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  price?: number
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  turnaroundDays?: number
-
-  @IsOptional()
   @ValidateNested()
   @Type(() => CreateWebsiteServiceDto)
   initialService?: CreateWebsiteServiceDto
+
+  @IsBoolean()
+  sportsGamingAllowed!: boolean
+
+  @IsBoolean()
+  pharmacyAllowed!: boolean
+
+  @IsBoolean()
+  cryptoAllowed!: boolean
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  backlinkCount!: number
+
+  @IsEnum(ListingLinkType)
+  linkType!: ListingLinkType
+
+  @IsEnum(ListingLinkValidity)
+  linkValidity!: ListingLinkValidity
+
+  @IsBoolean()
+  googleNews!: boolean
+
+  @IsBoolean()
+  markedSponsored!: boolean
+
+  @IsBoolean()
+  foreignLanguageAllowed!: boolean
 }
 
-export class UpdateWebsiteDto extends CreateWebsiteDto {}
+export class UpdateWebsiteDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  name?: string
+
+  @IsOptional()
+  @IsUrl()
+  @MaxLength(2048)
+  url?: string
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  country?: string
+
+  @IsOptional()
+  @IsString()
+  @IsIn(MARKETPLACE_LANGUAGES)
+  @MaxLength(50)
+  language?: string
+}

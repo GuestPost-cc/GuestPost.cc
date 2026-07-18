@@ -2,6 +2,14 @@
 
 import type { Category } from "@guestpost/api-client"
 import {
+  LISTING_LINK_TYPE_LABELS,
+  LISTING_LINK_TYPES,
+  LISTING_LINK_VALIDITIES,
+  LISTING_LINK_VALIDITY_LABELS,
+  MARKETPLACE_CATEGORY_LIMIT,
+  MARKETPLACE_LANGUAGES,
+} from "@guestpost/shared"
+import {
   Badge,
   Button,
   Card,
@@ -12,6 +20,7 @@ import {
   Checkbox,
   Input,
   Label,
+  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -61,15 +70,10 @@ const COUNTRIES = [
   ["OTHER", "Other"],
 ] as const
 
-const LANGUAGES = [
-  "English",
-  "Spanish",
-  "French",
-  "German",
-  "Portuguese",
-  "Dutch",
-  "Other",
-] as const
+const YES_NO_OPTIONS = [
+  { value: "no", label: "No" },
+  { value: "yes", label: "Yes" },
+]
 
 const optionalNumber = (minimum: number) =>
   z.preprocess(
@@ -82,13 +86,11 @@ const websiteSchema = z
     url: z.string().url("Enter a complete URL, including https://"),
     country: z.string().min(1, "Country is required"),
     language: z.string().min(1, "Language is required"),
-    domainRating: optionalNumber(0).refine(
-      (value) => value == null || value <= 100,
-      "Domain rating cannot exceed 100",
-    ),
-    monthlyTraffic: optionalNumber(0),
     listingTitle: z.string().trim().min(3).max(200),
-    categoryId: z.string().min(1, "Choose a marketplace category"),
+    categoryIds: z
+      .array(z.string())
+      .min(1, "Choose at least one marketplace category")
+      .max(MARKETPLACE_CATEGORY_LIMIT),
     description: z
       .string()
       .trim()
@@ -100,6 +102,15 @@ const websiteSchema = z
     turnaroundDays: z.coerce.number().int().min(1),
     revisionRounds: z.coerce.number().int().min(0),
     warrantyDays: optionalNumber(0),
+    sportsGamingAllowed: z.enum(["yes", "no"]),
+    pharmacyAllowed: z.enum(["yes", "no"]),
+    cryptoAllowed: z.enum(["yes", "no"]),
+    backlinkCount: z.coerce.number().int().min(1).max(3),
+    linkType: z.enum(LISTING_LINK_TYPES),
+    linkValidity: z.enum(LISTING_LINK_VALIDITIES),
+    googleNews: z.enum(["yes", "no"]),
+    markedSponsored: z.enum(["yes", "no"]),
+    foreignLanguageAllowed: z.enum(["yes", "no"]),
   })
   .superRefine((value, context) => {
     if (value.addInitialService && value.price == null) {
@@ -134,12 +145,21 @@ export default function NewWebsitePage() {
       country: "US",
       language: "English",
       listingTitle: "",
-      categoryId: "",
+      categoryIds: [],
       description: "",
       addInitialService: true,
       serviceType: "GUEST_POST",
       turnaroundDays: 7,
       revisionRounds: 2,
+      sportsGamingAllowed: "no",
+      pharmacyAllowed: "no",
+      cryptoAllowed: "no",
+      backlinkCount: 1,
+      linkType: "DOFOLLOW",
+      linkValidity: "PERMANENT",
+      googleNews: "no",
+      markedSponsored: "no",
+      foreignLanguageAllowed: "no",
     },
   })
   const description = watch("description") ?? ""
@@ -151,11 +171,18 @@ export default function NewWebsitePage() {
         url: data.url,
         country: data.country,
         language: data.language,
-        categoryId: data.categoryId,
+        categoryIds: data.categoryIds,
         listingTitle: data.listingTitle.trim(),
         description: data.description.trim(),
-        domainRating: data.domainRating,
-        monthlyTraffic: data.monthlyTraffic,
+        sportsGamingAllowed: data.sportsGamingAllowed === "yes",
+        pharmacyAllowed: data.pharmacyAllowed === "yes",
+        cryptoAllowed: data.cryptoAllowed === "yes",
+        backlinkCount: data.backlinkCount,
+        linkType: data.linkType,
+        linkValidity: data.linkValidity,
+        googleNews: data.googleNews === "yes",
+        markedSponsored: data.markedSponsored === "yes",
+        foreignLanguageAllowed: data.foreignLanguageAllowed === "yes",
         initialService:
           data.addInitialService && data.price != null
             ? {
@@ -243,37 +270,18 @@ export default function NewWebsitePage() {
                   label="Primary language"
                   name="language"
                   control={control}
-                  options={LANGUAGES.map((value) => ({ value, label: value }))}
+                  options={MARKETPLACE_LANGUAGES.map((value) => ({
+                    value,
+                    label: value,
+                  }))}
                   error={errors.language?.message}
                 />
               </div>
-              <div className="grid gap-5 sm:grid-cols-2">
-                <Field
-                  label="Domain rating"
-                  hint="Optional · 0–100"
-                  error={errors.domainRating?.message}
-                >
-                  <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    placeholder="e.g. 52"
-                    {...register("domainRating")}
-                  />
-                </Field>
-                <Field
-                  label="Monthly organic traffic"
-                  hint="Optional estimate"
-                  error={errors.monthlyTraffic?.message}
-                >
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="e.g. 25000"
-                    {...register("monthlyTraffic")}
-                  />
-                </Field>
-              </div>
+              <p className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                Search and traffic metrics are imported from the Google Search
+                Console and GA4 properties you link after enlistment; they are
+                not self-reported here.
+              </p>
             </CardContent>
           </Card>
 
@@ -318,30 +326,27 @@ export default function NewWebsitePage() {
                   </div>
                 ) : (
                   <Controller
-                    name="categoryId"
+                    name="categoryIds"
                     control={control}
                     render={({ field }) => (
-                      <Select
+                      <MultiSelect
+                        options={(categoriesQ.data ?? []).map((category) => ({
+                          value: category.id,
+                          label: category.name,
+                        }))}
                         value={field.value}
                         onValueChange={field.onChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Choose the closest category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(categoriesQ.data ?? []).map((category) => (
-                            <SelectItem key={category.id} value={category.id}>
-                              {category.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        maxSelected={MARKETPLACE_CATEGORY_LIMIT}
+                        placeholder="Choose 1–7 categories"
+                        searchPlaceholder="Search categories..."
+                        ariaLabel="Marketplace categories"
+                      />
                     )}
                   />
                 )}
-                {errors.categoryId && (
+                {errors.categoryIds && (
                   <p className="text-xs text-destructive">
-                    {errors.categoryId.message}
+                    {errors.categoryIds.message}
                   </p>
                 )}
               </div>
@@ -379,6 +384,81 @@ export default function NewWebsitePage() {
                   </p>
                 )}
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Placement policy</CardTitle>
+              <CardDescription>
+                Choose one accurate value for each site-wide publishing term.
+                Buyers can filter by these commitments.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <SelectField
+                label="Sports/Gaming allowed?"
+                name="sportsGamingAllowed"
+                control={control}
+                options={YES_NO_OPTIONS}
+              />
+              <SelectField
+                label="Pharmacy allowed?"
+                name="pharmacyAllowed"
+                control={control}
+                options={YES_NO_OPTIONS}
+              />
+              <SelectField
+                label="Crypto allowed?"
+                name="cryptoAllowed"
+                control={control}
+                options={YES_NO_OPTIONS}
+              />
+              <SelectField
+                label="Number of backlinks"
+                name="backlinkCount"
+                control={control}
+                options={[1, 2, 3].map((value) => ({
+                  value: String(value),
+                  label: String(value),
+                }))}
+              />
+              <SelectField
+                label="Link type"
+                name="linkType"
+                control={control}
+                options={LISTING_LINK_TYPES.map((value) => ({
+                  value,
+                  label: LISTING_LINK_TYPE_LABELS[value],
+                }))}
+              />
+              <SelectField
+                label="Link validity"
+                name="linkValidity"
+                control={control}
+                options={LISTING_LINK_VALIDITIES.map((value) => ({
+                  value,
+                  label: LISTING_LINK_VALIDITY_LABELS[value],
+                }))}
+              />
+              <SelectField
+                label="Google News?"
+                name="googleNews"
+                control={control}
+                options={YES_NO_OPTIONS}
+              />
+              <SelectField
+                label="Marked as sponsored?"
+                name="markedSponsored"
+                control={control}
+                options={YES_NO_OPTIONS}
+              />
+              <SelectField
+                label="Foreign-language content allowed?"
+                name="foreignLanguageAllowed"
+                control={control}
+                options={YES_NO_OPTIONS}
+              />
             </CardContent>
           </Card>
 
@@ -561,7 +641,19 @@ function SelectField({
   error,
 }: {
   label: string
-  name: "country" | "language" | "serviceType"
+  name:
+    | "country"
+    | "language"
+    | "serviceType"
+    | "sportsGamingAllowed"
+    | "pharmacyAllowed"
+    | "cryptoAllowed"
+    | "backlinkCount"
+    | "linkType"
+    | "linkValidity"
+    | "googleNews"
+    | "markedSponsored"
+    | "foreignLanguageAllowed"
   control: any
   options: Array<{ value: string; label: string }>
   error?: string
@@ -573,7 +665,7 @@ function SelectField({
         name={name}
         control={control}
         render={({ field }) => (
-          <Select value={field.value} onValueChange={field.onChange}>
+          <Select value={String(field.value)} onValueChange={field.onChange}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>

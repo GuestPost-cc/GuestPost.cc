@@ -153,6 +153,33 @@ export class GoogleSearchConsoleProvider
 
           totalRecordsProcessed++
         }
+
+        // Denormalize only the buyer-safe 30-day summary onto the listing.
+        // Raw provider rows stay in WebsiteSearchDaily and never leave the
+        // marketplace API projection.
+        const periodStart = new Date()
+        periodStart.setUTCHours(0, 0, 0, 0)
+        periodStart.setUTCDate(periodStart.getUTCDate() - 29)
+        const summary = await (db.websiteSearchDaily as any).aggregate({
+          where: {
+            websiteId: wi.websiteId,
+            sourceIntegrationId: wi.id,
+            date: { gte: periodStart },
+          },
+          _sum: { clicks: true, impressions: true },
+        })
+        await (db.marketplaceListing as any).updateMany({
+          where: { websiteId: wi.websiteId },
+          data: {
+            metricsData: {
+              source: "GSC",
+              periodDays: 30,
+              clicks: summary._sum.clicks ?? 0,
+              impressions: summary._sum.impressions ?? 0,
+              syncedAt: new Date().toISOString(),
+            },
+          },
+        })
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : String(err)
         return {

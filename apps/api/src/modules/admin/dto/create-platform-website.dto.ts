@@ -1,6 +1,18 @@
+import { ListingLinkType, ListingLinkValidity } from "@guestpost/database"
+import {
+  MARKETPLACE_CATEGORY_LIMIT,
+  MARKETPLACE_LANGUAGES,
+} from "@guestpost/shared"
 import { Type } from "class-transformer"
 import {
-  IsNumber,
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsIn,
+  IsInt,
   IsOptional,
   IsString,
   IsUrl,
@@ -25,27 +37,54 @@ export class CreatePlatformWebsiteDto {
   country?: string
 
   @IsString()
-  @IsOptional()
+  @IsIn(MARKETPLACE_LANGUAGES)
   @MaxLength(50)
-  language?: string
+  language!: string
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MARKETPLACE_CATEGORY_LIMIT)
+  @ArrayUnique()
+  @IsString({ each: true })
+  categoryIds!: string[]
 
   @IsString()
-  @IsOptional()
-  @MaxLength(100)
-  category?: string
+  @MaxLength(200)
+  listingTitle!: string
 
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  domainRating?: number
+  @IsString()
+  @MaxLength(500)
+  description!: string
 
-  @IsOptional()
+  @IsBoolean()
+  sportsGamingAllowed!: boolean
+
+  @IsBoolean()
+  pharmacyAllowed!: boolean
+
+  @IsBoolean()
+  cryptoAllowed!: boolean
+
   @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  monthlyTraffic?: number
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  backlinkCount!: number
+
+  @IsEnum(ListingLinkType)
+  linkType!: ListingLinkType
+
+  @IsEnum(ListingLinkValidity)
+  linkValidity!: ListingLinkValidity
+
+  @IsBoolean()
+  googleNews!: boolean
+
+  @IsBoolean()
+  markedSponsored!: boolean
+
+  @IsBoolean()
+  foreignLanguageAllowed!: boolean
 
   // Super Admin may optionally choose an Operations owner. For Operations
   // callers the service ignores this value and always assigns the creator.
@@ -68,24 +107,64 @@ export class UpdatePlatformWebsiteDto {
 
   @IsString()
   @IsOptional()
+  @IsIn(MARKETPLACE_LANGUAGES)
   @MaxLength(50)
   language?: string
 
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MARKETPLACE_CATEGORY_LIMIT)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @IsOptional()
+  categoryIds?: string[]
+
   @IsString()
   @IsOptional()
-  @MaxLength(100)
-  category?: string
+  @MaxLength(200)
+  listingTitle?: string
 
+  @IsString()
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  @Max(100)
-  domainRating?: number
+  @MaxLength(500)
+  description?: string
 
+  @IsBoolean()
   @IsOptional()
+  sportsGamingAllowed?: boolean
+
+  @IsBoolean()
+  @IsOptional()
+  pharmacyAllowed?: boolean
+
+  @IsBoolean()
+  @IsOptional()
+  cryptoAllowed?: boolean
+
   @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  monthlyTraffic?: number
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  @IsOptional()
+  backlinkCount?: number
+
+  @IsEnum(ListingLinkType)
+  @IsOptional()
+  linkType?: ListingLinkType
+
+  @IsEnum(ListingLinkValidity)
+  @IsOptional()
+  linkValidity?: ListingLinkValidity
+
+  @IsBoolean()
+  @IsOptional()
+  googleNews?: boolean
+
+  @IsBoolean()
+  @IsOptional()
+  markedSponsored?: boolean
+
+  @IsBoolean()
+  @IsOptional()
+  foreignLanguageAllowed?: boolean
 }

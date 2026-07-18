@@ -1188,6 +1188,25 @@ export type EnumListingFulfillmentTypeFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumListingFulfillmentTypeFilter<$PrismaModel> | $Enums.ListingFulfillmentType
 }
 
+export type BoolNullableFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedBoolNullableFilter<$PrismaModel> | boolean | null
+}
+
+export type EnumListingLinkTypeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.ListingLinkType | Prisma.EnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ListingLinkType[] | Prisma.ListEnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ListingLinkType[] | Prisma.ListEnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumListingLinkTypeNullableFilter<$PrismaModel> | $Enums.ListingLinkType | null
+}
+
+export type EnumListingLinkValidityNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.ListingLinkValidity | Prisma.EnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ListingLinkValidity[] | Prisma.ListEnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ListingLinkValidity[] | Prisma.ListEnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumListingLinkValidityNullableFilter<$PrismaModel> | $Enums.ListingLinkValidity | null
+}
+
 export type EnumListingStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.ListingStatus | Prisma.EnumListingStatusFieldRefInput<$PrismaModel>
   in?: $Enums.ListingStatus[] | Prisma.ListEnumListingStatusFieldRefInput<$PrismaModel>
@@ -1206,6 +1225,34 @@ export type EnumListingFulfillmentTypeWithAggregatesFilter<$PrismaModel = never>
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumListingFulfillmentTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumListingFulfillmentTypeFilter<$PrismaModel>
+}
+
+export type BoolNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedBoolNullableWithAggregatesFilter<$PrismaModel> | boolean | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedBoolNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedBoolNullableFilter<$PrismaModel>
+}
+
+export type EnumListingLinkTypeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ListingLinkType | Prisma.EnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ListingLinkType[] | Prisma.ListEnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ListingLinkType[] | Prisma.ListEnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumListingLinkTypeNullableWithAggregatesFilter<$PrismaModel> | $Enums.ListingLinkType | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumListingLinkTypeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumListingLinkTypeNullableFilter<$PrismaModel>
+}
+
+export type EnumListingLinkValidityNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ListingLinkValidity | Prisma.EnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ListingLinkValidity[] | Prisma.ListEnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ListingLinkValidity[] | Prisma.ListEnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumListingLinkValidityNullableWithAggregatesFilter<$PrismaModel> | $Enums.ListingLinkValidity | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumListingLinkValidityNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumListingLinkValidityNullableFilter<$PrismaModel>
 }
 
 export type EnumServiceAvailabilityFilter<$PrismaModel = never> = {
@@ -2548,6 +2595,25 @@ export type NestedEnumListingFulfillmentTypeFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumListingFulfillmentTypeFilter<$PrismaModel> | $Enums.ListingFulfillmentType
 }
 
+export type NestedBoolNullableFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedBoolNullableFilter<$PrismaModel> | boolean | null
+}
+
+export type NestedEnumListingLinkTypeNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.ListingLinkType | Prisma.EnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ListingLinkType[] | Prisma.ListEnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ListingLinkType[] | Prisma.ListEnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumListingLinkTypeNullableFilter<$PrismaModel> | $Enums.ListingLinkType | null
+}
+
+export type NestedEnumListingLinkValidityNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.ListingLinkValidity | Prisma.EnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ListingLinkValidity[] | Prisma.ListEnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ListingLinkValidity[] | Prisma.ListEnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumListingLinkValidityNullableFilter<$PrismaModel> | $Enums.ListingLinkValidity | null
+}
+
 export type NestedEnumListingStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.ListingStatus | Prisma.EnumListingStatusFieldRefInput<$PrismaModel>
   in?: $Enums.ListingStatus[] | Prisma.ListEnumListingStatusFieldRefInput<$PrismaModel>
@@ -2566,6 +2632,34 @@ export type NestedEnumListingFulfillmentTypeWithAggregatesFilter<$PrismaModel = 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumListingFulfillmentTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumListingFulfillmentTypeFilter<$PrismaModel>
+}
+
+export type NestedBoolNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: boolean | Prisma.BooleanFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedBoolNullableWithAggregatesFilter<$PrismaModel> | boolean | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedBoolNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedBoolNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumListingLinkTypeNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ListingLinkType | Prisma.EnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ListingLinkType[] | Prisma.ListEnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ListingLinkType[] | Prisma.ListEnumListingLinkTypeFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumListingLinkTypeNullableWithAggregatesFilter<$PrismaModel> | $Enums.ListingLinkType | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumListingLinkTypeNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumListingLinkTypeNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumListingLinkValidityNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ListingLinkValidity | Prisma.EnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  in?: $Enums.ListingLinkValidity[] | Prisma.ListEnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.ListingLinkValidity[] | Prisma.ListEnumListingLinkValidityFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumListingLinkValidityNullableWithAggregatesFilter<$PrismaModel> | $Enums.ListingLinkValidity | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumListingLinkValidityNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumListingLinkValidityNullableFilter<$PrismaModel>
 }
 
 export type NestedEnumServiceAvailabilityFilter<$PrismaModel = never> = {
