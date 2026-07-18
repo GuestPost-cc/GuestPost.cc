@@ -283,7 +283,7 @@ describe("WebsitesService hardening", () => {
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       marketplaceListing: { create: jest.fn().mockResolvedValue({}) },
-      marketplaceCategory: { findUnique: jest.fn() },
+      marketplaceCategory: { findMany: jest.fn() },
       auditLog: { count: jest.fn().mockResolvedValue(0) },
     }
     svc = new WebsitesService(prisma as any, audit as any, queue as any)
@@ -308,10 +308,9 @@ describe("WebsitesService hardening", () => {
 
   it("creates the publisher website, listing metadata, and first service atomically", async () => {
     prisma.website.findFirst.mockResolvedValue(null)
-    prisma.marketplaceCategory.findUnique.mockResolvedValue({
-      id: "category-1",
-      name: "Technology",
-    })
+    prisma.marketplaceCategory.findMany.mockResolvedValue([
+      { id: "category-1", name: "Technology", slug: "technology" },
+    ])
     const websiteCreate = jest.fn().mockResolvedValue({
       id: "website-1",
       url: "https://example.com",
@@ -329,7 +328,17 @@ describe("WebsitesService hardening", () => {
       "o1",
       {
         url: "https://example.com",
-        categoryId: "category-1",
+        categoryIds: ["category-1"],
+        language: "English",
+        sportsGamingAllowed: false,
+        pharmacyAllowed: false,
+        cryptoAllowed: false,
+        backlinkCount: 1,
+        linkType: "DOFOLLOW",
+        linkValidity: "PERMANENT",
+        googleNews: false,
+        markedSponsored: false,
+        foreignLanguageAllowed: false,
         listingTitle: "Example technology placements",
         description: "A focused technology publication for software buyers.",
         initialService: {
@@ -353,7 +362,9 @@ describe("WebsitesService hardening", () => {
         data: expect.objectContaining({
           title: "Example technology placements",
           description: "A focused technology publication for software buyers.",
-          categoryId: "category-1",
+          categories: {
+            create: [{ category: { connect: { id: "category-1" } } }],
+          },
           ownerType: "PUBLISHER",
           services: {
             create: [

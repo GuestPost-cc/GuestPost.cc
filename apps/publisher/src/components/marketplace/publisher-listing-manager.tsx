@@ -6,6 +6,14 @@ import type {
   PublisherWebsiteService,
 } from "@guestpost/api-client"
 import {
+  LISTING_LINK_TYPE_LABELS,
+  LISTING_LINK_TYPES,
+  LISTING_LINK_VALIDITIES,
+  LISTING_LINK_VALIDITY_LABELS,
+  MARKETPLACE_CATEGORY_LIMIT,
+  MARKETPLACE_LANGUAGES,
+} from "@guestpost/shared"
+import {
   Badge,
   Button,
   Card,
@@ -15,6 +23,7 @@ import {
   CardTitle,
   Input,
   Label,
+  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -61,6 +70,11 @@ const STATUS_LABELS: Record<string, string> = {
   ARCHIVED: "Archived",
 }
 
+const YES_NO_OPTIONS = [
+  { value: "no", label: "No" },
+  { value: "yes", label: "Yes" },
+]
+
 function serviceLabel(value: string) {
   return (
     SERVICE_TYPES.find(([serviceType]) => serviceType === value)?.[1] ??
@@ -76,6 +90,30 @@ function money(value: number, currency: string) {
   }).format(Number(value))
 }
 
+function listingDetails(listing: PublisherWebsiteListing) {
+  return {
+    title: listing.title,
+    description: listing.description,
+    categoryIds:
+      listing.categories?.map((category) => category.id) ??
+      (listing.category ? [listing.category.id] : []),
+    language: listing.language ?? "English",
+    sportsGamingAllowed: listing.sportsGamingAllowed ?? false,
+    pharmacyAllowed: listing.pharmacyAllowed ?? false,
+    cryptoAllowed: listing.cryptoAllowed ?? false,
+    backlinkCount: listing.backlinkCount ?? 1,
+    linkType: listing.linkType ?? ("DOFOLLOW" as const),
+    linkValidity: listing.linkValidity ?? ("PERMANENT" as const),
+    googleNews: listing.googleNews ?? false,
+    markedSponsored: listing.markedSponsored ?? false,
+    foreignLanguageAllowed: listing.foreignLanguageAllowed ?? false,
+  }
+}
+
+function sameValues(left: readonly string[], right: readonly string[]) {
+  return [...left].sort().join("|") === [...right].sort().join("|")
+}
+
 export function PublisherListingManager({
   listing,
   verificationStatus,
@@ -85,11 +123,7 @@ export function PublisherListingManager({
   verificationStatus: string
   onChanged: () => void
 }) {
-  const [details, setDetails] = useState({
-    title: listing.title,
-    description: listing.description,
-    categoryId: listing.category?.id ?? "",
-  })
+  const [details, setDetails] = useState(() => listingDetails(listing))
   const [editingService, setEditingService] =
     useState<PublisherWebsiteService | null>(null)
   const [serviceDraft, setServiceDraft] = useState({
@@ -109,12 +143,8 @@ export function PublisherListingManager({
   })
 
   useEffect(() => {
-    setDetails({
-      title: listing.title,
-      description: listing.description,
-      categoryId: listing.category?.id ?? "",
-    })
-  }, [listing.category?.id, listing.description, listing.title])
+    setDetails(listingDetails(listing))
+  }, [listing])
 
   const categoriesQ = useQuery<Category[]>({
     queryKey: ["marketplace-categories"],
@@ -140,22 +170,44 @@ export function PublisherListingManager({
     details.title.trim().length >= 3 &&
     details.description.trim().length > 0 &&
     details.description.length <= 500 &&
-    !!details.categoryId
+    details.categoryIds.length >= 1 &&
+    details.categoryIds.length <= MARKETPLACE_CATEGORY_LIMIT
   const readyForReview =
     metadataReady &&
     verificationStatus === "VERIFIED" &&
     availableServices.length > 0
+  const originalDetails = listingDetails(listing)
   const detailsChanged =
     details.title.trim() !== listing.title ||
     details.description.trim() !== listing.description ||
-    details.categoryId !== (listing.category?.id ?? "")
+    !sameValues(details.categoryIds, originalDetails.categoryIds) ||
+    details.language !== originalDetails.language ||
+    details.sportsGamingAllowed !== originalDetails.sportsGamingAllowed ||
+    details.pharmacyAllowed !== originalDetails.pharmacyAllowed ||
+    details.cryptoAllowed !== originalDetails.cryptoAllowed ||
+    details.backlinkCount !== originalDetails.backlinkCount ||
+    details.linkType !== originalDetails.linkType ||
+    details.linkValidity !== originalDetails.linkValidity ||
+    details.googleNews !== originalDetails.googleNews ||
+    details.markedSponsored !== originalDetails.markedSponsored ||
+    details.foreignLanguageAllowed !== originalDetails.foreignLanguageAllowed
 
   const updateDetailsMut = useMutation({
     mutationFn: () =>
       api.marketplace.updateListing(listing.id, {
         title: details.title.trim(),
         description: details.description.trim(),
-        categoryId: details.categoryId,
+        categoryIds: details.categoryIds,
+        language: details.language,
+        sportsGamingAllowed: details.sportsGamingAllowed,
+        pharmacyAllowed: details.pharmacyAllowed,
+        cryptoAllowed: details.cryptoAllowed,
+        backlinkCount: details.backlinkCount,
+        linkType: details.linkType,
+        linkValidity: details.linkValidity,
+        googleNews: details.googleNews,
+        markedSponsored: details.markedSponsored,
+        foreignLanguageAllowed: details.foreignLanguageAllowed,
       }),
     onSuccess: () => {
       onChanged()
@@ -295,27 +347,24 @@ export function PublisherListingManager({
                   }
                 />
               </Field>
-              <Field label="Category">
+              <Field label="Categories">
                 {categoriesQ.isLoading ? (
                   <Skeleton className="h-10 w-full" />
                 ) : (
-                  <Select
-                    value={details.categoryId}
-                    onValueChange={(categoryId) =>
-                      setDetails((current) => ({ ...current, categoryId }))
+                  <MultiSelect
+                    options={(categoriesQ.data ?? []).map((category) => ({
+                      value: category.id,
+                      label: category.name,
+                    }))}
+                    value={details.categoryIds}
+                    onValueChange={(categoryIds) =>
+                      setDetails((current) => ({ ...current, categoryIds }))
                     }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choose a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(categoriesQ.data ?? []).map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    maxSelected={MARKETPLACE_CATEGORY_LIMIT}
+                    placeholder="Choose 1–7 categories"
+                    searchPlaceholder="Search categories..."
+                    ariaLabel="Marketplace categories"
+                  />
                 )}
               </Field>
             </div>
@@ -352,6 +401,126 @@ export function PublisherListingManager({
                 description on the listing detail page.
               </p>
             </div>
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <div className="mb-4">
+                <p className="font-medium">Language & placement policy</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Choose one accurate value for every buyer filter.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <DetailsSelect
+                  label="Primary language"
+                  value={details.language}
+                  options={MARKETPLACE_LANGUAGES.map((value) => ({
+                    value,
+                    label: value,
+                  }))}
+                  onChange={(language) =>
+                    setDetails((current) => ({ ...current, language }))
+                  }
+                />
+                <DetailsSelect
+                  label="Sports/Gaming allowed?"
+                  value={details.sportsGamingAllowed ? "yes" : "no"}
+                  options={YES_NO_OPTIONS}
+                  onChange={(value) =>
+                    setDetails((current) => ({
+                      ...current,
+                      sportsGamingAllowed: value === "yes",
+                    }))
+                  }
+                />
+                <DetailsSelect
+                  label="Pharmacy allowed?"
+                  value={details.pharmacyAllowed ? "yes" : "no"}
+                  options={YES_NO_OPTIONS}
+                  onChange={(value) =>
+                    setDetails((current) => ({
+                      ...current,
+                      pharmacyAllowed: value === "yes",
+                    }))
+                  }
+                />
+                <DetailsSelect
+                  label="Crypto allowed?"
+                  value={details.cryptoAllowed ? "yes" : "no"}
+                  options={YES_NO_OPTIONS}
+                  onChange={(value) =>
+                    setDetails((current) => ({
+                      ...current,
+                      cryptoAllowed: value === "yes",
+                    }))
+                  }
+                />
+                <DetailsSelect
+                  label="Number of backlinks"
+                  value={String(details.backlinkCount)}
+                  options={[1, 2, 3].map((value) => ({
+                    value: String(value),
+                    label: String(value),
+                  }))}
+                  onChange={(value) =>
+                    setDetails((current) => ({
+                      ...current,
+                      backlinkCount: Number(value),
+                    }))
+                  }
+                />
+                <DetailsSelect
+                  label="Link type"
+                  value={details.linkType}
+                  options={LISTING_LINK_TYPES.map((value) => ({
+                    value,
+                    label: LISTING_LINK_TYPE_LABELS[value],
+                  }))}
+                  onChange={(value) =>
+                    setDetails((current) => ({
+                      ...current,
+                      linkType: value as typeof current.linkType,
+                    }))
+                  }
+                />
+                <DetailsSelect
+                  label="Link validity"
+                  value={details.linkValidity}
+                  options={LISTING_LINK_VALIDITIES.map((value) => ({
+                    value,
+                    label: LISTING_LINK_VALIDITY_LABELS[value],
+                  }))}
+                  onChange={(value) =>
+                    setDetails((current) => ({
+                      ...current,
+                      linkValidity: value as typeof current.linkValidity,
+                    }))
+                  }
+                />
+                <BooleanDetailsSelect
+                  label="Google News?"
+                  value={details.googleNews}
+                  onChange={(googleNews) =>
+                    setDetails((current) => ({ ...current, googleNews }))
+                  }
+                />
+                <BooleanDetailsSelect
+                  label="Marked as sponsored?"
+                  value={details.markedSponsored}
+                  onChange={(markedSponsored) =>
+                    setDetails((current) => ({ ...current, markedSponsored }))
+                  }
+                />
+                <BooleanDetailsSelect
+                  label="Foreign-language content allowed?"
+                  value={details.foreignLanguageAllowed}
+                  onChange={(foreignLanguageAllowed) =>
+                    setDetails((current) => ({
+                      ...current,
+                      foreignLanguageAllowed,
+                    }))
+                  }
+                />
+              </div>
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 onClick={() => updateDetailsMut.mutate()}
@@ -372,13 +541,7 @@ export function PublisherListingManager({
               {detailsChanged && (
                 <Button
                   variant="ghost"
-                  onClick={() =>
-                    setDetails({
-                      title: listing.title,
-                      description: listing.description,
-                      categoryId: listing.category?.id ?? "",
-                    })
-                  }
+                  onClick={() => setDetails(listingDetails(listing))}
                 >
                   <RotateCcw className="mr-2 h-4 w-4" /> Reset
                 </Button>
@@ -569,6 +732,54 @@ export function PublisherListingManager({
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+function DetailsSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: readonly { value: string; label: string }[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <Field label={label}>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  )
+}
+
+function BooleanDetailsSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: boolean
+  onChange: (value: boolean) => void
+}) {
+  return (
+    <DetailsSelect
+      label={label}
+      value={value ? "yes" : "no"}
+      options={YES_NO_OPTIONS}
+      onChange={(next) => onChange(next === "yes")}
+    />
   )
 }
 

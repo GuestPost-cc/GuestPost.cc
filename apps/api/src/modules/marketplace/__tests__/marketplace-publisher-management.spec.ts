@@ -28,8 +28,34 @@ describe("publisher listing management", () => {
     )
   })
 
+  it("rejects more than seven categories on a listing update", async () => {
+    const errors = await validate(
+      plainToInstance(UpdateListingDto, {
+        title: "Example listing",
+        description: "A complete buyer-facing listing description.",
+        categoryIds: Array.from(
+          { length: 8 },
+          (_, index) => `category-${index}`,
+        ),
+        language: "English",
+        sportsGamingAllowed: false,
+        pharmacyAllowed: false,
+        cryptoAllowed: false,
+        backlinkCount: 1,
+        linkType: "DOFOLLOW",
+        linkValidity: "PERMANENT",
+        googleNews: false,
+        markedSponsored: false,
+        foreignLanguageAllowed: false,
+      }),
+    )
+
+    expect(errors.some((error) => error.property === "categoryIds")).toBe(true)
+  })
+
   it("allowlists publisher metadata and ignores privileged update fields", async () => {
     const prisma: any = {
+      $transaction: jest.fn((callback) => callback(prisma)),
       marketplaceListing: {
         findUnique: jest.fn().mockResolvedValue({
           id: "listing-1",
@@ -40,7 +66,11 @@ describe("publisher listing management", () => {
         update: jest.fn().mockResolvedValue({ id: "listing-1" }),
       },
       marketplaceCategory: {
-        findUnique: jest.fn().mockResolvedValue({ id: "category-1" }),
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: "category-1", name: "Technology", slug: "technology" },
+          ]),
       },
       publisherMembership: {
         findFirst: jest.fn().mockResolvedValue({ id: "membership-1" }),
@@ -52,7 +82,17 @@ describe("publisher listing management", () => {
     await service.updateListing("user-1", "publisher-1", "listing-1", {
       title: "Updated listing",
       description: "A clear buyer-facing description",
-      categoryId: "category-1",
+      categoryIds: ["category-1"],
+      language: "English",
+      sportsGamingAllowed: false,
+      pharmacyAllowed: false,
+      cryptoAllowed: false,
+      backlinkCount: 1,
+      linkType: "DOFOLLOW",
+      linkValidity: "PERMANENT",
+      googleNews: false,
+      markedSponsored: false,
+      foreignLanguageAllowed: false,
       status: "APPROVED",
       featured: true,
       verified: true,
@@ -64,7 +104,7 @@ describe("publisher listing management", () => {
       expect.objectContaining({
         title: "Updated listing",
         description: "A clear buyer-facing description",
-        categoryId: "category-1",
+        categories: expect.objectContaining({ deleteMany: {} }),
       }),
     )
     expect(data).not.toHaveProperty("status")
@@ -82,7 +122,7 @@ describe("publisher listing management", () => {
           organizationId: "organization-1",
           websiteId: "website-1",
           status: "DRAFT",
-          categoryId: null,
+          categories: [],
           description: "A valid buyer-facing description",
           title: "Example listing",
           website: {
@@ -104,7 +144,7 @@ describe("publisher listing management", () => {
     await expect(
       service.submitListingForReview("user-1", "publisher-1", "listing-1"),
     ).rejects.toMatchObject({
-      response: { code: "LISTING_CATEGORY_REQUIRED" },
+      response: { code: "LISTING_CATEGORIES_REQUIRED" },
     })
     expect(prisma.marketplaceListing.updateMany).not.toHaveBeenCalled()
   })

@@ -12,7 +12,16 @@
 import type {
   AdminOpsStaffResponse,
   AdminPlatformWebsiteResponse,
+  Category,
 } from "@guestpost/api-client"
+import {
+  LISTING_LINK_TYPE_LABELS,
+  LISTING_LINK_TYPES,
+  LISTING_LINK_VALIDITIES,
+  LISTING_LINK_VALIDITY_LABELS,
+  MARKETPLACE_CATEGORY_LIMIT,
+  MARKETPLACE_LANGUAGES,
+} from "@guestpost/shared"
 import {
   Badge,
   Button,
@@ -29,6 +38,12 @@ import {
   DialogTitle,
   Input,
   Label,
+  MultiSelect,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Skeleton,
   Table,
   TableBody,
@@ -36,6 +51,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
@@ -52,6 +68,41 @@ import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
+
+const YES_NO_OPTIONS = [
+  { value: "no", label: "No" },
+  { value: "yes", label: "Yes" },
+]
+
+function PolicySelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string
+  value: string
+  options: readonly { value: string; label: string }[]
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="space-y-1.5">
+      <Label>{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
 
 export default function PlatformWebsitesPage() {
   const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
@@ -70,10 +121,16 @@ function PlatformWebsitesPageInner() {
     undefined,
   )
   const [reason, setReason] = useState("")
+  const [showCreate, setShowCreate] = useState(false)
 
   const websitesQ = useQuery({
     queryKey: ["admin", "platform-websites"],
     queryFn: () => api.admin.listPlatformWebsites(),
+  })
+  const categoriesQ = useQuery<Category[]>({
+    queryKey: ["marketplace-categories"],
+    queryFn: () => api.marketplace.getCategories(),
+    enabled: showCreate,
   })
 
   // Ops staff for the picker — only loaded when the reassign dialog opens.
@@ -104,15 +161,23 @@ function PlatformWebsitesPageInner() {
   })
 
   // ── Create platform website state ──
-  const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState({
     url: "",
     name: "",
-    category: "",
-    language: "",
+    listingTitle: "",
+    description: "",
+    categoryIds: [] as string[],
+    language: "English",
     country: "",
-    domainRating: "",
-    monthlyTraffic: "",
+    sportsGamingAllowed: false,
+    pharmacyAllowed: false,
+    cryptoAllowed: false,
+    backlinkCount: "1",
+    linkType: "DOFOLLOW",
+    linkValidity: "PERMANENT",
+    googleNews: false,
+    markedSponsored: false,
+    foreignLanguageAllowed: false,
   })
 
   const createMut = useMutation({
@@ -120,15 +185,29 @@ function PlatformWebsitesPageInner() {
       api.admin.createPlatformWebsite({
         url: createForm.url.trim(),
         name: createForm.name.trim() || undefined,
-        category: createForm.category.trim() || undefined,
-        language: createForm.language.trim() || undefined,
+        listingTitle: createForm.listingTitle.trim(),
+        description: createForm.description.trim(),
+        categoryIds: createForm.categoryIds,
+        language: createForm.language,
         country: createForm.country.trim() || undefined,
-        domainRating: createForm.domainRating
-          ? Number(createForm.domainRating)
-          : undefined,
-        monthlyTraffic: createForm.monthlyTraffic
-          ? Number(createForm.monthlyTraffic)
-          : undefined,
+        sportsGamingAllowed: createForm.sportsGamingAllowed,
+        pharmacyAllowed: createForm.pharmacyAllowed,
+        cryptoAllowed: createForm.cryptoAllowed,
+        backlinkCount: Number(createForm.backlinkCount),
+        linkType: createForm.linkType as
+          | "DOFOLLOW"
+          | "NOFOLLOW"
+          | "SPONSORED"
+          | "UGC",
+        linkValidity: createForm.linkValidity as
+          | "PERMANENT"
+          | "FIVE_YEARS"
+          | "ONE_YEAR"
+          | "SIX_MONTHS"
+          | "THREE_MONTHS",
+        googleNews: createForm.googleNews,
+        markedSponsored: createForm.markedSponsored,
+        foreignLanguageAllowed: createForm.foreignLanguageAllowed,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "platform-websites"] })
@@ -137,17 +216,32 @@ function PlatformWebsitesPageInner() {
       setCreateForm({
         url: "",
         name: "",
-        category: "",
-        language: "",
+        listingTitle: "",
+        description: "",
+        categoryIds: [],
+        language: "English",
         country: "",
-        domainRating: "",
-        monthlyTraffic: "",
+        sportsGamingAllowed: false,
+        pharmacyAllowed: false,
+        cryptoAllowed: false,
+        backlinkCount: "1",
+        linkType: "DOFOLLOW",
+        linkValidity: "PERMANENT",
+        googleNews: false,
+        markedSponsored: false,
+        foreignLanguageAllowed: false,
       })
     },
     onError: (e: Error) => toast.error(e.message || "Failed to create website"),
   })
 
-  const canCreate = createForm.url.trim().length > 0
+  const canCreate =
+    createForm.url.trim().length > 0 &&
+    createForm.listingTitle.trim().length >= 3 &&
+    createForm.description.trim().length > 0 &&
+    createForm.description.length <= 500 &&
+    createForm.categoryIds.length >= 1 &&
+    createForm.categoryIds.length <= MARKETPLACE_CATEGORY_LIMIT
   const websites = websitesQ.data ?? []
   const assignedCount = websites.filter((website) => website.managedBy).length
   const unassignedCount = websites.length - assignedCount
@@ -598,7 +692,7 @@ function PlatformWebsitesPageInner() {
 
       {/* Create platform website dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Platform Website</DialogTitle>
             <DialogDescription>
@@ -609,7 +703,7 @@ function PlatformWebsitesPageInner() {
                 " The site and every new order placed through it will be assigned to you automatically."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="space-y-1">
               <Label>Website URL *</Label>
               <Input
@@ -632,26 +726,6 @@ function PlatformWebsitesPageInner() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Category</Label>
-                <Input
-                  placeholder="Technology"
-                  value={createForm.category}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, category: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Language</Label>
-                <Input
-                  placeholder="en"
-                  value={createForm.language}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, language: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-1">
                 <Label>Country</Label>
                 <Input
                   placeholder="US"
@@ -661,38 +735,192 @@ function PlatformWebsitesPageInner() {
                   }
                 />
               </div>
+            </div>
+            <div className="space-y-1">
+              <Label>Listing title *</Label>
+              <Input
+                maxLength={200}
+                placeholder="Technology guest posts on Example"
+                value={createForm.listingTitle}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    listingTitle: e.target.value,
+                  })
+                }
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between gap-3">
+                <Label>Description *</Label>
+                <span className="text-xs text-muted-foreground">
+                  {createForm.description.length}/500
+                </span>
+              </div>
+              <Textarea
+                rows={4}
+                maxLength={500}
+                placeholder="Describe the audience, editorial focus, and publishing standards."
+                value={createForm.description}
+                onChange={(e) =>
+                  setCreateForm({
+                    ...createForm,
+                    description: e.target.value,
+                  })
+                }
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label>Domain Rating</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  placeholder="60"
-                  value={createForm.domainRating}
-                  onChange={(e) =>
-                    setCreateForm({
-                      ...createForm,
-                      domainRating: e.target.value,
-                    })
+                <Label>Categories * (1–7)</Label>
+                <MultiSelect
+                  options={(categoriesQ.data ?? []).map((category) => ({
+                    value: category.id,
+                    label: category.name,
+                  }))}
+                  value={createForm.categoryIds}
+                  onValueChange={(categoryIds) =>
+                    setCreateForm({ ...createForm, categoryIds })
                   }
+                  maxSelected={MARKETPLACE_CATEGORY_LIMIT}
+                  placeholder={
+                    categoriesQ.isLoading
+                      ? "Loading categories..."
+                      : "Choose categories"
+                  }
+                  searchPlaceholder="Search categories..."
+                  disabled={categoriesQ.isLoading || categoriesQ.isError}
                 />
               </div>
               <div className="space-y-1">
-                <Label>Monthly Traffic</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  placeholder="10000"
-                  value={createForm.monthlyTraffic}
-                  onChange={(e) =>
+                <Label>Primary language *</Label>
+                <Select
+                  value={createForm.language}
+                  onValueChange={(language) =>
+                    setCreateForm({ ...createForm, language })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MARKETPLACE_LANGUAGES.map((language) => (
+                      <SelectItem key={language} value={language}>
+                        {language}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <p className="mb-3 font-medium">Placement policy</p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <PolicySelect
+                  label="Sports/Gaming allowed?"
+                  value={createForm.sportsGamingAllowed ? "yes" : "no"}
+                  options={YES_NO_OPTIONS}
+                  onChange={(value) =>
                     setCreateForm({
                       ...createForm,
-                      monthlyTraffic: e.target.value,
+                      sportsGamingAllowed: value === "yes",
+                    })
+                  }
+                />
+                <PolicySelect
+                  label="Pharmacy allowed?"
+                  value={createForm.pharmacyAllowed ? "yes" : "no"}
+                  options={YES_NO_OPTIONS}
+                  onChange={(value) =>
+                    setCreateForm({
+                      ...createForm,
+                      pharmacyAllowed: value === "yes",
+                    })
+                  }
+                />
+                <PolicySelect
+                  label="Crypto allowed?"
+                  value={createForm.cryptoAllowed ? "yes" : "no"}
+                  options={YES_NO_OPTIONS}
+                  onChange={(value) =>
+                    setCreateForm({
+                      ...createForm,
+                      cryptoAllowed: value === "yes",
+                    })
+                  }
+                />
+                <PolicySelect
+                  label="Number of backlinks"
+                  value={createForm.backlinkCount}
+                  options={[1, 2, 3].map((value) => ({
+                    value: String(value),
+                    label: String(value),
+                  }))}
+                  onChange={(backlinkCount) =>
+                    setCreateForm({ ...createForm, backlinkCount })
+                  }
+                />
+                <PolicySelect
+                  label="Link type"
+                  value={createForm.linkType}
+                  options={LISTING_LINK_TYPES.map((value) => ({
+                    value,
+                    label: LISTING_LINK_TYPE_LABELS[value],
+                  }))}
+                  onChange={(linkType) =>
+                    setCreateForm({ ...createForm, linkType })
+                  }
+                />
+                <PolicySelect
+                  label="Link validity"
+                  value={createForm.linkValidity}
+                  options={LISTING_LINK_VALIDITIES.map((value) => ({
+                    value,
+                    label: LISTING_LINK_VALIDITY_LABELS[value],
+                  }))}
+                  onChange={(linkValidity) =>
+                    setCreateForm({ ...createForm, linkValidity })
+                  }
+                />
+                <PolicySelect
+                  label="Google News?"
+                  value={createForm.googleNews ? "yes" : "no"}
+                  options={YES_NO_OPTIONS}
+                  onChange={(value) =>
+                    setCreateForm({
+                      ...createForm,
+                      googleNews: value === "yes",
+                    })
+                  }
+                />
+                <PolicySelect
+                  label="Marked as sponsored?"
+                  value={createForm.markedSponsored ? "yes" : "no"}
+                  options={YES_NO_OPTIONS}
+                  onChange={(value) =>
+                    setCreateForm({
+                      ...createForm,
+                      markedSponsored: value === "yes",
+                    })
+                  }
+                />
+                <PolicySelect
+                  label="Foreign-language content allowed?"
+                  value={createForm.foreignLanguageAllowed ? "yes" : "no"}
+                  options={YES_NO_OPTIONS}
+                  onChange={(value) =>
+                    setCreateForm({
+                      ...createForm,
+                      foreignLanguageAllowed: value === "yes",
                     })
                   }
                 />
               </div>
             </div>
+            <p className="text-xs leading-5 text-muted-foreground">
+              Search and traffic metrics are imported from the GSC and GA4
+              properties linked after creation; staff cannot self-report them.
+            </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCreate(false)}>
@@ -700,7 +928,12 @@ function PlatformWebsitesPageInner() {
             </Button>
             <Button
               onClick={() => createMut.mutate()}
-              disabled={!canCreate || createMut.isPending}
+              disabled={
+                !canCreate ||
+                createMut.isPending ||
+                categoriesQ.isLoading ||
+                categoriesQ.isError
+              }
             >
               {createMut.isPending ? "Creating..." : "Create"}
             </Button>

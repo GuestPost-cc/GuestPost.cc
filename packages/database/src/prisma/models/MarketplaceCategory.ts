@@ -258,7 +258,7 @@ export type MarketplaceCategoryWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"MarketplaceCategory"> | Date | string
   parent?: Prisma.XOR<Prisma.MarketplaceCategoryNullableScalarRelationFilter, Prisma.MarketplaceCategoryWhereInput> | null
   children?: Prisma.MarketplaceCategoryListRelationFilter
-  listings?: Prisma.MarketplaceListingListRelationFilter
+  listings?: Prisma.MarketplaceListingCategoryListRelationFilter
 }
 
 export type MarketplaceCategoryOrderByWithRelationInput = {
@@ -274,7 +274,7 @@ export type MarketplaceCategoryOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   parent?: Prisma.MarketplaceCategoryOrderByWithRelationInput
   children?: Prisma.MarketplaceCategoryOrderByRelationAggregateInput
-  listings?: Prisma.MarketplaceListingOrderByRelationAggregateInput
+  listings?: Prisma.MarketplaceListingCategoryOrderByRelationAggregateInput
 }
 
 export type MarketplaceCategoryWhereUniqueInput = Prisma.AtLeast<{
@@ -293,7 +293,7 @@ export type MarketplaceCategoryWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"MarketplaceCategory"> | Date | string
   parent?: Prisma.XOR<Prisma.MarketplaceCategoryNullableScalarRelationFilter, Prisma.MarketplaceCategoryWhereInput> | null
   children?: Prisma.MarketplaceCategoryListRelationFilter
-  listings?: Prisma.MarketplaceListingListRelationFilter
+  listings?: Prisma.MarketplaceListingCategoryListRelationFilter
 }, "id" | "slug">
 
 export type MarketplaceCategoryOrderByWithAggregationInput = {
@@ -342,7 +342,7 @@ export type MarketplaceCategoryCreateInput = {
   updatedAt?: Date | string
   parent?: Prisma.MarketplaceCategoryCreateNestedOneWithoutChildrenInput
   children?: Prisma.MarketplaceCategoryCreateNestedManyWithoutParentInput
-  listings?: Prisma.MarketplaceListingCreateNestedManyWithoutCategoryInput
+  listings?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutCategoryInput
 }
 
 export type MarketplaceCategoryUncheckedCreateInput = {
@@ -357,7 +357,7 @@ export type MarketplaceCategoryUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   children?: Prisma.MarketplaceCategoryUncheckedCreateNestedManyWithoutParentInput
-  listings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutCategoryInput
+  listings?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutCategoryInput
 }
 
 export type MarketplaceCategoryUpdateInput = {
@@ -372,7 +372,7 @@ export type MarketplaceCategoryUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   parent?: Prisma.MarketplaceCategoryUpdateOneWithoutChildrenNestedInput
   children?: Prisma.MarketplaceCategoryUpdateManyWithoutParentNestedInput
-  listings?: Prisma.MarketplaceListingUpdateManyWithoutCategoryNestedInput
+  listings?: Prisma.MarketplaceListingCategoryUpdateManyWithoutCategoryNestedInput
 }
 
 export type MarketplaceCategoryUncheckedUpdateInput = {
@@ -387,7 +387,7 @@ export type MarketplaceCategoryUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MarketplaceCategoryUncheckedUpdateManyWithoutParentNestedInput
-  listings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutCategoryNestedInput
+  listings?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutCategoryNestedInput
 }
 
 export type MarketplaceCategoryCreateManyInput = {
@@ -490,6 +490,11 @@ export type MarketplaceCategorySumOrderByAggregateInput = {
   sortOrder?: Prisma.SortOrder
 }
 
+export type MarketplaceCategoryScalarRelationFilter = {
+  is?: Prisma.MarketplaceCategoryWhereInput
+  isNot?: Prisma.MarketplaceCategoryWhereInput
+}
+
 export type MarketplaceCategoryCreateNestedOneWithoutChildrenInput = {
   create?: Prisma.XOR<Prisma.MarketplaceCategoryCreateWithoutChildrenInput, Prisma.MarketplaceCategoryUncheckedCreateWithoutChildrenInput>
   connectOrCreate?: Prisma.MarketplaceCategoryCreateOrConnectWithoutChildrenInput
@@ -554,12 +559,10 @@ export type MarketplaceCategoryCreateNestedOneWithoutListingsInput = {
   connect?: Prisma.MarketplaceCategoryWhereUniqueInput
 }
 
-export type MarketplaceCategoryUpdateOneWithoutListingsNestedInput = {
+export type MarketplaceCategoryUpdateOneRequiredWithoutListingsNestedInput = {
   create?: Prisma.XOR<Prisma.MarketplaceCategoryCreateWithoutListingsInput, Prisma.MarketplaceCategoryUncheckedCreateWithoutListingsInput>
   connectOrCreate?: Prisma.MarketplaceCategoryCreateOrConnectWithoutListingsInput
   upsert?: Prisma.MarketplaceCategoryUpsertWithoutListingsInput
-  disconnect?: Prisma.MarketplaceCategoryWhereInput | boolean
-  delete?: Prisma.MarketplaceCategoryWhereInput | boolean
   connect?: Prisma.MarketplaceCategoryWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.MarketplaceCategoryUpdateToOneWithWhereWithoutListingsInput, Prisma.MarketplaceCategoryUpdateWithoutListingsInput>, Prisma.MarketplaceCategoryUncheckedUpdateWithoutListingsInput>
 }
@@ -575,7 +578,7 @@ export type MarketplaceCategoryCreateWithoutChildrenInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   parent?: Prisma.MarketplaceCategoryCreateNestedOneWithoutChildrenInput
-  listings?: Prisma.MarketplaceListingCreateNestedManyWithoutCategoryInput
+  listings?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutCategoryInput
 }
 
 export type MarketplaceCategoryUncheckedCreateWithoutChildrenInput = {
@@ -589,7 +592,7 @@ export type MarketplaceCategoryUncheckedCreateWithoutChildrenInput = {
   isActive?: boolean
   createdAt?: Date | string
   updatedAt?: Date | string
-  listings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutCategoryInput
+  listings?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutCategoryInput
 }
 
 export type MarketplaceCategoryCreateOrConnectWithoutChildrenInput = {
@@ -608,7 +611,7 @@ export type MarketplaceCategoryCreateWithoutParentInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   children?: Prisma.MarketplaceCategoryCreateNestedManyWithoutParentInput
-  listings?: Prisma.MarketplaceListingCreateNestedManyWithoutCategoryInput
+  listings?: Prisma.MarketplaceListingCategoryCreateNestedManyWithoutCategoryInput
 }
 
 export type MarketplaceCategoryUncheckedCreateWithoutParentInput = {
@@ -622,7 +625,7 @@ export type MarketplaceCategoryUncheckedCreateWithoutParentInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   children?: Prisma.MarketplaceCategoryUncheckedCreateNestedManyWithoutParentInput
-  listings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutCategoryInput
+  listings?: Prisma.MarketplaceListingCategoryUncheckedCreateNestedManyWithoutCategoryInput
 }
 
 export type MarketplaceCategoryCreateOrConnectWithoutParentInput = {
@@ -657,7 +660,7 @@ export type MarketplaceCategoryUpdateWithoutChildrenInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   parent?: Prisma.MarketplaceCategoryUpdateOneWithoutChildrenNestedInput
-  listings?: Prisma.MarketplaceListingUpdateManyWithoutCategoryNestedInput
+  listings?: Prisma.MarketplaceListingCategoryUpdateManyWithoutCategoryNestedInput
 }
 
 export type MarketplaceCategoryUncheckedUpdateWithoutChildrenInput = {
@@ -671,7 +674,7 @@ export type MarketplaceCategoryUncheckedUpdateWithoutChildrenInput = {
   isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
-  listings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutCategoryNestedInput
+  listings?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutCategoryNestedInput
 }
 
 export type MarketplaceCategoryUpsertWithWhereUniqueWithoutParentInput = {
@@ -801,7 +804,7 @@ export type MarketplaceCategoryUpdateWithoutParentInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MarketplaceCategoryUpdateManyWithoutParentNestedInput
-  listings?: Prisma.MarketplaceListingUpdateManyWithoutCategoryNestedInput
+  listings?: Prisma.MarketplaceListingCategoryUpdateManyWithoutCategoryNestedInput
 }
 
 export type MarketplaceCategoryUncheckedUpdateWithoutParentInput = {
@@ -815,7 +818,7 @@ export type MarketplaceCategoryUncheckedUpdateWithoutParentInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   children?: Prisma.MarketplaceCategoryUncheckedUpdateManyWithoutParentNestedInput
-  listings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutCategoryNestedInput
+  listings?: Prisma.MarketplaceListingCategoryUncheckedUpdateManyWithoutCategoryNestedInput
 }
 
 export type MarketplaceCategoryUncheckedUpdateManyWithoutParentInput = {
@@ -866,7 +869,7 @@ export type MarketplaceCategoryCountOutputTypeCountChildrenArgs<ExtArgs extends 
  * MarketplaceCategoryCountOutputType without action
  */
 export type MarketplaceCategoryCountOutputTypeCountListingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
-  where?: Prisma.MarketplaceListingWhereInput
+  where?: Prisma.MarketplaceListingCategoryWhereInput
 }
 
 
@@ -947,7 +950,7 @@ export type $MarketplaceCategoryPayload<ExtArgs extends runtime.Types.Extensions
   objects: {
     parent: Prisma.$MarketplaceCategoryPayload<ExtArgs> | null
     children: Prisma.$MarketplaceCategoryPayload<ExtArgs>[]
-    listings: Prisma.$MarketplaceListingPayload<ExtArgs>[]
+    listings: Prisma.$MarketplaceListingCategoryPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1356,7 +1359,7 @@ export interface Prisma__MarketplaceCategoryClient<T, Null = never, ExtArgs exte
   readonly [Symbol.toStringTag]: "PrismaPromise"
   parent<T extends Prisma.MarketplaceCategory$parentArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceCategory$parentArgs<ExtArgs>>): Prisma.Prisma__MarketplaceCategoryClient<runtime.Types.Result.GetResult<Prisma.$MarketplaceCategoryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   children<T extends Prisma.MarketplaceCategory$childrenArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceCategory$childrenArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceCategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
-  listings<T extends Prisma.MarketplaceCategory$listingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceCategory$listingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  listings<T extends Prisma.MarketplaceCategory$listingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.MarketplaceCategory$listingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingCategoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1844,23 +1847,23 @@ export type MarketplaceCategory$childrenArgs<ExtArgs extends runtime.Types.Exten
  */
 export type MarketplaceCategory$listingsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   /**
-   * Select specific fields to fetch from the MarketplaceListing
+   * Select specific fields to fetch from the MarketplaceListingCategory
    */
-  select?: Prisma.MarketplaceListingSelect<ExtArgs> | null
+  select?: Prisma.MarketplaceListingCategorySelect<ExtArgs> | null
   /**
-   * Omit specific fields from the MarketplaceListing
+   * Omit specific fields from the MarketplaceListingCategory
    */
-  omit?: Prisma.MarketplaceListingOmit<ExtArgs> | null
+  omit?: Prisma.MarketplaceListingCategoryOmit<ExtArgs> | null
   /**
    * Choose, which related nodes to fetch as well
    */
-  include?: Prisma.MarketplaceListingInclude<ExtArgs> | null
-  where?: Prisma.MarketplaceListingWhereInput
-  orderBy?: Prisma.MarketplaceListingOrderByWithRelationInput | Prisma.MarketplaceListingOrderByWithRelationInput[]
-  cursor?: Prisma.MarketplaceListingWhereUniqueInput
+  include?: Prisma.MarketplaceListingCategoryInclude<ExtArgs> | null
+  where?: Prisma.MarketplaceListingCategoryWhereInput
+  orderBy?: Prisma.MarketplaceListingCategoryOrderByWithRelationInput | Prisma.MarketplaceListingCategoryOrderByWithRelationInput[]
+  cursor?: Prisma.MarketplaceListingCategoryWhereUniqueInput
   take?: number
   skip?: number
-  distinct?: Prisma.MarketplaceListingScalarFieldEnum | Prisma.MarketplaceListingScalarFieldEnum[]
+  distinct?: Prisma.MarketplaceListingCategoryScalarFieldEnum | Prisma.MarketplaceListingCategoryScalarFieldEnum[]
 }
 
 /**

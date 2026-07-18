@@ -6,10 +6,18 @@ import type {
   SearchFilters,
 } from "@guestpost/api-client"
 import {
+  LISTING_LINK_TYPE_LABELS,
+  LISTING_LINK_TYPES,
+  LISTING_LINK_VALIDITIES,
+  LISTING_LINK_VALIDITY_LABELS,
+  MARKETPLACE_LANGUAGES,
+} from "@guestpost/shared"
+import {
   Button,
   ErrorState,
   Input,
   Label,
+  MultiSelect,
   Select,
   SelectContent,
   SelectItem,
@@ -40,31 +48,41 @@ import { api } from "../../../lib/api"
 import { useCustomerAccess } from "../../../lib/hooks/use-customer-access"
 
 interface FilterState {
-  minDR: string
-  maxDR: string
   minPrice: string
   maxPrice: string
   minTraffic: string
   country: string
-  language: string
   maxTurnaroundDays: string
+  sportsGamingAllowed: string
+  pharmacyAllowed: string
+  cryptoAllowed: string
+  googleNews: string
+  markedSponsored: string
+  foreignLanguageAllowed: string
 }
 
 const EMPTY_FILTERS: FilterState = {
-  minDR: "",
-  maxDR: "",
   minPrice: "",
   maxPrice: "",
   minTraffic: "",
   country: "",
-  language: "",
   maxTurnaroundDays: "",
+  sportsGamingAllowed: "any",
+  pharmacyAllowed: "any",
+  cryptoAllowed: "any",
+  googleNews: "any",
+  markedSponsored: "any",
+  foreignLanguageAllowed: "any",
 }
 
 export default function MarketplacePage() {
   const [searchQuery, setSearchQuery] = useState("")
   const deferredSearchQuery = useDeferredValue(searchQuery)
-  const [selectedCategory, setSelectedCategory] = useState("all")
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([])
+  const [backlinkCounts, setBacklinkCounts] = useState<string[]>([])
+  const [linkTypes, setLinkTypes] = useState<string[]>([])
+  const [linkValidities, setLinkValidities] = useState<string[]>([])
   const [selectedService, setSelectedService] = useState("all")
   const [sortBy, setSortBy] = useState<SearchFilters["sortBy"]>("recommended")
   const [showMobileFilters, setShowMobileFilters] = useState(false)
@@ -84,24 +102,41 @@ export default function MarketplacePage() {
     const params: SearchFilters = { page, limit: 18, sortBy }
     const query = deferredSearchQuery.trim()
     if (query) params.query = query
-    if (selectedCategory !== "all") params.category = selectedCategory
+    if (selectedCategories.length) params.categories = selectedCategories
     if (selectedService !== "all") params.type = selectedService
-    if (filters.minDR) params.minDR = Number(filters.minDR)
-    if (filters.maxDR) params.maxDR = Number(filters.maxDR)
     if (filters.minPrice) params.minPrice = Number(filters.minPrice)
     if (filters.maxPrice) params.maxPrice = Number(filters.maxPrice)
     if (filters.minTraffic) params.minTraffic = Number(filters.minTraffic)
     if (filters.country.trim()) params.country = filters.country.trim()
-    if (filters.language.trim()) params.language = filters.language.trim()
+    if (selectedLanguages.length) params.languages = selectedLanguages
+    if (backlinkCounts.length) {
+      params.backlinkCounts = backlinkCounts.map(Number)
+    }
+    if (linkTypes.length) params.linkTypes = linkTypes
+    if (linkValidities.length) params.linkValidities = linkValidities
+    for (const key of [
+      "sportsGamingAllowed",
+      "pharmacyAllowed",
+      "cryptoAllowed",
+      "googleNews",
+      "markedSponsored",
+      "foreignLanguageAllowed",
+    ] as const) {
+      if (filters[key] !== "any") params[key] = filters[key] === "yes"
+    }
     if (filters.maxTurnaroundDays) {
       params.maxTurnaroundDays = Number(filters.maxTurnaroundDays)
     }
     return params
   }, [
     deferredSearchQuery,
+    backlinkCounts,
     filters,
+    linkTypes,
+    linkValidities,
     page,
-    selectedCategory,
+    selectedCategories,
+    selectedLanguages,
     selectedService,
     sortBy,
   ])
@@ -128,7 +163,11 @@ export default function MarketplacePage() {
 
   const resetFilters = () => {
     setFilters(EMPTY_FILTERS)
-    setSelectedCategory("all")
+    setSelectedCategories([])
+    setSelectedLanguages([])
+    setBacklinkCounts([])
+    setLinkTypes([])
+    setLinkValidities([])
     setSelectedService("all")
     setSearchQuery("")
     setPage(1)
@@ -138,10 +177,6 @@ export default function MarketplacePage() {
     setFilters((current) => ({ ...current, [key]: value }))
     setPage(1)
   }, [])
-
-  const categoryName = categories.find(
-    (category) => category.slug === selectedCategory,
-  )?.name
 
   const activeFilters = useMemo(() => {
     const active: Array<{ key: string; label: string; clear: () => void }> = []
@@ -155,12 +190,12 @@ export default function MarketplacePage() {
         },
       })
     }
-    if (selectedCategory !== "all") {
+    if (selectedCategories.length) {
       active.push({
         key: "category",
-        label: categoryName ?? selectedCategory,
+        label: `${selectedCategories.length} ${selectedCategories.length === 1 ? "category" : "categories"}`,
         clear: () => {
-          setSelectedCategory("all")
+          setSelectedCategories([])
           setPage(1)
         },
       })
@@ -174,20 +209,6 @@ export default function MarketplacePage() {
             ...current,
             minPrice: "",
             maxPrice: "",
-          }))
-          setPage(1)
-        },
-      })
-    }
-    if (filters.minDR || filters.maxDR) {
-      active.push({
-        key: "dr",
-        label: `DR ${filters.minDR || "1"}–${filters.maxDR || "100"}`,
-        clear: () => {
-          setFilters((current) => ({
-            ...current,
-            minDR: "",
-            maxDR: "",
           }))
           setPage(1)
         },
@@ -214,15 +235,65 @@ export default function MarketplacePage() {
         clear: () => updateFilter("country", ""),
       })
     }
-    if (filters.language) {
+    if (selectedLanguages.length) {
       active.push({
         key: "language",
-        label: filters.language,
-        clear: () => updateFilter("language", ""),
+        label: `${selectedLanguages.length} ${selectedLanguages.length === 1 ? "language" : "languages"}`,
+        clear: () => {
+          setSelectedLanguages([])
+          setPage(1)
+        },
+      })
+    }
+    if (backlinkCounts.length || linkTypes.length || linkValidities.length) {
+      active.push({
+        key: "link-policy",
+        label: "Link policy",
+        clear: () => {
+          setBacklinkCounts([])
+          setLinkTypes([])
+          setLinkValidities([])
+          setPage(1)
+        },
+      })
+    }
+    const yesNoCount = [
+      filters.sportsGamingAllowed,
+      filters.pharmacyAllowed,
+      filters.cryptoAllowed,
+      filters.googleNews,
+      filters.markedSponsored,
+      filters.foreignLanguageAllowed,
+    ].filter((value) => value !== "any").length
+    if (yesNoCount) {
+      active.push({
+        key: "policies",
+        label: `${yesNoCount} ${yesNoCount === 1 ? "policy" : "policies"}`,
+        clear: () => {
+          setFilters((current) => ({
+            ...current,
+            sportsGamingAllowed: "any",
+            pharmacyAllowed: "any",
+            cryptoAllowed: "any",
+            googleNews: "any",
+            markedSponsored: "any",
+            foreignLanguageAllowed: "any",
+          }))
+          setPage(1)
+        },
       })
     }
     return active
-  }, [categoryName, filters, selectedCategory, selectedService, updateFilter])
+  }, [
+    backlinkCounts,
+    filters,
+    linkTypes,
+    linkValidities,
+    selectedCategories,
+    selectedLanguages,
+    selectedService,
+    updateFilter,
+  ])
 
   if (searchError) {
     return (
@@ -238,9 +309,29 @@ export default function MarketplacePage() {
     <FilterPanel
       categories={categories}
       categoriesError={categoriesError as Error | null}
-      selectedCategory={selectedCategory}
-      onCategoryChange={(value) => {
-        setSelectedCategory(value)
+      selectedCategories={selectedCategories}
+      onCategoriesChange={(value) => {
+        setSelectedCategories(value)
+        setPage(1)
+      }}
+      selectedLanguages={selectedLanguages}
+      onLanguagesChange={(value) => {
+        setSelectedLanguages(value)
+        setPage(1)
+      }}
+      backlinkCounts={backlinkCounts}
+      onBacklinkCountsChange={(value) => {
+        setBacklinkCounts(value)
+        setPage(1)
+      }}
+      linkTypes={linkTypes}
+      onLinkTypesChange={(value) => {
+        setLinkTypes(value)
+        setPage(1)
+      }}
+      linkValidities={linkValidities}
+      onLinkValiditiesChange={(value) => {
+        setLinkValidities(value)
         setPage(1)
       }}
       filters={filters}
@@ -575,8 +666,7 @@ function SortOptions() {
   return (
     <>
       <SelectItem value="recommended">Best match</SelectItem>
-      <SelectItem value="dr">Highest authority</SelectItem>
-      <SelectItem value="traffic">Most traffic</SelectItem>
+      <SelectItem value="traffic">Highest GA4 traffic</SelectItem>
       <SelectItem value="price_asc">Lowest starting price</SelectItem>
       <SelectItem value="price_desc">Highest starting price</SelectItem>
       <SelectItem value="best_rated">Most reviewed</SelectItem>
@@ -588,8 +678,16 @@ function SortOptions() {
 function FilterPanel({
   categories,
   categoriesError,
-  selectedCategory,
-  onCategoryChange,
+  selectedCategories,
+  onCategoriesChange,
+  selectedLanguages,
+  onLanguagesChange,
+  backlinkCounts,
+  onBacklinkCountsChange,
+  linkTypes,
+  onLinkTypesChange,
+  linkValidities,
+  onLinkValiditiesChange,
   filters,
   onFilterChange,
   onReset,
@@ -598,8 +696,16 @@ function FilterPanel({
 }: {
   categories: Category[]
   categoriesError: Error | null
-  selectedCategory: string
-  onCategoryChange: (value: string) => void
+  selectedCategories: string[]
+  onCategoriesChange: (value: string[]) => void
+  selectedLanguages: string[]
+  onLanguagesChange: (value: string[]) => void
+  backlinkCounts: string[]
+  onBacklinkCountsChange: (value: string[]) => void
+  linkTypes: string[]
+  onLinkTypesChange: (value: string[]) => void
+  linkValidities: string[]
+  onLinkValiditiesChange: (value: string[]) => void
   filters: FilterState
   onFilterChange: (key: keyof FilterState, value: string) => void
   onReset: () => void
@@ -623,20 +729,19 @@ function FilterPanel({
       </div>
 
       <div className="space-y-3 px-1">
-        <Label htmlFor="marketplace-category">Category</Label>
-        <Select value={selectedCategory} onValueChange={onCategoryChange}>
-          <SelectTrigger id="marketplace-category" className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
-            {categories.map((category) => (
-              <SelectItem key={category.id} value={category.slug}>
-                {category.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label>Categories</Label>
+        <MultiSelect
+          options={categories.map((category) => ({
+            value: category.slug,
+            label: category.name,
+          }))}
+          value={selectedCategories}
+          onValueChange={onCategoriesChange}
+          placeholder="All categories"
+          searchPlaceholder="Search categories..."
+          disabled={!!categoriesError}
+          ariaLabel="Filter by categories"
+        />
         {categoriesError && (
           <button
             type="button"
@@ -684,32 +789,8 @@ function FilterPanel({
         </div>
       </fieldset>
 
-      <fieldset className="space-y-3 px-1">
-        <legend className="text-sm font-medium">Domain rating</legend>
-        <div className="grid grid-cols-2 gap-2">
-          <Input
-            aria-label="Minimum domain rating"
-            type="number"
-            min={1}
-            max={100}
-            placeholder="Min DR"
-            value={filters.minDR}
-            onChange={(event) => onFilterChange("minDR", event.target.value)}
-          />
-          <Input
-            aria-label="Maximum domain rating"
-            type="number"
-            min={1}
-            max={100}
-            placeholder="Max DR"
-            value={filters.maxDR}
-            onChange={(event) => onFilterChange("maxDR", event.target.value)}
-          />
-        </div>
-      </fieldset>
-
       <div className="space-y-3 px-1">
-        <Label htmlFor="minimum-traffic">Minimum monthly traffic</Label>
+        <Label htmlFor="minimum-traffic">Minimum monthly GA4 sessions</Label>
         <Input
           id="minimum-traffic"
           type="number"
@@ -752,15 +833,115 @@ function FilterPanel({
           />
         </div>
         <div className="space-y-3">
-          <Label htmlFor="marketplace-language">Language</Label>
-          <Input
-            id="marketplace-language"
-            placeholder="e.g. English"
-            value={filters.language}
-            onChange={(event) => onFilterChange("language", event.target.value)}
+          <Label>Languages</Label>
+          <MultiSelect
+            options={MARKETPLACE_LANGUAGES.map((language) => ({
+              value: language,
+              label: language,
+            }))}
+            value={selectedLanguages}
+            onValueChange={onLanguagesChange}
+            placeholder="All languages"
+            searchPlaceholder="Search languages..."
+            ariaLabel="Filter by languages"
           />
         </div>
       </div>
+
+      <div className="space-y-4 border-t px-1 pt-6">
+        <div>
+          <p className="text-sm font-medium">Placement policy</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Match the exact terms needed for this campaign.
+          </p>
+        </div>
+        <MultiSelect
+          options={[1, 2, 3].map((value) => ({
+            value: String(value),
+            label: `${value} backlink${value === 1 ? "" : "s"}`,
+          }))}
+          value={backlinkCounts}
+          onValueChange={onBacklinkCountsChange}
+          placeholder="Any backlink count"
+          ariaLabel="Filter by backlink count"
+        />
+        <MultiSelect
+          options={LISTING_LINK_TYPES.map((value) => ({
+            value,
+            label: LISTING_LINK_TYPE_LABELS[value],
+          }))}
+          value={linkTypes}
+          onValueChange={onLinkTypesChange}
+          placeholder="Any link type"
+          ariaLabel="Filter by link type"
+        />
+        <MultiSelect
+          options={LISTING_LINK_VALIDITIES.map((value) => ({
+            value,
+            label: LISTING_LINK_VALIDITY_LABELS[value],
+          }))}
+          value={linkValidities}
+          onValueChange={onLinkValiditiesChange}
+          placeholder="Any link validity"
+          ariaLabel="Filter by link validity"
+        />
+        <PolicyFilterSelect
+          label="Sports/Gaming allowed?"
+          value={filters.sportsGamingAllowed}
+          onChange={(value) => onFilterChange("sportsGamingAllowed", value)}
+        />
+        <PolicyFilterSelect
+          label="Pharmacy allowed?"
+          value={filters.pharmacyAllowed}
+          onChange={(value) => onFilterChange("pharmacyAllowed", value)}
+        />
+        <PolicyFilterSelect
+          label="Crypto allowed?"
+          value={filters.cryptoAllowed}
+          onChange={(value) => onFilterChange("cryptoAllowed", value)}
+        />
+        <PolicyFilterSelect
+          label="Google News?"
+          value={filters.googleNews}
+          onChange={(value) => onFilterChange("googleNews", value)}
+        />
+        <PolicyFilterSelect
+          label="Marked as sponsored?"
+          value={filters.markedSponsored}
+          onChange={(value) => onFilterChange("markedSponsored", value)}
+        />
+        <PolicyFilterSelect
+          label="Foreign-language content allowed?"
+          value={filters.foreignLanguageAllowed}
+          onChange={(value) => onFilterChange("foreignLanguageAllowed", value)}
+        />
+      </div>
+    </div>
+  )
+}
+
+function PolicyFilterSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="any">Any</SelectItem>
+          <SelectItem value="yes">Yes</SelectItem>
+          <SelectItem value="no">No</SelectItem>
+        </SelectContent>
+      </Select>
     </div>
   )
 }

@@ -37,11 +37,10 @@ function listingRow(id: string, price: number) {
     publisherId: "publisher-1",
     websiteId: `website-${id}`,
     organizationId: null,
-    categoryId: null,
     metricsData: null,
     trafficData: null,
     semrushData: null,
-    category: null,
+    categories: [],
     tags: [],
     images: [],
     reviews: [],
@@ -119,14 +118,18 @@ describe("MarketplaceService search", () => {
     const where = prisma.marketplaceListing.findMany.mock.calls[0][0].where
     expect(where.country).toEqual({ equals: "us", mode: "insensitive" })
     expect(where.language).toEqual({
-      equals: "english",
+      in: ["english"],
       mode: "insensitive",
     })
     expect(where.OR).toEqual(
       expect.arrayContaining([
         {
-          category: {
-            name: { contains: "technology", mode: "insensitive" },
+          categories: {
+            some: {
+              category: {
+                name: { contains: "technology", mode: "insensitive" },
+              },
+            },
           },
         },
         {
@@ -138,5 +141,35 @@ describe("MarketplaceService search", () => {
         },
       ]),
     )
+  })
+
+  it("combines multi-category, language, and placement-policy filters", async () => {
+    await service.searchListings({
+      categories: ["saas", "technology-and-gadgets"],
+      languages: ["English", "French"],
+      backlinkCounts: [1, 2],
+      linkTypes: ["DOFOLLOW"],
+      linkValidities: ["PERMANENT", "ONE_YEAR"],
+      cryptoAllowed: true,
+      googleNews: false,
+    })
+
+    const where = prisma.marketplaceListing.findMany.mock.calls[0][0].where
+    expect(where.categories).toEqual({
+      some: {
+        category: {
+          slug: { in: ["saas", "technology-and-gadgets"] },
+        },
+      },
+    })
+    expect(where.language).toEqual({
+      in: ["English", "French"],
+      mode: "insensitive",
+    })
+    expect(where.backlinkCount).toEqual({ in: [1, 2] })
+    expect(where.linkType).toEqual({ in: ["DOFOLLOW"] })
+    expect(where.linkValidity).toEqual({ in: ["PERMANENT", "ONE_YEAR"] })
+    expect(where.cryptoAllowed).toBe(true)
+    expect(where.googleNews).toBe(false)
   })
 })

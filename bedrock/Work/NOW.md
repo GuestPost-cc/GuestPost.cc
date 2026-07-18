@@ -1,10 +1,19 @@
 # Current Status
 
-**Phase**: Platform inventory, assigned-Operations management, and website-scoped Google integrations are implemented and verified locally; migration plus staging OAuth/sync validation remain.
+**Phase**: Marketplace taxonomy/language/policy expansion and website-scoped Google marketplace metrics are implemented, migrated, and verified locally; staging migration plus OAuth/sync validation remain.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Marketplace Taxonomy, Language, Policy, And Verified Metrics
+
+- Added the reviewed 87-category marketplace taxonomy and explicit many-to-many listing categories, with 1–7 unique categories enforced in DTOs, active-record lookup, and a concurrency-safe database trigger.
+- Added one controlled primary language and one value for every placement-policy field to both publisher and platform inventory flows; submission and approval fail closed when metadata is incomplete.
+- Added searchable multi-select category/language filters, multi-value link/backlink/validity filters, boolean policy filters, updated buyer cards/details, and category-aware publisher/admin inventory editing.
+- Removed self-reported performance inputs. GSC now publishes 30-day clicks/impressions and GA4 publishes 30-day sessions/users/pageviews into buyer-safe listing summaries; marketplace traffic ranking/filtering uses GA4 sessions.
+- Validation: Prisma schema valid; API 75/75 suites and 857/857 tests pass; integrations 7/7 suites and 69/69 tests pass; focused taxonomy/inventory tests 56/56 pass; API, integrations, shared, database client, API client, and UI builds pass; portal, publisher, and admin production builds/typechecks/lint pass; Biome and whitespace checks pass.
+- Local database recovery: reconciled a pre-existing `prisma db push` integration-schema drift, preserved and owner-scoped the existing encrypted Google account, marked `20260718120000_platform_domain_and_integration_ownership` applied, and deployed `20260718180000_marketplace_taxonomy_and_listing_policies`. All 36 migrations are current, Prisma reports an empty schema diff, API liveness/readiness are HTTP 200, and the database has 87 active categories with the max-seven trigger installed. All 17 legacy local listings still require an owner policy review because the migration intentionally did not guess commercial terms.
 
 ### Publisher Inventory And Service Management Redesign
 
@@ -220,16 +229,19 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
-Platform website/listing inventory and website-scoped Google performance integrations
-are code-complete locally. The release is gated on migration
-`20260718120000_platform_domain_and_integration_ownership`, worker deployment,
-and real-Google staging validation. The migration also applies the previously
-missing integration-model transition required by the publisher flow.
+Platform/publisher inventory, the reviewed marketplace taxonomy and placement
+policy, and website-scoped Google marketplace summaries are code-complete and
+migrated locally. The release is gated on applying migrations
+`20260718120000_platform_domain_and_integration_ownership` and
+`20260718180000_marketplace_taxonomy_and_listing_policies`, worker deployment,
+and real-Google staging validation.
 
 Publisher DNS verification remains unchanged. Platform sites skip DNS, while
 both ownership types can explicitly link one GSC property and one GA4 property
-to their single website/listing aggregate. Google account selection is
-independent from GuestPost login identity.
+to their single website/listing aggregate. GSC and GA4 syncs populate the
+buyer-safe rolling 30-day metrics used by marketplace cards, details, traffic
+filters, and default ranking. Google account selection is independent from
+GuestPost login identity.
 
 Operations can create platform websites from the admin portal; the API always
 assigns those sites to the creator and existing order creation automatically
@@ -247,22 +259,20 @@ data.
 
 > **Phase 5C** ends when a publisher can successfully connect Google Search Console, link a property, synchronize it, and manage the integration. Displaying search analytics is explicitly deferred to Phase 5D.
 
-> **Phase 5D** begins with implementing the GSC Search Analytics API ingestion pipeline (provider, sync worker, `WebsiteSearchDaily` writes) and builds the reporting API + SEO metrics UI (KPI cards, trend charts).
+> **Phase 5D marketplace slice is complete**: GSC/GA4 daily ingestion feeds buyer-safe listing summaries. Full owner reporting APIs, historical trend charts, pagination/backfill controls, and KPI dashboards remain a later reporting expansion.
 
 ## Next Actions
 
-1. **Migration release gate** — inspect any duplicate canonical domains or duplicate provider/website property mappings, then run `prisma migrate status` and `prisma migrate deploy` against Neon before deploying API/worker code. The new migration intentionally stops rather than guessing how to merge conflicting ownership/history.
-2. **Google integration staging pass** — deploy the worker, authorize the production callback URI, connect a Google account different from the GuestPost login, discover/link GSC and GA4 properties for one publisher and one platform site, then verify daily rows are written only to the selected website mappings.
+1. **Migration release gate** — inspect any duplicate canonical domains or duplicate provider/website property mappings, then run `prisma migrate status` and `prisma migrate deploy` against Neon before deploying API/worker code. Deploy both July 18 migrations before serving the new API. The ownership migration intentionally stops rather than guessing how to merge conflicting ownership/history.
+2. **Google integration staging pass** — deploy the worker, authorize the production callback URI, connect a Google account different from the GuestPost login, discover/link GSC and GA4 properties for one publisher and one platform site, then verify daily rows and their buyer-safe 30-day listing summaries are written only to the selected website mappings.
 3. **Auth IP warning follow-up** — Render logs now show Better Auth falling back to a shared per-path rate-limit bucket when no trusted client IP header is resolved; configure Better Auth trusted proxy/IP headers before production hardening.
 4. **Worker operations** — the worker is not deployed on Render yet; run it locally when testing DNS TXT verification, GSC sync, cancellation/settlement sweeps, or other queue-backed flows.
 5. **OAuth configuration** — authorize the deployed Google redirect URI `https://api.guestpost.pro.bd/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback` plus any localhost callback still needed for development.
 6. **Historical credential containment** — the exposed Neon password was rotated, but the old value remains in git history. Assess whether repository history/access containment is needed before production.
-7. **Phase 5D** — GSC Search Analytics ingestion + SEO metrics display
-   - Implement real GSC Search Analytics API calls in provider
-   - Pagination, date windows, UPSERT logic, deduplication, retries
-   - Historical data imports
-   - Reporting API endpoints (`GET /websites/:id/metrics`)
-   - SEO Metrics KPI cards (impressions, clicks, CTR, position) + trend charts
+7. **Reporting expansion** — build on the completed GSC/GA4 ingestion
+   - Pagination, configurable date windows, historical imports, and retry observability
+   - Owner reporting endpoints (`GET /websites/:id/metrics`)
+   - GSC/GA4 KPI cards and historical trend charts
 8. **Additional providers** — Bing Webmaster Tools
 
 ## Backlog (Future Cleanup)

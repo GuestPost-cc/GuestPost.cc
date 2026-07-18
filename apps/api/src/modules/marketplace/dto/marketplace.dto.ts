@@ -1,10 +1,24 @@
-import { ListingStatus, ServiceType } from "@guestpost/database"
-import { WebsiteOwnershipType } from "@guestpost/shared"
-import { Type } from "class-transformer"
 import {
+  ListingLinkType,
+  ListingLinkValidity,
+  ListingStatus,
+  ServiceType,
+} from "@guestpost/database"
+import {
+  MARKETPLACE_CATEGORY_LIMIT,
+  MARKETPLACE_LANGUAGES,
+  WebsiteOwnershipType,
+} from "@guestpost/shared"
+import { Transform, Type } from "class-transformer"
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsEnum,
+  IsIn,
+  IsInt,
   IsNumber,
   IsObject,
   IsOptional,
@@ -25,6 +39,9 @@ export const SERVICE_AVAILABILITY_VALUES = [
   "WAITLIST",
 ] as const
 export type ServiceAvailability = (typeof SERVICE_AVAILABILITY_VALUES)[number]
+
+const queryArray = (value: unknown) =>
+  Array.isArray(value) ? value : value == null ? value : [value]
 
 // One service offering on a listing. The same listing can carry many.
 // Price + turnaround are snapshotted onto the Order at creation, so
@@ -132,6 +149,13 @@ export class SearchListingsDto {
   @IsString()
   category?: string
 
+  @IsOptional()
+  @Transform(({ value }) => queryArray(value))
+  @IsArray()
+  @ArrayUnique()
+  @IsString({ each: true })
+  categories?: string[]
+
   // Phase 7: SearchListingsDto.type was a ListingType filter; now it's a
   // ServiceType filter that matches listings with ≥1 AVAILABLE service of
   // the given type.
@@ -140,6 +164,7 @@ export class SearchListingsDto {
   type?: ServiceType
 
   @IsOptional()
+  @Transform(({ value }) => queryArray(value))
   @IsArray()
   @IsString({ each: true })
   tags?: string[]
@@ -151,6 +176,80 @@ export class SearchListingsDto {
   @IsOptional()
   @IsString()
   language?: string
+
+  @IsOptional()
+  @Transform(({ value }) => queryArray(value))
+  @IsArray()
+  @ArrayUnique()
+  @IsIn(MARKETPLACE_LANGUAGES, { each: true })
+  languages?: string[]
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === "true" ? true : value === "false" ? false : value,
+  )
+  @IsBoolean()
+  sportsGamingAllowed?: boolean
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === "true" ? true : value === "false" ? false : value,
+  )
+  @IsBoolean()
+  pharmacyAllowed?: boolean
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === "true" ? true : value === "false" ? false : value,
+  )
+  @IsBoolean()
+  cryptoAllowed?: boolean
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    queryArray(value)?.map((item: unknown) => Number(item)),
+  )
+  @IsArray()
+  @ArrayUnique()
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  @Max(3, { each: true })
+  backlinkCounts?: number[]
+
+  @IsOptional()
+  @Transform(({ value }) => queryArray(value))
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(ListingLinkType, { each: true })
+  linkTypes?: ListingLinkType[]
+
+  @IsOptional()
+  @Transform(({ value }) => queryArray(value))
+  @IsArray()
+  @ArrayUnique()
+  @IsEnum(ListingLinkValidity, { each: true })
+  linkValidities?: ListingLinkValidity[]
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === "true" ? true : value === "false" ? false : value,
+  )
+  @IsBoolean()
+  googleNews?: boolean
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === "true" ? true : value === "false" ? false : value,
+  )
+  @IsBoolean()
+  markedSponsored?: boolean
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === "true" ? true : value === "false" ? false : value,
+  )
+  @IsBoolean()
+  foreignLanguageAllowed?: boolean
 
   @IsOptional()
   @Type(() => Number)
@@ -276,32 +375,12 @@ export class CreateListingDto {
   maxPrice?: number
 
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  domainRating?: number
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(1)
-  @Max(100)
-  domainAuthority?: number
-
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  @Min(0)
-  traffic?: number
-
-  @IsOptional()
   @IsString()
   country?: string
 
-  @IsOptional()
   @IsString()
-  language?: string
+  @IsIn(MARKETPLACE_LANGUAGES)
+  language!: string
 
   @IsOptional()
   @IsArray()
@@ -348,10 +427,42 @@ export class CreateListingDto {
   @IsUrl()
   sampleUrl?: string
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  categoryId?: string
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MARKETPLACE_CATEGORY_LIMIT)
+  @ArrayUnique()
+  @IsString({ each: true })
+  categoryIds!: string[]
+
+  @IsBoolean()
+  sportsGamingAllowed!: boolean
+
+  @IsBoolean()
+  pharmacyAllowed!: boolean
+
+  @IsBoolean()
+  cryptoAllowed!: boolean
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  backlinkCount!: number
+
+  @IsEnum(ListingLinkType)
+  linkType!: ListingLinkType
+
+  @IsEnum(ListingLinkValidity)
+  linkValidity!: ListingLinkValidity
+
+  @IsBoolean()
+  googleNews!: boolean
+
+  @IsBoolean()
+  markedSponsored!: boolean
+
+  @IsBoolean()
+  foreignLanguageAllowed!: boolean
 
   @IsOptional()
   @IsArray()
@@ -393,10 +504,46 @@ export class UpdateListingDto {
   @MaxLength(500)
   shortDescription?: string
 
-  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(MARKETPLACE_CATEGORY_LIMIT)
+  @ArrayUnique()
+  @IsString({ each: true })
+  categoryIds!: string[]
+
   @IsString()
-  @MaxLength(64)
-  categoryId?: string
+  @IsIn(MARKETPLACE_LANGUAGES)
+  language!: string
+
+  @IsBoolean()
+  sportsGamingAllowed!: boolean
+
+  @IsBoolean()
+  pharmacyAllowed!: boolean
+
+  @IsBoolean()
+  cryptoAllowed!: boolean
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(3)
+  backlinkCount!: number
+
+  @IsEnum(ListingLinkType)
+  linkType!: ListingLinkType
+
+  @IsEnum(ListingLinkValidity)
+  linkValidity!: ListingLinkValidity
+
+  @IsBoolean()
+  googleNews!: boolean
+
+  @IsBoolean()
+  markedSponsored!: boolean
+
+  @IsBoolean()
+  foreignLanguageAllowed!: boolean
 
   @IsOptional()
   @IsArray()

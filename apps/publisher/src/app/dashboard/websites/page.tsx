@@ -1,5 +1,6 @@
 "use client"
 
+import { MARKETPLACE_LANGUAGES } from "@guestpost/shared"
 import {
   Badge,
   Button,
@@ -42,7 +43,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
 import { api } from "../../../lib/api"
@@ -50,12 +51,8 @@ import { useAuth } from "../../../lib/auth"
 
 const websiteSchema = z.object({
   url: z.string().url("Must be a valid URL"),
-  domainRating: z.coerce.number().min(0).max(100).optional(),
-  monthlyTraffic: z.coerce.number().min(0).optional(),
   country: z.string().optional(),
-  language: z.string().optional(),
-  price: z.coerce.number().min(0).optional(),
-  niche: z.string().optional(),
+  language: z.enum(MARKETPLACE_LANGUAGES).optional(),
 })
 
 type WebsiteFormData = z.infer<typeof websiteSchema>
@@ -66,7 +63,7 @@ interface Website {
   domainRating?: number
   monthlyTraffic?: number
   country?: string
-  language?: string
+  language?: (typeof MARKETPLACE_LANGUAGES)[number]
   price?: number
   niche?: string
   status: "ACTIVE" | "ARCHIVED" | "PENDING"
@@ -118,6 +115,7 @@ function WebsiteForm({
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
   } = useForm<WebsiteFormData>({
     resolver: zodResolver(websiteSchema),
@@ -140,55 +138,35 @@ function WebsiteForm({
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="domainRating">Domain Rating (DA)</Label>
-          <Input
-            id="domainRating"
-            type="number"
-            placeholder="50"
-            {...register("domainRating")}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="monthlyTraffic">Monthly Traffic</Label>
-          <Input
-            id="monthlyTraffic"
-            type="number"
-            placeholder="10000"
-            {...register("monthlyTraffic")}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
           <Label htmlFor="country">Country</Label>
           <Input id="country" placeholder="US" {...register("country")} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="language">Language</Label>
-          <Input
-            id="language"
-            placeholder="English"
-            {...register("language")}
+          <Controller
+            name="language"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger id="language">
+                  <SelectValue placeholder="Choose language" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MARKETPLACE_LANGUAGES.map((language) => (
+                    <SelectItem key={language} value={language}>
+                      {language}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           />
         </div>
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="price">Price (USD)</Label>
-          <Input
-            id="price"
-            type="number"
-            placeholder="100"
-            {...register("price")}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="niche">Niche</Label>
-          <Input id="niche" placeholder="Technology" {...register("niche")} />
-        </div>
-      </div>
+      <p className="text-xs leading-5 text-muted-foreground">
+        Categories, placement terms, and services are edited from the website
+        workspace. Search and traffic metrics come from linked GSC/GA4 data.
+      </p>
 
       <DialogFooter className="pt-4">
         {onCancel && (
@@ -286,7 +264,7 @@ export default function WebsitesPage() {
           domainRating: s.metrics?.dr || 0,
           monthlyTraffic: s.metrics?.traffic || 0,
           country: s.country || "",
-          language: s.language || "",
+          language: s.language || undefined,
           price: prices.length > 0 ? Math.min(...prices) : 0,
           niche: listing?.category?.name || s.category || "",
           status: s.isActive ? "ACTIVE" : "ARCHIVED",
@@ -305,12 +283,8 @@ export default function WebsitesPage() {
       if (!publisherId) throw new Error("Not authenticated")
       return api.publishers.updateWebsite(publisherId, id, {
         url: data.url,
-        category: data.niche,
         language: data.language,
         country: data.country,
-        domainRating: data.domainRating,
-        monthlyTraffic: data.monthlyTraffic,
-        price: data.price,
       })
     },
     onSuccess: () => {
@@ -665,12 +639,8 @@ export default function WebsitesPage() {
           editingWebsite
             ? {
                 url: editingWebsite.url,
-                domainRating: editingWebsite.domainRating,
-                monthlyTraffic: editingWebsite.monthlyTraffic,
                 country: editingWebsite.country,
                 language: editingWebsite.language,
-                price: editingWebsite.price,
-                niche: editingWebsite.niche,
               }
             : undefined
         }

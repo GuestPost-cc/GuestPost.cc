@@ -138,8 +138,9 @@ export default function PublisherListingsPage() {
   const categories = useMemo(() => {
     const values = new Map<string, string>()
     for (const listing of listings) {
-      if (listing.category) {
-        values.set(listing.category.id, listing.category.name)
+      for (const category of listing.categories ??
+        (listing.category ? [listing.category] : [])) {
+        values.set(category.id, category.name)
       }
     }
     return [...values.entries()].sort((a, b) => a[1].localeCompare(b[1]))
@@ -154,7 +155,9 @@ export default function PublisherListingsPage() {
           listing.title,
           listing.description,
           listing.websiteUrl,
-          listing.category?.name,
+          ...(
+            listing.categories ?? (listing.category ? [listing.category] : [])
+          ).map((category) => category.name),
           ...services.map((service) => serviceLabel(service.serviceType)),
         ]
           .filter(Boolean)
@@ -180,7 +183,10 @@ export default function PublisherListingsPage() {
               service.availability !== "PAUSED",
           )
         const matchesCategory =
-          categoryFilter === "all" || listing.category?.id === categoryFilter
+          categoryFilter === "all" ||
+          (
+            listing.categories ?? (listing.category ? [listing.category] : [])
+          ).some((category) => category.id === categoryFilter)
         return (
           matchesSearch && matchesStatus && matchesService && matchesCategory
         )
@@ -520,8 +526,20 @@ function PublisherListingCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              {listing.category && (
-                <Badge variant="secondary">{listing.category.name}</Badge>
+              {(
+                listing.categories ??
+                (listing.category ? [listing.category] : [])
+              )
+                .slice(0, 3)
+                .map((category) => (
+                  <Badge key={category.id} variant="secondary">
+                    {category.name}
+                  </Badge>
+                ))}
+              {(listing.categories?.length ?? 0) > 3 && (
+                <Badge variant="outline">
+                  +{(listing.categories?.length ?? 0) - 3}
+                </Badge>
               )}
               <Badge className={phaseInfo.tone}>{phaseInfo.label}</Badge>
             </div>

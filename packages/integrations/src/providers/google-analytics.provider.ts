@@ -204,6 +204,53 @@ export class GoogleAnalyticsProvider
 
             totalRecordsProcessed++
           }
+
+          const periodStart = new Date()
+          periodStart.setUTCHours(0, 0, 0, 0)
+          periodStart.setUTCDate(periodStart.getUTCDate() - 29)
+          const summary = await (db.websiteAnalyticsDaily as any).aggregate({
+            where: {
+              websiteId: wi.websiteId,
+              sourceIntegrationId: wi.id,
+              date: { gte: periodStart },
+            },
+            _sum: { sessions: true, users: true, pageviews: true },
+          })
+          const sessions = summary._sum.sessions ?? 0
+          const users = summary._sum.users ?? 0
+          const pageviews = summary._sum.pageviews ?? 0
+          const syncedAt = new Date().toISOString()
+          await (db.marketplaceListing as any).updateMany({
+            where: { websiteId: wi.websiteId },
+            data: {
+              traffic: sessions,
+              trafficData: {
+                source: "GA4",
+                periodDays: 30,
+                sessions,
+                users,
+                pageviews,
+                syncedAt,
+              },
+            },
+          })
+          const website = await (db.website as any).findUnique({
+            where: { id: wi.websiteId },
+            select: { metrics: true },
+          })
+          await (db.website as any).update({
+            where: { id: wi.websiteId },
+            data: {
+              metrics: {
+                ...(website?.metrics ?? {}),
+                traffic: sessions,
+                ga4Sessions30d: sessions,
+                ga4Users30d: users,
+                ga4Pageviews30d: pageviews,
+                ga4SyncedAt: syncedAt,
+              },
+            },
+          })
         } catch (err) {
           const errorMessage = err instanceof Error ? err.message : String(err)
           return {

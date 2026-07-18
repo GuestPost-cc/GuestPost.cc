@@ -5,6 +5,10 @@ import type {
   MarketplaceListing,
 } from "@guestpost/api-client"
 import {
+  LISTING_LINK_TYPE_LABELS,
+  LISTING_LINK_VALIDITY_LABELS,
+} from "@guestpost/shared"
+import {
   Avatar,
   AvatarFallback,
   Badge,
@@ -165,6 +169,8 @@ export default function ListingDetailPage() {
 
   const images = (listing.images ?? []).filter((image) => Boolean(image.url))
   const relatedListings = listing.relatedListings ?? []
+  const categories =
+    listing.categories ?? (listing.category ? [listing.category] : [])
   const attribution =
     listing.attribution?.label ??
     (listing.ownerType === "PLATFORM"
@@ -186,7 +192,7 @@ export default function ListingDetailPage() {
           </Link>
           <ChevronRight className="h-3.5 w-3.5" />
           <span className="truncate">
-            {listing.category?.name ?? "Listing details"}
+            {categories[0]?.name ?? "Listing details"}
           </span>
         </nav>
         <Button
@@ -206,9 +212,11 @@ export default function ListingDetailPage() {
 
       <header className="rounded-3xl border bg-card p-5 shadow-sm sm:p-7">
         <div className="flex flex-wrap items-center gap-2">
-          {listing.category && (
-            <Badge variant="secondary">{listing.category.name}</Badge>
-          )}
+          {categories.map((category) => (
+            <Badge key={category.id} variant="secondary">
+              {category.name}
+            </Badge>
+          ))}
           <Badge variant="outline" className={fulfillmentBadgeClass(listing)}>
             {fulfillmentLabel(listing)}
           </Badge>
@@ -330,44 +338,46 @@ export default function ListingDetailPage() {
                 Performance snapshot
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Compare the site-level signals that matter for placement
-                quality.
+                Verified 30-day signals imported from linked Google data
+                sources.
               </p>
             </div>
             <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Metric
-                label="Domain rating"
-                value={
-                  listing.domainRating != null
-                    ? String(listing.domainRating)
-                    : "—"
-                }
-                note="Authority signal"
-              />
-              <Metric
-                label="Monthly traffic"
+                label="GA4 sessions"
                 value={
                   listing.traffic != null
                     ? formatCompactNumber(listing.traffic)
                     : "—"
                 }
-                note="Estimated visits"
+                note="Last 30 days"
               />
               <Metric
-                label="Referring domains"
+                label="GSC clicks"
                 value={
-                  listing.referringDomains != null
-                    ? formatCompactNumber(listing.referringDomains)
+                  listing.siteMetrics?.gsc?.clicks != null
+                    ? formatCompactNumber(listing.siteMetrics.gsc.clicks)
                     : "—"
                 }
-                note="Linking websites"
+                note="Last 30 days"
               />
               <Metric
-                label="Spam score"
+                label="GSC impressions"
                 value={
-                  listing.spamScore != null ? `${listing.spamScore}%` : "—"
+                  listing.siteMetrics?.gsc?.impressions != null
+                    ? formatCompactNumber(listing.siteMetrics.gsc.impressions)
+                    : "—"
                 }
-                note="Risk indicator"
+                note="Last 30 days"
+              />
+              <Metric
+                label="GA4 pageviews"
+                value={
+                  listing.siteMetrics?.ga4?.pageviews != null
+                    ? formatCompactNumber(listing.siteMetrics.ga4.pageviews)
+                    : "—"
+                }
+                note="Last 30 days"
               />
             </dl>
           </section>
@@ -399,6 +409,33 @@ export default function ListingDetailPage() {
               {listing.doFollowOnly && (
                 <Badge variant="outline" className="gap-1.5">
                   <Check className="h-3.5 w-3.5" /> Do-follow only
+                </Badge>
+              )}
+              {listing.linkType && (
+                <Badge variant="outline">
+                  {LISTING_LINK_TYPE_LABELS[listing.linkType]}
+                </Badge>
+              )}
+              {listing.backlinkCount && (
+                <Badge variant="outline">
+                  {listing.backlinkCount} backlink
+                  {listing.backlinkCount === 1 ? "" : "s"}
+                </Badge>
+              )}
+              {listing.linkValidity && (
+                <Badge variant="outline">
+                  {LISTING_LINK_VALIDITY_LABELS[listing.linkValidity]}
+                </Badge>
+              )}
+              {listing.googleNews && (
+                <Badge variant="outline">Google News</Badge>
+              )}
+              {listing.markedSponsored && (
+                <Badge variant="outline">Marked sponsored</Badge>
+              )}
+              {listing.foreignLanguageAllowed && (
+                <Badge variant="outline">
+                  Foreign-language content allowed
                 </Badge>
               )}
               {listing.tags.map((tag) => (

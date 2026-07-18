@@ -1,4 +1,4 @@
-import type { HttpClient } from "../client"
+import type { HttpClient, RequestOptions } from "../client"
 
 // A single purchasable service on a listing. The customer's pick locks
 // (listingId, listingServiceId) onto the order — service and website cannot
@@ -48,10 +48,30 @@ export interface MarketplaceListing {
   domainRating?: number
   domainAuthority?: number
   traffic?: number
+  siteMetrics?: {
+    periodDays: number
+    gsc?: { clicks: number; impressions: number }
+    ga4?: { sessions: number; users: number; pageviews: number }
+  }
   referringDomains?: number
   spamScore?: number
   country?: string
   language?: string
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: 1 | 2 | 3 | null
+  linkType?: "DOFOLLOW" | "NOFOLLOW" | "SPONSORED" | "UGC" | null
+  linkValidity?:
+    | "PERMANENT"
+    | "FIVE_YEARS"
+    | "ONE_YEAR"
+    | "SIX_MONTHS"
+    | "THREE_MONTHS"
+    | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   turnaroundDays?: number
   revisionRounds?: number
   featured: boolean
@@ -62,6 +82,7 @@ export interface MarketplaceListing {
   websiteId?: string | null
   sampleUrl?: string
   category?: { id: string; name: string; slug: string }
+  categories?: Array<{ id: string; name: string; slug: string }>
   tags: Array<{ id: string; name: string; slug: string }>
   images: Array<{ url: string; isPrimary: boolean }>
   // pricingTiers removed in Phase 5 — replaced by the per-service price on
@@ -113,10 +134,21 @@ export interface MarketplaceListing {
 export interface SearchFilters {
   query?: string
   category?: string
+  categories?: string[]
   type?: string
   tags?: string[]
   country?: string
   language?: string
+  languages?: string[]
+  sportsGamingAllowed?: boolean
+  pharmacyAllowed?: boolean
+  cryptoAllowed?: boolean
+  backlinkCounts?: number[]
+  linkTypes?: string[]
+  linkValidities?: string[]
+  googleNews?: boolean
+  markedSponsored?: boolean
+  foreignLanguageAllowed?: boolean
   minPrice?: number
   maxPrice?: number
   minDR?: number
@@ -141,7 +173,22 @@ export interface UpdateMarketplaceListingInput {
   title: string
   description: string
   shortDescription?: string
-  categoryId?: string
+  categoryIds: string[]
+  language: string
+  sportsGamingAllowed: boolean
+  pharmacyAllowed: boolean
+  cryptoAllowed: boolean
+  backlinkCount: number
+  linkType: "DOFOLLOW" | "NOFOLLOW" | "SPONSORED" | "UGC"
+  linkValidity:
+    | "PERMANENT"
+    | "FIVE_YEARS"
+    | "ONE_YEAR"
+    | "SIX_MONTHS"
+    | "THREE_MONTHS"
+  googleNews: boolean
+  markedSponsored: boolean
+  foreignLanguageAllowed: boolean
   tags?: string[]
   doFollowOnly?: boolean
   sampleUrl?: string
@@ -223,7 +270,7 @@ export class MarketplaceService {
 
   searchListings(filters?: SearchFilters): Promise<SearchResult> {
     return this.client.get<SearchResult>("/marketplace/listings", {
-      params: filters as Record<string, any>,
+      params: filters as unknown as RequestOptions["params"],
     })
   }
 

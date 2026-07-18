@@ -1,4 +1,8 @@
 import type { MarketplaceListing } from "@guestpost/api-client"
+import {
+  LISTING_LINK_TYPE_LABELS,
+  LISTING_LINK_VALIDITY_LABELS,
+} from "@guestpost/shared"
 import { Badge } from "@guestpost/ui"
 import {
   ArrowUpRight,
@@ -47,6 +51,8 @@ export function MarketplaceListingCard({
   const turnaround =
     matchingService?.turnaroundDays ?? fastestTurnaround(listing)
   const price = matchingService?.price ?? startingPrice(listing)
+  const categories =
+    listing.categories ?? (listing.category ? [listing.category] : [])
 
   return (
     <Link
@@ -97,9 +103,24 @@ export function MarketplaceListingCard({
       </div>
 
       <div className="flex flex-1 flex-col p-5">
-        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-          <span>{listing.category?.name ?? "General"}</span>
-          <span aria-hidden="true">•</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          {categories.slice(0, 2).map((category) => (
+            <Badge
+              key={category.id}
+              variant="secondary"
+              className="font-medium"
+            >
+              {category.name}
+            </Badge>
+          ))}
+          {categories.length > 2 && (
+            <Badge variant="outline">+{categories.length - 2}</Badge>
+          )}
+          {listing.language && (
+            <Badge variant="outline">{listing.language}</Badge>
+          )}
+        </div>
+        <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
           {canViewUrls && listing.websiteUrl ? (
             <span className="min-w-0 truncate">
               {displayWebsiteHost(listing.websiteUrl)}
@@ -123,15 +144,15 @@ export function MarketplaceListingCard({
 
         <dl className="mt-5 grid grid-cols-3 divide-x rounded-xl border bg-muted/30 py-3">
           <div className="px-3">
-            <dt className="text-[11px] text-muted-foreground">Authority</dt>
+            <dt className="text-[11px] text-muted-foreground">Link type</dt>
             <dd className="mt-0.5 font-semibold">
-              {listing.domainRating != null
-                ? `DR ${listing.domainRating}`
+              {listing.linkType
+                ? LISTING_LINK_TYPE_LABELS[listing.linkType]
                 : "—"}
             </dd>
           </div>
           <div className="px-3">
-            <dt className="text-[11px] text-muted-foreground">Traffic/mo</dt>
+            <dt className="text-[11px] text-muted-foreground">GA4 sessions</dt>
             <dd className="mt-0.5 inline-flex items-center gap-1 font-semibold">
               <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
               {listing.traffic != null
@@ -165,6 +186,27 @@ export function MarketplaceListingCard({
             {visibleServices.length > 3 && (
               <span className="rounded-full border px-2.5 py-1 text-[11px] font-medium text-muted-foreground">
                 +{visibleServices.length - 3} more
+              </span>
+            )}
+          </div>
+        )}
+
+        {(listing.backlinkCount || listing.linkValidity) && (
+          <div className="mt-3 flex flex-wrap gap-1.5 text-[11px] text-muted-foreground">
+            {listing.backlinkCount && (
+              <span className="rounded-full border px-2.5 py-1">
+                {listing.backlinkCount} backlink
+                {listing.backlinkCount === 1 ? "" : "s"}
+              </span>
+            )}
+            {listing.linkValidity && (
+              <span className="rounded-full border px-2.5 py-1">
+                {LISTING_LINK_VALIDITY_LABELS[listing.linkValidity]}
+              </span>
+            )}
+            {listing.googleNews && (
+              <span className="rounded-full border px-2.5 py-1">
+                Google News
               </span>
             )}
           </div>

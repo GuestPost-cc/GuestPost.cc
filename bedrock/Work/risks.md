@@ -6,7 +6,7 @@ updated: 2026-07-17
 
 # Risks
 
-Updated 2026-06-18 after Phase 7.9 closed 25/31 findings (**11/11 Critical**, 7/14 High, **5/5 Medium**). All audit findings at Medium severity or above are now closed; the 6 still-open items are all High severity strategic/long-horizon items + the operator-action follow-ups. Original 2026-06-11 architecture review risks reassessed below.
+Updated 2026-07-18 after the marketplace taxonomy and verified-metrics change. All audit findings at Medium severity or above are now closed; the remaining items are strategic/long-horizon risks and operator-action follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
 
 The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
 
@@ -59,6 +59,7 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 
 - **URGENT — historical Render blueprint exposed a database credential.** The active `render.yml` uses Render secret prompts for `DATABASE_URL`, but an earlier committed Blueprint revision contained an inline Neon credential. Treat that credential as exposed: it was rotated in Neon during staging setup, and the new value must remain only in Render. Assess whether Git history/repository access needs containment before production. Do not copy the credential into tickets, logs, or Bedrock notes.
 - **Worker is local-only on free-tier staging.** The active Render Blueprint intentionally excludes `guestpost-worker` while the workspace is on free-tier testing. Queue-backed flows (email delivery, DNS/GSC verification, cancellation/settlement sweeps, payout jobs) require a local worker until Render worker capacity is available.
+- **Legacy listing metadata requires an owner review after the taxonomy migration.** The migration preserves existing category relationships and deliberately leaves the new placement-policy fields nullable instead of guessing commercial terms. Existing approved inventory can remain visible, but it will not match value-specific policy filters until a publisher or authorized platform staff member saves the reviewed language/categories/policy. Complete that review during the staging migration pass.
 - The historical 2026-06-15 platform audit has zero open production-blocker findings, but the deployment-secret exposure above is a separate current risk.
 - **Zero open Medium findings.** Phase 7.9 closed #28 (status-color drift), #29 (unused shared components), #30 (hooks-rule violation). Phase 7.8 closed #25 + #26 + #27.
 - ~~**Drawer a11y polish gap (Phase 7.6.1)**~~ — **CLOSED** by Phase 7.9 (`8c9d868` + `e90ea34`). New `<Drawer>` component on `@radix-ui/react-dialog` gives all 3 dashboards focus trap, Escape close, body scroll-lock, focus restore, and `aria-modal` for free. Portal layout also gained the pathname-auto-close it was missing since Phase 7.6.

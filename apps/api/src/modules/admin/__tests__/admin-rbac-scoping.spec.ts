@@ -26,6 +26,13 @@ describe("AdminService RBAC scoping", () => {
         create: jest.fn().mockResolvedValue({ id: "listing-1" }),
         findUnique: jest.fn(),
       },
+      marketplaceCategory: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { id: "category-1", name: "Technology", slug: "technology" },
+          ]),
+      },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       staffMembership: { findUnique: jest.fn() },
     }
@@ -90,6 +97,19 @@ describe("AdminService RBAC scoping", () => {
       {
         url: "https://ops-example.com",
         managedByUserId: "ops-2",
+        listingTitle: "Operations example listing",
+        description: "A complete platform listing description.",
+        categoryIds: ["category-1"],
+        language: "English",
+        sportsGamingAllowed: false,
+        pharmacyAllowed: false,
+        cryptoAllowed: false,
+        backlinkCount: 1,
+        linkType: "DOFOLLOW",
+        linkValidity: "PERMANENT",
+        googleNews: false,
+        markedSponsored: false,
+        foreignLanguageAllowed: false,
       },
       { id: "ops-1", staffRole: "OPERATIONS" },
     )
@@ -116,7 +136,22 @@ describe("AdminService RBAC scoping", () => {
     })
 
     await service.createPlatformWebsite(
-      { url: "https://platform-example.com" },
+      {
+        url: "https://platform-example.com",
+        listingTitle: "Platform example listing",
+        description: "A complete platform listing description.",
+        categoryIds: ["category-1"],
+        language: "English",
+        sportsGamingAllowed: false,
+        pharmacyAllowed: false,
+        cryptoAllowed: false,
+        backlinkCount: 1,
+        linkType: "DOFOLLOW",
+        linkValidity: "PERMANENT",
+        googleNews: false,
+        markedSponsored: false,
+        foreignLanguageAllowed: false,
+      },
       { id: "admin-1", staffRole: "SUPER_ADMIN" },
     )
 

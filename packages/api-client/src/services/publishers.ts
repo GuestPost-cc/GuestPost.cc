@@ -20,6 +20,23 @@ export interface PublisherWebsiteListing {
   status: string
   ownerType: "PUBLISHER"
   category?: { id: string; name: string; slug: string } | null
+  categories?: Array<{ id: string; name: string; slug: string }>
+  language?: string | null
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: "DOFOLLOW" | "NOFOLLOW" | "SPONSORED" | "UGC" | null
+  linkValidity?:
+    | "PERMANENT"
+    | "FIVE_YEARS"
+    | "ONE_YEAR"
+    | "SIX_MONTHS"
+    | "THREE_MONTHS"
+    | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
   services: PublisherWebsiteService[]
   createdAt?: string
   updatedAt?: string
@@ -62,13 +79,24 @@ export interface CreatePublisherWebsiteInput {
   url: string
   name?: string
   country?: string
-  language?: string
-  category?: string
-  categoryId?: string
+  language: string
+  categoryIds: string[]
   listingTitle?: string
   description?: string
-  domainRating?: number
-  monthlyTraffic?: number
+  sportsGamingAllowed: boolean
+  pharmacyAllowed: boolean
+  cryptoAllowed: boolean
+  backlinkCount: number
+  linkType: "DOFOLLOW" | "NOFOLLOW" | "SPONSORED" | "UGC"
+  linkValidity:
+    | "PERMANENT"
+    | "FIVE_YEARS"
+    | "ONE_YEAR"
+    | "SIX_MONTHS"
+    | "THREE_MONTHS"
+  googleNews: boolean
+  markedSponsored: boolean
+  foreignLanguageAllowed: boolean
   initialService?: {
     serviceType: string
     price: number

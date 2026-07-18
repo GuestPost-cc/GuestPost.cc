@@ -98,6 +98,7 @@ export const ModelName = {
   MarketplaceCategory: 'MarketplaceCategory',
   MarketplaceTag: 'MarketplaceTag',
   MarketplaceListing: 'MarketplaceListing',
+  MarketplaceListingCategory: 'MarketplaceListingCategory',
   ListingService: 'ListingService',
   MarketplaceListingTag: 'MarketplaceListingTag',
   MarketplaceListingImage: 'MarketplaceListingImage',
@@ -943,6 +944,15 @@ export const MarketplaceListingScalarFieldEnum = {
   featured: 'featured',
   verified: 'verified',
   doFollowOnly: 'doFollowOnly',
+  sportsGamingAllowed: 'sportsGamingAllowed',
+  pharmacyAllowed: 'pharmacyAllowed',
+  cryptoAllowed: 'cryptoAllowed',
+  backlinkCount: 'backlinkCount',
+  linkType: 'linkType',
+  linkValidity: 'linkValidity',
+  googleNews: 'googleNews',
+  markedSponsored: 'markedSponsored',
+  foreignLanguageAllowed: 'foreignLanguageAllowed',
   websiteUrl: 'websiteUrl',
   sampleUrl: 'sampleUrl',
   signupUrl: 'signupUrl',
@@ -955,11 +965,19 @@ export const MarketplaceListingScalarFieldEnum = {
   publishedAt: 'publishedAt',
   expiresAt: 'expiresAt',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt',
-  categoryId: 'categoryId'
+  updatedAt: 'updatedAt'
 } as const
 
 export type MarketplaceListingScalarFieldEnum = (typeof MarketplaceListingScalarFieldEnum)[keyof typeof MarketplaceListingScalarFieldEnum]
+
+
+export const MarketplaceListingCategoryScalarFieldEnum = {
+  listingId: 'listingId',
+  categoryId: 'categoryId',
+  createdAt: 'createdAt'
+} as const
+
+export type MarketplaceListingCategoryScalarFieldEnum = (typeof MarketplaceListingCategoryScalarFieldEnum)[keyof typeof MarketplaceListingCategoryScalarFieldEnum]
 
 
 export const ListingServiceScalarFieldEnum = {

@@ -586,6 +586,27 @@ export const ListingFulfillmentType = {
 export type ListingFulfillmentType = (typeof ListingFulfillmentType)[keyof typeof ListingFulfillmentType]
 
 
+export const ListingLinkType = {
+  DOFOLLOW: 'DOFOLLOW',
+  NOFOLLOW: 'NOFOLLOW',
+  SPONSORED: 'SPONSORED',
+  UGC: 'UGC'
+} as const
+
+export type ListingLinkType = (typeof ListingLinkType)[keyof typeof ListingLinkType]
+
+
+export const ListingLinkValidity = {
+  PERMANENT: 'PERMANENT',
+  FIVE_YEARS: 'FIVE_YEARS',
+  ONE_YEAR: 'ONE_YEAR',
+  SIX_MONTHS: 'SIX_MONTHS',
+  THREE_MONTHS: 'THREE_MONTHS'
+} as const
+
+export type ListingLinkValidity = (typeof ListingLinkValidity)[keyof typeof ListingLinkValidity]
+
+
 export const ExternalAccountStatus = {
   ACTIVE: 'ACTIVE',
   EXPIRED: 'EXPIRED',
