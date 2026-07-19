@@ -37,6 +37,15 @@ describe("MultiSelect selection limit", () => {
     await user.click(
       screen.getByRole("combobox", { name: "Marketplace categories" }),
     )
+    const enabledOption = screen
+      .getByText("Category 1")
+      .closest("[role=option]")
+    expect(enabledOption).toHaveAttribute("data-disabled", "false")
+    expect(enabledOption).toHaveClass(
+      "data-[disabled=true]:pointer-events-none",
+    )
+    expect(enabledOption).not.toHaveClass("data-[disabled]:pointer-events-none")
+
     for (let index = 1; index <= 7; index += 1) {
       await user.click(screen.getByText(`Category ${index}`))
     }

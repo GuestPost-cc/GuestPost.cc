@@ -156,7 +156,8 @@ const websiteSchema = z
     }
   })
 
-type WebsiteFormData = z.infer<typeof websiteSchema>
+type WebsiteFormInput = z.input<typeof websiteSchema>
+type WebsiteFormData = z.output<typeof websiteSchema>
 
 export default function NewWebsitePage() {
   const router = useRouter()
@@ -176,7 +177,7 @@ export default function NewWebsitePage() {
     clearErrors,
     setError,
     formState: { errors },
-  } = useForm<WebsiteFormData>({
+  } = useForm<WebsiteFormInput, unknown, WebsiteFormData>({
     resolver: zodResolver(websiteSchema),
     defaultValues: {
       country: "US",

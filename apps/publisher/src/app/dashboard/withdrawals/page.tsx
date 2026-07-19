@@ -97,7 +97,8 @@ export default function WithdrawalsPage() {
     amount: z.coerce.number().positive("Amount must be positive"),
   })
 
-  type RequestFormData = z.infer<typeof requestSchema>
+  type RequestFormInput = z.input<typeof requestSchema>
+  type RequestFormData = z.output<typeof requestSchema>
 
   const {
     register,
@@ -105,7 +106,7 @@ export default function WithdrawalsPage() {
     setValue,
     formState: { errors },
     reset,
-  } = useForm<RequestFormData>({
+  } = useForm<RequestFormInput, unknown, RequestFormData>({
     resolver: zodResolver(requestSchema),
   })
 
