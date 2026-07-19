@@ -59,6 +59,13 @@ Open/partial items require architectural design discussion.
   seed, integration, concurrency, and load setup use test-only Prisma helpers
   that refuse to run with `NODE_ENV=production`.
 - Worker deliveries verified via shared `delivery-verification` module (24 tests)
+- The worker uses a hybrid free-tier topology: Northflank continuously runs
+  only the four latency-sensitive BullMQ queues in `realtime` mode; a
+  five-minute maintenance dispatcher and an API-wakeable `on-demand` job run
+  the remaining work with a mandatory ten-minute catch-up. The realtime and
+  maintenance lanes do not load integration workers or receive integration and
+  Google credentials. Verified payout webhooks are durable in PostgreSQL
+  before acknowledgement; no worker lane initiates payout transfers.
 - Job signing with configurable secret (QUEUE_SIGNING_SECRET / JWT_SECRET fallback)
 - Publisher integrations are a top-level dashboard area at `/dashboard/integrations`, separate from Settings; sidebar active-state matching uses path-segment boundaries to avoid selecting Settings for integration pages.
 - Publisher website ownership is proven via DNS TXT verification, not Google Search Console. GSC links search performance data after OAuth. DNS verification jobs require the worker queue process, and GSC OAuth requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, plus an authorized redirect URI matching `${API_BASE_URL}/integrations/GOOGLE_SEARCH_CONSOLE/callback`.
