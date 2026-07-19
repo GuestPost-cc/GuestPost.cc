@@ -1,6 +1,6 @@
 # Current Status
 
-**Phase**: Admin authentication and account suspension are hardened locally, and the additive suspension-lifecycle migration is current on Neon. The API/auth suites and repository checks pass; PR, CI, merge, and deployed Admin-login verification are the active release steps. Real GSC/GA4 connection and sync validation remain.
+**Phase**: The free-tier hybrid worker rollout is live on Northflank and Render at `10c971c`. The realtime lane is running as one 0.2-vCPU/512-MB instance, the two scheduled job lanes are active, the Neon migration is current, and API/Redis/database readiness checks pass. Real GSC/GA4 connection and sync validation remain.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
@@ -23,6 +23,21 @@
   reduced idle BullMQ and metrics traffic for Upstash.
 - Added the deployment, security, scheduling, migration, rollback, monitoring,
   and incident runbook in `docs/WORKER_ARCHITECTURE.md`.
+- Merged PRs #57-#59 and deployed exact commit `10c971c`: Northflank runs
+  four continuous realtime queues, a five-minute deterministic maintenance
+  dispatcher, and an API-wakeable on-demand job with a ten-minute catch-up.
+  The recurring jobs use forbid-concurrency semantics and the realtime lane
+  does not receive payout-provider, integration-encryption, or Google OAuth
+  credentials.
+- Migrated the non-production Neon database through
+  `20260719223000_payout_webhook_inbox`; the payout-reference duplicate
+  preflight and stale-webhook-lock check are clean. The Render API is ready
+  with Redis and PostgreSQL healthy, and the first real five-minute maintenance
+  and ten-minute on-demand catch-up executions completed successfully.
+- The Render wake token is restricted to job-read/run access in the worker
+  project. Its negative authorization checks deny service and secret reads.
+  The temporary provisioning token was revoked, its setup role deleted, and
+  all local temporary credential files were erased after cutover.
 
 ### Admin Authentication And Suspension Hardening
 
