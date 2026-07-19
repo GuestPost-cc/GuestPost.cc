@@ -81,8 +81,8 @@ export interface CreatePublisherWebsiteInput {
   country?: string
   language: string
   categoryIds: string[]
-  listingTitle?: string
-  description?: string
+  listingTitle: string
+  description: string
   sportsGamingAllowed: boolean
   pharmacyAllowed: boolean
   cryptoAllowed: boolean

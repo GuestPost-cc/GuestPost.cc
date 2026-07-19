@@ -28,6 +28,7 @@ export interface MultiSelectProps {
   disabled?: boolean
   className?: string
   ariaLabel?: string
+  ariaInvalid?: boolean
 }
 
 export function MultiSelect({
@@ -41,6 +42,7 @@ export function MultiSelect({
   disabled,
   className,
   ariaLabel,
+  ariaInvalid,
 }: MultiSelectProps) {
   const selected = new Set(value)
   const selectedLabels = options
@@ -71,6 +73,7 @@ export function MultiSelect({
           variant="outline"
           role="combobox"
           aria-label={ariaLabel}
+          aria-invalid={ariaInvalid || undefined}
           aria-haspopup="listbox"
           disabled={disabled}
           className={cn("w-full justify-between font-normal", className)}
@@ -83,7 +86,14 @@ export function MultiSelect({
           >
             {summary}
           </span>
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <span className="ml-2 flex shrink-0 items-center gap-2">
+            {maxSelected !== undefined && (
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {value.length}/{maxSelected}
+              </span>
+            )}
+            <ChevronsUpDown className="h-4 w-4 opacity-50" />
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -123,7 +133,10 @@ export function MultiSelect({
             })}
           </CommandList>
           {maxSelected !== undefined && (
-            <div className="border-t px-3 py-2 text-xs text-muted-foreground">
+            <div
+              className="border-t px-3 py-2 text-xs text-muted-foreground"
+              aria-live="polite"
+            >
               {value.length}/{maxSelected} selected
             </div>
           )}

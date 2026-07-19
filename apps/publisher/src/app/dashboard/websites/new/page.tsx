@@ -1,13 +1,15 @@
 "use client"
 
-import type { Category } from "@guestpost/api-client"
+import { ApiError, type Category } from "@guestpost/api-client"
 import {
   LISTING_LINK_TYPE_LABELS,
   LISTING_LINK_TYPES,
   LISTING_LINK_VALIDITIES,
   LISTING_LINK_VALIDITY_LABELS,
+  LISTING_TITLE_URL_WARNING,
   MARKETPLACE_CATEGORY_LIMIT,
   MARKETPLACE_LANGUAGES,
+  validateWebsiteEnlistmentInput,
 } from "@guestpost/shared"
 import {
   Badge,
@@ -32,6 +34,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
@@ -42,6 +45,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 import { toast } from "sonner"
 import { z } from "zod"
@@ -83,14 +87,37 @@ const optionalNumber = (minimum: number) =>
 
 const websiteSchema = z
   .object({
-    url: z.string().url("Enter a complete URL, including https://"),
-    country: z.string().min(1, "Country is required"),
-    language: z.string().min(1, "Language is required"),
-    listingTitle: z.string().trim().min(3).max(200),
+    url: z.string().trim().min(1, "Website URL is required").max(2048),
+    country: z
+      .string()
+      .min(1, "Country is required")
+      .refine(
+        (value) => COUNTRIES.some(([country]) => country === value),
+        "Choose a supported country",
+      ),
+    language: z
+      .string()
+      .min(1, "Language is required")
+      .refine(
+        (value) => MARKETPLACE_LANGUAGES.some((language) => language === value),
+        "Choose a supported language",
+      ),
+    listingTitle: z
+      .string()
+      .trim()
+      .min(3, "Listing title must be at least 3 characters")
+      .max(200, "Listing title must be 200 characters or fewer"),
     categoryIds: z
       .array(z.string())
       .min(1, "Choose at least one marketplace category")
-      .max(MARKETPLACE_CATEGORY_LIMIT),
+      .max(
+        MARKETPLACE_CATEGORY_LIMIT,
+        `Choose no more than ${MARKETPLACE_CATEGORY_LIMIT} categories`,
+      )
+      .refine(
+        (values) => new Set(values).size === values.length,
+        "Choose each category only once",
+      ),
     description: z
       .string()
       .trim()
@@ -113,6 +140,13 @@ const websiteSchema = z
     foreignLanguageAllowed: z.enum(["yes", "no"]),
   })
   .superRefine((value, context) => {
+    for (const issue of validateWebsiteEnlistmentInput(value)) {
+      context.addIssue({
+        code: "custom",
+        path: [issue.field],
+        message: issue.message,
+      })
+    }
     if (value.addInitialService && value.price == null) {
       context.addIssue({
         code: "custom",
@@ -129,6 +163,7 @@ export default function NewWebsitePage() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const publisherId = user?.publisherId ?? "current"
+  const [submitAttempted, setSubmitAttempted] = useState(false)
   const categoriesQ = useQuery<Category[]>({
     queryKey: ["marketplace-categories"],
     queryFn: () => api.marketplace.getCategories(),
@@ -138,6 +173,8 @@ export default function NewWebsitePage() {
     handleSubmit,
     control,
     watch,
+    clearErrors,
+    setError,
     formState: { errors },
   } = useForm<WebsiteFormData>({
     resolver: zodResolver(websiteSchema),
@@ -163,6 +200,7 @@ export default function NewWebsitePage() {
     },
   })
   const description = watch("description") ?? ""
+  const categoryCount = watch("categoryIds")?.length ?? 0
   const addInitialService = watch("addInitialService")
 
   const addMutation = useMutation({
@@ -201,9 +239,29 @@ export default function NewWebsitePage() {
       toast.success("Website enlisted with its marketplace listing")
       router.push(`/dashboard/websites/${website.id}#marketplace`)
     },
-    onError: (error: Error) =>
-      toast.error(error.message || "Website could not be enlisted"),
+    onError: (error: Error) => {
+      const requestId = error instanceof ApiError ? error.requestId : undefined
+      const message = error.message || "Website could not be enlisted"
+      setError("root.server", {
+        message: requestId ? `${message} Request ID: ${requestId}` : message,
+      })
+      toast.error(message, {
+        description: requestId ? `Request ID: ${requestId}` : undefined,
+      })
+    },
   })
+
+  const submitForm = handleSubmit(
+    (data) => {
+      setSubmitAttempted(true)
+      clearErrors("root.server")
+      addMutation.mutate(data)
+    },
+    () => {
+      setSubmitAttempted(true)
+      toast.error("Complete the highlighted required fields")
+    },
+  )
 
   return (
     <div className="mx-auto max-w-6xl space-y-7">
@@ -233,10 +291,26 @@ export default function NewWebsitePage() {
       </div>
 
       <form
-        onSubmit={handleSubmit((data) => addMutation.mutate(data))}
+        onSubmit={submitForm}
+        noValidate
         className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_300px]"
       >
         <div className="space-y-6">
+          {submitAttempted && Object.keys(errors).length > 0 && (
+            <div
+              role="alert"
+              className="flex gap-3 rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive"
+            >
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium">Website could not be submitted</p>
+                <p className="mt-1 text-xs leading-5">
+                  {errors.root?.server?.message ??
+                    "Review every highlighted field and try again."}
+                </p>
+              </div>
+            </div>
+          )}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -248,10 +322,19 @@ export default function NewWebsitePage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              <Field label="Website URL" required error={errors.url?.message}>
+              <Field
+                label="Website URL"
+                htmlFor="website-url"
+                required
+                error={errors.url?.message}
+                description="Use the public homepage only, for example https://example.com."
+              >
                 <Input
+                  id="website-url"
                   placeholder="https://example.com"
                   autoComplete="url"
+                  aria-invalid={Boolean(errors.url)}
+                  className={errors.url ? "border-destructive" : undefined}
                   {...register("url")}
                 />
               </Field>
@@ -298,18 +381,28 @@ export default function NewWebsitePage() {
             <CardContent className="space-y-5">
               <Field
                 label="Listing title"
+                htmlFor="listing-title"
                 required
                 error={errors.listingTitle?.message}
+                description={LISTING_TITLE_URL_WARNING}
               >
                 <Input
+                  id="listing-title"
                   placeholder="Technology guest posts on Example"
                   maxLength={200}
+                  aria-invalid={Boolean(errors.listingTitle)}
+                  className={
+                    errors.listingTitle ? "border-destructive" : undefined
+                  }
                   {...register("listingTitle")}
                 />
               </Field>
               <div className="space-y-2.5">
                 <Label>
-                  Category <span className="text-destructive">*</span>
+                  Categories <span className="text-destructive">*</span>
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {categoryCount}/{MARKETPLACE_CATEGORY_LIMIT} selected
+                  </span>
                 </Label>
                 {categoriesQ.isLoading ? (
                   <Skeleton className="h-10 w-full" />
@@ -337,6 +430,10 @@ export default function NewWebsitePage() {
                         value={field.value}
                         onValueChange={field.onChange}
                         maxSelected={MARKETPLACE_CATEGORY_LIMIT}
+                        ariaInvalid={Boolean(errors.categoryIds)}
+                        className={
+                          errors.categoryIds ? "border-destructive" : undefined
+                        }
                         placeholder="Choose 1–7 categories"
                         searchPlaceholder="Search categories..."
                         ariaLabel="Marketplace categories"
@@ -344,6 +441,10 @@ export default function NewWebsitePage() {
                     )}
                   />
                 )}
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Select at least one relevant niche and up to seven. You can
+                  remove a selected category and replace it at any time.
+                </p>
                 {errors.categoryIds && (
                   <p className="text-xs text-destructive">
                     {errors.categoryIds.message}
@@ -372,6 +473,10 @@ export default function NewWebsitePage() {
                   rows={6}
                   maxLength={500}
                   placeholder="Explain the audience, editorial focus, content standards, and what makes this placement useful to buyers."
+                  aria-invalid={Boolean(errors.description)}
+                  className={
+                    errors.description ? "border-destructive" : undefined
+                  }
                   {...register("description")}
                 />
                 <p className="text-xs leading-5 text-muted-foreground">
@@ -511,6 +616,10 @@ export default function NewWebsitePage() {
                       min={0.01}
                       step="0.01"
                       placeholder="150"
+                      aria-invalid={Boolean(errors.price)}
+                      className={
+                        errors.price ? "border-destructive" : undefined
+                      }
                       {...register("price")}
                     />
                   </Field>
@@ -608,26 +717,33 @@ export default function NewWebsitePage() {
 
 function Field({
   label,
+  htmlFor,
   required,
   hint,
+  description,
   error,
   children,
 }: {
   label: string
+  htmlFor?: string
   required?: boolean
   hint?: string
+  description?: string
   error?: string
   children: React.ReactNode
 }) {
   return (
     <div className="space-y-2.5">
       <div className="flex items-center justify-between gap-2">
-        <Label>
+        <Label htmlFor={htmlFor}>
           {label} {required && <span className="text-destructive">*</span>}
         </Label>
         {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </div>
       {children}
+      {description && !error && (
+        <p className="text-xs leading-5 text-muted-foreground">{description}</p>
+      )}
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   )
@@ -658,15 +774,20 @@ function SelectField({
   options: Array<{ value: string; label: string }>
   error?: string
 }) {
+  const fieldId = `website-${name}`
   return (
     <div className="space-y-2.5">
-      <Label>{label}</Label>
+      <Label htmlFor={fieldId}>{label}</Label>
       <Controller
         name={name}
         control={control}
         render={({ field }) => (
           <Select value={String(field.value)} onValueChange={field.onChange}>
-            <SelectTrigger>
+            <SelectTrigger
+              id={fieldId}
+              aria-invalid={Boolean(error)}
+              className={error ? "border-destructive" : undefined}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

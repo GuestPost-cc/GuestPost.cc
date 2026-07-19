@@ -7,7 +7,7 @@ import {
   MARKETPLACE_CATEGORY_LIMIT,
   MARKETPLACE_LANGUAGES,
 } from "@guestpost/shared"
-import { Type } from "class-transformer"
+import { Transform, Type } from "class-transformer"
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -61,15 +61,19 @@ export class CreateWebsiteServiceDto {
 }
 
 export class CreateWebsiteDto {
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
   @MaxLength(100)
   @IsOptional()
   name?: string
 
-  @IsUrl()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @IsUrl({ protocols: ["http", "https"], require_protocol: true })
   @MaxLength(2048)
   url!: string
 
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
   @IsOptional()
   @MaxLength(100)
@@ -85,19 +89,20 @@ export class CreateWebsiteDto {
   @ArrayMaxSize(MARKETPLACE_CATEGORY_LIMIT)
   @ArrayUnique()
   @IsString({ each: true })
+  @MaxLength(64, { each: true })
   categoryIds!: string[]
 
   @IsString()
-  @IsOptional()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @MinLength(3)
   @MaxLength(200)
-  listingTitle?: string
+  listingTitle!: string
 
   @IsString()
-  @IsOptional()
-  @MinLength(1)
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @MinLength(20)
   @MaxLength(500)
-  description?: string
+  description!: string
 
   @IsOptional()
   @ValidateNested()

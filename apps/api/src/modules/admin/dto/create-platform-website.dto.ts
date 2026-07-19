@@ -3,7 +3,7 @@ import {
   MARKETPLACE_CATEGORY_LIMIT,
   MARKETPLACE_LANGUAGES,
 } from "@guestpost/shared"
-import { Type } from "class-transformer"
+import { Transform, Type } from "class-transformer"
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -19,18 +19,23 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
 } from "class-validator"
 
 export class CreatePlatformWebsiteDto {
-  @IsUrl()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @IsString()
+  @IsUrl({ protocols: ["http", "https"], require_protocol: true })
   @MaxLength(2048)
   url!: string
 
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
   @IsOptional()
   @MaxLength(100)
   name?: string
 
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
   @IsOptional()
   @MaxLength(100)
@@ -46,13 +51,18 @@ export class CreatePlatformWebsiteDto {
   @ArrayMaxSize(MARKETPLACE_CATEGORY_LIMIT)
   @ArrayUnique()
   @IsString({ each: true })
+  @MaxLength(64, { each: true })
   categoryIds!: string[]
 
   @IsString()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @MinLength(3)
   @MaxLength(200)
   listingTitle!: string
 
   @IsString()
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
+  @MinLength(20)
   @MaxLength(500)
   description!: string
 

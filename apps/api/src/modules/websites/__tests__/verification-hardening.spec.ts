@@ -296,9 +296,17 @@ describe("WebsitesService hardening", () => {
       publisherId: "OTHER",
     })
     await expect(
-      svc.createWebsite("p1", "o1", { url: "https://www.example.com" } as any, {
-        id: "u1",
-      }),
+      svc.createWebsite(
+        "p1",
+        "o1",
+        {
+          url: "https://www.example.com",
+          listingTitle: "Technology guest posts on Example",
+          description:
+            "Editorial technology coverage for founders and software buyers.",
+        } as any,
+        { id: "u1" },
+      ),
     ).rejects.toMatchObject({ response: { code: "DOMAIN_ALREADY_REGISTERED" } })
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({ action: "WEBSITE_DUPLICATE_DOMAIN_ATTEMPT" }),

@@ -5,7 +5,7 @@ import {
   WebsiteOwnershipType,
   WebsiteVerificationStatus,
 } from "@guestpost/database"
-import { StaffRole } from "@guestpost/shared"
+import { StaffRole, validateWebsiteEnlistmentInput } from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
@@ -1409,6 +1409,17 @@ export class AdminService {
   async createPlatformWebsite(dto: any, user: any) {
     const isOperations = user?.staffRole === "OPERATIONS"
     if (!isOperations) this.assertWebsiteInventoryWriteAccess(user)
+
+    const inputIssue = validateWebsiteEnlistmentInput({
+      url: dto.url,
+      name: dto.name,
+      country: dto.country,
+      listingTitle: dto.listingTitle,
+      description: dto.description,
+    })[0]
+    if (inputIssue) {
+      throw new BadRequestException(inputIssue)
+    }
 
     const domain = normalizeDomain(dto.url)
     const canonicalDomain = domain

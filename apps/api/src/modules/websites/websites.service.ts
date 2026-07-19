@@ -2,6 +2,7 @@ import { ListingFulfillmentType, ListingStatus } from "@guestpost/database"
 import {
   generateVerificationToken,
   QUEUES,
+  validateWebsiteEnlistmentInput,
   verificationTxtValue,
 } from "@guestpost/shared"
 import {
@@ -46,6 +47,17 @@ export class WebsitesService {
       throw new ForbiddenException(
         "Publisher does not belong to this organization",
       )
+    }
+
+    const inputIssue = validateWebsiteEnlistmentInput({
+      url: dto.url,
+      name: dto.name,
+      country: dto.country,
+      listingTitle: dto.listingTitle,
+      description: dto.description,
+    })[0]
+    if (inputIssue) {
+      throw new BadRequestException(inputIssue)
     }
 
     // Canonical domain = dedupe + ownership-uniqueness key (protocol/path/www
@@ -129,11 +141,9 @@ export class WebsitesService {
 
         await tx.marketplaceListing.create({
           data: {
-            title: dto.listingTitle?.trim() || dto.name?.trim() || domain,
+            title: dto.listingTitle,
             slug,
-            description:
-              dto.description?.trim() ||
-              `Guest posting placement opportunities on ${domain}.`,
+            description: dto.description,
             status: ListingStatus.DRAFT,
             fulfillmentType: ListingFulfillmentType.PUBLISHER,
             currency: "USD",

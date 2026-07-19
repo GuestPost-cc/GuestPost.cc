@@ -9,18 +9,21 @@
 // existing FulfillmentAssignment row keeps its current owner). Only new
 // orders + new tickets routed by `createTicket` route to the new owner.
 
-import type {
-  AdminOpsStaffResponse,
-  AdminPlatformWebsiteResponse,
-  Category,
+import {
+  type AdminOpsStaffResponse,
+  type AdminPlatformWebsiteResponse,
+  ApiError,
+  type Category,
 } from "@guestpost/api-client"
 import {
   LISTING_LINK_TYPE_LABELS,
   LISTING_LINK_TYPES,
   LISTING_LINK_VALIDITIES,
   LISTING_LINK_VALIDITY_LABELS,
+  LISTING_TITLE_URL_WARNING,
   MARKETPLACE_CATEGORY_LIMIT,
   MARKETPLACE_LANGUAGES,
+  validateWebsiteEnlistmentInput,
 } from "@guestpost/shared"
 import {
   Badge,
@@ -73,6 +76,36 @@ const YES_NO_OPTIONS = [
   { value: "no", label: "No" },
   { value: "yes", label: "Yes" },
 ]
+
+const EMPTY_CREATE_FORM = {
+  url: "",
+  name: "",
+  listingTitle: "",
+  description: "",
+  categoryIds: [] as string[],
+  language: "English",
+  country: "",
+  sportsGamingAllowed: false,
+  pharmacyAllowed: false,
+  cryptoAllowed: false,
+  backlinkCount: "1",
+  linkType: "DOFOLLOW",
+  linkValidity: "PERMANENT",
+  googleNews: false,
+  markedSponsored: false,
+  foreignLanguageAllowed: false,
+}
+
+type CreateWebsiteField =
+  | "url"
+  | "name"
+  | "listingTitle"
+  | "description"
+  | "categoryIds"
+  | "language"
+  | "country"
+
+type CreateWebsiteErrors = Partial<Record<CreateWebsiteField, string>>
 
 function PolicySelect({
   label,
@@ -161,24 +194,45 @@ function PlatformWebsitesPageInner() {
   })
 
   // ── Create platform website state ──
-  const [createForm, setCreateForm] = useState({
-    url: "",
-    name: "",
-    listingTitle: "",
-    description: "",
-    categoryIds: [] as string[],
-    language: "English",
-    country: "",
-    sportsGamingAllowed: false,
-    pharmacyAllowed: false,
-    cryptoAllowed: false,
-    backlinkCount: "1",
-    linkType: "DOFOLLOW",
-    linkValidity: "PERMANENT",
-    googleNews: false,
-    markedSponsored: false,
-    foreignLanguageAllowed: false,
-  })
+  const [createForm, setCreateForm] = useState(EMPTY_CREATE_FORM)
+  const [createErrors, setCreateErrors] = useState<CreateWebsiteErrors>({})
+  const [createServerError, setCreateServerError] = useState<string | null>(
+    null,
+  )
+
+  const clearCreateError = (field: CreateWebsiteField) => {
+    setCreateErrors((current) => {
+      if (!current[field]) return current
+      const next = { ...current }
+      delete next[field]
+      return next
+    })
+    setCreateServerError(null)
+  }
+
+  const validateCreateForm = () => {
+    const nextErrors: CreateWebsiteErrors = {}
+    for (const issue of validateWebsiteEnlistmentInput(createForm)) {
+      nextErrors[issue.field] = issue.message
+    }
+
+    if (
+      createForm.categoryIds.length < 1 ||
+      createForm.categoryIds.length > MARKETPLACE_CATEGORY_LIMIT ||
+      new Set(createForm.categoryIds).size !== createForm.categoryIds.length
+    ) {
+      nextErrors.categoryIds = `Choose between 1 and ${MARKETPLACE_CATEGORY_LIMIT} unique categories.`
+    }
+    if (
+      !MARKETPLACE_LANGUAGES.some(
+        (language) => language === createForm.language,
+      )
+    ) {
+      nextErrors.language = "Choose a supported primary language."
+    }
+
+    return nextErrors
+  }
 
   const createMut = useMutation({
     mutationFn: () =>
@@ -213,35 +267,39 @@ function PlatformWebsitesPageInner() {
       qc.invalidateQueries({ queryKey: ["admin", "platform-websites"] })
       toast.success("Platform website created")
       setShowCreate(false)
-      setCreateForm({
-        url: "",
-        name: "",
-        listingTitle: "",
-        description: "",
-        categoryIds: [],
-        language: "English",
-        country: "",
-        sportsGamingAllowed: false,
-        pharmacyAllowed: false,
-        cryptoAllowed: false,
-        backlinkCount: "1",
-        linkType: "DOFOLLOW",
-        linkValidity: "PERMANENT",
-        googleNews: false,
-        markedSponsored: false,
-        foreignLanguageAllowed: false,
+      setCreateForm(EMPTY_CREATE_FORM)
+      setCreateErrors({})
+      setCreateServerError(null)
+    },
+    onError: (error: Error) => {
+      const requestId = error instanceof ApiError ? error.requestId : undefined
+      const message = error.message || "Failed to create website"
+      setCreateServerError(
+        requestId ? `${message} Request ID: ${requestId}` : message,
+      )
+      toast.error(message, {
+        description: requestId ? `Request ID: ${requestId}` : undefined,
       })
     },
-    onError: (e: Error) => toast.error(e.message || "Failed to create website"),
   })
 
-  const canCreate =
-    createForm.url.trim().length > 0 &&
-    createForm.listingTitle.trim().length >= 3 &&
-    createForm.description.trim().length > 0 &&
-    createForm.description.length <= 500 &&
-    createForm.categoryIds.length >= 1 &&
-    createForm.categoryIds.length <= MARKETPLACE_CATEGORY_LIMIT
+  const handleCreate = () => {
+    const nextErrors = validateCreateForm()
+    setCreateErrors(nextErrors)
+    setCreateServerError(null)
+    if (Object.keys(nextErrors).length > 0) {
+      toast.error("Complete the highlighted required fields")
+      return
+    }
+    createMut.mutate()
+  }
+
+  const closeCreateDialog = () => {
+    setShowCreate(false)
+    setCreateErrors({})
+    setCreateServerError(null)
+    createMut.reset()
+  }
   const websites = websitesQ.data ?? []
   const assignedCount = websites.filter((website) => website.managedBy).length
   const unassignedCount = websites.length - assignedCount
@@ -691,7 +749,12 @@ function PlatformWebsitesPageInner() {
       </Dialog>
 
       {/* Create platform website dialog */}
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog
+        open={showCreate}
+        onOpenChange={(open) =>
+          open ? setShowCreate(true) : closeCreateDialog()
+        }
+      >
         <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Platform Website</DialogTitle>
@@ -703,104 +766,238 @@ function PlatformWebsitesPageInner() {
                 " The site and every new order placed through it will be assigned to you automatically."}
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-5">
+          <form
+            onSubmit={(event) => {
+              event.preventDefault()
+              handleCreate()
+            }}
+            noValidate
+            className="space-y-5"
+          >
+            {createServerError && (
+              <div
+                role="alert"
+                className="flex gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+              >
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                <div>
+                  <p className="font-medium">Website could not be created</p>
+                  <p className="mt-1 text-xs leading-5">{createServerError}</p>
+                </div>
+              </div>
+            )}
             <div className="space-y-1">
-              <Label>Website URL *</Label>
+              <Label htmlFor="platform-website-url">Website URL *</Label>
               <Input
+                id="platform-website-url"
                 placeholder="https://example.com"
+                autoComplete="url"
                 value={createForm.url}
-                onChange={(e) =>
-                  setCreateForm({ ...createForm, url: e.target.value })
-                }
+                aria-invalid={Boolean(createErrors.url)}
+                className={createErrors.url ? "border-destructive" : undefined}
+                onChange={(event) => {
+                  setCreateForm({ ...createForm, url: event.target.value })
+                  clearCreateError("url")
+                }}
               />
+              <p className="text-xs leading-5 text-muted-foreground">
+                Use the public homepage only, for example https://example.com.
+              </p>
+              {createErrors.url && (
+                <p className="text-xs text-destructive">{createErrors.url}</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <Label>Name</Label>
+                <Label htmlFor="platform-website-name">Name</Label>
                 <Input
+                  id="platform-website-name"
                   placeholder="My Site"
+                  maxLength={100}
                   value={createForm.name}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, name: e.target.value })
+                  aria-invalid={Boolean(createErrors.name)}
+                  className={
+                    createErrors.name ? "border-destructive" : undefined
                   }
+                  onChange={(event) => {
+                    setCreateForm({ ...createForm, name: event.target.value })
+                    clearCreateError("name")
+                  }}
                 />
+                {createErrors.name && (
+                  <p className="text-xs text-destructive">
+                    {createErrors.name}
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
-                <Label>Country</Label>
+                <Label htmlFor="platform-website-country">Country</Label>
                 <Input
+                  id="platform-website-country"
                   placeholder="US"
+                  maxLength={100}
                   value={createForm.country}
-                  onChange={(e) =>
-                    setCreateForm({ ...createForm, country: e.target.value })
+                  aria-invalid={Boolean(createErrors.country)}
+                  className={
+                    createErrors.country ? "border-destructive" : undefined
                   }
+                  onChange={(event) => {
+                    setCreateForm({
+                      ...createForm,
+                      country: event.target.value,
+                    })
+                    clearCreateError("country")
+                  }}
                 />
+                {createErrors.country && (
+                  <p className="text-xs text-destructive">
+                    {createErrors.country}
+                  </p>
+                )}
               </div>
             </div>
             <div className="space-y-1">
-              <Label>Listing title *</Label>
+              <Label htmlFor="platform-listing-title">Listing title *</Label>
               <Input
+                id="platform-listing-title"
                 maxLength={200}
                 placeholder="Technology guest posts on Example"
                 value={createForm.listingTitle}
-                onChange={(e) =>
+                aria-invalid={Boolean(createErrors.listingTitle)}
+                className={
+                  createErrors.listingTitle ? "border-destructive" : undefined
+                }
+                onChange={(event) => {
                   setCreateForm({
                     ...createForm,
-                    listingTitle: e.target.value,
+                    listingTitle: event.target.value,
                   })
-                }
+                  clearCreateError("listingTitle")
+                }}
               />
+              {!createErrors.listingTitle && (
+                <p className="text-xs leading-5 text-muted-foreground">
+                  {LISTING_TITLE_URL_WARNING}
+                </p>
+              )}
+              {createErrors.listingTitle && (
+                <p className="text-xs text-destructive">
+                  {createErrors.listingTitle}
+                </p>
+              )}
             </div>
             <div className="space-y-1">
               <div className="flex justify-between gap-3">
-                <Label>Description *</Label>
+                <Label htmlFor="platform-listing-description">
+                  Description *
+                </Label>
                 <span className="text-xs text-muted-foreground">
                   {createForm.description.length}/500
                 </span>
               </div>
               <Textarea
+                id="platform-listing-description"
                 rows={4}
                 maxLength={500}
                 placeholder="Describe the audience, editorial focus, and publishing standards."
                 value={createForm.description}
-                onChange={(e) =>
+                aria-invalid={Boolean(createErrors.description)}
+                className={
+                  createErrors.description ? "border-destructive" : undefined
+                }
+                onChange={(event) => {
                   setCreateForm({
                     ...createForm,
-                    description: e.target.value,
+                    description: event.target.value,
                   })
-                }
+                  clearCreateError("description")
+                }}
               />
+              {createErrors.description && (
+                <p className="text-xs text-destructive">
+                  {createErrors.description}
+                </p>
+              )}
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label>Categories * (1–7)</Label>
-                <MultiSelect
-                  options={(categoriesQ.data ?? []).map((category) => ({
-                    value: category.id,
-                    label: category.name,
-                  }))}
-                  value={createForm.categoryIds}
-                  onValueChange={(categoryIds) =>
-                    setCreateForm({ ...createForm, categoryIds })
-                  }
-                  maxSelected={MARKETPLACE_CATEGORY_LIMIT}
-                  placeholder={
-                    categoriesQ.isLoading
-                      ? "Loading categories..."
-                      : "Choose categories"
-                  }
-                  searchPlaceholder="Search categories..."
-                  disabled={categoriesQ.isLoading || categoriesQ.isError}
-                />
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Categories *</Label>
+                  <span className="text-xs text-muted-foreground">
+                    {createForm.categoryIds.length}/{MARKETPLACE_CATEGORY_LIMIT}{" "}
+                    selected
+                  </span>
+                </div>
+                {categoriesQ.isLoading ? (
+                  <Skeleton className="h-10 w-full" />
+                ) : categoriesQ.isError ? (
+                  <div
+                    role="alert"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3"
+                  >
+                    <p className="text-xs text-destructive">
+                      Categories could not be loaded.
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => categoriesQ.refetch()}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                ) : (
+                  <MultiSelect
+                    options={(categoriesQ.data ?? []).map((category) => ({
+                      value: category.id,
+                      label: category.name,
+                    }))}
+                    value={createForm.categoryIds}
+                    onValueChange={(categoryIds) => {
+                      setCreateForm({ ...createForm, categoryIds })
+                      clearCreateError("categoryIds")
+                    }}
+                    maxSelected={MARKETPLACE_CATEGORY_LIMIT}
+                    placeholder="Choose 1–7 categories"
+                    searchPlaceholder="Search categories..."
+                    ariaLabel="Marketplace categories"
+                    ariaInvalid={Boolean(createErrors.categoryIds)}
+                    className={
+                      createErrors.categoryIds
+                        ? "border-destructive"
+                        : undefined
+                    }
+                  />
+                )}
+                <p className="text-xs leading-5 text-muted-foreground">
+                  Select at least one relevant niche and up to seven. Remove a
+                  selection before choosing a replacement.
+                </p>
+                {createErrors.categoryIds && (
+                  <p className="text-xs text-destructive">
+                    {createErrors.categoryIds}
+                  </p>
+                )}
               </div>
               <div className="space-y-1">
-                <Label>Primary language *</Label>
+                <Label htmlFor="platform-primary-language">
+                  Primary language *
+                </Label>
                 <Select
                   value={createForm.language}
-                  onValueChange={(language) =>
+                  onValueChange={(language) => {
                     setCreateForm({ ...createForm, language })
-                  }
+                    clearCreateError("language")
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger
+                    id="platform-primary-language"
+                    aria-invalid={Boolean(createErrors.language)}
+                    className={
+                      createErrors.language ? "border-destructive" : undefined
+                    }
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -811,6 +1008,11 @@ function PlatformWebsitesPageInner() {
                     ))}
                   </SelectContent>
                 </Select>
+                {createErrors.language && (
+                  <p className="text-xs text-destructive">
+                    {createErrors.language}
+                  </p>
+                )}
               </div>
             </div>
             <div className="rounded-xl border bg-muted/20 p-4">
@@ -921,23 +1123,26 @@ function PlatformWebsitesPageInner() {
               Search and traffic metrics are imported from the GSC and GA4
               properties linked after creation; staff cannot self-report them.
             </p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreate(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => createMut.mutate()}
-              disabled={
-                !canCreate ||
-                createMut.isPending ||
-                categoriesQ.isLoading ||
-                categoriesQ.isError
-              }
-            >
-              {createMut.isPending ? "Creating..." : "Create"}
-            </Button>
-          </DialogFooter>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={closeCreateDialog}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  createMut.isPending ||
+                  categoriesQ.isLoading ||
+                  categoriesQ.isError
+                }
+              >
+                {createMut.isPending ? "Creating..." : "Create"}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
