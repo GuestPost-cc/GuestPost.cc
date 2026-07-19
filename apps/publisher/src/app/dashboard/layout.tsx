@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useState } from "react"
 import { Notifications } from "../../components/notifications"
 import { useAuth } from "../../lib/auth"
 
@@ -100,16 +100,12 @@ export default function DashboardLayout({
   const router = useRouter()
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
-  const hasSeenLoadingFalse = useRef(false)
 
   useEffect(() => {
-    if (loading) return
-    if (!hasSeenLoadingFalse.current) {
-      hasSeenLoadingFalse.current = true
-      return
+    if (!loading && !user) {
+      router.replace(`/?returnTo=${encodeURIComponent(pathname)}`)
     }
-    if (!user) router.push("/")
-  }, [user, loading, router])
+  }, [user, loading, router, pathname])
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: navigation closes the mobile drawer
   useEffect(() => {
@@ -125,7 +121,13 @@ export default function DashboardLayout({
         </div>
       </div>
     )
-  if (!user) return null
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/20 text-sm text-muted-foreground">
+        Redirecting to secure login…
+      </div>
+    )
+  }
 
   const publisher = user
   const initial = (publisher.name ?? publisher.email).charAt(0).toUpperCase()

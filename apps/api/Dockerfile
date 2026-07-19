@@ -27,8 +27,9 @@ WORKDIR /repo
 ENV NODE_ENV=production
 COPY --from=builder /repo .
 EXPOSE 4000
-# Fail-fast env validation runs at boot (DATABASE_URL, REDIS_URL, JWT_SECRET,
-# QUEUE_SIGNING_SECRET, TRUSTED_ORIGINS are required in production).
+# Fail-fast env validation runs at boot (DATABASE_URL, REDIS_URL,
+# BETTER_AUTH_SECRET, QUEUE_SIGNING_SECRET, and TRUSTED_ORIGINS are required
+# in production).
 CMD ["node", "apps/api/dist/main.js"]
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD wget -qO- http://localhost:4000/api/v1/health || exit 1

@@ -10,12 +10,7 @@ import {
   Users,
   Zap,
 } from "lucide-react"
-import {
-  PORTAL_URL,
-  PUBLISHER_URL,
-  SiteFooter,
-  SiteHeader,
-} from "../components/site-chrome"
+import { SiteFooter, SiteHeader } from "../components/site-chrome"
 
 export default function HomePage() {
   return (
@@ -61,12 +56,12 @@ function Hero() {
         </p>
         <div className="flex flex-col sm:flex-row gap-4 mt-4">
           <Button size="lg" className="gap-2" asChild>
-            <a href={PORTAL_URL}>
+            <a href="/signup?audience=customer">
               Get Started <ArrowRight className="h-4 w-4" />
             </a>
           </Button>
           <Button variant="outline" size="lg" asChild>
-            <a href={PUBLISHER_URL}>Become a Publisher</a>
+            <a href="/signup?audience=publisher">Become a Publisher</a>
           </Button>
         </div>
         <p className="text-sm text-muted-foreground mt-2">
@@ -410,7 +405,7 @@ function CTA() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" variant="secondary" className="gap-2" asChild>
-                <a href={PORTAL_URL}>
+                <a href="/signup?audience=customer">
                   Start Free Trial <ArrowRight className="h-4 w-4" />
                 </a>
               </Button>

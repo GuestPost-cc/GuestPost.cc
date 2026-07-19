@@ -1,7 +1,6 @@
 "use client"
 
 import {
-  getSession,
   signIn as signInTransport,
   signOut as signOutTransport,
   signUp as signUpTransport,
@@ -16,7 +15,6 @@ import {
   useEffect,
   useState,
 } from "react"
-import { clearToken, getToken, setToken } from "./api"
 
 type User = {
   id: string
@@ -54,10 +52,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
  * any consumer that wants the AuthProvider-shaped API (e.g. programmatic
  * sign-in from a settings page).
  *
- * After birth-time provisioning (Phase 7.11), signup on the publisher portal
- * creates a PUBLISHER user directly — no `become-publisher` conversion step.
- * The `session.create.before` hook in packages/auth handles any existing
- * CUSTOMER collision.
+ * Signup creates a PUBLISHER directly; login never mutates account type.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -76,22 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      let token = getToken()
-      if (!token) {
-        const session = await getSession()
-        if (session?.token) {
-          token = session.token
-          setToken(session.token)
-        }
-      }
       const res = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         credentials: "include",
       })
       if (res.ok) {
         const me = await res.json()
         if (me.userType !== "PUBLISHER") {
-          clearToken()
           setUser(null)
           return
         }
@@ -129,21 +114,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setLoading(true)
     try {
-      const result = await signInTransport({
+      await signInTransport({
         email,
         password,
         portal: "publisher",
       })
-      const token = result.status === "authenticated" ? result.token : undefined
-      if (token) setToken(token)
 
       const meRes = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         credentials: "include",
       })
       const me = await meRes.json()
       if (me.userType !== "PUBLISHER") {
-        clearToken()
         throw new Error(
           "This portal is for publishers only. Please sign in at the correct portal.",
         )
@@ -165,16 +146,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       // Birth-time provisioning: the databaseHooks in packages/auth set
       // userType=PUBLISHER and provision the publisher entity automatically.
-      // No become-publisher call needed.
-      const result = await signUpTransport({
+      // No follow-up account-type mutation is needed.
+      await signUpTransport({
         email,
         password,
         name,
         termsAccepted,
         portal: "publisher",
       })
-      const token = result.status === "authenticated" ? result.token : undefined
-      if (token) setToken(token)
       await refresh()
     } finally {
       setLoading(false)
@@ -183,7 +162,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await signOutTransport()
-    clearToken()
     setUser(null)
   }
 

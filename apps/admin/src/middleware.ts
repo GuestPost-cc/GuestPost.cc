@@ -18,7 +18,7 @@ export function middleware(request: NextRequest) {
   )
   if (result.needsRedirect) {
     const url = new URL(result.signInPath, request.url)
-    url.searchParams.set("redirect", result.redirect!)
+    url.searchParams.set("returnTo", result.redirect!)
     return NextResponse.redirect(url)
   }
   return NextResponse.next()

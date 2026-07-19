@@ -94,7 +94,6 @@ describe("isAuthEndpointPath — skip 401 handler on auth endpoints", () => {
     "/marketplace/listings",
     "/support/tickets",
     "/admin/users",
-    "/identity/become-publisher", // intentionally NOT in the auth list
   ])("recognizes %s as a NON-auth endpoint", (path) => {
     expect(isAuthEndpointPath(path)).toBe(false)
   })

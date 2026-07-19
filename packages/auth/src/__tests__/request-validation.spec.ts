@@ -1,3 +1,4 @@
+import { CURRENT_TERMS_VERSION } from "@guestpost/shared"
 import { validateAuthRequest } from "../request-validation"
 
 describe("validateAuthRequest", () => {
@@ -17,6 +18,7 @@ describe("validateAuthRequest", () => {
         email: "jane@example.com",
         password: "secure-password",
         termsAccepted: false,
+        termsVersion: CURRENT_TERMS_VERSION,
       }),
     ).toEqual({
       success: false,
@@ -31,6 +33,7 @@ describe("validateAuthRequest", () => {
         email: "  jane@example.com  ",
         password: "secure-password",
         termsAccepted: true,
+        termsVersion: CURRENT_TERMS_VERSION,
       }),
     ).toEqual({
       success: true,
@@ -39,7 +42,24 @@ describe("validateAuthRequest", () => {
         email: "jane@example.com",
         password: "secure-password",
         termsAccepted: true,
+        termsVersion: CURRENT_TERMS_VERSION,
       },
+    })
+  })
+
+  it("rejects a stale or missing Terms version", () => {
+    expect(
+      validateAuthRequest("/sign-up/email", {
+        name: "Jane Smith",
+        email: "jane@example.com",
+        password: "secure-password",
+        termsAccepted: true,
+        termsVersion: "2025-01-01",
+      }),
+    ).toEqual({
+      success: false,
+      message:
+        "Accept the current Terms of Service before creating an account.",
     })
   })
 

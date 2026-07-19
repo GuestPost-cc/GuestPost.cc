@@ -10,7 +10,7 @@ export type {
   TriggerSyncResponse,
 } from "@guestpost/integrations/client"
 export type { ApiClientConfig, RequestOptions } from "./client"
-export { ApiError, clearToken, getToken, HttpClient, setToken } from "./client"
+export { ApiError, HttpClient } from "./client"
 export type {
   AdminCancellationRequestResponse,
   AdminCommandCenterAction,

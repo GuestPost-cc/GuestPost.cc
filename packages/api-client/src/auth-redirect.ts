@@ -3,14 +3,12 @@
 // Shared 401-handling for the three dashboard apps (portal / publisher /
 // admin). Each app calls `buildAuthErrorHandler(...)` and passes the result
 // into `createApiClient({ onAuthError })`. The HttpClient invokes it on a 401
-// from a NON-auth endpoint, after clearing the in-memory token.
+// from a NON-auth endpoint.
 //
 // Why a shared factory: every app needs the same security-sensitive logic
 // (sanitize returnTo, idempotency dedup, skip when already on sign-in,
 // best-effort clear of any client cache). Three copies would drift; one
 // drift = one open-redirect vuln or one infinite redirect loop.
-
-import { clearToken } from "./client"
 
 export interface AuthErrorHandlerConfig {
   /**
@@ -104,13 +102,12 @@ export { isAuthEndpointPath } from "./client"
  * from a non-auth endpoint. The callback:
  *
  *   1. Acquires the module-level redirect guard (no-op if already running).
- *   2. Clears the in-memory bearer token (clientside).
- *   3. Runs the optional app-provided cleanup hook (typically
+ *   2. Runs the optional app-provided cleanup hook (typically
  *      `queryClient.clear()`).
- *   4. Persists the reason banner to `sessionStorage` so the sign-in page
+ *   3. Persists the reason banner to `sessionStorage` so the sign-in page
  *      can surface it.
- *   5. If the user is already on the sign-in page, no-ops (debounce).
- *   6. Builds a sanitized `returnTo` query param and navigates via
+ *   4. If the user is already on the sign-in page, no-ops (debounce).
+ *   5. Builds a sanitized `returnTo` query param and navigates via
  *      `window.location.assign`. Full-page nav (not `router.push`) so any
  *      lingering React state / Service Worker / in-memory cache is
  *      flushed by the page reload.
@@ -128,19 +125,11 @@ export function buildAuthErrorHandler(
     if (redirecting) return
     redirecting = true
 
-    // (1) Clear token IMMEDIATELY so any concurrent in-flight fetch from this
-    // tick stops sending the stale Authorization header.
-    try {
-      clearToken()
-    } catch {
-      /* swallow — never block redirect on cleanup */
-    }
-
     // SSR guard. Server components should never trigger this path, but if a
     // misconfigured server fetch slips through, exit silently.
     if (typeof window === "undefined") return
 
-    // (2) App cleanup hook (cache clear).
+    // App cleanup hook (cache clear).
     try {
       onBeforeRedirect?.()
     } catch {
@@ -170,7 +159,7 @@ export function buildAuthErrorHandler(
     const query =
       safe && safe !== signInPath ? `?returnTo=${encodeURIComponent(safe)}` : ""
 
-    // (6) Full page nav, NOT router.push. Ensures React state, in-memory
+    // Full page nav, NOT router.push. Ensures React state, in-memory
     // caches, and any inadvertent module-level singletons are wiped.
     window.location.assign(`${signInPath}${query}`)
   }

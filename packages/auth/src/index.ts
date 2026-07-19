@@ -1,16 +1,24 @@
 import { prisma } from "@guestpost/database"
+import { CURRENT_TERMS_VERSION, TERMS_DOCUMENT_TYPE } from "@guestpost/shared"
 import { betterAuth } from "better-auth"
 import { prismaAdapter } from "better-auth/adapters/prisma"
 import { APIError, createAuthMiddleware, getOAuthState } from "better-auth/api"
 import { toNodeHandler } from "better-auth/node"
-import { bearer } from "better-auth/plugins/bearer"
+import { renderPasswordResetEmail } from "./email-templates/password-reset.js"
 import { renderVerificationEmail } from "./email-templates/verification.js"
 import {
   type EmailRateLimitOptions,
   emailRateLimitPlugin,
 } from "./plugins/email-rate-limit.js"
 import { validateAuthRequest } from "./request-validation.js"
+import {
+  AUTH_ACCOUNT_OPTIONS,
+  AUTH_SESSION_OPTIONS,
+  googleProviderOptions,
+} from "./security-options.js"
 
+export type { PasswordResetEmailContext } from "./email-templates/password-reset.js"
+export { renderPasswordResetEmail } from "./email-templates/password-reset.js"
 export type { VerificationEmailContext } from "./email-templates/verification.js"
 export { renderVerificationEmail } from "./email-templates/verification.js"
 export { emailRateLimitPlugin } from "./plugins/email-rate-limit.js"
@@ -34,6 +42,16 @@ export interface SendEmailArgs {
 }
 
 export type PortalIntent = "customer" | "publisher"
+type AuthAudience = PortalIntent | "staff"
+
+interface SignupConsent {
+  accepted: true
+  version: string
+  method: "email" | "google"
+  audience: PortalIntent
+}
+
+const SIGNUP_CONSENT_CONTEXT_KEY = "__guestpostSignupConsent"
 
 export interface AuthFactoryOptions {
   /**
@@ -71,9 +89,10 @@ export interface AuthFactoryOptions {
   invalidateAuthContext?: (userId: string) => void
 }
 
-function normalizePortalIntent(value: unknown): PortalIntent | null {
+function normalizeAuthAudience(value: unknown): AuthAudience | null {
   if (value === "publisher") return "publisher"
   if (value === "customer") return "customer"
+  if (value === "staff") return "staff"
   return null
 }
 
@@ -86,8 +105,8 @@ function portalIntentFromUrl(
       rawUrl,
       process.env.BETTER_AUTH_URL ?? "http://localhost:4000",
     )
-    const direct = normalizePortalIntent(url.searchParams.get("portal"))
-    if (direct) return direct
+    const direct = normalizeAuthAudience(url.searchParams.get("portal"))
+    if (direct === "customer" || direct === "publisher") return direct
 
     const callbackURL = url.searchParams.get("callbackURL")
     if (callbackURL) return portalIntentFromUrl(callbackURL)
@@ -97,22 +116,27 @@ function portalIntentFromUrl(
   return null
 }
 
-function portalIntentFromOrigin(
+function audienceFromOrigin(
   rawOrigin: string | null | undefined,
-): PortalIntent | null {
+): AuthAudience | null {
   if (!rawOrigin) return null
   try {
     const origin = new URL(rawOrigin)
     if (origin.port === "3002") return "publisher"
     if (origin.port === "3001") return "customer"
+    if (origin.port === "3003") return "staff"
   } catch {
     return null
   }
   return null
 }
 
-async function resolvePortalIntent(ctx: any): Promise<PortalIntent> {
+async function resolveAuthAudience(ctx: any): Promise<AuthAudience | null> {
   const oauthState = await getOAuthState().catch(() => null)
+  const explicitOAuthAudience = normalizeAuthAudience(
+    (oauthState as any)?.portal ?? (oauthState as any)?.audience,
+  )
+  if (explicitOAuthAudience) return explicitOAuthAudience
   const fromOAuthState = portalIntentFromUrl(oauthState?.callbackURL)
   if (fromOAuthState) return fromOAuthState
 
@@ -120,14 +144,14 @@ async function resolvePortalIntent(ctx: any): Promise<PortalIntent> {
   const headers = request?.headers
   const headerValue =
     headers?.get?.("x-portal-type") ?? headers?.["x-portal-type"]
-  const fromHeader = normalizePortalIntent(headerValue)
+  const fromHeader = normalizeAuthAudience(headerValue)
   if (fromHeader) return fromHeader
 
   const fromUrl = portalIntentFromUrl(request?.url)
   if (fromUrl) return fromUrl
 
   const body = ctx?.body ?? request?.body
-  const fromBody = normalizePortalIntent(body?.portal)
+  const fromBody = normalizeAuthAudience(body?.portal)
   if (fromBody) return fromBody
 
   const callbackURL = body?.callbackURL ?? body?.callbackUrl ?? body?.redirectTo
@@ -135,14 +159,105 @@ async function resolvePortalIntent(ctx: any): Promise<PortalIntent> {
   if (fromCallback) return fromCallback
 
   const origin = headers?.get?.("origin") ?? headers?.origin
-  const fromOrigin = portalIntentFromOrigin(origin)
+  const fromOrigin = audienceFromOrigin(origin)
   if (fromOrigin) return fromOrigin
 
   const referer = headers?.get?.("referer") ?? headers?.referer
-  const fromReferer = portalIntentFromOrigin(referer)
+  const fromReferer = audienceFromOrigin(referer)
   if (fromReferer) return fromReferer
 
-  return "customer"
+  return null
+}
+
+function readHeader(ctx: any, name: string): string | null {
+  const headers = ctx?.request?.headers
+  const value = headers?.get?.(name) ?? headers?.[name]
+  return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+function rememberSignupConsent(ctx: any, consent: SignupConsent): void {
+  if (ctx && typeof ctx === "object") ctx[SIGNUP_CONSENT_CONTEXT_KEY] = consent
+  if (ctx?.context && typeof ctx.context === "object") {
+    ctx.context[SIGNUP_CONSENT_CONTEXT_KEY] = consent
+  }
+}
+
+async function resolveSignupConsent(ctx: any): Promise<SignupConsent | null> {
+  const stored =
+    ctx?.[SIGNUP_CONSENT_CONTEXT_KEY] ??
+    ctx?.context?.[SIGNUP_CONSENT_CONTEXT_KEY]
+  if (stored?.accepted === true) return stored as SignupConsent
+
+  const state = (await getOAuthState().catch(() => null)) as any
+  const audience = normalizeAuthAudience(state?.portal ?? state?.audience)
+  if (
+    state?.authFlow === "signup" &&
+    state?.termsAccepted === true &&
+    state?.termsVersion === CURRENT_TERMS_VERSION &&
+    (audience === "customer" || audience === "publisher")
+  ) {
+    return {
+      accepted: true,
+      version: CURRENT_TERMS_VERSION,
+      method: "google",
+      audience,
+    }
+  }
+
+  return null
+}
+
+function userTypeForAudience(
+  audience: AuthAudience,
+): "CUSTOMER" | "PUBLISHER" | "STAFF" {
+  if (audience === "publisher") return "PUBLISHER"
+  if (audience === "staff") return "STAFF"
+  return "CUSTOMER"
+}
+
+function wrongPortalMessage(
+  actual: "CUSTOMER" | "PUBLISHER" | "STAFF",
+): string {
+  if (actual === "CUSTOMER") {
+    return "This account is registered as a customer. Open the Customer portal or use a different account."
+  }
+  if (actual === "PUBLISHER") {
+    return "This account is registered as a publisher. Open the Publisher portal or use a different account."
+  }
+  return "Staff accounts must sign in through the Admin portal."
+}
+
+async function recordLegalAcceptance(
+  user: { id: string; userType: "CUSTOMER" | "PUBLISHER" },
+  consent: SignupConsent,
+  ctx: any,
+): Promise<void> {
+  const forwardedFor = readHeader(ctx, "x-forwarded-for")
+  const ipAddress =
+    readHeader(ctx, "cf-connecting-ip") ??
+    forwardedFor?.split(",")[0]?.trim() ??
+    null
+
+  await prisma.legalAcceptance.upsert({
+    where: {
+      userId_documentType_documentVersion: {
+        userId: user.id,
+        documentType: TERMS_DOCUMENT_TYPE,
+        documentVersion: consent.version,
+      },
+    },
+    create: {
+      userId: user.id,
+      documentType: TERMS_DOCUMENT_TYPE,
+      documentVersion: consent.version,
+      method: consent.method,
+      audience: user.userType,
+      ipAddress,
+      userAgent: readHeader(ctx, "user-agent"),
+      requestId: readHeader(ctx, "x-request-id"),
+    },
+    update: {},
+  })
 }
 
 function displayName(
@@ -218,38 +333,49 @@ async function provisionPublisherAccount(user: {
   })
 }
 
-async function convertFreshCustomerToPublisher(userId: string) {
-  const user = await prisma.user.findUnique({ where: { id: userId } })
-  if (!user) throw new Error("USER_NOT_FOUND")
-  if (user.userType === "PUBLISHER") {
-    await provisionPublisherAccount(user)
-    return
-  }
-  if (user.userType !== "CUSTOMER") return
-
-  const [customerMemberships, publisherMemberships] = await Promise.all([
-    prisma.membership.count({ where: { userId, status: "ACTIVE" } }),
-    prisma.publisherMembership.count({ where: { userId } }),
-  ])
-  if (publisherMemberships > 0) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { userType: "PUBLISHER" },
-    })
-    return
-  }
-  if (customerMemberships > 0) {
-    throw new Error("ACCOUNT_COLLISION_USE_SEPARATE_PROFILE")
-  }
-
-  await provisionPublisherAccount(user)
-  await prisma.user.update({
-    where: { id: userId },
-    data: { userType: "PUBLISHER" },
-  })
-}
-
 const validateAuthRequestMiddleware = createAuthMiddleware(async (ctx) => {
+  if (ctx.path === "/sign-in/email") {
+    const audience = await resolveAuthAudience(ctx)
+    if (!audience) {
+      throw APIError.from("BAD_REQUEST", {
+        code: "INVALID_AUDIENCE",
+        message: "Choose the portal for this sign-in request.",
+      })
+    }
+  }
+
+  if (ctx.path === "/sign-in/social") {
+    const additionalData = ctx.body?.additionalData
+    const audience = normalizeAuthAudience(
+      additionalData?.portal ?? additionalData?.audience,
+    )
+    const flow = additionalData?.authFlow
+    const isSignup = ctx.body?.requestSignUp === true
+
+    if (
+      (flow !== "login" && flow !== "signup") ||
+      (flow === "signup") !== isSignup ||
+      (audience !== "customer" && audience !== "publisher")
+    ) {
+      throw APIError.from("BAD_REQUEST", {
+        code: "INVALID_AUTH_FLOW",
+        message: "Start Google authentication from a GuestPost login page.",
+      })
+    }
+
+    if (
+      isSignup &&
+      (additionalData?.termsAccepted !== true ||
+        additionalData?.termsVersion !== CURRENT_TERMS_VERSION)
+    ) {
+      throw APIError.from("BAD_REQUEST", {
+        code: "TERMS_REQUIRED",
+        message:
+          "Accept the current Terms of Service before creating an account.",
+      })
+    }
+  }
+
   const validation = validateAuthRequest(ctx.path, ctx.body)
   if (!validation) return
 
@@ -262,13 +388,59 @@ const validateAuthRequestMiddleware = createAuthMiddleware(async (ctx) => {
 
   Object.assign(ctx.body, validation.data)
 
-  // Terms acceptance is request-only. It is validated before account
-  // creation but is not a Better Auth user field and must not reach the
-  // database adapter as an unknown column.
   if (ctx.path === "/sign-up/email") {
+    const audience = await resolveAuthAudience(ctx)
+    if (audience !== "customer" && audience !== "publisher") {
+      throw APIError.from("BAD_REQUEST", {
+        code: "INVALID_AUDIENCE",
+        message: "Choose a customer or publisher account type.",
+      })
+    }
+    rememberSignupConsent(ctx, {
+      accepted: true,
+      version: CURRENT_TERMS_VERSION,
+      method: "email",
+      audience,
+    })
+
+    // Consent is persisted by the user create hook. These request-only
+    // fields must not reach Better Auth's user adapter as unknown columns.
     delete ctx.body.termsAccepted
+    delete ctx.body.termsVersion
   }
 })
+
+const redactBrowserSessionTokenMiddleware = createAuthMiddleware(
+  async (ctx) => {
+    if (
+      ![
+        "/get-session",
+        "/sign-in/email",
+        "/sign-in/social",
+        "/sign-up/email",
+      ].includes(ctx.path)
+    ) {
+      return
+    }
+
+    const returned = ctx.context.returned
+    if (
+      !returned ||
+      returned instanceof Response ||
+      typeof returned !== "object"
+    ) {
+      return
+    }
+
+    const safe = { ...(returned as Record<string, any>) }
+    delete safe.token
+    if (safe.session && typeof safe.session === "object") {
+      safe.session = { ...safe.session }
+      delete safe.session.token
+    }
+    return ctx.json(safe)
+  },
+)
 
 /**
  * Phase 7.10 test seam — builds the option object passed to betterAuth().
@@ -296,36 +468,74 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
         },
       },
     },
-    session: {
-      expiresIn: 8 * 60 * 60, // 8 hours — stolen cookie window bounded
-      updateAge: 30 * 60, // 30 min — active users extend expiry; keeps
-      // thieves' window from being infinite
-    },
+    // 8-hour rolling session with a 30-minute refresh cadence. The API adds
+    // an absolute lifetime so a stolen cookie cannot be renewed forever.
+    session: AUTH_SESSION_OPTIONS,
     hooks: {
       before: validateAuthRequestMiddleware,
+      after: redactBrowserSessionTokenMiddleware,
     },
     emailAndPassword: {
       enabled: true,
+      revokeSessionsOnPasswordReset: true,
+      resetPasswordTokenExpiresIn: 60 * 60,
+      sendResetPassword: opts.sendEmail
+        ? async ({
+            user,
+            url,
+          }: {
+            user: { email: string; name?: string | null }
+            url: string
+          }) => {
+            await opts.sendEmail?.({
+              to: user.email,
+              subject: "Reset your password — GuestPost.cc",
+              html: renderPasswordResetEmail({
+                name: user.name ?? null,
+                url,
+              }),
+              jobName: "send-password-reset-email",
+            })
+          }
+        : undefined,
     },
+    // Linking Google is an explicit account-settings action, never a login
+    // side effect.
+    account: AUTH_ACCOUNT_OPTIONS,
     databaseHooks: {
       user: {
         create: {
           before: async (user: any, ctx: any) => {
-            const portalIntent = await resolvePortalIntent(ctx)
+            const consent = await resolveSignupConsent(ctx)
+            if (!consent) {
+              throw APIError.from("BAD_REQUEST", {
+                code: "TERMS_REQUIRED",
+                message:
+                  "Accept the current Terms of Service before creating an account.",
+              })
+            }
             return {
               data: {
                 ...user,
                 userType:
-                  portalIntent === "publisher" ? "PUBLISHER" : "CUSTOMER",
+                  consent.audience === "publisher" ? "PUBLISHER" : "CUSTOMER",
               },
             }
           },
-          after: async (user: any) => {
+          after: async (user: any, ctx: any) => {
+            const consent = await resolveSignupConsent(ctx)
+            if (!consent) {
+              throw APIError.from("BAD_REQUEST", {
+                code: "TERMS_REQUIRED",
+                message: "Account creation could not verify Terms acceptance.",
+              })
+            }
             if (user.userType === "PUBLISHER") {
               await provisionPublisherAccount(user)
             } else if (user.userType === "CUSTOMER") {
               await provisionCustomerAccount(user)
             }
+            await recordLegalAcceptance(user, consent, ctx)
             opts.invalidateAuthContext?.(user.id)
           },
         },
@@ -333,10 +543,24 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
       session: {
         create: {
           before: async (session: any, ctx: any) => {
-            const portalIntent = await resolvePortalIntent(ctx)
-            if (portalIntent === "publisher") {
-              await convertFreshCustomerToPublisher(session.userId)
-              opts.invalidateAuthContext?.(session.userId)
+            const audience = await resolveAuthAudience(ctx)
+            if (!audience) return { data: session }
+
+            const user = await prisma.user.findUnique({
+              where: { id: session.userId },
+              select: { userType: true },
+            })
+            if (!user) {
+              throw APIError.from("UNAUTHORIZED", {
+                code: "USER_NOT_FOUND",
+                message: "Account not found.",
+              })
+            }
+            if (user.userType !== userTypeForAudience(audience)) {
+              throw APIError.from("FORBIDDEN", {
+                code: "WRONG_PORTAL",
+                message: wrongPortalMessage(user.userType),
+              })
             }
             return { data: session }
           },
@@ -385,10 +609,9 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
         }
       : undefined,
     socialProviders: {
-      google: {
-        clientId: process.env.GOOGLE_CLIENT_ID ?? "",
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
-      },
+      // Login never creates an account. Explicit signup opts in only after
+      // the current Terms have been accepted.
+      google: googleProviderOptions(),
     },
     magicLink: {
       enabled: true,
@@ -429,9 +652,9 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
           attributes: {
             sameSite:
               (process.env.OAUTH_STATE_COOKIE_SAMESITE as
-                | "Strict"
-                | "Lax"
-                | "None") ||
+                | "strict"
+                | "lax"
+                | "none") ||
               (() => {
                 throw new Error("OAUTH_STATE_COOKIE_SAMESITE must be set")
               })(),
@@ -449,9 +672,9 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
           attributes: {
             sameSite:
               (process.env.OAUTH_STATE_COOKIE_SAMESITE as
-                | "Strict"
-                | "Lax"
-                | "None") ||
+                | "strict"
+                | "lax"
+                | "none") ||
               (() => {
                 throw new Error("OAUTH_STATE_COOKIE_SAMESITE must be set")
               })(),
@@ -467,12 +690,9 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
         },
       },
     },
-    plugins: [
-      bearer(),
-      ...(opts.emailRateLimit
-        ? [emailRateLimitPlugin(opts.emailRateLimit)]
-        : []),
-    ],
+    plugins: opts.emailRateLimit
+      ? [emailRateLimitPlugin(opts.emailRateLimit)]
+      : [],
   }
 }
 

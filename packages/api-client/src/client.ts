@@ -55,44 +55,32 @@ function generateRequestId(): string {
   return `${out.slice(0, 8)}-${out.slice(8, 12)}-4${out.slice(13, 16)}-${out.slice(16, 20)}-${out.slice(20, 32)}`
 }
 
-const STORAGE_KEY = "gp:api-token"
+const LEGACY_STORAGE_KEY = "gp:api-token"
 
-let _token: string | null = null
-
-function initToken() {
+function clearLegacyToken() {
   if (typeof sessionStorage !== "undefined") {
     try {
-      const stored = sessionStorage.getItem(STORAGE_KEY)
-      if (stored) _token = stored
+      sessionStorage.removeItem(LEGACY_STORAGE_KEY)
     } catch {
       /* noop */
     }
   }
 }
-initToken()
+clearLegacyToken()
 
-export function setToken(token: string) {
-  _token = token
-  if (typeof sessionStorage !== "undefined") {
-    try {
-      sessionStorage.setItem(STORAGE_KEY, token)
-    } catch {
-      /* noop */
-    }
-  }
+function isStateChangingMethod(method: string): boolean {
+  return ["POST", "PUT", "PATCH", "DELETE"].includes(method.toUpperCase())
 }
-export function clearToken() {
-  _token = null
-  if (typeof sessionStorage !== "undefined") {
-    try {
-      sessionStorage.removeItem(STORAGE_KEY)
-    } catch {
-      /* noop */
-    }
+
+function addCsrfProtectionHeader(
+  headers: Record<string, string>,
+  method: string,
+): void {
+  if (isStateChangingMethod(method)) {
+    // A non-simple custom header forces CORS preflight. The API additionally
+    // validates the exact Origin and Fetch Metadata before accepting cookies.
+    headers["X-CSRF-Protection"] = "1"
   }
-}
-export function getToken() {
-  return _token
 }
 
 /**
@@ -154,7 +142,7 @@ export class HttpClient {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     }
-    if (_token) headers.Authorization = `Bearer ${_token}`
+    addCsrfProtectionHeader(headers, method)
     // Phase 7.0 — every request carries an X-Request-ID. The API echoes it in
     // the response (or replaces with its own if malformed). On failure we
     // attach it to the ApiError so toasts/error reports can surface it.
@@ -177,12 +165,6 @@ export class HttpClient {
     }
 
     const res = await fetch(this.buildUrl(path, params), init)
-
-    // If the server rotated our session token, update the in-memory
-    // store so subsequent state-changing requests don't lose the Bearer
-    // header and trigger the CSRF guard.
-    const rotatedToken = res.headers.get("X-Session-Token")
-    if (rotatedToken) setToken(rotatedToken)
 
     const responseRequestId = res.headers.get("X-Request-ID") ?? requestId
     if (!res.ok) {

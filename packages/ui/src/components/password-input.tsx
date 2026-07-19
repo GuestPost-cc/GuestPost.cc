@@ -59,14 +59,14 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
           <div className="mt-2 flex justify-end">
             <a
               href={forgotPasswordHref}
-              className="text-xs text-zinc-500 hover:text-zinc-300"
+              className="text-xs text-zinc-400 hover:text-zinc-200"
             >
               Forgot password?
             </a>
           </div>
         )}
         {description && !error && (
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-sm text-zinc-400">{description}</p>
         )}
         {error && (
           <p id={`${id}-error`} className="text-sm text-destructive">

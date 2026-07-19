@@ -37,9 +37,14 @@ import { PrismaService } from "./common/prisma.service"
 import { getQueueConnection, getRedisClient } from "./common/redis-client"
 import { QueueService } from "./modules/queues/queue.service"
 
-const REQUIRED_ENV_VARS = ["DATABASE_URL", "REDIS_URL", "JWT_SECRET"] as const
+const REQUIRED_ENV_VARS = [
+  "DATABASE_URL",
+  "REDIS_URL",
+  "BETTER_AUTH_SECRET",
+] as const
 
 const PRODUCTION_ONLY_VARS = ["SMTP_HOST", "EMAIL_FROM"] as const
+const bootstrapLogger = createLogger("api.bootstrap")
 
 function validateEnv(): void {
   const missing: string[] = []
@@ -49,6 +54,13 @@ function validateEnv(): void {
   if (missing.length > 0) {
     console.error(
       `FATAL: Missing required environment variables: ${missing.join(", ")}`,
+    )
+    process.exit(1)
+  }
+
+  if ((process.env.BETTER_AUTH_SECRET?.trim().length ?? 0) < 32) {
+    bootstrapLogger.error(
+      "BETTER_AUTH_SECRET must be a random value of at least 32 characters",
     )
     process.exit(1)
   }
@@ -66,25 +78,6 @@ function validateEnv(): void {
         "FATAL: QUEUE_SIGNING_SECRET is required in production (do not reuse JWT_SECRET)",
       )
       process.exit(1)
-    }
-    if (
-      process.env.JWT_SECRET === "dev-jwt-secret-change-in-production" ||
-      process.env.JWT_SECRET ===
-        "generate_a_random_secret_with_openssl_rand_base64_32"
-    ) {
-      console.error(
-        "FATAL: JWT_SECRET is set to an insecure default value. Generate a unique secret for production.",
-      )
-      process.exit(1)
-    }
-    if (
-      !/^[0-9a-zA-Z!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]{32,}$/.test(
-        process.env.JWT_SECRET ?? "",
-      )
-    ) {
-      console.warn(
-        "WARN: JWT_SECRET appears weak. Use a randomly generated 32+ character string.",
-      )
     }
   }
 }
@@ -301,11 +294,15 @@ async function bootstrap() {
   server.use("/api/v1/auth/sign-in", createAuthLimiter(envLimits.auth.signIn))
   server.use("/api/v1/auth/sign-up", createAuthLimiter(envLimits.auth.signUp))
   server.use(
-    "/api/v1/auth/magic-link",
+    "/api/v1/auth/sign-in/magic-link",
     createAuthLimiter(envLimits.auth.magicLink),
   )
   server.use(
     "/api/v1/auth/reset-password",
+    createAuthLimiter(envLimits.auth.resetPassword),
+  )
+  server.use(
+    "/api/v1/auth/request-password-reset",
     createAuthLimiter(envLimits.auth.resetPassword),
   )
 

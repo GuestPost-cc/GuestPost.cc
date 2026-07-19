@@ -1,4 +1,5 @@
 import {
+  CURRENT_TERMS_VERSION,
   forgotPasswordSchema,
   loginSchema,
   signupSchema,
@@ -39,5 +40,25 @@ export function validateAuthRequest(
     }
   }
 
-  return { success: true, data: { ...result.data } }
+  if (
+    path === "/sign-up/email" &&
+    (body as { termsVersion?: unknown } | null)?.termsVersion !==
+      CURRENT_TERMS_VERSION
+  ) {
+    return {
+      success: false,
+      message:
+        "Accept the current Terms of Service before creating an account.",
+    }
+  }
+
+  return {
+    success: true,
+    data: {
+      ...result.data,
+      ...(path === "/sign-up/email"
+        ? { termsVersion: CURRENT_TERMS_VERSION }
+        : {}),
+    },
+  }
 }

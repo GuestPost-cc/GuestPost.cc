@@ -1,3 +1,8 @@
+export type {
+  AuthAudienceTabsProps,
+  PublicAuthAudience,
+} from "./components/auth-audience-tabs"
+export { AuthAudienceTabs } from "./components/auth-audience-tabs"
 export type { AuthCardProps } from "./components/auth-card"
 export { AuthCard } from "./components/auth-card"
 export type {
@@ -91,6 +96,7 @@ export type {
   FulfillmentChannelValue,
 } from "./components/fulfillment-channel-badge"
 export { FulfillmentChannelBadge } from "./components/fulfillment-channel-badge"
+export { GoogleIcon } from "./components/google-icon"
 export { Input } from "./components/input"
 export type {
   ConnectButtonProps,

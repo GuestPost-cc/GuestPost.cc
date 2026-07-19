@@ -1,12 +1,7 @@
 import { Button } from "@guestpost/ui"
 import { CheckCircle2 } from "lucide-react"
 import type { Metadata } from "next"
-import {
-  PORTAL_URL,
-  PUBLISHER_URL,
-  SiteFooter,
-  SiteHeader,
-} from "../../components/site-chrome"
+import { SiteFooter, SiteHeader } from "../../components/site-chrome"
 
 export const metadata: Metadata = {
   title: "Pricing — Pay Per Placement, No Subscription | GuestPost",
@@ -58,7 +53,7 @@ export default function PricingPage() {
               ))}
             </ul>
             <Button className="mt-8 w-full" asChild>
-              <a href={PORTAL_URL}>Create account</a>
+              <a href="/signup?audience=customer">Create account</a>
             </Button>
           </div>
 
@@ -88,7 +83,7 @@ export default function PricingPage() {
               ))}
             </ul>
             <Button className="mt-8 w-full" variant="outline" asChild>
-              <a href={PUBLISHER_URL}>Join as publisher</a>
+              <a href="/signup?audience=publisher">Join as publisher</a>
             </Button>
           </div>
         </section>

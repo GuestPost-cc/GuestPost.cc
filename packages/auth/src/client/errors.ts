@@ -27,10 +27,10 @@ export function mapBetterAuthError(
       }
     case "USER_NOT_FOUND":
       return {
-        code: "USER_NOT_FOUND",
-        message: "No account found with this email.",
+        code: "INVALID_CREDENTIALS",
+        message: "Incorrect email or password.",
         recoverable: true,
-        httpStatus: error.status ?? 404,
+        httpStatus: error.status ?? 401,
       }
     case "INVALID_EMAIL":
       return {
@@ -61,13 +61,23 @@ export function mapBetterAuthError(
         recoverable: true,
         httpStatus: error.status ?? 409,
       }
-    case "ACCOUNT_COLLISION_USE_SEPARATE_PROFILE":
+    case "WRONG_PORTAL":
+    case "WRONG_AUDIENCE":
       return {
-        code: "ACCOUNT_COLLISION_USE_SEPARATE_PROFILE",
+        code: "WRONG_PORTAL",
         message:
-          "This email already belongs to a customer workspace. Please use a separate account for publishing, or contact support.",
+          error.message ??
+          "This account belongs to a different portal. Use the correct portal or another account.",
         recoverable: true,
-        httpStatus: error.status ?? 409,
+        httpStatus: error.status ?? 403,
+      }
+    case "TERMS_REQUIRED":
+      return {
+        code: "TERMS_REQUIRED",
+        message:
+          "Accept the current Terms of Service before creating an account.",
+        recoverable: true,
+        httpStatus: error.status ?? 400,
       }
     case "RATE_LIMITED":
       return {
@@ -130,4 +140,30 @@ export function getErrorMessage(error: unknown): string {
   if (isAuthError(error)) return error.message
   if (error instanceof Error) return error.message
   return "Something went wrong"
+}
+
+export function getOAuthErrorMessage(code: string | null): string | null {
+  if (!code) return null
+  const normalized = code.trim().toLowerCase()
+  switch (normalized) {
+    case "access_denied":
+      return "Google sign-in was cancelled. You can try again when you're ready."
+    case "signup_disabled":
+      return "No account exists for this Google profile. Create an account first."
+    case "wrong_portal":
+    case "wrong_audience":
+      return "This account is registered for a different portal. Open the correct portal or use another Google account."
+    case "terms_required":
+      return "Accept the current Terms of Service before creating an account."
+    case "state_mismatch":
+    case "state_not_found":
+    case "invalid_state":
+      return "The secure Google sign-in request expired or could not be verified. Please try again."
+    case "account_not_linked":
+    case "account_already_linked_to_different_user":
+    case "unable_to_link_account":
+      return "This Google profile is already associated with another account. Sign in using the original method or contact support."
+    default:
+      return "Google sign-in could not be completed. Please try again."
+  }
 }

@@ -439,6 +439,11 @@ export class AdminService {
     const PUBLISHER_ROLES = ["PUBLISHER_OWNER"] as const
 
     if ((CUSTOMER_ROLES as readonly string[]).includes(role)) {
+      if (u.userType !== "CUSTOMER") {
+        throw new BadRequestException(
+          "ACCOUNT_TYPE_IMMUTABLE: publisher and staff accounts cannot be converted to customers",
+        )
+      }
       let membership = await this.prisma.membership.findFirst({
         where: { userId },
         orderBy: { createdAt: "asc" },
@@ -466,12 +471,6 @@ export class AdminService {
           data: { role: role as any },
         })
       }
-      if (u.userType !== "CUSTOMER") {
-        await this.prisma.user.update({
-          where: { id: userId },
-          data: { userType: "CUSTOMER" },
-        })
-      }
       await this.audit.log({
         action: "CUSTOMER_ROLE_UPDATE",
         entityType: "CustomerMembership",
@@ -484,6 +483,11 @@ export class AdminService {
     }
 
     if ((PUBLISHER_ROLES as readonly string[]).includes(role)) {
+      if (u.userType !== "PUBLISHER") {
+        throw new BadRequestException(
+          "ACCOUNT_TYPE_IMMUTABLE: customer and staff accounts cannot be converted to publishers",
+        )
+      }
       let pubMembership = await this.prisma.publisherMembership.findFirst({
         where: { userId },
         orderBy: { createdAt: "asc" },
@@ -523,12 +527,6 @@ export class AdminService {
         pubMembership = await this.prisma.publisherMembership.update({
           where: { id: pubMembership.id },
           data: { role: "PUBLISHER_OWNER" },
-        })
-      }
-      if (u.userType !== "PUBLISHER") {
-        await this.prisma.user.update({
-          where: { id: userId },
-          data: { userType: "PUBLISHER" },
         })
       }
       await this.audit.log({

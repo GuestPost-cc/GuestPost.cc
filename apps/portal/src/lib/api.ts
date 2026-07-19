@@ -1,10 +1,4 @@
-import {
-  buildAuthErrorHandler,
-  clearToken,
-  createApiClient,
-  getToken,
-  setToken,
-} from "@guestpost/api-client"
+import { buildAuthErrorHandler, createApiClient } from "@guestpost/api-client"
 
 export const getApiUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL
@@ -20,7 +14,7 @@ export const getApiUrl = () => {
 
 // Phase 6.8 — Audit finding #7 closure.
 // 401 from a non-auth endpoint means the session is gone (expired / revoked /
-// invalidated). Clear the token and bounce the user to the sign-in page with
+// invalidated). Bounce the user to the sign-in page with
 // a sanitized `returnTo` so they land back where they were after re-auth.
 // See packages/api-client/src/auth-redirect.ts for the security contract.
 //
@@ -31,4 +25,3 @@ export const api = createApiClient({
   baseUrl: getApiUrl(),
   onAuthError: buildAuthErrorHandler({ signInPath: "/" }),
 })
-export { clearToken, getToken, setToken }

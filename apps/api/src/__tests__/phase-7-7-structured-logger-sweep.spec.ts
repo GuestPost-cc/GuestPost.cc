@@ -41,7 +41,7 @@ const repoRoot = path.resolve(__dirname, "..", "..", "..", "..")
 // from @guestpost/shared/dist/observability/structured-logger (preferred) or
 // add to this map with a comment justifying why it's exempt.
 const CURRENTLY_ALLOWED_WITH_CONSOLE: Record<string, number> = {
-  "apps/api/src/main.ts": 6, // boot/startup last-resort; 5x console.log swept to authLogger.info (Sprint C codebase maintenance)
+  "apps/api/src/main.ts": 4, // boot/startup last-resort; auth policy validation uses the structured bootstrap logger
   "apps/admin/src/lib/auth.tsx": 1, // browser-side session-refresh error
   "apps/portal/src/lib/auth.tsx": 1, // browser-side session-refresh error
   "apps/publisher/src/lib/auth.tsx": 1, // browser-side session-refresh error

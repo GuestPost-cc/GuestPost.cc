@@ -29,7 +29,7 @@ export async function getSession(
         emailVerified: user.emailVerified,
         name: user.name ?? null,
         image: user.image ?? null,
-        userType: user.userType ?? "CUSTOMER",
+        userType: user.userType,
         banned: user.banned ?? false,
       },
     }

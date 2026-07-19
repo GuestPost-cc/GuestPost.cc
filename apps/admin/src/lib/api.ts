@@ -1,10 +1,7 @@
 import {
   buildAuthErrorHandler,
-  clearToken,
   createApiClient,
-  getToken,
   isAuthEndpointPath,
-  setToken,
 } from "@guestpost/api-client"
 
 export const getApiUrl = () => {
@@ -28,7 +25,6 @@ export const api = createApiClient({
   baseUrl: getApiUrl(),
   onAuthError,
 })
-export { clearToken, getToken, setToken }
 
 // The two helpers below predate Phase 6.8 and bypass the typed HttpClient,
 // so they need their own 401 handling. Mirror the same contract: skip the
@@ -40,9 +36,7 @@ function handle401(path: string) {
 
 /** Fetch helper that throws on non-ok responses. Calls getApiUrl() at fetch time. */
 export async function adminFetch(path: string) {
-  const token = getToken()
   const res = await fetch(`${getApiUrl()}${path}`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     credentials: "include",
   })
   if (res.status === 401) handle401(path)
@@ -52,9 +46,7 @@ export async function adminFetch(path: string) {
 
 /** Fetch helper that returns the raw Response (caller checks res.ok). */
 export async function authFetch(url: string) {
-  const token = getToken()
   const res = await fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     credentials: "include",
   })
   if (res.status === 401) handle401(url)

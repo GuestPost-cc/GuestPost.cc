@@ -4,9 +4,6 @@ import Link from "next/link"
 
 export const PORTAL_URL =
   process.env.NEXT_PUBLIC_PORTAL_URL ?? "http://localhost:3001"
-export const PUBLISHER_URL =
-  process.env.NEXT_PUBLIC_PUBLISHER_URL ?? "http://localhost:3002"
-
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -41,10 +38,10 @@ export function SiteHeader() {
           </Link>
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" asChild>
-              <a href={PUBLISHER_URL}>Publisher Login</a>
+              <Link href="/login">Log in</Link>
             </Button>
             <Button size="sm" asChild>
-              <a href={PORTAL_URL}>Get Started</a>
+              <Link href="/signup">Get Started</Link>
             </Button>
           </div>
         </nav>
