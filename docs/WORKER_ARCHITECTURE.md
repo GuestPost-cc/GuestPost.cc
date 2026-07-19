@@ -3,8 +3,9 @@
 ## Purpose
 
 The production worker uses a hybrid runtime. Only user-facing work that should
-start promptly has a continuously running consumer. Periodic automation runs as
-Northflank cron jobs, and bursty work starts a short-lived job on demand. This
+start promptly has a continuously running consumer. Periodic automation runs
+through a short-lived Northflank dispatcher job, and bursty work starts a
+short-lived job on demand. This
 preserves BullMQ durability while avoiding an idle Redis poller for every
 logical queue.
 
@@ -17,7 +18,7 @@ rollback. It is not the recommended production shape.
 |---|---|---|---|
 | Realtime | `realtime` | Continuous, one replica | Email, in-app notifications, requested website DNS verification, requested delivery/link verification |
 | On demand | `on-demand` | Starts on API wake-up, drains, exits | Reports, generic verification, publisher trust recomputation, integration discovery/sync, legacy payout queue drain, payout webhook inbox |
-| Scheduled | `scheduled` | One task, then exits | Payout reconciliation, financial reconciliation, settlement automation, order deadlines/reminders, link monitoring, website re-verification |
+| Scheduled | `scheduled` | Due maintenance tasks, then exits | Payout reconciliation, financial reconciliation, settlement automation, order deadlines/reminders, link monitoring, website re-verification |
 | Compatibility | `all` | Continuous | All legacy workers and BullMQ repeatable schedules |
 
 The realtime lane deliberately excludes payout. The API sends a payout to the
@@ -73,7 +74,9 @@ unsafe state is not mutated silently; it creates a
 
 ### Scheduled reconciliation
 
-`WORKER_TASK=payout-reconcile` processes up to
+The five-minute maintenance dispatcher invokes `payout-reconcile` every ten
+minutes. A direct `WORKER_TASK=payout-reconcile` run remains available for
+incident recovery and processes up to
 `PAYOUT_WEBHOOK_INBOX_BATCH_SIZE` ready inbox events and polls up to
 `PAYOUT_STATUS_BATCH_SIZE` provider transfers that remain `PROCESSING`. Run it
 every 10 minutes; successive runs bound larger backlogs. Webhooks are the
@@ -81,7 +84,8 @@ prompt signal, and polling is the independent recovery path.
 
 ## Scheduled task catalog
 
-Run the same worker image with `WORKER_MODE=scheduled` and one `WORKER_TASK`:
+The task catalog remains individually runnable with `WORKER_MODE=scheduled`
+and one `WORKER_TASK`:
 
 | `WORKER_TASK` | Recommended cron (UTC) | Notes |
 |---|---:|---|
@@ -89,20 +93,25 @@ Run the same worker image with `WORKER_MODE=scheduled` and one `WORKER_TASK`:
 | `settlement-auto-approve` | `*/15 * * * *` | Review-window approvals |
 | `settlement-auto-release` | `5,20,35,50 * * * *` | Offset from approval |
 | `cancellation-timeouts` | `*/15 * * * *` | Cancellation response deadlines |
-| `acceptance-timeouts` | `7,22,37,52 * * * *` | Order acceptance deadlines |
+| `acceptance-timeouts` | `10,25,40,55 * * * *` | Order acceptance deadlines; at most three minutes later than the legacy cadence |
 | `auto-accept` | `10 * * * *` | Orders past review window |
 | `review-reminders` | `20 * * * *` | Upcoming review deadline email |
 | `reconciliation` | `30 * * * *` | Financial drift detection |
 | `settlement-link-check` | `0 */6 * * *` | Verify links while funds are held |
 | `website-reverify` | `0 3 1 * *` | Monthly ownership re-verification |
 
-Set Northflank concurrency policy to **forbid** for every scheduled job. A
-second invocation must not overlap the first. Use a 15-minute timeout unless a
-measured production backlog requires more.
+On a paid project, these may be separate jobs. The current Northflank free
+project is limited to two jobs, so use one job with
+`WORKER_TASK=maintenance-dispatch` on `*/5 * * * *`. It deterministically runs
+only the catalog tasks due in that UTC slot. Set its concurrency policy to
+**forbid** and its timeout to 30 minutes. The dispatcher attempts every due
+task even if an earlier one fails, then exits non-zero with an aggregate error.
+Successful tasks retain their BullMQ idempotency marker, so a platform retry
+cannot duplicate them.
 
-Disabled flags such as `SETTLEMENT_AUTO_APPROVE_DISABLED` are honored by the
-legacy `all` scheduler. In hybrid mode, disable or pause the corresponding
-Northflank cron job as well.
+`SETTLEMENT_AUTO_APPROVE_DISABLED` and
+`SETTLEMENT_AUTO_RELEASE_DISABLED` are honored by both the compatibility
+scheduler and the maintenance dispatcher.
 
 ## Northflank production layout
 
@@ -127,7 +136,8 @@ its four consumers. Do not run it beside a stale `WORKER_MODE=all` process.
 - Environment: `WORKER_MODE=on-demand`
 - Concurrency policy: **forbid**
 - Timeout: 10 minutes (match `WORKER_ON_DEMAND_MAX_RUNTIME_MS`)
-- Restart policy: no continuous restart; the mandatory catch-up cron retries
+- Schedule: `*/10 * * * *` for mandatory catch-up; API runs use the same job
+- Restart policy: no continuous restart
 
 Create a project-scoped Northflank API token with only
 `Project > Jobs > General > Read`, the permission Northflank requires for its
@@ -142,15 +152,17 @@ endpoint, as well as non-HTTPS or credential-bearing URLs. Never put the token
 in a URL, log, image, or client bundle.
 
 The API wake signal is only an optimization. Queue/inbox persistence happens
-first. Configure a second invocation of the same on-demand job on
-`*/10 * * * *` as mandatory catch-up for missed or throttled wake signals.
+first; the job's ten-minute schedule is the mandatory catch-up for missed or
+throttled wake signals.
 
-### 3. Scheduled jobs
+### 3. Scheduled maintenance dispatcher
 
-Create one Northflank cron job per catalog row. Each uses the same command and
-image, `WORKER_MODE=scheduled`, and its own `WORKER_TASK`. Keep provider keys
-only on jobs that require them; for example, only payout reconciliation needs
-Wise/Stripe payout credentials.
+Create one cron job using the same command and image with
+`WORKER_MODE=scheduled`, `WORKER_TASK=maintenance-dispatch`, and
+`*/5 * * * *`. This is the second and final job allowed by the free project.
+Keep payout provider credentials on this dispatcher only when provider polling
+is enabled; the realtime worker never receives payout initiation or payout
+method decryption keys.
 
 ## Redis configuration and command budget
 
@@ -188,7 +200,8 @@ Lane-specific:
 - Realtime: SMTP and verification/object-storage settings used by its queues
 - On demand: integration encryption/provider settings, report settings, payout
   provider settings for inbox recovery
-- Scheduled: only credentials needed by the selected task
+- Scheduled dispatcher: the union of credentials needed by enabled maintenance
+  tasks; never include payout method decryption keys
 - API: `WORKER_ON_DEMAND_TRIGGER_URL` and
   `WORKER_ON_DEMAND_TRIGGER_TOKEN` for immediate burst processing
 
@@ -205,8 +218,9 @@ independently.
 3. Deploy the additive `PayoutWebhookEvent` migration, which also enforces
    provider-scoped transfer-reference uniqueness.
 4. Build and publish one immutable API/worker image set.
-5. Create the on-demand and scheduled Northflank jobs with the new worker image,
-   but keep scheduled invocations paused.
+5. Create the two Northflank jobs with the new worker image: an on-demand drain
+   with a ten-minute catch-up schedule and a five-minute maintenance dispatcher.
+   Keep their schedules paused until cutover.
 6. Deploy the new API. Verified payout events now accumulate durably even if no
    job is running yet.
 7. Let the old worker drain `integration-sync` and `integration-discovery`, then
@@ -215,8 +229,10 @@ independently.
 8. Stop every old worker replica. Do not overlap worker code versions.
 9. Start the realtime service with `WORKER_MODE=realtime`; confirm the log says
    four queues and legacy repeatables were removed.
-10. Run `payout-reconcile` manually once, then run the on-demand job once.
-11. Enable all cron schedules and the 10-minute catch-up job.
+10. Run the maintenance dispatcher in a payout-reconciliation slot, then run
+    the on-demand job once.
+11. Enable the five-minute maintenance schedule and the on-demand job's
+    ten-minute catch-up schedule.
 12. Verify health, queue depth, inbox state, Redis command rate, and financial
     reconciliation before declaring the cutover complete.
 

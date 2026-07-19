@@ -79,8 +79,10 @@ procedure does not exist.
 
 ## Automated reconciliation + alerting
 
-In the hybrid production layout, Northflank runs the financial drift sweep
-every 60 minutes (`WORKER_MODE=scheduled`, `WORKER_TASK=reconciliation`).
+In the hybrid production layout, Northflank's five-minute maintenance job runs
+the financial drift sweep at minute 30 of every hour
+(`WORKER_MODE=scheduled`, `WORKER_TASK=maintenance-dispatch`). A direct
+`WORKER_TASK=reconciliation` run remains available for incident response.
 `WORKER_MODE=all` retains the legacy BullMQ repeatable sweep for local fallback.
 The Northflank cron controls hybrid cadence; `RECONCILIATION_SWEEP_MINUTES`
 only tunes the compatibility scheduler (minimum 5). Checks: wallet drift,

@@ -62,8 +62,9 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 - **Hybrid worker deployment is pending.** The current Northflank service must
   not be switched from compatibility `all` mode until the payout inbox
   migration is deployed, old unsigned integration jobs are drained, the
-  realtime service is healthy, and every scheduled task plus the mandatory
-  on-demand catch-up has been created with forbid-concurrency behavior.
+  realtime service is healthy, and the two free-tier jobs (on-demand/catch-up
+  and five-minute maintenance dispatcher) have been created with
+  forbid-concurrency behavior.
 - **On-demand wake is best-effort by design.** A bad Northflank endpoint/token
   can increase report, trust, integration, or payout-webhook processing latency.
   It cannot be the only trigger: the documented 10-minute catch-up schedule and

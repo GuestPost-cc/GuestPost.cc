@@ -28,6 +28,11 @@ import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { Queue, QueueEvents } from "bullmq"
 import { type HealthServerHandle, startHealthServer } from "./lib/health-server"
+import {
+  MAINTENANCE_DISPATCH_TASK,
+  type MaintenanceTaskName,
+  maintenanceTasksDueAt,
+} from "./lib/maintenance-schedule"
 import { createAutoAcceptWorker } from "./processors/auto-accept.processor"
 import { createDeliveryVerificationWorker } from "./processors/delivery-verification.processor"
 import { createEmailWorker } from "./processors/email.processor"
@@ -610,6 +615,50 @@ async function runScheduledTask(taskName: string): Promise<void> {
   }
 }
 
+function isMaintenanceTaskDisabled(taskName: MaintenanceTaskName): boolean {
+  if (taskName === "settlement-auto-approve") {
+    return process.env.SETTLEMENT_AUTO_APPROVE_DISABLED === "true"
+  }
+  if (taskName === "settlement-auto-release") {
+    return process.env.SETTLEMENT_AUTO_RELEASE_DISABLED === "true"
+  }
+  return false
+}
+
+async function runMaintenanceDispatch(now = new Date()): Promise<void> {
+  const dueTasks = maintenanceTasksDueAt(now).filter(
+    (taskName) => !isMaintenanceTaskDisabled(taskName),
+  )
+  logger.info("maintenance dispatch started", {
+    scheduledAt: now.toISOString(),
+    tasks: dueTasks,
+  })
+
+  const failures: Array<{ taskName: MaintenanceTaskName; error: Error }> = []
+  for (const taskName of dueTasks) {
+    try {
+      await runScheduledTask(taskName)
+    } catch (error) {
+      const normalized =
+        error instanceof Error ? error : new Error(String(error))
+      failures.push({ taskName, error: normalized })
+      logger.error("maintenance task failed", {
+        taskName,
+        err: normalized.message,
+      })
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new AggregateError(
+      failures.map(({ error }) => error),
+      `Maintenance dispatch failed: ${failures.map(({ taskName }) => taskName).join(", ")}`,
+    )
+  }
+
+  logger.info("maintenance dispatch completed", { tasks: dueTasks })
+}
+
 async function drainOnDemandQueues(): Promise<void> {
   const queueHandles = ON_DEMAND_QUEUES.map(
     (name) => new Queue(name, { connection }),
@@ -785,6 +834,11 @@ async function bootstrap() {
   const taskName = process.env.WORKER_TASK?.trim()
   if (!taskName) {
     throw new Error("WORKER_TASK is required when WORKER_MODE=scheduled")
+  }
+  if (taskName === MAINTENANCE_DISPATCH_TASK) {
+    await runMaintenanceDispatch()
+    await shutdown(`scheduled-complete:${taskName}`)
+    return
   }
   await runScheduledTask(taskName)
   await shutdown(`scheduled-complete:${taskName}`)

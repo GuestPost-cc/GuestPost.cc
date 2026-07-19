@@ -389,13 +389,14 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
-The hybrid worker rewrite is code-complete and locally verified. The payout
-reference preflight returned no duplicates, the additive inbox migration is
-deployed to the Neon test database, and all worker modes passed against the new
-dedicated Upstash queue database. The active release focus is PR/CI followed by
-the controlled API-and-Northflank cutover: drain legacy unsigned integration
-jobs with the old worker, then configure the realtime, on-demand, and scheduled
-Northflank workloads. The safe `all` default remains available for rollback.
+The hybrid worker rewrite is merged through PR #57 and its main-branch CI is
+green. The payout reference preflight returned no duplicates, the additive
+inbox migration is deployed to the Neon test database, and all worker modes
+passed against the new dedicated Upstash queue database. Northflank's free
+project allows only two jobs, so a follow-up adds one five-minute maintenance
+dispatcher alongside the API-triggerable on-demand/catch-up job. The realtime
+service remains paused while that follow-up passes PR/CI and the controlled
+cutover completes. The safe `all` default remains available for rollback.
 
 The Operations assignment and Support workbench is code-complete and locally
 verified. `GET /admin/operations-workbench` supplies exact workflow counts and
@@ -459,7 +460,7 @@ data.
 
 ## Next Actions
 
-1. **Hybrid worker cutover** — merge only after GitHub CI passes, deploy the API, drain legacy unsigned integration jobs, and then deploy the Northflank realtime/on-demand/scheduled workloads with forbid-concurrency schedules and the mandatory catch-up job.
+1. **Hybrid worker cutover** — merge the free-tier dispatcher follow-up only after GitHub CI passes, then deploy the Render API plus the paused Northflank realtime service, on-demand/catch-up job, and maintenance dispatcher with forbid-concurrency behavior.
 2. **Redis quota validation** — configure the dedicated staging `QUEUE_REDIS_URL` through deployment secrets and monitor commands/day for at least 24 hours after the hybrid cutover before treating the cost model as validated.
 3. **Customer workbench release** — review, commit, push, and open the customer workbench PR (stacked on the publisher workbench commit); confirm the full GitHub CI gate before merging.
 4. **Google integration staging pass** — authorize the production callback URI, connect a Google account different from the GuestPost login, discover/link GSC and GA4 properties for one publisher and one platform site, then verify daily rows and their buyer-safe 30-day listing summaries are written only to the selected website mappings.

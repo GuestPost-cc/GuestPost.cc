@@ -134,6 +134,7 @@ jobs:
           --filter @guestpost/auth
           --filter @guestpost/integrations
           --filter @guestpost/api-client
+          --filter @guestpost/worker
           test
 
       - name: UI component tests with coverage
