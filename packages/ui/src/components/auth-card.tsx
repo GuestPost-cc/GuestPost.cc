@@ -32,11 +32,11 @@ export function AuthCard({
               {eyebrow}
             </div>
           )}
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-50 sm:text-3xl">
             {title}
           </h1>
           {description && (
-            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-muted-foreground">
+            <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-zinc-400">
               {description}
             </p>
           )}
@@ -45,7 +45,7 @@ export function AuthCard({
         {children}
 
         {footer && (
-          <div className="border-t border-zinc-800 pt-6 text-center text-sm text-muted-foreground">
+          <div className="border-t border-zinc-800 pt-6 text-center text-sm text-zinc-400 [&_a]:text-sky-300 [&_a]:underline-offset-4 [&_a:hover]:text-sky-200 [&_a:hover]:underline">
             {footer}
           </div>
         )}

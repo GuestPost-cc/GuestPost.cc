@@ -381,8 +381,28 @@ model User {
   activeContext                 ActiveContext?
   managedWebsites               Website[]              @relation("WebsiteManager")
   assignedTickets               Ticket[]               @relation("TicketAssignee")
+  legalAcceptances              LegalAcceptance[]
 
   @@index([userType, banned])
+}
+
+model LegalAcceptance {
+  id              String   @id @default(cuid())
+  userId          String
+  documentType    String
+  documentVersion String
+  acceptedAt      DateTime @default(now())
+  method          String
+  audience        UserType
+  ipAddress       String?
+  userAgent       String?
+  requestId       String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentType, documentVersion])
+  @@index([acceptedAt])
+  @@index([audience, acceptedAt])
 }
 
 model Session {

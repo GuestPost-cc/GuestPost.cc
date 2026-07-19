@@ -1,10 +1,4 @@
-import {
-  buildAuthErrorHandler,
-  clearToken,
-  createApiClient,
-  getToken,
-  setToken,
-} from "@guestpost/api-client"
+import { buildAuthErrorHandler, createApiClient } from "@guestpost/api-client"
 
 export const getApiUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL
@@ -25,4 +19,3 @@ export const api = createApiClient({
   baseUrl: getApiUrl(),
   onAuthError: buildAuthErrorHandler({ signInPath: "/" }),
 })
-export { clearToken, getToken, setToken }

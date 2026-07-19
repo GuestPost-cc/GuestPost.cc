@@ -258,6 +258,7 @@ export type UserWhereInput = {
   activeContext?: Prisma.XOR<Prisma.ActiveContextNullableScalarRelationFilter, Prisma.ActiveContextWhereInput> | null
   managedWebsites?: Prisma.WebsiteListRelationFilter
   assignedTickets?: Prisma.TicketListRelationFilter
+  legalAcceptances?: Prisma.LegalAcceptanceListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -293,6 +294,7 @@ export type UserOrderByWithRelationInput = {
   activeContext?: Prisma.ActiveContextOrderByWithRelationInput
   managedWebsites?: Prisma.WebsiteOrderByRelationAggregateInput
   assignedTickets?: Prisma.TicketOrderByRelationAggregateInput
+  legalAcceptances?: Prisma.LegalAcceptanceOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -331,6 +333,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   activeContext?: Prisma.XOR<Prisma.ActiveContextNullableScalarRelationFilter, Prisma.ActiveContextWhereInput> | null
   managedWebsites?: Prisma.WebsiteListRelationFilter
   assignedTickets?: Prisma.TicketListRelationFilter
+  legalAcceptances?: Prisma.LegalAcceptanceListRelationFilter
 }, "id" | "email">
 
 export type UserOrderByWithAggregationInput = {
@@ -402,6 +405,7 @@ export type UserCreateInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -437,6 +441,7 @@ export type UserUncheckedCreateInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -472,6 +477,7 @@ export type UserUpdateInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -507,6 +513,7 @@ export type UserUncheckedUpdateInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -635,6 +642,20 @@ export type NullableDateTimeFieldUpdateOperationsInput = {
 
 export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
+}
+
+export type UserCreateNestedOneWithoutLegalAcceptancesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutLegalAcceptancesInput, Prisma.UserUncheckedCreateWithoutLegalAcceptancesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutLegalAcceptancesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutLegalAcceptancesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutLegalAcceptancesInput, Prisma.UserUncheckedCreateWithoutLegalAcceptancesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutLegalAcceptancesInput
+  upsert?: Prisma.UserUpsertWithoutLegalAcceptancesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutLegalAcceptancesInput, Prisma.UserUpdateWithoutLegalAcceptancesInput>, Prisma.UserUncheckedUpdateWithoutLegalAcceptancesInput>
 }
 
 export type UserCreateNestedOneWithoutSessionsInput = {
@@ -937,6 +958,162 @@ export type UserUpdateOneRequiredWithoutMarketplaceFavoritesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutMarketplaceFavoritesInput, Prisma.UserUpdateWithoutMarketplaceFavoritesInput>, Prisma.UserUncheckedUpdateWithoutMarketplaceFavoritesInput>
 }
 
+export type UserCreateWithoutLegalAcceptancesInput = {
+  id?: string
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  userType?: $Enums.UserType
+  role?: $Enums.UserRole
+  banned?: boolean
+  banReason?: string | null
+  banExpires?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipCreateNestedManyWithoutUserInput
+  publisherMemberships?: Prisma.PublisherMembershipCreateNestedManyWithoutUserInput
+  staffMemberships?: Prisma.StaffMembershipCreateNestedManyWithoutUserInput
+  ownedOrders?: Prisma.OrderCreateNestedManyWithoutCustomerInput
+  assignedOrders?: Prisma.OrderCreateNestedManyWithoutAssigneeInput
+  orderEvents?: Prisma.OrderEventCreateNestedManyWithoutActorInput
+  publications?: Prisma.PublicationCreateNestedManyWithoutVerifiedByUserInput
+  approvedWithdrawals?: Prisma.WithdrawalCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutAdminVerifiedByInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutUserInput
+  messages?: Prisma.TicketMessageCreateNestedManyWithoutUserInput
+  notifications?: Prisma.NotificationCreateNestedManyWithoutUserInput
+  auditLogs?: Prisma.AuditLogCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionCreateNestedManyWithoutUserInput
+  accounts?: Prisma.AccountCreateNestedManyWithoutUserInput
+  marketplaceReviews?: Prisma.MarketplaceReviewCreateNestedManyWithoutUserInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
+  managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
+  assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+}
+
+export type UserUncheckedCreateWithoutLegalAcceptancesInput = {
+  id?: string
+  email: string
+  emailVerified?: boolean
+  name?: string | null
+  image?: string | null
+  userType?: $Enums.UserType
+  role?: $Enums.UserRole
+  banned?: boolean
+  banReason?: string | null
+  banExpires?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  memberships?: Prisma.MembershipUncheckedCreateNestedManyWithoutUserInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedCreateNestedManyWithoutUserInput
+  staffMemberships?: Prisma.StaffMembershipUncheckedCreateNestedManyWithoutUserInput
+  ownedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutCustomerInput
+  assignedOrders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssigneeInput
+  orderEvents?: Prisma.OrderEventUncheckedCreateNestedManyWithoutActorInput
+  publications?: Prisma.PublicationUncheckedCreateNestedManyWithoutVerifiedByUserInput
+  approvedWithdrawals?: Prisma.WithdrawalUncheckedCreateNestedManyWithoutApprovedByUserInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutAdminVerifiedByInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutUserInput
+  messages?: Prisma.TicketMessageUncheckedCreateNestedManyWithoutUserInput
+  notifications?: Prisma.NotificationUncheckedCreateNestedManyWithoutUserInput
+  auditLogs?: Prisma.AuditLogUncheckedCreateNestedManyWithoutUserInput
+  sessions?: Prisma.SessionUncheckedCreateNestedManyWithoutUserInput
+  accounts?: Prisma.AccountUncheckedCreateNestedManyWithoutUserInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUncheckedCreateNestedManyWithoutUserInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
+  activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
+  managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
+  assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+}
+
+export type UserCreateOrConnectWithoutLegalAcceptancesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutLegalAcceptancesInput, Prisma.UserUncheckedCreateWithoutLegalAcceptancesInput>
+}
+
+export type UserUpsertWithoutLegalAcceptancesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutLegalAcceptancesInput, Prisma.UserUncheckedUpdateWithoutLegalAcceptancesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutLegalAcceptancesInput, Prisma.UserUncheckedCreateWithoutLegalAcceptancesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutLegalAcceptancesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutLegalAcceptancesInput, Prisma.UserUncheckedUpdateWithoutLegalAcceptancesInput>
+}
+
+export type UserUpdateWithoutLegalAcceptancesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userType?: Prisma.EnumUserTypeFieldUpdateOperationsInput | $Enums.UserType
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  banned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  banReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  banExpires?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUpdateManyWithoutUserNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUpdateManyWithoutUserNestedInput
+  staffMemberships?: Prisma.StaffMembershipUpdateManyWithoutUserNestedInput
+  ownedOrders?: Prisma.OrderUpdateManyWithoutCustomerNestedInput
+  assignedOrders?: Prisma.OrderUpdateManyWithoutAssigneeNestedInput
+  orderEvents?: Prisma.OrderEventUpdateManyWithoutActorNestedInput
+  publications?: Prisma.PublicationUpdateManyWithoutVerifiedByUserNestedInput
+  approvedWithdrawals?: Prisma.WithdrawalUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutAdminVerifiedByNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutUserNestedInput
+  messages?: Prisma.TicketMessageUpdateManyWithoutUserNestedInput
+  notifications?: Prisma.NotificationUpdateManyWithoutUserNestedInput
+  auditLogs?: Prisma.AuditLogUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUpdateManyWithoutUserNestedInput
+  accounts?: Prisma.AccountUpdateManyWithoutUserNestedInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUpdateManyWithoutUserNestedInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
+  managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
+  assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+}
+
+export type UserUncheckedUpdateWithoutLegalAcceptancesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerified?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  image?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userType?: Prisma.EnumUserTypeFieldUpdateOperationsInput | $Enums.UserType
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  banned?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  banReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  banExpires?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  memberships?: Prisma.MembershipUncheckedUpdateManyWithoutUserNestedInput
+  publisherMemberships?: Prisma.PublisherMembershipUncheckedUpdateManyWithoutUserNestedInput
+  staffMemberships?: Prisma.StaffMembershipUncheckedUpdateManyWithoutUserNestedInput
+  ownedOrders?: Prisma.OrderUncheckedUpdateManyWithoutCustomerNestedInput
+  assignedOrders?: Prisma.OrderUncheckedUpdateManyWithoutAssigneeNestedInput
+  orderEvents?: Prisma.OrderEventUncheckedUpdateManyWithoutActorNestedInput
+  publications?: Prisma.PublicationUncheckedUpdateManyWithoutVerifiedByUserNestedInput
+  approvedWithdrawals?: Prisma.WithdrawalUncheckedUpdateManyWithoutApprovedByUserNestedInput
+  adminVerifiedDeliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutAdminVerifiedByNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutUserNestedInput
+  messages?: Prisma.TicketMessageUncheckedUpdateManyWithoutUserNestedInput
+  notifications?: Prisma.NotificationUncheckedUpdateManyWithoutUserNestedInput
+  auditLogs?: Prisma.AuditLogUncheckedUpdateManyWithoutUserNestedInput
+  sessions?: Prisma.SessionUncheckedUpdateManyWithoutUserNestedInput
+  accounts?: Prisma.AccountUncheckedUpdateManyWithoutUserNestedInput
+  marketplaceReviews?: Prisma.MarketplaceReviewUncheckedUpdateManyWithoutUserNestedInput
+  marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
+  activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
+  managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
+  assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+}
+
 export type UserCreateWithoutSessionsInput = {
   id?: string
   email: string
@@ -969,6 +1146,7 @@ export type UserCreateWithoutSessionsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSessionsInput = {
@@ -1003,6 +1181,7 @@ export type UserUncheckedCreateWithoutSessionsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSessionsInput = {
@@ -1053,6 +1232,7 @@ export type UserUpdateWithoutSessionsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -1087,6 +1267,7 @@ export type UserUncheckedUpdateWithoutSessionsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAccountsInput = {
@@ -1121,6 +1302,7 @@ export type UserCreateWithoutAccountsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAccountsInput = {
@@ -1155,6 +1337,7 @@ export type UserUncheckedCreateWithoutAccountsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAccountsInput = {
@@ -1205,6 +1388,7 @@ export type UserUpdateWithoutAccountsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAccountsInput = {
@@ -1239,6 +1423,7 @@ export type UserUncheckedUpdateWithoutAccountsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutActiveContextInput = {
@@ -1273,6 +1458,7 @@ export type UserCreateWithoutActiveContextInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutActiveContextInput = {
@@ -1307,6 +1493,7 @@ export type UserUncheckedCreateWithoutActiveContextInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutActiveContextInput = {
@@ -1357,6 +1544,7 @@ export type UserUpdateWithoutActiveContextInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutActiveContextInput = {
@@ -1391,6 +1579,7 @@ export type UserUncheckedUpdateWithoutActiveContextInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMembershipsInput = {
@@ -1425,6 +1614,7 @@ export type UserCreateWithoutMembershipsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMembershipsInput = {
@@ -1459,6 +1649,7 @@ export type UserUncheckedCreateWithoutMembershipsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMembershipsInput = {
@@ -1509,6 +1700,7 @@ export type UserUpdateWithoutMembershipsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMembershipsInput = {
@@ -1543,6 +1735,7 @@ export type UserUncheckedUpdateWithoutMembershipsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPublisherMembershipsInput = {
@@ -1577,6 +1770,7 @@ export type UserCreateWithoutPublisherMembershipsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPublisherMembershipsInput = {
@@ -1611,6 +1805,7 @@ export type UserUncheckedCreateWithoutPublisherMembershipsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPublisherMembershipsInput = {
@@ -1661,6 +1856,7 @@ export type UserUpdateWithoutPublisherMembershipsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPublisherMembershipsInput = {
@@ -1695,6 +1891,7 @@ export type UserUncheckedUpdateWithoutPublisherMembershipsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutStaffMembershipsInput = {
@@ -1729,6 +1926,7 @@ export type UserCreateWithoutStaffMembershipsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutStaffMembershipsInput = {
@@ -1763,6 +1961,7 @@ export type UserUncheckedCreateWithoutStaffMembershipsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutStaffMembershipsInput = {
@@ -1813,6 +2012,7 @@ export type UserUpdateWithoutStaffMembershipsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutStaffMembershipsInput = {
@@ -1847,6 +2047,7 @@ export type UserUncheckedUpdateWithoutStaffMembershipsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutManagedWebsitesInput = {
@@ -1881,6 +2082,7 @@ export type UserCreateWithoutManagedWebsitesInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutManagedWebsitesInput = {
@@ -1915,6 +2117,7 @@ export type UserUncheckedCreateWithoutManagedWebsitesInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutManagedWebsitesInput = {
@@ -1965,6 +2168,7 @@ export type UserUpdateWithoutManagedWebsitesInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutManagedWebsitesInput = {
@@ -1999,6 +2203,7 @@ export type UserUncheckedUpdateWithoutManagedWebsitesInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutOwnedOrdersInput = {
@@ -2033,6 +2238,7 @@ export type UserCreateWithoutOwnedOrdersInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutOwnedOrdersInput = {
@@ -2067,6 +2273,7 @@ export type UserUncheckedCreateWithoutOwnedOrdersInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutOwnedOrdersInput = {
@@ -2106,6 +2313,7 @@ export type UserCreateWithoutAssignedOrdersInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAssignedOrdersInput = {
@@ -2140,6 +2348,7 @@ export type UserUncheckedCreateWithoutAssignedOrdersInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAssignedOrdersInput = {
@@ -2190,6 +2399,7 @@ export type UserUpdateWithoutOwnedOrdersInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOwnedOrdersInput = {
@@ -2224,6 +2434,7 @@ export type UserUncheckedUpdateWithoutOwnedOrdersInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutAssignedOrdersInput = {
@@ -2269,6 +2480,7 @@ export type UserUpdateWithoutAssignedOrdersInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAssignedOrdersInput = {
@@ -2303,6 +2515,7 @@ export type UserUncheckedUpdateWithoutAssignedOrdersInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutOrderEventsInput = {
@@ -2337,6 +2550,7 @@ export type UserCreateWithoutOrderEventsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutOrderEventsInput = {
@@ -2371,6 +2585,7 @@ export type UserUncheckedCreateWithoutOrderEventsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutOrderEventsInput = {
@@ -2421,6 +2636,7 @@ export type UserUpdateWithoutOrderEventsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOrderEventsInput = {
@@ -2455,6 +2671,7 @@ export type UserUncheckedUpdateWithoutOrderEventsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutPublicationsInput = {
@@ -2489,6 +2706,7 @@ export type UserCreateWithoutPublicationsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutPublicationsInput = {
@@ -2523,6 +2741,7 @@ export type UserUncheckedCreateWithoutPublicationsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutPublicationsInput = {
@@ -2573,6 +2792,7 @@ export type UserUpdateWithoutPublicationsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutPublicationsInput = {
@@ -2607,6 +2827,7 @@ export type UserUncheckedUpdateWithoutPublicationsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAdminVerifiedDeliveryVersionsInput = {
@@ -2641,6 +2862,7 @@ export type UserCreateWithoutAdminVerifiedDeliveryVersionsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAdminVerifiedDeliveryVersionsInput = {
@@ -2675,6 +2897,7 @@ export type UserUncheckedCreateWithoutAdminVerifiedDeliveryVersionsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAdminVerifiedDeliveryVersionsInput = {
@@ -2725,6 +2948,7 @@ export type UserUpdateWithoutAdminVerifiedDeliveryVersionsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAdminVerifiedDeliveryVersionsInput = {
@@ -2759,6 +2983,7 @@ export type UserUncheckedUpdateWithoutAdminVerifiedDeliveryVersionsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutApprovedWithdrawalsInput = {
@@ -2793,6 +3018,7 @@ export type UserCreateWithoutApprovedWithdrawalsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutApprovedWithdrawalsInput = {
@@ -2827,6 +3053,7 @@ export type UserUncheckedCreateWithoutApprovedWithdrawalsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutApprovedWithdrawalsInput = {
@@ -2877,6 +3104,7 @@ export type UserUpdateWithoutApprovedWithdrawalsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutApprovedWithdrawalsInput = {
@@ -2911,6 +3139,7 @@ export type UserUncheckedUpdateWithoutApprovedWithdrawalsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTicketsInput = {
@@ -2945,6 +3174,7 @@ export type UserCreateWithoutTicketsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTicketsInput = {
@@ -2979,6 +3209,7 @@ export type UserUncheckedCreateWithoutTicketsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTicketsInput = {
@@ -3018,6 +3249,7 @@ export type UserCreateWithoutAssignedTicketsInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteCreateNestedManyWithoutUserInput
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAssignedTicketsInput = {
@@ -3052,6 +3284,7 @@ export type UserUncheckedCreateWithoutAssignedTicketsInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedCreateNestedManyWithoutUserInput
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAssignedTicketsInput = {
@@ -3102,6 +3335,7 @@ export type UserUpdateWithoutTicketsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTicketsInput = {
@@ -3136,6 +3370,7 @@ export type UserUncheckedUpdateWithoutTicketsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutAssignedTicketsInput = {
@@ -3181,6 +3416,7 @@ export type UserUpdateWithoutAssignedTicketsInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUpdateManyWithoutUserNestedInput
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAssignedTicketsInput = {
@@ -3215,6 +3451,7 @@ export type UserUncheckedUpdateWithoutAssignedTicketsInput = {
   marketplaceFavorites?: Prisma.MarketplaceFavoriteUncheckedUpdateManyWithoutUserNestedInput
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMessagesInput = {
@@ -3249,6 +3486,7 @@ export type UserCreateWithoutMessagesInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMessagesInput = {
@@ -3283,6 +3521,7 @@ export type UserUncheckedCreateWithoutMessagesInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMessagesInput = {
@@ -3333,6 +3572,7 @@ export type UserUpdateWithoutMessagesInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMessagesInput = {
@@ -3367,6 +3607,7 @@ export type UserUncheckedUpdateWithoutMessagesInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutNotificationsInput = {
@@ -3401,6 +3642,7 @@ export type UserCreateWithoutNotificationsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutNotificationsInput = {
@@ -3435,6 +3677,7 @@ export type UserUncheckedCreateWithoutNotificationsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutNotificationsInput = {
@@ -3485,6 +3728,7 @@ export type UserUpdateWithoutNotificationsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutNotificationsInput = {
@@ -3519,6 +3763,7 @@ export type UserUncheckedUpdateWithoutNotificationsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAuditLogsInput = {
@@ -3553,6 +3798,7 @@ export type UserCreateWithoutAuditLogsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAuditLogsInput = {
@@ -3587,6 +3833,7 @@ export type UserUncheckedCreateWithoutAuditLogsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAuditLogsInput = {
@@ -3637,6 +3884,7 @@ export type UserUpdateWithoutAuditLogsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAuditLogsInput = {
@@ -3671,6 +3919,7 @@ export type UserUncheckedUpdateWithoutAuditLogsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMarketplaceReviewsInput = {
@@ -3705,6 +3954,7 @@ export type UserCreateWithoutMarketplaceReviewsInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMarketplaceReviewsInput = {
@@ -3739,6 +3989,7 @@ export type UserUncheckedCreateWithoutMarketplaceReviewsInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMarketplaceReviewsInput = {
@@ -3789,6 +4040,7 @@ export type UserUpdateWithoutMarketplaceReviewsInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMarketplaceReviewsInput = {
@@ -3823,6 +4075,7 @@ export type UserUncheckedUpdateWithoutMarketplaceReviewsInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutMarketplaceFavoritesInput = {
@@ -3857,6 +4110,7 @@ export type UserCreateWithoutMarketplaceFavoritesInput = {
   activeContext?: Prisma.ActiveContextCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMarketplaceFavoritesInput = {
@@ -3891,6 +4145,7 @@ export type UserUncheckedCreateWithoutMarketplaceFavoritesInput = {
   activeContext?: Prisma.ActiveContextUncheckedCreateNestedOneWithoutUserInput
   managedWebsites?: Prisma.WebsiteUncheckedCreateNestedManyWithoutManagedByInput
   assignedTickets?: Prisma.TicketUncheckedCreateNestedManyWithoutAssignedToInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMarketplaceFavoritesInput = {
@@ -3941,6 +4196,7 @@ export type UserUpdateWithoutMarketplaceFavoritesInput = {
   activeContext?: Prisma.ActiveContextUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMarketplaceFavoritesInput = {
@@ -3975,6 +4231,7 @@ export type UserUncheckedUpdateWithoutMarketplaceFavoritesInput = {
   activeContext?: Prisma.ActiveContextUncheckedUpdateOneWithoutUserNestedInput
   managedWebsites?: Prisma.WebsiteUncheckedUpdateManyWithoutManagedByNestedInput
   assignedTickets?: Prisma.TicketUncheckedUpdateManyWithoutAssignedToNestedInput
+  legalAcceptances?: Prisma.LegalAcceptanceUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -4002,6 +4259,7 @@ export type UserCountOutputType = {
   marketplaceFavorites: number
   managedWebsites: number
   assignedTickets: number
+  legalAcceptances: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -4024,6 +4282,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   marketplaceFavorites?: boolean | UserCountOutputTypeCountMarketplaceFavoritesArgs
   managedWebsites?: boolean | UserCountOutputTypeCountManagedWebsitesArgs
   assignedTickets?: boolean | UserCountOutputTypeCountAssignedTicketsArgs
+  legalAcceptances?: boolean | UserCountOutputTypeCountLegalAcceptancesArgs
 }
 
 /**
@@ -4169,6 +4428,13 @@ export type UserCountOutputTypeCountAssignedTicketsArgs<ExtArgs extends runtime.
   where?: Prisma.TicketWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountLegalAcceptancesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.LegalAcceptanceWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -4203,6 +4469,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   activeContext?: boolean | Prisma.User$activeContextArgs<ExtArgs>
   managedWebsites?: boolean | Prisma.User$managedWebsitesArgs<ExtArgs>
   assignedTickets?: boolean | Prisma.User$assignedTicketsArgs<ExtArgs>
+  legalAcceptances?: boolean | Prisma.User$legalAcceptancesArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -4273,6 +4540,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   activeContext?: boolean | Prisma.User$activeContextArgs<ExtArgs>
   managedWebsites?: boolean | Prisma.User$managedWebsitesArgs<ExtArgs>
   assignedTickets?: boolean | Prisma.User$assignedTicketsArgs<ExtArgs>
+  legalAcceptances?: boolean | Prisma.User$legalAcceptancesArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -4301,6 +4569,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     activeContext: Prisma.$ActiveContextPayload<ExtArgs> | null
     managedWebsites: Prisma.$WebsitePayload<ExtArgs>[]
     assignedTickets: Prisma.$TicketPayload<ExtArgs>[]
+    legalAcceptances: Prisma.$LegalAcceptancePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -4729,6 +4998,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   activeContext<T extends Prisma.User$activeContextArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$activeContextArgs<ExtArgs>>): Prisma.Prisma__ActiveContextClient<runtime.Types.Result.GetResult<Prisma.$ActiveContextPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   managedWebsites<T extends Prisma.User$managedWebsitesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$managedWebsitesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebsitePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   assignedTickets<T extends Prisma.User$assignedTicketsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$assignedTicketsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TicketPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  legalAcceptances<T extends Prisma.User$legalAcceptancesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$legalAcceptancesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LegalAcceptancePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -5635,6 +5905,30 @@ export type User$assignedTicketsArgs<ExtArgs extends runtime.Types.Extensions.In
   take?: number
   skip?: number
   distinct?: Prisma.TicketScalarFieldEnum | Prisma.TicketScalarFieldEnum[]
+}
+
+/**
+ * User.legalAcceptances
+ */
+export type User$legalAcceptancesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the LegalAcceptance
+   */
+  select?: Prisma.LegalAcceptanceSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the LegalAcceptance
+   */
+  omit?: Prisma.LegalAcceptanceOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LegalAcceptanceInclude<ExtArgs> | null
+  where?: Prisma.LegalAcceptanceWhereInput
+  orderBy?: Prisma.LegalAcceptanceOrderByWithRelationInput | Prisma.LegalAcceptanceOrderByWithRelationInput[]
+  cursor?: Prisma.LegalAcceptanceWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.LegalAcceptanceScalarFieldEnum | Prisma.LegalAcceptanceScalarFieldEnum[]
 }
 
 /**

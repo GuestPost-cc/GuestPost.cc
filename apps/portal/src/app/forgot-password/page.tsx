@@ -18,7 +18,9 @@ function Content() {
           loading={loading}
           error={error?.message}
           successMessage={
-            success ? "Check your email for a reset link." : undefined
+            success
+              ? "If an account exists for that email, a reset link is on its way."
+              : undefined
           }
         />
       </AuthCard>

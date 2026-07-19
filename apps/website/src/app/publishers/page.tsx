@@ -8,11 +8,7 @@ import {
   Wallet,
 } from "lucide-react"
 import type { Metadata } from "next"
-import {
-  PUBLISHER_URL,
-  SiteFooter,
-  SiteHeader,
-} from "../../components/site-chrome"
+import { SiteFooter, SiteHeader } from "../../components/site-chrome"
 
 export const metadata: Metadata = {
   title: "For Publishers — Monetize Your Website | GuestPost",
@@ -83,7 +79,7 @@ export default function PublishersPage() {
             </p>
             <div className="mt-8 flex justify-center gap-4">
               <Button size="lg" asChild>
-                <a href={PUBLISHER_URL}>
+                <a href="/signup?audience=publisher">
                   Join as a Publisher <ArrowRight className="ml-2 h-4 w-4" />
                 </a>
               </Button>
@@ -165,7 +161,7 @@ export default function PublishersPage() {
           </div>
           <div className="mt-12 text-center">
             <Button size="lg" asChild>
-              <a href={PUBLISHER_URL}>
+              <a href="/signup?audience=publisher">
                 Start earning <ArrowRight className="ml-2 h-4 w-4" />
               </a>
             </Button>

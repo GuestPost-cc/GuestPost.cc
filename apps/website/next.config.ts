@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
     "@guestpost/ui",
     "@guestpost/shared",
     "@guestpost/api-client",
+    "@guestpost/auth",
   ],
 }
 

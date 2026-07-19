@@ -385,6 +385,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   User: 'User',
+  LegalAcceptance: 'LegalAcceptance',
   Session: 'Session',
   Account: 'Account',
   Verification: 'Verification',
@@ -471,7 +472,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
+    modelProps: "user" | "legalAcceptance" | "session" | "account" | "verification" | "activeContext" | "organization" | "membership" | "publisherMembership" | "staffMembership" | "team" | "publisher" | "website" | "order" | "campaign" | "orderItem" | "orderEvent" | "publication" | "orderDispute" | "orderCancellationRequest" | "settlement" | "settlementApproval" | "fulfillmentAssignment" | "orderDeliveryVersion" | "deliveryVerificationEvidence" | "deliverySnapshot" | "deliveryFraudFlag" | "orderReview" | "publisherBalance" | "withdrawal" | "payoutMethod" | "payoutProvider" | "payoutExecution" | "payoutBatch" | "apiKey" | "contentOrder" | "revision" | "report" | "platformRevenue" | "wallet" | "transaction" | "ticket" | "ticketMessage" | "notification" | "auditLog" | "marketplaceCategory" | "marketplaceTag" | "marketplaceListing" | "marketplaceListingCategory" | "listingService" | "marketplaceListingTag" | "marketplaceListingImage" | "marketplaceReview" | "marketplaceFavorite" | "marketplaceSavedList" | "marketplaceSavedListItem" | "marketplaceListingView" | "marketplaceListingClick" | "marketplaceSearchHistory" | "marketplaceRecommendation" | "publisherProfile" | "marketplaceFlag" | "listingFulfillmentRule" | "platformSettings" | "externalAccount" | "publisherIntegration" | "integrationSchedule" | "integrationDiscovery" | "websiteIntegration" | "integrationSync" | "websiteSearchDaily" | "websiteAnalyticsDaily" | "websitePageSearchDaily"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -546,6 +547,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    LegalAcceptance: {
+      payload: Prisma.$LegalAcceptancePayload<ExtArgs>
+      fields: Prisma.LegalAcceptanceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LegalAcceptanceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LegalAcceptanceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload>
+        }
+        findFirst: {
+          args: Prisma.LegalAcceptanceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LegalAcceptanceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload>
+        }
+        findMany: {
+          args: Prisma.LegalAcceptanceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload>[]
+        }
+        create: {
+          args: Prisma.LegalAcceptanceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload>
+        }
+        createMany: {
+          args: Prisma.LegalAcceptanceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LegalAcceptanceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload>[]
+        }
+        delete: {
+          args: Prisma.LegalAcceptanceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload>
+        }
+        update: {
+          args: Prisma.LegalAcceptanceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload>
+        }
+        deleteMany: {
+          args: Prisma.LegalAcceptanceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LegalAcceptanceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LegalAcceptanceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload>[]
+        }
+        upsert: {
+          args: Prisma.LegalAcceptanceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LegalAcceptancePayload>
+        }
+        aggregate: {
+          args: Prisma.LegalAcceptanceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLegalAcceptance>
+        }
+        groupBy: {
+          args: Prisma.LegalAcceptanceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LegalAcceptanceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LegalAcceptanceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LegalAcceptanceCountAggregateOutputType> | number
         }
       }
     }
@@ -5860,6 +5935,22 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const LegalAcceptanceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  documentType: 'documentType',
+  documentVersion: 'documentVersion',
+  acceptedAt: 'acceptedAt',
+  method: 'method',
+  audience: 'audience',
+  ipAddress: 'ipAddress',
+  userAgent: 'userAgent',
+  requestId: 'requestId'
+} as const
+
+export type LegalAcceptanceScalarFieldEnum = (typeof LegalAcceptanceScalarFieldEnum)[keyof typeof LegalAcceptanceScalarFieldEnum]
+
+
 export const SessionScalarFieldEnum = {
   id: 'id',
   expiresAt: 'expiresAt',
@@ -8064,6 +8155,7 @@ export type PrismaClientOptions = ({
 }
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
+  legalAcceptance?: Prisma.LegalAcceptanceOmit
   session?: Prisma.SessionOmit
   account?: Prisma.AccountOmit
   verification?: Prisma.VerificationOmit

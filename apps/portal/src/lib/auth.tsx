@@ -1,6 +1,10 @@
 "use client"
 
-import { getSession } from "@guestpost/auth/client"
+import {
+  signIn as signInTransport,
+  signOut as signOutTransport,
+  signUp as signUpTransport,
+} from "@guestpost/auth/client"
 import { setBusinessContext } from "@guestpost/shared"
 import * as Sentry from "@sentry/nextjs"
 import {
@@ -11,7 +15,6 @@ import {
   useEffect,
   useState,
 } from "react"
-import { clearToken, getToken, setToken } from "./api"
 
 const getBaseUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL
@@ -58,26 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      let token = getToken()
-      if (!token) {
-        const session = await getSession()
-        if (session?.token) {
-          token = session.token
-          setToken(session.token)
-        }
-      }
       const res = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         credentials: "include",
       })
       if (res.ok) {
         const me = await res.json()
-        if (getToken() !== token) return
         if (me.userType === "CUSTOMER") {
           setUser(me)
           return
         }
-        clearToken()
       }
     } catch (e) {
       console.error("Session refresh failed:", e)
@@ -112,28 +104,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`${getBaseUrl()}/api/v1/auth/sign-in/email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        credentials: "include",
-      })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message ?? "Invalid credentials")
-      }
-      const data = await res.json()
-      if (data.token) setToken(data.token)
-
+      await signInTransport({ email, password, portal: "customer" })
       const meRes = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
-        headers: data.token
-          ? { Authorization: `Bearer ${data.token}` }
-          : undefined,
         credentials: "include",
       })
       const me = await meRes.json()
       if (me.userType !== "CUSTOMER") {
-        clearToken()
         throw new Error(
           "This portal is for customers only. Please sign in at the correct portal.",
         )
@@ -153,18 +129,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ) => {
     setLoading(true)
     try {
-      const res = await fetch(`${getBaseUrl()}/api/v1/auth/sign-up/email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, name, termsAccepted }),
-        credentials: "include",
+      await signUpTransport({
+        email,
+        password,
+        name,
+        termsAccepted,
+        portal: "customer",
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message ?? "Sign up failed")
-      }
-      const data = await res.json()
-      if (data.token) setToken(data.token)
       await refresh()
     } finally {
       setLoading(false)
@@ -172,11 +143,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async () => {
-    await fetch(`${getBaseUrl()}/api/v1/auth/sign-out`, {
-      method: "POST",
-      credentials: "include",
-    })
-    clearToken()
+    await signOutTransport()
     setUser(null)
   }
 

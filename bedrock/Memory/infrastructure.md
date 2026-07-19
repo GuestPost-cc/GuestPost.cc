@@ -2,7 +2,7 @@
 note_type: domain-memory
 domain: infrastructure
 project: guestpost-platform
-updated: 2026-07-17
+updated: 2026-07-19
 ---
 
 # Infrastructure
@@ -13,15 +13,24 @@ Currently **laptop-only** for development. A 2GB VPS attempt at `103.42.5.163` (
 
 Shared dev/testing host is an **open question** (see `bedrock/Work/open-questions.md`): bigger VPS, cloud sandbox (Railway/Fly/Render), or production-build (`next build` once + `next start`) instead of dev mode to cut RAM. The image-based staging path was NOT tried — would be significantly cheaper at runtime.
 
-## Render Blueprint (configuration only)
+## Render staging and Northflank worker
 
 `render.yml` defines the active Render staging topology for `guestpost.pro.bd`: one NestJS API and four Next.js web services in the Singapore region, all built from the monorepo root. The worker is intentionally not deployed on Render while the workspace is on free-tier testing; run it locally for queue processing.
+
+The staging worker is deployed separately on Northflank as `guestpost-worker`
+from the repository's `main` branch. It shares the Render API's staging
+`DATABASE_URL`, `REDIS_URL`, `QUEUE_SIGNING_SECRET`, and
+`INTEGRATION_ENCRYPTION_KEY`; secret values are stored only in the deployment
+platforms. The worker exposes its health server on port 3004 and was verified
+`Running`, `1/1 passing`, with zero restarts after the 2026-07-19 environment
+rollout. A queue-signature failure during rollout was traced to a mismatched
+Northflank signing key and fixed by aligning it to Render before restarting.
 
 External infrastructure is bring-your-own for staging: Neon Postgres, Upstash Redis, Resend SMTP, Cloudflare R2, Sentry, and ReadyBD DNS. Render uses `sync: false` or `generateValue` for secrets so active credentials are not committed. Web services are configured on Render's free instance type for internal testing.
 
 The API build is compile-only (`pnpm turbo build --filter=@guestpost/api...`) because Render free web services cannot use `preDeployCommand`, and running Prisma migrations in the build phase was unreliable with Neon. Prisma config supports `DIRECT_DATABASE_URL` for direct Neon migrations; run migrations manually/one-off before deploys that require schema changes, or move this to Render predeploy once the workspace upgrades.
 
-Auth is served from `api.guestpost.pro.bd` while dashboards run on sibling subdomains. Staging sets `AUTH_COOKIE_DOMAIN=guestpost.pro.bd` so Better Auth issues a shared secure session cookie that Next middleware on `app`, `publisher`, and `admin` can see. Middleware must accept both `guestpost.session_token` (dev) and `__Secure-guestpost.session_token` (production).
+Auth is served from `api.guestpost.pro.bd` while the website and dashboards run on sibling subdomains. Staging sets `AUTH_COOKIE_DOMAIN=guestpost.pro.bd` so Better Auth issues a shared secure, HttpOnly session cookie. Browser authentication is opaque database-session based, not JWT/bearer based. Middleware recognizes both `guestpost.session_token` (dev) and `__Secure-guestpost.session_token` (production); mutation clients send the CSRF protection header and the API validates exact configured origins.
 
 Staging incident note (2026-07-18): deployed API commit `a5edf8a` returned 500s for customer orders/billing and admin operations because the Neon staging schema was three migrations behind (`20260713120000_listing_per_website_unique`, `20260716030403_fin02_transaction_provider_unique`, `20260716120000_order_cancellation_workflow`). Applying `prisma migrate deploy` against Neon fixed the missing `OrderCancellationRequest` table and restored customer, publisher, and admin API reads. Render free web services block Shell and One-Off Jobs, so migrations currently require a local/direct Neon run or a temporary Render plan upgrade.
 
@@ -44,8 +53,10 @@ The historical Blueprint contained an inline Neon database credential. The activ
 
 - `.env.development` — dev env vars (loaded when `NODE_ENV=development`)
 - `.env.example` — template with all required vars
-- Runtime env validation at startup (required: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`)
+- Runtime env validation at startup (required: `DATABASE_URL`, `REDIS_URL`, `BETTER_AUTH_SECRET`; production also requires `QUEUE_SIGNING_SECRET` and trusted origins)
 - `NODE_ENV` guards production behaviors
+- Local development keeps a separate `INTEGRATION_ENCRYPTION_KEY` from staging;
+  the ignored `.env.development` file is owner-readable only (`0600`).
 
 ## CI/CD
 

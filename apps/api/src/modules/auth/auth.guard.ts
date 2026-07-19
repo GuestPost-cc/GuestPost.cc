@@ -1,11 +1,9 @@
-import crypto from "node:crypto"
 import { auth } from "@guestpost/auth"
 import {
   type CanActivate,
   type ExecutionContext,
   ForbiddenException,
   Injectable,
-  Logger,
   UnauthorizedException,
 } from "@nestjs/common"
 import { Reflector } from "@nestjs/core"
@@ -15,46 +13,15 @@ import {
 } from "../../common/auth-context-cache"
 import { IS_PUBLIC_KEY } from "../../common/decorators/public.decorator"
 import { PrismaService } from "../../common/prisma.service"
+import { isTrustedOrigin } from "../../common/security/trusted-origins"
 import { ActiveContextService } from "../active-context/active-context.service"
 import { requiresEmailVerification } from "./email-verification-policy"
 
-const SESSION_FRESH_AGE_SEC = 15 * 60
-const SESSION_EXPIRES_IN_SEC = 8 * 60 * 60
-
-// Validate that the session signing secret is configured at startup.
-// A hardcoded or missing secret would allow session forgery — fail fast.
-function getSessionSecret(): string {
-  const secret = process.env.BETTER_AUTH_SECRET
-  if (!secret?.trim()) {
-    throw new Error(
-      "BETTER_AUTH_SECRET must be configured. Set it in .env.development.",
-    )
-  }
-  return secret
-}
-
-// Parse comma-separated allowed origins from the CORS_ORIGIN env var.
-// Falls back to localhost defaults for development.
-function getAllowedOrigins(): string[] {
-  const raw = process.env.CORS_ORIGIN
-  if (raw?.trim()) {
-    return raw
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean)
-  }
-  return [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002",
-    "http://localhost:4000",
-  ]
-}
+const PUBLIC_SESSION_ABSOLUTE_AGE_MS = 24 * 60 * 60 * 1000
+const STAFF_SESSION_ABSOLUTE_AGE_MS = 8 * 60 * 60 * 1000
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  private readonly logger = new Logger(AuthGuard.name)
-
   constructor(
     private reflector: Reflector,
     private readonly prisma: PrismaService,
@@ -75,23 +42,25 @@ export class AuthGuard implements CanActivate {
 
     if (!session) throw new UnauthorizedException()
 
+    const createdAt = new Date(session.session.createdAt).getTime()
+    const sessionUserType = (session.user as { userType?: string }).userType
+    const absoluteAge =
+      sessionUserType === "CUSTOMER" || sessionUserType === "PUBLISHER"
+        ? PUBLIC_SESSION_ABSOLUTE_AGE_MS
+        : STAFF_SESSION_ABSOLUTE_AGE_MS
+    if (!Number.isFinite(createdAt) || Date.now() - createdAt > absoluteAge) {
+      await this.prisma.session.deleteMany({
+        where: { id: session.session.id },
+      })
+      throw new UnauthorizedException("SESSION_EXPIRED")
+    }
+
     // ── CSRF protection for state-changing requests ──
     // Validate the Origin header against the configured allowlist.
     if (["POST", "PUT", "PATCH", "DELETE"].includes(request.method)) {
       const origin = request.headers.origin || request.headers.referer
-      if (origin) {
-        const allowed = getAllowedOrigins()
-        const originHost = new URL(origin).host
-        const isAllowed = allowed.some((a) => {
-          try {
-            return new URL(a).host === originHost
-          } catch {
-            return a === origin
-          }
-        })
-        if (!isAllowed) {
-          throw new ForbiddenException("Cross-origin request denied")
-        }
+      if (origin && !isTrustedOrigin(origin)) {
+        throw new ForbiddenException("Cross-origin request denied")
       }
     }
 
@@ -108,7 +77,6 @@ export class AuthGuard implements CanActivate {
       }
       request.user = cached
       request.session = session.session
-      await this.rotateSessionIfNeeded(session.session, context)
       return true
     }
 
@@ -214,68 +182,6 @@ export class AuthGuard implements CanActivate {
     }
     setCachedAuthContext(user.id, request.user)
     request.session = session.session
-    await this.rotateSessionIfNeeded(session.session, context)
     return true
-  }
-
-  private async rotateSessionIfNeeded(
-    sessionRecord: { token: string; userId: string; createdAt: Date | string },
-    context: ExecutionContext,
-  ): Promise<void> {
-    if (!sessionRecord.token) return
-
-    const createdAt = new Date(sessionRecord.createdAt).getTime()
-    const ageSec = (Date.now() - createdAt) / 1000
-    if (ageSec < SESSION_FRESH_AGE_SEC) return
-
-    const newToken = crypto.randomUUID()
-    const expiresAt = new Date(Date.now() + SESSION_EXPIRES_IN_SEC * 1000)
-
-    try {
-      await this.prisma.$transaction([
-        this.prisma.session.create({
-          data: {
-            token: newToken,
-            userId: sessionRecord.userId,
-            expiresAt,
-          },
-        }),
-        this.prisma.session.deleteMany({
-          where: { token: sessionRecord.token },
-        }),
-      ])
-
-      const secret = getSessionSecret()
-      const hmac = crypto.createHmac("sha256", secret)
-      hmac.update(newToken)
-      const signedValue = `${newToken}.${hmac.digest("base64")}`
-
-      const isProduction = process.env.NODE_ENV === "production"
-      const cookieName = isProduction
-        ? "__Secure-guestpost.session_token"
-        : "guestpost.session_token"
-      const authCookieDomain = process.env.AUTH_COOKIE_DOMAIN?.trim()
-
-      const response = context.switchToHttp().getResponse()
-      response.cookie(cookieName, signedValue, {
-        httpOnly: true,
-        secure: isProduction,
-        sameSite: "lax",
-        path: "/",
-        maxAge: SESSION_EXPIRES_IN_SEC * 1000,
-        ...(authCookieDomain ? { domain: authCookieDomain } : {}),
-      })
-      response.setHeader("X-Session-Token", newToken)
-
-      context.switchToHttp().getRequest().session = {
-        ...sessionRecord,
-        token: newToken,
-        expiresAt,
-      }
-    } catch (e) {
-      this.logger.warn(
-        `Session rotation failed for user ${sessionRecord.userId}: ${e instanceof Error ? e.message : e}`,
-      )
-    }
   }
 }

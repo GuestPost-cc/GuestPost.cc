@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException } from "@nestjs/common"
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from "@nestjs/common"
 import { AdminService } from "../admin.service"
 
 jest.mock("@better-auth/utils/password", () => ({
@@ -136,6 +140,30 @@ describe("AdminService staff management", () => {
       service.banUser("ops-1", true, { id: "admin-1" }),
     ).rejects.toThrow(ConflictException)
     expect(prisma.user.update).not.toHaveBeenCalled()
+  })
+
+  it("does not convert a customer account into a publisher", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "customer-1",
+      userType: "CUSTOMER",
+    })
+
+    await expect(
+      service.updateUserRole("customer-1", "PUBLISHER_OWNER", {
+        id: "admin-1",
+      }),
+    ).rejects.toThrow(BadRequestException)
+  })
+
+  it("does not convert a publisher account into a customer", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "publisher-1",
+      userType: "PUBLISHER",
+    })
+
+    await expect(
+      service.updateUserRole("publisher-1", "OWNER", { id: "admin-1" }),
+    ).rejects.toThrow(BadRequestException)
   })
 
   it("reports Operations sales and Finance handled volume separately", async () => {

@@ -1,3 +1,4 @@
+import { CURRENT_TERMS_VERSION } from "@guestpost/shared"
 import type { AuthError, AuthenticatedUser, SignInResult } from "../types"
 import { authClient } from "./auth-client"
 import { mapBetterAuthError } from "./errors"
@@ -6,7 +7,7 @@ import { getSession as serverGetSession } from "./session"
 export async function signIn(input: {
   email: string
   password: string
-  portal?: "customer" | "publisher"
+  portal?: "customer" | "publisher" | "staff"
 }): Promise<SignInResult> {
   const { data, error } = await authClient.signIn.email(
     {
@@ -54,7 +55,6 @@ export async function signIn(input: {
         }
       : { id: "", userId: user.id, expiresAt: new Date() },
     user,
-    token: data.token ?? undefined,
   }
 }
 
@@ -70,8 +70,10 @@ export async function signUp(input: {
     email: input.email,
     password: input.password,
     termsAccepted: input.termsAccepted,
+    termsVersion: CURRENT_TERMS_VERSION,
   } as Parameters<typeof authClient.signUp.email>[0] & {
     termsAccepted: boolean
+    termsVersion: string
   }
 
   const { data, error } = await authClient.signUp.email(
@@ -117,7 +119,6 @@ export async function signUp(input: {
         }
       : { id: "", userId: user.id, expiresAt: new Date() },
     user,
-    token: data.token ?? undefined,
   }
 }
 
@@ -126,10 +127,17 @@ export async function signOut(): Promise<void> {
   if (error) throw mapBetterAuthError(error)
 }
 
-export async function forgotPassword(input: { email: string }): Promise<void> {
-  const { error } = await (authClient as any).forgetPassword({
+export async function forgotPassword(input: {
+  email: string
+  redirectTo?: string
+}): Promise<void> {
+  const { error } = await authClient.requestPasswordReset({
     email: input.email,
-    redirectTo: "/reset-password",
+    redirectTo:
+      input.redirectTo ??
+      (typeof window !== "undefined"
+        ? `${window.location.origin}/reset-password`
+        : "/reset-password"),
   })
   if (error) throw mapBetterAuthError(error)
 }
@@ -138,7 +146,7 @@ export async function resetPassword(input: {
   token: string
   password: string
 }): Promise<void> {
-  const { error } = await (authClient as any).resetPassword({
+  const { error } = await authClient.resetPassword({
     newPassword: input.password,
     token: input.token,
   })

@@ -46,7 +46,7 @@ export function ForgotPasswordForm({
           className="grid gap-4"
           noValidate
         >
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-zinc-400">
             Enter your email address and we&apos;ll send you a link to reset
             your password.
           </p>

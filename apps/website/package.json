@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@guestpost/api-client": "workspace:*",
+    "@guestpost/auth": "workspace:*",
     "@guestpost/shared": "workspace:*",
     "@guestpost/ui": "workspace:*",
     "@sentry/nextjs": "10.63.0",

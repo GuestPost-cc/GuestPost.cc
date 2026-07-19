@@ -63,6 +63,36 @@ describe("auth forms", () => {
     ).toHaveAttribute("href", "https://guestpost.cc/legal/terms")
   })
 
+  it("keeps Google signup disabled until Terms are accepted", async () => {
+    const user = userEvent.setup()
+    const onGoogleSignup = vi.fn()
+    render(
+      <SignupForm
+        onSubmit={vi.fn().mockResolvedValue(undefined)}
+        oauthProvider={{
+          id: "google",
+          label: "Sign up with Google",
+          onClick: onGoogleSignup,
+        }}
+      />,
+    )
+
+    const googleButton = screen.getByRole("button", {
+      name: "Sign up with Google",
+    })
+    expect(googleButton).toBeDisabled()
+
+    await user.click(
+      screen.getByRole("checkbox", {
+        name: /I agree to the Terms of Service/i,
+      }),
+    )
+    expect(googleButton).toBeEnabled()
+
+    await user.click(googleButton)
+    expect(onGoogleSignup).toHaveBeenCalledTimes(1)
+  })
+
   it("does not submit an empty forgot-password email", async () => {
     const user = userEvent.setup()
     const onSubmit = vi.fn().mockResolvedValue(undefined)

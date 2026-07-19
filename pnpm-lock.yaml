@@ -451,6 +451,9 @@ importers:
       '@guestpost/api-client':
         specifier: workspace:*
         version: link:../../packages/api-client
+      '@guestpost/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@guestpost/shared':
         specifier: workspace:*
         version: link:../../packages/shared

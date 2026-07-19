@@ -1,3 +1,4 @@
+import { CURRENT_TERMS_LAST_UPDATED } from "@guestpost/shared"
 import type { Metadata } from "next"
 import { ProsePage } from "../../../components/prose-page"
 
@@ -9,7 +10,10 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <ProsePage title="Terms of Service" subtitle="Last updated: June 12, 2026">
+    <ProsePage
+      title="Terms of Service"
+      subtitle={`Last updated: ${CURRENT_TERMS_LAST_UPDATED}`}
+    >
       <h2>1. The service</h2>
       <p>
         GuestPost operates a managed marketplace connecting customers seeking

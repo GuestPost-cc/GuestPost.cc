@@ -45,16 +45,6 @@ export class IdentityService {
     )
   }
 
-  // Self-serve publisher onboarding — fresh accounts only (backend enforces)
-  becomePublisher(publisherName?: string) {
-    return this.client.post<{ id: string; name: string; tier: string }>(
-      "/identity/become-publisher",
-      {
-        json: publisherName ? { publisherName } : {},
-      },
-    )
-  }
-
   listOrganizations() {
     return this.client.get<
       Array<{

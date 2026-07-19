@@ -40,8 +40,6 @@ services:
         sync: false
       - key: REDIS_URL
         sync: false
-      - key: JWT_SECRET
-        generateValue: true
       - key: BETTER_AUTH_SECRET
         generateValue: true
       - key: QUEUE_SIGNING_SECRET
@@ -71,7 +69,7 @@ services:
       - key: NEXT_PUBLIC_ADMIN_URL
         value: https://admin.guestpost.pro.bd
       - key: OAUTH_STATE_COOKIE_SAMESITE
-        value: none
+        value: lax
       - key: OAUTH_STATE_COOKIE_SECURE
         value: "true"
       - key: PRISMA_POOL_MAX
@@ -137,6 +135,8 @@ services:
         value: https://guestpost.pro.bd
       - key: NEXT_PUBLIC_PORTAL_URL
         value: https://app.guestpost.pro.bd
+      - key: NEXT_PUBLIC_PUBLISHER_URL
+        value: https://publisher.guestpost.pro.bd
       - key: NEXT_PUBLIC_SENTRY_DSN
         sync: false
       - key: SENTRY_ENVIRONMENT

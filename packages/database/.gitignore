@@ -3,3 +3,8 @@ node_modules
 .env
 
 /src/prisma
+!/src/prisma/
+/src/prisma/*
+!/src/prisma/models/
+/src/prisma/models/*
+!/src/prisma/models/LegalAcceptance.ts

@@ -1,10 +1,39 @@
 # Current Status
 
-**Phase**: Publisher, customer, Super Admin, Finance, and Operations workbenches are implemented and verified locally. Financial and authorization hardening is CI-verified; marketplace taxonomy and Google metric migrations are current locally and on Neon. Real-Google sync validation and worker deployment remain.
+**Phase**: Publisher, customer, Super Admin, Finance, and Operations workbenches are implemented and verified locally. Financial and authorization hardening is CI-verified; marketplace taxonomy and Google metric migrations are current locally and on Neon. Google customer sign-in and the Northflank staging worker are verified; real GSC/GA4 connection and sync validation remain.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Unified Public Authentication And Session Hardening
+
+- Added one website login/signup entrypoint with Customer/Publisher selection while preserving dedicated direct customer, publisher, and admin login pages.
+- Made CUSTOMER/PUBLISHER account type immutable and mutually exclusive across email signup, Google signup, session creation, self-service identity routes, and admin role changes.
+- Split login from signup for Google OAuth, disabled implicit signup/linking, required versioned Terms acceptance for both signup methods, and persisted auditable `LegalAcceptance` records.
+- Replaced browser bearer-token/session rotation with one opaque HttpOnly cookie session, bounded rolling and absolute lifetimes, exact-origin/custom-header CSRF protection, token-redacted auth responses, and safe return paths.
+- Fixed the permanent blank-dashboard redirect state, wrong-portal Google 500 path, password-reset endpoint/email/session revocation, and generic recovery/error messages.
+- Validation: all 12 typecheck targets pass; auth, API-client, and UI package suites pass; all four Next production builds pass; the API unit suite and focused CSRF/account-immutability regressions pass after updating its structured-logger maintenance baseline.
+- Deployed `20260719174500_versioned_legal_acceptance` to the supplied Neon non-production database and verified all 38 migrations are current.
+
+### Google OAuth And Staging Worker Rollout
+
+- Configured the `GestPoustLoginGSC` Google Auth Platform project with exact
+  local/staging callbacks, GuestPost branding, and the five required identity,
+  Search Console read-only, and Analytics read-only scopes.
+- Recovered a malformed OAuth rollout where Render received an inline-commented
+  client ID and a Redis env assignment instead of the Google secret. Restored
+  the exact OAuth values in Render and the ignored local development env.
+- Deployed the queue worker on Northflank, aligned its staging database, Redis,
+  queue-signing, and integration-encryption settings with Render, and verified
+  its pod is `Running`, `1/1 passing`, with zero restarts.
+- Verified the Render API environment deployment is live and
+  `https://api.guestpost.pro.bd/api/v1/health` returns `status: ok`.
+- Verified a complete customer Google sign-in and callback into the deployed
+  dashboard. Remaining manual gate: connect GSC/GA4 and run the first real sync.
+- The unused, unrecoverable 2026-07-19 Google client secret should be disabled
+  and deleted after explicit cleanup approval; the older enabled secret is the
+  working deployment credential.
 
 ### Financial And Authorization Hardening
 

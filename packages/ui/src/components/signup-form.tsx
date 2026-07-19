@@ -4,9 +4,11 @@ import type { SignupInput } from "@guestpost/shared"
 import { signupSchema } from "@guestpost/shared"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
+import type { ProviderConfig } from "./auth-providers"
 import { Checkbox } from "./checkbox"
 import { Input } from "./input"
 import { PasswordInput } from "./password-input"
+import { ProviderButton } from "./provider-button"
 import { SpinnerButton } from "./spinner-button"
 
 export interface SignupFormProps {
@@ -16,6 +18,7 @@ export interface SignupFormProps {
   onToggleMode?: () => void
   submitLabel?: string
   termsHref?: string
+  oauthProvider?: ProviderConfig
 }
 
 export function SignupForm({
@@ -23,12 +26,14 @@ export function SignupForm({
   loading,
   error,
   submitLabel = "Create account",
-  termsHref = "https://guestpost.cc/legal/terms",
+  termsHref = "/legal/terms",
+  oauthProvider,
 }: SignupFormProps) {
   const {
     control,
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<SignupInput>({
     resolver: zodResolver(signupSchema),
@@ -41,10 +46,80 @@ export function SignupForm({
   })
 
   const busy = loading || isSubmitting
+  const termsAccepted = watch("termsAccepted")
 
   return (
     <div>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <div>
+          <div className="flex items-start gap-2.5">
+            <Controller
+              control={control}
+              name="termsAccepted"
+              render={({ field }) => (
+                <Checkbox
+                  ref={field.ref}
+                  id="signup-terms"
+                  name={field.name}
+                  checked={field.value}
+                  onBlur={field.onBlur}
+                  onCheckedChange={(checked) =>
+                    field.onChange(checked === true)
+                  }
+                  required
+                  aria-invalid={!!errors.termsAccepted}
+                  aria-describedby={
+                    errors.termsAccepted ? "signup-terms-error" : undefined
+                  }
+                  className="mt-0.5 border-zinc-500 focus-visible:ring-sky-300 data-[state=checked]:border-sky-300 data-[state=checked]:bg-sky-300 data-[state=checked]:text-zinc-950"
+                />
+              )}
+            />
+            <label
+              htmlFor="signup-terms"
+              className="text-sm leading-5 text-zinc-300"
+            >
+              I agree to the{" "}
+              <a
+                href={termsHref}
+                target="_blank"
+                rel="noreferrer"
+                className="font-semibold text-sky-300 underline-offset-4 hover:text-sky-200 hover:underline"
+              >
+                Terms of Service
+              </a>
+              .
+            </label>
+          </div>
+          {errors.termsAccepted && (
+            <p
+              id="signup-terms-error"
+              className="mt-1.5 text-sm text-destructive"
+            >
+              {errors.termsAccepted.message}
+            </p>
+          )}
+        </div>
+
+        {oauthProvider && (
+          <div className="space-y-4">
+            <ProviderButton
+              icon={oauthProvider.icon}
+              onClick={oauthProvider.onClick}
+              disabled={busy || !termsAccepted}
+            >
+              {oauthProvider.label}
+            </ProviderButton>
+            <div className="relative flex items-center py-1">
+              <div className="flex-grow border-t border-zinc-800" />
+              <span className="flex-shrink px-4 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+                or sign up with email
+              </span>
+              <div className="flex-grow border-t border-zinc-800" />
+            </div>
+          </div>
+        )}
+
         <div>
           <label
             htmlFor="signup-name"
@@ -109,56 +184,6 @@ export function SignupForm({
           error={errors.password?.message}
           {...register("password")}
         />
-
-        <div>
-          <div className="flex items-start gap-2.5">
-            <Controller
-              control={control}
-              name="termsAccepted"
-              render={({ field }) => (
-                <Checkbox
-                  ref={field.ref}
-                  id="signup-terms"
-                  name={field.name}
-                  checked={field.value}
-                  onBlur={field.onBlur}
-                  onCheckedChange={(checked) =>
-                    field.onChange(checked === true)
-                  }
-                  required
-                  aria-invalid={!!errors.termsAccepted}
-                  aria-describedby={
-                    errors.termsAccepted ? "signup-terms-error" : undefined
-                  }
-                  className="mt-0.5"
-                />
-              )}
-            />
-            <label
-              htmlFor="signup-terms"
-              className="text-sm leading-5 text-muted-foreground"
-            >
-              I agree to the{" "}
-              <a
-                href={termsHref}
-                target="_blank"
-                rel="noreferrer"
-                className="font-medium text-primary underline-offset-4 hover:underline"
-              >
-                Terms of Service
-              </a>
-              .
-            </label>
-          </div>
-          {errors.termsAccepted && (
-            <p
-              id="signup-terms-error"
-              className="mt-1.5 text-sm text-destructive"
-            >
-              {errors.termsAccepted.message}
-            </p>
-          )}
-        </div>
 
         {error && (
           <p

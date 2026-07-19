@@ -141,18 +141,6 @@ export class IdentityController {
     })
   }
 
-  // Self-serve publisher onboarding — fresh accounts only (service enforces:
-  // no existing customer/publisher memberships, never staff). Downstream
-  // money controls are unchanged: NEW tier hold, listing moderation, dual
-  // settlement approval.
-  @Post("become-publisher")
-  becomePublisher(
-    @Body("publisherName") publisherName: string | undefined,
-    @CurrentUser() user: any,
-  ) {
-    return this.identity.becomePublisher(user.id, publisherName)
-  }
-
   @Post("organizations/:id/invite")
   @UseGuards(MemberRolesGuard)
   @MemberRoles("OWNER")

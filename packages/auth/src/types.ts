@@ -21,7 +21,6 @@ export type SignInResult =
       status: "authenticated"
       session: AuthSession
       user: AuthenticatedUser
-      token?: string
     }
   | {
       status: "mfa_required"

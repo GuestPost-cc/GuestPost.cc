@@ -1,5 +1,6 @@
 "use client"
 
+import { sanitizeReturnTo } from "@guestpost/api-client"
 import type { AuthError } from "@guestpost/auth"
 import {
   getErrorMessage,
@@ -32,8 +33,7 @@ function LoginPageInner() {
 
   const safeReturnTo = (() => {
     const raw = searchParams.get("returnTo")
-    if (raw && raw !== "/" && raw.startsWith("/")) return raw
-    return "/dashboard"
+    return sanitizeReturnTo(raw) ?? "/dashboard"
   })()
 
   useEffect(() => {
@@ -59,7 +59,7 @@ function LoginPageInner() {
     setError(null)
     setLoading(true)
     try {
-      const result = await signInTransport(data)
+      const result = await signInTransport({ ...data, portal: "staff" })
       if (result.status === "mfa_required") {
         throw {
           code: "MFA_REQUIRED",
