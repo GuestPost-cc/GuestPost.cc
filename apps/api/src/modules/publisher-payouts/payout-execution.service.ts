@@ -123,8 +123,9 @@ export class PayoutExecutionService {
     execution = execResult.execution
     versionSnapshot = execResult.versionSnapshot
 
+    let transferResult: any = null
     try {
-      const transferResult = await adapter.createTransfer({
+      transferResult = await adapter.createTransfer({
         amount: Number(withdrawal.amount),
         currency: "usd",
         recipientDetails: decryptedDetails,
@@ -160,33 +161,25 @@ export class PayoutExecutionService {
         }
 
         if (transferResult.status === "COMPLETED") {
-          const balance = await tx.publisherBalance.findUnique({
-            where: { publisherId: withdrawal.publisherId },
-          })
-          if (balance) {
-            const updated = await tx.publisherBalance.updateMany({
-              where: {
-                publisherId: withdrawal.publisherId,
-                version: balance.version,
-              },
-              data: {
-                lifetimePaid: { increment: Number(withdrawal.amount) },
-                version: { increment: 1 },
-              },
-            })
-            if (updated.count > 0) {
-              checkPublisherBalanceInvariant(
-                {
-                  ...balance,
-                  lifetimeEarnings:
-                    Number(balance.lifetimeEarnings) +
-                    Number(withdrawal.amount),
-                },
-                this.logger,
-                "executeWithdrawal/completed",
-              )
-            }
+          const balance = await lockPublisherBalanceForUpdate(
+            tx,
+            withdrawal.publisherId,
+          )
+          if (!balance) {
+            throw new Error("Publisher balance missing during payout")
           }
+          await tx.publisherBalance.update({
+            where: { publisherId: withdrawal.publisherId },
+            data: {
+              lifetimePaid: { increment: Number(withdrawal.amount) },
+              version: { increment: 1 },
+            },
+          })
+          checkPublisherBalanceInvariant(
+            balance,
+            this.logger,
+            "executeWithdrawal/completed",
+          )
         }
 
         await this.audit.log(
@@ -224,17 +217,20 @@ export class PayoutExecutionService {
         `Payout execution failed for withdrawal ${withdrawalId}: ${safeMessage}`,
       )
 
-      let providerExecId: string | null = null
-      try {
-        providerExecId = execution?.id
-      } catch {
-        /* swallow */
-      }
+      // If the provider returned successfully but our local finalization
+      // failed, retain its transfer id. Reconciliation can then query provider
+      // truth; storing our internal execution id here previously made that
+      // recovery path impossible and could make a retry send money twice.
+      const providerExecId: string | null =
+        transferResult?.providerExecutionId ??
+        execution?.providerExecutionId ??
+        null
 
       await this.prisma.$transaction(async (tx: any) => {
         const updateData: any = {
           status: "FAILED",
           errorMessage: safeMessage,
+          providerExecutionId: providerExecId ?? undefined,
         }
 
         await tx.payoutExecution.update({
@@ -282,34 +278,39 @@ export class PayoutExecutionService {
       )
     }
 
+    // No provider reference means the original POST may have succeeded but
+    // its response was lost. The old retry path advanced the withdrawal
+    // version and generated a NEW provider idempotency key, which could create
+    // a second real transfer. Fail closed until finance reconciles the
+    // original idempotency key in the provider dashboard.
+    if (!execution.providerExecutionId) {
+      throw new ConflictException(
+        "Provider outcome is unconfirmed and no provider transfer reference was recorded. Do not retry: reconcile the original idempotency key with the provider first.",
+      )
+    }
+
     // A FAILED execution that already reached the provider may have actually
     // gone through (timeout after send, late webhook marked it failed, etc.).
     // Re-sending would pay the publisher twice — the retry gets a NEW
     // idempotency key because the withdrawal version advances. Ask the
     // provider for the truth before moving money again.
-    if (execution.providerExecutionId) {
-      const adapter = this.providerService.getAdapter(execution.provider.name)
-      const providerStatus = await adapter.checkTransferStatus(
-        execution.providerExecutionId,
+    const adapter = this.providerService.getAdapter(execution.provider.name)
+    const providerStatus = await adapter.checkTransferStatus(
+      execution.providerExecutionId,
+    )
+    if (providerStatus.status === "COMPLETED") {
+      await this.finalizeCompletedAtProvider(execution, providerStatus, userId)
+      return {
+        executionId: execution.id,
+        status: "COMPLETED",
+        providerExecutionId: execution.providerExecutionId,
+        recoveredFromProvider: true,
+      }
+    }
+    if (providerStatus.status === "PROCESSING") {
+      throw new ConflictException(
+        `Provider transfer ${execution.providerExecutionId} is still processing — cannot retry until it settles`,
       )
-      if (providerStatus.status === "COMPLETED") {
-        await this.finalizeCompletedAtProvider(
-          execution,
-          providerStatus,
-          userId,
-        )
-        return {
-          executionId: execution.id,
-          status: "COMPLETED",
-          providerExecutionId: execution.providerExecutionId,
-          recoveredFromProvider: true,
-        }
-      }
-      if (providerStatus.status === "PROCESSING") {
-        throw new ConflictException(
-          `Provider transfer ${execution.providerExecutionId} is still processing — cannot retry until it settles`,
-        )
-      }
     }
 
     if (execution.withdrawal.status !== "FAILED") {
@@ -377,21 +378,18 @@ export class PayoutExecutionService {
         )
       }
 
-      const balance = await tx.publisherBalance.findUnique({
+      const balance = await lockPublisherBalanceForUpdate(
+        tx,
+        execution.withdrawal.publisherId,
+      )
+      if (!balance) throw new Error("Publisher balance missing during payout")
+      await tx.publisherBalance.update({
         where: { publisherId: execution.withdrawal.publisherId },
+        data: {
+          lifetimePaid: { increment: Number(execution.amount) },
+          version: { increment: 1 },
+        },
       })
-      if (balance) {
-        await tx.publisherBalance.updateMany({
-          where: {
-            publisherId: execution.withdrawal.publisherId,
-            version: balance.version,
-          },
-          data: {
-            lifetimePaid: { increment: Number(execution.amount) },
-            version: { increment: 1 },
-          },
-        })
-      }
 
       await this.audit.log(
         {

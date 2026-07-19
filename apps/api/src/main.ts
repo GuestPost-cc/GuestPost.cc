@@ -512,8 +512,21 @@ async function bootstrap() {
   // Phase A3 — queue depth metrics using the BullMQ connection.
   // Mirrors the worker's /metrics/queues for API-side queue inspection.
   const queueConnection = getQueueConnection()
-  server.get("/api/v1/metrics/queues", async (_req, res) => {
-    try {
+  const queueMetricsCacheMs = Math.max(
+    Number(process.env.QUEUE_METRICS_CACHE_MS) || 30 * 60_000,
+    10_000,
+  )
+  let queueMetricsCache:
+    | { expiresAt: number; value: Record<string, unknown> }
+    | undefined
+  let queueMetricsInFlight: Promise<Record<string, unknown>> | undefined
+
+  const collectQueueMetrics = async (): Promise<Record<string, unknown>> => {
+    if (queueMetricsCache && queueMetricsCache.expiresAt > Date.now()) {
+      return queueMetricsCache.value
+    }
+    if (queueMetricsInFlight) return queueMetricsInFlight
+    queueMetricsInFlight = (async () => {
       const queueNames = Object.values(QUEUES)
       const entries = await Promise.all(
         queueNames.map(async (name) => {
@@ -527,17 +540,7 @@ async function bootstrap() {
               "failed",
               "paused",
             )
-            return [
-              name,
-              {
-                waiting: counts.waiting ?? 0,
-                active: counts.active ?? 0,
-                delayed: counts.delayed ?? 0,
-                completed: counts.completed ?? 0,
-                failed: counts.failed ?? 0,
-                paused: counts.paused ?? 0,
-              },
-            ] as const
+            return [name, counts] as const
           } finally {
             await q.close().catch(() => {})
           }
@@ -553,15 +556,36 @@ async function bootstrap() {
         paused: 0,
       }
       for (const [name, counts] of entries) {
-        queues[name] = counts
-        totals.waiting += (counts as Record<string, number>).waiting ?? 0
-        totals.active += (counts as Record<string, number>).active ?? 0
-        totals.delayed += (counts as Record<string, number>).delayed ?? 0
-        totals.completed += (counts as Record<string, number>).completed ?? 0
-        totals.failed += (counts as Record<string, number>).failed ?? 0
-        totals.paused += (counts as Record<string, number>).paused ?? 0
+        const normalized = {
+          waiting: counts.waiting ?? 0,
+          active: counts.active ?? 0,
+          delayed: counts.delayed ?? 0,
+          completed: counts.completed ?? 0,
+          failed: counts.failed ?? 0,
+          paused: counts.paused ?? 0,
+        }
+        queues[name] = normalized
+        for (const key of Object.keys(totals) as Array<keyof typeof totals>) {
+          totals[key] += normalized[key]
+        }
       }
-      res.json({ queues, totals })
+      return { queues, totals }
+    })()
+    try {
+      const value = await queueMetricsInFlight
+      queueMetricsCache = {
+        expiresAt: Date.now() + queueMetricsCacheMs,
+        value,
+      }
+      return value
+    } finally {
+      queueMetricsInFlight = undefined
+    }
+  }
+
+  server.get("/api/v1/metrics/queues", async (_req, res) => {
+    try {
+      res.json(await collectQueueMetrics())
     } catch (err) {
       res.status(500).json({
         error: "failed to collect queue metrics",

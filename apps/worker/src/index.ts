@@ -26,13 +26,16 @@ import {
 } from "@guestpost/shared"
 import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
-import { Queue } from "bullmq"
+import { Queue, QueueEvents } from "bullmq"
 import { type HealthServerHandle, startHealthServer } from "./lib/health-server"
 import { createAutoAcceptWorker } from "./processors/auto-accept.processor"
 import { createDeliveryVerificationWorker } from "./processors/delivery-verification.processor"
 import { createEmailWorker } from "./processors/email.processor"
 import { createNotificationWorker } from "./processors/notification.processor"
-import { createPayoutWorker } from "./processors/payout.processor"
+import {
+  createPayoutWorker,
+  processPayoutWebhookInbox,
+} from "./processors/payout.processor"
 import { createPublisherTrustWorker } from "./processors/publisher-trust.processor"
 import { createReconciliationWorker } from "./processors/reconciliation.processor"
 import { createReportWorker } from "./processors/report.processor"
@@ -372,6 +375,287 @@ async function checkConnections() {
   logger.info("Redis + database connections verified")
 }
 
+type WorkerFactory = () => { close: () => Promise<void> }
+type WorkerMode = "all" | "realtime" | "on-demand" | "scheduled"
+
+const REALTIME_WORKERS: WorkerFactory[] = [
+  createEmailWorker,
+  createNotificationWorker,
+  createWebsiteVerificationWorker,
+  createDeliveryVerificationWorker,
+]
+
+const ON_DEMAND_WORKERS: WorkerFactory[] = [
+  createReportWorker,
+  createVerificationWorker,
+  createPayoutWorker, // drains pre-inbox rollout jobs only
+  createPublisherTrustWorker,
+  () =>
+    createDiscoveryWorker(connection as any) as {
+      close: () => Promise<void>
+    },
+  () => createSyncWorker(connection as any) as { close: () => Promise<void> },
+]
+
+const ON_DEMAND_QUEUES = [
+  QUEUES.REPORT,
+  QUEUES.VERIFICATION,
+  QUEUES.PAYOUT,
+  QUEUES.PUBLISHER_TRUST,
+  QUEUES.INTEGRATION_DISCOVERY,
+  QUEUES.INTEGRATION_SYNC,
+] as const
+
+interface ScheduledTaskConfig {
+  queue: string
+  jobName: string
+  data: Record<string, unknown>
+  createWorker: WorkerFactory
+}
+
+function positiveInt(value: string | undefined, fallback: number): number {
+  const parsed = Number(value)
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
+  const cancellation = resolveOrderCancellationConfig(process.env)
+  const tasks: Record<string, ScheduledTaskConfig> = {
+    "payout-reconcile": {
+      queue: QUEUES.PAYOUT,
+      jobName: QUEUE_JOBS[QUEUES.PAYOUT].CHECK_STATUS,
+      data: { limit: positiveInt(process.env.PAYOUT_STATUS_BATCH_SIZE, 50) },
+      createWorker: createPayoutWorker,
+    },
+    reconciliation: {
+      queue: QUEUES.RECONCILIATION,
+      jobName: QUEUE_JOBS[QUEUES.RECONCILIATION].RUN,
+      data: {},
+      createWorker: createReconciliationWorker,
+    },
+    "website-reverify": {
+      queue: QUEUES.WEBSITE_VERIFICATION,
+      jobName: QUEUE_JOBS[QUEUES.WEBSITE_VERIFICATION].REVERIFY_SWEEP,
+      data: {},
+      createWorker: createWebsiteVerificationWorker,
+    },
+    "settlement-link-check": {
+      queue: QUEUES.DELIVERY_VERIFICATION,
+      jobName: QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].HOLD_LINK_SWEEP,
+      data: {},
+      createWorker: createDeliveryVerificationWorker,
+    },
+    "settlement-auto-approve": {
+      queue: QUEUES.SETTLEMENT,
+      jobName: QUEUE_JOBS[QUEUES.SETTLEMENT].AUTO_APPROVE,
+      data: {
+        batchSize: positiveInt(
+          process.env.SETTLEMENT_AUTO_APPROVE_BATCH_SIZE,
+          100,
+        ),
+      },
+      createWorker: createSettlementAutoApproveWorker,
+    },
+    "settlement-auto-release": {
+      queue: QUEUES.SETTLEMENT_RELEASE,
+      jobName: QUEUE_JOBS[QUEUES.SETTLEMENT_RELEASE].AUTO_RELEASE,
+      data: {
+        batchSize: positiveInt(
+          process.env.SETTLEMENT_AUTO_RELEASE_BATCH_SIZE,
+          100,
+        ),
+      },
+      createWorker: createSettlementReleaseWorker,
+    },
+    "auto-accept": {
+      queue: QUEUES.AUTO_ACCEPT,
+      jobName: QUEUE_JOBS[QUEUES.AUTO_ACCEPT].SWEEP,
+      data: {},
+      createWorker: createAutoAcceptWorker,
+    },
+    "review-reminders": {
+      queue: QUEUES.AUTO_ACCEPT,
+      jobName: QUEUE_JOBS[QUEUES.AUTO_ACCEPT].REMINDER_SWEEP,
+      data: {},
+      createWorker: createAutoAcceptWorker,
+    },
+    "cancellation-timeouts": {
+      queue: QUEUES.AUTO_ACCEPT,
+      jobName: QUEUE_JOBS[QUEUES.AUTO_ACCEPT].CANCELLATION_TIMEOUT_SWEEP,
+      data: { responseSweepMinutes: cancellation.responseSweepMinutes },
+      createWorker: createAutoAcceptWorker,
+    },
+    "acceptance-timeouts": {
+      queue: QUEUES.AUTO_ACCEPT,
+      jobName: QUEUE_JOBS[QUEUES.AUTO_ACCEPT].ACCEPTANCE_TIMEOUT_SWEEP,
+      data: { acceptanceSweepMinutes: cancellation.acceptanceSweepMinutes },
+      createWorker: createAutoAcceptWorker,
+    },
+  }
+  return tasks[name]
+}
+
+function resolveWorkerMode(): WorkerMode {
+  const value = (process.env.WORKER_MODE ?? "all").trim()
+  if (
+    value === "all" ||
+    value === "realtime" ||
+    value === "on-demand" ||
+    value === "scheduled"
+  ) {
+    return value
+  }
+  throw new Error(
+    `Invalid WORKER_MODE=${value}; expected all, realtime, on-demand, or scheduled`,
+  )
+}
+
+async function removeHybridRepeatables(): Promise<void> {
+  // Shared queues may gain unrelated repeatables later. Remove only the
+  // schedules whose ownership moved to Northflank; deleting an entire queue's
+  // repeatable registry could silently disable a future feature.
+  const ownedSchedules: Array<{ queue: string; names: string[] }> = [
+    {
+      queue: QUEUES.PAYOUT,
+      names: [QUEUE_JOBS[QUEUES.PAYOUT].CHECK_STATUS],
+    },
+    {
+      queue: QUEUES.RECONCILIATION,
+      names: [QUEUE_JOBS[QUEUES.RECONCILIATION].RUN],
+    },
+    {
+      queue: QUEUES.WEBSITE_VERIFICATION,
+      names: [QUEUE_JOBS[QUEUES.WEBSITE_VERIFICATION].REVERIFY_SWEEP],
+    },
+    {
+      queue: QUEUES.DELIVERY_VERIFICATION,
+      names: [QUEUE_JOBS[QUEUES.DELIVERY_VERIFICATION].HOLD_LINK_SWEEP],
+    },
+    {
+      queue: QUEUES.SETTLEMENT,
+      // AUTO_RELEASE historically lived on this shared queue.
+      names: [
+        QUEUE_JOBS[QUEUES.SETTLEMENT].AUTO_APPROVE,
+        "settlement-auto-release",
+      ],
+    },
+    {
+      queue: QUEUES.SETTLEMENT_RELEASE,
+      names: [QUEUE_JOBS[QUEUES.SETTLEMENT_RELEASE].AUTO_RELEASE],
+    },
+    {
+      queue: QUEUES.AUTO_ACCEPT,
+      names: [
+        QUEUE_JOBS[QUEUES.AUTO_ACCEPT].SWEEP,
+        QUEUE_JOBS[QUEUES.AUTO_ACCEPT].REMINDER_SWEEP,
+        QUEUE_JOBS[QUEUES.AUTO_ACCEPT].CANCELLATION_TIMEOUT_SWEEP,
+        QUEUE_JOBS[QUEUES.AUTO_ACCEPT].ACCEPTANCE_TIMEOUT_SWEEP,
+      ],
+    },
+  ]
+  for (const owned of ownedSchedules) {
+    const queue = new Queue(owned.queue, { connection })
+    try {
+      const repeatables = await queue.getRepeatableJobs()
+      const names = new Set(owned.names)
+      await Promise.all(
+        repeatables
+          .filter((job) => names.has(job.name))
+          .map((job) => queue.removeRepeatableByKey(job.key)),
+      )
+    } finally {
+      await queue.close()
+    }
+  }
+  logger.info("owned legacy BullMQ repeatables removed for hybrid runtime")
+}
+
+async function runScheduledTask(taskName: string): Promise<void> {
+  const task = getScheduledTask(taskName)
+  if (!task) {
+    throw new Error(`Unknown WORKER_TASK=${taskName}`)
+  }
+
+  if (taskName === "payout-reconcile") {
+    const inbox = await processPayoutWebhookInbox(
+      positiveInt(process.env.PAYOUT_WEBHOOK_INBOX_BATCH_SIZE, 100),
+    )
+    logger.info("payout webhook inbox drained", inbox)
+  }
+
+  const events = new QueueEvents(task.queue, { connection })
+  await events.waitUntilReady()
+  const worker = task.createWorker()
+  const queue = new Queue(task.queue, { connection })
+  try {
+    const tenMinuteBucket = Math.floor(Date.now() / (10 * 60 * 1000))
+    const job = await queue.add(task.jobName, signJobPayload(task.data), {
+      jobId: `scheduled-${taskName}-${tenMinuteBucket}`,
+      attempts: 1,
+      // Retain through the bucket so an orchestrator retry/duplicate trigger
+      // cannot execute the same scheduled mutation twice.
+      removeOnComplete: { count: 20, age: 15 * 60 },
+      removeOnFail: { count: 20, age: 604800 },
+    })
+    const timeoutMs = positiveInt(
+      process.env.WORKER_SCHEDULED_TIMEOUT_MS,
+      15 * 60 * 1000,
+    )
+    await job.waitUntilFinished(events, timeoutMs)
+    logger.info("scheduled task completed", { taskName, jobId: job.id })
+  } finally {
+    await worker.close()
+    await events.close()
+    await queue.close()
+  }
+}
+
+async function drainOnDemandQueues(): Promise<void> {
+  const queueHandles = ON_DEMAND_QUEUES.map(
+    (name) => new Queue(name, { connection }),
+  )
+  const timeoutMs = positiveInt(
+    process.env.WORKER_ON_DEMAND_MAX_RUNTIME_MS,
+    10 * 60 * 1000,
+  )
+  const deadline = Date.now() + timeoutMs
+  let quietChecks = 0
+  try {
+    while (Date.now() < deadline) {
+      const inbox = await processPayoutWebhookInbox(
+        positiveInt(process.env.PAYOUT_WEBHOOK_INBOX_BATCH_SIZE, 100),
+      )
+      const counts = await Promise.all(
+        queueHandles.map((queue) =>
+          queue.getJobCounts("waiting", "active", "prioritized"),
+        ),
+      )
+      const queued = counts.reduce(
+        (sum, count) =>
+          sum +
+          (count.waiting ?? 0) +
+          (count.active ?? 0) +
+          (count.prioritized ?? 0),
+        0,
+      )
+      // A delayed retry is durable but not currently runnable. Waiting for it
+      // here can hold all six consumers open for ten minutes and burn Redis
+      // commands even when its backoff is hours long. The mandatory catch-up
+      // run will claim it after its delay expires.
+      const inboxPending = inbox.claimed - inbox.processed - inbox.ignored
+      if (queued === 0 && inboxPending <= 0) quietChecks++
+      else quietChecks = 0
+      if (quietChecks >= 2) return
+      await new Promise((resolve) => setTimeout(resolve, 2_000))
+    }
+    logger.warn("on-demand drain reached runtime limit; catch-up will resume", {
+      timeoutMs,
+    })
+  } finally {
+    await Promise.all(queueHandles.map((queue) => queue.close()))
+  }
+}
+
 const workers: Array<{ close: () => Promise<void> }> = []
 let healthServer: HealthServerHandle | undefined
 
@@ -429,42 +713,81 @@ process.on("uncaughtException", (err: Error) => {
 
 async function bootstrap() {
   await checkConnections()
-  healthServer = await startHealthServer()
+  const mode = resolveWorkerMode()
+  logger.info("worker runtime selected", { mode })
 
-  workers.push(
-    createEmailWorker(),
-    createReportWorker(),
-    createNotificationWorker(),
-    createVerificationWorker(),
-    createPayoutWorker(),
-    createReconciliationWorker(),
-    createWebsiteVerificationWorker(),
-    createDeliveryVerificationWorker(),
-    createPublisherTrustWorker(),
-    createSettlementAutoApproveWorker(),
-    createSettlementReleaseWorker(),
-    createAutoAcceptWorker(),
-    createDiscoveryWorker(connection as any) as { close: () => Promise<void> },
-    createSyncWorker(connection as any) as { close: () => Promise<void> },
-  )
-  logger.info("workers started", { count: workers.length })
-  // Register all repeatable cron jobs and verify the registry matches expectations.
-  const registeredJobs = await Promise.all([
-    registerPayoutStatusPoll(),
-    registerReconciliationSweep(),
-    registerWebsiteReverifySweep(),
-    registerSettlementHoldLinkSweep(),
-    registerSettlementAutoApproveSweep(),
-    registerSettlementAutoReleaseSweep(),
-    registerAutoAcceptSweep(),
-    registerReviewReminderSweep(),
-    registerCancellationResponseTimeoutSweep(),
-    registerOrderAcceptanceTimeoutSweep(),
-  ])
-  // Assert that the set of actually-registered jobs matches the canonical registry.
-  // This catches drift between registration functions and REPEATABLE_JOB_NAMES in
-  // repeatable-job-registry.ts at startup (fail-fast).
-  assertNoRegistryDrift(registeredJobs)
+  if (mode === "all") {
+    healthServer = await startHealthServer()
+    workers.push(
+      createEmailWorker(),
+      createReportWorker(),
+      createNotificationWorker(),
+      createVerificationWorker(),
+      createPayoutWorker(),
+      createReconciliationWorker(),
+      createWebsiteVerificationWorker(),
+      createDeliveryVerificationWorker(),
+      createPublisherTrustWorker(),
+      createSettlementAutoApproveWorker(),
+      createSettlementReleaseWorker(),
+      createAutoAcceptWorker(),
+      createDiscoveryWorker(connection as any) as {
+        close: () => Promise<void>
+      },
+      createSyncWorker(connection as any) as { close: () => Promise<void> },
+    )
+    logger.info("legacy-compatible worker fleet started", {
+      count: workers.length,
+    })
+    const registeredJobs = await Promise.all([
+      registerPayoutStatusPoll(),
+      registerReconciliationSweep(),
+      registerWebsiteReverifySweep(),
+      registerSettlementHoldLinkSweep(),
+      registerSettlementAutoApproveSweep(),
+      registerSettlementAutoReleaseSweep(),
+      registerAutoAcceptSweep(),
+      registerReviewReminderSweep(),
+      registerCancellationResponseTimeoutSweep(),
+      registerOrderAcceptanceTimeoutSweep(),
+    ])
+    assertNoRegistryDrift(registeredJobs)
+    return
+  }
+
+  if (mode === "realtime") {
+    await removeHybridRepeatables()
+    healthServer = await startHealthServer()
+    workers.push(...REALTIME_WORKERS.map((createWorker) => createWorker()))
+    logger.info("realtime worker lane started", {
+      count: workers.length,
+      queues: [
+        QUEUES.EMAIL,
+        QUEUES.NOTIFICATION,
+        QUEUES.WEBSITE_VERIFICATION,
+        QUEUES.DELIVERY_VERIFICATION,
+      ],
+    })
+    return
+  }
+
+  if (mode === "on-demand") {
+    workers.push(...ON_DEMAND_WORKERS.map((createWorker) => createWorker()))
+    logger.info("on-demand worker lane started", {
+      count: workers.length,
+      queues: ON_DEMAND_QUEUES,
+    })
+    await drainOnDemandQueues()
+    await shutdown("on-demand-complete")
+    return
+  }
+
+  const taskName = process.env.WORKER_TASK?.trim()
+  if (!taskName) {
+    throw new Error("WORKER_TASK is required when WORKER_MODE=scheduled")
+  }
+  await runScheduledTask(taskName)
+  await shutdown(`scheduled-complete:${taskName}`)
 }
 
 bootstrap().catch((err) => {

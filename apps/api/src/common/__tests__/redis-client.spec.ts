@@ -55,7 +55,22 @@ describe("redis-client", () => {
 
   describe("getQueueConnection (BullMQ context)", () => {
     it("creates the queue client with connectTimeout, retryStrategy, and maxRetriesPerRequest: null", () => {
-      getQueueConnection()
+      const originalQueueRedisUrl = process.env.QUEUE_REDIS_URL
+      const originalRedisUrl = process.env.REDIS_URL
+      process.env.QUEUE_REDIS_URL = "   "
+      process.env.REDIS_URL = "redis://fallback.internal:6379"
+      try {
+        getQueueConnection()
+      } finally {
+        if (originalQueueRedisUrl === undefined)
+          delete process.env.QUEUE_REDIS_URL
+        else process.env.QUEUE_REDIS_URL = originalQueueRedisUrl
+        if (originalRedisUrl === undefined) delete process.env.REDIS_URL
+        else process.env.REDIS_URL = originalRedisUrl
+      }
+      expect(IORedisMock.mock.calls[1]?.[0]).toBe(
+        "redis://fallback.internal:6379",
+      )
       const opts = IORedisMock.mock.calls[1]?.[1] as
         | Record<string, unknown>
         | undefined

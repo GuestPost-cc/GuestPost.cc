@@ -25,8 +25,8 @@ RUN corepack enable && corepack prepare pnpm@11.5.1 --activate
 WORKDIR /repo
 ENV NODE_ENV=production
 COPY --from=builder /repo .
-# Exactly ONE worker instance per queue deployment unless every instance runs
-# identical code — stale duplicate consumers swallow jobs (see runbook).
+# One image serves the realtime service and short-lived job modes. WORKER_MODE
+# selects the runtime; see docs/WORKER_ARCHITECTURE.md.
 CMD ["node", "apps/worker/dist/index.js"]
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD wget -qO- "http://localhost:${WORKER_HEALTH_PORT:-3004}/health" || exit 1
+  CMD if [ "$WORKER_MODE" = "scheduled" ] || [ "$WORKER_MODE" = "on-demand" ]; then exit 0; else wget -qO- "http://localhost:${WORKER_HEALTH_PORT:-3004}/health" || exit 1; fi

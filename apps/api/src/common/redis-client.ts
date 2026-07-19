@@ -25,11 +25,16 @@ function createHttpClient(): IORedis {
 }
 
 function createQueueClient(): IORedis {
-  return new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-    ...BASE_OPTS,
-    // BullMQ manages its own retries — must be null per BullMQ docs.
-    maxRetriesPerRequest: null,
-  })
+  return new IORedis(
+    process.env.QUEUE_REDIS_URL?.trim() ||
+      process.env.REDIS_URL?.trim() ||
+      "redis://localhost:6379",
+    {
+      ...BASE_OPTS,
+      // BullMQ manages its own retries — must be null per BullMQ docs.
+      maxRetriesPerRequest: null,
+    },
+  )
 }
 
 // HTTP context — auth rate limiting, caches, ephemeral lookups.

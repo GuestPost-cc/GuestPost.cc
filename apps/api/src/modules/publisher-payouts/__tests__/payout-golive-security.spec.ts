@@ -23,7 +23,8 @@ afterEach(() => {
 
 describe("PayoutWebhookController — signature verification", () => {
   let controller: PayoutWebhookController
-  let queueMock: any
+  let prismaMock: any
+  let wakeupMock: any
 
   // Default test payload — Wise-shape (data.id), used by both providers via
   // normalizeProviderWebhook's envelope-or-inner tolerance. The Stripe-specific
@@ -38,8 +39,14 @@ describe("PayoutWebhookController — signature verification", () => {
   const rawBody = Buffer.from(payload, "utf8")
 
   beforeEach(() => {
-    queueMock = { addJob: jest.fn().mockResolvedValue({ id: "job-1" }) }
-    controller = new PayoutWebhookController(queueMock)
+    prismaMock = {
+      payoutWebhookEvent: {
+        create: jest.fn().mockResolvedValue({ id: "event-1" }),
+        findUnique: jest.fn().mockResolvedValue({ id: "event-1" }),
+      },
+    }
+    wakeupMock = { wake: jest.fn().mockResolvedValue(undefined) }
+    controller = new PayoutWebhookController(prismaMock, wakeupMock)
   })
 
   function stripeSig(
@@ -69,7 +76,7 @@ describe("PayoutWebhookController — signature verification", () => {
         { rawBody } as any,
       ),
     ).rejects.toThrow(ServiceUnavailableException)
-    expect(queueMock.addJob).not.toHaveBeenCalled()
+    expect(prismaMock.payoutWebhookEvent.create).not.toHaveBeenCalled()
   })
 
   it("rejects Stripe webhook with missing signature header", async () => {
@@ -77,7 +84,7 @@ describe("PayoutWebhookController — signature verification", () => {
     await expect(
       controller.handleWebhook("stripe_connect", {}, { rawBody } as any),
     ).rejects.toThrow(UnauthorizedException)
-    expect(queueMock.addJob).not.toHaveBeenCalled()
+    expect(prismaMock.payoutWebhookEvent.create).not.toHaveBeenCalled()
   })
 
   it("rejects Stripe webhook with a forged signature", async () => {
@@ -90,7 +97,7 @@ describe("PayoutWebhookController — signature verification", () => {
         { rawBody } as any,
       ),
     ).rejects.toThrow(UnauthorizedException)
-    expect(queueMock.addJob).not.toHaveBeenCalled()
+    expect(prismaMock.payoutWebhookEvent.create).not.toHaveBeenCalled()
   })
 
   it("rejects Stripe webhook with a stale timestamp (replay protection)", async () => {
@@ -109,7 +116,7 @@ describe("PayoutWebhookController — signature verification", () => {
     ).rejects.toThrow(UnauthorizedException)
   })
 
-  it("queues a correctly signed Stripe webhook with deterministic jobId (Phase 8.3 / audit #3)", async () => {
+  it("durably stores a correctly signed Stripe webhook before wake-up", async () => {
     process.env.STRIPE_PAYOUT_WEBHOOK_SECRET = "whsec_test"
     // Use the real Stripe envelope shape so normalizeProviderWebhook extracts
     // data.object.id = "tr_phase83" → jobId = "payout-webhook:stripe_connect:tr_phase83".
@@ -125,13 +132,21 @@ describe("PayoutWebhookController — signature verification", () => {
       { "stripe-signature": sig },
       { rawBody: stripeRaw } as any,
     )
-    expect(result).toEqual({ received: true, jobId: "job-1" })
-    expect(queueMock.addJob).toHaveBeenCalledWith(
-      "payout",
-      "payout-webhook",
-      expect.objectContaining({ verified: true, provider: "stripe_connect" }),
-      { jobId: "payout-webhook:stripe_connect:tr_phase83" },
+    expect(result).toEqual({
+      received: true,
+      eventId: "event-1",
+      duplicate: false,
+    })
+    expect(prismaMock.payoutWebhookEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          provider: "stripe_connect",
+          providerExecutionId: "tr_phase83",
+          providerStatus: "COMPLETED",
+        }),
+      }),
     )
+    expect(wakeupMock.wake).toHaveBeenCalledWith("payout-webhook")
   })
 
   it("rejects Wise webhook when no public key is configured (fail closed)", async () => {
@@ -158,7 +173,7 @@ describe("PayoutWebhookController — signature verification", () => {
         { rawBody } as any,
       ),
     ).rejects.toThrow(UnauthorizedException)
-    expect(queueMock.addJob).not.toHaveBeenCalled()
+    expect(prismaMock.payoutWebhookEvent.create).not.toHaveBeenCalled()
 
     const signer = createSign("RSA-SHA256")
     signer.update(rawBody)
@@ -169,14 +184,18 @@ describe("PayoutWebhookController — signature verification", () => {
       { "x-signature-sha256": signature },
       { rawBody } as any,
     )
-    expect(result).toEqual({ received: true, jobId: "job-1" })
-    // Phase 8.3 (audit #3) — normalizer pulls data.id as the providerExecutionId
-    // for Wise via inner.resource.id ?? inner.id fallback → deterministic jobId.
-    expect(queueMock.addJob).toHaveBeenCalledWith(
-      "payout",
-      "payout-webhook",
-      expect.objectContaining({ verified: true, provider: "wise" }),
-      { jobId: "payout-webhook:wise:transfer-1" },
+    expect(result).toEqual({
+      received: true,
+      eventId: "event-1",
+      duplicate: false,
+    })
+    expect(prismaMock.payoutWebhookEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          provider: "wise",
+          providerExecutionId: "transfer-1",
+        }),
+      }),
     )
   })
 
@@ -208,8 +227,12 @@ describe("PayoutWebhookController — signature verification", () => {
       { "x-signature-sha256": signature },
       { rawBody: raw } as any,
     )
-    expect(result).toEqual({ received: true, jobId: "job-1" })
-    expect(queueMock.addJob).toHaveBeenCalled()
+    expect(result).toEqual({
+      received: true,
+      eventId: "event-1",
+      duplicate: false,
+    })
+    expect(prismaMock.payoutWebhookEvent.create).toHaveBeenCalled()
   })
 
   it("accepts Wise webhook at the exact 300s tolerance boundary", async () => {
@@ -239,7 +262,11 @@ describe("PayoutWebhookController — signature verification", () => {
       { "x-signature-sha256": signature },
       { rawBody: raw } as any,
     )
-    expect(result).toEqual({ received: true, jobId: "job-1" })
+    expect(result).toEqual({
+      received: true,
+      eventId: "event-1",
+      duplicate: false,
+    })
   })
 
   it("rejects Wise webhook with timestamp just outside the 300s tolerance (301s past)", async () => {
@@ -265,7 +292,7 @@ describe("PayoutWebhookController — signature verification", () => {
         rawBody: raw,
       } as any),
     ).rejects.toThrow(UnauthorizedException)
-    expect(queueMock.addJob).not.toHaveBeenCalled()
+    expect(prismaMock.payoutWebhookEvent.create).not.toHaveBeenCalled()
   })
 
   it("rejects Wise webhook with a future timestamp outside tolerance (+301s)", async () => {
@@ -291,7 +318,7 @@ describe("PayoutWebhookController — signature verification", () => {
         rawBody: raw,
       } as any),
     ).rejects.toThrow(UnauthorizedException)
-    expect(queueMock.addJob).not.toHaveBeenCalled()
+    expect(prismaMock.payoutWebhookEvent.create).not.toHaveBeenCalled()
   })
 })
 
@@ -421,11 +448,16 @@ describe("PayoutExecutionService.retryExecution — double-payment prevention", 
     provider: { id: "prov-1", name: "wise" },
   }
 
-  function makeService(providerStatus: { status: string; fee?: number }) {
+  function makeService(
+    providerStatus: { status: string; fee?: number },
+    executionOverride: Record<string, unknown> = {},
+  ) {
     const auditMock = { log: jest.fn().mockResolvedValue(undefined) }
     const prismaMock: any = {
       payoutExecution: {
-        findUnique: jest.fn().mockResolvedValue(failedExecution),
+        findUnique: jest
+          .fn()
+          .mockResolvedValue({ ...failedExecution, ...executionOverride }),
         updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         update: jest.fn().mockResolvedValue({}),
       },
@@ -437,8 +469,11 @@ describe("PayoutExecutionService.retryExecution — double-payment prevention", 
         findUnique: jest
           .fn()
           .mockResolvedValue({ publisherId: "pub-1", version: 1 }),
-        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn().mockResolvedValue({}),
       },
+      $queryRaw: jest
+        .fn()
+        .mockResolvedValue([{ publisherId: "pub-1", version: 1 }]),
       $transaction: jest
         .fn()
         .mockImplementation(async (cb: any) => cb(prismaMock)),
@@ -479,7 +514,7 @@ describe("PayoutExecutionService.retryExecution — double-payment prevention", 
       recoveredFromProvider: true,
     })
     expect(adapterMock.createTransfer).not.toHaveBeenCalled()
-    expect(prismaMock.publisherBalance.updateMany).toHaveBeenCalledWith(
+    expect(prismaMock.publisherBalance.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ lifetimePaid: { increment: 100 } }),
       }),
@@ -496,6 +531,19 @@ describe("PayoutExecutionService.retryExecution — double-payment prevention", 
     await expect(service.retryExecution("exec-1", "staff-1")).rejects.toThrow(
       ConflictException,
     )
+    expect(adapterMock.createTransfer).not.toHaveBeenCalled()
+  })
+
+  it("fails closed when provider outcome is ambiguous and no transfer id was recorded", async () => {
+    const { service, adapterMock } = makeService(
+      { status: "FAILED" },
+      { providerExecutionId: null },
+    )
+
+    await expect(service.retryExecution("exec-1", "staff-1")).rejects.toThrow(
+      /Do not retry/,
+    )
+    expect(adapterMock.checkTransferStatus).not.toHaveBeenCalled()
     expect(adapterMock.createTransfer).not.toHaveBeenCalled()
   })
 })

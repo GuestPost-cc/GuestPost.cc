@@ -81,9 +81,10 @@ Open/partial items require architectural design discussion.
   `Wallet_userId_personal_key` index (`organizationId IS NULL`). The migration
   safely merges historical duplicates, while organization wallets may retain
   the same creator `userId`.
-- Wise/Stripe Connect payout webhooks always receive a deterministic BullMQ
-  job ID: provider execution ID first, then a hashed provider event ID, then a
-  verified raw-payload hash.
+- Verified Wise/Stripe Connect payout webhooks are persisted to the durable
+  `PayoutWebhookEvent` inbox before acknowledgement. Events deduplicate by
+  provider event ID when available and otherwise by the verified raw-payload
+  hash; Redis is not the webhook acknowledgement boundary.
 - Platform-fulfilled orders create platform revenue and complete directly rather than creating publisher settlements. Worker sweeps enforce the acceptance and cancellation-response deadlines. Dispute refunds require Finance/Super Admin plus explicit responsibility rather than inferring fault from the listing channel.
 - Prisma migrations are an API/worker release prerequisite. Generate the client from the migrated schema, apply migrations before serving requests that select new fields, and verify `prisma migrate status` during the release; otherwise shared reads such as order and billing queries can fail together with HTTP 500 responses.
 - The customer portal is an order-focused workbench. Its dashboard uses exact server totals for attention, active work, and delivered results; `/dashboard/orders` is a server-paginated queue with stage, campaign, service, search, and sort controls; campaign and report totals page through the complete tenant-scoped data set rather than silently truncating at the API page limit.

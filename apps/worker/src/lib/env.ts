@@ -7,7 +7,7 @@ import { createLogger } from "@guestpost/shared/dist/observability/structured-lo
 
 const logger = createLogger("worker.env")
 
-const REQUIRED = ["DATABASE_URL", "REDIS_URL"] as const
+const REQUIRED = ["DATABASE_URL"] as const
 
 const PRODUCTION_REQUIRED = ["QUEUE_SIGNING_SECRET"] as const
 
@@ -20,6 +20,9 @@ export function validateEnv(): void {
   const missing: string[] = []
   for (const key of REQUIRED) {
     if (!process.env[key]) missing.push(key)
+  }
+  if (!process.env.QUEUE_REDIS_URL?.trim() && !process.env.REDIS_URL?.trim()) {
+    missing.push("QUEUE_REDIS_URL (or REDIS_URL fallback)")
   }
   if (missing.length > 0) {
     logger.error("FATAL: missing required env vars", { missing })

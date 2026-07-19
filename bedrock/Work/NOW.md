@@ -6,6 +6,24 @@
 
 ## Recently Completed
 
+### Hybrid Worker And Durable Payout Reconciliation
+
+- Re-evaluated the payout path from the implementation: authenticated API
+  requests initiate provider transfers synchronously; the worker only applies
+  verified webhooks and polls uncertain executions.
+- Split the worker into safe-default `all`, continuously running `realtime`,
+  burst `on-demand`, and single-task `scheduled` modes. Added Northflank wake
+  requests plus a mandatory 10-minute catch-up contract for burst work.
+- Moved verified payout webhooks from a Redis acknowledgement boundary to a
+  durable PostgreSQL inbox with event-level deduplication, bounded allowlisted
+  fields, conditional leases, retryable out-of-order delivery, and provider-
+  scoped execution references.
+- Hardened payout recovery against ambiguous provider sends and balance races,
+  signed integration queue payloads, separated queue Redis configuration, and
+  reduced idle BullMQ and metrics traffic for Upstash.
+- Added the deployment, security, scheduling, migration, rollback, monitoring,
+  and incident runbook in `docs/WORKER_ARCHITECTURE.md`.
+
 ### Admin Authentication And Suspension Hardening
 
 - Fixed the production login 500 caused by exhausted Redis request quota in the shared per-email limiter. Redis remains the cross-instance authority; a bounded local fallback preserves throttling and controlled 429 responses during provider/quota failures, with rate-limited warnings and periodic recovery attempts.
@@ -371,6 +389,14 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
+The hybrid worker rewrite is code-complete and locally verified. The payout
+reference preflight returned no duplicates, the additive inbox migration is
+deployed to the Neon test database, and all worker modes passed against the new
+dedicated Upstash queue database. The active release focus is PR/CI followed by
+the controlled API-and-Northflank cutover: drain legacy unsigned integration
+jobs with the old worker, then configure the realtime, on-demand, and scheduled
+Northflank workloads. The safe `all` default remains available for rollback.
+
 The Operations assignment and Support workbench is code-complete and locally
 verified. `GET /admin/operations-workbench` supplies exact workflow counts and
 a bounded action queue spanning assigned/claimable fulfillment, assigned
@@ -433,13 +459,14 @@ data.
 
 ## Next Actions
 
-1. **Customer workbench release** — review, commit, push, and open the customer workbench PR (stacked on the publisher workbench commit); confirm the full GitHub CI gate before merging.
-2. **Google integration staging pass** — deploy the worker, authorize the production callback URI, connect a Google account different from the GuestPost login, discover/link GSC and GA4 properties for one publisher and one platform site, then verify daily rows and their buyer-safe 30-day listing summaries are written only to the selected website mappings.
-3. **Auth IP warning follow-up** — Render logs now show Better Auth falling back to a shared per-path rate-limit bucket when no trusted client IP header is resolved; configure Better Auth trusted proxy/IP headers before production hardening.
-4. **Worker operations** — the worker is not deployed on Render yet; run it locally when testing DNS TXT verification, GSC sync, cancellation/settlement sweeps, or other queue-backed flows.
-5. **OAuth configuration** — authorize the deployed Google redirect URI `https://api.guestpost.pro.bd/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback` plus any localhost callback still needed for development.
-6. **Historical credential containment** — the exposed Neon password was rotated, but the old value remains in git history. Assess whether repository history/access containment is needed before production.
-7. **Reporting expansion** — build on the completed GSC/GA4 ingestion
+1. **Hybrid worker cutover** — merge only after GitHub CI passes, deploy the API, drain legacy unsigned integration jobs, and then deploy the Northflank realtime/on-demand/scheduled workloads with forbid-concurrency schedules and the mandatory catch-up job.
+2. **Redis quota validation** — configure the dedicated staging `QUEUE_REDIS_URL` through deployment secrets and monitor commands/day for at least 24 hours after the hybrid cutover before treating the cost model as validated.
+3. **Customer workbench release** — review, commit, push, and open the customer workbench PR (stacked on the publisher workbench commit); confirm the full GitHub CI gate before merging.
+4. **Google integration staging pass** — authorize the production callback URI, connect a Google account different from the GuestPost login, discover/link GSC and GA4 properties for one publisher and one platform site, then verify daily rows and their buyer-safe 30-day listing summaries are written only to the selected website mappings.
+5. **Auth IP warning follow-up** — Render logs now show Better Auth falling back to a shared per-path rate-limit bucket when no trusted client IP header is resolved; configure Better Auth trusted proxy/IP headers before production hardening.
+6. **OAuth configuration** — authorize the deployed Google redirect URI `https://api.guestpost.pro.bd/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback` plus any localhost callback still needed for development.
+7. **Historical credential containment** — the exposed Neon password was rotated, but the old value remains in git history. Assess whether repository history/access containment is needed before production.
+8. **Reporting expansion** — build on the completed GSC/GA4 ingestion
    - Pagination, configurable date windows, historical imports, and retry observability
    - Owner reporting endpoints (`GET /websites/:id/metrics`)
    - GSC/GA4 KPI cards and historical trend charts
@@ -466,4 +493,7 @@ data.
 ## Blockers
 
 - Historical credential containment and Render environment review require operator access to the deployed Render project.
-- Queue-backed Google/cancellation/settlement staging validation requires a deployed worker service.
+- Hybrid worker activation now requires the reviewed branch to pass GitHub CI
+  and the explicit Northflank service/job configuration; the repository
+  intentionally defaults to compatibility `all` mode until that
+  operator-controlled cutover occurs.

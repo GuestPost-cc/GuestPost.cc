@@ -5,6 +5,7 @@ const ORIGINAL_ENV = process.env
 describe("integration Redis connection", () => {
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV }
+    delete process.env.QUEUE_REDIS_URL
     delete process.env.REDIS_URL
     delete process.env.REDIS_HOST
     delete process.env.REDIS_PORT
@@ -18,6 +19,22 @@ describe("integration Redis connection", () => {
     process.env.REDIS_URL = "rediss://default:secret@example.upstash.io:6379"
     process.env.REDIS_HOST = "localhost"
     process.env.REDIS_PORT = "6379"
+
+    expect(resolveIntegrationRedisConnection()).toBe(process.env.REDIS_URL)
+  })
+
+  it("prefers the dedicated QUEUE_REDIS_URL", () => {
+    process.env.REDIS_URL = "redis://api-cache.internal:6379"
+    process.env.QUEUE_REDIS_URL = "rediss://queue.internal:6379"
+
+    expect(resolveIntegrationRedisConnection()).toBe(
+      process.env.QUEUE_REDIS_URL,
+    )
+  })
+
+  it("treats a blank QUEUE_REDIS_URL as unset", () => {
+    process.env.QUEUE_REDIS_URL = "   "
+    process.env.REDIS_URL = "redis://api-cache.internal:6379"
 
     expect(resolveIntegrationRedisConnection()).toBe(process.env.REDIS_URL)
   })

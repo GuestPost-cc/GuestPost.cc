@@ -124,7 +124,15 @@ async function getQueueCounts(
 }
 
 async function buildQueueMetrics() {
-  const queueNames = Object.values(QUEUES)
+  const queueNames =
+    process.env.WORKER_MODE === "realtime"
+      ? [
+          QUEUES.EMAIL,
+          QUEUES.NOTIFICATION,
+          QUEUES.WEBSITE_VERIFICATION,
+          QUEUES.DELIVERY_VERIFICATION,
+        ]
+      : Object.values(QUEUES)
   const entries = await Promise.all(
     queueNames.map(async (name) => [name, await getQueueCounts(name)] as const),
   )
@@ -165,6 +173,30 @@ async function buildQueueMetrics() {
   }
 }
 
+const METRICS_CACHE_MS = Math.max(
+  Number(process.env.QUEUE_METRICS_CACHE_MS) || 30 * 60_000,
+  10_000,
+)
+let queueMetricsCache:
+  | { expiresAt: number; value: Awaited<ReturnType<typeof buildQueueMetrics>> }
+  | undefined
+let queueMetricsInFlight: ReturnType<typeof buildQueueMetrics> | undefined
+
+async function getCachedQueueMetrics() {
+  if (queueMetricsCache && queueMetricsCache.expiresAt > Date.now()) {
+    return queueMetricsCache.value
+  }
+  if (queueMetricsInFlight) return queueMetricsInFlight
+  queueMetricsInFlight = buildQueueMetrics()
+  try {
+    const value = await queueMetricsInFlight
+    queueMetricsCache = { expiresAt: Date.now() + METRICS_CACHE_MS, value }
+    return value
+  } finally {
+    queueMetricsInFlight = undefined
+  }
+}
+
 function writeJson(res: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body)
   res.writeHead(status, {
@@ -196,7 +228,7 @@ async function handleRequest(
     }
     case "/metrics/queues": {
       try {
-        const metrics = await buildQueueMetrics()
+        const metrics = await getCachedQueueMetrics()
         writeJson(res, 200, metrics)
       } catch (err) {
         writeJson(res, 500, {

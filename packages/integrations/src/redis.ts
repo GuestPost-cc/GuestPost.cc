@@ -16,7 +16,8 @@ function parseRedisPort(value: string | undefined): number {
 }
 
 export function resolveIntegrationRedisConnection(): string | RedisOptions {
-  const redisUrl = process.env.REDIS_URL?.trim()
+  const redisUrl =
+    process.env.QUEUE_REDIS_URL?.trim() || process.env.REDIS_URL?.trim()
   if (redisUrl) return redisUrl
 
   return {

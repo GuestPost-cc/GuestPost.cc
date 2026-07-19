@@ -1,3 +1,4 @@
+import { verifyJobPayload } from "@guestpost/shared/dist/job-signing"
 import { Job, Worker } from "bullmq"
 import { INTEGRATION_QUEUES } from "../queue-names"
 import type { DiscoveryJobPayload } from "../services/discovery.service"
@@ -14,6 +15,19 @@ const logger = {
 let syncWorker: Worker | null = null
 let discoveryWorker: Worker | null = null
 
+function positiveNumber(value: string | undefined, fallback: number): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+const idleWorkerOptions = {
+  drainDelay: positiveNumber(process.env.WORKER_DRAIN_DELAY_SECONDS, 300),
+  stalledInterval: positiveNumber(
+    process.env.WORKER_STALLED_INTERVAL_MS,
+    300_000,
+  ),
+}
+
 export { INTEGRATION_QUEUES as QUEUES } from "../queue-names"
 
 export function createSyncWorker(connection: Record<string, unknown>) {
@@ -24,6 +38,9 @@ export function createSyncWorker(connection: Record<string, unknown>) {
   syncWorker = new Worker<SyncJobPayload>(
     INTEGRATION_QUEUES.SYNC,
     async (job: Job<SyncJobPayload>) => {
+      if (!verifyJobPayload(job.data as unknown as Record<string, unknown>)) {
+        throw new Error("Invalid integration sync job signature")
+      }
       logger.log(
         `Processing sync job ${job.id} for integration ${job.data.integrationId}`,
       )
@@ -40,6 +57,7 @@ export function createSyncWorker(connection: Record<string, unknown>) {
         max: 10,
         duration: 3600 * 1000,
       },
+      ...idleWorkerOptions,
     },
   )
 
@@ -62,6 +80,9 @@ export function createDiscoveryWorker(connection: Record<string, unknown>) {
   discoveryWorker = new Worker<DiscoveryJobPayload>(
     INTEGRATION_QUEUES.DISCOVERY,
     async (job: Job<DiscoveryJobPayload>) => {
+      if (!verifyJobPayload(job.data as unknown as Record<string, unknown>)) {
+        throw new Error("Invalid integration discovery job signature")
+      }
       logger.log(
         `Processing discovery job ${job.id} for account ${job.data.externalAccountId}`,
       )
@@ -74,6 +95,7 @@ export function createDiscoveryWorker(connection: Record<string, unknown>) {
     {
       connection,
       concurrency: 1,
+      ...idleWorkerOptions,
     },
   )
 
