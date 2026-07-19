@@ -1,10 +1,19 @@
 # Current Status
 
-**Phase**: Publisher, customer, Super Admin, Finance, and Operations workbenches are implemented and verified locally. Financial and authorization hardening is CI-verified; marketplace taxonomy and Google metric migrations are current locally and on Neon. Google customer sign-in and the Northflank staging worker are verified; real GSC/GA4 connection and sync validation remain.
+**Phase**: Admin authentication and account suspension are hardened locally, and the additive suspension-lifecycle migration is current on Neon. The API/auth suites and repository checks pass; PR, CI, merge, and deployed Admin-login verification are the active release steps. Real GSC/GA4 connection and sync validation remain.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Admin Authentication And Suspension Hardening
+
+- Fixed the production login 500 caused by exhausted Redis request quota in the shared per-email limiter. Redis remains the cross-instance authority; a bounded local fallback preserves throttling and controlled 429 responses during provider/quota failures, with rate-limited warnings and periodic recovery attempts.
+- Added correlation IDs, structured completion/error logs, and Sentry capture to raw Better Auth routes without logging request bodies, credentials, emails, cookies, or tokens.
+- Aligned Admin login with the shared verified-session transport and made `/identity/me` the authoritative STAFF check. Login success now requires a real cookie round trip and matching session/user IDs, removing false-success redirects and blank/flickering dashboard loops.
+- Replaced the one-click ban toggle with an audited suspension lifecycle: structured reason, required private note, optional expiry, atomic session revocation, safe user messaging, Super Admin governance guards, and explicit restoration that requires a fresh login.
+- Applied `20260719210000_account_suspension_lifecycle` to the supplied Neon non-production database and verified all 39 migrations are current.
+- Validation: 87 API suites / 907 tests, 8 auth suites / 38 tests, all 12 typecheck targets, Admin/Portal/Publisher lint, Prisma generation/build, repository formatting/dependency checks, and focused auth/session/suspension regressions pass.
 
 ### Unified Public Authentication And Session Hardening
 

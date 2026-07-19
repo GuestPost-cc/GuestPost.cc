@@ -1,7 +1,7 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-07-17
+updated: 2026-07-19
 ---
 
 # Risks
@@ -58,6 +58,7 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 ### Critical / High that survived this batch
 
 - **URGENT — historical Render blueprint exposed a database credential.** The active `render.yml` uses Render secret prompts for `DATABASE_URL`, but an earlier committed Blueprint revision contained an inline Neon credential. Treat that credential as exposed: it was rotated in Neon during staging setup, and the new value must remain only in Render. Assess whether Git history/repository access needs containment before production. Do not copy the credential into tickets, logs, or Bedrock notes.
+- **Redis auth-limit capacity is exhausted in the current staging provider account.** The application now degrades to a bounded per-instance email limiter instead of returning authentication 500s or failing open, but the fallback is not cluster-global. Reset/upgrade the Redis request quota and add capacity alerts so normal cross-pod enforcement is restored before production traffic.
 - **Worker is local-only on free-tier staging.** The active Render Blueprint intentionally excludes `guestpost-worker` while the workspace is on free-tier testing. Queue-backed flows (email delivery, DNS/GSC verification, cancellation/settlement sweeps, payout jobs) require a local worker until Render worker capacity is available.
 - **Legacy listing metadata requires an owner review after the taxonomy migration.** The migration preserves existing category relationships and deliberately leaves the new placement-policy fields nullable instead of guessing commercial terms. Existing approved inventory can remain visible, but it will not match value-specific policy filters until a publisher or authorized platform staff member saves the reviewed language/categories/policy. Complete that review during the staging migration pass.
 - The historical 2026-06-15 platform audit has zero open production-blocker findings, but the deployment-secret exposure above is a separate current risk.

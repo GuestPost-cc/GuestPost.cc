@@ -5927,7 +5927,10 @@ export const UserScalarFieldEnum = {
   role: 'role',
   banned: 'banned',
   banReason: 'banReason',
+  banReasonCode: 'banReasonCode',
   banExpires: 'banExpires',
+  suspendedAt: 'suspendedAt',
+  suspendedByUserId: 'suspendedByUserId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -7230,6 +7233,20 @@ export type EnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaM
  * Reference to a field of type 'UserRole[]'
  */
 export type ListEnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserRole[]'>
+
+
+
+/**
+ * Reference to a field of type 'AccountSuspensionReason'
+ */
+export type EnumAccountSuspensionReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AccountSuspensionReason'>
+
+
+
+/**
+ * Reference to a field of type 'AccountSuspensionReason[]'
+ */
+export type ListEnumAccountSuspensionReasonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AccountSuspensionReason[]'>
 
 
 

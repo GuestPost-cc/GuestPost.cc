@@ -13,6 +13,17 @@ enum UserType {
   STAFF
 }
 
+enum AccountSuspensionReason {
+  SECURITY_RISK
+  FRAUD_OR_ABUSE
+  TERMS_VIOLATION
+  PAYMENT_RISK
+  COMPLIANCE
+  STAFF_ACCESS_REMOVAL
+  OTHER
+  LEGACY
+}
+
 enum CustomerRole {
   OWNER
   MEMBER
@@ -348,18 +359,21 @@ enum IntegrationSyncTrigger {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  name          String?
-  image         String?
-  userType      UserType  @default(CUSTOMER)
-  role          UserRole  @default(SEO_SPECIALIST)
-  banned        Boolean   @default(false)
-  banReason     String?
-  banExpires    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String                   @id @default(cuid())
+  email             String                   @unique
+  emailVerified     Boolean                  @default(false)
+  name              String?
+  image             String?
+  userType          UserType                 @default(CUSTOMER)
+  role              UserRole                 @default(SEO_SPECIALIST)
+  banned            Boolean                  @default(false)
+  banReason         String?
+  banReasonCode     AccountSuspensionReason?
+  banExpires        DateTime?
+  suspendedAt       DateTime?
+  suspendedByUserId String?
+  createdAt         DateTime                 @default(now())
+  updatedAt         DateTime                 @updatedAt
 
   memberships                   Membership[]
   publisherMemberships          PublisherMembership[]
@@ -382,8 +396,11 @@ model User {
   managedWebsites               Website[]              @relation("WebsiteManager")
   assignedTickets               Ticket[]               @relation("TicketAssignee")
   legalAcceptances              LegalAcceptance[]
+  suspendedBy                   User?                  @relation("UserSuspensionsIssued", fields: [suspendedByUserId], references: [id], onDelete: SetNull)
+  suspensionsIssued             User[]                 @relation("UserSuspensionsIssued")
 
   @@index([userType, banned])
+  @@index([suspendedByUserId])
 }
 
 model LegalAcceptance {

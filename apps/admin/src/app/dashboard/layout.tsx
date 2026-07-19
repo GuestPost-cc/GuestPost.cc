@@ -257,7 +257,19 @@ export default function DashboardLayout({
       </div>
     )
   }
-  if (!user) return null
+  if (!user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/20 px-6">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          <p className="text-sm font-medium">Returning to secure login…</p>
+          <p className="text-xs text-muted-foreground">
+            Your administrator session is unavailable or has expired.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const staff = user
   const role = staff.staffRole as StaffRole

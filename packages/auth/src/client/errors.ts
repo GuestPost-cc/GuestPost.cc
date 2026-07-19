@@ -54,6 +54,16 @@ export function mapBetterAuthError(
         recoverable: true,
         httpStatus: error.status ?? 403,
       }
+    case "ACCOUNT_SUSPENDED":
+    case "USER_BANNED":
+      return {
+        code: "ACCOUNT_SUSPENDED",
+        message:
+          error.message ??
+          "This account is suspended. Contact support if you believe this is a mistake.",
+        recoverable: true,
+        httpStatus: error.status ?? 403,
+      }
     case "ACCOUNT_LINKED":
       return {
         code: "ACCOUNT_LINKED",
@@ -155,6 +165,9 @@ export function getOAuthErrorMessage(code: string | null): string | null {
       return "This account is registered for a different portal. Open the correct portal or use another Google account."
     case "terms_required":
       return "Accept the current Terms of Service before creating an account."
+    case "account_suspended":
+    case "user_banned":
+      return "This account is suspended. Contact support if you believe this is a mistake."
     case "state_mismatch":
     case "state_not_found":
     case "invalid_state":

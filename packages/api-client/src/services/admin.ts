@@ -30,7 +30,46 @@ export interface AdminUserResponse {
   publisherRole: string | null
   staffRole: string | null
   banned: boolean
+  banReasonCode: AccountSuspensionReason | null
+  banExpires: string | null
+  suspendedAt: string | null
   createdAt: string
+}
+
+export type AccountSuspensionReason =
+  | "SECURITY_RISK"
+  | "FRAUD_OR_ABUSE"
+  | "TERMS_VIOLATION"
+  | "PAYMENT_RISK"
+  | "COMPLIANCE"
+  | "STAFF_ACCESS_REMOVAL"
+  | "OTHER"
+  | "LEGACY"
+
+export interface AccountSuspensionMutationResponse {
+  id: string
+  banned: boolean
+  banReasonCode?: AccountSuspensionReason | null
+  banExpires?: string | null
+  suspendedAt?: string | null
+  sessionsRevoked?: number
+}
+
+export interface AdminUserDetailResponse {
+  id: string
+  email: string
+  name: string | null
+  userType: string
+  staffRole: string | null
+  banned: boolean
+  banReasonCode: AccountSuspensionReason | null
+  banReason: string | null
+  banExpires: string | null
+  suspendedAt: string | null
+  suspendedBy: { id: string; name: string | null; email: string } | null
+  createdAt: string
+  organizations: Array<{ id: string; name: string; slug: string; role: string }>
+  publisher: { id: string; name: string; role: string } | null
 }
 
 export type MoneyByCurrency = Record<string, number>
@@ -40,6 +79,9 @@ export interface AdminStaffPerformanceItem {
   email: string
   name: string | null
   banned: boolean
+  banReasonCode: AccountSuspensionReason | null
+  banExpires: string | null
+  suspendedAt: string | null
   createdAt: string
   staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE" | null
   permissions: unknown
@@ -60,6 +102,8 @@ export interface AdminStaffPerformanceItem {
 export interface AdminStaffPerformanceResponse {
   summary: {
     totalStaff: number
+    activeStaff: number
+    suspendedStaff: number
     superAdmins: number
     operations: number
     finance: number
@@ -814,10 +858,31 @@ export class AdminService {
     )
   }
 
-  banUser(userId: string, banned: boolean) {
-    return this.client.patch(`/admin/users/${userId}/ban`, {
-      json: { banned },
-    })
+  getUser(userId: string) {
+    return this.client.get<AdminUserDetailResponse>(`/admin/users/${userId}`)
+  }
+
+  suspendUser(
+    userId: string,
+    data: {
+      reasonCode: Exclude<AccountSuspensionReason, "LEGACY">
+      internalNote: string
+      expiresAt?: string
+    },
+  ) {
+    return this.client.post<AccountSuspensionMutationResponse>(
+      `/admin/users/${userId}/suspension`,
+      { json: data },
+    )
+  }
+
+  restoreUser(userId: string, internalNote: string) {
+    return this.client.post<AccountSuspensionMutationResponse>(
+      `/admin/users/${userId}/suspension/restore`,
+      {
+        json: { internalNote },
+      },
+    )
   }
 
   updateUserRole(userId: string, role: string) {

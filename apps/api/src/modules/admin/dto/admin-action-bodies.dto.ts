@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsEnum,
   IsIn,
@@ -54,9 +55,43 @@ export class UpdateUserRoleDto {
   role!: CustomerRoleValue | PublisherRoleValue | StaffRoleValue
 }
 
-export class BanUserDto {
-  @IsBoolean()
-  banned!: boolean
+export const ACCOUNT_SUSPENSION_REASONS = [
+  "SECURITY_RISK",
+  "FRAUD_OR_ABUSE",
+  "TERMS_VIOLATION",
+  "PAYMENT_RISK",
+  "COMPLIANCE",
+  "STAFF_ACCESS_REMOVAL",
+  "OTHER",
+] as const
+
+export type AccountSuspensionReasonValue =
+  (typeof ACCOUNT_SUSPENSION_REASONS)[number]
+
+export class SuspendUserDto {
+  @IsString()
+  @IsIn(ACCOUNT_SUSPENSION_REASONS as unknown as string[])
+  reasonCode!: AccountSuspensionReasonValue
+
+  @IsString()
+  @MinLength(10, {
+    message: "Internal note must be at least 10 characters for audit clarity",
+  })
+  @MaxLength(2_000)
+  internalNote!: string
+
+  @IsOptional()
+  @IsDateString({ strict: true })
+  expiresAt?: string
+}
+
+export class RestoreUserDto {
+  @IsString()
+  @MinLength(10, {
+    message: "Restore note must be at least 10 characters for audit clarity",
+  })
+  @MaxLength(2_000)
+  internalNote!: string
 }
 
 export class UpdateStaffRoleDto {

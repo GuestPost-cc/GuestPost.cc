@@ -35,25 +35,42 @@ export async function signIn(input: {
 
   const session = await serverGetSession()
 
+  // Never report a successful login until the browser cookie has been
+  // round-tripped through the authoritative session endpoint. This prevents
+  // the UI from redirecting to a dashboard with a missing/rejected cookie and
+  // entering the login ↔ dashboard flicker seen in production.
+  if (
+    !session.session ||
+    !session.user ||
+    session.session.userId !== data.user.id ||
+    session.user.id !== data.user.id
+  ) {
+    throw {
+      code: "SESSION_ESTABLISHMENT_FAILED",
+      message:
+        "Your credentials were accepted, but a secure session could not be established. Please try again.",
+      recoverable: true,
+      httpStatus: 503,
+    } as AuthError
+  }
+
   const user: AuthenticatedUser = {
     id: data.user.id,
     email: data.user.email as string,
     emailVerified: data.user.emailVerified ?? false,
     name: data.user.name ?? null,
     image: null,
-    userType: session.user?.userType,
-    banned: (data.user as any).banned ?? false,
+    userType: session.user.userType,
+    banned: session.user.banned ?? false,
   }
 
   return {
     status: "authenticated",
-    session: session.session
-      ? {
-          id: session.session.id,
-          userId: session.session.userId,
-          expiresAt: session.session.expiresAt,
-        }
-      : { id: "", userId: user.id, expiresAt: new Date() },
+    session: {
+      id: session.session.id,
+      userId: session.session.userId,
+      expiresAt: session.session.expiresAt,
+    },
     user,
   }
 }

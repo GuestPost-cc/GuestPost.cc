@@ -227,6 +227,48 @@ describe("emailRateLimitPlugin", () => {
       expect(dumped).not.toContain("alice@example.com")
       expect(dumped).not.toContain("alice")
     })
+
+    it("falls back to a bounded local counter when Redis is unavailable", async () => {
+      const redis = {
+        incr: jest.fn(async () => {
+          throw new Error("provider quota exhausted")
+        }),
+        pexpire: jest.fn(),
+      }
+      const logger = { info: jest.fn(), warn: jest.fn() }
+      const plugin = emailRateLimitPlugin(
+        makeOpts({
+          redis: redis as any,
+          logger,
+          limits: { signIn: 2, signUp: 2, magicLink: 2, resetPassword: 2 },
+        }),
+      )
+
+      const first = await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
+      const second = await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
+      const third = await runHook(plugin, "/sign-in/email", {
+        body: { email: "alice@example.com" },
+      })
+
+      expect(first).toBeUndefined()
+      expect(second).toBeUndefined()
+      expect(third?.status).toBe(429)
+      // Circuit-breaker cooldown avoids hammering a failed/quota-exhausted
+      // Redis service on every auth request.
+      expect(redis.incr).toHaveBeenCalledTimes(1)
+      expect(logger.warn).toHaveBeenCalledTimes(1)
+      expect(logger.info).toHaveBeenCalledWith(
+        "auth email rate limit triggered",
+        expect.objectContaining({ source: "local", count: 3, limit: 2 }),
+      )
+      expect(JSON.stringify(logger.warn.mock.calls)).not.toContain(
+        "alice@example.com",
+      )
+    })
   })
 
   describe("email normalization (regression — copy-paste robustness)", () => {
