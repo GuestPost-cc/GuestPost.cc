@@ -1,8 +1,8 @@
 import Redis from "ioredis"
 
 const REDIS_URL =
-  process.env.QUEUE_REDIS_URL ??
-  process.env.REDIS_URL ??
+  process.env.QUEUE_REDIS_URL?.trim() ||
+  process.env.REDIS_URL?.trim() ||
   "redis://localhost:6379"
 
 // Phase A2 — added connectTimeout + retryStrategy so a Redis outage surfaces

@@ -21,7 +21,7 @@ export function validateEnv(): void {
   for (const key of REQUIRED) {
     if (!process.env[key]) missing.push(key)
   }
-  if (!process.env.QUEUE_REDIS_URL && !process.env.REDIS_URL) {
+  if (!process.env.QUEUE_REDIS_URL?.trim() && !process.env.REDIS_URL?.trim()) {
     missing.push("QUEUE_REDIS_URL (or REDIS_URL fallback)")
   }
   if (missing.length > 0) {

@@ -32,6 +32,13 @@ describe("integration Redis connection", () => {
     )
   })
 
+  it("treats a blank QUEUE_REDIS_URL as unset", () => {
+    process.env.QUEUE_REDIS_URL = "   "
+    process.env.REDIS_URL = "redis://api-cache.internal:6379"
+
+    expect(resolveIntegrationRedisConnection()).toBe(process.env.REDIS_URL)
+  })
+
   it("falls back to REDIS_HOST and REDIS_PORT", () => {
     process.env.REDIS_HOST = "redis.internal"
     process.env.REDIS_PORT = "6380"

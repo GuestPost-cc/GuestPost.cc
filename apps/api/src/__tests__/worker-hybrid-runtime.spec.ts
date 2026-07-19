@@ -41,6 +41,22 @@ describe("hybrid worker runtime contract", () => {
       expect(source).toContain("QUEUE_REDIS_URL")
       expect(source).toContain("REDIS_URL")
     }
+    expect(read("apps/api/src/common/redis-client.ts")).toContain(
+      "process.env.QUEUE_REDIS_URL?.trim() ||",
+    )
+    expect(read("apps/worker/src/redis.ts")).toContain(
+      "process.env.QUEUE_REDIS_URL?.trim() ||",
+    )
+    expect(read("packages/integrations/src/redis.ts")).toContain(
+      "process.env.QUEUE_REDIS_URL?.trim() ||",
+    )
+  })
+
+  it("uses valid Dockerfile shell-form healthcheck syntax", () => {
+    const source = read("apps/worker/Dockerfile")
+    expect(source).toContain("HEALTHCHECK --interval=30s")
+    expect(source).toContain("  CMD if [")
+    expect(source).not.toContain("CMD-SHELL")
   })
 
   it("keeps payout webhook acknowledgement on Postgres, not BullMQ", () => {

@@ -29,4 +29,4 @@ COPY --from=builder /repo .
 # selects the runtime; see docs/WORKER_ARCHITECTURE.md.
 CMD ["node", "apps/worker/dist/index.js"]
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
-  CMD-SHELL if [ "$WORKER_MODE" = "scheduled" ] || [ "$WORKER_MODE" = "on-demand" ]; then exit 0; else wget -qO- "http://localhost:${WORKER_HEALTH_PORT:-3004}/health" || exit 1; fi
+  CMD if [ "$WORKER_MODE" = "scheduled" ] || [ "$WORKER_MODE" = "on-demand" ]; then exit 0; else wget -qO- "http://localhost:${WORKER_HEALTH_PORT:-3004}/health" || exit 1; fi
