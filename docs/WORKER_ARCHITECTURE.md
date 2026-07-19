@@ -205,6 +205,12 @@ Lane-specific:
 - API: `WORKER_ON_DEMAND_TRIGGER_URL` and
   `WORKER_ON_DEMAND_TRIGGER_TOKEN` for immediate burst processing
 
+The integration worker package is loaded lazily only in `on-demand` and legacy
+`all` modes. This is a security boundary, not just a startup optimization:
+`realtime` and `scheduled` must boot without `INTEGRATION_ENCRYPTION_KEY` or
+Google OAuth credentials. CI has a lane-boundary contract test to prevent a
+future eager import from silently broadening those workloads' secret access.
+
 Do not reuse database, Redis, queue-signing, webhook, encryption, or Northflank
 trigger credentials. Put each in Northflank secret storage and rotate them
 independently.
