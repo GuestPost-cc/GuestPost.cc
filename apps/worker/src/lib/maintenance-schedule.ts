@@ -27,9 +27,13 @@ export function maintenanceTasksDueAt(now: Date): MaintenanceTaskName[] {
     throw new Error("A valid dispatch timestamp is required")
   }
 
-  const minute = now.getUTCMinutes()
-  const hour = now.getUTCHours()
-  const day = now.getUTCDate()
+  // A cold start may begin after the nominal cron minute. Resolve against the
+  // current five-minute slot so a delayed 12:10 run does not become a no-op at
+  // 12:11. BullMQ task IDs still prevent a duplicate run in the same slot.
+  const slot = new Date(Math.floor(now.getTime() / 300_000) * 300_000)
+  const minute = slot.getUTCMinutes()
+  const hour = slot.getUTCHours()
+  const day = slot.getUTCDate()
   const tasks: MaintenanceTaskName[] = []
 
   if (minute % 10 === 0) tasks.push("payout-reconcile")

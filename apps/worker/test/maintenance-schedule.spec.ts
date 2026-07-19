@@ -19,6 +19,14 @@ test("dispatches the ten and fifteen minute safety tasks", () => {
   ])
 })
 
+test("uses the intended five-minute slot when a cold start is delayed", () => {
+  assert.deepEqual(at("2026-07-20T12:12:59Z"), [
+    "payout-reconcile",
+    "acceptance-timeouts",
+    "auto-accept",
+  ])
+})
+
 test("dispatches hourly tasks only in their UTC slot", () => {
   assert.deepEqual(at("2026-07-20T12:20:00Z"), [
     "payout-reconcile",
