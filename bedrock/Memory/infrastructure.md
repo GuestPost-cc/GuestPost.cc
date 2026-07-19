@@ -50,9 +50,12 @@ The worker has four explicit runtime modes. `all` remains the safe default for
 local development and rollback; `realtime` runs only email, notification,
 requested website verification, and requested delivery verification;
 `on-demand` drains burst queues and the PostgreSQL payout-webhook inbox before
-exiting; `scheduled` executes exactly one allowlisted maintenance task and then
-exits. Northflank must configure the non-default mode explicitly, and scheduled
-jobs must use a forbid-concurrency policy.
+exiting; `scheduled` executes either one allowlisted maintenance task or the
+deterministic five-minute maintenance dispatcher and then exits. Northflank
+must configure the non-default mode explicitly, and scheduled jobs must use a
+forbid-concurrency policy. Because free projects allow only two jobs, the
+deployment uses one API-triggerable on-demand job with a ten-minute catch-up
+schedule and one five-minute maintenance dispatcher.
 
 Queue traffic can be isolated through `QUEUE_REDIS_URL`, with `REDIS_URL` kept
 as a compatibility fallback. BullMQ's worker drain delay and stalled-job scan

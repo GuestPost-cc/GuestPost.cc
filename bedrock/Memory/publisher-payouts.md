@@ -70,11 +70,11 @@ recording a partial completion.
 
 ### Status Poller
 
-Northflank runs the allowlisted `payout-reconcile` scheduled task every 10
-minutes. It drains the PostgreSQL webhook inbox first, then polls PROCESSING
-executions. The task payload remains HMAC-signed and the one-shot worker exits
-after completion. Legacy BullMQ repeatables remain available only in `all`
-mode for rollout and rollback compatibility.
+Northflank's five-minute maintenance dispatcher invokes the allowlisted
+`payout-reconcile` task every 10 minutes. It drains the PostgreSQL webhook inbox
+first, then polls PROCESSING executions. The task payload remains HMAC-signed
+and the one-shot worker exits after completion. Legacy BullMQ repeatables
+remain available only in `all` mode for rollout and rollback compatibility.
 
 ## Key Models
 
