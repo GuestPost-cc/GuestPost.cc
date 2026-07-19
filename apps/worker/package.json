@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/index.ts",
     "build": "tsc",
-    "test": "tsx --test test/**/*.spec.ts",
+    "test": "tsx --test test/*.spec.ts",
     "start": "node dist/index.js",
     "start:realtime": "WORKER_MODE=realtime node dist/index.js",
     "start:on-demand": "WORKER_MODE=on-demand node dist/index.js",
