@@ -15,10 +15,16 @@ if (process.env.NODE_ENV === "development") {
 import "./instrument"
 import { createAuth, toNodeHandler } from "@guestpost/auth"
 import { QUEUES } from "@guestpost/shared"
+import {
+  generateRequestId,
+  isValidRequestId,
+  runWithRequestId,
+} from "@guestpost/shared/dist/observability/request-context"
 import { createLogger } from "@guestpost/shared/dist/observability/structured-logger"
 import { ValidationPipe } from "@nestjs/common"
 import { NestFactory } from "@nestjs/core"
 import { ExpressAdapter } from "@nestjs/platform-express"
+import * as Sentry from "@sentry/node"
 import { Queue } from "bullmq"
 import cookieParser from "cookie-parser"
 import cors from "cors"
@@ -601,6 +607,47 @@ async function bootstrap() {
     },
   })
   // Better Auth handler must be before body parsers so it can read raw bodies
+  // and therefore sits outside Nest's global middleware/filter pipeline.
+  // Establish the same request-correlation and 5xx visibility guarantees here
+  // without ever logging credentials or request bodies.
+  server.use("/api/v1/auth", (req, res, next) => {
+    const incoming = req.headers["x-request-id"]
+    const candidate = Array.isArray(incoming) ? incoming[0] : incoming
+    const requestId = isValidRequestId(candidate)
+      ? candidate
+      : generateRequestId()
+    const startedAt = Date.now()
+    const portalHeader = req.headers["x-portal-type"]
+    const portal =
+      typeof portalHeader === "string" &&
+      ["customer", "publisher", "staff"].includes(portalHeader)
+        ? portalHeader
+        : "unknown"
+
+    res.setHeader("X-Request-ID", requestId)
+    ;(req as express.Request & { requestId?: string }).requestId = requestId
+    res.on("finish", () => {
+      const context = {
+        method: req.method,
+        path: req.path,
+        statusCode: res.statusCode,
+        portal,
+        durationMs: Date.now() - startedAt,
+      }
+      if (res.statusCode >= 500) {
+        authLogger.error("auth request failed", context)
+        Sentry.withScope((scope) => {
+          scope.setTag("requestId", requestId)
+          scope.setTag("auth.portal", portal)
+          scope.setContext("authRequest", context)
+          Sentry.captureMessage("Better Auth request returned 5xx", "error")
+        })
+      } else {
+        authLogger.info("auth request completed", context)
+      }
+    })
+    runWithRequestId(requestId, next)
+  })
   server.use("/api/v1/auth", toNodeHandler(authWithRateLimit))
   authLogger.info("Better Auth mounted")
 

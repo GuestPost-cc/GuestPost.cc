@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  getErrorMessage,
   signIn as signInTransport,
   signOut as signOutTransport,
 } from "@guestpost/auth/client"
@@ -40,7 +41,8 @@ type User = {
 interface AuthContextValue {
   user: User | null
   loading: boolean
-  signIn: (email: string, password: string) => Promise<void>
+  sessionError: string | null
+  signIn: (email: string, password: string) => Promise<User>
   signOut: () => Promise<void>
 }
 
@@ -49,25 +51,44 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [sessionError, setSessionError] = useState<string | null>(null)
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<User | null> => {
     try {
       const res = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
         credentials: "include",
+        cache: "no-store",
       })
       if (res.ok) {
-        const me = await res.json()
+        const me = (await res.json()) as User
         if (me.userType !== "STAFF") {
           setUser(null)
-          return
+          setSessionError(
+            "This portal is for staff only. Sign in with a staff account.",
+          )
+          return null
         }
         setUser(me)
-        return
+        setSessionError(null)
+        return me
+      }
+      if (res.status === 403) {
+        const body = await res.json().catch(() => null)
+        const message =
+          body?.code === "ACCOUNT_SUSPENDED" ||
+          /suspend|banned/i.test(body?.message ?? "")
+            ? "This administrator account is suspended. Contact a Super Admin if you believe this is a mistake."
+            : "Your administrator session is not authorized. Sign in again."
+        setSessionError(message)
       }
     } catch (e) {
       console.error("Session refresh failed:", e)
+      setSessionError(
+        "We could not verify your administrator session. Please try again.",
+      )
     }
     setUser(null)
+    return null
   }, [])
 
   useEffect(() => {
@@ -91,21 +112,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user])
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<User> => {
     setLoading(true)
+    setSessionError(null)
     try {
       await signInTransport({ email, password, portal: "staff" })
-      const meRes = await fetch(`${getBaseUrl()}/api/v1/identity/me`, {
-        credentials: "include",
-      })
-      const me = await meRes.json()
-      if (me.userType !== "STAFF") {
+      const me = await refresh()
+      if (!me) {
         throw new Error(
-          "This portal is for staff only. Please sign in at the correct portal.",
+          "Your administrator session could not be established. Please sign in again.",
         )
       }
-      setUser(me)
-      window.location.reload()
+      return me
+    } catch (error) {
+      setSessionError(getErrorMessage(error))
+      throw error
     } finally {
       setLoading(false)
     }
@@ -114,10 +135,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await signOutTransport()
     setUser(null)
+    setSessionError(null)
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{ user, loading, sessionError, signIn, signOut }}
+    >
       {children}
     </AuthContext.Provider>
   )

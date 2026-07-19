@@ -29,7 +29,7 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 
 ## AuthGuard Caching
 
-30s per-instance TTL cache (`common/auth-context-cache.ts`, 10K-entry cap). Session still verified every request. Explicit invalidation on context switch, membership invite/remove, role changes. `PermissionsGuard` (decrypt) deliberately uncached.
+30s per-instance TTL cache (`common/auth-context-cache.ts`, 10K-entry cap). Session still verified every request, and Better Auth's `user.banned` signal is checked before the derived-context cache so a suspension cannot retain cached access. Explicit invalidation occurs on context switch, membership invite/remove, role changes, suspension, and restoration. `PermissionsGuard` (decrypt) deliberately uncached.
 
 ## Mutation Security (2026-07-16)
 
@@ -67,6 +67,15 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 - The unused secret created on 2026-07-19 remains enabled but its value is not
   recoverable from Google Cloud. Disable and delete that unused secret after
   explicit cleanup approval; the working secret must remain enabled.
+
+## Account Suspension Lifecycle (2026-07-19)
+
+- `User.banned` remains the compatibility/enforcement flag, with structured `banReasonCode`, private `banReason`, `suspendedAt`, `banExpires`, and `suspendedByUserId` metadata. The reason, note, and actor are exposed only through a Super Admin endpoint; clients receive only a safe suspended-account message.
+- Only Super Admin can suspend or restore an account. Suspension and deletion of every Better Auth `Session` row occur in one serializable transaction with an audit record. Restoration clears suspension metadata but deliberately requires a fresh login.
+- Self-suspension, suspension of the final active Super Admin, and suspension of an Operations user with active fulfillment assignments fail closed. Concurrent suspension changes return a retryable conflict instead of silently overwriting state.
+- Email and Google session creation both reject active suspensions. Expired temporary suspensions are atomically restored at the auth boundary, audited as `USER_SUSPENSION_EXPIRED`, and do not restore any old session.
+- Admin login uses the same hardened shared auth transport as customer/publisher email login, then treats `GET /identity/me` as the authoritative STAFF check. A login is not reported as successful until the new cookie round-trips through the session endpoint and the verified staff identity is returned.
+- The per-email limiter remains Redis-backed across pods. During Redis quota exhaustion or provider failure it enters a bounded local fallback with the same limits and 429 response, logs a rate-limited warning, and periodically retries Redis rather than turning authentication into HTTP 500 or failing open.
 
 ## Key Models
 
@@ -112,7 +121,7 @@ Decoupled from auth provider (Better-Auth). Stores which org/publisher the user 
 - The marketing site has one `/login` and one `/signup`, each with Customer/Publisher tabs. All public signup CTAs route through the website; login, signup, Google OAuth, Terms, forgot-password, and reset-password share the platform auth design.
 - `apps/portal/src/app/page.tsx` remains the direct CUSTOMER-only login and `apps/publisher/src/app/page.tsx` remains the direct PUBLISHER-only login. Each has a separate explicit signup page and sends a wrong-account user to the correct dashboard.
 - Valid shared sessions route to the account's actual dashboard. Safe `returnTo` paths are relative-only; dashboard layouts redirect unauthenticated users instead of rendering a permanent blank screen.
-- Admin keeps its separate login page and STAFF-only audience validation.
+- Admin keeps its separate login page and STAFF-only audience validation, but shares the hardened email transport, verified-session round trip, safe errors, cookie policy, password recovery, and session-expiry behavior.
 
 ## Auth Input Validation (2026-07-16)
 

@@ -141,7 +141,10 @@ async function resolveAuthAudience(ctx: any): Promise<AuthAudience | null> {
   if (fromOAuthState) return fromOAuthState
 
   const request = ctx?.request
-  const headers = request?.headers
+  // Better Auth route middleware exposes request.headers, while database
+  // hooks expose ctx.headers directly. Read both so portal enforcement cannot
+  // disappear when the same request crosses the adapter boundary.
+  const headers = ctx?.headers ?? request?.headers
   const headerValue =
     headers?.get?.("x-portal-type") ?? headers?.["x-portal-type"]
   const fromHeader = normalizeAuthAudience(headerValue)
@@ -170,9 +173,55 @@ async function resolveAuthAudience(ctx: any): Promise<AuthAudience | null> {
 }
 
 function readHeader(ctx: any, name: string): string | null {
-  const headers = ctx?.request?.headers
+  const headers = ctx?.headers ?? ctx?.request?.headers
   const value = headers?.get?.(name) ?? headers?.[name]
   return typeof value === "string" && value.trim() ? value.trim() : null
+}
+
+async function isAccountSuspended(
+  user: {
+    id: string
+    banned: boolean
+    banExpires: Date | null
+  },
+  onRestored?: (userId: string) => void,
+): Promise<boolean> {
+  if (!user.banned) return false
+  if (!user.banExpires || user.banExpires.getTime() > Date.now()) return true
+
+  // Expired temporary suspensions are restored atomically at the first auth
+  // boundary. No session is resurrected; the user must complete a fresh login.
+  await prisma.$transaction(async (tx) => {
+    const restored = await tx.user.updateMany({
+      where: {
+        id: user.id,
+        banned: true,
+        banExpires: { lte: new Date() },
+      },
+      data: {
+        banned: false,
+        banReason: null,
+        banReasonCode: null,
+        banExpires: null,
+        suspendedAt: null,
+        suspendedByUserId: null,
+      },
+    })
+    if (restored.count > 0) {
+      await tx.auditLog.create({
+        data: {
+          action: "USER_SUSPENSION_EXPIRED",
+          entityType: "User",
+          entityId: user.id,
+          metadata: { userId: user.id, source: "AUTH_BOUNDARY" },
+          userId: null,
+          organizationId: null,
+        },
+      })
+    }
+  })
+  onRestored?.(user.id)
+  return false
 }
 
 function rememberSignupConsent(ctx: any, consent: SignupConsent): void {
@@ -466,6 +515,14 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
           defaultValue: "CUSTOMER",
           input: false,
         },
+        // Safe, non-sensitive account state used only as a defensive client
+        // guard. Suspension notes, actor, and reason codes are never exposed.
+        banned: {
+          type: "boolean",
+          required: true,
+          defaultValue: false,
+          input: false,
+        },
       },
     },
     // 8-hour rolling session with a 30-minute refresh cadence. The API adds
@@ -544,11 +601,9 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
         create: {
           before: async (session: any, ctx: any) => {
             const audience = await resolveAuthAudience(ctx)
-            if (!audience) return { data: session }
-
             const user = await prisma.user.findUnique({
               where: { id: session.userId },
-              select: { userType: true },
+              select: { userType: true, banned: true, banExpires: true },
             })
             if (!user) {
               throw APIError.from("UNAUTHORIZED", {
@@ -556,10 +611,23 @@ export function buildAuthOptions(opts: AuthFactoryOptions = {}) {
                 message: "Account not found.",
               })
             }
-            if (user.userType !== userTypeForAudience(audience)) {
+            if (audience && user.userType !== userTypeForAudience(audience)) {
               throw APIError.from("FORBIDDEN", {
                 code: "WRONG_PORTAL",
                 message: wrongPortalMessage(user.userType),
+              })
+            }
+            if (
+              await isAccountSuspended(
+                { id: session.userId, ...user },
+                opts.invalidateAuthContext,
+              )
+            ) {
+              throw APIError.from("FORBIDDEN", {
+                code: "ACCOUNT_SUSPENDED",
+                message: user.banExpires
+                  ? `This account is suspended until ${user.banExpires.toISOString()}. Contact support if you believe this is a mistake.`
+                  : "This account is suspended. Contact support if you believe this is a mistake.",
               })
             }
             return { data: session }

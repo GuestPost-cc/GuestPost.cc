@@ -1,12 +1,7 @@
 "use client"
 
 import { sanitizeReturnTo } from "@guestpost/api-client"
-import type { AuthError } from "@guestpost/auth"
-import {
-  getErrorMessage,
-  getSession as serverGetSession,
-  signIn as signInTransport,
-} from "@guestpost/auth/client"
+import { getErrorMessage } from "@guestpost/auth/client"
 import {
   AuthCard,
   AuthLayout,
@@ -15,6 +10,7 @@ import {
 } from "@guestpost/ui"
 import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useState } from "react"
+import { useAuth } from "../lib/auth"
 
 export default function LoginPage() {
   return (
@@ -28,8 +24,8 @@ function LoginPageInner() {
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [initialCheck, setInitialCheck] = useState(true)
-  const { expired, reason, dismiss } = useSessionExpired()
+  const { expired, reason } = useSessionExpired()
+  const { user, loading: sessionLoading, sessionError, signIn } = useAuth()
 
   const safeReturnTo = (() => {
     const raw = searchParams.get("returnTo")
@@ -37,46 +33,17 @@ function LoginPageInner() {
   })()
 
   useEffect(() => {
-    // Check if already signed in as staff
-    async function checkSession() {
-      try {
-        const sessionResult = await serverGetSession()
-        if (sessionResult?.user?.userType === "STAFF") {
-          // Hard navigation — router.push() leaves the Next.js layout with
-          // stale session state and can bounce back to the login page.
-          window.location.href = safeReturnTo
-          return
-        }
-      } catch {
-        // ignore
-      }
-      setInitialCheck(false)
+    if (!sessionLoading && user?.userType === "STAFF") {
+      window.location.replace(safeReturnTo)
     }
-    checkSession()
-  }, [safeReturnTo])
+  }, [safeReturnTo, sessionLoading, user])
 
   const handleSignIn = async (data: { email: string; password: string }) => {
     setError(null)
     setLoading(true)
     try {
-      const result = await signInTransport({ ...data, portal: "staff" })
-      if (result.status === "mfa_required") {
-        throw {
-          code: "MFA_REQUIRED",
-          message: "Multi-factor authentication is required.",
-          recoverable: true,
-        } as AuthError
-      }
-      const session = await serverGetSession()
-      if (session.user?.userType !== "STAFF") {
-        throw {
-          code: "WRONG_AUDIENCE",
-          message:
-            "This portal is for staff only. Please sign in at the correct portal.",
-          recoverable: true,
-        } as AuthError
-      }
-      window.location.href = safeReturnTo
+      await signIn(data.email, data.password)
+      window.location.replace(safeReturnTo)
     } catch (err: unknown) {
       setError(getErrorMessage(err))
     } finally {
@@ -84,7 +51,7 @@ function LoginPageInner() {
     }
   }
 
-  if (initialCheck) {
+  if (sessionLoading || user) {
     return (
       <AuthLayout>
         <div className="animate-pulse text-zinc-500">Loading...</div>
@@ -111,7 +78,7 @@ function LoginPageInner() {
         <LoginForm
           onSubmit={handleSignIn}
           loading={loading}
-          error={error ?? undefined}
+          error={error ?? sessionError ?? undefined}
           forgotPasswordHref="/forgot-password"
           submitLabel="Open admin dashboard"
         />

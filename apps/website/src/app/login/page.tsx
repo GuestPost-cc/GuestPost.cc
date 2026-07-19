@@ -54,6 +54,12 @@ function LoginContent() {
 
   useEffect(() => {
     if (sessionLoading || !user) return
+    if (user.banned) {
+      setError(
+        "This account is suspended. Contact support if you believe this is a mistake.",
+      )
+      return
+    }
     if (user.userType === "CUSTOMER") {
       window.location.replace(destination("customer", returnTo))
     } else if (user.userType === "PUBLISHER") {

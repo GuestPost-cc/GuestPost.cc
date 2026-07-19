@@ -12,6 +12,8 @@ export type {
 export type { ApiClientConfig, RequestOptions } from "./client"
 export { ApiError, HttpClient } from "./client"
 export type {
+  AccountSuspensionMutationResponse,
+  AccountSuspensionReason,
   AdminCancellationRequestResponse,
   AdminCommandCenterAction,
   AdminCommandCenterActionType,
@@ -36,6 +38,7 @@ export type {
   AdminSettlementResponse,
   AdminStaffPerformanceItem,
   AdminStaffPerformanceResponse,
+  AdminUserDetailResponse,
   AdminUserResponse,
   AdminWithdrawalResponse,
   OperationsInboxOrder,

@@ -36,7 +36,7 @@ Open/partial items require architectural design discussion.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 876 unit tests + integration tests
+- **apps/api** — NestJS REST API, 907 unit tests + integration tests
 - **apps/worker** — BullMQ queue processor
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard
@@ -52,6 +52,8 @@ Open/partial items require architectural design discussion.
 - Controllers are thin; business logic lives in dedicated services
 - Stripe webhook timestamp validation via shared `assertWebhookTimestampFresh`
 - Redis pub/sub for cross-pod auth context invalidation
+- Account suspension is an audited lifecycle rather than a boolean toggle: Super Admin records a reason and internal note, every database session is revoked atomically, temporary expiry restores eligibility but never resurrects a session, and the final active Super Admin or an Operations user with active assignments cannot be suspended.
+- Per-email auth throttling uses Redis for cross-instance enforcement and a bounded per-instance fallback during Redis quota/provider failures. The fallback preserves throttling and avoids login 500s, but restoring healthy Redis remains an operational requirement for cluster-wide limits.
 - Wallet credits have no direct HTTP or API-client mutation surface. Customer
   funding is accepted only through Stripe checkout/webhook verification;
   seed, integration, concurrency, and load setup use test-only Prisma helpers

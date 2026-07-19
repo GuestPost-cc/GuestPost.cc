@@ -18,8 +18,17 @@ export interface EmailRateLimitOptions {
    */
   logger?: {
     info: (msg: string, meta?: Record<string, unknown>) => void
+    warn?: (msg: string, meta?: Record<string, unknown>) => void
   }
 }
+
+interface LocalCounter {
+  count: number
+  expiresAt: number
+}
+
+const REDIS_RETRY_COOLDOWN_MS = 30_000
+const MAX_LOCAL_COUNTERS = 20_000
 
 // Verified against Better Auth 1.6.14 source during Phase 7.8 pre-impl
 // (dist/api/routes/sign-in.mjs:143, sign-up.mjs:21, password.mjs:20 and
@@ -62,6 +71,59 @@ function rateLimitResponse(retryAfterSec: number): Response {
 
 export function emailRateLimitPlugin(opts: EmailRateLimitOptions) {
   const windowSec = Math.ceil(opts.windowMs / 1000)
+  // Redis is the authoritative, cross-instance store. The bounded local map
+  // is a security-preserving degradation path for provider outages and quota
+  // exhaustion: requests remain email-rate-limited instead of turning every
+  // login into a 500 or silently disabling the second protection layer.
+  const localCounters = new Map<string, LocalCounter>()
+  let redisRetryAt = 0
+  let lastRedisWarningAt = 0
+
+  function incrementLocal(key: string, now: number): number {
+    const current = localCounters.get(key)
+    if (!current || current.expiresAt <= now) {
+      if (localCounters.size >= MAX_LOCAL_COUNTERS) {
+        for (const [candidate, counter] of localCounters) {
+          if (
+            counter.expiresAt <= now ||
+            localCounters.size >= MAX_LOCAL_COUNTERS
+          ) {
+            localCounters.delete(candidate)
+          }
+          if (localCounters.size < MAX_LOCAL_COUNTERS) break
+        }
+      }
+      localCounters.set(key, { count: 1, expiresAt: now + opts.windowMs })
+      return 1
+    }
+    current.count += 1
+    return current.count
+  }
+
+  async function increment(
+    key: string,
+  ): Promise<{ count: number; source: "redis" | "local" }> {
+    const now = Date.now()
+    if (now >= redisRetryAt) {
+      try {
+        const count = await opts.redis.incr(key)
+        if (count === 1) await opts.redis.pexpire(key, opts.windowMs)
+        redisRetryAt = 0
+        return { count, source: "redis" }
+      } catch (error) {
+        redisRetryAt = now + REDIS_RETRY_COOLDOWN_MS
+        if (now - lastRedisWarningAt >= REDIS_RETRY_COOLDOWN_MS) {
+          lastRedisWarningAt = now
+          opts.logger?.warn?.("auth email rate limit using local fallback", {
+            errorName: error instanceof Error ? error.name : "UnknownError",
+            retryInMs: REDIS_RETRY_COOLDOWN_MS,
+          })
+        }
+      }
+    }
+    return { count: incrementLocal(key, now), source: "local" }
+  }
+
   return {
     id: "email-rate-limit",
     hooks: {
@@ -74,16 +136,14 @@ export function emailRateLimitPlugin(opts: EmailRateLimitOptions) {
           if (!email) return
           const limit = opts.limits[key]
           const redisKey = `auth-rl:${prefix}:${hashEmail(email)}`
-          const count = await opts.redis.incr(redisKey)
-          if (count === 1) {
-            await opts.redis.pexpire(redisKey, opts.windowMs)
-          }
+          const { count, source } = await increment(redisKey)
           if (count > limit) {
             opts.logger?.info("auth email rate limit triggered", {
               emailHash: hashEmail(email),
               endpoint: prefix,
               count,
               limit,
+              source,
             })
             return rateLimitResponse(windowSec)
           }

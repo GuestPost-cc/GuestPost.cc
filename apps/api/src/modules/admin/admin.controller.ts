@@ -54,7 +54,6 @@ import { SupportActor, SupportService } from "../support/support.service"
 import { AdminService } from "./admin.service"
 import { CommandCenterService } from "./command-center.service"
 import {
-  BanUserDto,
   BulkRetryVerificationDto,
   CreateStaffDto,
   ExecuteWithdrawalDto,
@@ -66,8 +65,10 @@ import {
   RejectVerificationDto,
   RequestReverifyDto,
   ResolveDisputeDto,
+  RestoreUserDto,
   ReverseWithdrawalDto,
   SubmitPlatformContentDto,
+  SuspendUserDto,
   ToggleListingFeaturedDto,
   ToggleListingVerifiedDto,
   UpdateListingStatusDto,
@@ -354,14 +355,24 @@ export class AdminController {
     return this.admin.updateStaffRole(id, role, user)
   }
 
-  @Patch("users/:id/ban")
+  @Post("users/:id/suspension")
   @StaffRoles("SUPER_ADMIN")
-  banUser(
+  suspendUser(
     @Param("id") id: string,
-    @Body() body: BanUserDto,
+    @Body() body: SuspendUserDto,
     @CurrentUser() user?: any,
   ) {
-    return this.admin.banUser(id, body.banned, user)
+    return this.admin.suspendUser(id, body, user)
+  }
+
+  @Post("users/:id/suspension/restore")
+  @StaffRoles("SUPER_ADMIN")
+  restoreUser(
+    @Param("id") id: string,
+    @Body() body: RestoreUserDto,
+    @CurrentUser() user?: any,
+  ) {
+    return this.admin.restoreUser(id, body, user)
   }
 
   @Get("organizations")

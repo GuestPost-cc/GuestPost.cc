@@ -1,6 +1,7 @@
 "use client"
 
 import type {
+  AccountSuspensionReason,
   AdminStaffPerformanceItem,
   AdminUserResponse,
 } from "@guestpost/api-client"
@@ -38,6 +39,7 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  Textarea,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
@@ -58,7 +60,7 @@ import {
   Users,
   WalletCards,
 } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
@@ -98,13 +100,263 @@ function StaffRoleBadge({ role }: { role: StaffRole | null }) {
   )
 }
 
-function StatusBadge({ banned }: { banned: boolean }) {
+function StatusBadge({
+  banned,
+  banExpires,
+}: {
+  banned: boolean
+  banExpires?: string | null
+}) {
   return banned ? (
-    <Badge variant="destructive">Suspended</Badge>
+    <Badge variant="destructive">
+      {banExpires ? "Temporarily suspended" : "Suspended"}
+    </Badge>
   ) : (
     <Badge variant="outline" className="border-emerald-300 text-emerald-700">
       Active
     </Badge>
+  )
+}
+
+type SuspensionTarget = {
+  id: string
+  email: string
+  name: string | null
+  userType: string
+  banned: boolean
+  banReasonCode: AccountSuspensionReason | null
+  banExpires: string | null
+  suspendedAt: string | null
+}
+
+const suspensionReasonLabels: Record<
+  Exclude<AccountSuspensionReason, "LEGACY">,
+  string
+> = {
+  SECURITY_RISK: "Security risk",
+  FRAUD_OR_ABUSE: "Fraud or abuse",
+  TERMS_VIOLATION: "Terms violation",
+  PAYMENT_RISK: "Payment risk",
+  COMPLIANCE: "Compliance",
+  STAFF_ACCESS_REMOVAL: "Staff access removal",
+  OTHER: "Other",
+}
+
+function SuspensionDetails({
+  userId,
+  banned,
+}: {
+  userId: string
+  banned: boolean
+}) {
+  const detail = useQuery({
+    queryKey: ["admin", "users", userId, "detail"],
+    queryFn: () => api.admin.getUser(userId),
+    enabled: banned,
+  })
+  if (!banned) return null
+  if (detail.isLoading) return <Skeleton className="h-24 w-full" />
+  if (!detail.data) return null
+  const suspension = detail.data
+  return (
+    <div className="rounded-xl border border-destructive/25 bg-destructive/5 p-4 text-sm">
+      <div className="font-semibold text-destructive">Suspension record</div>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <dt className="text-xs text-muted-foreground">Reason</dt>
+          <dd className="mt-1">
+            {suspension.banReasonCode
+              ? (suspensionReasonLabels[
+                  suspension.banReasonCode as Exclude<
+                    AccountSuspensionReason,
+                    "LEGACY"
+                  >
+                ] ?? "Legacy suspension")
+              : "Not recorded"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Suspended by</dt>
+          <dd className="mt-1">
+            {suspension.suspendedBy?.name ??
+              suspension.suspendedBy?.email ??
+              "Legacy / system action"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Started</dt>
+          <dd className="mt-1">
+            {suspension.suspendedAt
+              ? format(new Date(suspension.suspendedAt), "MMM d, yyyy, p")
+              : "Not recorded"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-muted-foreground">Expires</dt>
+          <dd className="mt-1">
+            {suspension.banExpires
+              ? format(new Date(suspension.banExpires), "MMM d, yyyy, p")
+              : "Until manually restored"}
+          </dd>
+        </div>
+        <div className="sm:col-span-2">
+          <dt className="text-xs text-muted-foreground">Internal note</dt>
+          <dd className="mt-1 whitespace-pre-wrap">
+            {suspension.banReason ?? "No legacy note was recorded."}
+          </dd>
+        </div>
+      </dl>
+    </div>
+  )
+}
+
+function SuspensionDialog({
+  target,
+  open,
+  onOpenChange,
+}: {
+  target: SuspensionTarget | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const queryClient = useQueryClient()
+  const [reasonCode, setReasonCode] =
+    useState<Exclude<AccountSuspensionReason, "LEGACY">>("SECURITY_RISK")
+  const [internalNote, setInternalNote] = useState("")
+  const [expiresAt, setExpiresAt] = useState("")
+  const restoring = target?.banned === true
+
+  useEffect(() => {
+    if (!open) return
+    setReasonCode(
+      target?.userType === "STAFF" ? "STAFF_ACCESS_REMOVAL" : "SECURITY_RISK",
+    )
+    setInternalNote("")
+    setExpiresAt("")
+  }, [open, target?.userType])
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!target) throw new Error("Choose an account")
+      if (restoring)
+        return api.admin.restoreUser(target.id, internalNote.trim())
+      return api.admin.suspendUser(target.id, {
+        reasonCode,
+        internalNote: internalNote.trim(),
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
+      })
+    },
+    onSuccess: async (result) => {
+      if (restoring) {
+        toast.success("Account restored. A fresh login is required.")
+      } else {
+        toast.success(
+          `Account suspended and ${result.sessionsRevoked ?? 0} active session${result.sessionsRevoked === 1 ? "" : "s"} revoked.`,
+        )
+      }
+      onOpenChange(false)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["admin", "staff"] }),
+        queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+      ])
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
+
+  const valid = internalNote.trim().length >= 10
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {restoring ? "Restore account access" : "Suspend account"}
+          </DialogTitle>
+          <DialogDescription>
+            {target?.name ?? target?.email}
+            {target?.name ? ` — ${target.email}` : ""}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-lg border border-amber-500/25 bg-amber-500/5 p-3 text-sm text-muted-foreground">
+            {restoring
+              ? "Restoring access does not recreate old sessions. The user must complete a fresh login."
+              : "Suspension takes effect immediately, revokes every active session, and blocks email and Google login. Internal notes are never shown to the user."}
+          </div>
+          {!restoring && (
+            <>
+              <div>
+                <Label>Reason category</Label>
+                <Select
+                  value={reasonCode}
+                  onValueChange={(value) =>
+                    setReasonCode(
+                      value as Exclude<AccountSuspensionReason, "LEGACY">,
+                    )
+                  }
+                >
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(suspensionReasonLabels).map(
+                      ([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="suspension-expiry">Expiry (optional)</Label>
+                <Input
+                  id="suspension-expiry"
+                  type="datetime-local"
+                  value={expiresAt}
+                  min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+                  onChange={(event) => setExpiresAt(event.target.value)}
+                  className="mt-1"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Leave blank to require manual restoration.
+                </p>
+              </div>
+            </>
+          )}
+          <div>
+            <Label htmlFor="suspension-note">
+              {restoring ? "Restore note" : "Internal security note"}
+            </Label>
+            <Textarea
+              id="suspension-note"
+              value={internalNote}
+              onChange={(event) => setInternalNote(event.target.value)}
+              maxLength={2_000}
+              rows={4}
+              className="mt-1"
+              placeholder="Record the evidence and operational context (minimum 10 characters)."
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant={restoring ? "default" : "destructive"}
+            onClick={() => mutation.mutate()}
+            disabled={!valid || mutation.isPending}
+          >
+            {mutation.isPending
+              ? "Saving…"
+              : restoring
+                ? "Restore access"
+                : "Suspend and revoke sessions"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
@@ -245,11 +497,12 @@ function StaffDetailsDialog({
         </DialogHeader>
         <div className="flex flex-wrap items-center gap-2">
           <StaffRoleBadge role={member.staffRole} />
-          <StatusBadge banned={member.banned} />
+          <StatusBadge banned={member.banned} banExpires={member.banExpires} />
           <span className="text-xs text-muted-foreground">
             Joined {format(new Date(member.createdAt), "MMM d, yyyy")}
           </span>
         </div>
+        <SuspensionDetails userId={member.id} banned={member.banned} />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardContent className="p-4">
@@ -389,7 +642,6 @@ function RoleDialog({
 
 function StaffDirectory() {
   const { user: currentUser } = useAuth()
-  const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
   const [role, setRole] = useState<StaffRole | "all">("all")
   const [selected, setSelected] = useState<AdminStaffPerformanceItem | null>(
@@ -397,21 +649,12 @@ function StaffDirectory() {
   )
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [roleOpen, setRoleOpen] = useState(false)
+  const [suspensionTarget, setSuspensionTarget] =
+    useState<SuspensionTarget | null>(null)
   const query = useQuery({
     queryKey: ["admin", "staff", "performance"],
     queryFn: () => api.admin.staffPerformance(),
     refetchInterval: 30_000,
-  })
-  const status = useMutation({
-    mutationFn: ({ id, banned }: { id: string; banned: boolean }) =>
-      api.admin.banUser(id, banned),
-    onSuccess: async (_result, variables) => {
-      toast.success(
-        variables.banned ? "Staff account suspended" : "Staff account restored",
-      )
-      await queryClient.invalidateQueries({ queryKey: ["admin", "staff"] })
-    },
-    onError: (error: Error) => toast.error(error.message),
   })
   const items = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -434,7 +677,8 @@ function StaffDirectory() {
   }
   const summary = query.data?.summary
   const summaryCards = [
-    ["Total staff", summary?.totalStaff ?? 0, Users],
+    ["Active staff", summary?.activeStaff ?? 0, Users],
+    ["Suspended", summary?.suspendedStaff ?? 0, Ban],
     ["Operations", summary?.operations ?? 0, UserCog],
     ["Active assigned", summary?.activeAssignments ?? 0, Activity],
     ["Self-claimed", summary?.totalClaimed ?? 0, CheckCircle2],
@@ -448,7 +692,7 @@ function StaffDirectory() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-7">
         {summaryCards.map(([label, value, Icon]) => (
           <Card key={label}>
             <CardContent className="p-4">
@@ -554,7 +798,10 @@ function StaffDirectory() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <StatusBadge banned={member.banned} />
+                        <StatusBadge
+                          banned={member.banned}
+                          banExpires={member.banExpires}
+                        />
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
@@ -587,19 +834,22 @@ function StaffDirectory() {
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
-                              disabled={
-                                member.id === currentUser?.id ||
-                                status.isPending
-                              }
+                              disabled={member.id === currentUser?.id}
                               className={
                                 member.banned ? "" : "text-destructive"
                               }
-                              onClick={() =>
-                                status.mutate({
+                              onClick={() => {
+                                setSuspensionTarget({
                                   id: member.id,
-                                  banned: !member.banned,
+                                  email: member.email,
+                                  name: member.name,
+                                  userType: "STAFF",
+                                  banned: member.banned,
+                                  banReasonCode: member.banReasonCode,
+                                  banExpires: member.banExpires,
+                                  suspendedAt: member.suspendedAt,
                                 })
-                              }
+                              }}
                             >
                               {member.banned ? (
                                 <CheckCircle2 className="h-4 w-4" />
@@ -632,18 +882,24 @@ function StaffDirectory() {
         open={roleOpen}
         onOpenChange={setRoleOpen}
       />
+      <SuspensionDialog
+        target={suspensionTarget}
+        open={Boolean(suspensionTarget)}
+        onOpenChange={(open) => !open && setSuspensionTarget(null)}
+      />
     </div>
   )
 }
 
 function ExternalUserDirectory({ type }: { type: "PUBLISHER" | "CUSTOMER" }) {
-  const queryClient = useQueryClient()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<
     "all" | "active" | "suspended"
   >("all")
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<AdminUserResponse | null>(null)
+  const [suspensionTarget, setSuspensionTarget] =
+    useState<SuspensionTarget | null>(null)
   const query = useQuery({
     queryKey: ["admin", "users", type, search, statusFilter, page],
     queryFn: () =>
@@ -654,15 +910,6 @@ function ExternalUserDirectory({ type }: { type: "PUBLISHER" | "CUSTOMER" }) {
         take: PAGE_SIZE,
         skip: (page - 1) * PAGE_SIZE,
       }),
-  })
-  const status = useMutation({
-    mutationFn: ({ id, banned }: { id: string; banned: boolean }) =>
-      api.admin.banUser(id, banned),
-    onSuccess: async (_result, variables) => {
-      toast.success(variables.banned ? "Account suspended" : "Account restored")
-      await queryClient.invalidateQueries({ queryKey: ["admin", "users"] })
-    },
-    onError: (error: Error) => toast.error(error.message),
   })
   if (query.error) {
     return (
@@ -753,7 +1000,10 @@ function ExternalUserDirectory({ type }: { type: "PUBLISHER" | "CUSTOMER" }) {
                       {format(new Date(user.createdAt), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell>
-                      <StatusBadge banned={user.banned} />
+                      <StatusBadge
+                        banned={user.banned}
+                        banExpires={user.banExpires}
+                      />
                     </TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
@@ -770,10 +1020,7 @@ function ExternalUserDirectory({ type }: { type: "PUBLISHER" | "CUSTOMER" }) {
                           size="icon"
                           title={user.banned ? "Restore user" : "Suspend user"}
                           className={user.banned ? "" : "text-destructive"}
-                          onClick={() =>
-                            status.mutate({ id: user.id, banned: !user.banned })
-                          }
-                          disabled={status.isPending}
+                          onClick={() => setSuspensionTarget(user)}
                         >
                           {user.banned ? (
                             <CheckCircle2 className="h-4 w-4" />
@@ -846,7 +1093,10 @@ function ExternalUserDirectory({ type }: { type: "PUBLISHER" | "CUSTOMER" }) {
               <div>
                 <div className="text-xs text-muted-foreground">Status</div>
                 <div className="mt-1">
-                  <StatusBadge banned={selected.banned} />
+                  <StatusBadge
+                    banned={selected.banned}
+                    banExpires={selected.banExpires}
+                  />
                 </div>
               </div>
               <div>
@@ -855,10 +1105,23 @@ function ExternalUserDirectory({ type }: { type: "PUBLISHER" | "CUSTOMER" }) {
                   {format(new Date(selected.createdAt), "MMM d, yyyy, p")}
                 </div>
               </div>
+              {selected.banned && (
+                <div className="sm:col-span-2">
+                  <SuspensionDetails
+                    userId={selected.id}
+                    banned={selected.banned}
+                  />
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
       </Dialog>
+      <SuspensionDialog
+        target={suspensionTarget}
+        open={Boolean(suspensionTarget)}
+        onOpenChange={(open) => !open && setSuspensionTarget(null)}
+      />
     </div>
   )
 }

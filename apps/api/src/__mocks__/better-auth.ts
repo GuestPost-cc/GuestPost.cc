@@ -23,3 +23,19 @@ export const prismaAdapter = () => ({})
 export const bearer = () => ({})
 export const toNodeHandler = (x: unknown) => x
 export const createAuthMiddleware = (fn: unknown) => fn
+export const getOAuthState = async () => null
+
+export class APIError extends Error {
+  body: Record<string, unknown>
+  status: string
+
+  constructor(status: string, body: Record<string, unknown>) {
+    super(typeof body.message === "string" ? body.message : status)
+    this.status = status
+    this.body = body
+  }
+
+  static from(status: string, body: Record<string, unknown>) {
+    return new APIError(status, body)
+  }
+}

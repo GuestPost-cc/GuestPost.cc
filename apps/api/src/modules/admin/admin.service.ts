@@ -26,6 +26,21 @@ import { QueueService } from "../queues/queue.service"
 
 const VALID_STAFF_ROLES: StaffRole[] = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
 
+type SuspensionReason =
+  | "SECURITY_RISK"
+  | "FRAUD_OR_ABUSE"
+  | "TERMS_VIOLATION"
+  | "PAYMENT_RISK"
+  | "COMPLIANCE"
+  | "STAFF_ACCESS_REMOVAL"
+  | "OTHER"
+
+interface SuspendUserInput {
+  reasonCode: SuspensionReason
+  internalNote: string
+  expiresAt?: string
+}
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -110,6 +125,9 @@ export class AdminService {
         publisherRole: u.publisherMemberships[0]?.role ?? null,
         staffRole: u.staffMemberships?.[0]?.role ?? null,
         banned: u.banned,
+        banReasonCode: u.banReasonCode,
+        banExpires: u.banExpires,
+        suspendedAt: u.suspendedAt,
         createdAt: u.createdAt,
       })),
       total,
@@ -125,6 +143,7 @@ export class AdminService {
         memberships: { include: { organization: true } },
         publisherMemberships: { include: { publisher: true } },
         staffMemberships: true,
+        suspendedBy: { select: { id: true, name: true, email: true } },
       },
     })
     if (!u) throw new NotFoundException("User not found")
@@ -134,6 +153,11 @@ export class AdminService {
       name: u.name,
       userType: u.userType,
       banned: u.banned,
+      banReasonCode: u.banReasonCode,
+      banReason: u.banReason,
+      banExpires: u.banExpires,
+      suspendedAt: u.suspendedAt,
+      suspendedBy: u.suspendedBy,
       createdAt: u.createdAt,
       organizations: u.memberships.map((m) => ({
         id: m.organization.id,
@@ -230,6 +254,9 @@ export class AdminService {
         email: true,
         name: true,
         banned: true,
+        banReasonCode: true,
+        banExpires: true,
+        suspendedAt: true,
         createdAt: true,
         staffMemberships: { select: { role: true, permissions: true } },
       },
@@ -239,6 +266,8 @@ export class AdminService {
       return {
         summary: {
           totalStaff: 0,
+          activeStaff: 0,
+          suspendedStaff: 0,
           superAdmins: 0,
           operations: 0,
           finance: 0,
@@ -377,6 +406,9 @@ export class AdminService {
         email: member.email,
         name: member.name,
         banned: member.banned,
+        banReasonCode: member.banReasonCode,
+        banExpires: member.banExpires,
+        suspendedAt: member.suspendedAt,
         createdAt: member.createdAt,
         staffRole: member.staffMemberships[0]?.role ?? null,
         permissions: member.staffMemberships[0]?.permissions ?? [],
@@ -410,11 +442,17 @@ export class AdminService {
     return {
       summary: {
         totalStaff: items.length,
-        superAdmins: items.filter((item) => item.staffRole === "SUPER_ADMIN")
-          .length,
-        operations: items.filter((item) => item.staffRole === "OPERATIONS")
-          .length,
-        finance: items.filter((item) => item.staffRole === "FINANCE").length,
+        activeStaff: items.filter((item) => !item.banned).length,
+        suspendedStaff: items.filter((item) => item.banned).length,
+        superAdmins: items.filter(
+          (item) => !item.banned && item.staffRole === "SUPER_ADMIN",
+        ).length,
+        operations: items.filter(
+          (item) => !item.banned && item.staffRole === "OPERATIONS",
+        ).length,
+        finance: items.filter(
+          (item) => !item.banned && item.staffRole === "FINANCE",
+        ).length,
         activeAssignments: items.reduce(
           (total, item) => total + item.metrics.activeAssigned,
           0,
@@ -607,55 +645,173 @@ export class AdminService {
     return result
   }
 
-  async banUser(userId: string, banned: boolean, user?: any) {
-    const target = await this.prisma.user.findUnique({ where: { id: userId } })
-    if (!target) throw new NotFoundException("User not found")
-    if (banned && user?.id === userId) {
+  async suspendUser(userId: string, input: SuspendUserInput, actor: any) {
+    if (!actor?.id) throw new ForbiddenException("Administrator required")
+    if (actor.id === userId) {
       throw new ForbiddenException("You cannot suspend your own account")
     }
-    if (banned && target.userType === "STAFF") {
-      const membership = await this.prisma.staffMembership.findUnique({
-        where: { userId },
-      })
-      if (
-        membership?.role === "SUPER_ADMIN" &&
-        (await this.activeSuperAdminCount()) <= 1
-      ) {
-        throw new ConflictException(
-          "At least one active Super Admin is required",
-        )
-      }
-      if (membership?.role === "OPERATIONS") {
-        const activeAssignments = await this.prisma.fulfillmentAssignment.count(
-          {
-            where: {
-              assignedToUserId: userId,
-              status: { in: ["ASSIGNED", "IN_PROGRESS"] },
-            },
-          },
-        )
-        if (activeAssignments > 0) {
-          throw new ConflictException(
-            "Reassign active fulfillment orders before suspending this Operations user",
-          )
-        }
-      }
+    const note = input.internalNote.trim()
+    const expiresAt = input.expiresAt ? new Date(input.expiresAt) : null
+    if (expiresAt && expiresAt.getTime() <= Date.now() + 60_000) {
+      throw new BadRequestException(
+        "Temporary suspension expiry must be at least one minute in the future",
+      )
     }
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { banned },
-    })
-    invalidateAuthContext(userId)
+    try {
+      const result = await this.prisma.$transaction(
+        async (tx: any) => {
+          const target = await tx.user.findUnique({
+            where: { id: userId },
+            include: { staffMemberships: true },
+          })
+          if (!target) throw new NotFoundException("User not found")
+          if (target.banned) {
+            throw new ConflictException("Account is already suspended")
+          }
 
-    await this.audit.log({
-      action: banned ? "USER_SUSPENDED" : "USER_RESTORED",
-      entityType: "User",
-      entityId: userId,
-      metadata: { userId, byUserId: user?.id },
-      userId: user?.id,
-      organizationId: null,
-    })
+          if (target.userType === "STAFF") {
+            const membership = target.staffMemberships[0]
+            if (membership?.role === "SUPER_ADMIN") {
+              const activeSuperAdmins = await tx.user.count({
+                where: {
+                  userType: "STAFF",
+                  banned: false,
+                  staffMemberships: { some: { role: "SUPER_ADMIN" } },
+                },
+              })
+              if (activeSuperAdmins <= 1) {
+                throw new ConflictException(
+                  "At least one active Super Admin is required",
+                )
+              }
+            }
+            if (membership?.role === "OPERATIONS") {
+              const activeAssignments = await tx.fulfillmentAssignment.count({
+                where: {
+                  assignedToUserId: userId,
+                  status: { in: ["ASSIGNED", "IN_PROGRESS"] },
+                },
+              })
+              if (activeAssignments > 0) {
+                throw new ConflictException(
+                  "Reassign active fulfillment orders before suspending this Operations user",
+                )
+              }
+            }
+          }
+
+          const suspended = await tx.user.update({
+            where: { id: userId },
+            data: {
+              banned: true,
+              banReasonCode: input.reasonCode,
+              banReason: note,
+              banExpires: expiresAt,
+              suspendedAt: new Date(),
+              suspendedByUserId: actor.id,
+            },
+            select: {
+              id: true,
+              banned: true,
+              banReasonCode: true,
+              banExpires: true,
+              suspendedAt: true,
+            },
+          })
+          const revoked = await tx.session.deleteMany({ where: { userId } })
+          await this.audit.log(
+            {
+              action: "USER_SUSPENDED",
+              entityType: "User",
+              entityId: userId,
+              metadata: {
+                userId,
+                reasonCode: input.reasonCode,
+                internalNote: note,
+                expiresAt: expiresAt?.toISOString() ?? null,
+                sessionsRevoked: revoked.count,
+              },
+              userId: actor.id,
+              organizationId: null,
+            },
+            tx,
+          )
+          return { ...suspended, sessionsRevoked: revoked.count }
+        },
+        { isolationLevel: "Serializable" },
+      )
+      invalidateAuthContext(userId)
+      return result
+    } catch (error: any) {
+      if (error?.code === "P2034") {
+        throw new ConflictException(
+          "Account access changed concurrently. Review the latest status and try again.",
+        )
+      }
+      throw error
+    }
+  }
+
+  async restoreUser(
+    userId: string,
+    input: { internalNote: string },
+    actor: any,
+  ) {
+    if (!actor?.id) throw new ForbiddenException("Administrator required")
+    const note = input.internalNote.trim()
+    try {
+      const result = await this.prisma.$transaction(
+        async (tx: any) => {
+          const target = await tx.user.findUnique({ where: { id: userId } })
+          if (!target) throw new NotFoundException("User not found")
+          if (!target.banned) {
+            throw new ConflictException("Account is already active")
+          }
+          const restored = await tx.user.update({
+            where: { id: userId },
+            data: {
+              banned: false,
+              banReasonCode: null,
+              banReason: null,
+              banExpires: null,
+              suspendedAt: null,
+              suspendedByUserId: null,
+            },
+            select: { id: true, banned: true },
+          })
+          // Sessions were revoked at suspension time and are deliberately not
+          // recreated. Restoration always requires a fresh authenticated login.
+          await this.audit.log(
+            {
+              action: "USER_RESTORED",
+              entityType: "User",
+              entityId: userId,
+              metadata: {
+                userId,
+                internalNote: note,
+                previousReasonCode: target.banReasonCode,
+                previousExpiresAt: target.banExpires?.toISOString() ?? null,
+              },
+              userId: actor.id,
+              organizationId: null,
+            },
+            tx,
+          )
+          return restored
+        },
+        { isolationLevel: "Serializable" },
+      )
+      invalidateAuthContext(userId)
+      return result
+    } catch (error: any) {
+      if (error?.code === "P2034") {
+        throw new ConflictException(
+          "Account access changed concurrently. Review the latest status and try again.",
+        )
+      }
+      throw error
+    }
   }
 
   async listOrganizations(take = 50, skip = 0, _user?: any) {

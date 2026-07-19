@@ -42,6 +42,17 @@ export class AuthGuard implements CanActivate {
 
     if (!session) throw new UnauthorizedException()
 
+    // Better Auth reads this field from the user row on every session lookup.
+    // Check it before the derived-context cache so a suspension performed by
+    // another process (or directly during incident response) cannot retain up
+    // to 30 seconds of cached access.
+    if ((session.user as { banned?: boolean }).banned) {
+      throw new ForbiddenException({
+        code: "ACCOUNT_SUSPENDED",
+        message: "This account is suspended.",
+      })
+    }
+
     const createdAt = new Date(session.session.createdAt).getTime()
     const sessionUserType = (session.user as { userType?: string }).userType
     const absoluteAge =
@@ -84,7 +95,12 @@ export class AuthGuard implements CanActivate {
       where: { id: session.user.id },
     })
     if (!user) throw new UnauthorizedException("User not found")
-    if (user.banned) throw new ForbiddenException("Account is banned")
+    if (user.banned) {
+      throw new ForbiddenException({
+        code: "ACCOUNT_SUSPENDED",
+        message: "This account is suspended.",
+      })
+    }
 
     // Phase 7.8 #25 + AUTH-04: All user types require a verified email for
     // state-changing operations. GET reads + sign-out + verification-resend
