@@ -15,6 +15,18 @@ test("integration workers are loaded only by lanes that consume their queues", (
   )
   assert.match(loader, /await import\(\s*"@guestpost\/integrations\/workers"/)
 
+  const all = source.slice(
+    source.indexOf('if (mode === "all")'),
+    source.indexOf('if (mode === "realtime")'),
+  )
+  assert.match(all, /await createIntegrationWorkers\(\)/)
+
+  const realtime = source.slice(
+    source.indexOf('if (mode === "realtime")'),
+    source.indexOf('if (mode === "on-demand")'),
+  )
+  assert.doesNotMatch(realtime, /createIntegrationWorkers/)
+
   const onDemand = source.slice(
     source.indexOf('if (mode === "on-demand")'),
     source.indexOf("const taskName = process.env.WORKER_TASK"),
