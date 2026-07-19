@@ -45,9 +45,30 @@ describe("SyncService ownership and mapping scope", () => {
 
   beforeEach(() => {
     jest.clearAllMocks()
+    process.env.QUEUE_SIGNING_SECRET = "integration-test-signing-secret"
     mockDb.integrationSync.update.mockResolvedValue({})
     mockDb.websiteIntegration.update.mockResolvedValue({})
     mockDb.integrationSchedule.updateMany.mockResolvedValue({ count: 1 })
+  })
+
+  it("signs queued sync jobs before Redis accepts them", async () => {
+    mockDb.publisherIntegration.findFirst.mockResolvedValue({
+      id: "integration-1",
+      websiteIntegrations: [{ id: "link-1" }],
+    })
+    mockDb.integrationSync.create.mockResolvedValue({ id: "sync-1" })
+
+    await new SyncService().triggerSync(owner, "integration-1")
+
+    expect(mockQueueAdd).toHaveBeenCalledWith(
+      "sync",
+      expect.objectContaining({
+        integrationId: "integration-1",
+        signature: expect.stringMatching(/^[0-9a-f]{64}$/),
+        iat: expect.any(Number),
+        v: 1,
+      }),
+    )
   })
 
   it("authorizes sync-status reads through the owning integration", async () => {

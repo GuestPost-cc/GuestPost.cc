@@ -7,7 +7,7 @@ Minimum operational readiness for running the platform with real money.
 | Process | Command | Port |
 |---|---|---|
 | API | `node apps/api/dist/main.js` | 4000 |
-| Worker | `node apps/worker/dist/index.js` | — |
+| Worker | `node apps/worker/dist/index.js` | `WORKER_MODE` selects realtime/on-demand/scheduled/all |
 | Website | `next start apps/website` | 3000 |
 | Portal | `next start apps/portal` | 3001 |
 | Publisher | `next start apps/publisher` | 3002 |
@@ -79,8 +79,11 @@ procedure does not exist.
 
 ## Automated reconciliation + alerting
 
-The worker runs a financial drift sweep every 60 minutes
-(`RECONCILIATION_SWEEP_MINUTES` to tune, min 5). Checks: wallet drift,
+In the hybrid production layout, Northflank runs the financial drift sweep
+every 60 minutes (`WORKER_MODE=scheduled`, `WORKER_TASK=reconciliation`).
+`WORKER_MODE=all` retains the legacy BullMQ repeatable sweep for local fallback.
+The Northflank cron controls hybrid cadence; `RECONCILIATION_SWEEP_MINUTES`
+only tunes the compatibility scheduler (minimum 5). Checks: wallet drift,
 publisher balance drift, stuck DELIVERED orders, stuck/duplicate payouts,
 lifetimePaid drift — same core as `GET /admin/reconciliation`.
 
@@ -126,7 +129,7 @@ Options (admin → Finance → Withdrawals):
 
 ## Required env vars (production)
 
-Fail-fast at boot: `DATABASE_URL`, `REDIS_URL`, `JWT_SECRET`,
+Fail-fast at boot: `DATABASE_URL`, `QUEUE_REDIS_URL` (or `REDIS_URL` fallback), `JWT_SECRET`,
 `QUEUE_SIGNING_SECRET` (must differ from JWT_SECRET).
 Payments: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`.
 Payouts: `STRIPE_PAYOUT_WEBHOOK_SECRET` (falls back to `STRIPE_WEBHOOK_SECRET`),

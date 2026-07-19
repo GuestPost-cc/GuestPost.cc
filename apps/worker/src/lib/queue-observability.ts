@@ -27,6 +27,24 @@ import { type Job, type Processor, Worker, type WorkerOptions } from "bullmq"
 
 const logger = createLogger("worker.queue-observability")
 
+function positiveNumber(value: string | undefined, fallback: number): number {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+// Upstash bills BullMQ's empty-queue maintenance commands. Five-minute idle
+// and stalled intervals are the provider-recommended low-traffic shape; a
+// producer marker wakes the blocking worker when work arrives. Both remain
+// tunable for a self-hosted Redis deployment with different latency/cost goals.
+const DEFAULT_DRAIN_DELAY_SECONDS = positiveNumber(
+  process.env.WORKER_DRAIN_DELAY_SECONDS,
+  300,
+)
+const DEFAULT_STALLED_INTERVAL_MS = positiveNumber(
+  process.env.WORKER_STALLED_INTERVAL_MS,
+  300_000,
+)
+
 // Phase 7.7 D — cumulative stall counter exposed via /metrics/queues.
 // Increments on every BullMQ 'stalled' event across all queues. Resets on
 // worker restart; long-term aggregation is the log-retention layer's job.
@@ -76,7 +94,11 @@ export function createObservableWorker<TData = any, TResult = any>(
   const worker = new Worker<TData, TResult, string>(
     queueName,
     wrappedProcessor,
-    opts,
+    {
+      drainDelay: DEFAULT_DRAIN_DELAY_SECONDS,
+      stalledInterval: DEFAULT_STALLED_INTERVAL_MS,
+      ...opts,
+    },
   )
 
   worker.on("failed", (job, err) => {

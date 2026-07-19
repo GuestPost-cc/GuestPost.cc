@@ -38,6 +38,38 @@ Staging Redis note (2026-07-18): `packages/integrations` queue producers previou
 
 The historical Blueprint contained an inline Neon database credential. The active Blueprint has removed inline database values, and the Neon role password was rotated during staging setup, but the old credential still exists in git history.
 
+The staging BullMQ connection now uses a dedicated Upstash Free Tier database
+in AWS Singapore (`ap-southeast-1`) with eviction disabled. Its credentials are
+kept only in deployment secret storage. TLS connectivity and worker
+realtime/on-demand/scheduled modes were verified against the database on
+2026-07-20; command usage still needs post-cutover monitoring.
+
+## Hybrid worker architecture (2026-07-19)
+
+The worker has four explicit runtime modes. `all` remains the safe default for
+local development and rollback; `realtime` runs only email, notification,
+requested website verification, and requested delivery verification;
+`on-demand` drains burst queues and the PostgreSQL payout-webhook inbox before
+exiting; `scheduled` executes exactly one allowlisted maintenance task and then
+exits. Northflank must configure the non-default mode explicitly, and scheduled
+jobs must use a forbid-concurrency policy.
+
+Queue traffic can be isolated through `QUEUE_REDIS_URL`, with `REDIS_URL` kept
+as a compatibility fallback. BullMQ's worker drain delay and stalled-job scan
+interval default to five minutes for the externally hosted Redis deployment,
+and queue-metric snapshots default to a 30-minute cache. These settings reduce
+idle Redis commands without changing retry or signature validation behavior.
+
+The API can send a least-privilege, bearer-authenticated wake request to the
+official Northflank run-job endpoint after a report, publisher-trust, or
+payout-webhook record is durably committed. The project-scoped token needs only
+`Project > Jobs > General > Read`. Wake failure is intentionally non-fatal: a
+mandatory 10-minute catch-up schedule is the durable recovery path. Production
+wake URLs are restricted to the official Northflank HTTPS host/path and cannot
+contain embedded credentials, query parameters, or fragments. See
+`docs/WORKER_ARCHITECTURE.md` for the deployment contract, task schedule,
+rollout, rollback, and quota-monitoring procedure.
+
 
 
 ## Docker Compose

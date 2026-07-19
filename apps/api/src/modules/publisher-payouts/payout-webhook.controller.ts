@@ -7,7 +7,6 @@ import {
 import {
   assertWebhookTimestampFresh,
   normalizeProviderWebhook,
-  QUEUES,
   WebhookTimestampError,
 } from "@guestpost/shared"
 import {
@@ -24,7 +23,8 @@ import {
 } from "@nestjs/common"
 import { Request } from "express"
 import { Public } from "../../common/decorators/public.decorator"
-import { QueueService } from "../queues/queue.service"
+import { PrismaService } from "../../common/prisma.service"
+import { WorkerWakeupService } from "../queues/worker-wakeup.service"
 
 const STRIPE_TIMESTAMP_TOLERANCE_SECONDS = 300
 
@@ -32,7 +32,10 @@ const STRIPE_TIMESTAMP_TOLERANCE_SECONDS = 300
 export class PayoutWebhookController {
   private readonly logger = new Logger(PayoutWebhookController.name)
 
-  constructor(private readonly queue: QueueService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workerWakeup: WorkerWakeupService,
+  ) {}
 
   // Public: providers cannot authenticate with a session — the cryptographic
   // signature check below is the authentication for this route.
@@ -43,6 +46,10 @@ export class PayoutWebhookController {
     @Headers() headers: Record<string, string>,
     @Req() req: RawBodyRequest<Request>,
   ) {
+    // The generated Prisma client is intentionally gitignored and regenerated
+    // during the database build. Keep this controller compilable in a fresh
+    // checkout before generation while the schema remains authoritative.
+    const payoutWebhookEvent = (this.prisma as any).payoutWebhookEvent
     if (!["wise", "stripe_connect"].includes(provider)) {
       throw new BadRequestException("Unsupported provider")
     }
@@ -88,54 +95,72 @@ export class PayoutWebhookController {
       }
     }
 
-    // Phase 8.3 (audit #3) — BullMQ-native dedup. Replay protection: two
-    // identical webhook payloads (provider retry, ops re-trigger, network
-    // duplicate) produce the same jobId and the second enqueue becomes a
-    // no-op for the dedup window bounded by the PAYOUT queue's
-    // removeOnComplete policy (`{ count: 100, age: 86400 }` → ~24h / 100
-    // jobs whichever first). We reuse normalizeProviderWebhook from
-    // @guestpost/shared rather than duplicating payload-shape extraction —
-    // single source of truth means future provider-shape changes update
-    // both the worker's status path AND our dedup keying together.
+    // Normalize once at the trust boundary and persist only allow-listed
+    // fields. Raw payout payloads/signature headers never enter Redis or the
+    // database. The database commit, not a best-effort worker wake-up, is the
+    // acknowledgement boundary returned to the provider.
     const normalized = normalizeProviderWebhook(provider, data)
-    const providerExecutionId = normalized.providerExecutionId
+    const providerExecutionId = this.boundedText(
+      normalized.providerExecutionId,
+      191,
+    )
 
     if (
       !providerExecutionId &&
       (provider === "stripe_connect" || provider === "wise")
     ) {
-      // Drift visibility: signature already passed, payload is genuine, but
-      // we couldn't pull a transfer id. The payload still receives a stable
-      // event/hash key below so provider retries cannot fan out duplicate jobs.
+      // Signature already passed, so retain the normalized event for audit and
+      // drift visibility. The inbox processor will mark it ignored safely.
       this.logger.warn(
         `unable to derive payout webhook dedup key (provider=${provider} eventType=${eventType})`,
       )
     }
 
     const providerEventId = body.id ?? body.event_id ?? body.eventId ?? null
-    const fallbackIdentity = providerEventId
-      ? `event-${createHash("sha256").update(String(providerEventId)).digest("hex")}`
-      : `payload-${createHash("sha256").update(rawBody).digest("hex")}`
-    const jobIdentity = providerExecutionId ?? fallbackIdentity
-    const jobIdOverride = {
-      jobId: `payout-webhook:${provider}:${jobIdentity}`,
+    const dedupSource = providerEventId
+      ? `event:${String(providerEventId)}`
+      : `payload:${createHash("sha256").update(rawBody).digest("hex")}`
+    const dedupKey = createHash("sha256").update(dedupSource).digest("hex")
+    const safeEventType = this.boundedText(eventType, 191) ?? "unknown"
+    const safeRawStatus = this.boundedText(normalized.rawStatus, 100)
+
+    let inboxEvent: { id: string }
+    let duplicate = false
+    try {
+      inboxEvent = await payoutWebhookEvent.create({
+        data: {
+          provider,
+          dedupKey,
+          eventType: safeEventType,
+          providerExecutionId,
+          providerStatus: normalized.status,
+          rawStatus: safeRawStatus,
+        },
+        select: { id: true },
+      })
+    } catch (error: any) {
+      if (error?.code !== "P2002") throw error
+      duplicate = true
+      const existing = await payoutWebhookEvent.findUnique({
+        where: { provider_dedupKey: { provider, dedupKey } },
+        select: { id: true },
+      })
+      if (!existing) throw error
+      inboxEvent = existing
     }
 
-    const job = await this.queue.addJob(
-      QUEUES.PAYOUT,
-      "payout-webhook",
-      {
-        provider,
-        event: eventType,
-        data,
-        verified: true,
-        receivedAt: new Date().toISOString(),
-      },
-      jobIdOverride,
+    // Do not await external orchestration before returning 2xx. The committed
+    // inbox row is durable and the 10-minute catch-up job guarantees recovery.
+    void this.workerWakeup.wake("payout-webhook")
+    this.logger.log(
+      `Verified payout webhook durably accepted (provider=${provider} duplicate=${duplicate})`,
     )
+    return { received: true, eventId: inboxEvent.id, duplicate }
+  }
 
-    this.logger.log(`Verified webhook from ${provider} queued as job ${job.id}`)
-    return { received: true, jobId: job.id }
+  private boundedText(value: unknown, maxLength: number): string | null {
+    if (typeof value !== "string") return null
+    return value.slice(0, maxLength)
   }
 
   // Stripe signs `${timestamp}.${rawBody}` with HMAC-SHA256 using the

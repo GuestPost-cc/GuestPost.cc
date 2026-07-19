@@ -6,7 +6,7 @@ updated: 2026-07-19
 
 # Risks
 
-Updated 2026-07-18 after the marketplace taxonomy and verified-metrics change. All audit findings at Medium severity or above are now closed; the remaining items are strategic/long-horizon risks and operator-action follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
+Updated 2026-07-19 after the hybrid worker and durable payout-reconciliation change. All audit findings at Medium severity or above are now closed; the remaining items are strategic/long-horizon risks and operator-action follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
 
 The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
 
@@ -59,7 +59,19 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 
 - **URGENT — historical Render blueprint exposed a database credential.** The active `render.yml` uses Render secret prompts for `DATABASE_URL`, but an earlier committed Blueprint revision contained an inline Neon credential. Treat that credential as exposed: it was rotated in Neon during staging setup, and the new value must remain only in Render. Assess whether Git history/repository access needs containment before production. Do not copy the credential into tickets, logs, or Bedrock notes.
 - **Redis auth-limit capacity is exhausted in the current staging provider account.** The application now degrades to a bounded per-instance email limiter instead of returning authentication 500s or failing open, but the fallback is not cluster-global. Reset/upgrade the Redis request quota and add capacity alerts so normal cross-pod enforcement is restored before production traffic.
-- **Worker is local-only on free-tier staging.** The active Render Blueprint intentionally excludes `guestpost-worker` while the workspace is on free-tier testing. Queue-backed flows (email delivery, DNS/GSC verification, cancellation/settlement sweeps, payout jobs) require a local worker until Render worker capacity is available.
+- **Hybrid worker deployment is pending.** The current Northflank service must
+  not be switched from compatibility `all` mode until the payout inbox
+  migration is deployed, old unsigned integration jobs are drained, the
+  realtime service is healthy, and every scheduled task plus the mandatory
+  on-demand catch-up has been created with forbid-concurrency behavior.
+- **On-demand wake is best-effort by design.** A bad Northflank endpoint/token
+  can increase report, trust, integration, or payout-webhook processing latency.
+  It cannot be the only trigger: the documented 10-minute catch-up schedule and
+  alerts on oldest pending work are required for production.
+- **Payout uniqueness migration needs a data preflight.** The new unique
+  `(providerId, providerExecutionId)` index intentionally fails if historical
+  duplicate provider references exist. Run the documented duplicate query and
+  resolve any result through provider-side reconciliation before migration.
 - **Legacy listing metadata requires an owner review after the taxonomy migration.** The migration preserves existing category relationships and deliberately leaves the new placement-policy fields nullable instead of guessing commercial terms. Existing approved inventory can remain visible, but it will not match value-specific policy filters until a publisher or authorized platform staff member saves the reviewed language/categories/policy. Complete that review during the staging migration pass.
 - The historical 2026-06-15 platform audit has zero open production-blocker findings, but the deployment-secret exposure above is a separate current risk.
 - **Zero open Medium findings.** Phase 7.9 closed #28 (status-color drift), #29 (unused shared components), #30 (hooks-rule violation). Phase 7.8 closed #25 + #26 + #27.

@@ -7,6 +7,7 @@ import { trustRecomputeJobOptions } from "@guestpost/shared/dist/publisher-trust
 import { Injectable, Logger } from "@nestjs/common"
 import { type JobsOptions, Queue, type QueueOptions } from "bullmq"
 import { getQueueConnection } from "../../common/redis-client"
+import { WorkerWakeupService } from "./worker-wakeup.service"
 
 const getConnection = getQueueConnection
 
@@ -50,6 +51,8 @@ const QUEUE_CONFIGS: Record<string, QueueConfig> = {
 export class QueueService {
   private readonly logger = new Logger(QueueService.name)
   private queues = new Map<string, Queue>()
+
+  constructor(private readonly workerWakeup: WorkerWakeupService) {}
 
   private getQueue(name: string): Queue {
     if (!this.queues.has(name)) {
@@ -132,6 +135,11 @@ export class QueueService {
     const payload = signJobPayload(dataWithRequestId)
     const job = await this.getQueue(queueName).add(jobName, payload, opts)
     this.logger.log(`Job queued: ${queueName}/${jobName} (job ${job.id})`)
+    if (queueName === QUEUES.REPORT || queueName === QUEUES.PUBLISHER_TRUST) {
+      // The Redis write above is the durable boundary. Wake-up is deliberately
+      // best-effort; the Northflank catch-up job drains missed signals.
+      void this.workerWakeup.wake(`${queueName}/${jobName}`)
+    }
     return job
   }
 

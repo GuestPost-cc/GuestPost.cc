@@ -1,4 +1,5 @@
 import { createPrismaClient } from "@guestpost/database"
+import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { Queue } from "bullmq"
 import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
 import {
@@ -11,6 +12,7 @@ import { INTEGRATION_QUEUES } from "../queue-names"
 import { createIntegrationQueueConnection } from "../redis"
 import type { OwnerContext, SyncResult } from "../types"
 import { IntegrationSyncJobType } from "../types"
+import { wakeOnDemandWorker } from "../worker-wakeup"
 
 const db = createPrismaClient()
 const encryption = new IntegrationEncryptionService()
@@ -86,13 +88,17 @@ export class SyncService {
     })
 
     // Enqueue BullMQ job
-    await this.syncQueue.add("sync", {
-      integrationId,
-      websiteIntegrationId: websiteIntegrationId ?? undefined,
-      trigger,
-      startDate,
-      endDate,
-    } satisfies SyncJobPayload)
+    await this.syncQueue.add(
+      "sync",
+      signJobPayload({
+        integrationId,
+        websiteIntegrationId: websiteIntegrationId ?? undefined,
+        trigger,
+        startDate,
+        endDate,
+      } satisfies SyncJobPayload),
+    )
+    wakeOnDemandWorker()
 
     return {
       syncId: sync.id,

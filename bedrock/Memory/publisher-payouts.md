@@ -41,15 +41,40 @@ Provider config stored encrypted. Missing API key → throws in production; fake
 
 Each payout attempt tracked in `PayoutExecution` with provider reference, idempotency key, status. `retryExecution` checks provider status of prior execution before re-sending.
 
+Payout initiation is synchronous in the authenticated API; the worker never
+creates or sends a new payout. If a provider accepted a transfer but local
+finalization fails, the returned provider transfer ID is persisted for
+reconciliation. A failed execution without a provider ID is treated as
+ambiguous and cannot be automatically resent with a new idempotency key.
+Finance must reconcile the original provider idempotency key first.
+
+Provider execution references are unique within each payout provider, and
+webhook/status reconciliation also scopes every lookup by provider. Completion
+locks the publisher balance row before moving withdrawal and balance state;
+missing or conflicting balance state fails closed rather than silently
+recording a partial completion.
+
 ### Webhooks
 
 - Stripe: HMAC verification via `STRIPE_PAYOUT_WEBHOOK_SECRET` (falls back to `STRIPE_WEBHOOK_SECRET`)
 - Wise: RSA-SHA256 verification via `WISE_WEBHOOK_PUBLIC_KEY` (PEM)
 - Webhook controller is `@Public()` — signature verification IS the authentication
+- After signature and timestamp verification, an allowlisted normalized event
+  is durably inserted into `PayoutWebhookEvent` before the API returns 2xx.
+  Redis is not part of the acknowledgement boundary.
+- Deduplication uses the provider event ID when present, otherwise a SHA-256
+  hash of the verified payload. The transfer ID alone is not an event identity,
+  because one transfer can legitimately emit processing and terminal events.
+- Unmatched provider references retry for up to 72 hours to cover the race where
+  a webhook arrives before the provider transfer ID is committed locally.
 
 ### Status Poller
 
-BullMQ repeatable job `payout-check-status` every 10m (jobId `payout-check-status-poll`). Polls PROCESSING executions and transitions them. Payload HMAC-signed.
+Northflank runs the allowlisted `payout-reconcile` scheduled task every 10
+minutes. It drains the PostgreSQL webhook inbox first, then polls PROCESSING
+executions. The task payload remains HMAC-signed and the one-shot worker exits
+after completion. Legacy BullMQ repeatables remain available only in `all`
+mode for rollout and rollback compatibility.
 
 ## Key Models
 
@@ -58,6 +83,7 @@ BullMQ repeatable job `payout-check-status` every 10m (jobId `payout-check-statu
 - `PayoutMethod` — encrypted payout details
 - `PayoutProvider` — provider config (encrypted)
 - `PayoutExecution` — individual payout attempt
+- `PayoutWebhookEvent` — durable, deduplicated provider-event inbox
 - `PayoutBatch` — batch grouping
 
 ## Key Files

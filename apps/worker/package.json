@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "start:realtime": "WORKER_MODE=realtime node dist/index.js",
+    "start:on-demand": "WORKER_MODE=on-demand node dist/index.js",
+    "start:scheduled": "WORKER_MODE=scheduled node dist/index.js"
   },
   "dependencies": {
     "@guestpost/database": "workspace:*",

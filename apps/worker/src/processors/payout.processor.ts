@@ -11,6 +11,9 @@ import { connection } from "../redis"
 import { isRepeatableJob } from "../repeatable-job-registry"
 
 const logger = createLogger("worker.payout")
+// Prisma output is generated during the database build and is intentionally
+// not committed for every model. The schema/migration remain authoritative.
+const payoutWebhookEvent = (prisma as any).payoutWebhookEvent
 
 // Shared state transitions for "the provider says this transfer finished".
 // Used by both the webhook path and the status poller. All guards are
@@ -24,7 +27,7 @@ async function completeExecution(
     const execUpdated = await tx.payoutExecution.updateMany({
       where: {
         id: execution.id,
-        status: "PROCESSING",
+        status: { in: ["PROCESSING", "FAILED"] },
         version: execution.version,
       },
       data: {
@@ -39,34 +42,33 @@ async function completeExecution(
     const wdUpdated = await tx.withdrawal.updateMany({
       where: {
         id: execution.withdrawalId,
-        status: "PROCESSING",
+        status: { in: ["PROCESSING", "FAILED"] },
         version: execution.withdrawal.version,
       },
       data: { status: "COMPLETED", version: { increment: 1 } },
     })
     if (wdUpdated.count === 0) {
-      await tx.payoutExecution.update({
-        where: { id: execution.id },
-        data: { status: "PROCESSING" },
-      })
       throw new Error("Withdrawal state changed before completion could apply")
     }
 
+    // Serialize lifetimePaid with every other balance mutation. The previous
+    // optimistic update ignored count=0, which could commit COMPLETED while
+    // silently skipping the financial aggregate update.
+    await tx.$queryRawUnsafe(
+      'SELECT "id" FROM "PublisherBalance" WHERE "publisherId" = $1 FOR UPDATE',
+      execution.withdrawal.publisherId,
+    )
     const balance = await tx.publisherBalance.findUnique({
       where: { publisherId: execution.withdrawal.publisherId },
     })
-    if (balance) {
-      await tx.publisherBalance.updateMany({
-        where: {
-          publisherId: execution.withdrawal.publisherId,
-          version: balance.version,
-        },
-        data: {
-          lifetimePaid: { increment: Number(execution.amount) },
-          version: { increment: 1 },
-        },
-      })
-    }
+    if (!balance) throw new Error("Publisher balance missing during payout")
+    await tx.publisherBalance.update({
+      where: { publisherId: execution.withdrawal.publisherId },
+      data: {
+        lifetimePaid: { increment: Number(execution.amount) },
+        version: { increment: 1 },
+      },
+    })
 
     await tx.auditLog.create({
       data: {
@@ -82,7 +84,7 @@ async function completeExecution(
           ...metadata,
         },
         userId: null,
-        organizationId: null,
+        organizationId: execution.withdrawal.publisher.organizationId,
       },
     })
   })
@@ -111,7 +113,7 @@ async function failExecution(
     if (execUpdated.count === 0)
       throw new Error("Execution already transitioned or claimed for cancel")
 
-    await tx.withdrawal.updateMany({
+    const withdrawalUpdated = await tx.withdrawal.updateMany({
       where: {
         id: execution.withdrawalId,
         status: "PROCESSING",
@@ -119,6 +121,9 @@ async function failExecution(
       },
       data: { status: "FAILED", version: { increment: 1 } },
     })
+    if (withdrawalUpdated.count === 0) {
+      throw new Error("Withdrawal state changed before failure could apply")
+    }
 
     await tx.auditLog.create({
       data: {
@@ -135,13 +140,13 @@ async function failExecution(
           ...metadata,
         },
         userId: null,
-        organizationId: null,
+        organizationId: execution.withdrawal.publisher.organizationId,
       },
     })
   })
 }
 
-async function handleCheckStatus(job: any) {
+export async function handleCheckStatus(job: any) {
   const limit = job.data.limit ?? 50
   const pendingExecutions = await prisma.payoutExecution.findMany({
     where: { status: "PROCESSING", providerExecutionId: { not: null } },
@@ -213,6 +218,227 @@ async function handleCheckStatus(job: any) {
   return { checked: pendingExecutions.length, completed, failed, skipped }
 }
 
+const INBOX_LOCK_TIMEOUT_MS = 15 * 60 * 1000
+const INBOX_MAX_RETRY_AGE_MS = 72 * 60 * 60 * 1000
+// At the capped ten-minute backoff this exceeds the 72-hour age window. It is
+// a corruption/clock safety bound, not the normal termination condition.
+const INBOX_MAX_ATTEMPTS = 432
+
+function safeInboxError(error: unknown): string {
+  const name = error instanceof Error ? error.name : "UnknownError"
+  // Provider bodies are never part of inbox processing. Keep only the error
+  // class/category so accidental sensitive strings cannot enter this table.
+  return name.slice(0, 100)
+}
+
+function inboxRetryAt(attempts: number): Date {
+  const delaySeconds = Math.min(30 * 2 ** Math.max(attempts - 1, 0), 600)
+  return new Date(Date.now() + delaySeconds * 1000)
+}
+
+async function markInboxEvent(
+  id: string,
+  status: "PROCESSED" | "FAILED" | "IGNORED",
+  data: Record<string, unknown> = {},
+) {
+  await payoutWebhookEvent.update({
+    where: { id },
+    data: {
+      status,
+      lockedAt: null,
+      processedAt: status === "FAILED" ? null : new Date(),
+      ...data,
+    },
+  })
+}
+
+async function processInboxEvent(event: any): Promise<string> {
+  if (!event.providerExecutionId) {
+    await markInboxEvent(event.id, "IGNORED", {
+      lastError: "MissingProviderExecutionId",
+    })
+    return "ignored"
+  }
+
+  const execution = await prisma.payoutExecution.findFirst({
+    where: {
+      providerExecutionId: event.providerExecutionId,
+      provider: { is: { name: event.provider } },
+    },
+    include: { withdrawal: { include: { publisher: true } } },
+  })
+  if (!execution) {
+    const ageMs = Date.now() - event.receivedAt.getTime()
+    if (
+      event.attempts >= INBOX_MAX_ATTEMPTS ||
+      ageMs >= INBOX_MAX_RETRY_AGE_MS
+    ) {
+      await prisma.$transaction(async (tx: any) => {
+        await tx.payoutWebhookEvent.update({
+          where: { id: event.id },
+          data: {
+            status: "IGNORED",
+            lockedAt: null,
+            processedAt: new Date(),
+            lastError: "ExecutionNotFoundAfterRetryWindow",
+          },
+        })
+        await tx.auditLog.create({
+          data: {
+            action: "PAYOUT_WEBHOOK_UNMATCHED",
+            entityType: "PayoutWebhookEvent",
+            entityId: event.id,
+            metadata: {
+              provider: event.provider,
+              eventType: event.eventType,
+              providerExecutionId: event.providerExecutionId,
+              attempts: event.attempts,
+            },
+            userId: null,
+            organizationId: null,
+          },
+        })
+      })
+      return "ignored"
+    }
+    await markInboxEvent(event.id, "FAILED", {
+      availableAt: inboxRetryAt(event.attempts),
+      lastError: "ExecutionNotFoundYet",
+    })
+    return "retried"
+  }
+
+  if (execution.status === "COMPLETED") {
+    await markInboxEvent(event.id, "PROCESSED", { lastError: null })
+    return "processed"
+  }
+
+  if (event.providerStatus === "COMPLETED") {
+    if (!["PROCESSING", "FAILED"].includes(execution.status)) {
+      await prisma.$transaction(async (tx: any) => {
+        await tx.payoutWebhookEvent.update({
+          where: { id: event.id },
+          data: {
+            status: "IGNORED",
+            lockedAt: null,
+            processedAt: new Date(),
+            lastError: "CompletedTransferConflictsWithLocalState",
+          },
+        })
+        await tx.auditLog.create({
+          data: {
+            action: "PAYOUT_WEBHOOK_STATE_CONFLICT",
+            entityType: "PayoutExecution",
+            entityId: execution.id,
+            metadata: {
+              payoutWebhookEventId: event.id,
+              providerExecutionId: event.providerExecutionId,
+              localStatus: execution.status,
+              providerStatus: event.providerStatus,
+            },
+            userId: null,
+            organizationId: execution.withdrawal.publisher.organizationId,
+          },
+        })
+      })
+      return "ignored"
+    }
+    await completeExecution(execution, "webhook", {
+      provider: event.provider,
+      event: event.eventType,
+      rawStatus: event.rawStatus,
+    })
+  } else if (
+    event.providerStatus === "FAILED" &&
+    execution.status === "PROCESSING"
+  ) {
+    await failExecution(
+      execution,
+      "webhook",
+      "Provider reported transfer failed/cancelled",
+      {
+        provider: event.provider,
+        event: event.eventType,
+        rawStatus: event.rawStatus,
+      },
+    )
+  }
+
+  await markInboxEvent(event.id, "PROCESSED", { lastError: null })
+  return "processed"
+}
+
+/** Drain cryptographically verified payout events from the Postgres inbox. */
+export async function processPayoutWebhookInbox(limit = 50) {
+  const safeLimit = Math.min(Math.max(Math.floor(limit), 1), 500)
+  const now = new Date()
+  await payoutWebhookEvent.updateMany({
+    where: {
+      status: "PROCESSING",
+      lockedAt: { lt: new Date(now.getTime() - INBOX_LOCK_TIMEOUT_MS) },
+    },
+    data: {
+      status: "FAILED",
+      lockedAt: null,
+      availableAt: now,
+      lastError: "StaleProcessingLeaseRecovered",
+    },
+  })
+
+  const candidates = await payoutWebhookEvent.findMany({
+    where: {
+      status: { in: ["PENDING", "FAILED"] },
+      availableAt: { lte: now },
+    },
+    orderBy: [{ receivedAt: "asc" }, { id: "asc" }],
+    take: safeLimit,
+  })
+
+  let processed = 0
+  let retried = 0
+  let ignored = 0
+  let claimedCount = 0
+  for (const candidate of candidates) {
+    const claimed = await payoutWebhookEvent.updateMany({
+      where: {
+        id: candidate.id,
+        status: { in: ["PENDING", "FAILED"] },
+        availableAt: { lte: now },
+      },
+      data: {
+        status: "PROCESSING",
+        lockedAt: new Date(),
+        attempts: { increment: 1 },
+      },
+    })
+    if (claimed.count === 0) continue
+    claimedCount++
+
+    const event = await payoutWebhookEvent.findUnique({
+      where: { id: candidate.id },
+    })
+    if (!event) continue
+    try {
+      const result = await processInboxEvent(event)
+      if (result === "processed") processed++
+      else if (result === "retried") retried++
+      else ignored++
+    } catch (error) {
+      retried++
+      await markInboxEvent(event.id, "FAILED", {
+        availableAt: inboxRetryAt(event.attempts),
+        lastError: safeInboxError(error),
+      })
+      logger.error("payout inbox event failed", {
+        eventId: event.id,
+        error: safeInboxError(error),
+      })
+    }
+  }
+
+  return { claimed: claimedCount, processed, retried, ignored }
+}
+
 async function handleWebhook(job: any) {
   const { provider, event, data, verified } = job.data
   if (!provider || !event || !data) {
@@ -240,7 +466,10 @@ async function handleWebhook(job: any) {
     return { skipped: true, reason: "No providerExecutionId" }
   }
   const execution = await prisma.payoutExecution.findFirst({
-    where: { providerExecutionId: normalized.providerExecutionId },
+    where: {
+      providerExecutionId: normalized.providerExecutionId,
+      provider: { is: { name: provider } },
+    },
     include: { withdrawal: { include: { publisher: true } } },
   })
   if (!execution) {

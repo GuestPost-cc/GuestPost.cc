@@ -251,6 +251,17 @@ enum PayoutExecutionStatus {
   CANCELLED
 }
 
+// Durable inbox state for cryptographically verified payout-provider events.
+// Webhook delivery is acknowledged only after one of these rows commits, so
+// Redis availability is never part of the financial acknowledgement boundary.
+enum PayoutWebhookEventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
 enum PayoutBatchStatus {
   PENDING
   PROCESSING
@@ -1237,9 +1248,36 @@ model PayoutExecution {
   provider   PayoutProvider @relation(fields: [providerId], references: [id])
 
   @@unique([withdrawalId, idempotencyKey])
+  @@unique([providerId, providerExecutionId])
   @@index([withdrawalId, status])
   @@index([providerId, status])
   @@index([status, createdAt])
+  @@index([providerExecutionId])
+}
+
+model PayoutWebhookEvent {
+  id                  String                   @id @default(cuid())
+  provider            String                   @db.VarChar(32)
+  // SHA-256 of the provider event id, or of the verified raw payload when the
+  // provider supplies no event id. Never use only the transfer id here: one
+  // transfer legitimately emits several distinct state-change events.
+  dedupKey            String                   @db.VarChar(64)
+  eventType           String                   @db.VarChar(191)
+  providerExecutionId String?                  @db.VarChar(191)
+  providerStatus      String?                  @db.VarChar(32)
+  rawStatus           String?                  @db.VarChar(100)
+  status              PayoutWebhookEventStatus @default(PENDING)
+  attempts            Int                      @default(0)
+  availableAt         DateTime                 @default(now())
+  lockedAt            DateTime?
+  processedAt         DateTime?
+  lastError           String?                  @db.VarChar(100)
+  receivedAt          DateTime                 @default(now())
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+
+  @@unique([provider, dedupKey])
+  @@index([status, availableAt, receivedAt])
   @@index([providerExecutionId])
 }
 

@@ -114,7 +114,8 @@ The minimum required keys (already present in `.env.example`):
 | Key                  | Purpose                                              |
 |----------------------|------------------------------------------------------|
 | `DATABASE_URL`       | Postgres connection string (literal, no `${...}`)    |
-| `REDIS_URL`          | Redis connection string                              |
+| `REDIS_URL`          | API cache/rate-limit Redis connection                 |
+| `QUEUE_REDIS_URL`    | Optional dedicated BullMQ Redis (falls back above)    |
 | `JWT_SECRET`         | Better Auth / JWT signing key                        |
 | `NEXT_PUBLIC_API_URL`| Public API origin used by the frontends              |
 
@@ -159,6 +160,9 @@ guestpost-platform/
 │   └── docker/           # Docker Compose configuration
 └── scripts/             # Development workflow scripts (setup, check, doctor, seed, etc.)
 ```
+
+Production worker lanes, payout recovery, and Northflank job setup are covered
+in [`docs/WORKER_ARCHITECTURE.md`](docs/WORKER_ARCHITECTURE.md).
 
 ## Key Features
 

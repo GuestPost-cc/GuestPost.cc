@@ -1,4 +1,5 @@
 import { createPrismaClient } from "@guestpost/database"
+import { signJobPayload } from "@guestpost/shared/dist/job-signing"
 import { Queue } from "bullmq"
 import { IntegrationEncryptionService } from "../adapters/encryption.adapter"
 import { DiscoveryInProgressError, IntegrationNotFoundError } from "../errors"
@@ -6,6 +7,7 @@ import { getProvider } from "../providers"
 import { INTEGRATION_QUEUES } from "../queue-names"
 import { createIntegrationQueueConnection } from "../redis"
 import type { OwnerContext } from "../types"
+import { wakeOnDemandWorker } from "../worker-wakeup"
 
 const db = createPrismaClient()
 const encryption = new IntegrationEncryptionService()
@@ -82,17 +84,18 @@ export class DiscoveryService {
 
     await this.discoveryQueue.add(
       "discover",
-      {
+      signJobPayload({
         externalAccountId,
         ownerType: owner.ownerType,
         ownerId: owner.ownerId,
-      } satisfies DiscoveryJobPayload,
+      } satisfies DiscoveryJobPayload),
       {
         jobId,
         removeOnComplete: { count: 5 },
         removeOnFail: { count: 5 },
       },
     )
+    wakeOnDemandWorker()
 
     return { enqueued: true }
   }

@@ -8,7 +8,8 @@ Companion to `docs/OPERATIONS.md` (backups, supervision, monitoring basics). Thi
 | Var | Notes |
 |---|---|
 | `DATABASE_URL` | include `connection_limit`/`pool_timeout` only to override tuned defaults |
-| `REDIS_URL` | BullMQ + queues |
+| `REDIS_URL` | API cache, rate limits, and pub/sub |
+| `QUEUE_REDIS_URL` | BullMQ; falls back to `REDIS_URL`, but use a separate production database |
 | `JWT_SECRET` | 32+ random chars, never a documented default |
 | `QUEUE_SIGNING_SECRET` | must differ from JWT_SECRET |
 | `TRUSTED_ORIGINS` | comma-separated app origins — **API throws without it in production** |
@@ -17,22 +18,26 @@ Companion to `docs/OPERATIONS.md` (backups, supervision, monitoring basics). Thi
 | `WISE_API_KEY`, `WISE_WEBHOOK_PUBLIC_KEY` | Wise payouts + webhook verification (fail-closed 503 without) |
 | `PAYOUT_ENCRYPTION_KEY` | 32+ chars; payout-details encryption refuses dev-derived key in prod |
 | `CORS_ORIGIN` | comma-separated frontend origins |
-| `RECONCILIATION_SWEEP_MINUTES` / `ORDER_ACCEPT_STALE_DAYS` | optional tuning (60 / 7) |
+| `WORKER_MODE` | `realtime` for the continuous service; job modes are documented in `WORKER_ARCHITECTURE.md` |
+| `WORKER_ON_DEMAND_TRIGGER_URL`, `WORKER_ON_DEMAND_TRIGGER_TOKEN` | least-privilege Northflank job wake-up; catch-up cron remains mandatory |
 
 ### Deploy sequence (zero-surprise order)
 1. `git pull` the release tag; `pnpm install --frozen-lockfile`.
 2. **Backup first**: `scripts/backup-db.sh /var/backups/guestpost` (verifies dump readability).
 3. Migrations: `cd packages/database && npx prisma migrate deploy` — additive migrations only; destructive changes need a two-release expand/contract.
 4. `pnpm build` (11 targets; abort on any failure).
-5. Restart in order: **worker first, then API**, then frontends:
-   `pm2 restart gp-worker gp-api gp-portal gp-publisher gp-admin gp-website`
-6. Verify: `/api/v1/health` 200; worker log shows `Started 6 workers` + both repeatable jobs; `GET /admin/reconciliation` → `ok: true`.
+5. Follow the hybrid cutover in `docs/WORKER_ARCHITECTURE.md`: deploy the API,
+   stop all old worker versions, start the realtime lane, then enable jobs.
+6. Verify: `/api/v1/health` 200; realtime worker log shows four queues;
+   manually run payout reconciliation and `GET /admin/reconciliation`.
 7. Watch the reconciliation sweep for one cycle before calling it done.
 
 Container path: `docker build -f apps/api/Dockerfile .` / `apps/worker/Dockerfile` from repo root; same env contract; compose healthcheck hits `/api/v1/health`.
 
-### CRITICAL: exactly one worker fleet, one code version
-Multiple worker processes are safe ONLY when all run identical code — a stale worker consumes queue jobs with old logic and silently swallows them (this exact failure was reproduced during provider validation). pm2/containers must replace, never accumulate, worker processes.
+### CRITICAL: exactly one worker code version
+Realtime and short-lived job modes may overlap only when they use the same
+immutable image tag. A stale worker can consume a job with old logic and
+silently swallow it. Deployments must replace versions, never accumulate them.
 
 Deployment verification:
 
@@ -84,7 +89,9 @@ Follow `docs/OPERATIONS.md` restore drill. Additional money-platform steps:
 - Quantify the gap: compare latest `Transaction.createdAt` in the restored DB to the incident time; every later provider event must be replayed or manually reconciled.
 - Stripe events: redeliver from Stripe dashboard (deposits/disputes are idempotent — unique `Transaction.reference` makes replays safe).
 - Wise: compare provider transfer list against `PayoutExecution` rows for the gap window; reconcile via retry/recovery (`PAYOUT_EXECUTION_RECOVERED_COMPLETED` path) — never re-send blindly.
-- Freeze payouts (`pm2 stop gp-worker` payout processing or revoke provider keys) until reconciliation is clean.
+- Freeze payout execution at the finance API/permissions layer or revoke
+  provider keys. Stopping the worker only pauses reconciliation; workers do not
+  initiate transfers.
 
 ## 4. Incident response
 
@@ -95,15 +102,20 @@ Follow `docs/OPERATIONS.md` restore drill. Additional money-platform steps:
 
 ### First 15 minutes (SEV1 financial)
 1. `GET /admin/reconciliation` — capture the full report (it's also in the audit log under `RECONCILIATION_DRIFT_DETECTED`).
-2. Stop the worker (halts payout execution + sweeps): `pm2 stop gp-worker`.
+2. Disable the staff payout-execute endpoint/finance role and pause payout jobs.
+   Stopping workers alone does not halt API-initiated transfers.
 3. Disable deposits if wallet-side: unset `STRIPE_WEBHOOK_SECRET`? **No** — never break signature verification; instead pause at Stripe dashboard (disable the webhook endpoint) so retries queue on Stripe's side.
 4. Snapshot: `scripts/backup-db.sh` immediately (evidence + recovery point).
 5. Trace with the audit log: every money mutation has an audit row with actor/metadata; `Transaction.reference` uniqueness tells you exactly what executed.
 
 ### Provider outage
 - **Stripe down**: deposits fail at checkout (user-visible, no money risk). Disputes/webhooks queue on Stripe side and redeliver — idempotent handlers absorb the burst.
-- **Wise down**: executions fail → withdrawals FAILED → publishers see status; retry (provider-truth checked) or reverse (audited) when service returns. Status poller resumes automatically.
-- **Redis down**: API serves reads/writes but queued work (notifications, payout webhooks) buffers at the controller as 5xx to providers — they retry. Worker reconnects automatically; verify repeatable jobs re-registered after recovery.
+- **Wise down**: executions fail → withdrawals FAILED → publishers see status.
+  If no provider transfer ID was recorded, do not retry until the original
+  idempotency key is reconciled in Wise. Scheduled polling resumes automatically.
+- **Queue Redis down**: realtime/on-demand BullMQ work pauses. Payout webhooks
+  still commit to the Postgres inbox and return 2xx; payout reconciliation
+  catches up after Redis/job recovery. Other queued API work fails at enqueue.
 - **Postgres down**: everything fails closed. Restore service, then run reconciliation before reopening.
 
 ### Chargeback handling
@@ -120,7 +132,8 @@ Automatic: hold placed on dispute.created (funds frozen), release on won/warning
 2. `npx prisma migrate deploy` (creates full schema incl. CHECK constraints/partial indexes from the squashed baseline).
 3. `pnpm seed` for staging; production starts empty — first SUPER_ADMIN is provisioned via DB insert into `StaffMembership` (documented bootstrap, no self-promote API by design).
 4. API boots only with the full env contract (above) — missing vars are an immediate, loud failure, not a degraded state.
-5. Worker boots, registers payout poll + reconciliation sweep.
+5. Realtime worker boots; Northflank scheduled jobs and the on-demand catch-up
+   cron are enabled per `docs/WORKER_ARCHITECTURE.md`.
 6. Smoke: health 200 → sign-up → org-create → deposit via Stripe test → reconciliation `ok: true`.
 
 ## Appendix: container build status (2026-06-12)
