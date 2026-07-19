@@ -16,10 +16,6 @@ validateEnv()
 
 import { prisma } from "@guestpost/database"
 import {
-  createDiscoveryWorker,
-  createSyncWorker,
-} from "@guestpost/integrations/workers"
-import {
   QUEUE_JOBS,
   QUEUES,
   resolveOrderCancellationConfig,
@@ -395,12 +391,25 @@ const ON_DEMAND_WORKERS: WorkerFactory[] = [
   createVerificationWorker,
   createPayoutWorker, // drains pre-inbox rollout jobs only
   createPublisherTrustWorker,
-  () =>
+]
+
+async function createIntegrationWorkers(): Promise<
+  Array<{ close: () => Promise<void> }>
+> {
+  // Importing the integrations worker package constructs its encryption
+  // adapter. Keep that import inside the only lanes that process integration
+  // queues so realtime and scheduled workloads do not need the integration
+  // encryption key (or Google credentials) merely to boot.
+  const { createDiscoveryWorker, createSyncWorker } = await import(
+    "@guestpost/integrations/workers"
+  )
+  return [
     createDiscoveryWorker(connection as any) as {
       close: () => Promise<void>
     },
-  () => createSyncWorker(connection as any) as { close: () => Promise<void> },
-]
+    createSyncWorker(connection as any) as { close: () => Promise<void> },
+  ]
+}
 
 const ON_DEMAND_QUEUES = [
   QUEUES.REPORT,
@@ -780,11 +789,8 @@ async function bootstrap() {
       createSettlementAutoApproveWorker(),
       createSettlementReleaseWorker(),
       createAutoAcceptWorker(),
-      createDiscoveryWorker(connection as any) as {
-        close: () => Promise<void>
-      },
-      createSyncWorker(connection as any) as { close: () => Promise<void> },
     )
+    workers.push(...(await createIntegrationWorkers()))
     logger.info("legacy-compatible worker fleet started", {
       count: workers.length,
     })
@@ -822,6 +828,7 @@ async function bootstrap() {
 
   if (mode === "on-demand") {
     workers.push(...ON_DEMAND_WORKERS.map((createWorker) => createWorker()))
+    workers.push(...(await createIntegrationWorkers()))
     logger.info("on-demand worker lane started", {
       count: workers.length,
       queues: ON_DEMAND_QUEUES,
