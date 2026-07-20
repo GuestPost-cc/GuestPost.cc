@@ -34,11 +34,12 @@ The API must fail at boot if an enabled feature lacks its key/webhook secret.
 Never put `sk_*`, `rk_*`, or `whsec_*` values in browser-exposed environment
 variables, logs, screenshots, tickets, or documentation.
 
-The staging restricted key needs only the Stripe resources used by this
-release: Checkout Sessions (write/read), Accounts and Account Links
-(write/read), Balance Settings (write/read), Transfers and Transfer Reversals
-(write/read), and Payouts (write/read). Deny every unrelated resource. Use a
-separate key per environment and rotate it immediately if it is exposed.
+The staging restricted key grants only the Stripe Dashboard resources used by
+this release: Checkout Sessions `Write`, Accounts `Write`, Account Links
+`Write`, and Transfers `Write` under platform permissions, plus Payouts
+`Write` under Connect permissions. `Write` includes the corresponding reads;
+all unrelated platform and Connect resources remain `None`. Use a separate key
+per environment and rotate it immediately if it is exposed.
 
 ## 3. Stripe Dashboard configuration
 
