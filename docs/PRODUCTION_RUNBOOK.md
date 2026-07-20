@@ -13,7 +13,7 @@ Companion to `docs/OPERATIONS.md` (backups, supervision, monitoring basics). Thi
 | `JWT_SECRET` | 32+ random chars, never a documented default |
 | `QUEUE_SIGNING_SECRET` | must differ from JWT_SECRET |
 | `TRUSTED_ORIGINS` | comma-separated app origins — **API throws without it in production** |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe deposits; secret key must match the webhook mode |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe deposits; prefer a least-privilege `rk_*` key whose mode matches the webhook |
 | `STRIPE_PAYOUT_WEBHOOK_SECRET` | Stripe platform-transfer webhook secret; no fallback/reuse |
 | `STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET` | separate connected-account payout webhook secret; required with Connect |
 | `STRIPE_DEPOSITS_ENABLED`, `STRIPE_CONNECT_ENABLED` | kill switches for new sends; false unless deliberately enabled |

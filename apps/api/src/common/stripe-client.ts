@@ -60,8 +60,8 @@ export function isStripeFeatureEnabled(feature: StripeFeature): boolean {
 export function stripeKeyMode(): "test" | "live" | "none" | "invalid" {
   const key = process.env.STRIPE_SECRET_KEY?.trim()
   if (!key) return "none"
-  if (key.startsWith("sk_test_")) return "test"
-  if (key.startsWith("sk_live_")) return "live"
+  if (key.startsWith("sk_test_") || key.startsWith("rk_test_")) return "test"
+  if (key.startsWith("sk_live_") || key.startsWith("rk_live_")) return "live"
   return "invalid"
 }
 
@@ -75,7 +75,9 @@ export function validateStripeEnvironment(): void {
     throw new Error("Stripe is enabled but STRIPE_SECRET_KEY is missing")
   }
   if (mode === "invalid") {
-    throw new Error("STRIPE_SECRET_KEY must be an sk_test_ or sk_live_ key")
+    throw new Error(
+      "STRIPE_SECRET_KEY must be a Stripe secret or restricted key",
+    )
   }
   if (mode === "live" && !enabled(process.env.STRIPE_LIVE_MODE_ENABLED)) {
     throw new Error(

@@ -18,7 +18,7 @@ It does not authorize live money.
 Set in the deployment secret manager, never source control:
 
 ```text
-STRIPE_SECRET_KEY=sk_test_...
+STRIPE_SECRET_KEY=rk_test_...                  # least-privilege restricted key
 STRIPE_WEBHOOK_SECRET=whsec_...               # customer deposit endpoint
 STRIPE_PAYOUT_WEBHOOK_SECRET=whsec_...        # platform transfer endpoint
 STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET=whsec_... # connected-account endpoint
@@ -31,8 +31,14 @@ NEXT_PUBLIC_PUBLISHER_URL=https://publisher.guestpost.pro.bd
 ```
 
 The API must fail at boot if an enabled feature lacks its key/webhook secret.
-Never put `sk_*` or `whsec_*` values in browser environment variables, logs,
-screenshots, tickets, or documentation.
+Never put `sk_*`, `rk_*`, or `whsec_*` values in browser-exposed environment
+variables, logs, screenshots, tickets, or documentation.
+
+The staging restricted key needs only the Stripe resources used by this
+release: Checkout Sessions (write/read), Accounts and Account Links
+(write/read), Balance Settings (write/read), Transfers and Transfer Reversals
+(write/read), and Payouts (write/read). Deny every unrelated resource. Use a
+separate key per environment and rotate it immediately if it is exposed.
 
 ## 3. Stripe Dashboard configuration
 
@@ -50,6 +56,7 @@ connected-account payouts each have a separate rotation boundary:
 2. `https://api.guestpost.pro.bd/api/v1/payout-webhooks/stripe_connect`
    - listen to events on **your account**;
    - `transfer.created`
+   - `transfer.canceled`
    - `transfer.updated`
    - `transfer.reversed`
 3. `https://api.guestpost.pro.bd/api/v1/payout-webhooks/stripe_connect`
