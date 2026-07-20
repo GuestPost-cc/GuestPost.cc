@@ -318,6 +318,8 @@ describe("PayoutExecutionService — provider error redaction", () => {
       status: "APPROVED",
       version: 0,
       amount: new Decimal(100),
+      currency: "USD",
+      method: "wise",
       publisherId: "pub-1",
       publisher: { organizationId: "org-1" },
       payoutMethod: {
@@ -338,6 +340,11 @@ describe("PayoutExecutionService — provider error redaction", () => {
       },
       payoutExecution: {
         create: jest.fn().mockResolvedValue({ id: "exec-1" }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: "exec-1",
+          status: "PROCESSING",
+          stage: "CREATED",
+        }),
         update: jest.fn().mockResolvedValue({}),
       },
       $queryRaw: jest.fn().mockResolvedValue([]),
@@ -350,6 +357,8 @@ describe("PayoutExecutionService — provider error redaction", () => {
     )
     const providerMock = {
       getAdapter: jest.fn().mockReturnValue({
+        capabilities: { supportedCurrencies: ["USD"] },
+        validateRecipient: jest.fn().mockResolvedValue({ valid: true }),
         createTransfer: jest.fn().mockRejectedValue(leakyError),
       }),
       getActiveProvider: jest

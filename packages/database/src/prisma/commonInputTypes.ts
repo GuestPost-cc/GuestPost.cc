@@ -1038,6 +1038,23 @@ export type EnumWithdrawalStatusWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumWithdrawalStatusFilter<$PrismaModel>
 }
 
+export type EnumPublisherProviderAccountStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.PublisherProviderAccountStatus | Prisma.EnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PublisherProviderAccountStatus[] | Prisma.ListEnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PublisherProviderAccountStatus[] | Prisma.ListEnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPublisherProviderAccountStatusFilter<$PrismaModel> | $Enums.PublisherProviderAccountStatus
+}
+
+export type EnumPublisherProviderAccountStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PublisherProviderAccountStatus | Prisma.EnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PublisherProviderAccountStatus[] | Prisma.ListEnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PublisherProviderAccountStatus[] | Prisma.ListEnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPublisherProviderAccountStatusWithAggregatesFilter<$PrismaModel> | $Enums.PublisherProviderAccountStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPublisherProviderAccountStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPublisherProviderAccountStatusFilter<$PrismaModel>
+}
+
 export type EnumPayoutExecutionStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.PayoutExecutionStatus | Prisma.EnumPayoutExecutionStatusFieldRefInput<$PrismaModel>
   in?: $Enums.PayoutExecutionStatus[] | Prisma.ListEnumPayoutExecutionStatusFieldRefInput<$PrismaModel>
@@ -1053,6 +1070,23 @@ export type EnumPayoutExecutionStatusWithAggregatesFilter<$PrismaModel = never> 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumPayoutExecutionStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumPayoutExecutionStatusFilter<$PrismaModel>
+}
+
+export type EnumPayoutWebhookEventStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.PayoutWebhookEventStatus | Prisma.EnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PayoutWebhookEventStatus[] | Prisma.ListEnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PayoutWebhookEventStatus[] | Prisma.ListEnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPayoutWebhookEventStatusFilter<$PrismaModel> | $Enums.PayoutWebhookEventStatus
+}
+
+export type EnumPayoutWebhookEventStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PayoutWebhookEventStatus | Prisma.EnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PayoutWebhookEventStatus[] | Prisma.ListEnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PayoutWebhookEventStatus[] | Prisma.ListEnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPayoutWebhookEventStatusWithAggregatesFilter<$PrismaModel> | $Enums.PayoutWebhookEventStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPayoutWebhookEventStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPayoutWebhookEventStatusFilter<$PrismaModel>
 }
 
 export type EnumPayoutBatchStatusFilter<$PrismaModel = never> = {
@@ -1121,6 +1155,40 @@ export type EnumTransactionTypeWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumTransactionTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumTransactionTypeFilter<$PrismaModel>
+}
+
+export type EnumDepositAttemptStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositAttemptStatus | Prisma.EnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel> | $Enums.DepositAttemptStatus
+}
+
+export type EnumDepositAttemptStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositAttemptStatus | Prisma.EnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositAttemptStatusWithAggregatesFilter<$PrismaModel> | $Enums.DepositAttemptStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel>
+}
+
+export type EnumPaymentProviderEventStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.PaymentProviderEventStatus | Prisma.EnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PaymentProviderEventStatus[] | Prisma.ListEnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PaymentProviderEventStatus[] | Prisma.ListEnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPaymentProviderEventStatusFilter<$PrismaModel> | $Enums.PaymentProviderEventStatus
+}
+
+export type EnumPaymentProviderEventStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PaymentProviderEventStatus | Prisma.EnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PaymentProviderEventStatus[] | Prisma.ListEnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PaymentProviderEventStatus[] | Prisma.ListEnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPaymentProviderEventStatusWithAggregatesFilter<$PrismaModel> | $Enums.PaymentProviderEventStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPaymentProviderEventStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPaymentProviderEventStatusFilter<$PrismaModel>
 }
 
 export type EnumTicketStatusFilter<$PrismaModel = never> = {
@@ -2462,6 +2530,23 @@ export type NestedEnumWithdrawalStatusWithAggregatesFilter<$PrismaModel = never>
   _max?: Prisma.NestedEnumWithdrawalStatusFilter<$PrismaModel>
 }
 
+export type NestedEnumPublisherProviderAccountStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.PublisherProviderAccountStatus | Prisma.EnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PublisherProviderAccountStatus[] | Prisma.ListEnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PublisherProviderAccountStatus[] | Prisma.ListEnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPublisherProviderAccountStatusFilter<$PrismaModel> | $Enums.PublisherProviderAccountStatus
+}
+
+export type NestedEnumPublisherProviderAccountStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PublisherProviderAccountStatus | Prisma.EnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PublisherProviderAccountStatus[] | Prisma.ListEnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PublisherProviderAccountStatus[] | Prisma.ListEnumPublisherProviderAccountStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPublisherProviderAccountStatusWithAggregatesFilter<$PrismaModel> | $Enums.PublisherProviderAccountStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPublisherProviderAccountStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPublisherProviderAccountStatusFilter<$PrismaModel>
+}
+
 export type NestedEnumPayoutExecutionStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.PayoutExecutionStatus | Prisma.EnumPayoutExecutionStatusFieldRefInput<$PrismaModel>
   in?: $Enums.PayoutExecutionStatus[] | Prisma.ListEnumPayoutExecutionStatusFieldRefInput<$PrismaModel>
@@ -2477,6 +2562,23 @@ export type NestedEnumPayoutExecutionStatusWithAggregatesFilter<$PrismaModel = n
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumPayoutExecutionStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumPayoutExecutionStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumPayoutWebhookEventStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.PayoutWebhookEventStatus | Prisma.EnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PayoutWebhookEventStatus[] | Prisma.ListEnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PayoutWebhookEventStatus[] | Prisma.ListEnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPayoutWebhookEventStatusFilter<$PrismaModel> | $Enums.PayoutWebhookEventStatus
+}
+
+export type NestedEnumPayoutWebhookEventStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PayoutWebhookEventStatus | Prisma.EnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PayoutWebhookEventStatus[] | Prisma.ListEnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PayoutWebhookEventStatus[] | Prisma.ListEnumPayoutWebhookEventStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPayoutWebhookEventStatusWithAggregatesFilter<$PrismaModel> | $Enums.PayoutWebhookEventStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPayoutWebhookEventStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPayoutWebhookEventStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumPayoutBatchStatusFilter<$PrismaModel = never> = {
@@ -2545,6 +2647,40 @@ export type NestedEnumTransactionTypeWithAggregatesFilter<$PrismaModel = never> 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumTransactionTypeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumTransactionTypeFilter<$PrismaModel>
+}
+
+export type NestedEnumDepositAttemptStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositAttemptStatus | Prisma.EnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel> | $Enums.DepositAttemptStatus
+}
+
+export type NestedEnumDepositAttemptStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.DepositAttemptStatus | Prisma.EnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.DepositAttemptStatus[] | Prisma.ListEnumDepositAttemptStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumDepositAttemptStatusWithAggregatesFilter<$PrismaModel> | $Enums.DepositAttemptStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumDepositAttemptStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumPaymentProviderEventStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.PaymentProviderEventStatus | Prisma.EnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PaymentProviderEventStatus[] | Prisma.ListEnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PaymentProviderEventStatus[] | Prisma.ListEnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPaymentProviderEventStatusFilter<$PrismaModel> | $Enums.PaymentProviderEventStatus
+}
+
+export type NestedEnumPaymentProviderEventStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.PaymentProviderEventStatus | Prisma.EnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.PaymentProviderEventStatus[] | Prisma.ListEnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.PaymentProviderEventStatus[] | Prisma.ListEnumPaymentProviderEventStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumPaymentProviderEventStatusWithAggregatesFilter<$PrismaModel> | $Enums.PaymentProviderEventStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumPaymentProviderEventStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumPaymentProviderEventStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumTicketStatusFilter<$PrismaModel = never> = {

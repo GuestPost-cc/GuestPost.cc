@@ -13,8 +13,13 @@ Companion to `docs/OPERATIONS.md` (backups, supervision, monitoring basics). Thi
 | `JWT_SECRET` | 32+ random chars, never a documented default |
 | `QUEUE_SIGNING_SECRET` | must differ from JWT_SECRET |
 | `TRUSTED_ORIGINS` | comma-separated app origins — **API throws without it in production** |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | deposits |
-| `STRIPE_PAYOUT_WEBHOOK_SECRET` | payout webhooks (falls back to STRIPE_WEBHOOK_SECRET) |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe deposits; prefer a least-privilege `rk_*` key whose mode matches the webhook |
+| `STRIPE_PAYOUT_WEBHOOK_SECRET` | Stripe platform-transfer webhook secret; no fallback/reuse |
+| `STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET` | separate connected-account payout webhook secret; required with Connect |
+| `STRIPE_DEPOSITS_ENABLED`, `STRIPE_CONNECT_ENABLED` | kill switches for new sends; false unless deliberately enabled |
+| `STRIPE_LIVE_MODE_ENABLED` | must remain false for test keys/staging; live-key boot gate |
+| `NEXT_PUBLIC_PORTAL_URL`, `NEXT_PUBLIC_PUBLISHER_URL` | exact HTTPS, credential-free return origins; required when the corresponding Stripe flow is enabled in production |
+| `PAYOUT_LEGACY_METHODS_ENABLED` | false for Stripe rollout; only enable after the selected legacy provider is certified |
 | `WISE_API_KEY`, `WISE_WEBHOOK_PUBLIC_KEY` | Wise payouts + webhook verification (fail-closed 503 without) |
 | `PAYOUT_ENCRYPTION_KEY` | 32+ chars; payout-details encryption refuses dev-derived key in prod |
 | `CORS_ORIGIN` | comma-separated frontend origins |
@@ -104,7 +109,10 @@ Follow `docs/OPERATIONS.md` restore drill. Additional money-platform steps:
 1. `GET /admin/reconciliation` — capture the full report (it's also in the audit log under `RECONCILIATION_DRIFT_DETECTED`).
 2. Disable the staff payout-execute endpoint/finance role and pause payout jobs.
    Stopping workers alone does not halt API-initiated transfers.
-3. Disable deposits if wallet-side: unset `STRIPE_WEBHOOK_SECRET`? **No** — never break signature verification; instead pause at Stripe dashboard (disable the webhook endpoint) so retries queue on Stripe's side.
+3. Disable new Stripe sends with `STRIPE_DEPOSITS_ENABLED=false` and/or
+   `STRIPE_CONNECT_ENABLED=false`. **Do not** unset keys/secrets or disable the
+   webhook endpoints: disputes, terminal events, and reconciliation for money
+   already in flight must continue.
 4. Snapshot: `scripts/backup-db.sh` immediately (evidence + recovery point).
 5. Trace with the audit log: every money mutation has an audit row with actor/metadata; `Transaction.reference` uniqueness tells you exactly what executed.
 
@@ -113,6 +121,10 @@ Follow `docs/OPERATIONS.md` restore drill. Additional money-platform steps:
 - **Wise down**: executions fail → withdrawals FAILED → publishers see status.
   If no provider transfer ID was recorded, do not retry until the original
   idempotency key is reconciled in Wise. Scheduled polling resumes automatically.
+- **Stripe Connect payout failure after Transfer**: the withdrawal remains
+  reserved in `BANK_PAYOUT_RECOVERY_REQUIRED`. Finance must establish provider
+  truth, then cancel the Payout/reverse the Transfer before re-execution or any
+  balance restoration. See `docs/STRIPE_STAGING_RUNBOOK.md`.
 - **Queue Redis down**: realtime/on-demand BullMQ work pauses. Payout webhooks
   still commit to the Postgres inbox and return 2xx; payout reconciliation
   catches up after Redis/job recovery. Other queued API work fails at enqueue.

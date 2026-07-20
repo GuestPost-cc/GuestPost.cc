@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-07-19
+updated: 2026-07-20
 ---
 
 # GuestPost.cc
@@ -36,13 +36,13 @@ Open/partial items require architectural design discussion.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 907 unit tests + integration tests
+- **apps/api** — NestJS REST API, 937 unit tests + integration tests
 - **apps/worker** — BullMQ queue processor
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard
 - **apps/publisher** — Publisher dashboard
 - **apps/website** — Public marketing site
-- **packages/shared** — Shared utilities (72 tests)
+- **packages/shared** — Shared utilities (102 tests)
 - **packages/database** — Prisma schema + migrations
 - **packages/ui** — Shared component library
 - **packages/api-client** — Generated API client
@@ -58,6 +58,22 @@ Open/partial items require architectural design discussion.
   funding is accepted only through Stripe checkout/webhook verification;
   seed, integration, concurrency, and load setup use test-only Prisma helpers
   that refuse to run with `NODE_ENV=production`.
+- Customer funding is provider-neutral at the domain boundary: a durable
+  `DepositAttempt` is created before provider checkout, public money commands
+  require an idempotency key bound to their immutable inputs, and a verified
+  provider event credits the wallet only for an explicit paid state. The
+  attempt, wallet balance, ledger row, webhook inbox row, and audit record
+  commit in one database transaction.
+- Publisher provider accounts are separate from payout methods. Stripe Connect
+  uses hosted Express onboarding and stores no publisher bank credentials;
+  payout execution persists distinct platform-to-connected `Transfer` and
+  connected-to-bank `Payout` references. Only a paid bank payout completes a
+  withdrawal, while explicit recovery/cancellation stages keep ambiguous
+  provider outcomes reserved for reconciliation.
+- Stripe test and live modes are isolated by key/event mode checks, separate
+  deposit and Connect webhook secrets, independent feature kill switches, and
+  a second opt-in gate for live keys. Stripe Connect is USD-only until an
+  additional currency is deliberately certified end to end.
 - Worker deliveries verified via shared `delivery-verification` module (24 tests)
 - The worker uses a hybrid free-tier topology: Northflank continuously runs
   only the four latency-sensitive BullMQ queues in `realtime` mode; a

@@ -22,11 +22,22 @@ export interface WithdrawalResponse {
   id: string
   amount: number
   currency: string
+  publicReference: string | null
+  payoutFee: number
+  netAmount: number
+  feePolicyVersion: string | null
   status: WithdrawalStatus
   availableAt: string | null
   payoutMethodId: string | null
   payoutMethod?: { id: string; type: string; label: string } | null
   createdAt: string
+  allocations?: Array<{
+    amount: number
+    currency: string
+    sourceType: string
+    serviceType: string | null
+    orderId: string | null
+  }>
 }
 
 export interface PayoutMethodResponse {
@@ -35,6 +46,29 @@ export interface PayoutMethodResponse {
   label: string
   isDefault: boolean
   displayDetails: Record<string, unknown>
+}
+
+export interface StripeConnectStatusResponse {
+  available: boolean
+  connected: boolean
+  status:
+    | "NOT_CONNECTED"
+    | "PENDING_ONBOARDING"
+    | "RESTRICTED"
+    | "ENABLED"
+    | "DISABLED"
+  country: string | null
+  defaultCurrency: string | null
+  transfersEnabled: boolean
+  payoutsEnabled: boolean
+  detailsSubmitted: boolean
+  requirementsDue: string[]
+  lastSyncedAt: string | null
+  feePolicy: {
+    version: string
+    publisherFee: number
+    providerFeesPaidBy: "platform"
+  }
 }
 
 // Prisma Decimal columns serialize as STRINGS over JSON. Every money field
@@ -58,7 +92,16 @@ function normalizeBalance(raw: any): PublisherBalanceResponse {
 }
 
 function normalizeWithdrawal(raw: any): WithdrawalResponse {
-  return { ...raw, amount: num(raw.amount) }
+  return {
+    ...raw,
+    amount: num(raw.amount),
+    payoutFee: num(raw.payoutFee),
+    netAmount: num(raw.netAmount ?? raw.amount),
+    allocations: raw.allocations?.map((allocation: any) => ({
+      ...allocation,
+      amount: num(allocation.amount),
+    })),
+  }
 }
 
 export class PublisherPayoutsService {
@@ -72,9 +115,9 @@ export class PublisherPayoutsService {
 
   async requestWithdrawal(data: {
     amount: number
-    method?: string
+    method: string
     payoutMethodId?: string
-    idempotencyKey?: string
+    idempotencyKey: string
   }) {
     const raw = await this.client.post<any>("/publisher-payouts/withdrawals", {
       json: data as unknown as Record<string, unknown>,
@@ -95,6 +138,24 @@ export class PublisherPayoutsService {
   listPayoutMethods() {
     return this.client.get<PayoutMethodResponse[]>(
       "/publisher-payouts/payout-methods",
+    )
+  }
+
+  getStripeConnectStatus() {
+    return this.client.get<StripeConnectStatusResponse>(
+      "/publisher-payouts/stripe-connect/status",
+    )
+  }
+
+  createStripeConnectOnboardingLink() {
+    return this.client.post<{ url: string; expiresAt: string }>(
+      "/publisher-payouts/stripe-connect/onboarding-link",
+    )
+  }
+
+  refreshStripeConnectStatus() {
+    return this.client.post<StripeConnectStatusResponse>(
+      "/publisher-payouts/stripe-connect/refresh",
     )
   }
 

@@ -25,6 +25,7 @@ function mockPrisma() {
       findMany: jest.fn().mockResolvedValue([]),
       groupBy: jest.fn().mockResolvedValue([]),
     },
+    depositAttempt: { findMany: jest.fn().mockResolvedValue([]) },
     platformRevenue: { findMany: jest.fn().mockResolvedValue([]) },
   }
 }
@@ -196,6 +197,29 @@ describe("runReconciliation with mock prisma", () => {
     )
     expect(unmatched.length).toBe(1)
     expect(unmatched[0].severity).toBe("critical")
+  })
+
+  it("detects a succeeded provider deposit without a wallet ledger row", async () => {
+    const prisma = mockPrisma()
+    prisma.depositAttempt.findMany.mockResolvedValue([
+      {
+        id: "deposit-1",
+        publicReference: "GP-DP-ABCD2345",
+        status: "SUCCEEDED",
+        walletCredit: "25.00",
+        currency: "USD",
+        ledgerTransactionId: null,
+        ledgerTransaction: null,
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+    expect(
+      report.orderPaymentRecon.some(
+        (issue) => issue.code === "DEPOSIT_SUCCEEDED_NO_LEDGER",
+      ),
+    ).toBe(true)
+    expect(report.ok).toBe(false)
   })
 
   it("handles negative PURCHASE convention (no false PAYMENT_AMOUNT_MISMATCH)", async () => {

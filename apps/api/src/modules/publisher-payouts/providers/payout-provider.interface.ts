@@ -9,9 +9,42 @@ export interface CreateTransferParams {
 
 export interface CreateTransferResult {
   providerExecutionId: string
+  providerTransferId?: string
   status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED"
   fee?: number
   metadata?: Record<string, unknown>
+}
+
+export interface CreateBankPayoutParams {
+  amount: number
+  currency: string
+  connectedAccountId: string
+  idempotencyKey: string
+  description: string
+  statementDescriptor: string
+  publicReference: string
+}
+
+export interface CreateBankPayoutResult extends CreateTransferResult {
+  providerPayoutId: string
+  acceptedReference?: string
+}
+
+export interface ProviderExecutionContext {
+  connectedAccountId?: string
+  providerTransferId?: string
+  providerPayoutId?: string
+}
+
+export interface PayoutProviderCapabilities {
+  supportedCurrencies: string[]
+  supportsBankPayout: boolean
+  supportsCancellation: boolean
+  supportsWebhooks: boolean
+  supportsStatusPolling: boolean
+  supportsExternalReference: boolean
+  requiresRecipientOnboarding: boolean
+  maxReferenceLength?: number
 }
 
 export interface CheckStatusResult {
@@ -30,6 +63,7 @@ export interface CancelTransferResult {
 
 export interface PayoutProviderAdapter {
   readonly providerName: string
+  readonly capabilities: PayoutProviderCapabilities
 
   validateRecipient(
     details: Record<string, unknown>,
@@ -37,10 +71,18 @@ export interface PayoutProviderAdapter {
 
   createTransfer(params: CreateTransferParams): Promise<CreateTransferResult>
 
-  checkTransferStatus(providerExecutionId: string): Promise<CheckStatusResult>
+  createBankPayout?(
+    params: CreateBankPayoutParams,
+  ): Promise<CreateBankPayoutResult>
+
+  checkTransferStatus(
+    providerExecutionId: string,
+    context?: ProviderExecutionContext,
+  ): Promise<CheckStatusResult>
 
   cancelTransfer(
     providerExecutionId: string,
     idempotencyKey: string,
+    context?: ProviderExecutionContext,
   ): Promise<CancelTransferResult>
 }

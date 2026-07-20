@@ -10,6 +10,16 @@ import {
 @Injectable()
 export class ManualPayoutAdapter implements PayoutProviderAdapter {
   readonly providerName = "manual"
+  readonly capabilities = {
+    supportedCurrencies: ["USD"],
+    supportsBankPayout: true,
+    supportsCancellation: true,
+    supportsWebhooks: false,
+    supportsStatusPolling: false,
+    supportsExternalReference: true,
+    requiresRecipientOnboarding: false,
+    maxReferenceLength: 32,
+  }
 
   async validateRecipient(
     details: Record<string, unknown>,

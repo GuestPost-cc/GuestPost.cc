@@ -33,6 +33,7 @@ function makePrismaMock() {
     "publisherBalance",
     "withdrawal",
     "payoutExecution",
+    "withdrawalAllocation",
     "publisher",
     "publisherMembership",
     "staffMembership",
@@ -97,6 +98,7 @@ describe("F-1: deposit webhook double-credit race", () => {
   const session = {
     id: "cs_test_123",
     amount_total: 25050, // $250.50
+    payment_status: "paid",
     payment_intent: "pi_test_456",
     metadata: {
       walletId: "wallet-1",
@@ -169,6 +171,19 @@ describe("F-1: deposit webhook double-credit race", () => {
     ).resolves.toBeUndefined()
     expect(prisma.__committed).toBe(false)
     expect(prisma.wallet.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("never credits a Checkout session unless Stripe explicitly marks it paid", async () => {
+    await expect(
+      (service as any).processSuccessfulPayment({
+        ...session,
+        id: "cs_test_unpaid",
+        payment_status: "unpaid",
+      }),
+    ).rejects.toThrow(/not paid/i)
+
+    expect(prisma.wallet.updateMany).not.toHaveBeenCalled()
+    expect(prisma.transaction.create).not.toHaveBeenCalled()
   })
 })
 

@@ -3,7 +3,9 @@ import {
   getWithdrawalHoldDays,
   type PublisherTier,
   QUEUES,
+  STRIPE_INITIAL_FEE_POLICY_VERSION,
 } from "@guestpost/shared"
+import { createFinancialReference } from "@guestpost/shared/dist/financial-reference-server"
 import {
   BadRequestException,
   ConflictException,
@@ -15,6 +17,7 @@ import {
 import { Decimal } from "@prisma/client/runtime/client"
 import { PrismaService } from "../../common/prisma.service"
 import { checkPublisherBalanceInvariant } from "../../common/publisher-balance-invariants"
+import { isStripeFeatureEnabled } from "../../common/stripe-client"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { PayoutEncryptionService } from "./payout-encryption.service"
@@ -36,6 +39,14 @@ export class PublisherPayoutsService {
     private readonly encryption: PayoutEncryptionService,
     readonly _execution: PayoutExecutionService,
   ) {}
+
+  private legacyPayoutMethodsEnabled() {
+    return (
+      process.env.PAYOUT_LEGACY_METHODS_ENABLED === "true" ||
+      process.env.NODE_ENV === "development" ||
+      process.env.NODE_ENV === "test"
+    )
+  }
 
   async getBalance(publisherId: string) {
     let balance = await this.prisma.publisherBalance.findUnique({
@@ -70,6 +81,11 @@ export class PublisherPayoutsService {
     },
   ) {
     await this.assertPublisherMember(userId, publisherId)
+    if (!this.legacyPayoutMethodsEnabled()) {
+      throw new BadRequestException(
+        "Direct payout-method entry is disabled. Connect a verified provider account instead.",
+      )
+    }
     const allowed = ["bank_transfer", "paypal", "wise"]
     if (!allowed.includes(dto.type)) {
       throw new BadRequestException(
@@ -220,6 +236,140 @@ export class PublisherPayoutsService {
 
   // ─── WITHDRAWALS ────────────────────────────────────────────
 
+  private async allocateWithdrawalSources(
+    tx: any,
+    withdrawalId: string,
+    publisherId: string,
+    amount: Decimal,
+    balance: any,
+  ): Promise<Decimal> {
+    let remaining = new Decimal(amount)
+    let sequence = 0
+    let carryUsed = new Decimal(0)
+    const carryAvailable = new Decimal(
+      balance.allocationCarryForward ?? balance.withdrawableBalance ?? 0,
+    ).minus(new Decimal(balance.allocationCarryForwardUsed ?? 0))
+
+    if (carryAvailable.greaterThan(0)) {
+      carryUsed = Decimal.min(carryAvailable, remaining)
+      if (carryUsed.greaterThan(0)) {
+        await tx.withdrawalAllocation.create({
+          data: {
+            withdrawalId,
+            sourceType: "CARRY_FORWARD",
+            amount: carryUsed,
+            currency: "USD",
+            sequence: sequence++,
+          },
+        })
+        remaining = remaining.minus(carryUsed)
+      }
+    }
+
+    if (remaining.greaterThan(0)) {
+      const transactions = await tx.transaction.findMany({
+        where: {
+          publisherId,
+          settlementId: { not: null },
+          type: { in: ["SETTLEMENT_RELEASE", "DEBT_REPAYMENT"] },
+          ...(balance.allocationCutoverAt
+            ? { createdAt: { gte: balance.allocationCutoverAt } }
+            : {}),
+        },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        include: {
+          settlement: { select: { serviceType: true, orderId: true } },
+          withdrawalAllocations: {
+            where: { releasedAt: null },
+            select: { amount: true },
+          },
+        },
+      })
+      const debtBySettlement = new Map<string, Decimal>()
+      for (const row of transactions) {
+        if (row.type !== "DEBT_REPAYMENT" || !row.settlementId) continue
+        debtBySettlement.set(
+          row.settlementId,
+          (debtBySettlement.get(row.settlementId) ?? new Decimal(0)).plus(
+            row.amount,
+          ),
+        )
+      }
+      for (const row of transactions) {
+        if (remaining.lessThanOrEqualTo(0)) break
+        if (row.type !== "SETTLEMENT_RELEASE" || !row.settlementId) continue
+        const allocated = row.withdrawalAllocations.reduce(
+          (sum: Decimal, item: any) => sum.plus(item.amount),
+          new Decimal(0),
+        )
+        const sourceAvailable = new Decimal(row.amount)
+          .plus(debtBySettlement.get(row.settlementId) ?? 0)
+          .minus(allocated)
+        if (sourceAvailable.lessThanOrEqualTo(0)) continue
+        const use = Decimal.min(sourceAvailable, remaining)
+        await tx.withdrawalAllocation.create({
+          data: {
+            withdrawalId,
+            sourceType: "SETTLEMENT_RELEASE",
+            sourceTransactionId: row.id,
+            settlementId: row.settlementId,
+            orderId: row.settlement?.orderId ?? row.orderId,
+            amount: use,
+            currency: row.currency ?? "USD",
+            sequence: sequence++,
+            serviceType: row.settlement?.serviceType ?? null,
+          },
+        })
+        remaining = remaining.minus(use)
+      }
+    }
+
+    if (remaining.greaterThan(0)) {
+      throw new ConflictException(
+        "Withdrawal source allocation does not match the publisher balance. Finance reconciliation is required.",
+      )
+    }
+    return carryUsed
+  }
+
+  private async releaseWithdrawalSources(tx: any, withdrawalId: string) {
+    const active = await tx.withdrawalAllocation.findMany({
+      where: { withdrawalId, releasedAt: null },
+      select: { id: true, sourceType: true, amount: true },
+    })
+    const carry = active
+      .filter((item: any) => item.sourceType === "CARRY_FORWARD")
+      .reduce(
+        (sum: Decimal, item: any) => sum.plus(item.amount),
+        new Decimal(0),
+      )
+    if (active.length) {
+      await tx.withdrawalAllocation.updateMany({
+        where: { id: { in: active.map((item: any) => item.id) } },
+        data: { releasedAt: new Date() },
+      })
+    }
+    return carry
+  }
+
+  private assertMatchingWithdrawalRequest(
+    existing: any,
+    amount: Decimal,
+    method: string,
+    payoutMethodId?: string,
+  ) {
+    if (
+      !new Decimal(existing.amount).equals(amount) ||
+      existing.method !== method ||
+      (existing.payoutMethodId ?? null) !== (payoutMethodId ?? null) ||
+      String(existing.currency).toUpperCase() !== "USD"
+    ) {
+      throw new ConflictException(
+        "This withdrawal request key was already used for different payout details",
+      )
+    }
+  }
+
   async requestWithdrawal(
     publisherId: string,
     amount: number,
@@ -235,16 +385,58 @@ export class PublisherPayoutsService {
     })
     if (!publisher) throw new NotFoundException("Publisher not found")
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      throw new BadRequestException("Withdrawal amount must be positive")
+    const amountDecimal = new Decimal(amount)
+    if (
+      !Number.isFinite(amount) ||
+      !amountDecimal.isFinite() ||
+      amountDecimal.lessThan(1) ||
+      amountDecimal.greaterThan(1_000_000) ||
+      !amountDecimal.mul(100).isInteger()
+    ) {
+      throw new BadRequestException(
+        "Withdrawal amount must be between 1 and 1,000,000 with no more than two decimal places",
+      )
+    }
+    if (
+      !["bank_transfer", "paypal", "wise", "stripe_connect"].includes(method)
+    ) {
+      throw new BadRequestException("Unsupported payout method")
+    }
+
+    if (isStripeFeatureEnabled("connect") && !payoutMethodId) {
+      throw new BadRequestException(
+        "Select a verified Stripe payout method before requesting a withdrawal",
+      )
     }
 
     if (payoutMethodId) {
       const payoutMethod = await this.prisma.payoutMethod.findFirst({
         where: { id: payoutMethodId, publisherId, isActive: true },
+        include: { providerAccount: true },
       })
       if (!payoutMethod)
         throw new BadRequestException("Payout method not found or inactive")
+      if (payoutMethod.type !== method) {
+        throw new BadRequestException(
+          "Selected payout method does not match the withdrawal request",
+        )
+      }
+      if (
+        !this.legacyPayoutMethodsEnabled() &&
+        payoutMethod.type !== "stripe_connect"
+      ) {
+        throw new BadRequestException(
+          "This payout method is not available during the Stripe rollout",
+        )
+      }
+      if (
+        payoutMethod.type === "stripe_connect" &&
+        payoutMethod.providerAccount?.status !== "ENABLED"
+      ) {
+        throw new BadRequestException(
+          "Stripe payout account is not ready. Complete onboarding first.",
+        )
+      }
     }
 
     // Tier hold: fraud window before staff may approve the payout.
@@ -257,6 +449,7 @@ export class PublisherPayoutsService {
     )
     const availableAt = new Date(Date.now() + holdDays * 24 * 60 * 60 * 1000)
 
+    const publicReference = createFinancialReference("WD")
     const withdrawal = await this.prisma.$transaction(async (tx: any) => {
       // Idempotency: scoped per publisher via @@unique([publisherId, idempotencyKey]).
       // Never used as the row's PK — a colliding client key must not be able
@@ -265,7 +458,15 @@ export class PublisherPayoutsService {
         const existing = await tx.withdrawal.findFirst({
           where: { publisherId, idempotencyKey },
         })
-        if (existing) return existing
+        if (existing) {
+          this.assertMatchingWithdrawalRequest(
+            existing,
+            amountDecimal,
+            method,
+            payoutMethodId,
+          )
+          return existing
+        }
       }
 
       const balance = await tx.publisherBalance.findUnique({
@@ -274,7 +475,7 @@ export class PublisherPayoutsService {
       if (!balance) throw new NotFoundException("Publisher balance not found")
 
       const withdrawable = new Decimal(balance.withdrawableBalance)
-      if (withdrawable.lessThan(amount)) {
+      if (withdrawable.lessThan(amountDecimal)) {
         throw new BadRequestException(
           `Insufficient withdrawable balance. Available: ${withdrawable}, requested: ${amount}`,
         )
@@ -295,7 +496,12 @@ export class PublisherPayoutsService {
         created = await tx.withdrawal.create({
           data: {
             publisherId,
-            amount,
+            amount: amountDecimal,
+            currency: "USD",
+            publicReference,
+            payoutFee: 0,
+            netAmount: amount,
+            feePolicyVersion: STRIPE_INITIAL_FEE_POLICY_VERSION,
             method,
             status: "PENDING",
             availableAt,
@@ -309,15 +515,32 @@ export class PublisherPayoutsService {
           const existing = await tx.withdrawal.findFirst({
             where: { publisherId, idempotencyKey },
           })
-          if (existing) return existing
+          if (existing) {
+            this.assertMatchingWithdrawalRequest(
+              existing,
+              amountDecimal,
+              method,
+              payoutMethodId,
+            )
+            return existing
+          }
         }
         throw err
       }
 
+      const carryUsed = await this.allocateWithdrawalSources(
+        tx,
+        created.id,
+        publisherId,
+        amountDecimal,
+        balance,
+      )
+
       const updated = await tx.publisherBalance.updateMany({
         where: { publisherId, version: balance.version },
         data: {
-          withdrawableBalance: { decrement: amount },
+          withdrawableBalance: { decrement: amountDecimal },
+          allocationCarryForwardUsed: { increment: carryUsed },
           version: { increment: 1 },
         },
       })
@@ -330,7 +553,9 @@ export class PublisherPayoutsService {
       checkPublisherBalanceInvariant(
         {
           ...balance,
-          withdrawableBalance: Number(balance.withdrawableBalance) - amount,
+          withdrawableBalance: new Decimal(balance.withdrawableBalance).minus(
+            amountDecimal,
+          ),
         },
         this.logger,
         "requestWithdrawal",
@@ -340,11 +565,11 @@ export class PublisherPayoutsService {
       // rejection writes the offsetting WITHDRAWAL_REVERSAL.
       await tx.transaction.create({
         data: {
-          amount: new Decimal(amount).negated(),
+          amount: amountDecimal.negated(),
           type: "WITHDRAWAL",
           publisherId,
           reference: `withdrawal-${created.id}`,
-          description: `Withdrawal request of ${amount} via ${method}`,
+          description: `Withdrawal ${created.publicReference} of ${amount} USD via ${method}`,
         },
       })
 
@@ -357,6 +582,10 @@ export class PublisherPayoutsService {
             publisherId,
             amount,
             method,
+            publicReference: created.publicReference,
+            payoutFee: 0,
+            netAmount: amount,
+            feePolicyVersion: STRIPE_INITIAL_FEE_POLICY_VERSION,
             holdDays,
             availableAt: availableAt.toISOString(),
           },
@@ -722,6 +951,7 @@ export class PublisherPayoutsService {
         where: { publisherId: withdrawal.publisherId },
       })
       if (balance) {
+        const releasedCarry = await this.releaseWithdrawalSources(tx, id)
         const restored = await tx.publisherBalance.updateMany({
           where: {
             publisherId: withdrawal.publisherId,
@@ -729,6 +959,7 @@ export class PublisherPayoutsService {
           },
           data: {
             withdrawableBalance: { increment: Number(withdrawal.amount) },
+            allocationCarryForwardUsed: { decrement: releasedCarry },
             version: { increment: 1 },
           },
         })
@@ -834,6 +1065,7 @@ export class PublisherPayoutsService {
         where: { publisherId: withdrawal.publisherId },
       })
       if (!balance) throw new NotFoundException("Publisher balance not found")
+      const releasedCarry = await this.releaseWithdrawalSources(tx, id)
       const restored = await tx.publisherBalance.updateMany({
         where: {
           publisherId: withdrawal.publisherId,
@@ -841,6 +1073,7 @@ export class PublisherPayoutsService {
         },
         data: {
           withdrawableBalance: { increment: Number(withdrawal.amount) },
+          allocationCarryForwardUsed: { decrement: releasedCarry },
           version: { increment: 1 },
         },
       })
@@ -910,11 +1143,27 @@ export class PublisherPayoutsService {
           id: true,
           publisherId: true,
           amount: true,
+          currency: true,
+          publicReference: true,
+          payoutFee: true,
+          netAmount: true,
+          feePolicyVersion: true,
           status: true,
           availableAt: true,
           createdAt: true,
           publisher: true,
           payoutMethod: { select: { id: true, type: true, label: true } },
+          allocations: {
+            where: { releasedAt: null },
+            orderBy: { sequence: "asc" },
+            select: {
+              amount: true,
+              currency: true,
+              sourceType: true,
+              serviceType: true,
+              orderId: true,
+            },
+          },
         },
         take,
         skip,

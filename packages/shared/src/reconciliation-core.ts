@@ -79,6 +79,11 @@ export enum ReconciliationCode {
   PAYOUT_DUPLICATE_COMPLETED = "PAYOUT_DUPLICATE_COMPLETED",
   PAYOUT_LIFETIME_DRIFT = "PAYOUT_LIFETIME_DRIFT",
   PAYOUT_COMPLETED_NO_EXECUTION = "PAYOUT_COMPLETED_NO_EXECUTION",
+  DEPOSIT_SUCCEEDED_NO_LEDGER = "DEPOSIT_SUCCEEDED_NO_LEDGER",
+  DEPOSIT_LEDGER_AMOUNT_MISMATCH = "DEPOSIT_LEDGER_AMOUNT_MISMATCH",
+  DEPOSIT_LEDGER_WITHOUT_SUCCESS = "DEPOSIT_LEDGER_WITHOUT_SUCCESS",
+  WITHDRAWAL_ALLOCATION_MISMATCH = "WITHDRAWAL_ALLOCATION_MISMATCH",
+  STRIPE_COMPLETED_WITHOUT_BANK_PAYOUT = "STRIPE_COMPLETED_WITHOUT_BANK_PAYOUT",
 }
 
 export enum ReconciliationCategory {
@@ -119,11 +124,177 @@ export interface DriftRow {
     orderId?: string
     publisherId?: string
     walletId?: string
+    publicReference?: string
+    payoutExecutionId?: string
   }
   action?: {
     type: "wallet" | "order" | "settlement" | "publisher" | "payout"
     id: string
   }
+}
+
+async function checkProviderNeutralDeposits(
+  prisma: AnyPrisma,
+): Promise<DriftRow[]> {
+  if (!prisma.depositAttempt?.findMany) return []
+  const attempts = await prisma.depositAttempt.findMany({
+    where: {
+      OR: [{ status: "SUCCEEDED" }, { ledgerTransactionId: { not: null } }],
+    },
+    select: {
+      id: true,
+      publicReference: true,
+      status: true,
+      walletCredit: true,
+      currency: true,
+      ledgerTransactionId: true,
+      ledgerTransaction: {
+        select: { id: true, amount: true, currency: true, type: true },
+      },
+    },
+  })
+  const drift: DriftRow[] = []
+  for (const attempt of attempts) {
+    if (attempt.status === "SUCCEEDED" && !attempt.ledgerTransaction) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.DEPOSIT_SUCCEEDED_NO_LEDGER,
+          entityId: attempt.id,
+          entityType: "DepositAttempt",
+          message: `Deposit ${attempt.publicReference} succeeded without an attached ledger transaction`,
+          metadata: { publicReference: attempt.publicReference },
+        }),
+      )
+      continue
+    }
+    if (attempt.status !== "SUCCEEDED" && attempt.ledgerTransaction) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.DEPOSIT_LEDGER_WITHOUT_SUCCESS,
+          entityId: attempt.id,
+          entityType: "DepositAttempt",
+          message: `Deposit ${attempt.publicReference} has wallet credit while status is ${attempt.status}`,
+          metadata: {
+            publicReference: attempt.publicReference,
+            transactionId: attempt.ledgerTransaction.id,
+          },
+        }),
+      )
+      continue
+    }
+    const ledger = attempt.ledgerTransaction
+    if (
+      ledger &&
+      (toScaled(ledger.amount) !== toScaled(attempt.walletCredit) ||
+        ledger.currency !== attempt.currency ||
+        ledger.type !== "DEPOSIT")
+    ) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYMENT,
+          code: ReconciliationCode.DEPOSIT_LEDGER_AMOUNT_MISMATCH,
+          entityId: attempt.id,
+          entityType: "DepositAttempt",
+          amount: String(attempt.walletCredit),
+          message: `Deposit ${attempt.publicReference} does not match its wallet ledger row`,
+          metadata: {
+            publicReference: attempt.publicReference,
+            transactionId: ledger.id,
+            expectedAmount: String(attempt.walletCredit),
+            actualAmount: String(ledger.amount),
+          },
+        }),
+      )
+    }
+  }
+  return drift
+}
+
+async function checkWithdrawalTraceability(
+  prisma: AnyPrisma,
+): Promise<DriftRow[]> {
+  if (!prisma.withdrawal?.findMany) return []
+  const withdrawals = await prisma.withdrawal.findMany({
+    where: {
+      publicReference: { not: null },
+      status: { in: ["PENDING", "APPROVED", "PROCESSING", "COMPLETED"] },
+    },
+    select: {
+      id: true,
+      publicReference: true,
+      amount: true,
+      publisherId: true,
+      allocations: {
+        where: { releasedAt: null },
+        select: { amount: true },
+      },
+      executions: {
+        where: { status: "COMPLETED" },
+        select: {
+          id: true,
+          providerPayoutId: true,
+          stage: true,
+          provider: { select: { name: true } },
+        },
+      },
+    },
+  })
+  const drift: DriftRow[] = []
+  for (const withdrawal of withdrawals) {
+    const allocated = withdrawal.allocations.reduce(
+      (sum: bigint, item: any) => sum + toScaled(item.amount),
+      0n,
+    )
+    if (allocated !== toScaled(withdrawal.amount)) {
+      drift.push(
+        makeRow({
+          severity: "critical",
+          category: ReconciliationCategory.PAYOUT,
+          code: ReconciliationCode.WITHDRAWAL_ALLOCATION_MISMATCH,
+          entityId: withdrawal.id,
+          entityType: "Withdrawal",
+          amount: fromScaled(allocated - toScaled(withdrawal.amount)),
+          message: `Withdrawal ${withdrawal.publicReference} source allocations do not equal its gross amount`,
+          metadata: {
+            publicReference: withdrawal.publicReference,
+            publisherId: withdrawal.publisherId,
+            expectedAmount: String(withdrawal.amount),
+            actualAmount: fromScaled(allocated),
+          },
+          action: { type: "payout", id: withdrawal.id },
+        }),
+      )
+    }
+    for (const execution of withdrawal.executions) {
+      if (
+        execution.provider.name === "stripe_connect" &&
+        (!execution.providerPayoutId || execution.stage !== "BANK_PAID")
+      ) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.PAYOUT,
+            code: ReconciliationCode.STRIPE_COMPLETED_WITHOUT_BANK_PAYOUT,
+            entityId: execution.id,
+            entityType: "PayoutExecution",
+            message: `Stripe execution for ${withdrawal.publicReference} is completed without bank-payout evidence`,
+            metadata: {
+              publicReference: withdrawal.publicReference,
+              publisherId: withdrawal.publisherId,
+              payoutExecutionId: execution.id,
+            },
+            action: { type: "payout", id: withdrawal.id },
+          }),
+        )
+      }
+    }
+  }
+  return drift
 }
 
 export interface ReconciliationReport {
@@ -1242,6 +1413,8 @@ export async function runReconciliation(
     refundRecon,
     stuckFinancialOrders,
     stuckPayouts,
+    providerNeutralDeposits,
+    withdrawalTraceability,
   ] = await Promise.all([
     checkWallets(prisma, stats),
     checkPublisherBalances(prisma, stats),
@@ -1250,7 +1423,12 @@ export async function runReconciliation(
     checkRefundReconciliation(prisma, stats),
     checkStuckFinancialOrders(prisma, stats),
     checkStuckPayouts(prisma, stats),
+    checkProviderNeutralDeposits(prisma),
+    checkWithdrawalTraceability(prisma),
   ])
+
+  orderPaymentRecon.push(...providerNeutralDeposits)
+  stuckPayouts.push(...withdrawalTraceability)
 
   const allIssues = [
     ...walletDrift,

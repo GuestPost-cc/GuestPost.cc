@@ -109,6 +109,11 @@ export default function EarningsPage() {
     enabled: !!user?.publisherId,
   })
 
+  const { data: payoutMethods } = useQuery({
+    queryKey: ["payout-methods"],
+    queryFn: () => api.publisherPayouts.listPayoutMethods(),
+  })
+
   const {
     data: transactions = [],
     isLoading: txnLoading,
@@ -130,16 +135,25 @@ export default function EarningsPage() {
   })
 
   const withdrawMutation = useMutation({
-    mutationFn: (amount: number) =>
-      api.publisherPayouts.requestWithdrawal({ amount }),
+    mutationFn: (amount: number) => {
+      const payoutMethod =
+        payoutMethods?.find((method) => method.isDefault) ?? payoutMethods?.[0]
+      if (!payoutMethod) throw new Error("Connect a payout method first")
+      return api.publisherPayouts.requestWithdrawal({
+        amount,
+        method: payoutMethod.type,
+        payoutMethodId: payoutMethod.id,
+        idempotencyKey: crypto.randomUUID(),
+      })
+    },
     onSuccess: () => {
       toast.success("Withdrawal requested successfully")
       setShowWithdrawDialog(false)
       reset()
       refetch()
     },
-    onError: () => {
-      toast.error("Failed to request withdrawal")
+    onError: (error: any) => {
+      toast.error(error?.message ?? "Failed to request withdrawal")
     },
   })
 

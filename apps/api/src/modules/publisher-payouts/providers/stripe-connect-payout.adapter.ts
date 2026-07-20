@@ -1,32 +1,76 @@
-import { Injectable, Logger } from "@nestjs/common"
+import { Injectable } from "@nestjs/common"
+import {
+  assertStripeObjectMode,
+  getStripeClient,
+  getStripeRecoveryClient,
+} from "../../../common/stripe-client"
 import {
   CancelTransferResult,
   CheckStatusResult,
+  CreateBankPayoutParams,
+  CreateBankPayoutResult,
   CreateTransferParams,
   CreateTransferResult,
   PayoutProviderAdapter,
+  ProviderExecutionContext,
 } from "./payout-provider.interface"
 
+function toMinorUnits(amount: number): number {
+  const minor = Math.round(amount * 100)
+  if (!Number.isSafeInteger(minor) || minor <= 0) {
+    throw new Error("Invalid payout amount")
+  }
+  return minor
+}
+
+function payoutStatus(status: string): CheckStatusResult["status"] {
+  if (status === "paid") return "COMPLETED"
+  if (status === "failed") return "FAILED"
+  if (status === "canceled") return "CANCELLED"
+  return "PROCESSING"
+}
+
+function payoutCreateStatus(status: string): CreateBankPayoutResult["status"] {
+  const normalized = payoutStatus(status)
+  return normalized === "CANCELLED" ? "FAILED" : normalized
+}
+
+/**
+ * Stripe Connect uses two different money movements:
+ *
+ * 1. Transfer: platform balance -> connected Stripe balance.
+ * 2. Payout: connected Stripe balance -> publisher bank account.
+ *
+ * A Transfer has no bank-settlement status and must never complete a
+ * withdrawal. Only the Payout's `paid` state may do that.
+ */
 @Injectable()
 export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
   readonly providerName = "stripe_connect"
-  private readonly logger = new Logger(StripeConnectPayoutAdapter.name)
-
-  private assertNotProductionMock(operation: string) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        `Stripe Connect ${operation} attempted without STRIPE_SECRET_KEY in production — refusing to fake a money movement`,
-      )
-    }
+  readonly capabilities = {
+    supportedCurrencies: ["USD"],
+    supportsBankPayout: true,
+    supportsCancellation: true,
+    supportsWebhooks: true,
+    supportsStatusPolling: true,
+    supportsExternalReference: true,
+    requiresRecipientOnboarding: true,
+    maxReferenceLength: 10,
   }
 
   async validateRecipient(
     details: Record<string, unknown>,
   ): Promise<{ valid: boolean; error?: string }> {
-    if (!details.connectedAccountId) {
+    if (typeof details.connectedAccountId !== "string") {
+      return { valid: false, error: "Stripe connected account is missing" }
+    }
+    if (details.providerAccountStatus !== "ENABLED") {
+      return { valid: false, error: "Stripe connected account is not enabled" }
+    }
+    if (details.payoutScheduleConfigured !== true) {
       return {
         valid: false,
-        error: "Stripe Connect payout requires connectedAccountId",
+        error: "Stripe connected account is not configured for manual payouts",
       }
     }
     return { valid: true }
@@ -35,123 +79,165 @@ export class StripeConnectPayoutAdapter implements PayoutProviderAdapter {
   async createTransfer(
     params: CreateTransferParams,
   ): Promise<CreateTransferResult> {
-    const apiKey = (params.providerConfig.apiKey ??
-      process.env.STRIPE_SECRET_KEY) as string
-    if (!apiKey) {
-      this.assertNotProductionMock("createTransfer")
-      this.logger.warn(
-        "STRIPE_SECRET_KEY not configured — returning mock transfer",
-      )
-      return {
-        providerExecutionId: `stripe-mock-${Date.now()}`,
-        status: "COMPLETED",
-        fee: Math.round(params.amount * 0.025 * 100) / 100,
-        metadata: { mock: true },
-      }
-    }
-
-    // Stripe Connect: create a transfer to the connected account
-    const response = await fetch("https://api.stripe.com/v1/transfers", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-        // Stripe deduplicates on this header — NOT a body field. Same key on
-        // retry returns the original transfer instead of creating a second one.
-        "Idempotency-Key": params.idempotencyKey,
-      },
-      body: new URLSearchParams({
-        amount: String(Math.round(params.amount * 100)),
+    const connectedAccountId = params.recipientDetails
+      .connectedAccountId as string
+    const stripe = getStripeClient("connect")
+    const transfer = await stripe.transfers.create(
+      {
+        amount: toMinorUnits(params.amount),
         currency: params.currency.toLowerCase(),
-        destination: params.recipientDetails.connectedAccountId as string,
-        description: params.description ?? "Publisher payout",
-      }),
-    })
+        destination: connectedAccountId,
+        description: params.description,
+        metadata: {
+          withdrawal_reference: String(
+            params.recipientDetails.publicReference ?? "",
+          ),
+        },
+      },
+      { idempotencyKey: params.idempotencyKey },
+    )
+    assertStripeObjectMode(transfer.livemode, "Stripe transfer")
 
-    if (!response.ok) {
-      const err = await response.text()
-      throw new Error(
-        `Stripe Connect transfer failed: ${response.status} ${err}`,
-      )
-    }
-
-    const data = (await response.json()) as any
     return {
-      providerExecutionId: data.id,
-      status: data.status === "paid" ? "COMPLETED" : "PROCESSING",
-      fee: Number(data.fee ?? 0),
-      metadata: { stripeTransferId: data.id, stripeStatus: data.status },
+      providerExecutionId: transfer.id,
+      providerTransferId: transfer.id,
+      // A Transfer only means funds reached the connected Stripe balance.
+      status: "PROCESSING",
+      metadata: {
+        stage: "TRANSFER_CREATED",
+        connectedAccountId,
+      },
+    }
+  }
+
+  async createBankPayout(
+    params: CreateBankPayoutParams,
+  ): Promise<CreateBankPayoutResult> {
+    const stripe = getStripeClient("connect")
+    const payout = await stripe.payouts.create(
+      {
+        amount: toMinorUnits(params.amount),
+        currency: params.currency.toLowerCase(),
+        description: params.description,
+        statement_descriptor: params.statementDescriptor,
+        metadata: { withdrawal_reference: params.publicReference },
+      },
+      {
+        stripeAccount: params.connectedAccountId,
+        idempotencyKey: params.idempotencyKey,
+      },
+    )
+    assertStripeObjectMode(payout.livemode, "Stripe payout")
+
+    return {
+      providerExecutionId: payout.id,
+      providerPayoutId: payout.id,
+      status: payoutCreateStatus(payout.status),
+      acceptedReference: payout.statement_descriptor ?? undefined,
+      metadata: {
+        stage: "BANK_PAYOUT_CREATED",
+        stripePayoutStatus: payout.status,
+        connectedAccountId: params.connectedAccountId,
+        arrivalDate: payout.arrival_date,
+      },
     }
   }
 
   async checkTransferStatus(
     providerExecutionId: string,
+    context?: ProviderExecutionContext,
   ): Promise<CheckStatusResult> {
-    const apiKey = process.env.STRIPE_SECRET_KEY
-    if (!apiKey) {
-      this.assertNotProductionMock("checkTransferStatus")
-      return { status: "COMPLETED", providerExecutionId }
+    if (!providerExecutionId.startsWith("po_")) {
+      return {
+        status: "PROCESSING",
+        providerExecutionId,
+        metadata: { stage: "TRANSFER_CREATED" },
+      }
+    }
+    if (!context?.connectedAccountId) {
+      throw new Error("Connected account context is required for payout status")
     }
 
-    const response = await fetch(
-      `https://api.stripe.com/v1/transfers/${providerExecutionId}`,
-      {
-        headers: { Authorization: `Bearer ${apiKey}` },
-      },
-    )
-
-    if (!response.ok) {
-      throw new Error(`Stripe status check failed: ${response.status}`)
-    }
-
-    const data = (await response.json()) as any
-    const statusMap: Record<string, "PROCESSING" | "COMPLETED" | "FAILED"> = {
-      pending: "PROCESSING",
-      in_transit: "PROCESSING",
-      paid: "COMPLETED",
-      canceled: "FAILED",
-      failed: "FAILED",
-    }
-
-    return {
-      status: statusMap[data.status as string] ?? "PROCESSING",
+    const stripe = getStripeRecoveryClient()
+    const payout = await stripe.payouts.retrieve(
       providerExecutionId,
-      fee: Number(data.fee ?? 0),
-      metadata: { stripeStatus: data.status },
+      {},
+      { stripeAccount: context.connectedAccountId },
+    )
+    assertStripeObjectMode(payout.livemode, "Stripe payout")
+    return {
+      status: payoutStatus(payout.status),
+      providerExecutionId,
+      errorMessage:
+        payout.status === "failed" ? "Stripe bank payout failed" : undefined,
+      metadata: {
+        stage: payout.status === "paid" ? "BANK_PAID" : "BANK_PAYOUT_CREATED",
+        stripePayoutStatus: payout.status,
+        arrivalDate: payout.arrival_date,
+        connectedAccountId: context.connectedAccountId,
+      },
     }
   }
 
   async cancelTransfer(
     providerExecutionId: string,
     idempotencyKey: string,
+    context?: ProviderExecutionContext,
   ): Promise<CancelTransferResult> {
-    const apiKey = process.env.STRIPE_SECRET_KEY
-    if (!apiKey) {
-      this.assertNotProductionMock("cancelTransfer")
-      return { success: true, providerExecutionId }
+    // Cancellation/reversal is a recovery operation. It must remain available
+    // after the new-send kill switch is disabled for an incident.
+    const stripe = getStripeRecoveryClient()
+    const payoutId =
+      context?.providerPayoutId ??
+      (providerExecutionId.startsWith("po_") ? providerExecutionId : undefined)
+    const transferId =
+      context?.providerTransferId ??
+      (providerExecutionId.startsWith("tr_") ? providerExecutionId : undefined)
+
+    if (payoutId) {
+      if (!context?.connectedAccountId) {
+        throw new Error(
+          "Connected account context is required to cancel payout",
+        )
+      }
+      const payout = await stripe.payouts.retrieve(
+        payoutId,
+        {},
+        { stripeAccount: context.connectedAccountId },
+      )
+      assertStripeObjectMode(payout.livemode, "Stripe payout")
+      if (payout.status === "paid") {
+        throw new Error("Bank payout is already paid and cannot be cancelled")
+      }
+      if (payout.status === "pending") {
+        await (stripe.payouts.cancel as any)(
+          payoutId,
+          {},
+          {
+            stripeAccount: context.connectedAccountId,
+            idempotencyKey: `${idempotencyKey}-payout`,
+          },
+        )
+      } else if (!["failed", "canceled"].includes(payout.status)) {
+        throw new Error(
+          `Bank payout is ${payout.status} and cannot be safely cancelled`,
+        )
+      }
     }
 
-    // Stripe transfers cannot be canceled once paid; attempt reversal
-    try {
-      const response = await fetch(
-        `https://api.stripe.com/v1/transfers/${providerExecutionId}/reversals`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Idempotency-Key": idempotencyKey,
-          },
-        },
+    if (transferId) {
+      const reversal = await stripe.transfers.createReversal(
+        transferId,
+        {},
+        { idempotencyKey: `${idempotencyKey}-transfer` },
       )
-      const data = (await response.json()) as any
       return {
-        success: response.ok,
+        success: true,
         providerExecutionId,
-        metadata: { reversalId: data.id },
+        metadata: { reversalId: reversal.id, payoutId, transferId },
       }
-    } catch (err) {
-      throw new Error(`Stripe transfer reversal failed: ${err}`)
     }
+
+    throw new Error("Stripe transfer reference is missing")
   }
 }

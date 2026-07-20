@@ -12,11 +12,37 @@ import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { StaffRoles } from "../../common/decorators/staff-roles.decorator"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
 import { StaffRolesGuard } from "../../common/guards/staff-roles.guard"
+import { RequestWithdrawalDto } from "./dto/request-withdrawal.dto"
 import { PublisherPayoutsService } from "./publisher-payouts.service"
+import { StripeConnectService } from "./stripe-connect.service"
 
 @Controller("publisher-payouts")
 export class PublisherPayoutsController {
-  constructor(private readonly payouts: PublisherPayoutsService) {}
+  constructor(
+    private readonly payouts: PublisherPayoutsService,
+    private readonly stripeConnect: StripeConnectService,
+  ) {}
+
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
+  @Get("stripe-connect/status")
+  getStripeConnectStatus(@CurrentUser() user: any) {
+    return this.stripeConnect.getStatus(user.publisherId, user.id)
+  }
+
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("stripe-connect/onboarding-link")
+  createStripeConnectOnboardingLink(@CurrentUser() user: any) {
+    return this.stripeConnect.createOnboardingLink(user.publisherId, user.id)
+  }
+
+  @UseGuards(MemberRolesGuard)
+  @MemberRoles("PUBLISHER_OWNER")
+  @Post("stripe-connect/refresh")
+  refreshStripeConnectStatus(@CurrentUser() user: any) {
+    return this.stripeConnect.refreshStatus(user.publisherId, user.id)
+  }
 
   @UseGuards(MemberRolesGuard)
   @MemberRoles("PUBLISHER_OWNER")
@@ -29,12 +55,7 @@ export class PublisherPayoutsController {
   @MemberRoles("PUBLISHER_OWNER")
   @Post("withdrawals")
   requestWithdrawal(
-    @Body() body: {
-      amount: number
-      method: string
-      idempotencyKey?: string
-      payoutMethodId?: string
-    },
+    @Body() body: RequestWithdrawalDto,
     @CurrentUser() user: any,
   ) {
     return this.payouts.requestWithdrawal(

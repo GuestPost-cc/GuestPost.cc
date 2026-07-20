@@ -195,6 +195,11 @@ export type Withdrawal = Prisma.WithdrawalModel
  */
 export type PayoutMethod = Prisma.PayoutMethodModel
 /**
+ * Model PublisherProviderAccount
+ *
+ */
+export type PublisherProviderAccount = Prisma.PublisherProviderAccountModel
+/**
  * Model PayoutProvider
  *
  */
@@ -204,6 +209,16 @@ export type PayoutProvider = Prisma.PayoutProviderModel
  *
  */
 export type PayoutExecution = Prisma.PayoutExecutionModel
+/**
+ * Model WithdrawalAllocation
+ *
+ */
+export type WithdrawalAllocation = Prisma.WithdrawalAllocationModel
+/**
+ * Model PayoutWebhookEvent
+ *
+ */
+export type PayoutWebhookEvent = Prisma.PayoutWebhookEventModel
 /**
  * Model PayoutBatch
  *
@@ -244,6 +259,16 @@ export type Wallet = Prisma.WalletModel
  *
  */
 export type Transaction = Prisma.TransactionModel
+/**
+ * Model DepositAttempt
+ *
+ */
+export type DepositAttempt = Prisma.DepositAttemptModel
+/**
+ * Model PaymentProviderEvent
+ *
+ */
+export type PaymentProviderEvent = Prisma.PaymentProviderEventModel
 /**
  * Model Ticket
  *

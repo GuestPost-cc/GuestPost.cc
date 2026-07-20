@@ -1061,6 +1061,14 @@ export class AdminService {
         fee: number
         errorMessage: string | null
         providerExecutionId: string | null
+        providerTransferId: string | null
+        providerPayoutId: string | null
+        stage: string
+        requestedReference: string | null
+        acceptedReference: string | null
+        sourceCurrency: string
+        destinationCurrency: string
+        destinationAmount: number | null
         createdAt: string
         provider: { id: string; name: string; displayName: string }
       }>

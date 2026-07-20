@@ -145,10 +145,13 @@ export default function WithdrawalsPage() {
     mutationFn: (data: {
       amount: number
       payoutMethodId?: string
-      method?: string
+      method: string
+      idempotencyKey: string
     }) => api.publisherPayouts.requestWithdrawal(data),
-    onSuccess: () => {
-      toast.success("Withdrawal requested successfully")
+    onSuccess: (withdrawal) => {
+      toast.success(
+        `Withdrawal ${withdrawal.publicReference ?? ""} requested successfully`,
+      )
       setShowRequestDialog(false)
       reset()
       refetch()
@@ -169,6 +172,7 @@ export default function WithdrawalsPage() {
       amount: data.amount,
       payoutMethodId: activeMethodId ?? undefined,
       method: method?.type ?? "bank_transfer",
+      idempotencyKey: crypto.randomUUID(),
     })
   }
 
@@ -282,6 +286,7 @@ export default function WithdrawalsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
+                  <TableHead>Reference</TableHead>
                   <TableHead>Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Method</TableHead>
@@ -298,8 +303,15 @@ export default function WithdrawalsPage() {
                       <TableCell className="text-muted-foreground">
                         {new Date(withdrawal.createdAt).toLocaleDateString()}
                       </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {withdrawal.publicReference ?? "Legacy"}
+                      </TableCell>
                       <TableCell className="font-medium">
-                        ${withdrawal.amount.toFixed(2)}
+                        <div>${withdrawal.netAmount.toFixed(2)} net</div>
+                        <div className="text-xs font-normal text-muted-foreground">
+                          ${withdrawal.amount.toFixed(2)} gross · ${" "}
+                          {withdrawal.payoutFee.toFixed(2)} fee
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge variant={config.variant}>
@@ -377,6 +389,21 @@ export default function WithdrawalsPage() {
                 </Button>
               </div>
             </div>
+            <div className="rounded-md border bg-muted/30 p-3 text-sm">
+              <div className="flex justify-between">
+                <span>Withdrawal fee</span>
+                <span>$0.00</span>
+              </div>
+              <div className="mt-1 flex justify-between font-medium">
+                <span>You receive</span>
+                <span>The full requested amount</span>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                GuestPost pays Stripe processing fees during this rollout. Your
+                bank may display GPOST plus a short withdrawal reference; some
+                banks replace provider-supplied wording.
+              </p>
+            </div>
             <div className="space-y-2">
               <Label>Payout Method</Label>
               {!payoutMethods || payoutMethods.length === 0 ? (
@@ -439,7 +466,7 @@ export default function WithdrawalsPage() {
             </Button>
             <Button
               onClick={handleFormSubmit(handleRequest)}
-              disabled={requestMutation.isPending}
+              disabled={requestMutation.isPending || !activeMethodId}
             >
               {requestMutation.isPending
                 ? "Processing..."

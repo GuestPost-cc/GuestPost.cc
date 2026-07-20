@@ -1024,7 +1024,14 @@ function FinancePageInner() {
                           {w.publisher?.name || w.publisher?.email || "—"}
                         </TableCell>
                         <TableCell className="tabular-nums">
-                          ${Number(w.amount || 0).toFixed(2)}
+                          <div>
+                            ${Number(w.netAmount ?? w.amount ?? 0).toFixed(2)}{" "}
+                            net
+                          </div>
+                          <div className="font-mono text-xs text-muted-foreground">
+                            {w.publicReference ?? "legacy"} · fee $
+                            {Number(w.payoutFee ?? 0).toFixed(2)}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <StatusBadge status={w.status} />
@@ -1166,7 +1173,12 @@ function FinancePageInner() {
                         {w.publisher?.name || w.publisher?.email || "—"}
                       </TableCell>
                       <TableCell className="tabular-nums">
-                        ${Number(w.amount || 0).toFixed(2)}
+                        <div>
+                          ${Number(w.netAmount ?? w.amount ?? 0).toFixed(2)} net
+                        </div>
+                        <div className="font-mono text-xs text-muted-foreground">
+                          {w.publicReference ?? "legacy"}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <StatusBadge status={w.status} />
@@ -1262,6 +1274,7 @@ function FinancePageInner() {
                   <TableHead>Provider</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Amount</TableHead>
+                  <TableHead>Provider evidence</TableHead>
                   <TableHead>Error</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -1276,6 +1289,20 @@ function FinancePageInner() {
                       <StatusBadge status={e.status} />
                     </TableCell>
                     <TableCell>${Number(e.amount).toFixed(2)}</TableCell>
+                    <TableCell className="max-w-[220px] text-xs">
+                      <div className="font-medium">{e.stage}</div>
+                      <div className="font-mono text-muted-foreground">
+                        {e.providerTransferId ?? "no transfer"}
+                      </div>
+                      <div className="font-mono text-muted-foreground">
+                        {e.providerPayoutId ?? "no bank payout"}
+                      </div>
+                      <div className="font-mono text-muted-foreground">
+                        {e.acceptedReference ??
+                          e.requestedReference ??
+                          "no reference"}
+                      </div>
+                    </TableCell>
                     <TableCell
                       className="max-w-[200px] truncate text-xs text-muted-foreground"
                       title={e.errorMessage ?? ""}
@@ -1284,7 +1311,15 @@ function FinancePageInner() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {e.status === "FAILED" && (
+                        {(e.status === "FAILED" ||
+                          (e.status === "PROCESSING" &&
+                            ((e.stage === "TRANSFER_RECOVERY_REQUIRED" &&
+                              !e.providerPayoutId) ||
+                              ([
+                                "BANK_PAYOUT_RECOVERY_REQUIRED",
+                                "CANCEL_REQUESTED",
+                              ].includes(e.stage) &&
+                                !!e.providerPayoutId)))) && (
                           <Button
                             size="sm"
                             variant="outline"
@@ -1294,16 +1329,24 @@ function FinancePageInner() {
                             Retry
                           </Button>
                         )}
-                        {["PENDING", "PROCESSING"].includes(e.status) && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => cancelExecution.mutate(e.id)}
-                            disabled={cancelExecution.isPending}
-                          >
-                            <XCircle className="mr-1 h-3 w-3" /> Cancel
-                          </Button>
-                        )}
+                        {["PENDING", "PROCESSING"].includes(e.status) &&
+                          !!e.providerExecutionId &&
+                          (e.provider?.name !== "stripe_connect" ||
+                            [
+                              "TRANSFER_RECOVERY_REQUIRED",
+                              "BANK_PAYOUT_PENDING",
+                              "BANK_PAYOUT_RECOVERY_REQUIRED",
+                              "CANCEL_REQUESTED",
+                            ].includes(e.stage)) && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => cancelExecution.mutate(e.id)}
+                              disabled={cancelExecution.isPending}
+                            >
+                              <XCircle className="mr-1 h-3 w-3" /> Cancel
+                            </Button>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>

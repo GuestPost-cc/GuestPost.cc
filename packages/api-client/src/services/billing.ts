@@ -32,24 +32,41 @@ export class BillingService {
     return this.client.get<WalletResponse>("/billing/wallet")
   }
 
-  createCheckoutSession(data: { walletId: string; amount: number }) {
-    return this.client.post<{ url: string }>(
-      `/billing/wallet/${data.walletId}/checkout`,
-      {
-        json: { amount: data.amount },
+  createCheckoutSession(data: {
+    walletId: string
+    amount: number
+    idempotencyKey: string
+  }) {
+    return this.client.post<{
+      url: string
+      publicReference: string
+      statementDescriptor: string
+      feePolicy: {
+        grossMinor: number
+        customerOrPublisherFeeMinor: number
+        netMinor: number
+        feePolicyVersion: string
+      }
+    }>(`/billing/wallet/${data.walletId}/checkout`, {
+      json: {
+        amount: data.amount,
+        idempotencyKey: data.idempotencyKey,
       },
-    )
+    })
   }
 
-  checkDepositStatus(walletId: string, sessionId: string) {
+  checkDepositStatus(publicReference: string) {
     return this.client.get<{
-      status: "COMPLETED" | "PAID_PENDING_WEBHOOK" | "PENDING"
+      publicReference: string
+      status: "COMPLETED" | "PENDING" | "FAILED" | "REFUNDED" | "DISPUTED"
       processed: boolean
-      walletBalance: number | null
-      transactionId: string | null
-    }>(`/billing/wallet/${walletId}/deposit-status`, {
-      params: { sessionId },
-    })
+      amount: number
+      walletCredit: number
+      customerFee: number
+      currency: string
+      statementDescriptor: string
+      completedAt: string | null
+    }>(`/billing/deposits/${encodeURIComponent(publicReference)}/status`)
   }
 
   withdraw(data: {
