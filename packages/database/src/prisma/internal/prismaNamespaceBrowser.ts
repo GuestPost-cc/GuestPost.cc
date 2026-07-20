@@ -82,8 +82,11 @@ export const ModelName = {
   PublisherBalance: 'PublisherBalance',
   Withdrawal: 'Withdrawal',
   PayoutMethod: 'PayoutMethod',
+  PublisherProviderAccount: 'PublisherProviderAccount',
   PayoutProvider: 'PayoutProvider',
   PayoutExecution: 'PayoutExecution',
+  WithdrawalAllocation: 'WithdrawalAllocation',
+  PayoutWebhookEvent: 'PayoutWebhookEvent',
   PayoutBatch: 'PayoutBatch',
   ApiKey: 'ApiKey',
   ContentOrder: 'ContentOrder',
@@ -92,6 +95,8 @@ export const ModelName = {
   PlatformRevenue: 'PlatformRevenue',
   Wallet: 'Wallet',
   Transaction: 'Transaction',
+  DepositAttempt: 'DepositAttempt',
+  PaymentProviderEvent: 'PaymentProviderEvent',
   Ticket: 'Ticket',
   TicketMessage: 'TicketMessage',
   Notification: 'Notification',
@@ -640,6 +645,9 @@ export const PublisherBalanceScalarFieldEnum = {
   debtBalance: 'debtBalance',
   lifetimeEarnings: 'lifetimeEarnings',
   lifetimePaid: 'lifetimePaid',
+  allocationCutoverAt: 'allocationCutoverAt',
+  allocationCarryForward: 'allocationCarryForward',
+  allocationCarryForwardUsed: 'allocationCarryForwardUsed',
   version: 'version',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -652,6 +660,11 @@ export const WithdrawalScalarFieldEnum = {
   id: 'id',
   publisherId: 'publisherId',
   amount: 'amount',
+  currency: 'currency',
+  publicReference: 'publicReference',
+  payoutFee: 'payoutFee',
+  netAmount: 'netAmount',
+  feePolicyVersion: 'feePolicyVersion',
   method: 'method',
   status: 'status',
   availableAt: 'availableAt',
@@ -679,11 +692,34 @@ export const PayoutMethodScalarFieldEnum = {
   isDefault: 'isDefault',
   isActive: 'isActive',
   version: 'version',
+  providerAccountId: 'providerAccountId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type PayoutMethodScalarFieldEnum = (typeof PayoutMethodScalarFieldEnum)[keyof typeof PayoutMethodScalarFieldEnum]
+
+
+export const PublisherProviderAccountScalarFieldEnum = {
+  id: 'id',
+  publisherId: 'publisherId',
+  provider: 'provider',
+  providerAccountId: 'providerAccountId',
+  status: 'status',
+  country: 'country',
+  defaultCurrency: 'defaultCurrency',
+  transfersEnabled: 'transfersEnabled',
+  payoutsEnabled: 'payoutsEnabled',
+  detailsSubmitted: 'detailsSubmitted',
+  payoutScheduleConfigured: 'payoutScheduleConfigured',
+  requirementsDue: 'requirementsDue',
+  lastSyncedAt: 'lastSyncedAt',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PublisherProviderAccountScalarFieldEnum = (typeof PublisherProviderAccountScalarFieldEnum)[keyof typeof PublisherProviderAccountScalarFieldEnum]
 
 
 export const PayoutProviderScalarFieldEnum = {
@@ -707,8 +743,18 @@ export const PayoutExecutionScalarFieldEnum = {
   providerId: 'providerId',
   status: 'status',
   providerExecutionId: 'providerExecutionId',
+  providerTransferId: 'providerTransferId',
+  providerPayoutId: 'providerPayoutId',
   amount: 'amount',
   fee: 'fee',
+  sourceCurrency: 'sourceCurrency',
+  destinationCurrency: 'destinationCurrency',
+  destinationAmount: 'destinationAmount',
+  providerFee: 'providerFee',
+  requestedReference: 'requestedReference',
+  acceptedReference: 'acceptedReference',
+  bankTraceReference: 'bankTraceReference',
+  stage: 'stage',
   errorMessage: 'errorMessage',
   providerMetadata: 'providerMetadata',
   idempotencyKey: 'idempotencyKey',
@@ -718,6 +764,46 @@ export const PayoutExecutionScalarFieldEnum = {
 } as const
 
 export type PayoutExecutionScalarFieldEnum = (typeof PayoutExecutionScalarFieldEnum)[keyof typeof PayoutExecutionScalarFieldEnum]
+
+
+export const WithdrawalAllocationScalarFieldEnum = {
+  id: 'id',
+  withdrawalId: 'withdrawalId',
+  sourceType: 'sourceType',
+  sourceTransactionId: 'sourceTransactionId',
+  settlementId: 'settlementId',
+  orderId: 'orderId',
+  amount: 'amount',
+  currency: 'currency',
+  sequence: 'sequence',
+  serviceType: 'serviceType',
+  releasedAt: 'releasedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type WithdrawalAllocationScalarFieldEnum = (typeof WithdrawalAllocationScalarFieldEnum)[keyof typeof WithdrawalAllocationScalarFieldEnum]
+
+
+export const PayoutWebhookEventScalarFieldEnum = {
+  id: 'id',
+  provider: 'provider',
+  dedupKey: 'dedupKey',
+  eventType: 'eventType',
+  providerExecutionId: 'providerExecutionId',
+  providerStatus: 'providerStatus',
+  rawStatus: 'rawStatus',
+  status: 'status',
+  attempts: 'attempts',
+  availableAt: 'availableAt',
+  lockedAt: 'lockedAt',
+  processedAt: 'processedAt',
+  lastError: 'lastError',
+  receivedAt: 'receivedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PayoutWebhookEventScalarFieldEnum = (typeof PayoutWebhookEventScalarFieldEnum)[keyof typeof PayoutWebhookEventScalarFieldEnum]
 
 
 export const PayoutBatchScalarFieldEnum = {
@@ -846,6 +932,57 @@ export const TransactionScalarFieldEnum = {
 } as const
 
 export type TransactionScalarFieldEnum = (typeof TransactionScalarFieldEnum)[keyof typeof TransactionScalarFieldEnum]
+
+
+export const DepositAttemptScalarFieldEnum = {
+  id: 'id',
+  publicReference: 'publicReference',
+  walletId: 'walletId',
+  organizationId: 'organizationId',
+  createdByUserId: 'createdByUserId',
+  method: 'method',
+  provider: 'provider',
+  amount: 'amount',
+  walletCredit: 'walletCredit',
+  customerFee: 'customerFee',
+  providerFee: 'providerFee',
+  currency: 'currency',
+  status: 'status',
+  idempotencyKey: 'idempotencyKey',
+  providerSessionId: 'providerSessionId',
+  providerPaymentId: 'providerPaymentId',
+  providerChargeId: 'providerChargeId',
+  intendedOrderId: 'intendedOrderId',
+  ledgerTransactionId: 'ledgerTransactionId',
+  expiresAt: 'expiresAt',
+  completedAt: 'completedAt',
+  failedAt: 'failedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type DepositAttemptScalarFieldEnum = (typeof DepositAttemptScalarFieldEnum)[keyof typeof DepositAttemptScalarFieldEnum]
+
+
+export const PaymentProviderEventScalarFieldEnum = {
+  id: 'id',
+  provider: 'provider',
+  providerEventId: 'providerEventId',
+  eventType: 'eventType',
+  objectId: 'objectId',
+  depositAttemptId: 'depositAttemptId',
+  status: 'status',
+  attempts: 'attempts',
+  availableAt: 'availableAt',
+  lockedAt: 'lockedAt',
+  processedAt: 'processedAt',
+  lastError: 'lastError',
+  receivedAt: 'receivedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PaymentProviderEventScalarFieldEnum = (typeof PaymentProviderEventScalarFieldEnum)[keyof typeof PaymentProviderEventScalarFieldEnum]
 
 
 export const TicketScalarFieldEnum = {

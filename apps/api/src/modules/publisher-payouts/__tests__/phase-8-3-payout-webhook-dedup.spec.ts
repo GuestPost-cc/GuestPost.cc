@@ -46,6 +46,7 @@ describe("payout webhook durable inbox dedup", () => {
       JSON.stringify({
         id: eventId,
         type: "transfer.updated",
+        livemode: false,
         data: { object: { id: "tr_same", status } },
       })
 
@@ -81,6 +82,7 @@ describe("payout webhook durable inbox dedup", () => {
     const payload = JSON.stringify({
       id: "evt_replay",
       type: "transfer.updated",
+      livemode: false,
       data: { object: { id: "tr_1", status: "paid" } },
     })
 
@@ -149,6 +151,7 @@ describe("payout webhook durable inbox dedup", () => {
     const payload = JSON.stringify({
       id: "evt_safe",
       type: "transfer.updated",
+      livemode: false,
       secretBankField: "must-not-persist",
       data: {
         object: {

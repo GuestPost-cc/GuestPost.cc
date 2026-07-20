@@ -10,6 +10,7 @@ import { StripeConnectPayoutAdapter } from "./providers/stripe-connect-payout.ad
 import { WisePayoutAdapter } from "./providers/wise-payout.adapter"
 import { PublisherPayoutsController } from "./publisher-payouts.controller"
 import { PublisherPayoutsService } from "./publisher-payouts.service"
+import { StripeConnectService } from "./stripe-connect.service"
 
 @Global()
 @Module({
@@ -23,6 +24,7 @@ import { PublisherPayoutsService } from "./publisher-payouts.service"
     ManualPayoutAdapter,
     WisePayoutAdapter,
     StripeConnectPayoutAdapter,
+    StripeConnectService,
   ],
   exports: [
     PublisherPayoutsService,
@@ -32,6 +34,7 @@ import { PublisherPayoutsService } from "./publisher-payouts.service"
     ManualPayoutAdapter,
     WisePayoutAdapter,
     StripeConnectPayoutAdapter,
+    StripeConnectService,
   ],
 })
 export class PublisherPayoutsModule {

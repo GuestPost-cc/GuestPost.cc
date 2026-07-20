@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { Injectable, Logger } from "@nestjs/common"
+import { Injectable } from "@nestjs/common"
 import {
   CancelTransferResult,
   CheckStatusResult,
@@ -19,14 +19,21 @@ export function idempotencyKeyToUuid(key: string): string {
 @Injectable()
 export class WisePayoutAdapter implements PayoutProviderAdapter {
   readonly providerName = "wise"
-  private readonly logger = new Logger(WisePayoutAdapter.name)
+  readonly capabilities = {
+    supportedCurrencies: ["USD"],
+    supportsBankPayout: true,
+    supportsCancellation: true,
+    supportsWebhooks: true,
+    supportsStatusPolling: true,
+    supportsExternalReference: true,
+    requiresRecipientOnboarding: true,
+    maxReferenceLength: 32,
+  }
 
-  private assertNotProductionMock(operation: string) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error(
-        `Wise ${operation} attempted without WISE_API_KEY in production — refusing to fake a money movement`,
-      )
-    }
+  private missingKey(operation: string): never {
+    throw new Error(
+      `Wise ${operation} requires WISE_API_KEY; fake money movements are never permitted`,
+    )
   }
 
   async validateRecipient(
@@ -44,14 +51,7 @@ export class WisePayoutAdapter implements PayoutProviderAdapter {
     const apiKey = (params.providerConfig.apiKey ??
       process.env.WISE_API_KEY) as string
     if (!apiKey) {
-      this.assertNotProductionMock("createTransfer")
-      this.logger.warn("WISE_API_KEY not configured — returning mock transfer")
-      return {
-        providerExecutionId: `wise-mock-${Date.now()}`,
-        status: "COMPLETED",
-        fee: Math.round(params.amount * 0.005 * 100) / 100,
-        metadata: { mock: true },
-      }
+      this.missingKey("createTransfer")
     }
 
     const response = await fetch("https://api.transferwise.com/v1/transfers", {
@@ -92,8 +92,7 @@ export class WisePayoutAdapter implements PayoutProviderAdapter {
   ): Promise<CheckStatusResult> {
     const apiKey = process.env.WISE_API_KEY
     if (!apiKey) {
-      this.assertNotProductionMock("checkTransferStatus")
-      return { status: "COMPLETED", providerExecutionId }
+      this.missingKey("checkTransferStatus")
     }
 
     const response = await fetch(
@@ -134,8 +133,7 @@ export class WisePayoutAdapter implements PayoutProviderAdapter {
   ): Promise<CancelTransferResult> {
     const apiKey = process.env.WISE_API_KEY
     if (!apiKey) {
-      this.assertNotProductionMock("cancelTransfer")
-      return { success: true, providerExecutionId }
+      this.missingKey("cancelTransfer")
     }
 
     const response = await fetch(

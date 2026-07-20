@@ -1,0 +1,146 @@
+import Stripe from "stripe"
+
+export type StripeFeature = "deposits" | "connect"
+
+const API_VERSION = "2025-01-27.acacia" as any
+let singleton: Stripe | undefined
+
+function enabled(value: string | undefined): boolean {
+  return value?.trim().toLowerCase() === "true"
+}
+
+function validateReturnOrigin(
+  envName: "NEXT_PUBLIC_PORTAL_URL" | "NEXT_PUBLIC_PUBLISHER_URL",
+): void {
+  const raw = process.env[envName]
+  if (!raw) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(`${envName} is required when Stripe is enabled`)
+    }
+    return
+  }
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    throw new Error(`${envName} must be a valid absolute URL`)
+  }
+  if (
+    url.username ||
+    url.password ||
+    url.search ||
+    url.hash ||
+    (process.env.NODE_ENV === "production" && url.protocol !== "https:")
+  ) {
+    throw new Error(
+      `${envName} must be a credential-free HTTPS origin in production`,
+    )
+  }
+}
+
+export function isStripeFeatureEnabled(feature: StripeFeature): boolean {
+  const key =
+    feature === "deposits"
+      ? "STRIPE_DEPOSITS_ENABLED"
+      : "STRIPE_CONNECT_ENABLED"
+  if (process.env[key] != null) return enabled(process.env[key])
+
+  // Production—including staging deployments that run production builds—is
+  // fail-closed. Local development keeps the historical key-driven behavior.
+  return (
+    feature === "deposits" &&
+    process.env.NODE_ENV === "development" &&
+    Boolean(process.env.STRIPE_SECRET_KEY)
+  )
+}
+
+export function stripeKeyMode(): "test" | "live" | "none" | "invalid" {
+  const key = process.env.STRIPE_SECRET_KEY?.trim()
+  if (!key) return "none"
+  if (key.startsWith("sk_test_")) return "test"
+  if (key.startsWith("sk_live_")) return "live"
+  return "invalid"
+}
+
+export function validateStripeEnvironment(): void {
+  const deposits = isStripeFeatureEnabled("deposits")
+  const connect = isStripeFeatureEnabled("connect")
+  if (!deposits && !connect) return
+
+  const mode = stripeKeyMode()
+  if (mode === "none") {
+    throw new Error("Stripe is enabled but STRIPE_SECRET_KEY is missing")
+  }
+  if (mode === "invalid") {
+    throw new Error("STRIPE_SECRET_KEY must be an sk_test_ or sk_live_ key")
+  }
+  if (mode === "live" && !enabled(process.env.STRIPE_LIVE_MODE_ENABLED)) {
+    throw new Error(
+      "Live Stripe key refused: set STRIPE_LIVE_MODE_ENABLED=true only after the live-money release gates pass",
+    )
+  }
+  if (deposits && !process.env.STRIPE_WEBHOOK_SECRET) {
+    throw new Error(
+      "Stripe deposits are enabled but STRIPE_WEBHOOK_SECRET is missing",
+    )
+  }
+  if (deposits) validateReturnOrigin("NEXT_PUBLIC_PORTAL_URL")
+  if (connect && !process.env.STRIPE_PAYOUT_WEBHOOK_SECRET) {
+    throw new Error(
+      "Stripe Connect is enabled but STRIPE_PAYOUT_WEBHOOK_SECRET is missing",
+    )
+  }
+  if (connect) validateReturnOrigin("NEXT_PUBLIC_PUBLISHER_URL")
+}
+
+export function getStripeClient(feature: StripeFeature): Stripe {
+  if (!isStripeFeatureEnabled(feature)) {
+    throw new Error(`Stripe ${feature} feature is disabled`)
+  }
+  validateStripeEnvironment()
+  if (singleton === undefined) {
+    singleton = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: API_VERSION,
+      maxNetworkRetries: 2,
+      timeout: 20_000,
+    })
+  }
+  return singleton
+}
+
+// Kill switches stop new sends, not verification/reconciliation of money that
+// may already be in flight. Inbound handlers therefore use this client path.
+export function getStripeRecoveryClient(): Stripe {
+  const mode = stripeKeyMode()
+  if (mode === "none" || mode === "invalid") {
+    throw new Error("A valid STRIPE_SECRET_KEY is required for recovery")
+  }
+  if (mode === "live" && !enabled(process.env.STRIPE_LIVE_MODE_ENABLED)) {
+    throw new Error("Live Stripe recovery refused while live mode is disabled")
+  }
+  if (singleton === undefined) {
+    singleton = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+      apiVersion: API_VERSION,
+      maxNetworkRetries: 2,
+      timeout: 20_000,
+    })
+  }
+  return singleton
+}
+
+export function assertStripeObjectMode(
+  livemode: boolean | null | undefined,
+  objectName: string,
+): void {
+  const expectedLive = stripeKeyMode() === "live"
+  if (typeof livemode !== "boolean" || livemode !== expectedLive) {
+    throw new Error(
+      `${objectName} mode does not match the configured Stripe key; refusing financial state change`,
+    )
+  }
+}
+
+/** Test hook; never used by runtime code. */
+export function resetStripeClientForTests(): void {
+  singleton = undefined
+}

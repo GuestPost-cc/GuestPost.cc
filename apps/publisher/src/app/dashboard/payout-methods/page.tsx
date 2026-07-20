@@ -24,6 +24,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import {
   Building2,
   CreditCard,
+  ExternalLink,
   Mail,
   Plus,
   ShieldCheck,
@@ -57,6 +58,7 @@ const typeIcons: Record<string, React.ElementType> = {
   bank_transfer: Building2,
   paypal: Mail,
   wise: CreditCard,
+  stripe_connect: CreditCard,
 }
 
 export default function PayoutMethodsPage() {
@@ -75,6 +77,28 @@ export default function PayoutMethodsPage() {
   } = useQuery({
     queryKey: ["payout-methods"],
     queryFn: () => api.publisherPayouts.listPayoutMethods(),
+  })
+
+  const { data: stripeStatus, refetch: refetchStripeStatus } = useQuery({
+    queryKey: ["stripe-connect-status"],
+    queryFn: () => api.publisherPayouts.getStripeConnectStatus(),
+  })
+
+  const stripeOnboarding = useMutation({
+    mutationFn: () => api.publisherPayouts.createStripeConnectOnboardingLink(),
+    onSuccess: ({ url }) => window.location.assign(url),
+    onError: (err: any) =>
+      toast.error(err?.message ?? "Could not start secure Stripe onboarding"),
+  })
+  const stripeRefresh = useMutation({
+    mutationFn: () => api.publisherPayouts.refreshStripeConnectStatus(),
+    onSuccess: () => {
+      void refetchStripeStatus()
+      void queryClient.invalidateQueries({ queryKey: ["payout-methods"] })
+      toast.success("Stripe payout status refreshed")
+    },
+    onError: (err: any) =>
+      toast.error(err?.message ?? "Could not refresh Stripe status"),
   })
 
   const bankForm = useForm<BankForm>({ resolver: zodResolver(bankSchema) })
@@ -150,18 +174,79 @@ export default function PayoutMethodsPage() {
             Where your withdrawals get paid out
           </p>
         </div>
-        <Button onClick={() => setShowAdd(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Method
-        </Button>
+        {!stripeStatus?.available ? (
+          <Button onClick={() => setShowAdd(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Method
+          </Button>
+        ) : null}
       </div>
+
+      {stripeStatus?.available ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <CardTitle>Stripe bank payouts</CardTitle>
+                <CardDescription>
+                  Stripe securely collects and verifies your bank details.
+                  GuestPost does not receive or store the full account number.
+                </CardDescription>
+              </div>
+              <Badge
+                variant={
+                  stripeStatus.status === "ENABLED" ? "success" : "secondary"
+                }
+              >
+                {stripeStatus.status === "ENABLED"
+                  ? "Ready"
+                  : stripeStatus.connected
+                    ? "Setup required"
+                    : "Not connected"}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground">
+              <p>Your withdrawal fee: $0.00 during the initial rollout.</p>
+              <p>Stripe processing fees are paid by GuestPost.</p>
+              {stripeStatus.requirementsDue.length > 0 ? (
+                <p>
+                  {stripeStatus.requirementsDue.length} verification item(s)
+                  remain.
+                </p>
+              ) : null}
+            </div>
+            <div className="flex gap-2">
+              {stripeStatus.connected ? (
+                <Button
+                  variant="outline"
+                  onClick={() => stripeRefresh.mutate()}
+                  disabled={stripeRefresh.isPending}
+                >
+                  Refresh status
+                </Button>
+              ) : null}
+              {stripeStatus.status !== "ENABLED" ? (
+                <Button
+                  onClick={() => stripeOnboarding.mutate()}
+                  disabled={stripeOnboarding.isPending}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  {stripeStatus.connected ? "Continue setup" : "Connect Stripe"}
+                </Button>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="flex items-start gap-2 rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
         <p>
-          Banking details are encrypted at rest (AES-256-GCM). Only the masked
-          summary below is ever shown — full details are visible to no one,
-          including platform staff, without an audited finance-only unlock.
+          Stripe-hosted setup keeps full bank details outside GuestPost. Legacy
+          methods, when enabled by operations, remain encrypted at rest and
+          require an audited finance-only unlock.
         </p>
       </div>
 
@@ -177,7 +262,7 @@ export default function PayoutMethodsPage() {
             <CreditCard className="mb-3 h-10 w-10 text-muted-foreground/50" />
             <p className="font-medium">No payout methods yet</p>
             <p className="text-sm text-muted-foreground">
-              Add a bank account or PayPal to receive withdrawals
+              Connect Stripe above to receive verified bank payouts
             </p>
           </CardContent>
         </Card>

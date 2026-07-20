@@ -6,6 +6,7 @@ import {
   UnauthorizedException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
+import * as stripeClient from "../../../common/stripe-client"
 import { PayoutExecutionService } from "../payout-execution.service"
 import { PayoutWebhookController } from "../payout-webhook.controller"
 import { StripeConnectPayoutAdapter } from "../providers/stripe-connect-payout.adapter"
@@ -18,6 +19,7 @@ const ORIGINAL_ENV = { ...process.env }
 
 afterEach(() => {
   jest.useRealTimers()
+  jest.restoreAllMocks()
   process.env = { ...ORIGINAL_ENV }
 })
 
@@ -123,6 +125,7 @@ describe("PayoutWebhookController — signature verification", () => {
     const stripePayload = JSON.stringify({
       id: "evt_phase83",
       type: "transfer.updated",
+      livemode: false,
       data: { object: { id: "tr_phase83", status: "paid" } },
     })
     const stripeRaw = Buffer.from(stripePayload, "utf8")
@@ -147,6 +150,24 @@ describe("PayoutWebhookController — signature verification", () => {
       }),
     )
     expect(wakeupMock.wake).toHaveBeenCalledWith("payout-webhook")
+  })
+
+  it("rejects a signed Stripe event when its test/live mode is missing", async () => {
+    process.env.STRIPE_PAYOUT_WEBHOOK_SECRET = "whsec_test"
+    const body = JSON.stringify({
+      id: "evt_mode_missing",
+      type: "payout.paid",
+      data: { object: { id: "po_1", status: "paid" } },
+    })
+
+    await expect(
+      controller.handleWebhook(
+        "stripe_connect",
+        { "stripe-signature": stripeSig("whsec_test", body) },
+        { rawBody: Buffer.from(body) } as any,
+      ),
+    ).rejects.toThrow(/mode does not match/i)
+    expect(prismaMock.payoutWebhookEvent.create).not.toHaveBeenCalled()
   })
 
   it("rejects Wise webhook when no public key is configured (fail closed)", async () => {
@@ -359,11 +380,10 @@ describe("Provider adapters — idempotency and production safety", () => {
   })
 
   it("Stripe adapter sends the Idempotency-Key header, not a body field", async () => {
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ id: "tr_1", status: "pending" }),
-    })
-    global.fetch = fetchMock as any
+    const create = jest.fn().mockResolvedValue({ id: "tr_1", livemode: false })
+    jest.spyOn(stripeClient, "getStripeClient").mockReturnValue({
+      transfers: { create },
+    } as any)
 
     const adapter = new StripeConnectPayoutAdapter()
     await adapter.createTransfer({
@@ -375,9 +395,73 @@ describe("Provider adapters — idempotency and production safety", () => {
       description: "test",
     })
 
-    const [, options] = fetchMock.mock.calls[0]
-    expect(options.headers["Idempotency-Key"]).toBe("payout-wd-1-v0")
-    expect(String(options.body)).not.toContain("idempotency_key")
+    expect(create).toHaveBeenCalledWith(
+      expect.not.objectContaining({ idempotency_key: expect.anything() }),
+      { idempotencyKey: "payout-wd-1-v0" },
+    )
+  })
+
+  it("keeps a Stripe Transfer processing and creates a distinct bank Payout", async () => {
+    const createPayout = jest.fn().mockResolvedValue({
+      id: "po_1",
+      status: "pending",
+      livemode: false,
+      statement_descriptor: "GP1234",
+      arrival_date: 1_800_000_000,
+    })
+    jest.spyOn(stripeClient, "getStripeClient").mockReturnValue({
+      payouts: { create: createPayout },
+    } as any)
+
+    const adapter = new StripeConnectPayoutAdapter()
+    await expect(adapter.checkTransferStatus("tr_1")).resolves.toMatchObject({
+      status: "PROCESSING",
+      metadata: { stage: "TRANSFER_CREATED" },
+    })
+    const result = await adapter.createBankPayout({
+      amount: 100,
+      currency: "USD",
+      connectedAccountId: "acct_1",
+      idempotencyKey: "payout-bank-wd-1-v1",
+      description: "GuestPost payout GP-WD-1234",
+      statementDescriptor: "GP1234",
+      publicReference: "GP-WD-1234",
+    })
+
+    expect(result).toMatchObject({
+      providerExecutionId: "po_1",
+      providerPayoutId: "po_1",
+      status: "PROCESSING",
+    })
+    expect(createPayout).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 10_000,
+        currency: "usd",
+        statement_descriptor: "GP1234",
+      }),
+      {
+        stripeAccount: "acct_1",
+        idempotencyKey: "payout-bank-wd-1-v1",
+      },
+    )
+  })
+
+  it("requires an enabled, manually scheduled Stripe recipient", async () => {
+    const adapter = new StripeConnectPayoutAdapter()
+    await expect(
+      adapter.validateRecipient({
+        connectedAccountId: "acct_1",
+        providerAccountStatus: "RESTRICTED",
+        payoutScheduleConfigured: false,
+      }),
+    ).resolves.toMatchObject({ valid: false })
+    await expect(
+      adapter.validateRecipient({
+        connectedAccountId: "acct_1",
+        providerAccountStatus: "ENABLED",
+        payoutScheduleConfigured: true,
+      }),
+    ).resolves.toEqual({ valid: true })
   })
 
   it("refuses mock transfers in production when API keys are missing", async () => {
@@ -397,36 +481,41 @@ describe("Provider adapters — idempotency and production safety", () => {
     }
 
     await expect(wise.createTransfer(params as any)).rejects.toThrow(
-      /production/,
+      /WISE_API_KEY/,
     )
     await expect(stripe.createTransfer(params as any)).rejects.toThrow(
-      /production/,
+      /disabled/,
     )
-    await expect(wise.checkTransferStatus("t-1")).rejects.toThrow(/production/)
-    await expect(stripe.checkTransferStatus("t-1")).rejects.toThrow(
-      /production/,
+    await expect(wise.checkTransferStatus("t-1")).rejects.toThrow(
+      /WISE_API_KEY/,
     )
+    await expect(stripe.checkTransferStatus("tr_1")).resolves.toMatchObject({
+      status: "PROCESSING",
+    })
     await expect(wise.cancelTransfer("t-1", "test-key")).rejects.toThrow(
-      /production/,
+      /WISE_API_KEY/,
     )
-    await expect(stripe.cancelTransfer("t-1", "test-key")).rejects.toThrow(
-      /production/,
+    await expect(stripe.cancelTransfer("tr_1", "test-key")).rejects.toThrow(
+      /required for recovery/,
     )
   })
 
   it("Stripe adapter sends the Idempotency-Key header on cancelTransfer", async () => {
-    process.env.STRIPE_SECRET_KEY = "sk_test"
-    const fetchMock = jest.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ id: "re_1" }),
-    })
-    global.fetch = fetchMock as any
+    const createReversal = jest.fn().mockResolvedValue({ id: "re_1" })
+    jest.spyOn(stripeClient, "getStripeRecoveryClient").mockReturnValue({
+      transfers: { createReversal },
+    } as any)
 
     const adapter = new StripeConnectPayoutAdapter()
     await adapter.cancelTransfer("tr_1", "payout-cancel-exec-1")
 
-    const [, options] = fetchMock.mock.calls[0]
-    expect(options.headers["Idempotency-Key"]).toBe("payout-cancel-exec-1")
+    expect(createReversal).toHaveBeenCalledWith(
+      "tr_1",
+      {},
+      {
+        idempotencyKey: "payout-cancel-exec-1-transfer",
+      },
+    )
   })
 })
 
@@ -545,5 +634,73 @@ describe("PayoutExecutionService.retryExecution — double-payment prevention", 
     )
     expect(adapterMock.checkTransferStatus).not.toHaveBeenCalled()
     expect(adapterMock.createTransfer).not.toHaveBeenCalled()
+  })
+
+  it("recovers a processing Stripe bank payout from provider truth without creating another payout", async () => {
+    const stripeExecution = {
+      status: "PROCESSING",
+      stage: "BANK_PAYOUT_RECOVERY_REQUIRED",
+      providerExecutionId: "po_1",
+      providerTransferId: "tr_1",
+      providerPayoutId: "po_1",
+      provider: { id: "prov-stripe", name: "stripe_connect" },
+      withdrawal: {
+        ...failedExecution.withdrawal,
+        status: "PROCESSING",
+        payoutMethod: {
+          providerAccount: { providerAccountId: "acct_1" },
+        },
+      },
+    }
+    const { service, adapterMock } = makeService(
+      { status: "COMPLETED" },
+      stripeExecution,
+    )
+
+    await expect(
+      service.retryExecution("exec-1", "staff-1"),
+    ).resolves.toMatchObject({
+      status: "COMPLETED",
+      recoveredFromProvider: true,
+    })
+    expect(adapterMock.checkTransferStatus).toHaveBeenCalledWith("po_1", {
+      connectedAccountId: "acct_1",
+      providerTransferId: "tr_1",
+      providerPayoutId: "po_1",
+    })
+    expect(adapterMock.createTransfer).not.toHaveBeenCalled()
+  })
+
+  it("blocks cancellation while a provider send has no recorded outcome", async () => {
+    const { service, adapterMock } = makeService(
+      { status: "PROCESSING" },
+      {
+        status: "PROCESSING",
+        stage: "CREATED",
+        providerExecutionId: null,
+      },
+    )
+
+    await expect(service.cancelExecution("exec-1", "staff-1")).rejects.toThrow(
+      /outcome is not yet recorded/i,
+    )
+    expect(adapterMock.checkTransferStatus).not.toHaveBeenCalled()
+  })
+
+  it("blocks Stripe cancellation during the active transfer-to-bank handoff", async () => {
+    const { service } = makeService(
+      { status: "PROCESSING" },
+      {
+        status: "PROCESSING",
+        stage: "TRANSFER_CREATED",
+        providerExecutionId: "tr_1",
+        providerTransferId: "tr_1",
+        provider: { id: "prov-stripe", name: "stripe_connect" },
+      },
+    )
+
+    await expect(service.cancelExecution("exec-1", "staff-1")).rejects.toThrow(
+      /between provider stages/i,
+    )
   })
 })

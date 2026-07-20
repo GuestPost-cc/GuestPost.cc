@@ -1,4 +1,4 @@
-import { BadRequestException } from "@nestjs/common"
+import { BadRequestException, ConflictException } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
 import { PublisherPayoutsService } from "../publisher-payouts.service"
 
@@ -14,6 +14,9 @@ describe("PublisherPayoutsService", () => {
   const balance = {
     publisherId: "pub-1",
     withdrawableBalance: new Decimal(500),
+    allocationCarryForward: new Decimal(500),
+    allocationCarryForwardUsed: new Decimal(0),
+    allocationCutoverAt: new Date(),
     version: 1,
   }
 
@@ -74,7 +77,15 @@ describe("PublisherPayoutsService", () => {
           .fn()
           .mockResolvedValue({ id: "manual-1", name: "manual" }),
       },
-      transaction: { create: jest.fn().mockResolvedValue({}) },
+      transaction: {
+        create: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      withdrawalAllocation: {
+        create: jest.fn().mockResolvedValue({}),
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       auditLog: { create: jest.fn().mockResolvedValue({}) },
       $transaction: jest
         .fn()
@@ -115,7 +126,13 @@ describe("PublisherPayoutsService", () => {
     })
 
     it("returns existing withdrawal on idempotency key replay without moving balance", async () => {
-      prismaMock.withdrawal.findFirst.mockResolvedValue({ id: "wd-existing" })
+      prismaMock.withdrawal.findFirst.mockResolvedValue({
+        id: "wd-existing",
+        amount: new Decimal(100),
+        currency: "USD",
+        method: "bank_transfer",
+        payoutMethodId: null,
+      })
 
       const result = await service.requestWithdrawal(
         "pub-1",
@@ -125,9 +142,37 @@ describe("PublisherPayoutsService", () => {
         "key-1",
       )
 
-      expect(result).toEqual({ id: "wd-existing" })
+      expect(result).toMatchObject({ id: "wd-existing" })
       expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
       expect(prismaMock.transaction.create).not.toHaveBeenCalled()
+    })
+
+    it("rejects idempotency-key reuse with different payout details", async () => {
+      prismaMock.withdrawal.findFirst.mockResolvedValue({
+        id: "wd-existing",
+        amount: new Decimal(100),
+        currency: "USD",
+        method: "bank_transfer",
+        payoutMethodId: null,
+      })
+
+      await expect(
+        service.requestWithdrawal(
+          "pub-1",
+          101,
+          "bank_transfer",
+          "user-1",
+          "key-1",
+        ),
+      ).rejects.toThrow(ConflictException)
+      expect(prismaMock.publisherBalance.updateMany).not.toHaveBeenCalled()
+    })
+
+    it("rejects sub-cent withdrawal amounts at the service boundary", async () => {
+      await expect(
+        service.requestWithdrawal("pub-1", 10.001, "bank_transfer", "user-1"),
+      ).rejects.toThrow(BadRequestException)
+      expect(prismaMock.withdrawal.create).not.toHaveBeenCalled()
     })
 
     it("rejects amounts above withdrawable", async () => {

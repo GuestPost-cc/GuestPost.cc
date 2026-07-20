@@ -1,3 +1,4 @@
+import { publisherPayoutStatementDescriptor } from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
@@ -31,7 +32,10 @@ export class PayoutExecutionService {
   ) {
     const withdrawal = await this.prisma.withdrawal.findUnique({
       where: { id: withdrawalId },
-      include: { payoutMethod: true, publisher: true },
+      include: {
+        payoutMethod: { include: { providerAccount: true } },
+        publisher: true,
+      },
     })
     if (!withdrawal) throw new NotFoundException("Withdrawal not found")
     if (withdrawal.status !== "APPROVED") {
@@ -40,19 +44,67 @@ export class PayoutExecutionService {
       )
     }
 
+    const allowedProvidersByMethod: Record<string, string[]> = {
+      bank_transfer: ["manual"],
+      wise: ["wise"],
+      stripe_connect: ["stripe_connect"],
+      // No PayPal adapter is active yet. Keeping the route empty fails closed
+      // instead of treating an unsupported provider as a manual payout.
+      paypal: [],
+    }
+    if (
+      !(allowedProvidersByMethod[withdrawal.method] ?? []).includes(
+        providerName,
+      )
+    ) {
+      throw new BadRequestException(
+        `Provider ${providerName} is not authorized for ${withdrawal.method} withdrawals`,
+      )
+    }
+
     const adapter = this.providerService.getAdapter(providerName)
     const provider = await this.providerService.getActiveProvider(providerName)
+    if (
+      !adapter.capabilities.supportedCurrencies.includes(withdrawal.currency)
+    ) {
+      throw new BadRequestException(
+        `${providerName} does not support ${withdrawal.currency} payouts`,
+      )
+    }
 
     if (withdrawal.payoutMethod && !withdrawal.payoutMethod.isActive) {
       throw new Error("Payout method is no longer active")
     }
 
-    const decryptedDetails = withdrawal.payoutMethod
+    let recipientDetails: Record<string, unknown> = withdrawal.payoutMethod
       ? this.encryption.decrypt(
           withdrawal.payoutMethod.details as unknown as string,
           withdrawal.payoutMethod.encryptionKeyVersion,
         )
       : {}
+
+    if (providerName === "stripe_connect") {
+      const account = withdrawal.payoutMethod?.providerAccount
+      if (account?.provider !== "stripe_connect") {
+        throw new BadRequestException(
+          "Withdrawal is not linked to a Stripe connected payout account",
+        )
+      }
+      recipientDetails = {
+        connectedAccountId: account.providerAccountId,
+        providerAccountStatus: account.status,
+        payoutScheduleConfigured: account.payoutScheduleConfigured,
+        publicReference: withdrawal.publicReference,
+      }
+    }
+
+    const recipientValidation =
+      await adapter.validateRecipient(recipientDetails)
+    if (!recipientValidation.valid) {
+      throw new BadRequestException(
+        recipientValidation.error ?? "Payout destination is not ready",
+      )
+    }
 
     let execution: any
     let versionSnapshot: number
@@ -96,6 +148,11 @@ export class PayoutExecutionService {
           status: "PROCESSING",
           amount: withdrawal.amount,
           fee: 0,
+          sourceCurrency: withdrawal.currency,
+          destinationCurrency: withdrawal.currency,
+          destinationAmount: withdrawal.netAmount ?? withdrawal.amount,
+          requestedReference: withdrawal.publicReference,
+          stage: "CREATED",
           idempotencyKey: `payout-${withdrawalId}-v${versionSnapshot}`,
         },
       })
@@ -124,29 +181,123 @@ export class PayoutExecutionService {
     versionSnapshot = execResult.versionSnapshot
 
     let transferResult: any = null
+    let transferRecorded = false
     try {
       transferResult = await adapter.createTransfer({
-        amount: Number(withdrawal.amount),
-        currency: "usd",
-        recipientDetails: decryptedDetails,
+        amount: Number(withdrawal.netAmount ?? withdrawal.amount),
+        currency: withdrawal.currency,
+        recipientDetails,
         providerConfig: provider.decryptedConfig,
         idempotencyKey: `payout-${withdrawalId}-v${versionSnapshot}`,
-        description: `Publisher payout — withdrawal ${withdrawal.id}`,
+        description: `GuestPost publisher payout ${withdrawal.publicReference ?? withdrawal.id}`,
       })
 
+      // Persist provider evidence before starting the next money movement.
+      // A crash after Stripe accepted the Transfer can then be resumed without
+      // creating a duplicate transfer or falsely returning publisher funds.
+      if (providerName === "stripe_connect") {
+        const transferEvidence = await this.prisma.payoutExecution.updateMany({
+          where: {
+            id: execution.id,
+            status: "PROCESSING",
+            stage: "CREATED",
+            version: execution.version,
+          },
+          data: {
+            providerExecutionId: transferResult.providerExecutionId,
+            providerTransferId:
+              transferResult.providerTransferId ??
+              transferResult.providerExecutionId,
+            stage: "TRANSFER_CREATED",
+            providerMetadata: (transferResult.metadata as any) ?? undefined,
+          },
+        })
+        if (transferEvidence.count === 0) {
+          throw new ConflictException(
+            "Payout execution changed before the Stripe transfer could be recorded",
+          )
+        }
+        transferRecorded = true
+
+        if (!adapter.createBankPayout) {
+          throw new Error("Stripe adapter cannot create a bank payout")
+        }
+        const connectedAccountId = String(recipientDetails.connectedAccountId)
+        const payoutResult = await adapter.createBankPayout({
+          amount: Number(withdrawal.netAmount ?? withdrawal.amount),
+          currency: withdrawal.currency,
+          connectedAccountId,
+          idempotencyKey: `payout-bank-${withdrawalId}-v${versionSnapshot}`,
+          description: `GuestPost publisher payout ${withdrawal.publicReference ?? withdrawal.id}`,
+          statementDescriptor: publisherPayoutStatementDescriptor(
+            withdrawal.publicReference ?? withdrawal.id,
+          ),
+          publicReference: withdrawal.publicReference ?? withdrawal.id,
+        })
+        const payoutEvidence = await this.prisma.payoutExecution.updateMany({
+          where: {
+            id: execution.id,
+            status: "PROCESSING",
+            stage: "TRANSFER_CREATED",
+            version: execution.version,
+          },
+          data: {
+            providerExecutionId: payoutResult.providerExecutionId,
+            providerPayoutId: payoutResult.providerPayoutId,
+            acceptedReference: payoutResult.acceptedReference,
+            stage:
+              payoutResult.status === "COMPLETED"
+                ? "BANK_PAID"
+                : payoutResult.status === "FAILED"
+                  ? "BANK_PAYOUT_FAILED"
+                  : "BANK_PAYOUT_CREATED",
+            providerMetadata: (payoutResult.metadata as any) ?? undefined,
+          },
+        })
+        if (payoutEvidence.count === 0) {
+          throw new ConflictException(
+            "Payout execution changed before the Stripe bank payout could be recorded",
+          )
+        }
+        transferResult = payoutResult
+        if (payoutResult.status === "FAILED") {
+          throw new Error(
+            "Stripe bank payout failed after the connected-balance transfer; finance recovery is required",
+          )
+        }
+      }
+
       await this.prisma.$transaction(async (tx: any) => {
-        await tx.payoutExecution.update({
-          where: { id: execution.id },
+        const executionUpdated = await tx.payoutExecution.updateMany({
+          where: {
+            id: execution.id,
+            status: "PROCESSING",
+            version: execution.version,
+          },
           data: {
             status:
               transferResult.status === "COMPLETED"
                 ? "COMPLETED"
                 : "PROCESSING",
             providerExecutionId: transferResult.providerExecutionId,
+            providerTransferId: transferResult.providerTransferId ?? undefined,
+            providerPayoutId: transferResult.providerPayoutId ?? undefined,
+            acceptedReference: transferResult.acceptedReference ?? undefined,
+            stage:
+              transferResult.status === "COMPLETED"
+                ? "BANK_PAID"
+                : providerName === "stripe_connect"
+                  ? "BANK_PAYOUT_PENDING"
+                  : "PROVIDER_SENT",
             fee: transferResult.fee ?? 0,
             providerMetadata: (transferResult.metadata as any) ?? undefined,
           },
         })
+        if (executionUpdated.count === 0) {
+          throw new ConflictException(
+            "Payout execution changed during provider finalization",
+          )
+        }
 
         const withdrawalStatus =
           transferResult.status === "COMPLETED" ? "COMPLETED" : "PROCESSING"
@@ -226,7 +377,64 @@ export class PayoutExecutionService {
         execution?.providerExecutionId ??
         null
 
+      const currentExecution = execution?.id
+        ? await this.prisma.payoutExecution.findUnique({
+            where: { id: execution.id },
+          })
+        : null
+      if (currentExecution?.status === "COMPLETED") {
+        return {
+          executionId: currentExecution.id,
+          status: "COMPLETED",
+          providerExecutionId: currentExecution.providerExecutionId,
+          recoveredFromConcurrentFinalization: true,
+        }
+      }
+      if (
+        currentExecution?.status === "CANCELLED" ||
+        currentExecution?.stage === "CANCEL_REQUESTED"
+      ) {
+        if (err && typeof err === "object") err.message = safeMessage
+        throw err
+      }
+
       await this.prisma.$transaction(async (tx: any) => {
+        if (providerName === "stripe_connect" && transferRecorded) {
+          const held = await tx.payoutExecution.updateMany({
+            where: {
+              id: execution.id,
+              status: "PROCESSING",
+              version: execution.version,
+            },
+            data: {
+              status: "PROCESSING",
+              errorMessage: safeMessage,
+              stage: transferResult?.providerPayoutId
+                ? "BANK_PAYOUT_RECOVERY_REQUIRED"
+                : "TRANSFER_RECOVERY_REQUIRED",
+            },
+          })
+          if (held.count === 0) return
+          await this.audit.log(
+            {
+              action: "PAYOUT_EXECUTION_RECOVERY_REQUIRED",
+              entityType: "PayoutExecution",
+              entityId: execution.id,
+              metadata: {
+                withdrawalId,
+                providerTransferId:
+                  transferResult?.providerTransferId ??
+                  transferResult?.providerExecutionId,
+                providerPayoutId: transferResult?.providerPayoutId,
+                error: safeMessage,
+              },
+              userId,
+              organizationId: withdrawal.publisher.organizationId,
+            },
+            tx,
+          )
+          return
+        }
         const updateData: any = {
           status: "FAILED",
           errorMessage: safeMessage,
@@ -269,9 +477,67 @@ export class PayoutExecutionService {
   async retryExecution(executionId: string, userId: string) {
     const execution = await this.prisma.payoutExecution.findUnique({
       where: { id: executionId },
-      include: { withdrawal: { include: { publisher: true } }, provider: true },
+      include: {
+        withdrawal: {
+          include: {
+            publisher: true,
+            payoutMethod: { include: { providerAccount: true } },
+          },
+        },
+        provider: true,
+      },
     })
     if (!execution) throw new NotFoundException("Payout execution not found")
+    if (
+      execution.provider.name === "stripe_connect" &&
+      execution.status === "PROCESSING" &&
+      execution.providerTransferId &&
+      !execution.providerPayoutId &&
+      execution.stage === "TRANSFER_RECOVERY_REQUIRED"
+    ) {
+      return this.resumeStripeBankPayout(execution, userId)
+    }
+    if (
+      execution.provider.name === "stripe_connect" &&
+      execution.status === "PROCESSING" &&
+      execution.providerPayoutId
+    ) {
+      const adapter = this.providerService.getAdapter("stripe_connect")
+      const providerStatus = await adapter.checkTransferStatus(
+        execution.providerPayoutId,
+        {
+          connectedAccountId:
+            execution.withdrawal.payoutMethod?.providerAccount
+              ?.providerAccountId,
+          providerTransferId: execution.providerTransferId ?? undefined,
+          providerPayoutId: execution.providerPayoutId,
+        },
+      )
+      if (providerStatus.status === "COMPLETED") {
+        await this.finalizeCompletedAtProvider(
+          execution,
+          providerStatus,
+          userId,
+        )
+        return {
+          executionId: execution.id,
+          status: "COMPLETED",
+          providerExecutionId: execution.providerPayoutId,
+          recoveredFromProvider: true,
+        }
+      }
+      if (
+        providerStatus.status === "FAILED" ||
+        providerStatus.status === "CANCELLED"
+      ) {
+        throw new ConflictException(
+          "Stripe bank payout did not settle. Cancel and reverse the recorded transfer before creating another payout.",
+        )
+      }
+      throw new ConflictException(
+        `Stripe bank payout ${execution.providerPayoutId} is still processing`,
+      )
+    }
     if (execution.status !== "FAILED") {
       throw new BadRequestException(
         `Execution ${executionId} is ${execution.status}, expected FAILED`,
@@ -297,6 +563,12 @@ export class PayoutExecutionService {
     const adapter = this.providerService.getAdapter(execution.provider.name)
     const providerStatus = await adapter.checkTransferStatus(
       execution.providerExecutionId,
+      {
+        connectedAccountId:
+          execution.withdrawal.payoutMethod?.providerAccount?.providerAccountId,
+        providerTransferId: execution.providerTransferId ?? undefined,
+        providerPayoutId: execution.providerPayoutId ?? undefined,
+      },
     )
     if (providerStatus.status === "COMPLETED") {
       await this.finalizeCompletedAtProvider(execution, providerStatus, userId)
@@ -342,6 +614,81 @@ export class PayoutExecutionService {
     )
   }
 
+  private async resumeStripeBankPayout(execution: any, userId: string) {
+    const account = execution.withdrawal.payoutMethod?.providerAccount
+    if (account?.status !== "ENABLED") {
+      throw new ConflictException(
+        "Stripe connected account is not enabled; resolve onboarding before recovery",
+      )
+    }
+    const adapter = this.providerService.getAdapter("stripe_connect")
+    if (!adapter.createBankPayout) {
+      throw new Error("Stripe adapter cannot create a bank payout")
+    }
+    const withdrawal = execution.withdrawal
+    const payout = await adapter.createBankPayout({
+      amount: Number(withdrawal.netAmount ?? withdrawal.amount),
+      currency: withdrawal.currency,
+      connectedAccountId: account.providerAccountId,
+      idempotencyKey: `payout-bank-${withdrawal.id}-v${withdrawal.version}`,
+      description: `GuestPost publisher payout ${withdrawal.publicReference ?? withdrawal.id}`,
+      statementDescriptor: publisherPayoutStatementDescriptor(
+        withdrawal.publicReference ?? withdrawal.id,
+      ),
+      publicReference: withdrawal.publicReference ?? withdrawal.id,
+    })
+
+    await this.prisma.$transaction(async (tx: any) => {
+      const updated = await tx.payoutExecution.updateMany({
+        where: {
+          id: execution.id,
+          status: "PROCESSING",
+          providerTransferId: execution.providerTransferId,
+          providerPayoutId: null,
+        },
+        data: {
+          providerExecutionId: payout.providerExecutionId,
+          providerPayoutId: payout.providerPayoutId,
+          acceptedReference: payout.acceptedReference,
+          stage:
+            payout.status === "COMPLETED" ? "BANK_PAID" : "BANK_PAYOUT_CREATED",
+          providerMetadata: (payout.metadata as any) ?? undefined,
+          errorMessage: null,
+          version: { increment: 1 },
+        },
+      })
+      if (updated.count === 0) {
+        throw new ConflictException(
+          "Payout recovery was completed by another process",
+        )
+      }
+      await this.audit.log(
+        {
+          action: "PAYOUT_BANK_STAGE_RESUMED",
+          entityType: "PayoutExecution",
+          entityId: execution.id,
+          metadata: {
+            withdrawalId: withdrawal.id,
+            providerTransferId: execution.providerTransferId,
+            providerPayoutId: payout.providerPayoutId,
+          },
+          userId,
+          organizationId: withdrawal.publisher.organizationId,
+        },
+        tx,
+      )
+    })
+    return {
+      executionId: execution.id,
+      // The resume transaction only persists provider evidence. Even if Stripe
+      // returns `paid` immediately, the normal webhook/poller completion path
+      // performs the guarded withdrawal + lifetimePaid transition.
+      status: "PROCESSING",
+      providerExecutionId: payout.providerExecutionId,
+      recoveredBankStage: true,
+    }
+  }
+
   // The provider says the money already moved: reconcile our records to match
   // instead of sending it again.
   private async finalizeCompletedAtProvider(
@@ -351,9 +698,12 @@ export class PayoutExecutionService {
   ) {
     await this.prisma.$transaction(async (tx: any) => {
       const execUpdated = await tx.payoutExecution.updateMany({
-        where: { id: execution.id, status: "FAILED" },
+        where: { id: execution.id, status: execution.status },
         data: {
           status: "COMPLETED",
+          ...(execution.provider?.name === "stripe_connect"
+            ? { stage: "BANK_PAID" }
+            : {}),
           fee: providerStatus.fee ?? execution.fee,
           providerMetadata: (providerStatus.metadata as any) ?? undefined,
           errorMessage: null,
@@ -412,12 +762,38 @@ export class PayoutExecutionService {
   async cancelExecution(executionId: string, userId: string) {
     const execution = await this.prisma.payoutExecution.findUnique({
       where: { id: executionId },
-      include: { withdrawal: { include: { publisher: true } }, provider: true },
+      include: {
+        withdrawal: {
+          include: {
+            publisher: true,
+            payoutMethod: { include: { providerAccount: true } },
+          },
+        },
+        provider: true,
+      },
     })
     if (!execution) throw new NotFoundException("Payout execution not found")
     if (!["PENDING", "PROCESSING"].includes(execution.status)) {
       throw new BadRequestException(
         `Execution ${executionId} is ${execution.status}, cannot cancel`,
+      )
+    }
+    if (!execution.providerExecutionId) {
+      throw new ConflictException(
+        "Provider outcome is not yet recorded. Cancellation is blocked until the in-flight send is reconciled.",
+      )
+    }
+    if (
+      execution.provider.name === "stripe_connect" &&
+      ![
+        "TRANSFER_RECOVERY_REQUIRED",
+        "BANK_PAYOUT_PENDING",
+        "BANK_PAYOUT_RECOVERY_REQUIRED",
+        "CANCEL_REQUESTED",
+      ].includes(execution.stage)
+    ) {
+      throw new ConflictException(
+        "Stripe payout is between provider stages. Wait for recovery status before cancelling.",
       )
     }
 
@@ -438,7 +814,7 @@ export class PayoutExecutionService {
       }
       const claimed = await tx.payoutExecution.updateMany({
         where: { id: executionId, version: execution.version },
-        data: { version: claimedVersion },
+        data: { stage: "CANCEL_REQUESTED", version: claimedVersion },
       })
       if (claimed.count === 0) {
         throw new ConflictException(
@@ -465,6 +841,13 @@ export class PayoutExecutionService {
       await adapter.cancelTransfer(
         execution.providerExecutionId,
         `payout-cancel-${executionId}`,
+        {
+          connectedAccountId:
+            execution.withdrawal.payoutMethod?.providerAccount
+              ?.providerAccountId,
+          providerTransferId: execution.providerTransferId ?? undefined,
+          providerPayoutId: execution.providerPayoutId ?? undefined,
+        },
       )
     }
 
@@ -475,29 +858,27 @@ export class PayoutExecutionService {
         where: {
           id: executionId,
           version: claimedVersion,
-          status: { not: "CANCELLED" },
+          status: { in: ["PENDING", "PROCESSING"] },
+          stage: "CANCEL_REQUESTED",
         },
-        data: { status: "CANCELLED", version: { increment: 1 } },
+        data: {
+          status: "CANCELLED",
+          stage: "CANCELLED_REVERSED",
+          version: { increment: 1 },
+        },
       })
       if (finalized.count === 0) {
-        // Already finalized (e.g. retry after partial Tx2 failure) — carry on
-        // so withdrawal update below still runs if it was the part that failed.
-        this.logger.warn("cancelExecution Tx2: execution already finalized", {
-          executionId,
-        })
+        throw new ConflictException(
+          "Execution changed while provider cancellation was in progress",
+        )
       }
       const wUpdated = await tx.withdrawal.updateMany({
         where: { id: execution.withdrawalId, status: "PROCESSING" },
         data: { status: "APPROVED", version: { increment: 1 } },
       })
       if (wUpdated.count === 0) {
-        // Withdrawal already transitioned — log but don't throw, the execution
-        // is still correctly CANCELLED.
-        this.logger.warn(
-          "cancelExecution Tx2: withdrawal already transitioned",
-          {
-            withdrawalId: execution.withdrawalId,
-          },
+        throw new ConflictException(
+          "Withdrawal changed while provider cancellation was in progress",
         )
       }
       await this.audit.log(

@@ -182,6 +182,32 @@ enum PaymentStatus {
   FAILED
 }
 
+// Provider-neutral lifecycle for customer funding attempts. Provider-specific
+// states remain metadata; these values are the only states allowed to drive
+// wallet credits and customer-visible status.
+enum DepositAttemptStatus {
+  CREATED
+  PENDING_CUSTOMER_ACTION
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  EXPIRED
+  PARTIALLY_REFUNDED
+  REFUNDED
+  DISPUTED
+  CHARGEBACK
+}
+
+// Durable inbox shared by payment providers. A provider webhook is
+// acknowledged only after one of these rows commits.
+enum PaymentProviderEventStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+  IGNORED
+}
+
 enum TicketStatus {
   OPEN
   IN_PROGRESS
@@ -249,6 +275,13 @@ enum PayoutExecutionStatus {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum PublisherProviderAccountStatus {
+  PENDING_ONBOARDING
+  RESTRICTED
+  ENABLED
+  DISABLED
 }
 
 // Durable inbox state for cryptographically verified payout-provider events.
@@ -513,6 +546,7 @@ model Organization {
   apiKeys             ApiKey[]
   marketplaceListings MarketplaceListing[]
   activeContexts      ActiveContext[]
+  depositAttempts     DepositAttempt[]
 }
 
 enum MembershipStatus {
@@ -586,7 +620,7 @@ model Publisher {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  organization         Organization          @relation(fields: [organizationId], references: [id])
+  organization         Organization               @relation(fields: [organizationId], references: [id])
   websites             Website[]
   publisherMemberships PublisherMembership[]
   balance              PublisherBalance?
@@ -598,7 +632,8 @@ model Publisher {
   transactions         Transaction[]
   activeContexts       ActiveContext[]
   orderReviews         OrderReview[]
-  tickets              Ticket[]              @relation("TicketPublisher")
+  tickets              Ticket[]                   @relation("TicketPublisher")
+  providerAccounts     PublisherProviderAccount[]
 
   @@index([organizationId])
 }
@@ -761,6 +796,7 @@ model Order {
   tickets                Ticket[]
   review                 OrderReview?
   cancellationRequests   OrderCancellationRequest[]
+  withdrawalAllocations  WithdrawalAllocation[]
 
   // Scoped per organization — a globally unique key let one tenant replay
   // another tenant's key and read their order (cross-tenant leak).
@@ -932,11 +968,12 @@ model Settlement {
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
 
-  order          Order                @relation(fields: [orderId], references: [id])
-  publisher      Publisher            @relation(fields: [publisherId], references: [id])
-  approvals      SettlementApproval[]
-  transactions   Transaction[]
-  listingService ListingService?      @relation(fields: [listingServiceId], references: [id])
+  order                 Order                  @relation(fields: [orderId], references: [id])
+  publisher             Publisher              @relation(fields: [publisherId], references: [id])
+  approvals             SettlementApproval[]
+  transactions          Transaction[]
+  listingService        ListingService?        @relation(fields: [listingServiceId], references: [id])
+  withdrawalAllocations WithdrawalAllocation[]
 
   // NOTE: two indexes live in raw SQL migrations because Prisma can't
   // express them in @@index:
@@ -1144,46 +1181,58 @@ model OrderReview {
 }
 
 model PublisherBalance {
-  id                  String   @id @default(cuid())
-  publisherId         String   @unique
-  pendingBalance      Decimal  @default(0)
-  approvedBalance     Decimal  @default(0)
-  withdrawableBalance Decimal  @default(0)
+  id                         String    @id @default(cuid())
+  publisherId                String    @unique
+  pendingBalance             Decimal   @default(0)
+  approvedBalance            Decimal   @default(0)
+  withdrawableBalance        Decimal   @default(0)
   // Owed back to the platform (refund clawback exceeded withdrawable).
   // Netted against future settlement releases before crediting withdrawable.
-  debtBalance         Decimal  @default(0)
-  lifetimeEarnings    Decimal  @default(0)
-  lifetimePaid        Decimal  @default(0)
-  version             Int      @default(0)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  debtBalance                Decimal   @default(0)
+  lifetimeEarnings           Decimal   @default(0)
+  lifetimePaid               Decimal   @default(0)
+  // Allocation cutover captures the pre-provider-neutral withdrawable balance
+  // as one honest carry-forward bucket. New releases after this timestamp are
+  // allocated to their exact settlement transactions.
+  allocationCutoverAt        DateTime?
+  allocationCarryForward     Decimal   @default(0)
+  allocationCarryForwardUsed Decimal   @default(0)
+  version                    Int       @default(0)
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
 
   publisher Publisher @relation(fields: [publisherId], references: [id])
 }
 
 model Withdrawal {
-  id             String           @id @default(cuid())
-  publisherId    String
-  amount         Decimal
-  method         String           @default("bank_transfer")
-  status         WithdrawalStatus @default(PENDING)
+  id               String           @id @default(cuid())
+  publisherId      String
+  amount           Decimal
+  currency         String           @default("USD")
+  publicReference  String?          @unique
+  payoutFee        Decimal          @default(0)
+  netAmount        Decimal?
+  feePolicyVersion String?          @db.VarChar(64)
+  method           String           @default("bank_transfer")
+  status           WithdrawalStatus @default(PENDING)
   // Tier-based hold: approval is rejected before this timestamp.
-  availableAt    DateTime?
+  availableAt      DateTime?
   // Client-supplied dedup key — scoped per publisher, never used as PK.
-  idempotencyKey String?
-  payoutMethodId String?
-  payoutBatchId  String?
-  approvedBy     String?
-  approvedAt     DateTime?
-  version        Int              @default(0)
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  idempotencyKey   String?
+  payoutMethodId   String?
+  payoutBatchId    String?
+  approvedBy       String?
+  approvedAt       DateTime?
+  version          Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
-  publisher      Publisher         @relation(fields: [publisherId], references: [id])
-  approvedByUser User?             @relation("WithdrawalApprover", fields: [approvedBy], references: [id])
-  payoutMethod   PayoutMethod?     @relation(fields: [payoutMethodId], references: [id])
-  payoutBatch    PayoutBatch?      @relation(fields: [payoutBatchId], references: [id])
+  publisher      Publisher              @relation(fields: [publisherId], references: [id])
+  approvedByUser User?                  @relation("WithdrawalApprover", fields: [approvedBy], references: [id])
+  payoutMethod   PayoutMethod?          @relation(fields: [payoutMethodId], references: [id])
+  payoutBatch    PayoutBatch?           @relation(fields: [payoutBatchId], references: [id])
   executions     PayoutExecution[]
+  allocations    WithdrawalAllocation[]
 
   @@unique([publisherId, idempotencyKey])
   @@index([publisherId, status])
@@ -1204,13 +1253,45 @@ model PayoutMethod {
   isDefault            Boolean  @default(false)
   isActive             Boolean  @default(true)
   version              Int      @default(0)
+  providerAccountId    String?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
 
-  publisher   Publisher    @relation(fields: [publisherId], references: [id])
-  withdrawals Withdrawal[]
+  publisher       Publisher                 @relation(fields: [publisherId], references: [id])
+  withdrawals     Withdrawal[]
+  providerAccount PublisherProviderAccount? @relation(fields: [providerAccountId], references: [id])
 
   @@index([publisherId])
+  @@index([providerAccountId])
+}
+
+// A provider recipient/account is separate from a payout method. This lets a
+// BANK_ACCOUNT method route through Stripe now and Wise/local-bank adapters in
+// the future without asking the publisher to re-enter destination details.
+model PublisherProviderAccount {
+  id                       String                         @id @default(cuid())
+  publisherId              String
+  provider                 String                         @db.VarChar(32)
+  providerAccountId        String                         @db.VarChar(191)
+  status                   PublisherProviderAccountStatus @default(PENDING_ONBOARDING)
+  country                  String?                        @db.VarChar(2)
+  defaultCurrency          String?                        @db.VarChar(3)
+  transfersEnabled         Boolean                        @default(false)
+  payoutsEnabled           Boolean                        @default(false)
+  detailsSubmitted         Boolean                        @default(false)
+  payoutScheduleConfigured Boolean                        @default(false)
+  requirementsDue          Json?
+  lastSyncedAt             DateTime?
+  isActive                 Boolean                        @default(true)
+  createdAt                DateTime                       @default(now())
+  updatedAt                DateTime                       @updatedAt
+
+  publisher     Publisher      @relation(fields: [publisherId], references: [id])
+  payoutMethods PayoutMethod[]
+
+  @@unique([publisherId, provider])
+  @@unique([provider, providerAccountId])
+  @@index([provider, status])
 }
 
 model PayoutProvider {
@@ -1235,8 +1316,18 @@ model PayoutExecution {
   providerId          String
   status              PayoutExecutionStatus @default(PENDING)
   providerExecutionId String? // Provider's reference ID (transfer ID, payment ID)
+  providerTransferId  String?               @db.VarChar(191)
+  providerPayoutId    String?               @db.VarChar(191)
   amount              Decimal
   fee                 Decimal               @default(0)
+  sourceCurrency      String                @default("USD") @db.VarChar(3)
+  destinationCurrency String                @default("USD") @db.VarChar(3)
+  destinationAmount   Decimal?
+  providerFee         Decimal               @default(0)
+  requestedReference  String?               @db.VarChar(64)
+  acceptedReference   String?               @db.VarChar(64)
+  bankTraceReference  String?               @db.VarChar(191)
+  stage               String                @default("CREATED") @db.VarChar(64)
   errorMessage        String?
   providerMetadata    Json?
   idempotencyKey      String?
@@ -1249,10 +1340,42 @@ model PayoutExecution {
 
   @@unique([withdrawalId, idempotencyKey])
   @@unique([providerId, providerExecutionId])
+  @@unique([providerId, providerTransferId])
+  @@unique([providerId, providerPayoutId])
   @@index([withdrawalId, status])
   @@index([providerId, status])
   @@index([status, createdAt])
   @@index([providerExecutionId])
+  @@index([providerPayoutId])
+}
+
+// Immutable source breakdown for a withdrawal. releasedAt marks an allocation
+// returned to the publisher after a rejected/reversed withdrawal without
+// deleting financial history.
+model WithdrawalAllocation {
+  id                  String       @id @default(cuid())
+  withdrawalId        String
+  sourceType          String       @db.VarChar(32)
+  sourceTransactionId String?
+  settlementId        String?
+  orderId             String?
+  amount              Decimal
+  currency            String       @default("USD") @db.VarChar(3)
+  sequence            Int
+  serviceType         ServiceType?
+  releasedAt          DateTime?
+  createdAt           DateTime     @default(now())
+
+  withdrawal        Withdrawal   @relation(fields: [withdrawalId], references: [id])
+  sourceTransaction Transaction? @relation(fields: [sourceTransactionId], references: [id])
+  settlement        Settlement?  @relation(fields: [settlementId], references: [id])
+  order             Order?       @relation(fields: [orderId], references: [id])
+
+  @@unique([withdrawalId, sequence])
+  @@unique([withdrawalId, sourceTransactionId])
+  @@index([sourceTransactionId, releasedAt])
+  @@index([settlementId])
+  @@index([orderId])
 }
 
 model PayoutWebhookEvent {
@@ -1398,14 +1521,15 @@ model Wallet {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  organization Organization? @relation(fields: [organizationId], references: [id])
-  transactions Transaction[]
-
-  @@unique([organizationId])
-  @@index([userId])
+  organization    Organization?    @relation(fields: [organizationId], references: [id])
+  transactions    Transaction[]
+  depositAttempts DepositAttempt[]
   // Partial unique index for legacy personal wallets only. A global userId
   // unique would break users who create wallets for multiple organizations.
   // See migration 20260719120000_wallet_personal_user_unique.
+
+  @@unique([organizationId])
+  @@index([userId])
 }
 
 enum TransactionType {
@@ -1450,10 +1574,12 @@ model Transaction {
   settlementId String?
   createdAt    DateTime        @default(now())
 
-  wallet     Wallet?     @relation(fields: [walletId], references: [id])
-  order      Order?      @relation(fields: [orderId], references: [id])
-  publisher  Publisher?  @relation(fields: [publisherId], references: [id])
-  settlement Settlement? @relation(fields: [settlementId], references: [id])
+  wallet                Wallet?                @relation(fields: [walletId], references: [id])
+  order                 Order?                 @relation(fields: [orderId], references: [id])
+  publisher             Publisher?             @relation(fields: [publisherId], references: [id])
+  settlement            Settlement?            @relation(fields: [settlementId], references: [id])
+  depositAttempt        DepositAttempt?
+  withdrawalAllocations WithdrawalAllocation[]
 
   @@unique([reference])
   @@index([walletId])
@@ -1464,6 +1590,71 @@ model Transaction {
   @@index([settlementId])
   @@index([providerRef])
   @@index([provider, providerRef])
+}
+
+// Provider-neutral customer funding record. The provider adapter may create or
+// inspect external objects, but only the billing domain can attach a ledger
+// transaction and move wallet balances.
+model DepositAttempt {
+  id                  String               @id @default(cuid())
+  publicReference     String               @unique @db.VarChar(32)
+  walletId            String
+  organizationId      String?
+  createdByUserId     String
+  method              String               @db.VarChar(32)
+  provider            String               @db.VarChar(32)
+  amount              Decimal
+  walletCredit        Decimal
+  customerFee         Decimal              @default(0)
+  providerFee         Decimal?
+  currency            String               @default("USD") @db.VarChar(3)
+  status              DepositAttemptStatus @default(CREATED)
+  idempotencyKey      String               @db.VarChar(191)
+  providerSessionId   String?              @unique @db.VarChar(191)
+  providerPaymentId   String?              @db.VarChar(191)
+  providerChargeId    String?              @db.VarChar(191)
+  intendedOrderId     String?
+  ledgerTransactionId String?              @unique
+  expiresAt           DateTime?
+  completedAt         DateTime?
+  failedAt            DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  wallet            Wallet                 @relation(fields: [walletId], references: [id])
+  organization      Organization?          @relation(fields: [organizationId], references: [id])
+  ledgerTransaction Transaction?           @relation(fields: [ledgerTransactionId], references: [id])
+  providerEvents    PaymentProviderEvent[]
+
+  @@unique([walletId, idempotencyKey])
+  @@index([organizationId, status])
+  @@index([provider, providerPaymentId])
+  @@index([createdAt])
+}
+
+model PaymentProviderEvent {
+  id               String                     @id @default(cuid())
+  provider         String                     @db.VarChar(32)
+  providerEventId  String                     @db.VarChar(191)
+  eventType        String                     @db.VarChar(191)
+  objectId         String?                    @db.VarChar(191)
+  depositAttemptId String?
+  status           PaymentProviderEventStatus @default(PENDING)
+  attempts         Int                        @default(0)
+  availableAt      DateTime                   @default(now())
+  lockedAt         DateTime?
+  processedAt      DateTime?
+  lastError        String?                    @db.VarChar(100)
+  receivedAt       DateTime                   @default(now())
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  depositAttempt DepositAttempt? @relation(fields: [depositAttemptId], references: [id])
+
+  @@unique([provider, providerEventId])
+  @@index([status, availableAt, receivedAt])
+  @@index([depositAttemptId])
+  @@index([objectId])
 }
 
 model Ticket {
@@ -1708,8 +1899,8 @@ model MarketplaceCategory {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  parent   MarketplaceCategory?  @relation("CategoryHierarchy", fields: [parentId], references: [id])
-  children MarketplaceCategory[] @relation("CategoryHierarchy")
+  parent   MarketplaceCategory?         @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children MarketplaceCategory[]        @relation("CategoryHierarchy")
   listings MarketplaceListingCategory[]
 
   @@index([slug])
@@ -1771,14 +1962,14 @@ model MarketplaceListing {
   // Placement-policy attributes are site/listing-level facts. Each listing
   // stores exactly one value for every policy; NULL is retained only for
   // pre-migration inventory until it is reviewed and resubmitted.
-  sportsGamingAllowed   Boolean?
-  pharmacyAllowed       Boolean?
-  cryptoAllowed         Boolean?
-  backlinkCount         Int?
-  linkType              ListingLinkType?
-  linkValidity          ListingLinkValidity?
-  googleNews            Boolean?
-  markedSponsored       Boolean?
+  sportsGamingAllowed    Boolean?
+  pharmacyAllowed        Boolean?
+  cryptoAllowed          Boolean?
+  backlinkCount          Int?
+  linkType               ListingLinkType?
+  linkValidity           ListingLinkValidity?
+  googleNews             Boolean?
+  markedSponsored        Boolean?
   foreignLanguageAllowed Boolean?
 
   // URLs
@@ -1808,9 +1999,9 @@ model MarketplaceListing {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  publisher    Publisher?           @relation(fields: [publisherId], references: [id])
-  website      Website?             @relation(fields: [websiteId], references: [id])
-  organization Organization?        @relation(fields: [organizationId], references: [id])
+  publisher    Publisher?                   @relation(fields: [publisherId], references: [id])
+  website      Website?                     @relation(fields: [websiteId], references: [id])
+  organization Organization?                @relation(fields: [organizationId], references: [id])
   categories   MarketplaceListingCategory[]
 
   tags       MarketplaceListingTag[]
@@ -2147,7 +2338,7 @@ enum IntegrationSyncJobType {
 }
 
 model ExternalAccount {
-  id             String  @id @default(cuid())
+  id             String               @id @default(cuid())
   provider       String // GOOGLE, MICROSOFT
   externalUserId String
   // Credential ownership is explicit so the same Google identity can be

@@ -1,10 +1,39 @@
 # Current Status
 
-**Phase**: The free-tier hybrid worker rollout is live on Northflank and Render at `10c971c`. The realtime lane is running as one 0.2-vCPU/512-MB instance, the two scheduled job lanes are active, the Neon migration is current, and API/Redis/database readiness checks pass. Real GSC/GA4 connection and sync validation remain.
+**Phase**: The free-tier hybrid worker rollout is live on Northflank and Render, and Stripe-first provider-neutral finance groundwork is implemented and locally verified. Both Stripe feature flags remain off. The next finance step is a controlled Neon staging migration plus Stripe test-mode webhook and sandbox certification. Existing Admin-auth and GSC/GA4 deployment follow-ups remain open.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
 
 ## Recently Completed
+
+### Stripe-First Provider-Neutral Finance Groundwork
+
+- Added durable deposit attempts and provider event inbox records, mandatory
+  input-bound idempotency, explicit paid-state verification, and one atomic
+  wallet/ledger/attempt/event/audit transaction for customer funding.
+- Added a deposit-provider registry and provider-neutral capability contracts
+  so future gateways can be introduced behind the same domain boundary without
+  changing wallet semantics.
+- Added hosted Stripe Express onboarding with no local bank-data collection,
+  provider-account state separate from payout methods, a manual USD payout
+  schedule, and distinct persisted Transfer and bank Payout references.
+- Added gross/fee/net/reference snapshots and source allocations to withdrawals,
+  with fail-closed recovery and cancellation states for ambiguous provider
+  outcomes. Provider fees are disclosed to publishers; statement text is a
+  best-effort provider/bank surface and never the accounting source of truth.
+- Added reconciliation coverage for provider success without a ledger entry,
+  ledger/attempt amount drift, allocation drift, and Stripe Transfers that have
+  not produced a paid bank Payout.
+- Documented the architecture decision, security model, provider rollout
+  checklist, Stripe staging steps, incident handling, and rollback constraints
+  in `docs/adr/0006-provider-neutral-finance-stripe-first.md`,
+  `docs/PAYMENTS_ARCHITECTURE.md`, `docs/PROVIDER_ROLLOUT_GUIDE.md`, and
+  `docs/STRIPE_STAGING_RUNBOOK.md`.
+- Validation: 90 API suites / 937 tests, 11 shared suites / 102 tests, six
+  worker tests, API/worker/database/API-client builds, all four application
+  typechecks, Prisma format/validate/generate, and whitespace checks pass.
+  Clean migration replay and real Stripe test-mode end-to-end certification
+  remain mandatory staging gates; they were not claimed from this local host.
 
 ### Hybrid Worker And Durable Payout Reconciliation
 

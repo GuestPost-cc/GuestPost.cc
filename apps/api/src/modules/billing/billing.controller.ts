@@ -6,7 +6,6 @@ import {
   Headers,
   Param,
   Post,
-  Query,
   type RawBodyRequest,
   Req,
   UseGuards,
@@ -42,16 +41,23 @@ export class BillingController {
     @Body() body: DepositDto,
     @CurrentUser() user: any,
   ) {
-    return this.billing.createCheckoutSession(walletId, body.amount, user)
+    return this.billing.createCheckoutSession(
+      walletId,
+      body.amount,
+      user,
+      body.idempotencyKey,
+    )
   }
 
-  @Public()
-  @Get("wallet/:id/deposit-status")
+  @Get("deposits/:reference/status")
+  @UseGuards(ActorTypeGuard, MemberRolesGuard)
+  @ActorType("CUSTOMER")
+  @MemberRoles("OWNER")
   checkDepositStatus(
-    @Param("id") walletId: string,
-    @Query("sessionId") sessionId: string,
+    @Param("reference") publicReference: string,
+    @CurrentUser() user: any,
   ) {
-    return this.billing.checkDepositStatus(walletId, sessionId)
+    return this.billing.checkDepositStatus(publicReference, user)
   }
 
   @Public()
@@ -60,7 +66,10 @@ export class BillingController {
     @Headers("stripe-signature") signature: string,
     @Req() req: RawBodyRequest<Request>,
   ) {
-    const payload = req.rawBody || Buffer.from(JSON.stringify(req.body))
+    const payload = req.rawBody
+    if (!payload) {
+      throw new BadRequestException("Missing raw webhook body")
+    }
     if (!signature) {
       throw new BadRequestException("Missing stripe-signature header")
     }

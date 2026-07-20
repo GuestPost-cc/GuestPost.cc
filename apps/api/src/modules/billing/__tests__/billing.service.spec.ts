@@ -43,10 +43,94 @@ describe("BillingService", () => {
         findMany: jest.fn(),
         create: jest.fn(),
       },
+      depositAttempt: {
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
       $transaction: jest.fn(),
     }
 
     service = new BillingService(prismaMock as any, auditMock as any)
+  })
+
+  describe("Stripe deposit attempts", () => {
+    const previousFlag = process.env.STRIPE_DEPOSITS_ENABLED
+
+    beforeEach(() => {
+      process.env.STRIPE_DEPOSITS_ENABLED = "true"
+      prismaMock.wallet.findUnique.mockResolvedValue(mockWallet)
+    })
+
+    afterAll(() => {
+      if (previousFlag == null) delete process.env.STRIPE_DEPOSITS_ENABLED
+      else process.env.STRIPE_DEPOSITS_ENABLED = previousFlag
+    })
+
+    it("rejects idempotency-key reuse with a different amount", async () => {
+      prismaMock.depositAttempt.findUnique.mockResolvedValue({
+        id: "dp-1",
+        amount: new Decimal(10),
+        currency: "USD",
+        providerSessionId: "cs_1",
+      })
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        retrieveSession: jest.fn(),
+      }
+
+      await expect(
+        service.createCheckoutSession("wallet-1", 20, mockUser, "request-1"),
+      ).rejects.toThrow(ConflictException)
+      expect(
+        (service as any).depositProvider.retrieveSession,
+      ).not.toHaveBeenCalled()
+    })
+
+    it("creates a server-owned fee/reference snapshot before Checkout", async () => {
+      prismaMock.depositAttempt.findUnique.mockResolvedValue(null)
+      prismaMock.depositAttempt.create.mockResolvedValue({
+        id: "dp-1",
+        publicReference: "GP-DP-ABCD2345",
+      })
+      prismaMock.depositAttempt.update.mockResolvedValue({})
+      ;(service as any).depositProvider = {
+        capabilities: { supportedCurrencies: ["USD"] },
+        createSession: jest.fn().mockResolvedValue({
+          providerSessionId: "cs_1",
+          providerPaymentId: null,
+          url: "https://checkout.stripe.test/session",
+          expiresAt: new Date(),
+        }),
+      }
+
+      const result = await service.createCheckoutSession(
+        "wallet-1",
+        20.5,
+        mockUser,
+        "request-1",
+      )
+
+      expect(prismaMock.depositAttempt.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          amount: new Decimal(20.5),
+          walletCredit: new Decimal(20.5),
+          customerFee: 0,
+          currency: "USD",
+          method: "CARD",
+          provider: "stripe",
+        }),
+      })
+      expect(result).toMatchObject({
+        publicReference: "GP-DP-ABCD2345",
+        feePolicy: {
+          grossMinor: 2050,
+          customerOrPublisherFeeMinor: 0,
+          netMinor: 2050,
+        },
+      })
+    })
   })
 
   describe("getWallet", () => {

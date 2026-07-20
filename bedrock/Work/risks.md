@@ -1,12 +1,12 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-07-19
+updated: 2026-07-20
 ---
 
 # Risks
 
-Updated 2026-07-19 after the hybrid worker and durable payout-reconciliation change. All audit findings at Medium severity or above are now closed; the remaining items are strategic/long-horizon risks and operator-action follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
+Updated 2026-07-20 after the Stripe-first provider-neutral finance groundwork. All historical audit findings at Medium severity or above are closed; the remaining items are staging gates, strategic/long-horizon risks, and operator-action follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
 
 The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
 
@@ -63,6 +63,20 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
   can increase report, trust, integration, or payout-webhook processing latency.
   It cannot be the only trigger: the documented 10-minute catch-up schedule and
   alerts on oldest pending work are required for production.
+- **Payout uniqueness migration needs a data preflight.** The new unique
+  `(providerId, providerExecutionId)` index intentionally fails if historical
+  duplicate provider references exist. Run the documented duplicate query and
+  resolve any result through provider-side reconciliation before migration.
+- **The Stripe finance migration has not been replayed on a clean database from
+  this host.** Prisma format, validate, generate, and package builds pass, but
+  the local host has neither PostgreSQL/`psql` nor a running Docker daemon. A
+  backup, clean migration replay, duplicate/reference preflight, and post-deploy
+  reconciliation are mandatory before either Stripe feature flag is enabled.
+- **Stripe test mode is not live-readiness evidence.** The platform's legal
+  entity/country, connected-account availability, payout currency, business
+  profile, descriptor behavior, and bank statement rendering must be accepted
+  and certified in the actual Stripe account. Keep `STRIPE_LIVE_MODE_ENABLED`
+  false until that separate review is complete.
 - **Legacy listing metadata requires an owner review after the taxonomy migration.** The migration preserves existing category relationships and deliberately leaves the new placement-policy fields nullable instead of guessing commercial terms. Existing approved inventory can remain visible, but it will not match value-specific policy filters until a publisher or authorized platform staff member saves the reviewed language/categories/policy. Complete that review during the staging migration pass.
 - The historical 2026-06-15 platform audit has zero open production-blocker findings, but the deployment-secret exposure above is a separate current risk.
 - **Zero open Medium findings.** Phase 7.9 closed #28 (status-color drift), #29 (unused shared components), #30 (hooks-rule violation). Phase 7.8 closed #25 + #26 + #27.
@@ -75,11 +89,11 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 
 - **No double-entry ledger.** Reconciliation core (`packages/shared/src/reconciliation-core.ts`) is the interim drift detector; single-entry bookkeeping remains. Money conservation is provable via reconciliation; accounting audit will eventually require dual-entry escrow / revenue accounts. Medium-term re-architecture.
 - **Item-level settlements not implemented.** Settlement is computed at the order level. Multi-website orders are blocked at order creation (one-website-per-order invariant), so the risk is currently mitigated, but a future "shopping cart" UX would need item-level work.
-- **Crash between provider send and DB write** (Wise / Stripe Connect). Reconciliation flags stale `PROCESSING` >2h; manual recovery via provider-side idempotency-key lookup. No automated provider-side reconciliation (compare provider's transfer list vs `PayoutExecution` rows).
+- **Provider-side reconciliation remains partly manual.** Stripe Connect now persists each Transfer/Payout stage, uses stable provider idempotency keys, and promotes stale active handoffs into explicit recovery states instead of restoring funds. Wise still has an ambiguous send/write window, and neither provider has a complete automatic provider-list-versus-`PayoutExecution` comparison. Operators must reconcile provider-side before retrying or canceling an uncertain execution.
 - **Latent pool-deadlock in colder audit-write paths.** 18/66 audit.log calls pass `tx`; hot money paths fixed in batch 15. Phase 6.9's sweep got 20+ more; remaining cold paths (some admin actions, support fan-out edge cases) still write outside the tx via `this.prisma.auditLog.create` and swallow errors. Acceptable for current scale; revisit if cold-path drift surfaces.
 - **Dispute resolution non-idempotent.** RESTORE/REJECT restore hardcoded PUBLISHED regardless of pre-dispute status. REFUND resolution: refund commits, dispute update fails → unresolvable. Lower-priority cleanup.
 - **Listing reviews default APPROVED without purchase verification.** Low-volume today; opens fake-review attack vector at scale.
-- **Single-currency only.** `currency` is free-text USD default; non-USD orders today would settle as USD-as-its-own-currency. Phase 7.1 surfaces a warning (`meta.currencyMismatch`) when any non-USD Order exists in the revenue dashboard range. Multi-currency Phase 7.1.x is a follow-up if the platform expands beyond USD.
+- **Single-currency only.** `currency` is free-text USD default; non-USD orders today would settle as USD-as-its-own-currency. Stripe Connect onboarding is therefore restricted to accounts whose default currency is USD, and a non-USD account cannot be enabled. Phase 7.1 surfaces a warning (`meta.currencyMismatch`) when any non-USD Order exists in the revenue dashboard range. Multi-currency requires an explicit, end-to-end rollout rather than relaxing this guard.
 
 ### Risks introduced by this batch (new)
 

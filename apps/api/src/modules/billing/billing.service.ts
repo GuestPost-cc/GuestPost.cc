@@ -1,4 +1,10 @@
-import { isUniqueViolation } from "@guestpost/shared"
+import { createHash, randomUUID } from "node:crypto"
+import {
+  customerWalletStatementDescriptor,
+  initialStripeFeeDisclosure,
+  isUniqueViolation,
+} from "@guestpost/shared"
+import { createFinancialReference } from "@guestpost/shared/dist/financial-reference-server"
 import {
   BadRequestException,
   ConflictException,
@@ -8,9 +14,15 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { Decimal } from "@prisma/client/runtime/client"
-import Stripe from "stripe"
 import { PrismaService } from "../../common/prisma.service"
+import {
+  assertStripeObjectMode,
+  isStripeFeatureEnabled,
+} from "../../common/stripe-client"
 import { AuditService } from "../audit/audit.service"
+import type { DepositProviderAdapter } from "./providers/deposit-provider.interface"
+import { DepositProviderService } from "./providers/deposit-provider.service"
+import { StripeDepositAdapter } from "./providers/stripe-deposit.adapter"
 
 // Thrown inside an interactive transaction to force a ROLLBACK when a
 // concurrent duplicate is detected via P2002. Returning normally from the
@@ -24,24 +36,18 @@ class DuplicateEventError extends Error {
 
 @Injectable()
 export class BillingService {
-  private stripe: any = null
   private readonly logger = new Logger(BillingService.name)
+  private readonly depositProvider: DepositProviderAdapter
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    providerService?: DepositProviderService,
   ) {
-    const stripeKey = process.env.STRIPE_SECRET_KEY
-    if (stripeKey && stripeKey.trim() !== "") {
-      this.stripe = new Stripe(stripeKey, {
-        apiVersion: "2025-01-27.acacia" as any,
-      })
-      this.logger.log("Stripe initialized")
-    } else {
-      this.logger.warn(
-        "Stripe secret key not found — set STRIPE_SECRET_KEY in .env.development",
-      )
-    }
+    // The fallback keeps isolated unit construction lightweight; Nest runtime
+    // always supplies the registry from BillingModule.
+    this.depositProvider =
+      providerService?.getAdapter("stripe") ?? new StripeDepositAdapter()
   }
 
   private assertWalletOwned(
@@ -56,7 +62,12 @@ export class BillingService {
       throw new ForbiddenException("Wallet does not belong to this account")
   }
 
-  async createCheckoutSession(walletId: string, amount: number, user: any) {
+  async createCheckoutSession(
+    walletId: string,
+    amount: number,
+    user: any,
+    idempotencyKey?: string,
+  ) {
     const wallet = await this.prisma.wallet.findUnique({
       where: { id: walletId },
     })
@@ -64,79 +75,326 @@ export class BillingService {
 
     this.assertWalletOwned(wallet, user)
 
-    if (this.stripe) {
-      const session = await this.stripe.checkout.sessions.create({
-        payment_method_types: ["card"],
-        line_items: [
-          {
-            price_data: {
-              currency: wallet.currency.toLowerCase(),
-              product_data: {
-                name: "Wallet Deposit",
-              },
-              unit_amount: Math.round(amount * 100), // Amount in cents (Stripe requires integer)
-            },
-            quantity: 1,
-          },
-        ],
-        mode: "payment",
-        success_url: `${process.env.NEXT_PUBLIC_PORTAL_URL || "http://localhost:3001"}/dashboard/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${process.env.NEXT_PUBLIC_PORTAL_URL || "http://localhost:3001"}/dashboard/billing?canceled=true`,
-        client_reference_id: walletId,
-        metadata: {
+    if (!isStripeFeatureEnabled("deposits")) {
+      throw new BadRequestException("Card deposits are temporarily unavailable")
+    }
+    if (
+      !this.depositProvider.capabilities.supportedCurrencies.includes(
+        wallet.currency.toUpperCase(),
+      )
+    ) {
+      throw new BadRequestException(
+        `Card deposits do not support ${wallet.currency.toUpperCase()}`,
+      )
+    }
+
+    const amountDecimal = new Decimal(amount)
+    const amountMinorDecimal = amountDecimal.mul(100)
+    if (
+      !amountDecimal.isFinite() ||
+      amountDecimal.lessThanOrEqualTo(0) ||
+      !amountMinorDecimal.isInteger()
+    ) {
+      throw new BadRequestException(
+        "Deposit amount must be positive with no more than two decimal places",
+      )
+    }
+    const amountMinor = amountMinorDecimal.toNumber()
+    if (!Number.isSafeInteger(amountMinor)) {
+      throw new BadRequestException("Deposit amount is outside the safe range")
+    }
+
+    const requestKey = (idempotencyKey?.trim() || randomUUID()).slice(0, 191)
+    const depositAttempt = (this.prisma as any).depositAttempt
+    const existing = await depositAttempt.findUnique({
+      where: {
+        walletId_idempotencyKey: { walletId, idempotencyKey: requestKey },
+      },
+    })
+    if (
+      existing &&
+      (!new Decimal(existing.amount).equals(amountDecimal) ||
+        existing.currency !== wallet.currency.toUpperCase())
+    ) {
+      throw new ConflictException(
+        "This deposit request key was already used for a different amount or currency",
+      )
+    }
+    if (existing?.providerSessionId) {
+      const existingSession = await this.depositProvider.retrieveSession(
+        existing.providerSessionId,
+      )
+      if (existingSession.url && existingSession.status === "open") {
+        return {
+          url: existingSession.url,
+          publicReference: existing.publicReference,
+          statementDescriptor: customerWalletStatementDescriptor(
+            existing.publicReference,
+          ),
+          feePolicy: initialStripeFeeDisclosure(amountMinor),
+        }
+      }
+      throw new ConflictException(
+        "This deposit request has already been used; start a new deposit",
+      )
+    }
+
+    let attempt: any
+    try {
+      attempt = await depositAttempt.create({
+        data: {
+          publicReference: createFinancialReference("DP"),
           walletId,
-          userId: user.id,
-          amount: amount.toString(),
-          organizationId: user.organizationId || "",
+          organizationId: wallet.organizationId,
+          createdByUserId: user.id,
+          method: "CARD",
+          provider: "stripe",
+          amount: amountDecimal,
+          walletCredit: amountDecimal,
+          customerFee: 0,
+          currency: wallet.currency.toUpperCase(),
+          status: "CREATED",
+          idempotencyKey: requestKey,
         },
       })
-      return { url: session.url }
-    } else {
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error
+      attempt = await depositAttempt.findUnique({
+        where: {
+          walletId_idempotencyKey: { walletId, idempotencyKey: requestKey },
+        },
+      })
+      if (!attempt) throw error
+      if (
+        !new Decimal(attempt.amount).equals(amountDecimal) ||
+        attempt.currency !== wallet.currency.toUpperCase()
+      ) {
+        throw new ConflictException(
+          "This deposit request key was already used for a different amount or currency",
+        )
+      }
+    }
+
+    const portalUrl =
+      process.env.NEXT_PUBLIC_PORTAL_URL || "http://localhost:3001"
+    try {
+      const session = await this.depositProvider.createSession({
+        attemptId: attempt.id,
+        publicReference: attempt.publicReference,
+        walletId,
+        organizationId: wallet.organizationId,
+        userId: user.id,
+        amountMinor,
+        currency: wallet.currency,
+        idempotencyKey: `deposit-session-${attempt.id}`,
+        successUrl: `${portalUrl}/dashboard/billing?success=true`,
+        cancelUrl: `${portalUrl}/dashboard/billing?canceled=true`,
+      })
+
+      await depositAttempt.update({
+        where: { id: attempt.id },
+        data: {
+          status: "PENDING_CUSTOMER_ACTION",
+          providerSessionId: session.providerSessionId,
+          providerPaymentId: session.providerPaymentId,
+          expiresAt: session.expiresAt,
+        },
+      })
+
+      return {
+        url: session.url,
+        publicReference: attempt.publicReference,
+        statementDescriptor: customerWalletStatementDescriptor(
+          attempt.publicReference,
+        ),
+        feePolicy: initialStripeFeeDisclosure(amountMinor),
+      }
+    } catch (error) {
+      await depositAttempt.updateMany({
+        where: { id: attempt.id, status: "CREATED" },
+        data: { status: "FAILED", failedAt: new Date() },
+      })
+      this.logger.error("Stripe deposit session creation failed", {
+        depositAttemptId: attempt.id,
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      })
       throw new BadRequestException(
-        "Payment service not configured — set STRIPE_SECRET_KEY in .env.development",
+        "Unable to start the secure card checkout. Please try again.",
       )
     }
   }
 
   async handleWebhook(signature: string, payload: Buffer) {
-    if (!this.stripe || !process.env.STRIPE_WEBHOOK_SECRET) {
+    if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
       this.logger.error(
-        "Stripe webhook received without STRIPE_WEBHOOK_SECRET set",
+        "Stripe deposit webhook received without verification configuration",
       )
-      throw new BadRequestException(
-        "Webhook not configured — set STRIPE_WEBHOOK_SECRET in .env.development (run `stripe listen --forward-to localhost:4000/api/v1/billing/webhook/stripe`)",
-      )
+      throw new BadRequestException("Webhook verification is not configured")
     }
 
     let event: any
     try {
-      event = this.stripe.webhooks.constructEvent(
-        payload,
-        signature,
-        process.env.STRIPE_WEBHOOK_SECRET,
-      )
-    } catch (err: any) {
-      throw new BadRequestException(`Webhook Error: ${err.message}`)
+      event = this.depositProvider.verifyWebhook(signature, payload)
+      assertStripeObjectMode(event.livemode, "Stripe webhook Event")
+    } catch {
+      throw new BadRequestException("Invalid Stripe webhook signature or mode")
     }
 
-    if (event.type === "checkout.session.completed") {
-      const session = event.data.object as any
-      await this.processSuccessfulPayment(session)
-    } else if (event.type === "charge.dispute.created") {
-      await this.handleChargeback(event.data.object as any)
-    } else if (event.type === "charge.dispute.closed") {
-      await this.handleChargebackClosed(event.data.object as any)
-    } else if (event.type === "radar.early_fraud_warning.created") {
-      await this.handleEarlyFraudWarning(event)
-    } else {
-      this.logger.warn({
-        eventType: event.type,
-        eventId: event.id,
-        message: "Unhandled Stripe webhook event type",
+    const object = event.data?.object ?? {}
+    const attemptId = object.metadata?.depositAttemptId ?? null
+    const providerEventId =
+      typeof event.id === "string" && event.id
+        ? event.id
+        : createHash("sha256").update(payload).digest("hex")
+    const providerEvents = (this.prisma as any).paymentProviderEvent
+    let providerEvent: any
+    try {
+      providerEvent = await providerEvents.create({
+        data: {
+          provider: "stripe",
+          providerEventId,
+          eventType: String(event.type).slice(0, 191),
+          objectId:
+            typeof object.id === "string" ? object.id.slice(0, 191) : null,
+          depositAttemptId: attemptId,
+        },
       })
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error
+      providerEvent = await providerEvents.findUnique({
+        where: {
+          provider_providerEventId: {
+            provider: "stripe",
+            providerEventId,
+          },
+        },
+      })
+      if (
+        providerEvent?.status === "PROCESSED" ||
+        providerEvent?.status === "IGNORED"
+      ) {
+        return { received: true, duplicate: true }
+      }
+    }
+
+    await providerEvents.updateMany({
+      where: {
+        id: providerEvent.id,
+        status: "PROCESSING",
+        lockedAt: { lt: new Date(Date.now() - 15 * 60 * 1000) },
+      },
+      data: {
+        status: "FAILED",
+        lockedAt: null,
+        lastError: "StaleProcessingLeaseRecovered",
+      },
+    })
+    const claimed = await providerEvents.updateMany({
+      where: {
+        id: providerEvent.id,
+        status: { in: ["PENDING", "FAILED"] },
+      },
+      data: {
+        status: "PROCESSING",
+        lockedAt: new Date(),
+        attempts: { increment: 1 },
+      },
+    })
+    if (claimed.count === 0) {
+      return { received: true, duplicate: true, processing: true }
+    }
+
+    try {
+      if (
+        event.type === "checkout.session.completed" ||
+        event.type === "checkout.session.async_payment_succeeded"
+      ) {
+        await this.processSuccessfulPayment(object, providerEvent?.id)
+      } else if (
+        event.type === "checkout.session.expired" ||
+        event.type === "checkout.session.async_payment_failed"
+      ) {
+        await this.markDepositAttemptFromSession(object, "EXPIRED")
+      } else if (event.type === "charge.dispute.created") {
+        await this.handleChargeback(object)
+        await this.markDepositAttemptFromPaymentIntent(
+          object.payment_intent,
+          "DISPUTED",
+        )
+      } else if (event.type === "charge.dispute.closed") {
+        await this.handleChargebackClosed(object)
+        await this.markDepositAttemptFromPaymentIntent(
+          object.payment_intent,
+          object.status === "lost" ? "CHARGEBACK" : "SUCCEEDED",
+        )
+      } else if (event.type === "radar.early_fraud_warning.created") {
+        await this.handleEarlyFraudWarning(event)
+      } else {
+        await providerEvents.update({
+          where: { id: providerEvent.id },
+          data: {
+            status: "IGNORED",
+            lockedAt: null,
+            processedAt: new Date(),
+            lastError: "UnsupportedEventType",
+          },
+        })
+        return { received: true, ignored: true }
+      }
+
+      if (
+        event.type !== "checkout.session.completed" &&
+        event.type !== "checkout.session.async_payment_succeeded"
+      ) {
+        await providerEvents.update({
+          where: { id: providerEvent.id },
+          data: {
+            status: "PROCESSED",
+            processedAt: new Date(),
+            lockedAt: null,
+          },
+        })
+      }
+    } catch (error) {
+      await providerEvents.updateMany({
+        where: { id: providerEvent.id, status: { not: "PROCESSED" } },
+        data: {
+          status: "FAILED",
+          lockedAt: null,
+          lastError:
+            error instanceof Error ? error.name.slice(0, 100) : "UnknownError",
+        },
+      })
+      throw error
     }
 
     return { received: true }
+  }
+
+  private async markDepositAttemptFromSession(session: any, status: "EXPIRED") {
+    const depositAttempt = (this.prisma as any).depositAttempt
+    await depositAttempt.updateMany({
+      where: {
+        OR: [
+          { id: session.metadata?.depositAttemptId ?? "__missing__" },
+          { providerSessionId: session.id },
+        ],
+        status: { in: ["CREATED", "PENDING_CUSTOMER_ACTION", "PROCESSING"] },
+      },
+      data: { status, failedAt: new Date() },
+    })
+  }
+
+  private async markDepositAttemptFromPaymentIntent(
+    paymentIntent: unknown,
+    status: "DISPUTED" | "CHARGEBACK" | "SUCCEEDED",
+  ) {
+    if (typeof paymentIntent !== "string" || !paymentIntent) return
+    const depositAttempt = (this.prisma as any).depositAttempt
+    await depositAttempt.updateMany({
+      where: { provider: "stripe", providerPaymentId: paymentIntent },
+      data: { status },
+    })
   }
 
   // Cardholder opened a chargeback at their bank. Stripe will pull the money
@@ -553,9 +811,28 @@ export class BillingService {
     }
   }
 
-  private async processSuccessfulPayment(session: any) {
-    const walletId = session.metadata?.walletId || session.client_reference_id
-    if (!walletId) return
+  private async processSuccessfulPayment(
+    session: any,
+    providerEventRowId?: string,
+  ) {
+    const depositAttemptDelegate = (this.prisma as any).depositAttempt
+    const attemptId = session.metadata?.depositAttemptId
+    const attempt = depositAttemptDelegate
+      ? await depositAttemptDelegate.findFirst({
+          where: {
+            OR: [
+              { id: attemptId ?? "__missing__" },
+              { providerSessionId: session.id },
+            ],
+          },
+        })
+      : null
+    const walletId = attempt?.walletId ?? session.metadata?.walletId
+    if (!walletId) {
+      throw new BadRequestException(
+        "Stripe deposit is missing its server-owned wallet reference",
+      )
+    }
 
     // Amount from Stripe authoritative source (amount_total is in cents).
     // Exact Decimal division — Math.round(cents/100) would round $10.50 to
@@ -565,11 +842,60 @@ export class BillingService {
       this.logger.warn(
         `Invalid amount_total ${amountCents} in webhook session ${session.id}`,
       )
-      return
+      throw new BadRequestException("Stripe deposit amount is invalid")
     }
     const amount = new Decimal(amountCents).div(100)
+    const currency = String(
+      session.currency ?? attempt?.currency ?? "",
+    ).toUpperCase()
 
-    const orgId = session.metadata?.organizationId || null
+    // Never infer payment from the event name alone. Checkout can emit a
+    // completion event before delayed methods settle, and malformed fixtures
+    // may omit payment_status. Only Stripe's explicit `paid` state can mint
+    // wallet value.
+    if (session.payment_status !== "paid") {
+      if (attempt) {
+        await depositAttemptDelegate.update({
+          where: { id: attempt.id },
+          data: { status: "PROCESSING" },
+        })
+      }
+      throw new BadRequestException("Stripe Checkout payment is not paid")
+    }
+
+    if (attempt) {
+      if (
+        attempt.provider !== "stripe" ||
+        (attempt.providerSessionId &&
+          attempt.providerSessionId !== session.id) ||
+        !new Decimal(attempt.amount).equals(amount) ||
+        String(attempt.currency).toUpperCase() !== currency
+      ) {
+        throw new BadRequestException(
+          "Stripe deposit does not match its server-side funding attempt",
+        )
+      }
+      if (attempt.status === "SUCCEEDED") {
+        if (providerEventRowId) {
+          await (this.prisma as any).paymentProviderEvent.update({
+            where: { id: providerEventRowId },
+            data: {
+              status: "PROCESSED",
+              processedAt: new Date(),
+              lockedAt: null,
+            },
+          })
+        }
+        return
+      }
+    }
+
+    const orgId =
+      attempt?.organizationId ?? session.metadata?.organizationId ?? null
+    const paymentIntent =
+      typeof session.payment_intent === "string"
+        ? session.payment_intent
+        : (session.payment_intent?.id ?? null)
 
     try {
       await this.prisma.$transaction(async (tx: any) => {
@@ -605,7 +931,7 @@ export class BillingService {
         // Stripe event replays under a new session.id but the same
         // payment_intent. Either constraint firing surfaces as P2002 here.
         // The findFirst above is only the fast path.
-        await tx.transaction.create({
+        const ledgerTransaction = await tx.transaction.create({
           data: {
             walletId,
             amount,
@@ -616,33 +942,85 @@ export class BillingService {
             // row identity for write and lookup paths.
             provider: "stripe",
             // payment_intent linkage lets chargeback webhooks find this deposit
-            providerRef: session.payment_intent ?? null,
-            description: `Stripe deposit of ${amount.toFixed(2)}`,
+            providerRef: paymentIntent,
+            description: attempt?.publicReference
+              ? `GuestPost wallet deposit ${attempt.publicReference}`
+              : `Stripe deposit of ${amount.toFixed(2)}`,
           },
         })
+
+        if (attempt) {
+          await tx.depositAttempt.updateMany({
+            where: {
+              id: attempt.id,
+              status: {
+                in: [
+                  "CREATED",
+                  "PENDING_CUSTOMER_ACTION",
+                  "PROCESSING",
+                  "FAILED",
+                ],
+              },
+            },
+            data: {
+              status: "SUCCEEDED",
+              providerSessionId: session.id,
+              providerPaymentId: paymentIntent,
+              ledgerTransactionId: ledgerTransaction.id,
+              completedAt: new Date(),
+              failedAt: null,
+            },
+          })
+        }
+        if (providerEventRowId && tx.paymentProviderEvent) {
+          await tx.paymentProviderEvent.update({
+            where: { id: providerEventRowId },
+            data: {
+              status: "PROCESSED",
+              processedAt: new Date(),
+              lockedAt: null,
+              depositAttemptId: attempt?.id ?? undefined,
+              lastError: null,
+            },
+          })
+        }
+
+        await this.audit.log(
+          {
+            action: "WALLET_DEPOSIT",
+            entityType: "Wallet",
+            entityId: walletId,
+            metadata: {
+              amount: amount.toNumber(),
+              reference: attempt?.publicReference ?? session.id,
+              providerSessionId: session.id,
+              method: "stripe",
+            },
+            userId: session.metadata?.userId || null,
+            organizationId: orgId,
+          },
+          tx,
+        )
       })
     } catch (err: any) {
       if (err instanceof DuplicateEventError || err?.code === "P2002") {
         this.logger.warn(
           `Duplicate webhook: session ${session.id} already processed — rolled back`,
         )
+        if (providerEventRowId && (this.prisma as any).paymentProviderEvent) {
+          await (this.prisma as any).paymentProviderEvent.update({
+            where: { id: providerEventRowId },
+            data: {
+              status: "PROCESSED",
+              processedAt: new Date(),
+              lockedAt: null,
+            },
+          })
+        }
         return
       }
       throw err
     }
-
-    await this.audit.log({
-      action: "WALLET_DEPOSIT",
-      entityType: "Wallet",
-      entityId: walletId,
-      metadata: {
-        amount: amount.toNumber(),
-        reference: session.id,
-        method: "stripe",
-      },
-      userId: session.metadata?.userId || null,
-      organizationId: orgId,
-    })
   }
 
   async getWallet(organizationId: string | null, userId: string) {
@@ -950,60 +1328,39 @@ export class BillingService {
     return result
   }
 
-  // ── Check deposit status (read-only) ────────────────────────────────
-  // Called by the frontend after a successful Stripe redirect to check
-  // whether the webhook has already credited the wallet. This endpoint
-  // NEVER credits the wallet — the webhook is the only code path allowed
-  // to move money. It simply retrieves the Stripe session and checks
-  // whether a matching Transaction row exists in our ledger.
-  async checkDepositStatus(walletId: string, sessionId: string) {
-    if (!this.stripe) {
-      throw new BadRequestException("Stripe not configured")
-    }
-
-    // Check our ledger first — if the webhook already fired, we have a
-    // Transaction row with reference = sessionId.
-    const existingTx = await this.prisma.transaction.findFirst({
-      where: { reference: sessionId, type: "DEPOSIT" },
+  // Read-only and owner-scoped. It intentionally returns neither the wallet
+  // balance nor internal transaction identifiers; the normal wallet endpoint
+  // remains the only authenticated source for those values.
+  async checkDepositStatus(publicReference: string, user: any) {
+    const attempt = await (this.prisma as any).depositAttempt.findUnique({
+      where: { publicReference },
+      include: { wallet: true },
     })
+    if (!attempt) throw new NotFoundException("Deposit not found")
+    this.assertWalletOwned(attempt.wallet, user)
 
-    if (existingTx) {
-      // Already processed — return success with the wallet state.
-      const wallet = await this.prisma.wallet.findUniqueOrThrow({
-        where: { id: walletId },
-      })
-      return {
-        status: "COMPLETED",
-        processed: true,
-        walletBalance: Number(wallet.availableBalance),
-        transactionId: existingTx.id,
-      }
+    const terminalMap: Record<string, string> = {
+      SUCCEEDED: "COMPLETED",
+      FAILED: "FAILED",
+      EXPIRED: "FAILED",
+      REFUNDED: "REFUNDED",
+      PARTIALLY_REFUNDED: "REFUNDED",
+      DISPUTED: "DISPUTED",
+      CHARGEBACK: "DISPUTED",
     }
-
-    // Not in our ledger yet. Retrieve the Stripe session to see if the
-    // payment actually succeeded (without crediting the wallet).
-    const session = await this.stripe.checkout.sessions.retrieve(sessionId)
-    if (!session) {
-      throw new NotFoundException("Stripe session not found")
-    }
-
-    // Verify this session belongs to this wallet.
-    const refWalletId =
-      session.metadata?.walletId || session.client_reference_id
-    if (refWalletId !== walletId) {
-      throw new BadRequestException(
-        "Session does not match the specified wallet",
-      )
-    }
-
-    const paid =
-      session.payment_status === "paid" || session.status === "complete"
-
+    const normalized = terminalMap[attempt.status] ?? "PENDING"
     return {
-      status: paid ? "PAID_PENDING_WEBHOOK" : "PENDING",
-      processed: false,
-      walletBalance: null,
-      transactionId: null,
+      publicReference: attempt.publicReference,
+      status: normalized,
+      processed: attempt.status === "SUCCEEDED",
+      amount: Number(attempt.amount),
+      walletCredit: Number(attempt.walletCredit),
+      customerFee: Number(attempt.customerFee),
+      currency: attempt.currency,
+      statementDescriptor: customerWalletStatementDescriptor(
+        attempt.publicReference,
+      ),
+      completedAt: attempt.completedAt,
     }
   }
 }

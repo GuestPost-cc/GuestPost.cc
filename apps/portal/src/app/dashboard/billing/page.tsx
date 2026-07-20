@@ -108,6 +108,7 @@ export default function BillingPage() {
   const pollTimer = useRef<ReturnType<typeof setInterval> | undefined>(
     undefined,
   )
+  const depositRequestKey = useRef<string | null>(null)
   // Set when checkout sends the customer here to top up; we return them after.
   const [returnTo, setReturnTo] = useState<string | null>(null)
 
@@ -145,33 +146,34 @@ export default function BillingPage() {
 
   // ── Post-Stripe redirect: poll wallet until webhook credits it ──────
   // The webhook is the ONLY code path that credits the wallet. The frontend
-  // just polls the read-only deposit-status endpoint + wallet balance until
-  // the webhook fires, then shows success.
+  // polls the authenticated, read-only deposit status until the webhook fires.
   //
   // Scenarios handled:
   //   1. Webhook fires fast   → deposit-status returns COMPLETED → success
   //   2. Webhook slow/missing → polls 2s, timeout after 60s → graceful message
   //   3. Reload after success → deposit-status returns COMPLETED → success
-  //   4. Stale ?success=true  → no sessionStorage, no sessionId → show billing page
+  //   4. Stale ?success=true  → no opaque public reference → show billing page
   const checkDeposit = useCallback(async () => {
-    const sessionId = sessionStorage.getItem("deposit_sessionId") ?? ""
-    const walletId = sessionStorage.getItem("deposit_walletId") ?? ""
+    const publicReference =
+      sessionStorage.getItem("deposit_publicReference") ?? ""
 
-    if (!sessionId || !walletId) {
+    if (!publicReference) {
       // Stale URL — nothing to poll.
       setProcessingPayment(false)
       return
     }
 
     try {
-      const result = await api.billing.checkDepositStatus(walletId, sessionId)
+      const result = await api.billing.checkDepositStatus(publicReference)
       if (result.processed) {
         clearInterval(pollTimer.current)
-        sessionStorage.removeItem("deposit_sessionId")
-        sessionStorage.removeItem("deposit_walletId")
+        sessionStorage.removeItem("deposit_publicReference")
         sessionStorage.removeItem("deposit_expectedAmount")
         sessionStorage.removeItem("deposit_timestamp")
-        toast.success("Deposit successful!")
+        depositRequestKey.current = null
+        toast.success(
+          `Deposit ${result.publicReference} completed. Your statement should show ${result.statementDescriptor}.`,
+        )
         queryClient.invalidateQueries({ queryKey: ["wallet"] })
         queryClient.invalidateQueries({ queryKey: ["transactions"] })
         const pendingReturn = safeDashboardReturn(
@@ -183,6 +185,12 @@ export default function BillingPage() {
         } else {
           setProcessingPayment(false)
         }
+      } else if (["FAILED", "REFUNDED", "DISPUTED"].includes(result.status)) {
+        clearInterval(pollTimer.current)
+        setProcessingPayment(false)
+        toast.error(
+          `Deposit ${result.publicReference} is ${result.status.toLowerCase()}. No new wallet credit was added.`,
+        )
       }
       // If not processed yet, just wait for the next poll cycle.
     } catch {
@@ -203,15 +211,10 @@ export default function BillingPage() {
     if (ret) setReturnTo(ret)
 
     if (sp.get("success") === "true") {
-      // Stripe appends ?session_id=cs_xxx to the success_url via the
-      // {CHECKOUT_SESSION_ID} placeholder in the backend's success_url.
-      const sid = sp.get("session_id")
-      if (sid) sessionStorage.setItem("deposit_sessionId", sid)
-
-      // Only start polling if we have a session ID to check.
-      const sessionId = sessionStorage.getItem("deposit_sessionId")
-      const walletId = sessionStorage.getItem("deposit_walletId")
-      if (sessionId && walletId) {
+      // The return URL carries no Stripe object identifier. The app uses only
+      // its own opaque reference at the authenticated boundary.
+      const publicReference = sessionStorage.getItem("deposit_publicReference")
+      if (publicReference) {
         setProcessingPayment(true)
         checkDeposit()
         pollTimer.current = setInterval(checkDeposit, 2000)
@@ -224,7 +227,7 @@ export default function BillingPage() {
           )
         }, 60000)
       }
-      // No sessionId + walletId = stale URL → just show billing page.
+      // No reference = stale URL → just show billing page.
     }
 
     return () => clearInterval(pollTimer.current)
@@ -236,12 +239,18 @@ export default function BillingPage() {
       const session = await api.billing.createCheckoutSession({
         walletId: walletData.id,
         amount,
+        idempotencyKey:
+          depositRequestKey.current ??
+          (depositRequestKey.current = crypto.randomUUID()),
       })
       if (session?.url) {
         // Preserve returnTo and expected amount through Stripe redirect cycle
         sessionStorage.setItem("deposit_expectedAmount", String(amount))
         sessionStorage.setItem("deposit_timestamp", String(Date.now()))
-        sessionStorage.setItem("deposit_walletId", walletData!.id)
+        sessionStorage.setItem(
+          "deposit_publicReference",
+          session.publicReference,
+        )
         if (returnTo) {
           sessionStorage.setItem("deposit_returnTo", returnTo)
         }
@@ -561,8 +570,13 @@ export default function BillingPage() {
               <div className="rounded-lg bg-muted p-4 text-sm">
                 <p className="font-medium">Secure payment powered by Stripe</p>
                 <p className="mt-1 text-muted-foreground">
-                  Your payment information is encrypted and never stored on our
-                  servers.
+                  Your wallet receives the full amount shown above. GuestPost
+                  covers the Stripe processing fee during this rollout, and we
+                  never store your card details.
+                </p>
+                <p className="mt-2 text-muted-foreground">
+                  Your card statement should show GuestPost and a short wallet
+                  reference. Your bank may shorten the wording.
                 </p>
               </div>
             </div>

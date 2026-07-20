@@ -38,14 +38,25 @@ describe("payout-status provider checks", () => {
   })
 
   it("maps unknown provider statuses to PROCESSING, never COMPLETED", async () => {
-    process.env.STRIPE_SECRET_KEY = "key"
+    process.env.STRIPE_SECRET_KEY = "sk_test_key"
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ status: "some_new_status" }),
+      json: async () => ({ status: "some_new_status", livemode: false }),
     }) as any
 
-    const result = await checkStripeTransferStatus("t-1")
+    const result = await checkStripeTransferStatus("po_1", "acct_1")
     expect(result?.status).toBe("PROCESSING")
+  })
+
+  it("refuses live Stripe polling unless the independent live-money gate is enabled", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_live_key"
+    delete process.env.STRIPE_LIVE_MODE_ENABLED
+    global.fetch = jest.fn() as any
+
+    await expect(checkStripeTransferStatus("po_1", "acct_1")).rejects.toThrow(
+      /live mode is disabled/i,
+    )
+    expect(global.fetch).not.toHaveBeenCalled()
   })
 
   it("throws on provider API errors instead of guessing a status", async () => {

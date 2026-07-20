@@ -242,6 +242,33 @@ export const PaymentStatus = {
 export type PaymentStatus = (typeof PaymentStatus)[keyof typeof PaymentStatus]
 
 
+export const DepositAttemptStatus = {
+  CREATED: 'CREATED',
+  PENDING_CUSTOMER_ACTION: 'PENDING_CUSTOMER_ACTION',
+  PROCESSING: 'PROCESSING',
+  SUCCEEDED: 'SUCCEEDED',
+  FAILED: 'FAILED',
+  EXPIRED: 'EXPIRED',
+  PARTIALLY_REFUNDED: 'PARTIALLY_REFUNDED',
+  REFUNDED: 'REFUNDED',
+  DISPUTED: 'DISPUTED',
+  CHARGEBACK: 'CHARGEBACK'
+} as const
+
+export type DepositAttemptStatus = (typeof DepositAttemptStatus)[keyof typeof DepositAttemptStatus]
+
+
+export const PaymentProviderEventStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  PROCESSED: 'PROCESSED',
+  FAILED: 'FAILED',
+  IGNORED: 'IGNORED'
+} as const
+
+export type PaymentProviderEventStatus = (typeof PaymentProviderEventStatus)[keyof typeof PaymentProviderEventStatus]
+
+
 export const TicketStatus = {
   OPEN: 'OPEN',
   IN_PROGRESS: 'IN_PROGRESS',
@@ -324,6 +351,27 @@ export const PayoutExecutionStatus = {
 } as const
 
 export type PayoutExecutionStatus = (typeof PayoutExecutionStatus)[keyof typeof PayoutExecutionStatus]
+
+
+export const PublisherProviderAccountStatus = {
+  PENDING_ONBOARDING: 'PENDING_ONBOARDING',
+  RESTRICTED: 'RESTRICTED',
+  ENABLED: 'ENABLED',
+  DISABLED: 'DISABLED'
+} as const
+
+export type PublisherProviderAccountStatus = (typeof PublisherProviderAccountStatus)[keyof typeof PublisherProviderAccountStatus]
+
+
+export const PayoutWebhookEventStatus = {
+  PENDING: 'PENDING',
+  PROCESSING: 'PROCESSING',
+  PROCESSED: 'PROCESSED',
+  FAILED: 'FAILED',
+  IGNORED: 'IGNORED'
+} as const
+
+export type PayoutWebhookEventStatus = (typeof PayoutWebhookEventStatus)[keyof typeof PayoutWebhookEventStatus]
 
 
 export const PayoutBatchStatus = {

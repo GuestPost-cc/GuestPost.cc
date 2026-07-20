@@ -32,6 +32,9 @@ async function completeExecution(
       },
       data: {
         status: "COMPLETED",
+        ...(execution.provider?.name === "stripe_connect"
+          ? { stage: "BANK_PAID" }
+          : {}),
         version: { increment: 1 },
         providerMetadata: metadata as any,
       },
@@ -97,6 +100,48 @@ async function failExecution(
   metadata: Record<string, unknown>,
 ) {
   await prisma.$transaction(async (tx: any) => {
+    // A failed Stripe Payout leaves the earlier platform -> connected-balance
+    // Transfer in place. Keep funds reserved until finance cancels/reverses
+    // both stages; marking the withdrawal FAILED here would allow an unsafe
+    // local balance restoration while cash still sits in Stripe.
+    if (
+      execution.provider?.name === "stripe_connect" &&
+      execution.providerTransferId
+    ) {
+      const held = await tx.payoutExecution.updateMany({
+        where: {
+          id: execution.id,
+          status: "PROCESSING",
+          version: execution.version,
+        },
+        data: {
+          stage: "BANK_PAYOUT_RECOVERY_REQUIRED",
+          errorMessage,
+          providerMetadata: metadata as any,
+          version: { increment: 1 },
+        },
+      })
+      if (held.count === 0) {
+        throw new Error("Execution already transitioned or claimed for cancel")
+      }
+      await tx.auditLog.create({
+        data: {
+          action: "PAYOUT_EXECUTION_RECOVERY_REQUIRED",
+          entityType: "PayoutExecution",
+          entityId: execution.id,
+          metadata: {
+            providerExecutionId: execution.providerExecutionId,
+            providerTransferId: execution.providerTransferId,
+            providerPayoutId: execution.providerPayoutId,
+            source,
+            ...metadata,
+          },
+          userId: null,
+          organizationId: execution.withdrawal.publisher.organizationId,
+        },
+      })
+      return
+    }
     const execUpdated = await tx.payoutExecution.updateMany({
       where: {
         id: execution.id,
@@ -148,8 +193,49 @@ async function failExecution(
 
 export async function handleCheckStatus(job: any) {
   const limit = job.data.limit ?? 50
+  const staleProviderStage = new Date(Date.now() - 15 * 60 * 1000)
+  // If the API process died between Stripe accepting one stage and local
+  // finalization, promote the evidence to an explicit recovery state. The
+  // original Stripe idempotency keys remain authoritative for any resume.
+  await prisma.payoutExecution.updateMany({
+    where: {
+      status: "PROCESSING",
+      stage: "TRANSFER_CREATED",
+      providerTransferId: { not: null },
+      providerPayoutId: null,
+      updatedAt: { lt: staleProviderStage },
+    },
+    data: {
+      stage: "TRANSFER_RECOVERY_REQUIRED",
+      errorMessage:
+        "Local bank-payout stage did not finalize; recovery required",
+    },
+  })
+  await prisma.payoutExecution.updateMany({
+    where: {
+      status: "PROCESSING",
+      stage: "BANK_PAYOUT_CREATED",
+      providerPayoutId: { not: null },
+      updatedAt: { lt: staleProviderStage },
+    },
+    data: {
+      stage: "BANK_PAYOUT_RECOVERY_REQUIRED",
+      errorMessage:
+        "Local payout finalization did not complete; reconcile provider status",
+    },
+  })
   const pendingExecutions = await prisma.payoutExecution.findMany({
-    where: { status: "PROCESSING", providerExecutionId: { not: null } },
+    where: {
+      status: "PROCESSING",
+      providerExecutionId: { not: null },
+      stage: {
+        notIn: [
+          "TRANSFER_RECOVERY_REQUIRED",
+          "BANK_PAYOUT_RECOVERY_REQUIRED",
+          "CANCEL_REQUESTED",
+        ],
+      },
+    },
     take: limit,
     orderBy: { createdAt: "asc" },
     include: { provider: true, withdrawal: { include: { publisher: true } } },
@@ -167,6 +253,10 @@ export async function handleCheckStatus(job: any) {
       result = await checkProviderTransferStatus(
         execution.provider.name,
         execution.providerExecutionId!,
+        {
+          connectedAccountId: (execution.providerMetadata as any)
+            ?.connectedAccountId,
+        },
       )
     } catch (err: any) {
       // Provider API hiccup on one transfer must not abort the sweep
@@ -262,10 +352,16 @@ async function processInboxEvent(event: any): Promise<string> {
 
   const execution = await prisma.payoutExecution.findFirst({
     where: {
-      providerExecutionId: event.providerExecutionId,
+      OR: [
+        { providerExecutionId: event.providerExecutionId },
+        { providerPayoutId: event.providerExecutionId },
+      ],
       provider: { is: { name: event.provider } },
     },
-    include: { withdrawal: { include: { publisher: true } } },
+    include: {
+      provider: true,
+      withdrawal: { include: { publisher: true } },
+    },
   })
   if (!execution) {
     const ageMs = Date.now() - event.receivedAt.getTime()
@@ -467,10 +563,16 @@ async function handleWebhook(job: any) {
   }
   const execution = await prisma.payoutExecution.findFirst({
     where: {
-      providerExecutionId: normalized.providerExecutionId,
+      OR: [
+        { providerExecutionId: normalized.providerExecutionId },
+        { providerPayoutId: normalized.providerExecutionId },
+      ],
       provider: { is: { name: provider } },
     },
-    include: { withdrawal: { include: { publisher: true } } },
+    include: {
+      provider: true,
+      withdrawal: { include: { publisher: true } },
+    },
   })
   if (!execution) {
     logger.warn("no execution found for providerExecutionId", {

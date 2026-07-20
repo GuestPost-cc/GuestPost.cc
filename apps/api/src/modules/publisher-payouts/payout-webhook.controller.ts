@@ -24,7 +24,9 @@ import {
 import { Request } from "express"
 import { Public } from "../../common/decorators/public.decorator"
 import { PrismaService } from "../../common/prisma.service"
+import { stripeKeyMode } from "../../common/stripe-client"
 import { WorkerWakeupService } from "../queues/worker-wakeup.service"
+import { StripeConnectService } from "./stripe-connect.service"
 
 const STRIPE_TIMESTAMP_TOLERANCE_SECONDS = 300
 
@@ -35,6 +37,7 @@ export class PayoutWebhookController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly workerWakeup: WorkerWakeupService,
+    private readonly stripeConnect?: StripeConnectService,
   ) {}
 
   // Public: providers cannot authenticate with a session — the cryptographic
@@ -78,6 +81,26 @@ export class PayoutWebhookController {
 
     const eventType = body.type ?? body.event_type ?? body.event ?? "unknown"
     const data = body.data ?? body
+
+    if (provider === "stripe_connect") {
+      if (
+        typeof body.livemode !== "boolean" ||
+        body.livemode !== (stripeKeyMode() === "live")
+      ) {
+        throw new BadRequestException(
+          "Stripe event mode does not match API key",
+        )
+      }
+    }
+
+    if (provider === "stripe_connect" && eventType === "account.updated") {
+      const accountId = body.data?.object?.id
+      if (typeof accountId !== "string" || !this.stripeConnect) {
+        throw new BadRequestException("Invalid Stripe account event")
+      }
+      await this.stripeConnect.syncAccount(accountId)
+      return { received: true, accountSynced: true }
+    }
 
     // Wise webhook timestamp replay protection — mirrors Stripe's 5-minute
     // tolerance, checked after body parse because Wise puts the timestamp
@@ -166,9 +189,7 @@ export class PayoutWebhookController {
   // Stripe signs `${timestamp}.${rawBody}` with HMAC-SHA256 using the
   // endpoint's webhook secret; header format `t=...,v1=...`.
   private verifyStripeSignature(rawBody: Buffer, signatureHeader?: string) {
-    const secret =
-      process.env.STRIPE_PAYOUT_WEBHOOK_SECRET ??
-      process.env.STRIPE_WEBHOOK_SECRET
+    const secret = process.env.STRIPE_PAYOUT_WEBHOOK_SECRET
     if (!secret) {
       this.logger.error(
         "STRIPE_PAYOUT_WEBHOOK_SECRET not configured — rejecting webhook (fail closed)",

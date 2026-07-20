@@ -41,6 +41,7 @@ import { hasAuthCredentials } from "./common/has-auth-credentials"
 import { SentryBusinessContextInterceptor } from "./common/interceptors/sentry-business-context.interceptor"
 import { PrismaService } from "./common/prisma.service"
 import { getQueueConnection, getRedisClient } from "./common/redis-client"
+import { validateStripeEnvironment } from "./common/stripe-client"
 import { QueueService } from "./modules/queues/queue.service"
 
 const REQUIRED_ENV_VARS = [
@@ -85,6 +86,15 @@ function validateEnv(): void {
       )
       process.exit(1)
     }
+  }
+
+  try {
+    validateStripeEnvironment()
+  } catch (error) {
+    bootstrapLogger.error("Stripe environment validation failed", {
+      error: (error as Error).message,
+    })
+    process.exit(1)
   }
 }
 
