@@ -76,6 +76,23 @@ services:
         value: "10"
       - key: PLATFORM_FEE_PERCENT
         value: "20"
+      # Stripe credentials are supplied only in the Render Dashboard. New
+      # money movement stays disabled until the migration, webhook, and
+      # sandbox-certification gates in docs/STRIPE_STAGING_RUNBOOK.md pass.
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PAYOUT_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_DEPOSITS_ENABLED
+        value: "false"
+      - key: STRIPE_CONNECT_ENABLED
+        value: "false"
+      - key: STRIPE_LIVE_MODE_ENABLED
+        value: "false"
+      - key: PAYOUT_LEGACY_METHODS_ENABLED
+        value: "false"
       - key: SMTP_HOST
         value: smtp.resend.com
       - key: SMTP_PORT
