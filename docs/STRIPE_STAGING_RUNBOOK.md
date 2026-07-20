@@ -20,7 +20,8 @@ Set in the deployment secret manager, never source control:
 ```text
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...               # customer deposit endpoint
-STRIPE_PAYOUT_WEBHOOK_SECRET=whsec_...        # Connect endpoint
+STRIPE_PAYOUT_WEBHOOK_SECRET=whsec_...        # platform transfer endpoint
+STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET=whsec_... # connected-account endpoint
 STRIPE_DEPOSITS_ENABLED=true
 STRIPE_CONNECT_ENABLED=true
 STRIPE_LIVE_MODE_ENABLED=false
@@ -35,9 +36,10 @@ screenshots, tickets, or documentation.
 
 ## 3. Stripe Dashboard configuration
 
-Create two webhook endpoints so each has a separate rotation boundary:
+Create three webhook destinations so deposits, platform transfers, and
+connected-account payouts each have a separate rotation boundary:
 
-1. `https://api.guestpost.pro.bd/api/v1/billing/stripe/webhook`
+1. `https://api.guestpost.pro.bd/api/v1/billing/webhook/stripe`
    - `checkout.session.completed`
    - `checkout.session.async_payment_succeeded`
    - `checkout.session.async_payment_failed`
@@ -46,7 +48,12 @@ Create two webhook endpoints so each has a separate rotation boundary:
    - `charge.dispute.closed`
    - `radar.early_fraud_warning.created`
 2. `https://api.guestpost.pro.bd/api/v1/payout-webhooks/stripe_connect`
-   - listen to events on connected accounts;
+   - listen to events on **your account**;
+   - `transfer.created`
+   - `transfer.updated`
+   - `transfer.reversed`
+3. `https://api.guestpost.pro.bd/api/v1/payout-webhooks/stripe_connect`
+   - listen to events on **connected accounts**;
    - `account.updated`
    - `payout.created`
    - `payout.updated`
@@ -54,8 +61,10 @@ Create two webhook endpoints so each has a separate rotation boundary:
    - `payout.failed`
    - `payout.canceled`
 
-Copy each endpoint's signing secret to its matching environment variable. Do
-not reuse the dashboard secret from a different endpoint or mode.
+Copy each destination's signing secret to its matching environment variable.
+The two payout destinations intentionally share a URL; the API verifies either
+secret while keeping them independently rotatable. Do not reuse a secret from
+a different destination or mode.
 
 ## 4. Deployment order
 

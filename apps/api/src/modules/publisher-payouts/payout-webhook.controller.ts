@@ -186,13 +186,20 @@ export class PayoutWebhookController {
     return value.slice(0, maxLength)
   }
 
-  // Stripe signs `${timestamp}.${rawBody}` with HMAC-SHA256 using the
-  // endpoint's webhook secret; header format `t=...,v1=...`.
+  // Stripe requires separate webhook destinations for platform events and
+  // connected-account events. Each destination has its own secret, but both
+  // post to this durable inbox. Accept either configured secret without ever
+  // weakening the timestamp or mode checks below.
   private verifyStripeSignature(rawBody: Buffer, signatureHeader?: string) {
-    const secret = process.env.STRIPE_PAYOUT_WEBHOOK_SECRET
-    if (!secret) {
+    const secrets = [
+      process.env.STRIPE_PAYOUT_WEBHOOK_SECRET,
+      process.env.STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET,
+    ]
+      .map((secret) => secret?.trim())
+      .filter((secret): secret is string => Boolean(secret))
+    if (secrets.length === 0) {
       this.logger.error(
-        "STRIPE_PAYOUT_WEBHOOK_SECRET not configured — rejecting webhook (fail closed)",
+        "Stripe payout webhook secrets not configured — rejecting webhook (fail closed)",
       )
       throw new ServiceUnavailableException(
         "Webhook verification not configured",
@@ -226,16 +233,19 @@ export class PayoutWebhookController {
       throw new UnauthorizedException(msg)
     }
 
-    const expected = createHmac("sha256", secret)
-      .update(`${timestamp}.${rawBody.toString("utf8")}`)
-      .digest("hex")
-    const expectedBuf = Buffer.from(expected, "utf8")
-    const valid = candidates.some((c) => {
-      const candidateBuf = Buffer.from(c, "utf8")
-      return (
-        candidateBuf.length === expectedBuf.length &&
-        timingSafeEqual(candidateBuf, expectedBuf)
-      )
+    const signedPayload = `${timestamp}.${rawBody.toString("utf8")}`
+    const valid = secrets.some((secret) => {
+      const expected = createHmac("sha256", secret)
+        .update(signedPayload)
+        .digest("hex")
+      const expectedBuf = Buffer.from(expected, "utf8")
+      return candidates.some((candidate) => {
+        const candidateBuf = Buffer.from(candidate, "utf8")
+        return (
+          candidateBuf.length === expectedBuf.length &&
+          timingSafeEqual(candidateBuf, expectedBuf)
+        )
+      })
     })
     if (!valid) {
       throw new UnauthorizedException("Invalid Stripe webhook signature")

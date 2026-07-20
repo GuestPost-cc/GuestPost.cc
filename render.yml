@@ -85,6 +85,8 @@ services:
         sync: false
       - key: STRIPE_PAYOUT_WEBHOOK_SECRET
         sync: false
+      - key: STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET
+        sync: false
       - key: STRIPE_DEPOSITS_ENABLED
         value: "false"
       - key: STRIPE_CONNECT_ENABLED

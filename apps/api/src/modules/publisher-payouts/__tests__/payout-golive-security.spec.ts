@@ -70,6 +70,7 @@ describe("PayoutWebhookController — signature verification", () => {
 
   it("rejects Stripe webhook when no secret is configured (fail closed)", async () => {
     delete process.env.STRIPE_PAYOUT_WEBHOOK_SECRET
+    delete process.env.STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET
     delete process.env.STRIPE_WEBHOOK_SECRET
     await expect(
       controller.handleWebhook(
@@ -150,6 +151,35 @@ describe("PayoutWebhookController — signature verification", () => {
       }),
     )
     expect(wakeupMock.wake).toHaveBeenCalledWith("payout-webhook")
+  })
+
+  it("accepts the separate connected-account webhook signing secret", async () => {
+    delete process.env.STRIPE_PAYOUT_WEBHOOK_SECRET
+    process.env.STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET = "whsec_connected_test"
+    const body = JSON.stringify({
+      id: "evt_connected_payout",
+      type: "payout.paid",
+      livemode: false,
+      data: { object: { id: "po_connected", status: "paid" } },
+    })
+
+    await expect(
+      controller.handleWebhook(
+        "stripe_connect",
+        {
+          "stripe-signature": stripeSig("whsec_connected_test", body),
+        },
+        { rawBody: Buffer.from(body) } as any,
+      ),
+    ).resolves.toMatchObject({ received: true })
+    expect(prismaMock.payoutWebhookEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          providerExecutionId: "po_connected",
+          providerStatus: "COMPLETED",
+        }),
+      }),
+    )
   })
 
   it("rejects a signed Stripe event when its test/live mode is missing", async () => {

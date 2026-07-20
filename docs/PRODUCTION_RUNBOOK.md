@@ -14,7 +14,8 @@ Companion to `docs/OPERATIONS.md` (backups, supervision, monitoring basics). Thi
 | `QUEUE_SIGNING_SECRET` | must differ from JWT_SECRET |
 | `TRUSTED_ORIGINS` | comma-separated app origins — **API throws without it in production** |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe deposits; secret key must match the webhook mode |
-| `STRIPE_PAYOUT_WEBHOOK_SECRET` | separate Connect webhook secret; no fallback/reuse |
+| `STRIPE_PAYOUT_WEBHOOK_SECRET` | Stripe platform-transfer webhook secret; no fallback/reuse |
+| `STRIPE_CONNECTED_PAYOUT_WEBHOOK_SECRET` | separate connected-account payout webhook secret; required with Connect |
 | `STRIPE_DEPOSITS_ENABLED`, `STRIPE_CONNECT_ENABLED` | kill switches for new sends; false unless deliberately enabled |
 | `STRIPE_LIVE_MODE_ENABLED` | must remain false for test keys/staging; live-key boot gate |
 | `NEXT_PUBLIC_PORTAL_URL`, `NEXT_PUBLIC_PUBLISHER_URL` | exact HTTPS, credential-free return origins; required when the corresponding Stripe flow is enabled in production |
