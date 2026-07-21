@@ -98,6 +98,8 @@ control.
 - Routine SemVer major updates are suppressed and handled as planned migration
   PRs, normally during the quarterly dependency review.
 - Docker and GitHub Actions updates run monthly with one open PR per ecosystem.
+- The repository labels `dependencies`, `docker`, and `ci` are part of this
+  configuration and must remain available for bot-authored PRs.
 
 ## Review and release procedure
 
@@ -134,15 +136,19 @@ historical migration snapshot, not a permanent allowlist.
 | PR | Update | Disposition under this policy |
 |----|--------|-------------------------------|
 | #62 | Sentry 10.63 → 10.67 | Close: partial direct SDK cohort and release-age failure; recreate only when Node and Next SDKs align. |
-| #63 | ESLint tooling | Keep as a candidate: CI green; rebase and rerun after this policy lands. |
+| #63 | ESLint tooling | Automatically closed after the old group was replaced by the `eslint-tooling` cohort; no stale branch remains. |
 | #64 | TypeScript 6 → 7 group | Close: routine major and incompatible with the current TypeScript-ESLint stack. |
-| #65 | Helmet 8.2 → 8.3 | Keep as a candidate: CI green; release alone with auth/header smoke tests. |
+| #65 | Helmet 8.2 → 8.3 | Automatically closed when the 14-day minor-release cooldown made 8.3 temporarily ineligible; recreate after cooldown and rerun auth/header smoke tests. |
 | #66 | AWS S3 client only | Close: client/presigner update split the Smithy type graph. |
 | #67 | Radix Dialog patch | Close: recreate in the Radix patch cohort after cooldown. |
 | #68 | PostCSS 8.5.20 | Superseded here: the old PR did not update the workspace override, so its green CI tested 8.5.10. |
 | #69 | Hook Form resolvers 3 → 5 | Close: routine major and current portal form typing fails. |
 | #70 | Radix Switch patch | Close: recreate in the Radix patch cohort after cooldown. |
 | #71 | BullMQ only | Close: it introduced a second ioredis type/runtime version. |
+
+All PRs in this initial queue are closed and their remote branches are deleted.
+Routine eligible updates will be recreated by the scheduled cohorts; security
+updates remain exempt from the routine delay.
 
 ## Transitive security overrides
 

@@ -6,6 +6,26 @@
 
 ## Recently Completed
 
+### Dependency Governance And Repository Protection
+
+- Replaced the noisy one-package-at-a-time Dependabot queue with scheduled,
+  cooldown-aware compatibility cohorts and a three-PR npm limit; routine major
+  upgrades now require planned migrations while security updates retain their
+  expedited lane.
+- Added CI dependency review, resolved-lockfile compatibility enforcement,
+  production vulnerability auditing, and advisory floors for temporary
+  transitive security overrides.
+- Protected `main` with a required full CI check, one code-owner approval,
+  stale-review dismissal, resolved review threads, squash-only merges, and
+  automatic merged-branch deletion. Enabled dependency alerts, Dependabot
+  security updates, secret scanning, and push protection.
+- Reconciled and closed Dependabot PRs #62-#71 with documented reasons, removed
+  their stale remote branches, and deleted five historical branches for merged
+  PRs #57-#61. The next routine updates will be recreated under the new policy.
+- Validation: PR #72 passed dependency review, policy and audit checks,
+  migration replay, type/lint checks, API and package tests, UI coverage, and
+  all production builds before merge.
+
 ### Stripe-First Provider-Neutral Finance Groundwork
 
 - Added durable deposit attempts and provider event inbox records, mandatory
