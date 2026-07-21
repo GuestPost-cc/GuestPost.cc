@@ -17,6 +17,7 @@
     "reset": "pnpm tsx scripts/reset.ts",
     "check": "pnpm tsx scripts/check.ts",
     "repo:health": "pnpm depcruise apps packages scripts e2e --include-only '^(apps|packages|scripts|e2e)/'",
+    "deps:policy": "pnpm tsx scripts/check-dependency-policy.ts",
     "repo:check": "biome check . && pnpm lint && pnpm typecheck && pnpm depcruise apps packages scripts e2e --include-only '^(apps|packages|scripts|e2e)/'",
     "services:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d",
     "services:down": "docker compose -f infrastructure/docker/docker-compose.yml down",

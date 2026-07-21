@@ -29,10 +29,21 @@ escalation paths.
 
 1. Open a PR against `main`.
 2. Fill out the PR template.
-3. Ensure all CI checks pass.
-4. Request review from the relevant CODEOWNERS team.
-5. Address feedback.
-6. Squash-merge to `main`.
+3. Rebase on the latest `main` and ensure the required `build-and-test` check
+   passes.
+4. Request review from the relevant CODEOWNERS team and obtain at least one
+   human approval.
+5. Address feedback and resolve review threads. New commits invalidate stale
+   approvals.
+6. Squash-merge to `main`; direct pushes and force pushes are prohibited.
+
+Repository administrators retain an audited break-glass bypass for incidents.
+Using it for a non-emergency requires a follow-up review. Dependabot never has
+a bypass and its PRs are not auto-merged.
+
+Dependency updates also follow `docs/DEPENDENCY_POLICY.md`. Routine major
+upgrades require a dedicated compatibility PR; critical security fixes use the
+documented emergency lane.
 
 ## Release Process
 
@@ -52,3 +63,5 @@ require approval from at least one owner of the affected directories.
 - Issues triaged within 1 week.
 - PRs reviewed within 2 business days.
 - Security vulnerabilities: immediate triage.
+- Dependabot queue: review during the Tuesday maintenance window; keep no more
+  than three routine npm update PRs open.

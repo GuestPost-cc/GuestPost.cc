@@ -1,26 +1,35 @@
 # Each owner line below is a fallback — if no more specific pattern matches,
-# the default team(s) are requested for review.
+# the repository administrator is requested for review. Replace these entries
+# with role teams only after GitHub confirms the teams exist and have write
+# access to this repository.
 
 # Default — project maintainers.
-* @guestpost/maintainers
+* @5H0HAN
 
 # API and backend.
-apps/api/ @guestpost/backend
-packages/database/ @guestpost/backend
-packages/auth/ @guestpost/backend
-packages/shared/ @guestpost/backend
+apps/api/ @5H0HAN
+packages/database/ @5H0HAN
+packages/auth/ @5H0HAN
+packages/shared/ @5H0HAN
 
 # Frontend apps.
-apps/portal/ @guestpost/frontend
-apps/publisher/ @guestpost/frontend
-apps/admin/ @guestpost/frontend
-apps/website/ @guestpost/frontend
-packages/ui/ @guestpost/frontend
-packages/api-client/ @guestpost/frontend
+apps/portal/ @5H0HAN
+apps/publisher/ @5H0HAN
+apps/admin/ @5H0HAN
+apps/website/ @5H0HAN
+packages/ui/ @5H0HAN
+packages/api-client/ @5H0HAN
 
 # Infrastructure and CI.
-.github/workflows/ @guestpost/infra
-infrastructure/ @guestpost/infra
+.github/workflows/ @5H0HAN
+.github/dependabot.yml @5H0HAN
+.github/dependency-policy.json @5H0HAN
+.github/CODEOWNERS @5H0HAN
+package.json @5H0HAN
+pnpm-lock.yaml @5H0HAN
+pnpm-workspace.yaml @5H0HAN
+scripts/check-dependency-policy.ts @5H0HAN
+infrastructure/ @5H0HAN
 
 # E2E tests.
-e2e/ @guestpost/qa
+e2e/ @5H0HAN
