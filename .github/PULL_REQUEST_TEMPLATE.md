@@ -25,6 +25,13 @@
 - [ ] No circular dependencies introduced (`pnpm depcruise ...`)
 - [ ] Documentation updated (if applicable)
 
+### Dependency changes (if applicable)
+
+- [ ] Upstream release notes and manifest/lockfile diff reviewed
+- [ ] Compatibility cohort updated together (`pnpm deps:policy`)
+- [ ] Relevant smoke surface and rollback plan documented
+- [ ] Runtime dependency will be deployed and observed before another runtime update merges
+
 ## Screenshots (if applicable)
 
 ## Notes for reviewers

@@ -35,8 +35,17 @@
 
 ## Dependency security
 
-- Dependabot runs weekly for npm, Docker, and GitHub Actions dependencies.
-- Critical security updates are prioritised over feature work.
-- `pnpm audit` runs in CI to detect known vulnerabilities.
+- Dependabot security updates are enabled and are not delayed by the routine
+  update cooldown or routine-major suppression.
+- Critical alerts are acknowledged within one hour and remediated the same day
+  when a supported fix exists; high alerts target three business days.
+- GitHub dependency review blocks PRs that introduce high or critical known
+  vulnerabilities, and `pnpm audit` blocks moderate-or-higher production
+  vulnerabilities.
+- Routine npm updates run weekly with a three-PR cap; Docker and GitHub Actions
+  updates run monthly.
+- Runtime dependency PRs require a human approval and are deployed one at a
+  time. See `docs/DEPENDENCY_POLICY.md` for compatibility groups, smoke tests,
+  and rollback.
 - Only built-in dependencies are allowed (see `pnpm-workspace.yaml`'s
   `onlyBuiltDependencies`).

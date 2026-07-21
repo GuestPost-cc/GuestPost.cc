@@ -4,42 +4,115 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-      time: "09:00"
-      timezone: "America/New_York"
-    open-pull-requests-limit: 10
+      day: "tuesday"
+      time: "10:00"
+      timezone: "Asia/Dhaka"
+    open-pull-requests-limit: 3
     versioning-strategy: increase
+    rebase-strategy: auto
+    cooldown:
+      default-days: 14
+      semver-patch-days: 7
+      semver-minor-days: 14
+      semver-major-days: 30
+      include:
+        - "*"
     labels:
       - "dependencies"
+    ignore:
+      # Routine major upgrades need a compatibility plan and dedicated PR.
+      # update-types does not suppress Dependabot security updates.
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
     groups:
-      sentry:
+      queue-runtime:
+        applies-to: version-updates
+        patterns:
+          - "bullmq"
+          - "ioredis"
+        update-types:
+          - "patch"
+          - "minor"
+      aws-s3-runtime:
+        applies-to: version-updates
+        patterns:
+          - "@aws-sdk/client-s3"
+          - "@aws-sdk/s3-request-presigner"
+        update-types:
+          - "patch"
+          - "minor"
+      sentry-runtime:
+        applies-to: version-updates
         patterns:
           - "@sentry/*"
-      nextjs:
+        update-types:
+          - "patch"
+          - "minor"
+      forms-runtime:
+        applies-to: version-updates
+        patterns:
+          - "@hookform/resolvers"
+          - "react-hook-form"
+        update-types:
+          - "patch"
+          - "minor"
+      radix-ui-patches:
+        applies-to: version-updates
+        patterns:
+          - "@radix-ui/*"
+        update-types:
+          - "patch"
+      nextjs-patches:
+        applies-to: version-updates
         patterns:
           - "next"
           - "@next/*"
-      react:
+        update-types:
+          - "patch"
+      react-runtime:
+        applies-to: version-updates
         patterns:
           - "react"
           - "react-dom"
-          - "@types/react"
-          - "@types/react-dom"
-      eslint:
+        update-types:
+          - "patch"
+          - "minor"
+      eslint-tooling:
+        applies-to: version-updates
         patterns:
           - "eslint"
           - "@eslint/*"
+          - "eslint-plugin-*"
           - "typescript-eslint"
           - "@typescript-eslint/*"
-      typescript-group:
+        update-types:
+          - "patch"
+          - "minor"
+      typescript-compiler:
+        applies-to: version-updates
         patterns:
           - "typescript"
-          - "@types/*"
+        update-types:
+          - "patch"
+          - "minor"
+      postcss-tooling:
+        applies-to: version-updates
+        patterns:
+          - "postcss"
+        update-types:
+          - "patch"
+          - "minor"
 
   - package-ecosystem: "docker"
     directory: "/infrastructure/docker"
     schedule:
       interval: "monthly"
+    open-pull-requests-limit: 1
+    cooldown:
+      default-days: 14
+      include:
+        - "*"
     labels:
       - "dependencies"
       - "docker"
@@ -48,6 +121,20 @@ updates:
     directory: "/"
     schedule:
       interval: "monthly"
+    open-pull-requests-limit: 1
+    cooldown:
+      default-days: 14
+      include:
+        - "*"
     labels:
       - "dependencies"
       - "ci"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+    groups:
+      github-actions:
+        applies-to: version-updates
+        patterns:
+          - "*"

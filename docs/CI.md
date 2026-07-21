@@ -9,17 +9,25 @@ only after this workflow succeeds.
 
 The `CI / build-and-test` check performs:
 
-1. Frozen pnpm installation and a moderate-or-higher production dependency audit
-2. Prisma migration deployment and status validation against PostgreSQL 17
-3. Integration-test template database creation and migration
-4. TypeScript, Biome, ESLint, and dependency-graph validation
-5. API unit and database-backed integration tests
-6. Shared package and UI coverage tests
-7. A complete production build of every workspace target
+1. Pull-request dependency review, rejecting newly introduced high or critical
+   vulnerabilities
+2. Frozen pnpm installation, compatibility-cohort validation, and a
+   moderate-or-higher production dependency audit
+3. Prisma migration deployment and status validation against PostgreSQL 17
+4. Integration-test template database creation and migration
+5. TypeScript, Biome, ESLint, and dependency-graph validation
+6. API unit and database-backed integration tests
+7. Shared package and UI coverage tests
+8. A complete production build of every workspace target
 
 The workflow has read-only repository permissions, does not persist checkout
 credentials, does not expose deployment secrets, pins third-party Actions and
 service images, cancels superseded runs, and has a 60-minute timeout.
+
+`pnpm deps:policy` reads `.github/dependency-policy.json`. It rejects mixed
+direct Sentry/TypeScript/PostCSS versions, multiple resolved ioredis or Smithy
+type versions, advisory-version regressions, and dependency declarations that
+are silently replaced by an incompatible pnpm workspace override.
 
 ## Deployment boundary
 

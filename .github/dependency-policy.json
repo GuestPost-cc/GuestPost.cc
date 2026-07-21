@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "alignedDirectVersionCohorts": [
+    {
+      "name": "Sentry runtime SDKs",
+      "packages": ["@sentry/nextjs", "@sentry/node"],
+      "reason": "Mixed direct Sentry versions can duplicate instrumentation internals."
+    },
+    {
+      "name": "TypeScript compiler",
+      "packages": ["typescript"],
+      "reason": "Every workspace must compile against the same TypeScript release."
+    },
+    {
+      "name": "PostCSS toolchain",
+      "packages": ["postcss"],
+      "reason": "All Next.js applications must test the same PostCSS release."
+    }
+  ],
+  "resolvedSingletons": [
+    {
+      "package": "ioredis",
+      "reason": "BullMQ and direct Redis clients exchange ioredis types and connections."
+    },
+    {
+      "package": "@smithy/types",
+      "reason": "The S3 client and presigner must share one Smithy type universe."
+    },
+    {
+      "package": "postcss",
+      "minimumVersion": "8.5.10",
+      "reason": "GHSA-qx2v-qp2m-jg93 is fixed in PostCSS 8.5.10."
+    },
+    {
+      "package": "fast-uri",
+      "minimumVersion": "3.1.4",
+      "reason": "GHSA-v2hh-gcrm-f6hx is fixed in the 3.x line at 3.1.4."
+    },
+    {
+      "package": "sharp",
+      "minimumVersion": "0.35.0",
+      "reason": "GHSA-f88m-g3jw-g9cj requires Sharp 0.35.0 or newer."
+    },
+    {
+      "package": "@hono/node-server",
+      "minimumVersion": "2.0.5",
+      "reason": "GHSA-frvp-7c67-39w9 is fixed in Hono Node Server 2.0.5."
+    }
+  ]
+}
