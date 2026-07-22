@@ -24,10 +24,17 @@ interface ResolvedSingleton {
   reason: string
 }
 
+interface ResolvedSecurityFloor {
+  package: string
+  minimumVersionsByMajor: Record<string, string>
+  reason: string
+}
+
 interface DependencyPolicy {
   schemaVersion: number
   alignedDirectVersionCohorts: AlignedCohort[]
   resolvedSingletons: ResolvedSingleton[]
+  resolvedSecurityFloors?: ResolvedSecurityFloor[]
 }
 
 interface ResolvedNode {
@@ -104,14 +111,18 @@ for (const cohort of policy.alignedDirectVersionCohorts) {
 const singletonNames = policy.resolvedSingletons.map(
   ({ package: name }) => name,
 )
+const securityFloorNames = (policy.resolvedSecurityFloors ?? []).map(
+  ({ package: name }) => name,
+)
+const resolvedNames = [...new Set([...singletonNames, ...securityFloorNames])]
 const listOutput = execFileSync(
   "pnpm",
-  ["list", ...singletonNames, "--recursive", "--depth", "Infinity", "--json"],
+  ["list", ...resolvedNames, "--recursive", "--depth", "Infinity", "--json"],
   { cwd: root, encoding: "utf8", maxBuffer: 20 * 1024 * 1024 },
 )
 const resolvedRoots = JSON.parse(listOutput) as ResolvedNode[]
 const resolvedVersions = new Map(
-  singletonNames.map((name) => [name, new Set<string>()]),
+  resolvedNames.map((name) => [name, new Set<string>()]),
 )
 
 function visit(node: ResolvedNode): void {
@@ -158,6 +169,31 @@ for (const singleton of policy.resolvedSingletons) {
   }
 }
 
+for (const securityFloor of policy.resolvedSecurityFloors ?? []) {
+  const versions =
+    resolvedVersions.get(securityFloor.package) ?? new Set<string>()
+  if (versions.size === 0) {
+    errors.push(
+      `${securityFloor.package}: security floor is configured but the package was not resolved.`,
+    )
+    continue
+  }
+  for (const version of versions) {
+    const resolved = parseVersion(version)
+    if (!resolved) continue
+    const minimumVersion =
+      securityFloor.minimumVersionsByMajor[String(resolved[0])]
+    if (!minimumVersion) continue
+    const minimum = parseVersion(minimumVersion)
+    if (minimum && compareVersions(resolved, minimum) < 0) {
+      errors.push(
+        `${securityFloor.package} resolved to ${version}, below the security floor ` +
+          `${minimumVersion} for major ${resolved[0]}. ${securityFloor.reason}`,
+      )
+    }
+  }
+}
+
 const overrides = readWorkspaceOverrides(
   readFileSync(join(root, "pnpm-workspace.yaml"), "utf8"),
 )
@@ -180,7 +216,8 @@ if (errors.length > 0) {
 
 console.log(
   `Dependency compatibility policy passed (${policy.alignedDirectVersionCohorts.length} ` +
-    `declared cohorts, ${policy.resolvedSingletons.length} resolved singletons).`,
+    `declared cohorts, ${policy.resolvedSingletons.length} resolved singletons, ` +
+    `${policy.resolvedSecurityFloors?.length ?? 0} multi-line security floors).`,
 )
 
 function normalizeDeclaredVersion(version: string): string {

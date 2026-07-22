@@ -29,7 +29,8 @@ updated: 2026-07-22
   automatically.
 - `.github/dependency-policy.json` and
   `scripts/check-dependency-policy.ts` are the source of truth for aligned
-  direct dependency cohorts, resolved singleton versions, and advisory floors.
+  direct dependency cohorts, resolved singleton versions, and single- or
+  multi-major advisory floors.
 - The operational review, smoke, monitoring, rollback, and exception process
   is documented in `docs/DEPENDENCY_POLICY.md`.
 

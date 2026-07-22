@@ -162,3 +162,7 @@ upstream range catches up. Current advisory floors are:
 - fast-uri 3.1.4 for GHSA-v2hh-gcrm-f6hx
 - Sharp 0.35.0 for GHSA-f88m-g3jw-g9cj
 - Hono Node Server 2.0.5 for GHSA-frvp-7c67-39w9
+- DOMPurify 3.4.12 for GHSA-c2j3-45gr-mqc4
+- shell-quote 1.9.0 for GHSA-395f-4hp3-45gv
+- brace-expansion 1.1.16, 2.1.2, or 5.0.7 according to the resolved
+  major line for GHSA-3jxr-9vmj-r5cp

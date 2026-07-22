@@ -14,7 +14,9 @@
   expedited lane.
 - Added CI dependency review, resolved-lockfile compatibility enforcement,
   production vulnerability auditing, and advisory floors for temporary
-  transitive security overrides.
+  transitive security overrides. After enabling GitHub alerts, added patched
+  floors for the newly published brace-expansion, shell-quote, and DOMPurify
+  advisories rather than dismissing the two high and one low findings.
 - Protected `main` with a required full CI check, one code-owner approval,
   stale-review dismissal, resolved review threads, squash-only merges, and
   automatic merged-branch deletion. Enabled dependency alerts, Dependabot

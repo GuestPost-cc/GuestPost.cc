@@ -45,6 +45,29 @@
       "package": "@hono/node-server",
       "minimumVersion": "2.0.5",
       "reason": "GHSA-frvp-7c67-39w9 is fixed in Hono Node Server 2.0.5."
+    },
+    {
+      "package": "dompurify",
+      "minimumVersion": "3.4.12",
+      "reason": "GHSA-c2j3-45gr-mqc4 is fixed in DOMPurify 3.4.12."
+    },
+    {
+      "package": "shell-quote",
+      "minimumVersion": "1.9.0",
+      "reason": "GHSA-395f-4hp3-45gv is fixed in shell-quote 1.9.0."
+    }
+  ],
+  "resolvedSecurityFloors": [
+    {
+      "package": "brace-expansion",
+      "minimumVersionsByMajor": {
+        "1": "1.1.16",
+        "2": "2.1.2",
+        "3": "5.0.7",
+        "4": "5.0.7",
+        "5": "5.0.7"
+      },
+      "reason": "GHSA-3jxr-9vmj-r5cp requires patched floors for every affected major line."
     }
   ]
 }
