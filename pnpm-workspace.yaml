@@ -5,9 +5,12 @@ overrides:
   # Security floors for transitive dependencies. Keep these until upstream
   # ranges include patched releases; CI verifies the resolved versions.
   "@hono/node-server": 2.0.10
+  "minimatch@3.1.5>brace-expansion": 1.1.16
+  dompurify: 3.4.12
   fast-uri: 3.1.4
   postcss: 8.5.20
   sharp: 0.35.3
+  shell-quote: 1.9.0
 # pnpm v11 build-script approvals (map form); onlyBuiltDependencies kept for
 # older pnpm compatibility.
 allowBuilds:

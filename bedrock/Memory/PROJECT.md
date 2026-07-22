@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-07-20
+updated: 2026-07-22
 ---
 
 # GuestPost.cc
@@ -15,6 +15,24 @@ updated: 2026-07-20
 - **Payments**: Stripe Connect (Checkout Sessions + PaymentIntents), Wise API (payouts)
 - **Language**: TypeScript 6, strict mode, project references
 - **Tooling**: pnpm 11, Turbo 2, Biome, opencode
+
+## Dependency Governance
+
+- Dependabot routine npm updates run weekly with patch/minor cooldowns, a
+  three-PR limit, compatible dependency cohorts, and routine major upgrades
+  reserved for planned migrations. Docker and GitHub Actions run monthly.
+- Security updates bypass routine cooldowns. CI requires dependency review,
+  the resolved-version compatibility policy, a production audit, migrations,
+  tests, and all production builds.
+- `main` requires the `build-and-test` check, one code-owner approval, resolved
+  review threads, and squash merges. Merged remote branches are deleted
+  automatically.
+- `.github/dependency-policy.json` and
+  `scripts/check-dependency-policy.ts` are the source of truth for aligned
+  direct dependency cohorts, resolved singleton versions, and single- or
+  multi-major advisory floors.
+- The operational review, smoke, monitoring, rollback, and exception process
+  is documented in `docs/DEPENDENCY_POLICY.md`.
 
 ## Audit Status (41 findings)
 
