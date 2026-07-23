@@ -30,6 +30,10 @@ import {
 import { useParams, useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminPage,
+  AdminPageHeader,
+} from "../../../../components/admin-workspace"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
 
@@ -199,13 +203,19 @@ export default function AdminTicketDetailPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-      </div>
+    <AdminPage className="max-w-4xl">
+      <AdminPageHeader
+        title="Support ticket"
+        description="Review the conversation, ownership, visibility, and next action before responding."
+        eyebrow="Customer support"
+        icon={Info}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => router.back()}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader>
@@ -432,6 +442,6 @@ export default function AdminTicketDetailPage() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </AdminPage>
   )
 }

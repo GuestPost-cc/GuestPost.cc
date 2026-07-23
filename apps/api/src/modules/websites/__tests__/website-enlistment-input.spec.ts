@@ -9,6 +9,12 @@ const validInput = {
   listingTitle: "Technology guest posts on Example",
   description:
     "Editorial technology coverage for founders, developers, and software buyers.",
+  manualMetrics: {
+    ahrefsOrganicTraffic: 1200,
+    ahrefsTrafficAsOf: new Date().toISOString().slice(0, 10),
+    mozDomainAuthority: 54,
+    mozDomainAuthorityAsOf: new Date().toISOString().slice(0, 10),
+  },
 }
 
 describe("website enlistment input enforcement", () => {
@@ -70,6 +76,36 @@ describe("website enlistment input enforcement", () => {
       }),
     })
     expect(prisma.website.findFirst).not.toHaveBeenCalled()
+  })
+
+  it("requires both manual metric values and their measurement dates", async () => {
+    const missing = plainToInstance(CreateWebsiteDto, {
+      ...validInput,
+      manualMetrics: undefined,
+    })
+    const invalid = plainToInstance(CreateWebsiteDto, {
+      ...validInput,
+      manualMetrics: {
+        ahrefsOrganicTraffic: -1,
+        ahrefsTrafficAsOf: "2026-02-30",
+        mozDomainAuthority: 101,
+        mozDomainAuthorityAsOf: "not-a-date",
+      },
+    })
+
+    const missingErrors = await validate(missing)
+    const invalidErrors = await validate(invalid)
+
+    expect(
+      missingErrors.some((error) => error.property === "manualMetrics"),
+    ).toBe(true)
+    expect(
+      invalidErrors.some(
+        (error) =>
+          error.property === "manualMetrics" &&
+          (error.children?.length ?? 0) > 0,
+      ),
+    ).toBe(true)
   })
 
   it("rejects a non-root platform website URL before persistence", async () => {

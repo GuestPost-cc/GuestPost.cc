@@ -25,12 +25,18 @@ export type {
   AdminFinanceWorkbenchActionType,
   AdminFinanceWorkbenchPriority,
   AdminFinanceWorkbenchResponse,
+  AdminMarketplaceListingDetail,
+  AdminMarketplaceListingRow,
+  AdminMarketplacePublisherSummary,
+  AdminMarketplaceServiceRow,
   AdminOperationsWorkbenchAction,
   AdminOperationsWorkbenchActionType,
   AdminOperationsWorkbenchPriority,
   AdminOperationsWorkbenchResponse,
   AdminOpsStaffResponse,
   AdminOrderDetailResponse,
+  AdminOrderFocus,
+  AdminOrderListResponse,
   AdminOrderResponse,
   AdminOrderTimelineEvent,
   AdminPlatformListingServiceResponse,
@@ -45,6 +51,9 @@ export type {
   OperationsInboxResponse,
   OperationsInboxView,
   OperationsOrderDetail,
+  WebsiteImportBatchResponse,
+  WebsiteImportRowResponse,
+  WebsiteImportRowStatus,
 } from "./services/admin"
 export { AdminService } from "./services/admin"
 export type { ApiKeyCreatedResponse, ApiKeyResponse } from "./services/api-keys"
@@ -60,6 +69,8 @@ export type {
   ListingAttribution,
   ListingServiceOption,
   MarketplaceListing,
+  PublicDomainMetrics,
+  PublicDomainMetricValue,
   SearchFilters,
   SearchResult,
   UpdateMarketplaceListingInput,
@@ -91,6 +102,9 @@ export type {
   PublisherWebsiteListing,
   PublisherWebsiteResponse,
   PublisherWebsiteService,
+  UpdateManualWebsiteMetricsInput,
+  WebsiteDomainMetrics,
+  WebsiteMetricValue,
 } from "./services/publishers"
 export { PublishersService } from "./services/publishers"
 export { ReportingService } from "./services/reporting"

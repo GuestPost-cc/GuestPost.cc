@@ -14,6 +14,8 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsDateString,
+  IsDefined,
   IsEnum,
   IsIn,
   IsInt,
@@ -21,12 +23,35 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  Matches,
   Max,
   MaxLength,
   Min,
   MinLength,
   ValidateNested,
 } from "class-validator"
+
+export class ManualWebsiteMetricsDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(2_147_483_647)
+  ahrefsOrganicTraffic!: number
+
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  ahrefsTrafficAsOf!: string
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(100)
+  mozDomainAuthority!: number
+
+  @IsDateString({ strict: true })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  mozDomainAuthorityAsOf!: string
+}
 
 export class CreateWebsiteServiceDto {
   @IsEnum(ServiceType)
@@ -109,6 +134,11 @@ export class CreateWebsiteDto {
   @Type(() => CreateWebsiteServiceDto)
   initialService?: CreateWebsiteServiceDto
 
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => ManualWebsiteMetricsDto)
+  manualMetrics!: ManualWebsiteMetricsDto
+
   @IsBoolean()
   sportsGamingAllowed!: boolean
 
@@ -162,3 +192,5 @@ export class UpdateWebsiteDto {
   @MaxLength(50)
   language?: string
 }
+
+export class UpdateManualWebsiteMetricsDto extends ManualWebsiteMetricsDto {}

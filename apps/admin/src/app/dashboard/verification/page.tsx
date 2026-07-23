@@ -36,6 +36,11 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminFilterBar,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
@@ -141,17 +146,17 @@ function VerificationCenterPageInner() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <ShieldCheck className="h-7 w-7" /> Domain Verification
-        </h1>
-        <p className="text-muted-foreground">
-          {isSuperAdmin
-            ? "Domain ownership operations, trust scoring, and force-approval governance."
-            : "Domain ownership operations and trust scoring."}
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow={isSuperAdmin ? "Ownership governance" : "Ownership operations"}
+        title="Domain verification"
+        description={
+          isSuperAdmin
+            ? "Review ownership evidence, trust signals, retry failures, and audit exceptional force approvals."
+            : "Review ownership evidence, trust signals, and retry failed verification checks."
+        }
+        icon={ShieldCheck}
+      />
 
       <div className="flex gap-2">
         <Button
@@ -191,18 +196,27 @@ function VerificationCenterPageInner() {
             ))}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex-1 max-w-sm">
+          <AdminFilterBar
+            activeCount={Number(Boolean(domain)) + Number(status !== "all")}
+            resultCount={websites.length}
+            resultLabel={websites.length === 1 ? "website" : "websites"}
+            onClear={() => {
+              setDomain("")
+              setStatus("all")
+              setSelected(new Set())
+            }}
+          >
+            <div className="relative min-w-0 flex-1 lg:max-w-md">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder="Filter by domain..."
                 value={domain}
                 onChange={(e) => setDomain(e.target.value)}
-                className="pl-9"
+                className="bg-background pl-9"
               />
             </div>
             <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full bg-background sm:w-56">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -224,7 +238,7 @@ function VerificationCenterPageInner() {
               <RefreshCw className="h-4 w-4 mr-1" />
               Retry ({selected.size})
             </Button>
-          </div>
+          </AdminFilterBar>
 
           <div className="rounded-lg border">
             {isLoading ? (
@@ -385,6 +399,6 @@ function VerificationCenterPageInner() {
           </Card>
         </>
       )}
-    </div>
+    </AdminPage>
   )
 }

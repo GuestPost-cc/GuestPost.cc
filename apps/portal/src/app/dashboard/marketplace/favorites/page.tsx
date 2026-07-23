@@ -22,7 +22,9 @@ interface FavoriteListing {
     priceFrom?: number | null
     serviceTypes?: string[]
     currency: string
-    traffic?: number
+    domainMetrics?: {
+      ahrefs: { organicTraffic?: { value: number } }
+    }
     image?: string
     category?: { name: string }
     categories?: { name: string }[]
@@ -190,9 +192,11 @@ export default function FavoritesPage() {
                     </span>
                   </div>
                 )}
-                {fav.listing.traffic && (
+                {fav.listing.domainMetrics?.ahrefs.organicTraffic?.value !=
+                  null && (
                   <span className="text-sm text-muted-foreground">
-                    {fav.listing.traffic.toLocaleString()} GA4 sessions/mo
+                    {fav.listing.domainMetrics.ahrefs.organicTraffic.value.toLocaleString()}{" "}
+                    Ahrefs traffic
                   </span>
                 )}
               </div>

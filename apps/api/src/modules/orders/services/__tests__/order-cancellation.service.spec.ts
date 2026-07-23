@@ -70,6 +70,20 @@ describe("OrderCancellationService", () => {
     service = new OrderCancellationService(prisma, refund, audit, queue)
   })
 
+  it("rejects an emergency force-cancel without a meaningful audit note", async () => {
+    await expect(
+      service.forceCancel("order-1", "admin-1", {
+        reasonCode: CancellationReasonCode.LEGAL_OR_SECURITY_EMERGENCY,
+        expectedVersion: 4,
+        confirmationOrderId: "order-1",
+        responsibility: CancellationResponsibility.SYSTEM,
+        note: "Too short",
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException)
+
+    expect(prisma.$transaction).not.toHaveBeenCalled()
+  })
+
   it("returns a request action after the acceptance boundary", async () => {
     const preview = await service.preview("order-1", {
       userId: "customer-1",

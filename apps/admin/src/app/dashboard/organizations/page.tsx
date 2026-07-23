@@ -32,6 +32,12 @@ import {
 import { format } from "date-fns"
 import { AlertCircle, Building, Calendar, Search, Users } from "lucide-react"
 import { useMemo, useState } from "react"
+import {
+  AdminEmptyState,
+  AdminFilterBar,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 
@@ -178,26 +184,36 @@ function OrganizationsPageInner() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Organizations</h1>
-        <p className="text-muted-foreground">
-          Global customer organization directory
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow="Super Admin directory"
+        title="Organizations"
+        description="Review customer organizations, membership size, campaign activity, order volume, and plan distribution."
+        icon={Building}
+      />
 
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[240px]">
+      <AdminFilterBar
+        activeCount={Number(Boolean(search)) + Number(planFilter !== "all")}
+        resultCount={filteredOrgs.length}
+        resultLabel={
+          filteredOrgs.length === 1 ? "organization" : "organizations"
+        }
+        onClear={() => {
+          setSearch("")
+          setPlanFilter("all")
+        }}
+      >
+        <div className="relative min-w-0 flex-1 lg:max-w-xl">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search by name or slug..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="bg-background pl-9"
           />
         </div>
         <Select value={planFilter} onValueChange={setPlanFilter}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-full bg-background sm:w-44">
             <SelectValue placeholder="Plan" />
           </SelectTrigger>
           <SelectContent>
@@ -208,7 +224,7 @@ function OrganizationsPageInner() {
             <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </AdminFilterBar>
 
       <Card>
         <CardContent className="p-0">
@@ -219,10 +235,10 @@ function OrganizationsPageInner() {
               ))}
             </div>
           ) : filteredOrgs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <Building className="h-10 w-10 text-muted-foreground" />
-              <p className="text-muted-foreground">No organizations found</p>
-            </div>
+            <AdminEmptyState
+              title="No organizations found"
+              description="No organizations match the current search and plan filters."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -283,6 +299,6 @@ function OrganizationsPageInner() {
           </Button>
         </div>
       )}
-    </div>
+    </AdminPage>
   )
 }

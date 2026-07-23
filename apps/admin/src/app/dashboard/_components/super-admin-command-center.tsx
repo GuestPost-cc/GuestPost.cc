@@ -37,6 +37,7 @@ import {
   UserRoundCog,
 } from "lucide-react"
 import Link from "next/link"
+import { AdminPage, AdminPageHeader } from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 
 const actionLabels: Record<AdminCommandCenterAction["type"], string> = {
@@ -245,42 +246,35 @@ export function SuperAdminCommandCenter() {
   const reconciliation = data?.finance.reconciliation
 
   return (
-    <div className="space-y-7">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <ShieldCheck className="h-4 w-4" />
-            Super Admin command center
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Platform oversight
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-            Review platform exceptions, protect operational deadlines, and keep
-            financial and governance risks visible.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {data?.generatedAt ? (
-            <span className="hidden text-xs text-muted-foreground md:inline">
-              Updated{" "}
-              {formatDistanceToNow(new Date(data.generatedAt), {
-                addSuffix: true,
-              })}
-            </span>
-          ) : null}
-          <Button
-            variant="outline"
-            onClick={() => commandCenter.refetch()}
-            disabled={commandCenter.isFetching}
-          >
-            <RefreshCw
-              className={`mr-2 h-4 w-4 ${commandCenter.isFetching ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
-        </div>
-      </div>
+    <AdminPage className="space-y-7">
+      <AdminPageHeader
+        eyebrow="Super Admin command center"
+        title="Platform oversight"
+        description="Review platform exceptions, protect operational deadlines, and keep financial and governance risks visible."
+        icon={ShieldCheck}
+        actions={
+          <>
+            {data?.generatedAt ? (
+              <span className="hidden text-xs text-muted-foreground md:inline">
+                Updated{" "}
+                {formatDistanceToNow(new Date(data.generatedAt), {
+                  addSuffix: true,
+                })}
+              </span>
+            ) : null}
+            <Button
+              variant="outline"
+              onClick={() => commandCenter.refetch()}
+              disabled={commandCenter.isFetching}
+            >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${commandCenter.isFetching ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
@@ -614,6 +608,6 @@ export function SuperAdminCommandCenter() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminPage>
   )
 }

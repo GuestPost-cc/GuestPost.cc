@@ -31,6 +31,7 @@ import {
 } from "./lib/maintenance-schedule"
 import { createAutoAcceptWorker } from "./processors/auto-accept.processor"
 import { createDeliveryVerificationWorker } from "./processors/delivery-verification.processor"
+import { createDomainMetricsWorker } from "./processors/domain-metrics.processor"
 import { createEmailWorker } from "./processors/email.processor"
 import { createNotificationWorker } from "./processors/notification.processor"
 import {
@@ -105,19 +106,21 @@ async function registerReconciliationSweep(): Promise<RegisteredJob> {
   return { name: "reconciliation-run", queue: QUEUES.RECONCILIATION }
 }
 
-// Domain re-verification sweep — every VERIFIED site is re-checked every 30d
-// and REVOKED if its TXT record vanished. Trust must decay, not persist forever.
+// Daily governance sweep expires temporary overrides within 24h. The core
+// filters normal DNS-backed sites to the 30-day recheck cadence.
 async function registerWebsiteReverifySweep(): Promise<RegisteredJob> {
   const everyMs =
-    Math.max(Number(process.env.WEBSITE_REVERIFY_DAYS ?? 30), 1) *
-    24 *
+    Math.max(Number(process.env.WEBSITE_REVERIFY_SWEEP_HOURS ?? 24), 1) *
     60 *
     60 *
     1000
   const queue = new Queue(QUEUES.WEBSITE_VERIFICATION, { connection })
-  await queue
-    .removeRepeatable("website-reverify-sweep", { every: everyMs })
-    .catch(() => {})
+  const existing = await queue.getRepeatableJobs()
+  await Promise.all(
+    existing
+      .filter((job) => job.name === "website-reverify-sweep")
+      .map((job) => queue.removeRepeatableByKey(job.key)),
+  )
   await queue.add("website-reverify-sweep", signJobPayload({}, 0), {
     repeat: { every: everyMs },
     jobId: "website-reverify-sweep",
@@ -127,9 +130,30 @@ async function registerWebsiteReverifySweep(): Promise<RegisteredJob> {
   await queue.close()
   logger.info("registered website re-verify sweep", {
     intervalMs: everyMs,
-    intervalDays: everyMs / 86400000,
+    intervalHours: everyMs / 3600000,
   })
   return { name: "website-reverify-sweep", queue: QUEUES.WEBSITE_VERIFICATION }
+}
+
+async function registerDomainMetricsRefresh(): Promise<RegisteredJob> {
+  const everyMs = 30 * 24 * 60 * 60 * 1000
+  const queue = new Queue(QUEUES.DOMAIN_METRICS, { connection })
+  await queue
+    .removeRepeatable("domain-metrics-refresh", { every: everyMs })
+    .catch(() => {})
+  await queue.add(
+    "domain-metrics-refresh",
+    signJobPayload({ batchSize: 100 }, 0),
+    {
+      repeat: { every: everyMs },
+      jobId: "domain-metrics-refresh",
+      removeOnComplete: { count: 12 },
+      removeOnFail: { count: 12 },
+    },
+  )
+  await queue.close()
+  logger.info("registered domain metrics refresh", { intervalMs: everyMs })
+  return { name: "domain-metrics-refresh", queue: QUEUES.DOMAIN_METRICS }
 }
 
 // Settlement-hold link monitoring — re-check the live link for every order
@@ -391,6 +415,7 @@ const ON_DEMAND_WORKERS: WorkerFactory[] = [
   createVerificationWorker,
   createPayoutWorker, // drains pre-inbox rollout jobs only
   createPublisherTrustWorker,
+  createDomainMetricsWorker,
 ]
 
 async function createIntegrationWorkers(): Promise<
@@ -418,6 +443,7 @@ const ON_DEMAND_QUEUES = [
   QUEUES.PUBLISHER_TRUST,
   QUEUES.INTEGRATION_DISCOVERY,
   QUEUES.INTEGRATION_SYNC,
+  QUEUES.DOMAIN_METRICS,
 ] as const
 
 interface ScheduledTaskConfig {
@@ -452,6 +478,12 @@ function getScheduledTask(name: string): ScheduledTaskConfig | undefined {
       jobName: QUEUE_JOBS[QUEUES.WEBSITE_VERIFICATION].REVERIFY_SWEEP,
       data: {},
       createWorker: createWebsiteVerificationWorker,
+    },
+    "domain-metrics-refresh": {
+      queue: QUEUES.DOMAIN_METRICS,
+      jobName: "domain-metrics-refresh",
+      data: { batchSize: 100 },
+      createWorker: createDomainMetricsWorker,
     },
     "settlement-link-check": {
       queue: QUEUES.DELIVERY_VERIFICATION,
@@ -540,6 +572,10 @@ async function removeHybridRepeatables(): Promise<void> {
     {
       queue: QUEUES.WEBSITE_VERIFICATION,
       names: [QUEUE_JOBS[QUEUES.WEBSITE_VERIFICATION].REVERIFY_SWEEP],
+    },
+    {
+      queue: QUEUES.DOMAIN_METRICS,
+      names: ["domain-metrics-refresh"],
     },
     {
       queue: QUEUES.DELIVERY_VERIFICATION,
@@ -789,6 +825,7 @@ async function bootstrap() {
       createSettlementAutoApproveWorker(),
       createSettlementReleaseWorker(),
       createAutoAcceptWorker(),
+      createDomainMetricsWorker(),
     )
     workers.push(...(await createIntegrationWorkers()))
     logger.info("legacy-compatible worker fleet started", {
@@ -798,6 +835,7 @@ async function bootstrap() {
       registerPayoutStatusPoll(),
       registerReconciliationSweep(),
       registerWebsiteReverifySweep(),
+      registerDomainMetricsRefresh(),
       registerSettlementHoldLinkSweep(),
       registerSettlementAutoApproveSweep(),
       registerSettlementAutoReleaseSweep(),

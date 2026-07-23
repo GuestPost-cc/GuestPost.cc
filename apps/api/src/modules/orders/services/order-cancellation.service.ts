@@ -710,6 +710,12 @@ export class OrderCancellationService {
     staffUserId: string,
     body: ForceCancelOrderDto,
   ) {
+    const auditNote = body.note?.trim()
+    if (!auditNote || auditNote.length < 20) {
+      throw new BadRequestException(
+        "Emergency cancellation note must be at least 20 characters",
+      )
+    }
     if (body.confirmationOrderId !== orderId) {
       throw new BadRequestException(
         "confirmationOrderId must exactly match the order being cancelled",
@@ -731,7 +737,7 @@ export class OrderCancellationService {
           await this.refund.refundOrderInTransaction(
             tx,
             order,
-            `Emergency cancellation: ${this.reasonText(body.reasonCode, body.note)}`,
+            `Emergency cancellation: ${this.reasonText(body.reasonCode, auditNote)}`,
             staffUserId,
             `force-cancel:${orderId}:${body.idempotencyKey ?? order.version}`,
             finalResponsibility,
@@ -743,7 +749,7 @@ export class OrderCancellationService {
         order,
         staffUserId,
         body.reasonCode,
-        body.note,
+        auditNote,
         body.responsibility,
       )
     })

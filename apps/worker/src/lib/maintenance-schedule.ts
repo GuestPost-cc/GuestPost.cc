@@ -11,6 +11,7 @@ export const MAINTENANCE_TASK_NAMES = [
   "reconciliation",
   "settlement-link-check",
   "website-reverify",
+  "domain-metrics-refresh",
 ] as const
 
 export type MaintenanceTaskName = (typeof MAINTENANCE_TASK_NAMES)[number]
@@ -50,9 +51,9 @@ export function maintenanceTasksDueAt(now: Date): MaintenanceTaskName[] {
   if (minute === 20) tasks.push("review-reminders")
   if (minute === 30) tasks.push("reconciliation")
   if (minute === 0 && hour % 6 === 0) tasks.push("settlement-link-check")
-  if (minute === 0 && hour === 3 && day === 1) {
-    tasks.push("website-reverify")
-  }
+  if (minute === 0 && hour === 3) tasks.push("website-reverify")
+  if (minute === 0 && hour === 3 && day === 1)
+    tasks.push("domain-metrics-refresh")
 
   return tasks
 }

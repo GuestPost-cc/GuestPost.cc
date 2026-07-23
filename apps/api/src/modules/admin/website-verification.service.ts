@@ -1,5 +1,5 @@
 import { computeTrustScore, QUEUES, trustBand } from "@guestpost/shared"
-import { Injectable } from "@nestjs/common"
+import { BadRequestException, Injectable } from "@nestjs/common"
 import { PrismaService } from "../../common/prisma.service"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
@@ -14,6 +14,100 @@ export class WebsiteVerificationService {
     private readonly audit: AuditService,
     private readonly queue: QueueService,
   ) {}
+
+  // Break-glass ownership verification for Super Admin CSV onboarding. This
+  // deliberately records a distinct verification method and short expiry: it
+  // never fabricates DNS evidence, never auto-approves a listing, and can be
+  // replaced at any time by a successful publisher TXT verification.
+  async forceVerifyWebsites(
+    input: { websiteIds: string[]; reason: string; expiresInDays: number },
+    actor: { id: string; staffRole?: string | null },
+  ) {
+    if (actor.staffRole !== "SUPER_ADMIN") {
+      throw new BadRequestException("Super Admin access is required")
+    }
+
+    const websiteIds = [...new Set(input.websiteIds)]
+    const websites = await this.prisma.website.findMany({
+      where: {
+        id: { in: websiteIds },
+        ownershipType: "PUBLISHER",
+        publisherId: { not: null },
+        importBatchId: { not: null },
+        isActive: true,
+        NOT: {
+          verificationStatus: "VERIFIED",
+          verificationMethod: "DNS_TXT",
+        },
+      },
+      include: {
+        publisher: { select: { id: true, organizationId: true } },
+      },
+    })
+
+    // Fail the whole request rather than silently applying a partial override.
+    // The generic message also avoids confirming whether an out-of-scope ID
+    // exists.
+    if (websites.length !== websiteIds.length) {
+      throw new BadRequestException(
+        "One or more websites are unavailable for forced verification",
+      )
+    }
+
+    const now = new Date()
+    const expiresAt = new Date(
+      now.getTime() + input.expiresInDays * 24 * 60 * 60 * 1000,
+    )
+    const reason = input.reason.trim()
+
+    await this.prisma.$transaction(async (tx: any) => {
+      for (const website of websites) {
+        await tx.website.update({
+          where: { id: website.id },
+          data: {
+            verificationStatus: "VERIFIED",
+            verificationMethod: "SUPER_ADMIN_OVERRIDE",
+            verifiedAt: now,
+            lastVerificationCheckAt: now,
+            activeVerifiedToken: null,
+            verificationOverrideExpiresAt: expiresAt,
+            verificationOverrideReason: reason,
+            verifiedByUserId: actor.id,
+            verificationFailureReason: null,
+            consecutiveFailures: 0,
+            verificationVersion: { increment: 1 },
+          },
+        })
+        await this.audit.log(
+          {
+            action: "WEBSITE_DOMAIN_VERIFICATION_OVERRIDE",
+            entityType: "Website",
+            entityId: website.id,
+            metadata: {
+              domain: website.canonicalDomain ?? website.domain,
+              publisherId: website.publisherId,
+              reason,
+              expiresAt: expiresAt.toISOString(),
+              priorStatus: website.verificationStatus,
+              importBatchId: website.importBatchId,
+            },
+            userId: actor.id,
+            organizationId: website.publisher?.organizationId ?? null,
+          },
+          tx,
+        )
+      }
+    })
+
+    return {
+      verified: websites.length,
+      expiresAt,
+      websites: websites.map((website: any) => ({
+        id: website.id,
+        domain: website.canonicalDomain ?? website.domain,
+      })),
+    }
+  }
 
   // Recompute + persist a website's internal trust score from platform signals.
   async recomputeTrustScore(websiteId: string) {

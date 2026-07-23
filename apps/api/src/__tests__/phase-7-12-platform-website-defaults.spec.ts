@@ -32,10 +32,12 @@ describe("Phase 7.12 #24 — Platform website + auto-listing defaults", () => {
   const createPlatformWebsiteBlock = (() => {
     const startIdx = adminServiceSource.indexOf("async createPlatformWebsite(")
     expect(startIdx).toBeGreaterThan(-1)
-    // The function ends at the next `async ` at the same indentation, or
-    // the next `// ─` section comment, or EOF. Take the next 3000 chars
-    // as a safe upper bound — the function is ~80 lines.
-    return adminServiceSource.slice(startIdx, startIdx + 3500)
+    const endIdx = adminServiceSource.indexOf(
+      "\n  async updatePlatformWebsite(",
+      startIdx,
+    )
+    expect(endIdx).toBeGreaterThan(startIdx)
+    return adminServiceSource.slice(startIdx, endIdx)
   })()
 
   describe("platform website is created VERIFIED", () => {

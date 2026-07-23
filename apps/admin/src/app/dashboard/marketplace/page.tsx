@@ -1,5 +1,6 @@
 "use client"
 
+import type { AdminMarketplaceListingRow } from "@guestpost/api-client"
 import type { ListingStatus } from "@guestpost/database"
 import {
   Badge,
@@ -8,10 +9,6 @@ import {
   CardContent,
   CardHeader,
   CardTitle,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -36,1002 +33,629 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import {
-  CheckCircle,
-  MoreVertical,
+  Building2,
+  CircleAlert,
+  Eye,
+  FileClock,
+  MoreHorizontal,
   Search,
   ShieldCheck,
-  Star,
   Store,
-  ToggleLeft,
-  ToggleRight,
-  XCircle,
 } from "lucide-react"
+import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminEmptyState,
+  AdminFilterBar,
+  AdminMetricCard,
+  AdminNotice,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 
-// Listing-service row (Phase 2). Mirrors the API response; staff view shows
-// ALL availability values (not just AVAILABLE) so reviewers can spot paused
-// rows during moderation.
-interface ListingServiceRow {
-  id: string
-  serviceType: string
-  price: number
-  currency: string
-  turnaroundDays: number
-  revisionRounds: number
-  warrantyDays?: number | null
-  availability: string // backend returns string; restrict in UI via Select
-  version: number
+const SERVICE_TYPES = [
+  "GUEST_POST",
+  "NICHE_EDIT",
+  "EDITORIAL_LINK",
+  "OUTREACH_LINK",
+  "LOCAL_CITATION",
+  "FOUNDATION_LINK",
+  "BLOG_ARTICLE",
+  "SEO_CONTENT",
+] as const
+
+function formatMetric(value: number | undefined, compact = false) {
+  if (value == null) return "—"
+  return compact
+    ? Intl.NumberFormat("en", { notation: "compact" }).format(value)
+    : Intl.NumberFormat("en").format(value)
 }
 
-interface Listing {
-  id: string
-  title: string
-  slug: string
-  // Phase 7: type / price are LEGACY listing-level columns scheduled for
-  // drop. Prefer priceFrom + serviceTypes[] + services[].
-  type?: string
-  status: string
-  price?: number
-  priceFrom?: number | null
-  serviceTypes?: string[]
-  currency: string
-  domainRating?: number
-  traffic?: number
-  featured: boolean
-  verified: boolean
-  category?: { name: string }
-  organization?: { name: string }
-  publisher?: { name: string }
-  websiteVerificationStatus?: string | null
-  websiteVerifiedAt?: string | null
-  websiteDomain?: string | null
-  websiteUrl?: string | null
-  websiteManagedBy?: { id: string; name: string | null; email: string } | null
-  createdAt: string
-  ownerType?: "PUBLISHER" | "PLATFORM"
-  fulfillmentType?: "INTERNAL" | "PUBLISHER" | "HYBRID"
-  services?: ListingServiceRow[]
+function metricStatus(listing: AdminMarketplaceListingRow) {
+  const metrics = [
+    listing.domainMetrics?.ahrefs.domainRating,
+    listing.domainMetrics?.ahrefs.organicTraffic,
+    listing.domainMetrics?.moz.domainAuthority,
+    listing.domainMetrics?.openPageRank.pageRank,
+  ]
+  if (metrics.every((metric) => metric == null)) return "MISSING"
+  if (metrics.some((metric) => metric?.status === "STALE")) return "STALE"
+  if (metrics.some((metric) => metric == null)) return "PARTIAL"
+  return "CURRENT"
 }
 
-const verifyBadge: Record<string, string> = {
-  VERIFIED: "bg-green-100 text-green-800",
-  PENDING_VERIFICATION: "bg-yellow-100 text-yellow-800",
-  VERIFICATION_FAILED: "bg-red-100 text-red-800",
-  REVOKED: "bg-red-100 text-red-800",
+function sourceLabel(listing: AdminMarketplaceListingRow) {
+  return listing.ownerType === "PLATFORM"
+    ? "GuestPost.cc"
+    : listing.publisher?.name || "Publisher unavailable"
 }
-
-// Phase 7.9 #28 — ListingStatus colors come from the centralized table.
-// `verifyBadge` above maps the WebsiteVerificationStatus enum (a different
-// enum, not in scope for the Phase 7.9 sweep — kept inline for now).
 
 export default function AdminMarketplacePage() {
-  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
+  const { allowed, loading } = useRequireRole(
+    "SUPER_ADMIN",
+    "OPERATIONS",
+    "FINANCE",
+  )
   if (loading) return null
-  if (!allowed) return <ForbiddenPage requires="Operations or Super Admin" />
+  if (!allowed) return <ForbiddenPage requires="Staff marketplace access" />
   return <AdminMarketplacePageInner />
 }
 
 function AdminMarketplacePageInner() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
-  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
   const [ownerTypeFilter, setOwnerTypeFilter] = useState("all")
   const [page, setPage] = useState(1)
-  const canModerate =
-    user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
 
-  const {
-    data,
-    isLoading,
-    error: listingsError,
-  } = useQuery({
-    queryKey: [
-      "admin-marketplace-listings",
-      page,
-      statusFilter,
-      typeFilter,
-      ownerTypeFilter,
-      search,
-    ],
-    queryFn: async () => {
-      const params: any = { page, limit: 20 }
-      if (statusFilter !== "all") params.status = statusFilter
-      if (typeFilter !== "all") params.type = typeFilter
-      if (ownerTypeFilter !== "all") params.ownerType = ownerTypeFilter
-      if (search) params.search = search
-      const res = await api.admin.listMarketplaceListings(params)
-      return res
-    },
+  const canModerate = user?.staffRole !== "FINANCE"
+  const roleLabel =
+    user?.staffRole === "FINANCE"
+      ? "Financial inventory context"
+      : user?.staffRole === "OPERATIONS"
+        ? "Marketplace operations"
+        : "Marketplace oversight"
+
+  const filters = {
+    ...(statusFilter !== "all" && { status: statusFilter }),
+    ...(typeFilter !== "all" && { type: typeFilter }),
+    ...(ownerTypeFilter !== "all" && { ownerType: ownerTypeFilter }),
+    ...(search.trim() && { search: search.trim() }),
+    page,
+    limit: 20,
+  }
+
+  const listingsQ = useQuery({
+    queryKey: ["admin-marketplace-listings", filters],
+    queryFn: () => api.admin.listMarketplaceListings(filters),
   })
-
-  const { data: stats, error: statsError } = useQuery({
+  const statsQ = useQuery({
     queryKey: ["admin-marketplace-stats"],
-    queryFn: async () => {
-      const res = await api.admin.getMarketplaceStats()
-      return res
-    },
+    queryFn: () => api.admin.getMarketplaceStats(),
   })
 
-  const queryError = listingsError || statsError
-  const updateStatus = useMutation({
-    mutationFn: ({
-      id,
-      status,
-      force,
-    }: {
-      id: string
-      status: string
-      force?: boolean
-    }) => api.admin.updateListingStatus(id, status, force),
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+    queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
+  }
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.admin.updateListingStatus(id, status),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
       toast.success("Listing status updated")
+      invalidate()
     },
-    onError: (err: any) => {
-      // API blocks approval of listings whose website isn't VERIFIED.
-      const body = err?.response?.body || err?.body || err
-      const code = body?.code || body?.message?.code
-      if (
-        code === "WEBSITE_NOT_VERIFIED" ||
-        String(err?.message).includes("WEBSITE_NOT_VERIFIED")
-      ) {
-        toast.error(
-          "Domain not verified — publisher must verify ownership before this listing can be approved.",
-        )
-      } else {
-        toast.error(err?.message || "Failed to update status")
-      }
-    },
+    onError: (error: Error) => toast.error(error.message),
   })
 
-  const toggleFeatured = useMutation({
-    mutationFn: ({ id, featured }: { id: string; featured: boolean }) =>
-      api.admin.toggleListingFeatured(id, featured),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
-      toast.success("Featured status updated")
-    },
-    onError: () => toast.error("Failed to update featured status"),
-  })
+  const activeFilterCount = [
+    search.trim(),
+    statusFilter !== "all",
+    typeFilter !== "all",
+    ownerTypeFilter !== "all",
+  ].filter(Boolean).length
+  const listings = listingsQ.data?.listings ?? []
+  const pagination = listingsQ.data?.pagination
 
-  const toggleVerified = useMutation({
-    mutationFn: ({ id, verified }: { id: string; verified: boolean }) =>
-      api.admin.toggleListingVerified(id, verified),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
-      toast.success("Verified status updated")
-    },
-    onError: () => toast.error("Failed to update verified status"),
-  })
-
-  const deleteListing = useMutation({
-    mutationFn: (id: string) => api.admin.deleteListing(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
-      toast.success("Listing deleted")
-    },
-    onError: () => toast.error("Failed to delete listing"),
-  })
-
-  // ── Per-service management for the listing under review ────────────────
-  // Same UX as publisher Services dialog (apps/publisher/listings) but
-  // routed through admin endpoints. assertListingWriteAccess on the server
-  // skips the publisher-membership check for staff actors.
-  type AdminService = {
-    listingId: string
-    serviceId: string
-    data: {
-      version: number
-      price?: number
-      turnaroundDays?: number
-      availability?: "AVAILABLE" | "PAUSED" | "WAITLIST"
-    }
+  const resetFilters = () => {
+    setSearch("")
+    setStatusFilter("all")
+    setTypeFilter("all")
+    setOwnerTypeFilter("all")
+    setPage(1)
   }
-  const [servicesForListing, setServicesForListing] = useState<{
-    id: string
-    title: string
-    ownerType: "PUBLISHER" | "PLATFORM"
-    services: ListingServiceRow[]
-  } | null>(null)
-  const [newAdminService, setNewAdminService] = useState({
-    serviceType: "GUEST_POST",
-    price: "",
-    turnaroundDays: "7",
-    revisionRounds: "2",
-  })
-
-  // Services dialog reads directly from the listing row data (included in
-  // the listings response). No separate API query needed.
-  const dialogServices = servicesForListing?.services ?? []
-  const canEditDialogServices =
-    isSuperAdmin && servicesForListing?.ownerType === "PUBLISHER"
-
-  const addAdminServiceMut = useMutation({
-    mutationFn: (vars: {
-      listingId: string
-      data: {
-        serviceType: string
-        price: number
-        turnaroundDays: number
-        revisionRounds?: number
-      }
-    }) => api.admin.addPlatformListingService(vars.listingId, vars.data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
-      setNewAdminService({
-        serviceType: "GUEST_POST",
-        price: "",
-        turnaroundDays: "7",
-        revisionRounds: "2",
-      })
-      toast.success("Service added")
-    },
-    onError: (e: Error) => toast.error(e.message || "Failed to add service"),
-  })
-  const updateAdminServiceMut = useMutation({
-    mutationFn: (vars: AdminService) =>
-      api.admin.updatePlatformListingService(
-        vars.listingId,
-        vars.serviceId,
-        vars.data,
-      ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
-    },
-    onError: (e: Error) => toast.error(e.message || "Update failed"),
-  })
-  const pauseAdminServiceMut = useMutation({
-    mutationFn: (vars: { listingId: string; serviceId: string }) =>
-      api.admin.pausePlatformListingService(vars.listingId, vars.serviceId),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["admin-marketplace-listings"],
-      })
-      queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
-      toast.success("Service paused")
-    },
-    onError: (e: Error) => toast.error(e.message || "Pause failed"),
-  })
-
-  function formatPrice(price: number, currency: string = "USD") {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency,
-    }).format(price)
-  }
-
-  // Phase 7.9 #30 — early returns moved AFTER all hook calls (was before
-  // 9 hooks at line 168 pre-fix, which violates rules-of-hooks: on the
-  // queryError render the later hooks would be skipped, breaking React's
-  // hook-ordering invariant).
-  if (queryError) {
-    return (
-      <ErrorState
-        title="Failed to load marketplace"
-        description={
-          queryError instanceof Error
-            ? queryError.message
-            : "An unexpected error occurred"
-        }
-        onRetry={() => {
-          queryClient.invalidateQueries({
-            queryKey: ["admin-marketplace-listings"],
-          })
-          queryClient.invalidateQueries({
-            queryKey: ["admin-marketplace-stats"],
-          })
-        }}
-      />
-    )
-  }
-
-  const listings = data?.listings || []
-  const pagination = data?.pagination || { page: 1, totalPages: 0, total: 0 }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Marketplace Management
-          </h1>
-          <p className="text-muted-foreground">
-            Review and moderate publisher and platform-owned listings. Platform
-            inventory is edited from Platform Websites.
-          </p>
-        </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow={roleLabel}
+        title="Marketplace inventory"
+        description="Review listing readiness, publisher context, services, and source-aware domain metrics without leaving the workflow. Actions remain role-protected by the API."
+        icon={Store}
+        badges={
+          user?.staffRole === "FINANCE" ? (
+            <Badge variant="secondary">Read only</Badge>
+          ) : null
+        }
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard
+          label="Total listings"
+          value={statsQ.data?.totalListings ?? "—"}
+          description={`${statsQ.data?.platformListings ?? 0} platform · ${statsQ.data?.publisherListings ?? 0} publisher`}
+          icon={Store}
+        />
+        <AdminMetricCard
+          label="Live inventory"
+          value={statsQ.data?.activeListings ?? "—"}
+          description="Approved and customer-visible"
+          icon={ShieldCheck}
+          tone="success"
+        />
+        <AdminMetricCard
+          label="Needs attention"
+          value={statsQ.data?.needsAttention ?? "—"}
+          description={`${statsQ.data?.pendingListings ?? 0} in review · ${statsQ.data?.pausedListings ?? 0} paused`}
+          icon={CircleAlert}
+          tone="warning"
+        />
+        <AdminMetricCard
+          label="Draft preparation"
+          value={statsQ.data?.draftListings ?? "—"}
+          description="Missing readiness steps or not submitted"
+          icon={FileClock}
+          tone="info"
+        />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Listings
-            </CardTitle>
-            <Store className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats?.totalListings || 0}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Active</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats?.activeListings || 0}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Total Reviews</CardTitle>
-            <Star className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalReviews || 0}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Avg Rating</CardTitle>
-            <Star className="h-4 w-4 text-yellow-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {stats?.avgRating ? stats.avgRating.toFixed(1) : "N/A"}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {user?.staffRole === "FINANCE" ? (
+        <AdminNotice title="Finance view is contextual and read only">
+          Use listing price, ownership, publisher profile, and metric evidence
+          to investigate orders and settlements. Moderation and inventory
+          changes remain unavailable to Finance.
+        </AdminNotice>
+      ) : null}
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <AdminFilterBar
+        activeCount={activeFilterCount}
+        resultCount={pagination?.total}
+        resultLabel="listings"
+        onClear={resetFilters}
+      >
+        <div className="relative min-w-0 flex-1 lg:min-w-72">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search listings..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            onChange={(event) => {
+              setSearch(event.target.value)
+              setPage(1)
+            }}
+            placeholder="Search title or domain"
+            className="bg-background pl-9"
+            aria-label="Search marketplace listings"
           />
         </div>
-        <div className="flex gap-1">
-          <Button
-            variant={ownerTypeFilter === "all" ? "default" : "outline"}
-            size="sm"
-            onClick={() => {
-              setOwnerTypeFilter("all")
-              setPage(1)
-            }}
-          >
-            All
-          </Button>
-          <Button
-            variant={ownerTypeFilter === "PLATFORM" ? "default" : "outline"}
-            size="sm"
-            onClick={() => {
-              setOwnerTypeFilter("PLATFORM")
-              setPage(1)
-            }}
-          >
-            Platform
-          </Button>
-          <Button
-            variant={ownerTypeFilter === "PUBLISHER" ? "default" : "outline"}
-            size="sm"
-            onClick={() => {
-              setOwnerTypeFilter("PUBLISHER")
-              setPage(1)
-            }}
-          >
-            Publisher
-          </Button>
-        </div>
-        <div className="flex gap-2">
-          <Select
-            value={statusFilter}
-            onValueChange={(v) => {
-              setStatusFilter(v)
-              setPage(1)
-            }}
-          >
-            <SelectTrigger className="w-[150px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="APPROVED">Approved</SelectItem>
-              <SelectItem value="DRAFT">Draft</SelectItem>
-              <SelectItem value="PENDING_REVIEW">Pending Review</SelectItem>
-              <SelectItem value="PAUSED">Paused</SelectItem>
-              <SelectItem value="REJECTED">Rejected</SelectItem>
-              <SelectItem value="ARCHIVED">Archived</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select
-            value={typeFilter}
-            onValueChange={(v) => {
-              setTypeFilter(v)
-              setPage(1)
-            }}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="GUEST_POST">Guest Post</SelectItem>
-              <SelectItem value="NICHE_EDIT">Niche Edit</SelectItem>
-              <SelectItem value="EDITORIAL_LINK">Editorial Link</SelectItem>
-              <SelectItem value="OUTREACH_LINK">Outreach Link</SelectItem>
-              <SelectItem value="LOCAL_CITATION">Local Citation</SelectItem>
-              <SelectItem value="FOUNDATION_LINK">Foundation Link</SelectItem>
-              <SelectItem value="BLOG_ARTICLE">Blog Article</SelectItem>
-              <SelectItem value="SEO_CONTENT">SEO Content</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) => {
+            setStatusFilter(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-full bg-background sm:w-48">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {[
+              "DRAFT",
+              "PENDING_REVIEW",
+              "APPROVED",
+              "PAUSED",
+              "REJECTED",
+              "ARCHIVED",
+            ].map((status) => (
+              <SelectItem key={status} value={status}>
+                {status.replaceAll("_", " ")}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={ownerTypeFilter}
+          onValueChange={(value) => {
+            setOwnerTypeFilter(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-full bg-background sm:w-48">
+            <SelectValue placeholder="Owner" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All owners</SelectItem>
+            <SelectItem value="PUBLISHER">Publisher owned</SelectItem>
+            <SelectItem value="PLATFORM">Platform owned</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select
+          value={typeFilter}
+          onValueChange={(value) => {
+            setTypeFilter(value)
+            setPage(1)
+          }}
+        >
+          <SelectTrigger className="w-full bg-background sm:w-52">
+            <SelectValue placeholder="Service" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All services</SelectItem>
+            {SERVICE_TYPES.map((service) => (
+              <SelectItem key={service} value={service}>
+                {service.replaceAll("_", " ")}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </AdminFilterBar>
 
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[240px]">Listing</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead>Managed by</TableHead>
-              <TableHead>Domain</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>DR</TableHead>
-              <TableHead>Featured</TableHead>
-              <TableHead>Verified</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 10 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 12 }).map((_, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+      {listingsQ.isError || statsQ.isError ? (
+        <ErrorState
+          title="Marketplace data unavailable"
+          description={(listingsQ.error ?? statsQ.error)?.message}
+          onRetry={() => {
+            listingsQ.refetch()
+            statsQ.refetch()
+          }}
+        />
+      ) : (
+        <Card className="min-w-0 overflow-hidden">
+          <CardHeader className="border-b">
+            <CardTitle className="text-base">Listing work queue</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {listingsQ.isLoading ? (
+              <div className="space-y-3 p-5">
+                {Array.from({ length: 5 }, (_, index) => (
+                  <Skeleton key={index} className="h-20 w-full" />
+                ))}
+              </div>
             ) : listings.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={12}
-                  className="text-center py-8 text-muted-foreground"
-                >
-                  No listings found
-                </TableCell>
-              </TableRow>
+              <AdminEmptyState
+                title="No listings match this view"
+                description="Clear one or more filters to return to the full marketplace inventory."
+                action={
+                  activeFilterCount ? (
+                    <Button variant="outline" onClick={resetFilters}>
+                      Clear filters
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
-              listings.map((listing: Listing) => (
-                <TableRow key={listing.id}>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{listing.title}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {listing.slug}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {/* Phase 7: prefer the first AVAILABLE service. */}
-                    <Badge variant="outline">
-                      {(
-                        (listing as any).serviceTypes?.[0] ??
-                        listing.type ??
-                        ""
-                      ).replace(/_/g, " ")}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {(() => {
-                      const p = getListingStatusPresentation(
-                        listing.status as ListingStatus,
-                      )
-                      return (
-                        <StatusBadge variant={p.variant}>{p.label}</StatusBadge>
-                      )
-                    })()}
-                  </TableCell>
-                  <TableCell>
-                    {listing.ownerType === "PLATFORM" ? (
-                      <Badge
-                        variant="default"
-                        className="bg-blue-100 text-blue-800 hover:bg-blue-100"
-                      >
-                        Platform
-                      </Badge>
-                    ) : listing.ownerType === "PUBLISHER" ? (
-                      <Badge className="bg-purple-100 text-purple-800 hover:bg-purple-100">
-                        Publisher
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {listing.websiteManagedBy ? (
-                      <span className="text-sm">
-                        {listing.websiteManagedBy.name ||
-                          listing.websiteManagedBy.email}
-                      </span>
-                    ) : (
-                      <Badge variant="outline">Unassigned</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {listing.websiteVerificationStatus ? (
-                      <Badge
-                        className={
-                          verifyBadge[listing.websiteVerificationStatus] ||
-                          "bg-gray-100"
-                        }
-                        title={listing.websiteDomain ?? undefined}
-                      >
-                        {listing.websiteVerificationStatus
-                          .replace("_VERIFICATION", "")
-                          .replace("_", " ")}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        Platform
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {formatPrice(
-                      (listing as any).priceFrom ?? listing.price ?? 0,
-                      listing.currency,
-                    )}
-                  </TableCell>
-                  <TableCell>{listing.domainRating || "-"}</TableCell>
-                  <TableCell>
-                    {listing.featured ? (
-                      <ToggleRight className="h-5 w-5 text-primary" />
-                    ) : (
-                      <ToggleLeft
-                        className={`h-5 w-5 ${isSuperAdmin ? "text-muted-foreground cursor-pointer" : "text-muted-foreground"}`}
-                        onClick={() =>
-                          isSuperAdmin &&
-                          toggleFeatured.mutate({
-                            id: listing.id,
-                            featured: true,
-                          })
-                        }
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {listing.verified ? (
-                      <ShieldCheck className="h-5 w-5 text-green-500" />
-                    ) : (
-                      <XCircle className="h-5 w-5 text-muted-foreground" />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {format(new Date(listing.createdAt), "MMM d, yyyy")}
-                  </TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {isSuperAdmin && (
-                          <>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                toggleFeatured.mutate({
-                                  id: listing.id,
-                                  featured: !listing.featured,
-                                })
-                              }
-                            >
-                              {listing.featured
-                                ? "Remove Featured"
-                                : "Mark Featured"}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                toggleVerified.mutate({
-                                  id: listing.id,
-                                  verified: !listing.verified,
-                                })
-                              }
-                            >
-                              {listing.verified
-                                ? "Remove Verified"
-                                : "Mark Verified"}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        <DropdownMenuItem asChild>
-                          {/* In-app preview of the public page (staff cannot
-                              enter the customer portal) + moderation actions */}
-                          <a href={`/dashboard/marketplace/${listing.slug}`}>
-                            View Public Page
-                          </a>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() =>
-                            setServicesForListing({
-                              id: listing.id,
-                              title: listing.title,
-                              ownerType: listing.ownerType ?? "PUBLISHER",
-                              services: listing.services ?? [],
-                            })
+              <>
+                <div className="space-y-3 p-4 md:hidden">
+                  {listings.map((listing) => (
+                    <ListingCard
+                      key={listing.id}
+                      listing={listing}
+                      canModerate={canModerate}
+                      busy={statusMutation.isPending}
+                      onStatus={(status) =>
+                        statusMutation.mutate({ id: listing.id, status })
+                      }
+                    />
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Listing</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead>Services</TableHead>
+                        <TableHead>Domain metrics</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-12">
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {listings.map((listing) => (
+                        <ListingRow
+                          key={listing.id}
+                          listing={listing}
+                          canModerate={canModerate}
+                          busy={statusMutation.isPending}
+                          onStatus={(status) =>
+                            statusMutation.mutate({ id: listing.id, status })
                           }
-                        >
-                          {isSuperAdmin && listing.ownerType === "PUBLISHER"
-                            ? "Manage"
-                            : "View"}{" "}
-                          Services ({listing.services?.length ?? 0})
-                        </DropdownMenuItem>
-                        {canModerate && listing.status !== "ARCHIVED" && (
-                          <>
-                            {(() => {
-                              const blocked =
-                                !!listing.websiteVerificationStatus &&
-                                listing.websiteVerificationStatus !== "VERIFIED"
-                              if (blocked) {
-                                return (
-                                  <>
-                                    <DropdownMenuItem
-                                      disabled
-                                      className="text-muted-foreground"
-                                    >
-                                      Approve (domain not verified)
-                                    </DropdownMenuItem>
-                                    {isSuperAdmin && (
-                                      <DropdownMenuItem
-                                        className="text-amber-600"
-                                        onClick={() => {
-                                          if (
-                                            confirm(
-                                              "Emergency override: approve this listing even though the domain is NOT verified? This is audited.",
-                                            )
-                                          ) {
-                                            updateStatus.mutate({
-                                              id: listing.id,
-                                              status: "APPROVED",
-                                              force: true,
-                                            })
-                                          }
-                                        }}
-                                      >
-                                        Force approve (emergency)
-                                      </DropdownMenuItem>
-                                    )}
-                                  </>
-                                )
-                              }
-                              return (
-                                <DropdownMenuItem
-                                  onClick={() =>
-                                    updateStatus.mutate({
-                                      id: listing.id,
-                                      status: "APPROVED",
-                                    })
-                                  }
-                                >
-                                  Approve
-                                </DropdownMenuItem>
-                              )
-                            })()}
-                            <DropdownMenuItem
-                              onClick={() =>
-                                updateStatus.mutate({
-                                  id: listing.id,
-                                  status: "REJECTED",
-                                })
-                              }
-                            >
-                              Reject
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                updateStatus.mutate({
-                                  id: listing.id,
-                                  status: "PAUSED",
-                                })
-                              }
-                            >
-                              Pause / Suspend
-                            </DropdownMenuItem>
-                            {isSuperAdmin && (
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => deleteListing.mutate(listing.id)}
-                              >
-                                Archive listing
-                              </DropdownMenuItem>
-                            )}
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                        />
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
             )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2">
-          <Button
-            variant="outline"
-            disabled={page === 1}
-            onClick={() => setPage((p) => p - 1)}
-          >
-            Previous
-          </Button>
-          <span className="text-sm text-muted-foreground">
-            Page {pagination.page} of {pagination.totalPages}
-          </span>
-          <Button
-            variant="outline"
-            disabled={page === pagination.totalPages}
-            onClick={() => setPage((p) => p + 1)}
-          >
-            Next
-          </Button>
-        </div>
+          </CardContent>
+        </Card>
       )}
 
-      {/*
-        Admin Services dialog. Same shape as the publisher version but routes
-        through the staff-gated /admin/marketplace/listings/:id/services
-        endpoints. Pause is soft (PAUSED), preserving historical orders'
-        listingServiceId references.
-      */}
-      <Dialog
-        open={!!servicesForListing}
-        onOpenChange={(v) => {
-          if (!v) setServicesForListing(null)
-        }}
-      >
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Services on “{servicesForListing?.title}”</DialogTitle>
-          </DialogHeader>
+      {pagination && pagination.totalPages > 1 ? (
+        <div className="flex items-center justify-between gap-3">
           <p className="text-sm text-muted-foreground">
-            {canEditDialogServices
-              ? "Super Admin may correct publisher service pricing and availability here."
-              : servicesForListing?.ownerType === "PLATFORM"
-                ? "Platform services are read-only here and are managed from Platform Websites."
-                : "Operations can inspect publisher services for moderation but cannot edit them."}
+            Page {pagination.page} of {pagination.totalPages}
           </p>
-          <div className="space-y-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Service</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>TAT</TableHead>
-                  <TableHead>Availability</TableHead>
-                  <TableHead className="text-right"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {dialogServices.length === 0 &&
-                !addAdminServiceMut.isPending ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-muted-foreground py-6"
-                    >
-                      No services configured yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  dialogServices.map((s) => (
-                    <TableRow key={s.id}>
-                      <TableCell className="font-medium">
-                        {s.serviceType.replace(/_/g, " ")}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {formatPrice(Number(s.price), s.currency)}
-                      </TableCell>
-                      <TableCell>{s.turnaroundDays}d</TableCell>
-                      <TableCell>
-                        {canEditDialogServices ? (
-                          <Select
-                            value={s.availability}
-                            onValueChange={(v) =>
-                              updateAdminServiceMut.mutate({
-                                listingId: servicesForListing!.id,
-                                serviceId: s.id,
-                                data: {
-                                  version: s.version,
-                                  availability: v as
-                                    | "AVAILABLE"
-                                    | "PAUSED"
-                                    | "WAITLIST",
-                                },
-                              })
-                            }
-                          >
-                            <SelectTrigger className="h-8 w-[110px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="AVAILABLE">
-                                Available
-                              </SelectItem>
-                              <SelectItem value="PAUSED">Paused</SelectItem>
-                              <SelectItem value="WAITLIST">Waitlist</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <Badge variant="outline">
-                            {s.availability.replace(/_/g, " ")}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {canEditDialogServices && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                              pauseAdminServiceMut.mutate({
-                                listingId: servicesForListing!.id,
-                                serviceId: s.id,
-                              })
-                            }
-                            disabled={s.availability === "PAUSED"}
-                          >
-                            Pause
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-            {canEditDialogServices && (
-              <div className="border-t pt-4 space-y-3">
-                <div className="text-sm font-medium">Add a service</div>
-                <div className="grid grid-cols-4 gap-3">
-                  <Select
-                    value={newAdminService.serviceType}
-                    onValueChange={(v) =>
-                      setNewAdminService({ ...newAdminService, serviceType: v })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Service" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(
-                        [
-                          "GUEST_POST",
-                          "NICHE_EDIT",
-                          "EDITORIAL_LINK",
-                          "OUTREACH_LINK",
-                          "LOCAL_CITATION",
-                          "FOUNDATION_LINK",
-                          "BLOG_ARTICLE",
-                          "SEO_CONTENT",
-                        ] as const
-                      ).map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t.replace(/_/g, " ")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    type="number"
-                    min={1}
-                    step="0.01"
-                    placeholder="Price"
-                    value={newAdminService.price}
-                    onChange={(e) =>
-                      setNewAdminService({
-                        ...newAdminService,
-                        price: e.target.value,
-                      })
-                    }
-                  />
-                  <Input
-                    type="number"
-                    min={1}
-                    placeholder="TAT (days)"
-                    value={newAdminService.turnaroundDays}
-                    onChange={(e) =>
-                      setNewAdminService({
-                        ...newAdminService,
-                        turnaroundDays: e.target.value,
-                      })
-                    }
-                  />
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="Revisions"
-                    value={newAdminService.revisionRounds}
-                    onChange={(e) =>
-                      setNewAdminService({
-                        ...newAdminService,
-                        revisionRounds: e.target.value,
-                      })
-                    }
-                  />
-                </div>
-                <Button
-                  size="sm"
-                  disabled={
-                    !servicesForListing ||
-                    !newAdminService.price ||
-                    Number(newAdminService.price) <= 0 ||
-                    addAdminServiceMut.isPending
-                  }
-                  onClick={() =>
-                    servicesForListing &&
-                    addAdminServiceMut.mutate({
-                      listingId: servicesForListing.id,
-                      data: {
-                        serviceType: newAdminService.serviceType,
-                        price: Number(newAdminService.price),
-                        turnaroundDays:
-                          Number(newAdminService.turnaroundDays) || 7,
-                        revisionRounds:
-                          Number(newAdminService.revisionRounds) || 2,
-                      },
-                    })
-                  }
-                >
-                  {addAdminServiceMut.isPending ? "Adding..." : "Add service"}
-                </Button>
-              </div>
-            )}
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1 || listingsQ.isFetching}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= pagination.totalPages || listingsQ.isFetching}
+              onClick={() => setPage((current) => current + 1)}
+            >
+              Next
+            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      ) : null}
+    </AdminPage>
+  )
+}
+
+function ListingActions({
+  listing,
+  canModerate,
+  busy,
+  onStatus,
+}: {
+  listing: AdminMarketplaceListingRow
+  canModerate: boolean
+  busy: boolean
+  onStatus: (status: string) => void
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Actions for ${listing.title}`}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem asChild>
+          <Link href={`/dashboard/marketplace/${listing.slug}`}>
+            <Eye className="mr-2 h-4 w-4" /> View details
+          </Link>
+        </DropdownMenuItem>
+        {canModerate && listing.status === "PENDING_REVIEW" ? (
+          <>
+            <DropdownMenuItem
+              disabled={busy}
+              onClick={() => onStatus("APPROVED")}
+            >
+              Approve
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={busy}
+              onClick={() => onStatus("REJECTED")}
+            >
+              Reject
+            </DropdownMenuItem>
+          </>
+        ) : null}
+        {canModerate && listing.status === "APPROVED" ? (
+          <DropdownMenuItem disabled={busy} onClick={() => onStatus("PAUSED")}>
+            Pause listing
+          </DropdownMenuItem>
+        ) : null}
+        {canModerate && listing.status === "PAUSED" ? (
+          <DropdownMenuItem
+            disabled={busy}
+            onClick={() => onStatus("APPROVED")}
+          >
+            Restore listing
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function ListingRow({
+  listing,
+  canModerate,
+  busy,
+  onStatus,
+}: {
+  listing: AdminMarketplaceListingRow
+  canModerate: boolean
+  busy: boolean
+  onStatus: (status: string) => void
+}) {
+  const presentation = getListingStatusPresentation(
+    listing.status as ListingStatus,
+  )
+  const health = metricStatus(listing)
+  return (
+    <TableRow>
+      <TableCell className="max-w-72">
+        <Link
+          href={`/dashboard/marketplace/${listing.slug}`}
+          className="font-medium hover:text-primary hover:underline"
+        >
+          {listing.title}
+        </Link>
+        <p className="mt-1 truncate text-xs text-muted-foreground">
+          {listing.websiteDomain || listing.websiteUrl || "Domain unavailable"}
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Added {format(new Date(listing.createdAt), "PP")}
+        </p>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-start gap-2">
+          <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="text-sm font-medium">{sourceLabel(listing)}</p>
+            <p className="text-xs text-muted-foreground">
+              {listing.ownerType === "PLATFORM"
+                ? listing.websiteManagedBy?.name || "Shared Ops queue"
+                : listing.publisher?.tier || "Publisher"}
+            </p>
+          </div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <p className="text-sm font-medium">
+          {
+            listing.services.filter(
+              (service) => service.availability === "AVAILABLE",
+            ).length
+          }{" "}
+          available
+        </p>
+        <p className="text-xs text-muted-foreground">
+          {listing.priceFrom == null
+            ? "No active price"
+            : `From ${listing.currency} ${listing.priceFrom.toFixed(2)}`}
+        </p>
+      </TableCell>
+      <TableCell>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          <span>
+            DR {formatMetric(listing.domainMetrics?.ahrefs.domainRating?.value)}
+          </span>
+          <span>
+            DA {formatMetric(listing.domainMetrics?.moz.domainAuthority?.value)}
+          </span>
+          <span>
+            Traffic{" "}
+            {formatMetric(
+              listing.domainMetrics?.ahrefs.organicTraffic?.value,
+              true,
+            )}
+          </span>
+          <span>
+            OPR{" "}
+            {formatMetric(listing.domainMetrics?.openPageRank.pageRank?.value)}
+          </span>
+        </div>
+        <Badge
+          className="mt-2"
+          variant={
+            health === "CURRENT"
+              ? "success"
+              : health === "MISSING"
+                ? "destructive"
+                : "warning"
+          }
+        >
+          {health.toLowerCase()}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <StatusBadge variant={presentation.variant}>
+          {presentation.label}
+        </StatusBadge>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Domain{" "}
+          {listing.websiteVerificationStatus
+            ?.replaceAll("_", " ")
+            .toLowerCase() || "unknown"}
+        </p>
+      </TableCell>
+      <TableCell>
+        <ListingActions
+          listing={listing}
+          canModerate={canModerate}
+          busy={busy}
+          onStatus={onStatus}
+        />
+      </TableCell>
+    </TableRow>
+  )
+}
+
+function ListingCard(props: {
+  listing: AdminMarketplaceListingRow
+  canModerate: boolean
+  busy: boolean
+  onStatus: (status: string) => void
+}) {
+  const { listing } = props
+  const presentation = getListingStatusPresentation(
+    listing.status as ListingStatus,
+  )
+  return (
+    <div className="min-w-0 rounded-xl border p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link
+            href={`/dashboard/marketplace/${listing.slug}`}
+            className="font-semibold hover:text-primary"
+          >
+            {listing.title}
+          </Link>
+          <p className="mt-1 truncate text-xs text-muted-foreground">
+            {listing.websiteDomain || "Domain unavailable"}
+          </p>
+        </div>
+        <ListingActions {...props} />
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <StatusBadge variant={presentation.variant}>
+          {presentation.label}
+        </StatusBadge>
+        <Badge variant="outline">{sourceLabel(listing)}</Badge>
+        <Badge variant="secondary">{listing.services.length} services</Badge>
+      </div>
+      <div className="mt-4 grid grid-cols-4 gap-2 rounded-lg bg-muted/40 p-3 text-center">
+        <div>
+          <p className="text-[10px] text-muted-foreground">DR</p>
+          <p className="text-sm font-semibold">
+            {formatMetric(listing.domainMetrics?.ahrefs.domainRating?.value)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted-foreground">DA</p>
+          <p className="text-sm font-semibold">
+            {formatMetric(listing.domainMetrics?.moz.domainAuthority?.value)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted-foreground">Traffic</p>
+          <p className="text-sm font-semibold">
+            {formatMetric(
+              listing.domainMetrics?.ahrefs.organicTraffic?.value,
+              true,
+            )}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted-foreground">OPR</p>
+          <p className="text-sm font-semibold">
+            {formatMetric(listing.domainMetrics?.openPageRank.pageRank?.value)}
+          </p>
+        </div>
+      </div>
     </div>
   )
 }

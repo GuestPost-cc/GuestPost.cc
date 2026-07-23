@@ -135,7 +135,11 @@ export class QueueService {
     const payload = signJobPayload(dataWithRequestId)
     const job = await this.getQueue(queueName).add(jobName, payload, opts)
     this.logger.log(`Job queued: ${queueName}/${jobName} (job ${job.id})`)
-    if (queueName === QUEUES.REPORT || queueName === QUEUES.PUBLISHER_TRUST) {
+    if (
+      queueName === QUEUES.REPORT ||
+      queueName === QUEUES.PUBLISHER_TRUST ||
+      queueName === QUEUES.DOMAIN_METRICS
+    ) {
       // The Redis write above is the durable boundary. Wake-up is deliberately
       // best-effort; the Northflank catch-up job drains missed signals.
       void this.workerWakeup.wake(`${queueName}/${jobName}`)

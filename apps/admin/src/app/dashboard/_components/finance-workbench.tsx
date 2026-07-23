@@ -38,6 +38,7 @@ import {
   WalletCards,
 } from "lucide-react"
 import Link from "next/link"
+import { AdminPage, AdminPageHeader } from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 
 const actionLabels: Record<AdminFinanceWorkbenchActionType, string> = {
@@ -264,42 +265,35 @@ export function FinanceWorkbench() {
   const revenue = data?.revenue
 
   return (
-    <div className="space-y-7">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-            <Landmark className="h-4 w-4" />
-            Finance workbench
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Money operations
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
-            Protect publisher funds, respond to support, and move every
-            financial decision through its audited workflow.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {data?.generatedAt ? (
-            <span className="hidden text-xs text-muted-foreground md:inline">
-              Updated{" "}
-              {formatDistanceToNow(new Date(data.generatedAt), {
-                addSuffix: true,
-              })}
-            </span>
-          ) : null}
-          <Button
-            variant="outline"
-            onClick={() => workbench.refetch()}
-            disabled={workbench.isFetching}
-          >
-            <RefreshCw
-              className={`mr-2 h-4 w-4 ${workbench.isFetching ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
-        </div>
-      </div>
+    <AdminPage className="space-y-7">
+      <AdminPageHeader
+        eyebrow="Finance workbench"
+        title="Money operations"
+        description="Protect publisher funds, respond to support, and move every financial decision through its audited workflow."
+        icon={Landmark}
+        actions={
+          <>
+            {data?.generatedAt ? (
+              <span className="hidden text-xs text-muted-foreground md:inline">
+                Updated{" "}
+                {formatDistanceToNow(new Date(data.generatedAt), {
+                  addSuffix: true,
+                })}
+              </span>
+            ) : null}
+            <Button
+              variant="outline"
+              onClick={() => workbench.refetch()}
+              disabled={workbench.isFetching}
+            >
+              <RefreshCw
+                className={`mr-2 h-4 w-4 ${workbench.isFetching ? "animate-spin" : ""}`}
+              />
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
@@ -676,6 +670,6 @@ export function FinanceWorkbench() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AdminPage>
   )
 }

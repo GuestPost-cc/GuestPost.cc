@@ -7,6 +7,7 @@ import {
   Building,
   ClipboardCheck,
   ClipboardList,
+  FileUp,
   Globe2,
   HeadphonesIcon,
   Landmark,
@@ -108,6 +109,12 @@ const navGroups: NavGroup[] = [
         icon: Globe2,
         roles: ["SUPER_ADMIN", "OPERATIONS"],
       },
+      {
+        href: "/dashboard/websites/import",
+        label: "Publisher Import",
+        icon: FileUp,
+        roles: ["SUPER_ADMIN"],
+      },
     ],
   },
   {
@@ -175,6 +182,7 @@ const pageNames: Record<string, string> = {
   "/dashboard/verification": "Domain Verification",
   "/dashboard/marketplace": "Marketplace",
   "/dashboard/websites": "Platform Websites",
+  "/dashboard/websites/import": "Publisher Website Import",
   "/dashboard/users": "Users & Staff",
   "/dashboard/publishers": "Publishers",
   "/dashboard/organizations": "Organizations",
@@ -194,6 +202,42 @@ const workspaceBrandLabels: Record<StaffRole, string> = {
   SUPER_ADMIN: "Administration",
   OPERATIONS: "Operations",
   FINANCE: "Finance",
+}
+
+const roleThemes: Record<
+  StaffRole,
+  {
+    accent: string
+    activeNav: string
+    badge: string
+    dot: string
+    scope: string
+  }
+> = {
+  SUPER_ADMIN: {
+    accent: "bg-violet-600 text-white",
+    activeNav: "bg-violet-600 text-white shadow-sm hover:bg-violet-600",
+    badge:
+      "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-900 dark:bg-violet-950 dark:text-violet-300",
+    dot: "bg-violet-500",
+    scope: "Platform-wide governance",
+  },
+  OPERATIONS: {
+    accent: "bg-blue-600 text-white",
+    activeNav: "bg-blue-600 text-white shadow-sm hover:bg-blue-600",
+    badge:
+      "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300",
+    dot: "bg-blue-500",
+    scope: "Assigned and shared operations",
+  },
+  FINANCE: {
+    accent: "bg-emerald-600 text-white",
+    activeNav: "bg-emerald-600 text-white shadow-sm hover:bg-emerald-600",
+    badge:
+      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300",
+    dot: "bg-emerald-500",
+    scope: "Funds and financial review",
+  },
 }
 
 function pageName(pathname: string, role: StaffRole) {
@@ -270,9 +314,33 @@ export default function DashboardLayout({
       </div>
     )
   }
+  if (!user.staffRole) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/20 px-6">
+        <div className="max-w-md rounded-2xl border bg-background p-8 text-center shadow-sm">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+            <AlertTriangle className="h-6 w-6" />
+          </div>
+          <h1 className="mt-4 text-xl font-semibold">Staff role required</h1>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            This account has no active Admin workspace role. Access remains
+            closed until a Super Admin assigns one.
+          </p>
+          <button
+            type="button"
+            onClick={signOut}
+            className="mt-5 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-muted"
+          >
+            Sign out
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   const staff = user
   const role = staff.staffRole as StaffRole
+  const theme = roleThemes[role]
   const initial = (staff.name ?? staff.email).charAt(0).toUpperCase()
   const visibleItems = navGroups.flatMap((group) =>
     group.items.filter((item) => !item.roles || item.roles.includes(role)),
@@ -284,6 +352,7 @@ export default function DashboardLayout({
         (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`)),
     )
     .sort((left, right) => right.href.length - left.href.length)[0]
+  const CurrentPageIcon = bestNavMatch?.icon ?? LayoutDashboard
 
   function SidebarContents({ inDrawer = false }: { inDrawer?: boolean }) {
     return (
@@ -293,7 +362,12 @@ export default function DashboardLayout({
             href="/dashboard"
             className="flex items-center gap-2.5 text-lg font-bold tracking-tight"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <div
+              className={cn(
+                "flex h-9 w-9 items-center justify-center rounded-xl shadow-sm",
+                theme.accent,
+              )}
+            >
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
@@ -364,7 +438,7 @@ export default function DashboardLayout({
                         className={cn(
                           "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                           isActive
-                            ? "bg-foreground text-background shadow-sm"
+                            ? theme.activeNav
                             : "text-muted-foreground hover:bg-muted hover:text-foreground",
                         )}
                       >
@@ -430,20 +504,39 @@ export default function DashboardLayout({
             >
               <Menu className="h-5 w-5" />
             </button>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold">
-                {pageName(pathname, role)}
-              </p>
-              <p className="hidden text-xs text-muted-foreground sm:block">
-                {roleLabels[role] ?? "Staff"} workspace
-              </p>
+            <div className="flex min-w-0 flex-1 items-center gap-3">
+              <div
+                className={cn(
+                  "hidden h-9 w-9 shrink-0 items-center justify-center rounded-xl sm:flex",
+                  theme.badge,
+                )}
+              >
+                <CurrentPageIcon className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">
+                  {pageName(pathname, role)}
+                </p>
+                <p className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+                  <span className={cn("h-1.5 w-1.5 rounded-full", theme.dot)} />
+                  {theme.scope}
+                </p>
+              </div>
             </div>
+            <span
+              className={cn(
+                "hidden rounded-full border px-2.5 py-1 text-xs font-semibold md:inline-flex",
+                theme.badge,
+              )}
+            >
+              {roleLabels[role]}
+            </span>
             <Notifications />
           </div>
         </header>
 
-        <main className="min-h-[calc(100vh-4rem)]">
-          <div className="mx-auto w-full max-w-[1500px] p-4 sm:p-6 lg:p-8">
+        <main className="min-h-[calc(100vh-4rem)] min-w-0 overflow-x-clip bg-[radial-gradient(circle_at_top_right,hsl(var(--muted)/0.55),transparent_30rem)]">
+          <div className="mx-auto w-full min-w-0 max-w-[1520px] p-4 sm:p-6 lg:p-8 [&>*]:min-w-0">
             {children}
           </div>
         </main>

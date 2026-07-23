@@ -304,6 +304,12 @@ describe("WebsitesService hardening", () => {
           listingTitle: "Technology guest posts on Example",
           description:
             "Editorial technology coverage for founders and software buyers.",
+          manualMetrics: {
+            ahrefsOrganicTraffic: 1200,
+            ahrefsTrafficAsOf: new Date().toISOString().slice(0, 10),
+            mozDomainAuthority: 54,
+            mozDomainAuthorityAsOf: new Date().toISOString().slice(0, 10),
+          },
         } as any,
         { id: "u1" },
       ),
@@ -324,10 +330,16 @@ describe("WebsitesService hardening", () => {
       url: "https://example.com",
     })
     const listingCreate = jest.fn().mockResolvedValue({ id: "listing-1" })
+    const metricCreate = jest.fn().mockResolvedValue({})
     prisma.$transaction = jest.fn((callback) =>
       callback({
         website: { create: websiteCreate },
         marketplaceListing: { create: listingCreate },
+        websiteMetric: {
+          findUnique: jest.fn().mockResolvedValue(null),
+          create: metricCreate,
+        },
+        websiteMetricRevision: { create: jest.fn() },
       }),
     )
 
@@ -349,6 +361,12 @@ describe("WebsitesService hardening", () => {
         foreignLanguageAllowed: false,
         listingTitle: "Example technology placements",
         description: "A focused technology publication for software buyers.",
+        manualMetrics: {
+          ahrefsOrganicTraffic: 1200,
+          ahrefsTrafficAsOf: new Date().toISOString().slice(0, 10),
+          mozDomainAuthority: 54,
+          mozDomainAuthorityAsOf: new Date().toISOString().slice(0, 10),
+        },
         initialService: {
           serviceType: "GUEST_POST",
           price: 175,
@@ -370,6 +388,8 @@ describe("WebsitesService hardening", () => {
         data: expect.objectContaining({
           title: "Example technology placements",
           description: "A focused technology publication for software buyers.",
+          traffic: 1200,
+          domainAuthority: 54,
           categories: {
             create: [{ category: { connect: { id: "category-1" } } }],
           },
@@ -385,6 +405,14 @@ describe("WebsitesService hardening", () => {
           },
         }),
       }),
+    )
+    expect(metricCreate).toHaveBeenCalledTimes(2)
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "WEBSITE_MANUAL_METRICS_CREATED",
+        entityId: "website-1",
+      }),
+      expect.any(Object),
     )
   })
 

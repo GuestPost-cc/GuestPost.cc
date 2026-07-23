@@ -152,11 +152,15 @@ export function MarketplaceListingCard({
             </dd>
           </div>
           <div className="px-3">
-            <dt className="text-[11px] text-muted-foreground">GA4 sessions</dt>
+            <dt className="text-[11px] text-muted-foreground">
+              Ahrefs traffic
+            </dt>
             <dd className="mt-0.5 inline-flex items-center gap-1 font-semibold">
               <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
-              {listing.traffic != null
-                ? formatCompactNumber(listing.traffic)
+              {listing.domainMetrics?.ahrefs.organicTraffic?.value != null
+                ? formatCompactNumber(
+                    listing.domainMetrics.ahrefs.organicTraffic.value,
+                  )
                 : "—"}
             </dd>
           </div>

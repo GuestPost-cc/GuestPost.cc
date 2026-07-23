@@ -327,60 +327,154 @@ export default function ListingDetailPage() {
           <WebsiteAccessCard listing={listing} canViewUrls={canViewUrls} />
 
           <section
-            aria-labelledby="performance-heading"
+            aria-labelledby="domain-metrics-heading"
             className="rounded-3xl border bg-card p-6"
           >
             <div>
               <h2
-                id="performance-heading"
+                id="domain-metrics-heading"
                 className="text-xl font-semibold tracking-tight"
               >
-                Performance snapshot
+                Domain metrics
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Verified 30-day signals imported from linked Google data
-                sources.
+                Source-specific authority and organic traffic signals.
               </p>
             </div>
             <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Metric
-                label="GA4 sessions"
+                label="Ahrefs DR"
                 value={
-                  listing.traffic != null
-                    ? formatCompactNumber(listing.traffic)
+                  listing.domainMetrics?.ahrefs.domainRating?.value != null
+                    ? formatCompactNumber(
+                        listing.domainMetrics.ahrefs.domainRating.value,
+                      )
                     : "—"
                 }
-                note="Last 30 days"
+                note={
+                  listing.domainMetrics?.ahrefs.domainRating?.status ??
+                  "Unavailable"
+                }
               />
               <Metric
-                label="GSC clicks"
+                label="Ahrefs traffic"
                 value={
-                  listing.siteMetrics?.gsc?.clicks != null
-                    ? formatCompactNumber(listing.siteMetrics.gsc.clicks)
+                  listing.domainMetrics?.ahrefs.organicTraffic?.value != null
+                    ? formatCompactNumber(
+                        listing.domainMetrics.ahrefs.organicTraffic.value,
+                      )
                     : "—"
                 }
-                note="Last 30 days"
+                note={
+                  listing.domainMetrics?.ahrefs.organicTraffic?.status ??
+                  "Unavailable"
+                }
               />
               <Metric
-                label="GSC impressions"
+                label="Moz DA"
                 value={
-                  listing.siteMetrics?.gsc?.impressions != null
-                    ? formatCompactNumber(listing.siteMetrics.gsc.impressions)
+                  listing.domainMetrics?.moz.domainAuthority?.value != null
+                    ? formatCompactNumber(
+                        listing.domainMetrics.moz.domainAuthority.value,
+                      )
                     : "—"
                 }
-                note="Last 30 days"
+                note={
+                  listing.domainMetrics?.moz.domainAuthority?.status ??
+                  "Unavailable"
+                }
               />
               <Metric
-                label="GA4 pageviews"
+                label="Open PageRank"
                 value={
-                  listing.siteMetrics?.ga4?.pageviews != null
-                    ? formatCompactNumber(listing.siteMetrics.ga4.pageviews)
+                  listing.domainMetrics?.openPageRank.pageRank?.value != null
+                    ? String(listing.domainMetrics.openPageRank.pageRank.value)
                     : "—"
                 }
-                note="Last 30 days"
+                note={
+                  listing.domainMetrics?.openPageRank.pageRank?.status ??
+                  "Unavailable"
+                }
               />
             </dl>
+            <p className="mt-4 text-xs text-muted-foreground">
+              <a
+                href="https://ahrefs.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                Domain Rating by Ahrefs
+              </a>
+              {" · "}
+              <a
+                href="https://openpagerank.keywordseverywhere.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2"
+              >
+                Open PageRank
+              </a>
+            </p>
           </section>
+
+          {listing.siteMetrics && (
+            <section
+              aria-labelledby="performance-heading"
+              className="rounded-3xl border bg-card p-6"
+            >
+              <div>
+                <h2
+                  id="performance-heading"
+                  className="text-xl font-semibold tracking-tight"
+                >
+                  Connected Google performance
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  30-day signals shown only while the publisher has an active,
+                  successfully synced property connection.
+                </p>
+              </div>
+              <dl className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {listing.siteMetrics.ga4 && (
+                  <>
+                    <Metric
+                      label="GA4 sessions"
+                      value={formatCompactNumber(
+                        listing.siteMetrics.ga4.sessions,
+                      )}
+                      note="Last 30 days"
+                    />
+                    <Metric
+                      label="GA4 pageviews"
+                      value={formatCompactNumber(
+                        listing.siteMetrics.ga4.pageviews,
+                      )}
+                      note="Last 30 days"
+                    />
+                  </>
+                )}
+                {listing.siteMetrics.gsc && (
+                  <>
+                    <Metric
+                      label="GSC clicks"
+                      value={formatCompactNumber(
+                        listing.siteMetrics.gsc.clicks,
+                      )}
+                      note="Last 30 days"
+                    />
+                    <Metric
+                      label="GSC impressions"
+                      value={formatCompactNumber(
+                        listing.siteMetrics.gsc.impressions,
+                      )}
+                      note="Last 30 days"
+                    />
+                  </>
+                )}
+              </dl>
+            </section>
+          )}
 
           <section
             aria-labelledby="about-heading"

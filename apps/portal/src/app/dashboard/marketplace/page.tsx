@@ -217,7 +217,7 @@ export default function MarketplacePage() {
     if (filters.minTraffic) {
       active.push({
         key: "traffic",
-        label: `${Number(filters.minTraffic).toLocaleString()}+ traffic`,
+        label: `${Number(filters.minTraffic).toLocaleString()}+ Ahrefs traffic`,
         clear: () => updateFilter("minTraffic", ""),
       })
     }
@@ -666,7 +666,7 @@ function SortOptions() {
   return (
     <>
       <SelectItem value="recommended">Best match</SelectItem>
-      <SelectItem value="traffic">Highest GA4 traffic</SelectItem>
+      <SelectItem value="traffic">Highest Ahrefs traffic</SelectItem>
       <SelectItem value="price_asc">Lowest starting price</SelectItem>
       <SelectItem value="price_desc">Highest starting price</SelectItem>
       <SelectItem value="best_rated">Most reviewed</SelectItem>
@@ -790,7 +790,7 @@ function FilterPanel({
       </fieldset>
 
       <div className="space-y-3 px-1">
-        <Label htmlFor="minimum-traffic">Minimum monthly GA4 sessions</Label>
+        <Label htmlFor="minimum-traffic">Minimum Ahrefs organic traffic</Label>
         <Input
           id="minimum-traffic"
           type="number"

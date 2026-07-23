@@ -33,6 +33,12 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import {
+  AdminEmptyState,
+  AdminFilterBar,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 
@@ -105,28 +111,63 @@ export default function AdminSupportPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {isFinance
-              ? "Finance Support"
-              : isOperations
-                ? "Operations Support"
-                : "Support"}
-          </h1>
-          <p className="text-muted-foreground">
-            {isFinance
-              ? "Publisher-ticket replies and internal notes. Platform tickets are read-only except for internal notes."
-              : isOperations
-                ? "Support for platform listings and orders assigned to you. Unassigned platform tickets remain read-only until assigned."
-                : "Customer support ticket queue"}
-          </p>
-        </div>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow={
+          isFinance
+            ? "Finance-scoped inbox"
+            : isOperations
+              ? "Assigned operational inbox"
+              : "Platform support oversight"
+        }
+        title={
+          isFinance
+            ? "Finance Support"
+            : isOperations
+              ? "Operations Support"
+              : "Support"
+        }
+        description={
+          isFinance
+            ? "Reply to publisher tickets and coordinate internally. Platform tickets remain read-only except for internal notes."
+            : isOperations
+              ? "Work support for platform listings and orders assigned to you; unassigned tickets remain read-only until assigned."
+              : "Monitor and coordinate the customer, publisher, and platform support queues."
+        }
+        icon={HeadphonesIcon}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+        }
+      />
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative flex-1 min-w-[220px] max-w-md">
+      <AdminFilterBar
+        activeCount={
+          Number(Boolean(search)) +
+          Number(statusFilter !== "all") +
+          Number(channelFilter !== "all") +
+          Number(
+            assigneeFilter !== (isOperations && user?.id ? user.id : "all"),
+          )
+        }
+        resultCount={pagination.total}
+        resultLabel={pagination.total === 1 ? "ticket" : "tickets"}
+        onClear={() => {
+          setSearch("")
+          setStatusFilter("all")
+          setChannelFilter("all")
+          setAssigneeFilter(isOperations && user?.id ? user.id : "all")
+          setPage(1)
+        }}
+      >
+        <div className="relative min-w-0 flex-1 lg:max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Search tickets..."
@@ -145,7 +186,7 @@ export default function AdminSupportPage() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-full bg-background sm:w-44">
             <SelectValue placeholder="All status" />
           </SelectTrigger>
           <SelectContent>
@@ -166,7 +207,7 @@ export default function AdminSupportPage() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-full bg-background sm:w-44">
             <SelectValue placeholder="All channels" />
           </SelectTrigger>
           <SelectContent>
@@ -182,7 +223,7 @@ export default function AdminSupportPage() {
             setPage(1)
           }}
         >
-          <SelectTrigger className="w-44">
+          <SelectTrigger className="w-full bg-background sm:w-48">
             <SelectValue placeholder="All assignees" />
           </SelectTrigger>
           <SelectContent>
@@ -193,7 +234,7 @@ export default function AdminSupportPage() {
             )}
           </SelectContent>
         </Select>
-      </div>
+      </AdminFilterBar>
 
       <Card>
         <CardContent className="p-0">
@@ -204,15 +245,14 @@ export default function AdminSupportPage() {
               ))}
             </div>
           ) : tickets.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <HeadphonesIcon className="h-12 w-12 text-muted-foreground/50" />
-              <h3 className="mt-4 text-lg font-medium">No tickets found</h3>
-              <p className="text-sm text-muted-foreground">
-                {search
-                  ? "Try a different search"
-                  : "No support tickets match these filters"}
-              </p>
-            </div>
+            <AdminEmptyState
+              title="No tickets found"
+              description={
+                search
+                  ? "Try a different search or clear the active filters."
+                  : "No support tickets match this role and filter scope."
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -309,6 +349,6 @@ export default function AdminSupportPage() {
           </Button>
         </div>
       )}
-    </div>
+    </AdminPage>
   )
 }

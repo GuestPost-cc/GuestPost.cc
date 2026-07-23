@@ -10,6 +10,7 @@ import {
   ArrayUnique,
   IsArray,
   IsBoolean,
+  IsDefined,
   IsEnum,
   IsIn,
   IsInt,
@@ -20,7 +21,9 @@ import {
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from "class-validator"
+import { ManualWebsiteMetricsDto } from "../../websites/dto/websites.dto"
 
 export class CreatePlatformWebsiteDto {
   @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
@@ -95,6 +98,11 @@ export class CreatePlatformWebsiteDto {
 
   @IsBoolean()
   foreignLanguageAllowed!: boolean
+
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => ManualWebsiteMetricsDto)
+  manualMetrics!: ManualWebsiteMetricsDto
 
   // Super Admin may optionally choose an Operations owner. For Operations
   // callers the service ignores this value and always assigns the creator.

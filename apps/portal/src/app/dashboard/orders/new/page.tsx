@@ -359,11 +359,13 @@ function WebsiteSelection({
                       <span className="text-lg font-semibold">
                         {p.currency} {p.price.toLocaleString()}
                       </span>
-                      <Badge variant="secondary">DR {p.domainRating}</Badge>
+                      <Badge variant="secondary">
+                        Ahrefs DR {p.domainRating}
+                      </Badge>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       {p.traffic > 0 && (
-                        <span>{p.traffic.toLocaleString()} traffic</span>
+                        <span>{p.traffic.toLocaleString()} Ahrefs traffic</span>
                       )}
                       {p.turnaroundDays ? (
                         <span>· {p.turnaroundDays}d turnaround</span>

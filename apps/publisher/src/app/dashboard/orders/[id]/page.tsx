@@ -20,6 +20,7 @@ import {
   getOrderStatusPresentation,
   Input,
   Label,
+  OrderLifecycleProgress,
   Select,
   SelectContent,
   SelectItem,
@@ -119,80 +120,11 @@ const eventLabels: Record<string, string> = {
   PAYMENT_CAPTURED: "Payment captured",
 }
 
-const WORKFLOW_STEPS = [
-  { label: "Accept", statuses: ["SUBMITTED"] },
-  {
-    label: "Create",
-    statuses: [
-      "ACCEPTED",
-      "CONTENT_REQUESTED",
-      "CONTENT_CREATION",
-      "CONTENT_READY",
-    ],
-  },
-  { label: "Review", statuses: ["CUSTOMER_REVIEW", "APPROVED"] },
-  { label: "Publish", statuses: ["PUBLISHED", "VERIFIED"] },
-  { label: "Complete", statuses: ["DELIVERED", "SETTLED", "COMPLETED"] },
-]
-
-function getWorkflowStep(status: string): number {
-  const idx = WORKFLOW_STEPS.findIndex((s) => s.statuses.includes(status))
-  return idx === -1 ? 0 : idx
-}
-
 function OrderProgress({ status }: { status: string }) {
-  const terminalMap: Record<string, { text: string; cls: string }> = {
-    CANCELLED: { text: "Cancelled", cls: "bg-red-100 text-red-700" },
-    REFUNDED: { text: "Refunded", cls: "bg-red-100 text-red-700" },
-    DISPUTED: { text: "Disputed", cls: "bg-orange-100 text-orange-700" },
-  }
-
-  if (terminalMap[status]) {
-    const t = terminalMap[status]
-    return (
-      <Card>
-        <CardContent className={`flex items-center gap-2 py-3 ${t.cls}`}>
-          <AlertCircle className="h-5 w-5 shrink-0" />
-          <p className="text-sm font-medium">{t.text}</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  const current = getWorkflowStep(status)
-
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          {WORKFLOW_STEPS.map((step, i) => {
-            const done = i < current
-            const active = i === current
-            return (
-              <div
-                key={step.label}
-                className="flex flex-col items-center gap-2"
-              >
-                <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-medium ${
-                    done
-                      ? "bg-emerald-100 text-emerald-700"
-                      : active
-                        ? "bg-primary/10 text-primary ring-2 ring-primary/30"
-                        : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {done ? <Check className="h-4 w-4" /> : i + 1}
-                </div>
-                <span
-                  className={`text-xs ${active ? "font-medium text-foreground" : "text-muted-foreground"}`}
-                >
-                  {step.label}
-                </span>
-              </div>
-            )
-          })}
-        </div>
+        <OrderLifecycleProgress status={status} />
       </CardContent>
     </Card>
   )

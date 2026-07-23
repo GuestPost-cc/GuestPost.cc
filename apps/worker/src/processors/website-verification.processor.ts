@@ -21,8 +21,8 @@ const logger = createLogger("worker.website-verification")
 // real prisma client + node DNS lookup.
 //
 //  - "website-verify"          : single on-demand check enqueued by the API.
-//  - "website-reverify-sweep"  : 30-day repeatable sweep that REVOKES any
-//                                VERIFIED site whose TXT record disappeared.
+//  - "website-reverify-sweep"  : daily governance sweep; expires temporary
+//                                overrides and checks due DNS sites every 30d.
 
 interface VerifyJobData {
   websiteId: string

@@ -45,6 +45,12 @@ import {
 } from "lucide-react"
 import { Fragment, useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminEmptyState,
+  AdminFilterBar,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
 
@@ -211,6 +217,24 @@ function AuditLogsPageInner() {
         .includes(q)
     )
   })
+  const activeFilterCount = [
+    search,
+    actionFilter,
+    trimmedRequestId,
+    startDate,
+    endDate,
+    categoryFilter !== "all" ? categoryFilter : "",
+  ].filter(Boolean).length
+
+  const clearFilters = () => {
+    setSearch("")
+    setActionFilter("")
+    setCategoryFilter("all")
+    setRequestIdFilter("")
+    setStartDate("")
+    setEndDate("")
+    setPage(1)
+  }
 
   const toggle = (id: string) => {
     const next = new Set(expanded)
@@ -270,150 +294,129 @@ function AuditLogsPageInner() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <ScrollText className="h-7 w-7" /> Audit Logs
-          </h1>
-          <p className="text-muted-foreground">
-            Immutable record of every platform change — financial, security, and
-            operational.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => refetch()}
-            title="Refresh"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
-            />
-          </Button>
-          <Button
-            variant="outline"
-            onClick={exportCsv}
-            disabled={filteredLogs.length === 0}
-          >
-            <Download className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
-        </div>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Audit logs"
+        description="Investigate the immutable record of financial, security, and operational platform changes."
+        eyebrow="Governance"
+        icon={ScrollText}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => refetch()}
+              title="Refresh"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+              />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={exportCsv}
+              disabled={filteredLogs.length === 0}
+            >
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
+          </>
+        }
+      />
 
       {/* Filters */}
-      <Card>
-        <CardContent className="flex flex-col gap-3 p-4 lg:flex-row lg:items-end lg:flex-wrap">
-          <div className="relative flex-1 min-w-[200px]">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Search (this page)
-            </label>
-            <Search className="absolute left-3 top-[34px] h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="action, actor, id, IP, metadata..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <div className="w-full lg:w-44">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Action contains
-            </label>
-            <Input
-              placeholder="e.g. SETTLEMENT"
-              value={actionFilter}
-              onChange={(e) => {
-                setActionFilter(e.target.value)
-                setPage(1)
-              }}
-            />
-          </div>
-          <div className="w-full lg:w-56">
-            <label
-              className="mb-1 block text-xs font-medium text-muted-foreground"
-              title="Exact-match only — paste a full requestId"
-            >
-              Request ID (exact)
-            </label>
-            <Input
-              placeholder="paste from Sentry / logs"
-              value={requestIdFilter}
-              onChange={(e) => {
-                setRequestIdFilter(e.target.value)
-                setPage(1)
-              }}
-              className="font-mono text-xs"
-            />
-          </div>
-          <div className="w-full lg:w-44">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              Category
-            </label>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All categories</SelectItem>
-                {CATEGORIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-full lg:w-40">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              From
-            </label>
-            <Input
-              type="date"
-              value={startDate}
-              onChange={(e) => {
-                setStartDate(e.target.value)
-                setPage(1)
-              }}
-            />
-          </div>
-          <div className="w-full lg:w-40">
-            <label className="mb-1 block text-xs font-medium text-muted-foreground">
-              To
-            </label>
-            <Input
-              type="date"
-              value={endDate}
-              onChange={(e) => {
-                setEndDate(e.target.value)
-                setPage(1)
-              }}
-            />
-          </div>
-          {(actionFilter ||
-            requestIdFilter ||
-            startDate ||
-            endDate ||
-            categoryFilter !== "all" ||
-            search) && (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setSearch("")
-                setActionFilter("")
-                setCategoryFilter("all")
-                setRequestIdFilter("")
-                setStartDate("")
-                setEndDate("")
-                setPage(1)
-              }}
-            >
-              Clear
-            </Button>
-          )}
-        </CardContent>
-      </Card>
+      <AdminFilterBar
+        activeCount={activeFilterCount}
+        resultCount={filteredLogs.length}
+        resultLabel="events shown"
+        onClear={clearFilters}
+      >
+        <div className="relative flex-1 min-w-[200px]">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Search (this page)
+          </label>
+          <Search className="absolute left-3 top-[34px] h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="action, actor, id, IP, metadata..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <div className="w-full lg:w-44">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Action contains
+          </label>
+          <Input
+            placeholder="e.g. SETTLEMENT"
+            value={actionFilter}
+            onChange={(e) => {
+              setActionFilter(e.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+        <div className="w-full lg:w-56">
+          <label
+            className="mb-1 block text-xs font-medium text-muted-foreground"
+            title="Exact-match only — paste a full requestId"
+          >
+            Request ID (exact)
+          </label>
+          <Input
+            placeholder="paste from Sentry / logs"
+            value={requestIdFilter}
+            onChange={(e) => {
+              setRequestIdFilter(e.target.value)
+              setPage(1)
+            }}
+            className="font-mono text-xs"
+          />
+        </div>
+        <div className="w-full lg:w-44">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            Category
+          </label>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All categories</SelectItem>
+              {CATEGORIES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="w-full lg:w-40">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            From
+          </label>
+          <Input
+            type="date"
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+        <div className="w-full lg:w-40">
+          <label className="mb-1 block text-xs font-medium text-muted-foreground">
+            To
+          </label>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value)
+              setPage(1)
+            }}
+          />
+        </div>
+      </AdminFilterBar>
 
       <Card>
         <CardHeader className="pb-2">
@@ -433,13 +436,17 @@ function AuditLogsPageInner() {
               ))}
             </div>
           ) : filteredLogs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <ScrollText className="h-12 w-12 text-muted-foreground/40" />
-              <h3 className="mt-4 text-lg font-medium">No audit logs found</h3>
-              <p className="text-sm text-muted-foreground">
-                No activity matches these filters.
-              </p>
-            </div>
+            <AdminEmptyState
+              title="No audit logs found"
+              description="No activity matches the current forensic filters."
+              action={
+                activeFilterCount > 0 ? (
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -629,7 +636,7 @@ function AuditLogsPageInner() {
           </Button>
         </div>
       )}
-    </div>
+    </AdminPage>
   )
 }
 

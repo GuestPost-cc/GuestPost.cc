@@ -28,6 +28,11 @@ import {
   ShieldX,
 } from "lucide-react"
 import { Fragment, useState } from "react"
+import {
+  AdminEmptyState,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../../components/admin-workspace"
 import { api } from "../../../../lib/api"
 
 const vBadge: Record<string, { variant: any; Icon: any }> = {
@@ -128,16 +133,14 @@ export default function SettlementReviewPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Scale className="h-7 w-7" /> Settlement Review
-        </h1>
-        <p className="text-muted-foreground">
-          Verify delivery evidence before releasing settlement. Settlement is
-          gated on independent verification.
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow="Finance evidence gate"
+        title="Settlement review"
+        description="Inspect independent delivery evidence before funds advance through the settlement workflow."
+        icon={Scale}
+        badges={<Badge variant="warning">{total} awaiting review</Badge>}
+      />
 
       <Card>
         <CardHeader className="pb-2">
@@ -149,9 +152,10 @@ export default function SettlementReviewPage() {
           {isLoading ? (
             <Skeleton className="h-48 w-full" />
           ) : settlements.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              None awaiting review.
-            </p>
+            <AdminEmptyState
+              title="No settlements awaiting review"
+              description="New reviewable settlements will appear after the delivery and customer-approval gates are satisfied."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -241,6 +245,6 @@ export default function SettlementReviewPage() {
           </div>
         ) : null}
       </Card>
-    </div>
+    </AdminPage>
   )
 }

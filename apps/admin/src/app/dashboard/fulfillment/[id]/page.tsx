@@ -53,6 +53,10 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminPage,
+  AdminPageHeader,
+} from "../../../../components/admin-workspace"
 import { api } from "../../../../lib/api"
 import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
 
@@ -485,36 +489,30 @@ function FulfillmentOrderPageInner() {
   ].includes(order.status)
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Button variant="ghost" size="sm" asChild className="mb-3 px-0">
-          <Link href="/dashboard/fulfillment">
-            <ArrowLeft className="h-4 w-4" />
-            Back to fulfillment
-          </Link>
-        </Button>
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-2xl font-bold">
-                {order.title || order.type.replaceAll("_", " ")}
-              </h1>
-              <Badge variant="outline">
-                {order.status.replaceAll("_", " ")}
-              </Badge>
-              <Badge variant="secondary">Platform fulfilled</Badge>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
-              <span className="font-mono">{order.id}</span>
-              {dueDate && (
-                <span className={isPast(dueDate) ? "text-destructive" : ""}>
-                  {isPast(dueDate) ? "Overdue" : "Due"}{" "}
-                  {formatDistanceToNowStrict(dueDate)}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
+    <AdminPage>
+      <AdminPageHeader
+        title={order.title || order.type.replaceAll("_", " ")}
+        description={`${order.id}${
+          dueDate
+            ? ` · ${isPast(dueDate) ? "Overdue" : "Due"} ${formatDistanceToNowStrict(dueDate)}`
+            : ""
+        }`}
+        eyebrow="Fulfillment order"
+        icon={Upload}
+        badges={
+          <>
+            <Badge variant="outline">{order.status.replaceAll("_", " ")}</Badge>
+            <Badge variant="secondary">Platform fulfilled</Badge>
+          </>
+        }
+        actions={
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/fulfillment">
+                <ArrowLeft className="h-4 w-4" />
+                Fulfillment
+              </Link>
+            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -532,9 +530,9 @@ function FulfillmentOrderPageInner() {
                 Cancellation
               </Button>
             )}
-          </div>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <WorkflowSteps status={order.status} />
 
@@ -930,6 +928,6 @@ function FulfillmentOrderPageInner() {
         open={cancelOpen}
         onOpenChange={setCancelOpen}
       />
-    </div>
+    </AdminPage>
   )
 }

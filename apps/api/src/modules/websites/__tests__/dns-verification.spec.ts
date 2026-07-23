@@ -173,6 +173,77 @@ describe("runWebsiteVerify", () => {
     expect(prisma.website.updateMany).not.toHaveBeenCalled()
   })
 
+  it("replaces a temporary override with real DNS evidence", async () => {
+    prisma.website.findUnique.mockResolvedValue({
+      ...baseWebsite,
+      verificationStatus: "VERIFIED",
+      verificationMethod: "SUPER_ADMIN_OVERRIDE",
+      verificationOverrideExpiresAt: new Date("2026-08-01T00:00:00Z"),
+      verificationOverrideReason: "Publisher onboarding evidence reviewed",
+      verifiedByUserId: "admin1",
+    })
+    const res = await runWebsiteVerify(
+      {
+        prisma,
+        checkDns: jest.fn().mockResolvedValue({
+          found: true,
+          matchedHost: "example.com",
+          reason: null,
+        }),
+      },
+      "w1",
+    )
+
+    expect(res).toEqual({ ok: true, status: "VERIFIED" })
+    expect(prisma.website.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          verificationMethod: "DNS_TXT",
+          verificationOverrideExpiresAt: null,
+          verificationOverrideReason: null,
+          verifiedByUserId: null,
+        }),
+      }),
+    )
+  })
+
+  it("retains an unexpired override when voluntary TXT proof is not found", async () => {
+    prisma.website.findUnique.mockResolvedValue({
+      ...baseWebsite,
+      verificationStatus: "VERIFIED",
+      verificationMethod: "SUPER_ADMIN_OVERRIDE",
+      verificationOverrideExpiresAt: new Date("2026-08-01T00:00:00Z"),
+    })
+    const res = await runWebsiteVerify(
+      {
+        prisma,
+        now: () => new Date("2026-07-22T00:00:00Z"),
+        checkDns: jest.fn().mockResolvedValue({
+          found: false,
+          matchedHost: null,
+          reason: "No TXT record found",
+        }),
+      },
+      "w1",
+    )
+
+    expect(res).toMatchObject({ ok: false, status: "VERIFIED" })
+    expect(prisma.website.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.not.objectContaining({
+          verificationStatus: "VERIFICATION_FAILED",
+        }),
+      }),
+    )
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "WEBSITE_TXT_VERIFICATION_FAILED_OVERRIDE_RETAINED",
+        }),
+      }),
+    )
+  })
+
   it("skips on version conflict (a concurrent/replayed job already won)", async () => {
     prisma.website.updateMany.mockResolvedValue({ count: 0 })
     const checkDns = jest.fn().mockResolvedValue({
@@ -264,6 +335,38 @@ describe("runWebsiteReverifySweep", () => {
     expect(prisma.auditLog.create).not.toHaveBeenCalled()
   })
 
+  it("runs daily without rechecking DNS-backed sites before 30 days", async () => {
+    prisma.website.findMany.mockResolvedValue([])
+    await runWebsiteReverifySweep({
+      prisma,
+      checkDns: jest.fn(),
+      now: () => new Date("2026-07-31T00:00:00Z"),
+    })
+
+    expect(prisma.website.findMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        OR: expect.arrayContaining([
+          { verificationMethod: "SUPER_ADMIN_OVERRIDE" },
+          expect.objectContaining({
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                OR: expect.arrayContaining([
+                  { lastVerificationCheckAt: null },
+                  {
+                    lastVerificationCheckAt: {
+                      lte: new Date("2026-07-01T00:00:00Z"),
+                    },
+                  },
+                ]),
+              }),
+            ]),
+          }),
+        ]),
+      }),
+      select: { id: true },
+    })
+  })
+
   it("REVOKES + enforces + notifies on the 3rd consecutive miss", async () => {
     // 2 prior failures -> this miss is the 3rd, which revokes.
     prisma.website.findUnique.mockResolvedValue({
@@ -320,6 +423,58 @@ describe("runWebsiteReverifySweep", () => {
 
     expect(res).toMatchObject({ revoked: 0, refreshed: 0 })
     expect(prisma.website.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("does not query DNS while a temporary override is unexpired", async () => {
+    prisma.website.findUnique.mockResolvedValue({
+      ...verifiedSite,
+      verificationMethod: "SUPER_ADMIN_OVERRIDE",
+      verificationOverrideExpiresAt: new Date("2026-08-01T00:00:00Z"),
+    })
+    const checkDns = jest.fn()
+    const result = await runWebsiteReverifySweep({
+      prisma,
+      checkDns,
+      now: () => new Date("2026-07-22T00:00:00Z"),
+    })
+
+    expect(result).toMatchObject({ revoked: 0, refreshed: 0 })
+    expect(checkDns).not.toHaveBeenCalled()
+    expect(prisma.website.updateMany).not.toHaveBeenCalled()
+  })
+
+  it("revokes and hides listings when a temporary override expires", async () => {
+    prisma.website.findUnique.mockResolvedValue({
+      ...verifiedSite,
+      verificationMethod: "SUPER_ADMIN_OVERRIDE",
+      verificationOverrideExpiresAt: new Date("2026-07-21T00:00:00Z"),
+      verifiedByUserId: "admin1",
+    })
+    const checkDns = jest.fn()
+    const result = await runWebsiteReverifySweep({
+      prisma,
+      checkDns,
+      now: () => new Date("2026-07-22T00:00:00Z"),
+    })
+
+    expect(result).toMatchObject({ revoked: 1, refreshed: 0 })
+    expect(checkDns).not.toHaveBeenCalled()
+    expect(prisma.website.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          verificationMethod: "SUPER_ADMIN_OVERRIDE",
+        }),
+        data: expect.objectContaining({ verificationStatus: "REVOKED" }),
+      }),
+    )
+    expect(prisma.marketplaceListing.updateMany).toHaveBeenCalled()
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "WEBSITE_DOMAIN_VERIFICATION_OVERRIDE_EXPIRED",
+        }),
+      }),
+    )
   })
 })
 
@@ -430,6 +585,26 @@ describe("WebsitesService.requestVerification", () => {
     expect(queue.addJob).not.toHaveBeenCalled()
   })
 
+  it("allows real TXT verification to replace a temporary override", async () => {
+    prisma.website.findFirst.mockResolvedValue({
+      id: "w1",
+      domain: "example.com",
+      publisherId: "pub1",
+      verificationToken: "tok",
+      verificationStatus: "VERIFIED",
+      verificationMethod: "SUPER_ADMIN_OVERRIDE",
+    })
+    prisma.website.updateMany.mockResolvedValue({ count: 1 })
+
+    await expect(
+      service.requestVerification("pub1", "org1", "w1", user),
+    ).resolves.toMatchObject({
+      verificationStatus: "VERIFIED",
+      instructions: { value: "guestpost-verification=tok" },
+    })
+    expect(queue.addJob).toHaveBeenCalled()
+  })
+
   it("blocks cross-tenant: publisher not in caller's organization", async () => {
     prisma.publisher.findUnique.mockResolvedValue({
       id: "pub1",
@@ -492,6 +667,14 @@ describe("WebsitesService.submitForReview verification gate", () => {
         }),
         update: jest.fn().mockResolvedValue({ id: "l1" }),
       },
+      websiteMetric: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([
+            { key: "AHREFS_ORGANIC_TRAFFIC" },
+            { key: "MOZ_DOMAIN_AUTHORITY" },
+          ]),
+      },
     }
     audit = { log: jest.fn().mockResolvedValue(undefined) }
     queue = { addJob: jest.fn().mockResolvedValue({ id: "job1" }) }
@@ -523,6 +706,17 @@ describe("WebsitesService.submitForReview verification gate", () => {
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({ action: "WEBSITE_SUBMITTED_FOR_REVIEW" }),
     )
+  })
+
+  it("blocks submission when required manual metrics are missing", async () => {
+    prisma.websiteMetric.findMany.mockResolvedValue([
+      { key: "AHREFS_ORGANIC_TRAFFIC" },
+    ])
+
+    await expect(
+      service.submitForReview("pub1", "org1", "w1", user),
+    ).rejects.toMatchObject({ response: { code: "MANUAL_METRICS_REQUIRED" } })
+    expect(prisma.marketplaceListing.update).not.toHaveBeenCalled()
   })
 })
 

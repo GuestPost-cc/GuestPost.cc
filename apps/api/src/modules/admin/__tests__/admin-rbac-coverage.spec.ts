@@ -292,10 +292,18 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
     expect(roles).toEqual(["OPERATIONS", "SUPER_ADMIN"])
   })
 
-  it("inventory reads are available to Operations but not Finance", () => {
+  it("website management reads are available to Operations but not Finance", () => {
+    for (const method of ["listWebsites", "getWebsite"]) {
+      const handler = (AdminController.prototype as any)[method]
+      const roles = (
+        (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
+      ).sort()
+      expect([method, roles]).toEqual([method, ["OPERATIONS", "SUPER_ADMIN"]])
+    }
+  })
+
+  it("marketplace context is read-only visible to every staff role", () => {
     for (const method of [
-      "listWebsites",
-      "getWebsite",
       "listMarketplaceListings",
       "getMarketplaceStats",
       "getListingForStaff",
@@ -304,7 +312,10 @@ describe("AdminController — Phase 6.7 RBAC coverage", () => {
       const roles = (
         (Reflect.getMetadata(STAFF_ROLES_KEY, handler) as string[]) ?? []
       ).sort()
-      expect([method, roles]).toEqual([method, ["OPERATIONS", "SUPER_ADMIN"]])
+      expect([method, roles]).toEqual([
+        method,
+        ["FINANCE", "OPERATIONS", "SUPER_ADMIN"],
+      ])
     }
   })
 

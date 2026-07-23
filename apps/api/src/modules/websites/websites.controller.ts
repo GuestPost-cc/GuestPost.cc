@@ -15,14 +15,22 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { MemberRoles } from "../../common/decorators/member-roles.decorator"
 import { ActorTypeGuard } from "../../common/guards/actor-type.guard"
 import { MemberRolesGuard } from "../../common/guards/member-roles.guard"
-import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
+import {
+  CreateWebsiteDto,
+  UpdateManualWebsiteMetricsDto,
+  UpdateWebsiteDto,
+} from "./dto/websites.dto"
+import { WebsiteMetricsService } from "./website-metrics.service"
 import { WebsitesService } from "./websites.service"
 
 @Controller("publishers/:publisherId/websites")
 @UseGuards(ActorTypeGuard, MemberRolesGuard)
 @ActorType("PUBLISHER")
 export class WebsitesController {
-  constructor(private readonly websitesService: WebsitesService) {}
+  constructor(
+    private readonly websitesService: WebsitesService,
+    private readonly websiteMetrics: WebsiteMetricsService,
+  ) {}
 
   private resolvePublisherId(publisherIdParam: string, user: any): string {
     if (!user.publisherId) {
@@ -79,6 +87,24 @@ export class WebsitesController {
     return this.websitesService.createWebsite(
       resolvedPublisherId,
       user.publisherOrganizationId,
+      body,
+      user,
+    )
+  }
+
+  @MemberRoles("PUBLISHER_OWNER")
+  @Put(":id/metrics/manual")
+  async updateManualMetrics(
+    @Param("publisherId") publisherId: string,
+    @Param("id") id: string,
+    @Body() body: UpdateManualWebsiteMetricsDto,
+    @CurrentUser() user: any,
+  ) {
+    const resolvedPublisherId = this.resolvePublisherId(publisherId, user)
+    return this.websiteMetrics.updatePublisherManualMetrics(
+      resolvedPublisherId,
+      user.publisherOrganizationId,
+      id,
       body,
       user,
     )

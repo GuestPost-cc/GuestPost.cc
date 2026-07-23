@@ -31,6 +31,7 @@ import {
   CircleDollarSign,
   ClipboardList,
   Clock3,
+  type LucideIcon,
   RefreshCw,
   Search,
   UserPlus,
@@ -39,6 +40,12 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMemo, useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminFilterBar,
+  AdminMetricCard,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
@@ -194,7 +201,7 @@ function FulfillmentPageInner() {
   const summaryCards: Array<{
     label: string
     value: string | number
-    Icon: React.ElementType
+    Icon: LucideIcon
   }> = [
     {
       label: user?.staffRole === "OPERATIONS" ? "My active" : "Active",
@@ -223,51 +230,46 @@ function FulfillmentPageInner() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-3xl font-bold">
-            <ClipboardList className="h-7 w-7" />
-            {title}
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Assigned platform orders and new work available to claim.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Live queue
-          </span>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow="Live fulfillment queue"
+        title={title}
+        description="Assigned platform orders and new work available to claim, prioritized by lifecycle urgency."
+        icon={ClipboardList}
+        actions={
           <Button
             variant="outline"
-            size="icon"
+            size="sm"
             onClick={() => query.refetch()}
             disabled={query.isFetching}
-            title="Refresh fulfillment queue"
           >
             <RefreshCw
               className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
             />
+            <span className="ml-2">Refresh</span>
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
         {summaryCards.map(({ label, value, Icon }) => (
-          <Card key={label}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-muted-foreground">{label}</span>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-              </div>
-              {query.isLoading ? (
-                <Skeleton className="mt-2 h-7 w-16" />
-              ) : (
-                <div className="mt-1 text-xl font-semibold">{value}</div>
-              )}
-            </CardContent>
-          </Card>
+          <AdminMetricCard
+            key={label}
+            label={label}
+            value={query.isLoading ? <Skeleton className="h-7 w-16" /> : value}
+            icon={Icon}
+            tone={
+              label === "Overdue"
+                ? Number(value) > 0
+                  ? "danger"
+                  : "success"
+                : label === "Available"
+                  ? "info"
+                  : label === "Claimed" || label === "Completed"
+                    ? "success"
+                    : "neutral"
+            }
+          />
         ))}
       </div>
 
@@ -303,15 +305,22 @@ function FulfillmentPageInner() {
         </TabsList>
       </Tabs>
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Search order, title, or website"
-          className="pl-9"
-        />
-      </div>
+      <AdminFilterBar
+        activeCount={Number(Boolean(search))}
+        resultCount={items.length}
+        resultLabel={items.length === 1 ? "order" : "orders"}
+        onClear={() => setSearch("")}
+      >
+        <div className="relative min-w-0 flex-1 lg:max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search order, title, or website"
+            className="bg-background pl-9"
+          />
+        </div>
+      </AdminFilterBar>
 
       <Card>
         <CardContent className="p-0">
@@ -397,6 +406,6 @@ function FulfillmentPageInner() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminPage>
   )
 }

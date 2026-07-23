@@ -1,143 +1,153 @@
 "use client"
 
+import type {
+  AdminMarketplaceListingDetail,
+  PublicDomainMetricValue,
+} from "@guestpost/api-client"
+import type { ListingStatus } from "@guestpost/database"
 import {
   Badge,
   Button,
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
+  getListingStatusPresentation,
   Input,
+  Label,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
   Skeleton,
+  StatusBadge,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { format } from "date-fns"
 import {
   AlertCircle,
   ArrowLeft,
+  BarChart3,
+  Building2,
+  CalendarClock,
   ExternalLink,
-  Globe,
+  Globe2,
   RefreshCw,
   ShieldCheck,
   Star,
-  TrendingUp,
+  Store,
+  UserRound,
 } from "lucide-react"
 import Link from "next/link"
-/**
- * Staff preview of a marketplace listing's public page, with moderation
- * actions inline. Staff cannot enter the customer portal (CUSTOMER-only
- * session gate), so the public view is rendered here from the same public
- * API the portal uses — what staff see is what customers see.
- *
- * Action visibility mirrors the backend guards: Operations moderates status;
- * inventory flags and service edits are Super Admin-only.
- */
 import { use, useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminNotice,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../../components/admin-workspace"
 import { api } from "../../../../lib/api"
-import { useAuth } from "../../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
 
 const PORTAL_URL = process.env.NEXT_PUBLIC_PORTAL_URL ?? "http://localhost:3001"
+const SERVICE_TYPES = [
+  "GUEST_POST",
+  "NICHE_EDIT",
+  "EDITORIAL_LINK",
+  "OUTREACH_LINK",
+  "LOCAL_CITATION",
+  "FOUNDATION_LINK",
+  "BLOG_ARTICLE",
+  "SEO_CONTENT",
+] as const
 
-const STATUS_VARIANTS: Record<
-  string,
-  "default" | "secondary" | "destructive" | "outline"
-> = {
-  APPROVED: "default",
-  PENDING_REVIEW: "secondary",
-  DRAFT: "outline",
-  REJECTED: "destructive",
-  PAUSED: "secondary",
-  ARCHIVED: "outline",
+function formatMetric(value?: number, compact = false) {
+  if (value == null) return "—"
+  return compact
+    ? Intl.NumberFormat("en", { notation: "compact" }).format(value)
+    : Intl.NumberFormat("en").format(value)
 }
 
-export default function AdminListingPreviewPage({
+function sourceName(source: string) {
+  const labels: Record<string, string> = {
+    AHREFS_FREE_API: "Ahrefs free API",
+    AHREFS_PAID_API: "Ahrefs paid API",
+    OPEN_PAGE_RANK_API: "OpenPageRank API",
+    MOZ_PAID_API: "Moz paid API",
+    PUBLISHER_MANUAL: "Publisher supplied",
+    STAFF_MANUAL: "Staff supplied",
+    ADMIN_IMPORT: "Admin CSV import",
+  }
+  return labels[source] ?? source.replaceAll("_", " ").toLowerCase()
+}
+
+function MetricCard({
+  label,
+  metric,
+  compact,
+}: {
+  label: string
+  metric?: PublicDomainMetricValue
+  compact?: boolean
+}) {
+  return (
+    <div className="min-w-0 rounded-xl border bg-card p-4">
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <Badge
+          variant={
+            !metric
+              ? "destructive"
+              : metric.status === "CURRENT"
+                ? "success"
+                : "warning"
+          }
+        >
+          {metric?.status.toLowerCase() ?? "missing"}
+        </Badge>
+      </div>
+      <p className="mt-2 text-2xl font-bold tabular-nums">
+        {formatMetric(metric?.value, compact)}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {metric
+          ? `${sourceName(metric.source)} · measured ${format(new Date(metric.measuredAt), "PP")}`
+          : "No trusted value has been collected"}
+      </p>
+    </div>
+  )
+}
+
+function YesNo({ value }: { value: boolean | null | undefined }) {
+  return value == null ? "Not reviewed" : value ? "Yes" : "No"
+}
+
+export default function AdminListingDetailPage({
   params,
 }: {
   params: Promise<{ slug: string }>
 }) {
-  const { allowed, loading } = useRequireRole("SUPER_ADMIN", "OPERATIONS")
+  const { allowed, loading } = useRequireRole(
+    "SUPER_ADMIN",
+    "OPERATIONS",
+    "FINANCE",
+  )
   if (loading) return null
-  if (!allowed) return <ForbiddenPage requires="Operations or Super Admin" />
-  return <AdminListingPreviewPageInner params={params} />
+  if (!allowed) return <ForbiddenPage requires="Staff marketplace access" />
+  return <AdminListingDetailPageInner params={params} />
 }
 
-function AdminListingPreviewPageInner({
+function AdminListingDetailPageInner({
   params,
 }: {
   params: Promise<{ slug: string }>
 }) {
   const { slug } = use(params)
-  const { user } = useAuth()
   const queryClient = useQueryClient()
-
-  // Moderation is SUPER_ADMIN/OPERATIONS on the backend.
-  const canModerate =
-    user?.staffRole === "SUPER_ADMIN" || user?.staffRole === "OPERATIONS"
-  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
-
-  const {
-    data: listing,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
-    // Staff endpoint returns the listing in ANY status (pending/draft/etc) —
-    // the public getListing 404s anything not APPROVED for non-owners.
-    queryKey: ["admin", "listing-preview", slug],
-    queryFn: () => api.admin.getListingBySlug(slug),
-  })
-
-  const invalidate = () => {
-    queryClient.invalidateQueries({
-      queryKey: ["admin", "listing-preview", slug],
-    })
-    queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
-    queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
-    queryClient.invalidateQueries({ queryKey: ["admin", "marketplace"] })
-  }
-
-  const statusMutation = useMutation({
-    mutationFn: (vars: { status: string; force?: boolean }) =>
-      api.admin.updateListingStatus(listing?.id, vars.status, vars.force),
-    onSuccess: () => {
-      toast.success("Listing status updated")
-      invalidate()
-    },
-    onError: (e: Error) => toast.error(e.message || "Failed to update status"),
-  })
-  const featuredMutation = useMutation({
-    mutationFn: (featured: boolean) =>
-      api.admin.toggleListingFeatured(listing?.id, featured),
-    onSuccess: () => {
-      toast.success("Featured flag updated")
-      invalidate()
-    },
-    onError: (e: Error) =>
-      toast.error(e.message || "Failed to update featured"),
-  })
-  const verifiedMutation = useMutation({
-    mutationFn: (verified: boolean) =>
-      api.admin.toggleListingVerified(listing?.id, verified),
-    onSuccess: () => {
-      toast.success("Verified flag updated")
-      invalidate()
-    },
-    onError: (e: Error) =>
-      toast.error(e.message || "Failed to update verified"),
-  })
-  const busy =
-    statusMutation.isPending ||
-    featuredMutation.isPending ||
-    verifiedMutation.isPending
-
-  // ── Service management ──
-  const [showServices, setShowServices] = useState(false)
   const [newService, setNewService] = useState({
     serviceType: "GUEST_POST",
     price: "",
@@ -145,257 +155,289 @@ function AdminListingPreviewPageInner({
     revisionRounds: "2",
   })
 
-  const addServiceMut = useMutation({
-    mutationFn: (data: {
-      serviceType: string
-      price: number
-      turnaroundDays: number
-      revisionRounds?: number
-    }) => api.admin.addPlatformListingService(listing?.id, data),
+  const listingQ = useQuery<AdminMarketplaceListingDetail>({
+    queryKey: ["admin", "listing-preview", slug],
+    queryFn: () => api.admin.getListingBySlug(slug),
+  })
+  const listing = listingQ.data
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({
+      queryKey: ["admin", "listing-preview", slug],
+    })
+    queryClient.invalidateQueries({ queryKey: ["admin-marketplace-listings"] })
+    queryClient.invalidateQueries({ queryKey: ["admin-marketplace-stats"] })
+  }
+  const statusMutation = useMutation({
+    mutationFn: (status: string) =>
+      api.admin.updateListingStatus(listing!.id, status),
+    onSuccess: () => {
+      toast.success("Listing status updated")
+      invalidate()
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
+  const featuredMutation = useMutation({
+    mutationFn: (featured: boolean) =>
+      api.admin.toggleListingFeatured(listing!.id, featured),
+    onSuccess: () => {
+      toast.success("Featured flag updated")
+      invalidate()
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
+  const verifiedMutation = useMutation({
+    mutationFn: (verified: boolean) =>
+      api.admin.toggleListingVerified(listing!.id, verified),
+    onSuccess: () => {
+      toast.success("Verified flag updated")
+      invalidate()
+    },
+    onError: (error: Error) => toast.error(error.message),
+  })
+  const addServiceMutation = useMutation({
+    mutationFn: () =>
+      api.admin.addPlatformListingService(listing!.id, {
+        serviceType: newService.serviceType,
+        price: Number(newService.price),
+        turnaroundDays: Number(newService.turnaroundDays),
+        revisionRounds: Number(newService.revisionRounds),
+      }),
     onSuccess: () => {
       toast.success("Service added")
-      invalidate()
       setNewService({
         serviceType: "GUEST_POST",
         price: "",
         turnaroundDays: "7",
         revisionRounds: "2",
       })
+      invalidate()
     },
-    onError: (e: Error) => toast.error(e.message || "Failed to add service"),
+    onError: (error: Error) => toast.error(error.message),
   })
-
-  const pauseServiceMut = useMutation({
+  const pauseServiceMutation = useMutation({
     mutationFn: (serviceId: string) =>
-      api.admin.pausePlatformListingService(listing?.id, serviceId),
+      api.admin.pausePlatformListingService(listing!.id, serviceId),
     onSuccess: () => {
       toast.success("Service paused")
       invalidate()
     },
-    onError: (e: Error) => toast.error(e.message || "Failed to pause service"),
+    onError: (error: Error) => toast.error(error.message),
   })
 
-  if (isLoading) {
+  if (listingQ.isLoading) {
     return (
-      <div className="space-y-4">
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-32 w-full" />
+      <div className="space-y-5">
+        <Skeleton className="h-16 w-full" />
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }, (_, index) => (
+            <Skeleton key={index} className="h-28 w-full" />
+          ))}
+        </div>
+        <Skeleton className="h-80 w-full" />
       </div>
     )
   }
 
-  if (error || !listing) {
+  if (listingQ.isError || !listing) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center">
-        <AlertCircle className="h-12 w-12 text-destructive mb-4" />
-        <h2 className="text-xl font-semibold mb-2">Listing not found</h2>
-        <p className="text-muted-foreground mb-4">
-          {(error as Error)?.message ?? "It may have been archived."}
-        </p>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/marketplace">Back to Marketplace</Link>
-          </Button>
-          <Button onClick={() => refetch()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Retry
-          </Button>
-        </div>
-      </div>
+      <AdminPage>
+        <AdminPageHeader
+          eyebrow="Role-protected listing context"
+          title="Listing unavailable"
+          description="The listing may not exist or could not be loaded safely."
+          icon={AlertCircle}
+        />
+        <Card>
+          <AdminEmptyState
+            title="No listing context available"
+            description="Return to the marketplace inventory or retry this request."
+            action={
+              <div className="flex gap-2">
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard/marketplace">Back to marketplace</Link>
+                </Button>
+                <Button onClick={() => listingQ.refetch()}>Retry</Button>
+              </div>
+            }
+          />
+        </Card>
+      </AdminPage>
     )
   }
+
+  const statusPresentation = getListingStatusPresentation(
+    listing.status as ListingStatus,
+  )
+  const busy =
+    statusMutation.isPending ||
+    featuredMutation.isPending ||
+    verifiedMutation.isPending
+  const publisherLabel =
+    listing.ownerType === "PLATFORM"
+      ? "GuestPost.cc"
+      : listing.publisher?.name || "Publisher unavailable"
+  const availableServices = listing.services.filter(
+    (service) => service.availability === "AVAILABLE",
+  )
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/dashboard/marketplace">
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Back to Marketplace
-          </Link>
-        </Button>
-        <a
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-          href={`${PORTAL_URL}/dashboard/marketplace/${listing.slug}`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Open on customer portal <ExternalLink className="h-3.5 w-3.5" />
-        </a>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow={
+          listing.access.role === "FINANCE"
+            ? "Financial listing context"
+            : "Marketplace listing review"
+        }
+        title={listing.title}
+        description={`${listing.website?.domain || listing.websiteUrl || "Domain unavailable"} · ${publisherLabel}`}
+        icon={Store}
+        badges={
+          <>
+            <StatusBadge variant={statusPresentation.variant}>
+              {statusPresentation.label}
+            </StatusBadge>
+            <Badge variant="outline">
+              {listing.ownerType.toLowerCase()} owned
+            </Badge>
+          </>
+        }
+        actions={
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/marketplace">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Marketplace
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => listingQ.refetch()}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+            {listing.status === "APPROVED" ? (
+              <Button variant="outline" size="sm" asChild>
+                <a
+                  href={`${PORTAL_URL}/dashboard/marketplace/${listing.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Customer view <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                </a>
+              </Button>
+            ) : null}
+          </>
+        }
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard
+          label="Starting price"
+          value={
+            listing.priceFrom == null
+              ? "—"
+              : `${listing.currency} ${Number(listing.priceFrom).toFixed(2)}`
+          }
+          description={`${availableServices.length} available service${availableServices.length === 1 ? "" : "s"}`}
+          icon={Store}
+          tone="success"
+        />
+        <AdminMetricCard
+          label="Publisher / owner"
+          value={publisherLabel}
+          description={
+            listing.publisher?.tier ||
+            listing.website?.managedBy?.name ||
+            "Platform inventory"
+          }
+          icon={UserRound}
+        />
+        <AdminMetricCard
+          label="Domain verification"
+          value={
+            listing.website?.verificationStatus.replaceAll("_", " ") ||
+            "Unknown"
+          }
+          description={
+            listing.website?.verifiedAt
+              ? `Verified ${format(new Date(listing.website.verifiedAt), "PP")}`
+              : "No verification date"
+          }
+          icon={ShieldCheck}
+          tone={
+            listing.website?.verificationStatus === "VERIFIED"
+              ? "success"
+              : "warning"
+          }
+        />
+        <AdminMetricCard
+          label="Last updated"
+          value={format(new Date(listing.updatedAt), "PP")}
+          description={`Created ${format(new Date(listing.createdAt), "PP")}`}
+          icon={CalendarClock}
+          tone="info"
+        />
       </div>
 
-      {/* ── Public-page preview (same data customers see) ── */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={STATUS_VARIANTS[listing.status] ?? "secondary"}>
-              {listing.status.replace(/_/g, " ")}
-            </Badge>
-            {/* Phase 7: prefer the first AVAILABLE service. */}
-            <Badge variant="outline">
-              {(
-                (listing as any).serviceTypes?.[0] ??
-                listing.type ??
-                ""
-              ).replace(/_/g, " ")}
-            </Badge>
-            {listing.fulfillmentType === "INTERNAL" ? (
-              <Badge>Platform fulfilled</Badge>
-            ) : listing.fulfillmentType === "HYBRID" ? (
-              <Badge variant="secondary">Hybrid fulfillment</Badge>
-            ) : (
-              <Badge variant="secondary">Publisher fulfilled</Badge>
-            )}
-            {listing.verified && (
-              <span className="inline-flex items-center gap-1 text-xs text-green-600">
-                <ShieldCheck className="h-3.5 w-3.5" /> Verified
-              </span>
-            )}
-            {listing.featured && (
-              <span className="inline-flex items-center gap-1 text-xs text-primary">
-                <Star className="h-3.5 w-3.5" /> Featured
-              </span>
-            )}
-            {listing.websiteVerificationStatus && (
-              <Badge
-                variant={
-                  listing.websiteVerificationStatus === "VERIFIED"
-                    ? "default"
-                    : listing.websiteVerificationStatus ===
-                        "PENDING_VERIFICATION"
-                      ? "secondary"
-                      : "destructive"
-                }
-              >
-                Domain: {listing.websiteVerificationStatus.replace(/_/g, " ")}
-              </Badge>
-            )}
-          </div>
-          <CardTitle className="text-2xl">{listing.title}</CardTitle>
-          {listing.category && (
-            <p className="text-sm text-primary">{listing.category.name}</p>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="whitespace-pre-wrap text-sm text-muted-foreground">
-            {listing.description}
-          </p>
-          <div className="flex flex-wrap items-center gap-6 text-sm">
-            {/* Phase 7: priceFrom + first AVAILABLE service price > legacy. */}
-            <span className="text-2xl font-bold">
-              $
-              {Number((listing as any).priceFrom ?? listing.price ?? 0).toFixed(
-                2,
-              )}
-            </span>
-            {typeof listing.domainRating === "number" && (
-              <span className="inline-flex items-center gap-1 text-muted-foreground">
-                <TrendingUp className="h-4 w-4" /> DR {listing.domainRating}
-              </span>
-            )}
-            {typeof listing.traffic === "number" && listing.traffic > 0 && (
-              <span className="text-muted-foreground">
-                {Intl.NumberFormat("en", { notation: "compact" }).format(
-                  listing.traffic,
-                )}{" "}
-                visits/mo
-              </span>
-            )}
-            {listing.websiteUrl && (
-              <span className="inline-flex items-center gap-1 text-muted-foreground">
-                <Globe className="h-4 w-4" /> {listing.websiteUrl}
-              </span>
-            )}
-            {(() => {
-              // Phase 7: surface the first AVAILABLE service's TAT in the
-              // header summary; fall back to the legacy listing column.
-              const td =
-                (listing as any).services?.find(
-                  (s: any) => s.availability === "AVAILABLE",
-                )?.turnaroundDays ?? listing.turnaroundDays
-              return td ? (
-                <span className="text-muted-foreground">{td}d turnaround</span>
-              ) : null
-            })()}
-          </div>
-          {listing.tags?.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {listing.tags.map((t: any) => (
-                <span
-                  key={t.id}
-                  className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"
-                >
-                  {t.name}
-                </span>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* ── Moderation (mirrors backend SUPER_ADMIN/OPERATIONS guards) ── */}
-      {canModerate && (
+      {listing.access.role === "FINANCE" ? (
+        <AdminNotice title="Read-only financial context">
+          Listing price, ownership, services, publisher profile, and metric
+          provenance are visible for order and settlement investigation.
+          Moderation and inventory actions are intentionally hidden.
+        </AdminNotice>
+      ) : (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Moderation</CardTitle>
+            <CardTitle className="text-base">Moderation actions</CardTitle>
+            <CardDescription>
+              Normal approval always enforces domain ownership and listing
+              readiness gates.
+            </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            {listing.status !== "APPROVED" && (
-              <Button
-                size="sm"
-                disabled={busy}
-                onClick={() =>
-                  statusMutation.mutate({
-                    status: "APPROVED",
-                    force: user?.staffRole === "SUPER_ADMIN",
-                  })
-                }
-              >
-                Approve
-              </Button>
-            )}
-            {listing.status === "PENDING_REVIEW" && (
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={busy}
-                onClick={() => statusMutation.mutate({ status: "REJECTED" })}
-              >
-                Reject
-              </Button>
-            )}
-            {listing.status === "APPROVED" && (
+            {listing.status === "PENDING_REVIEW" ? (
+              <>
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => statusMutation.mutate("APPROVED")}
+                >
+                  Approve
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={busy}
+                  onClick={() => statusMutation.mutate("REJECTED")}
+                >
+                  Reject
+                </Button>
+              </>
+            ) : null}
+            {listing.status === "APPROVED" ? (
               <Button
                 size="sm"
                 variant="outline"
                 disabled={busy}
-                onClick={() => statusMutation.mutate({ status: "PAUSED" })}
+                onClick={() => statusMutation.mutate("PAUSED")}
               >
                 Pause
               </Button>
-            )}
-            {listing.status === "PAUSED" && (
+            ) : null}
+            {listing.status === "PAUSED" ? (
               <Button
                 size="sm"
                 variant="outline"
                 disabled={busy}
-                onClick={() => statusMutation.mutate({ status: "APPROVED" })}
+                onClick={() => statusMutation.mutate("APPROVED")}
               >
-                Unpause
+                Restore
               </Button>
-            )}
-            {isSuperAdmin && listing.status !== "ARCHIVED" && (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={busy}
-                onClick={() => statusMutation.mutate({ status: "ARCHIVED" })}
-              >
-                Archive
-              </Button>
-            )}
-            {isSuperAdmin && (
+            ) : null}
+            {listing.access.canManageGlobalFlags ? (
               <>
                 <Button
                   size="sm"
@@ -403,7 +445,8 @@ function AdminListingPreviewPageInner({
                   disabled={busy}
                   onClick={() => featuredMutation.mutate(!listing.featured)}
                 >
-                  {listing.featured ? "Remove Featured" : "Mark Featured"}
+                  <Star className="mr-2 h-4 w-4" />
+                  {listing.featured ? "Remove featured" : "Mark featured"}
                 </Button>
                 <Button
                   size="sm"
@@ -411,156 +454,399 @@ function AdminListingPreviewPageInner({
                   disabled={busy}
                   onClick={() => verifiedMutation.mutate(!listing.verified)}
                 >
-                  {listing.verified ? "Remove Verified" : "Mark Verified"}
+                  <ShieldCheck className="mr-2 h-4 w-4" />
+                  {listing.verified ? "Remove verified" : "Mark verified"}
                 </Button>
               </>
-            )}
+            ) : null}
           </CardContent>
         </Card>
       )}
 
-      {/* ── Services ── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            Services
-            <Badge variant="outline">
-              {((listing as any).services ?? []).length}
-            </Badge>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <BarChart3 className="h-4 w-4" />
+            Domain metrics
           </CardTitle>
+          <CardDescription>
+            Publisher and platform inventory share the same provenance,
+            freshness, and API collection model.
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {!(listing as any).services ||
-          (listing as any).services.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">
-              No services configured.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {(listing as any).services.map((s: any) => (
-                <div
-                  key={s.id}
-                  className="flex items-center justify-between rounded-lg border p-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium">
-                      {s.serviceType.replace(/_/g, " ")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      ${Number(s.price).toFixed(2)} · {s.turnaroundDays} days ·{" "}
-                      {s.revisionRounds} revisions
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={
-                        s.availability === "AVAILABLE"
-                          ? "default"
-                          : s.availability === "PAUSED"
-                            ? "secondary"
-                            : "outline"
-                      }
-                    >
-                      {s.availability.toLowerCase()}
-                    </Badge>
-                    {isSuperAdmin &&
-                      listing.ownerType === "PUBLISHER" &&
-                      s.availability !== "PAUSED" && (
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Ahrefs Domain Rating"
+              metric={listing.domainMetrics?.ahrefs.domainRating}
+            />
+            <MetricCard
+              label="Ahrefs organic traffic"
+              metric={listing.domainMetrics?.ahrefs.organicTraffic}
+              compact
+            />
+            <MetricCard
+              label="Moz Domain Authority"
+              metric={listing.domainMetrics?.moz.domainAuthority}
+            />
+            <MetricCard
+              label="OpenPageRank"
+              metric={listing.domainMetrics?.openPageRank.pageRank}
+            />
+          </div>
+          {listing.domainMetrics?.openPageRank.globalRank ||
+          listing.domainMetrics?.openPageRank.referringDomains ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <Badge variant="outline">
+                Global rank{" "}
+                {formatMetric(
+                  listing.domainMetrics.openPageRank.globalRank?.value,
+                )}
+              </Badge>
+              <Badge variant="outline">
+                Referring domains{" "}
+                {formatMetric(
+                  listing.domainMetrics.openPageRank.referringDomains?.value,
+                  true,
+                )}
+              </Badge>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-3">
+        <div className="space-y-6 xl:col-span-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Listing overview</CardTitle>
+              <CardDescription>
+                Customer-facing description and marketplace taxonomy
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                {listing.description}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {listing.categories.map((category) => (
+                  <Badge key={category.id} variant="secondary">
+                    {category.name}
+                  </Badge>
+                ))}
+                {listing.tags.map((tag) => (
+                  <Badge key={tag.id} variant="outline">
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+              <div className="grid gap-4 border-t pt-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Detail label="Country" value={listing.country || "Not set"} />
+                <Detail
+                  label="Language"
+                  value={listing.language || "Not set"}
+                />
+                <Detail
+                  label="Backlinks"
+                  value={listing.backlinkCount?.toString() || "Not reviewed"}
+                />
+                <Detail
+                  label="Link type"
+                  value={
+                    listing.linkType?.replaceAll("_", " ") || "Not reviewed"
+                  }
+                />
+                <Detail
+                  label="Link validity"
+                  value={
+                    listing.linkValidity?.replaceAll("_", " ") || "Not reviewed"
+                  }
+                />
+                <Detail
+                  label="Google News"
+                  value={YesNo({ value: listing.googleNews })}
+                />
+                <Detail
+                  label="Sports / gaming"
+                  value={YesNo({ value: listing.sportsGamingAllowed })}
+                />
+                <Detail
+                  label="Pharmacy"
+                  value={YesNo({ value: listing.pharmacyAllowed })}
+                />
+                <Detail
+                  label="Crypto"
+                  value={YesNo({ value: listing.cryptoAllowed })}
+                />
+                <Detail
+                  label="Marked sponsored"
+                  value={YesNo({ value: listing.markedSponsored })}
+                />
+                <Detail
+                  label="Foreign language"
+                  value={YesNo({ value: listing.foreignLanguageAllowed })}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Services</CardTitle>
+              <CardDescription>
+                Every service retains its own price, turnaround, revision, and
+                availability state.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {listing.services.length === 0 ? (
+                <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  No services configured.
+                </p>
+              ) : (
+                listing.services.map((service) => (
+                  <div
+                    key={service.id}
+                    className="flex flex-col justify-between gap-3 rounded-xl border p-4 sm:flex-row sm:items-center"
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {service.serviceType.replaceAll("_", " ")}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {service.currency} {Number(service.price).toFixed(2)} ·{" "}
+                        {service.turnaroundDays} days · {service.revisionRounds}{" "}
+                        revisions
+                        {service.warrantyDays
+                          ? ` · ${service.warrantyDays}d warranty`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={
+                          service.availability === "AVAILABLE"
+                            ? "success"
+                            : service.availability === "PAUSED"
+                              ? "warning"
+                              : "secondary"
+                        }
+                      >
+                        {service.availability.toLowerCase()}
+                      </Badge>
+                      {listing.access.canManageServices &&
+                      service.availability !== "PAUSED" ? (
                         <Button
                           size="sm"
                           variant="ghost"
-                          onClick={() => pauseServiceMut.mutate(s.id)}
+                          disabled={pauseServiceMutation.isPending}
+                          onClick={() =>
+                            pauseServiceMutation.mutate(service.id)
+                          }
                         >
                           Pause
                         </Button>
-                      )}
+                      ) : null}
+                    </div>
+                  </div>
+                ))
+              )}
+
+              {listing.access.canManageServices ? (
+                <div className="mt-4 rounded-xl border border-dashed bg-muted/20 p-4">
+                  <p className="text-sm font-semibold">Add service</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <Select
+                      value={newService.serviceType}
+                      onValueChange={(serviceType) =>
+                        setNewService({ ...newService, serviceType })
+                      }
+                    >
+                      <SelectTrigger aria-label="Service type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SERVICE_TYPES.map((service) => (
+                          <SelectItem key={service} value={service}>
+                            {service.replaceAll("_", " ")}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div>
+                      <Label htmlFor="service-price" className="sr-only">
+                        Price
+                      </Label>
+                      <Input
+                        id="service-price"
+                        type="number"
+                        min={0.01}
+                        step="0.01"
+                        placeholder="Price"
+                        value={newService.price}
+                        onChange={(event) =>
+                          setNewService({
+                            ...newService,
+                            price: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="service-turnaround" className="sr-only">
+                        Turnaround days
+                      </Label>
+                      <Input
+                        id="service-turnaround"
+                        type="number"
+                        min={1}
+                        placeholder="Turnaround days"
+                        value={newService.turnaroundDays}
+                        onChange={(event) =>
+                          setNewService({
+                            ...newService,
+                            turnaroundDays: event.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                    <Button
+                      disabled={
+                        addServiceMutation.isPending ||
+                        Number(newService.price) <= 0 ||
+                        Number(newService.turnaroundDays) < 1
+                      }
+                      onClick={() => addServiceMutation.mutate()}
+                    >
+                      {addServiceMutation.isPending ? "Adding…" : "Add service"}
+                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-          {isSuperAdmin && listing.ownerType === "PUBLISHER" && (
-            <div className="mt-4 border-t pt-4 space-y-3">
-              <p className="text-sm font-medium">Add a service</p>
-              <div className="grid grid-cols-4 gap-3">
-                <Select
-                  value={newService.serviceType}
-                  onValueChange={(v) =>
-                    setNewService({ ...newService, serviceType: v })
-                  }
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Building2 className="h-4 w-4" />
+                Publisher / owner
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Detail label="Display name" value={publisherLabel} />
+              {listing.publisher ? (
+                <>
+                  <Detail label="Tier" value={listing.publisher.tier} />
+                  <Detail
+                    label="Rating"
+                    value={
+                      listing.publisher.profile?.rating == null
+                        ? "Not rated"
+                        : `${listing.publisher.profile.rating.toFixed(1)} / 5`
+                    }
+                  />
+                  <Detail
+                    label="Completed reviews"
+                    value={String(listing.publisher.profile?.totalReviews ?? 0)}
+                  />
+                  <Detail
+                    label="Response time"
+                    value={
+                      listing.publisher.profile?.responseTime == null
+                        ? "Unavailable"
+                        : `${listing.publisher.profile.responseTime} hours`
+                    }
+                  />
+                  {listing.publisher.email ? (
+                    <Detail label="Contact" value={listing.publisher.email} />
+                  ) : null}
+                </>
+              ) : (
+                <Detail
+                  label="Operations owner"
+                  value={listing.website?.managedBy?.name || "Shared Ops queue"}
+                />
+              )}
+              {listing.organization?.name ? (
+                <Detail
+                  label="Organization"
+                  value={listing.organization.name}
+                />
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Globe2 className="h-4 w-4" />
+                Website & integrations
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Detail
+                label="Domain"
+                value={listing.website?.domain || "Unavailable"}
+              />
+              <Detail
+                label="Verification"
+                value={
+                  listing.website?.verificationStatus.replaceAll("_", " ") ||
+                  "Unknown"
+                }
+              />
+              {listing.website?.url ? (
+                <a
+                  href={listing.website.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 break-all text-sm text-primary hover:underline"
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[
-                      "GUEST_POST",
-                      "NICHE_EDIT",
-                      "EDITORIAL_LINK",
-                      "OUTREACH_LINK",
-                      "LOCAL_CITATION",
-                      "BLOG_ARTICLE",
-                      "SEO_CONTENT",
-                    ].map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t.replace(/_/g, " ")}
-                      </SelectItem>
+                  Open website <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              ) : null}
+              {(listing.website?.integrations.length ?? 0) > 0 ? (
+                <div className="border-t pt-3">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">
+                    Connected data sources
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {listing.website!.integrations.map((integration) => (
+                      <Badge key={integration.provider} variant="secondary">
+                        {integration.provider === "GOOGLE_SEARCH_CONSOLE"
+                          ? "GSC"
+                          : "GA4"}{" "}
+                        · {integration.status.toLowerCase()}
+                      </Badge>
                     ))}
-                  </SelectContent>
-                </Select>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="Price"
-                  value={newService.price}
-                  onChange={(e) =>
-                    setNewService({ ...newService, price: e.target.value })
-                  }
-                />
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="TAT days"
-                  value={newService.turnaroundDays}
-                  onChange={(e) =>
-                    setNewService({
-                      ...newService,
-                      turnaroundDays: e.target.value,
-                    })
-                  }
-                />
-                <Button
-                  size="sm"
-                  disabled={
-                    !newService.price ||
-                    Number(newService.price) <= 0 ||
-                    addServiceMut.isPending
-                  }
-                  onClick={() =>
-                    addServiceMut.mutate({
-                      serviceType: newService.serviceType,
-                      price: Number(newService.price),
-                      turnaroundDays: Number(newService.turnaroundDays) || 7,
-                      revisionRounds: Number(newService.revisionRounds) || 2,
-                    })
-                  }
-                >
-                  {addServiceMut.isPending ? "Adding..." : "Add"}
+                  </div>
+                </div>
+              ) : null}
+              {listing.ownerType === "PLATFORM" &&
+              listing.website &&
+              listing.access.role !== "FINANCE" ? (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/dashboard/websites/${listing.website.id}`}>
+                    Manage platform website
+                  </Link>
                 </Button>
-              </div>
-            </div>
-          )}
-          {listing.ownerType === "PLATFORM" && (
-            <div className="mt-4 border-t pt-4">
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/dashboard/websites/${listing.website?.id}`}>
-                  Open in Platform Websites
-                </Link>
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : null}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </AdminPage>
+  )
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium">{value}</p>
     </div>
   )
 }

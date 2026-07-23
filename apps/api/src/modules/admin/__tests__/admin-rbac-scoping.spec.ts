@@ -27,6 +27,11 @@ describe("AdminService RBAC scoping", () => {
         create: jest.fn().mockResolvedValue({ id: "listing-1" }),
         findUnique: jest.fn(),
       },
+      websiteMetric: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: "metric-1" }),
+      },
+      websiteMetricRevision: { create: jest.fn() },
       marketplaceCategory: {
         findMany: jest
           .fn()
@@ -89,15 +94,17 @@ describe("AdminService RBAC scoping", () => {
   })
 
   it("scopes the shared Operations order monitor to assigned or contextual work", async () => {
-    await service.listOrders(20, 0, {
-      id: "ops-1",
-      staffRole: "OPERATIONS",
+    await service.listOrders({
+      take: 20,
+      skip: 0,
+      user: { id: "ops-1", staffRole: "OPERATIONS" },
     })
 
     const where = prisma.order.findMany.mock.calls[0][0].where
-    const include = prisma.order.findMany.mock.calls[0][0].include
+    const select = prisma.order.findMany.mock.calls[0][0].select
+    const scope = where.AND[0]
     expect(JSON.stringify(where)).toContain("ops-1")
-    expect(where.OR).toEqual(
+    expect(scope.OR).toEqual(
       expect.arrayContaining([
         { tickets: { some: { assignedToUserId: "ops-1" } } },
         {
@@ -109,8 +116,65 @@ describe("AdminService RBAC scoping", () => {
         },
       ]),
     )
-    expect(include.customer.select).toEqual({ id: true, name: true })
-    expect(include.organization.select).toEqual({ id: true, name: true })
+    expect(select.customer.select).toEqual({ id: true, name: true })
+    expect(select.organization.select).toEqual({ id: true, name: true })
+  })
+
+  it("redacts customer contact and settlement context from Operations order rows", async () => {
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: "order-1",
+        version: 2,
+        type: "GUEST_POST",
+        title: "Protected order",
+        status: "SUBMITTED",
+        paymentStatus: "PAID",
+        amount: 250,
+        currency: "USD",
+        fulfillmentChannel: "PLATFORM",
+        fulfillmentDueAt: null,
+        autoAcceptAt: null,
+        createdAt: new Date("2026-07-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-07-02T00:00:00.000Z"),
+        organization: { id: "org-1", name: "Client org" },
+        customer: {
+          id: "customer-1",
+          name: "Customer",
+          email: "protected@example.com",
+        },
+        website: null,
+        activeDeliveryVersion: null,
+        fulfillmentAssignments: [],
+        dispute: null,
+        cancellationRequests: [],
+        settlements: [
+          { id: "settlement-1", status: "PENDING", reviewEndsAt: null },
+        ],
+      },
+    ])
+
+    const result = await service.listOrders({
+      user: { id: "ops-1", staffRole: "OPERATIONS" },
+    })
+
+    expect(result.items[0].customer).toEqual({
+      id: "customer-1",
+      name: "Customer",
+    })
+    expect(result.items[0].settlement).toBeNull()
+    expect(
+      prisma.order.findMany.mock.calls[0][0].select.customer.select,
+    ).toEqual({ id: true, name: true })
+  })
+
+  it("keeps customer email available only in the Super Admin order monitor", async () => {
+    await service.listOrders({
+      user: { id: "admin-1", staffRole: "SUPER_ADMIN" },
+    })
+
+    expect(
+      prisma.order.findMany.mock.calls[0][0].select.customer.select,
+    ).toEqual({ id: true, name: true, email: true })
   })
 
   it("returns not found when Operations guesses an unrelated order id", async () => {
@@ -154,6 +218,12 @@ describe("AdminService RBAC scoping", () => {
         googleNews: false,
         markedSponsored: false,
         foreignLanguageAllowed: false,
+        manualMetrics: {
+          ahrefsOrganicTraffic: 1200,
+          ahrefsTrafficAsOf: new Date().toISOString().slice(0, 10),
+          mozDomainAuthority: 45,
+          mozDomainAuthorityAsOf: new Date().toISOString().slice(0, 10),
+        },
       },
       { id: "ops-1", staffRole: "OPERATIONS" },
     )
@@ -195,6 +265,12 @@ describe("AdminService RBAC scoping", () => {
         googleNews: false,
         markedSponsored: false,
         foreignLanguageAllowed: false,
+        manualMetrics: {
+          ahrefsOrganicTraffic: 1200,
+          ahrefsTrafficAsOf: new Date().toISOString().slice(0, 10),
+          mozDomainAuthority: 45,
+          mozDomainAuthorityAsOf: new Date().toISOString().slice(0, 10),
+        },
       },
       { id: "admin-1", staffRole: "SUPER_ADMIN" },
     )

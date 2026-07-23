@@ -41,14 +41,19 @@ test("dispatches hourly tasks only in their UTC slot", () => {
   ])
 })
 
-test("dispatches monthly verification only on the first day at 03:00 UTC", () => {
+test("dispatches daily verification governance and monthly metric refresh", () => {
   assert.deepEqual(at("2026-08-01T03:00:00Z"), [
     "payout-reconcile",
     "settlement-auto-approve",
     "cancellation-timeouts",
     "website-reverify",
+    "domain-metrics-refresh",
   ])
-  assert.equal(at("2026-08-02T03:00:00Z").includes("website-reverify"), false)
+  assert.equal(at("2026-08-02T03:00:00Z").includes("website-reverify"), true)
+  assert.equal(
+    at("2026-08-02T03:00:00Z").includes("domain-metrics-refresh"),
+    false,
+  )
 })
 
 test("rejects invalid timestamps", () => {

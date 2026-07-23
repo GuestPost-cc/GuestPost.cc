@@ -35,9 +35,15 @@ import {
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
+import { FileWarning } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminFilterBar,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 
@@ -148,21 +154,27 @@ export default function CancellationsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Cancellations</h1>
-          <p className="text-muted-foreground">
-            Review contested requests; Finance approves every contested refund.
-          </p>
-        </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow="Resolution workflow"
+        title="Cancellations"
+        description="Review contested requests through the role-separated workflow; Finance approves every contested refund."
+        icon={FileWarning}
+      />
+
+      <AdminFilterBar
+        activeCount={status === "active" ? 0 : 1}
+        resultCount={items.length}
+        resultLabel={items.length === 1 ? "case" : "cases"}
+        onClear={() => setStatus("active")}
+      >
         <Select
           value={status}
           onValueChange={(value) =>
             setStatus(value as "active" | "all" | CancellationRequestStatus)
           }
         >
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full bg-background sm:w-52">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -174,7 +186,7 @@ export default function CancellationsPage() {
             <SelectItem value="REJECTED">Rejected</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </AdminFilterBar>
 
       <Card>
         <CardHeader>
@@ -360,6 +372,6 @@ export default function CancellationsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPage>
   )
 }

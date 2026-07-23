@@ -63,9 +63,13 @@ export type WebsiteMinAggregateOutputType = {
   verificationCheckCount: number | null
   consecutiveFailures: number | null
   verificationFailureReason: string | null
+  verificationOverrideExpiresAt: Date | null
+  verificationOverrideReason: string | null
+  verifiedByUserId: string | null
   canonicalDomain: string | null
   trustScore: number | null
   verificationVersion: number | null
+  importBatchId: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -93,9 +97,13 @@ export type WebsiteMaxAggregateOutputType = {
   verificationCheckCount: number | null
   consecutiveFailures: number | null
   verificationFailureReason: string | null
+  verificationOverrideExpiresAt: Date | null
+  verificationOverrideReason: string | null
+  verifiedByUserId: string | null
   canonicalDomain: string | null
   trustScore: number | null
   verificationVersion: number | null
+  importBatchId: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -124,9 +132,13 @@ export type WebsiteCountAggregateOutputType = {
   verificationCheckCount: number
   consecutiveFailures: number
   verificationFailureReason: number
+  verificationOverrideExpiresAt: number
+  verificationOverrideReason: number
+  verifiedByUserId: number
   canonicalDomain: number
   trustScore: number
   verificationVersion: number
+  importBatchId: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -170,9 +182,13 @@ export type WebsiteMinAggregateInputType = {
   verificationCheckCount?: true
   consecutiveFailures?: true
   verificationFailureReason?: true
+  verificationOverrideExpiresAt?: true
+  verificationOverrideReason?: true
+  verifiedByUserId?: true
   canonicalDomain?: true
   trustScore?: true
   verificationVersion?: true
+  importBatchId?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -200,9 +216,13 @@ export type WebsiteMaxAggregateInputType = {
   verificationCheckCount?: true
   consecutiveFailures?: true
   verificationFailureReason?: true
+  verificationOverrideExpiresAt?: true
+  verificationOverrideReason?: true
+  verifiedByUserId?: true
   canonicalDomain?: true
   trustScore?: true
   verificationVersion?: true
+  importBatchId?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -231,9 +251,13 @@ export type WebsiteCountAggregateInputType = {
   verificationCheckCount?: true
   consecutiveFailures?: true
   verificationFailureReason?: true
+  verificationOverrideExpiresAt?: true
+  verificationOverrideReason?: true
+  verifiedByUserId?: true
   canonicalDomain?: true
   trustScore?: true
   verificationVersion?: true
+  importBatchId?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -349,9 +373,13 @@ export type WebsiteGroupByOutputType = {
   verificationCheckCount: number
   consecutiveFailures: number
   verificationFailureReason: string | null
+  verificationOverrideExpiresAt: Date | null
+  verificationOverrideReason: string | null
+  verifiedByUserId: string | null
   canonicalDomain: string | null
   trustScore: number | null
   verificationVersion: number
+  importBatchId: string | null
   createdAt: Date
   updatedAt: Date
   _count: WebsiteCountAggregateOutputType | null
@@ -403,9 +431,13 @@ export type WebsiteWhereInput = {
   verificationCheckCount?: Prisma.IntFilter<"Website"> | number
   consecutiveFailures?: Prisma.IntFilter<"Website"> | number
   verificationFailureReason?: Prisma.StringNullableFilter<"Website"> | string | null
+  verificationOverrideExpiresAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  verificationOverrideReason?: Prisma.StringNullableFilter<"Website"> | string | null
+  verifiedByUserId?: Prisma.StringNullableFilter<"Website"> | string | null
   canonicalDomain?: Prisma.StringNullableFilter<"Website"> | string | null
   trustScore?: Prisma.IntNullableFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntFilter<"Website"> | number
+  importBatchId?: Prisma.StringNullableFilter<"Website"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherNullableScalarRelationFilter, Prisma.PublisherWhereInput> | null
@@ -414,6 +446,8 @@ export type WebsiteWhereInput = {
   orderItems?: Prisma.OrderItemListRelationFilter
   marketplaceListings?: Prisma.MarketplaceListingListRelationFilter
   websiteIntegrations?: Prisma.WebsiteIntegrationListRelationFilter
+  metricsHistory?: Prisma.WebsiteMetricListRelationFilter
+  importBatch?: Prisma.XOR<Prisma.WebsiteImportBatchNullableScalarRelationFilter, Prisma.WebsiteImportBatchWhereInput> | null
 }
 
 export type WebsiteOrderByWithRelationInput = {
@@ -440,9 +474,13 @@ export type WebsiteOrderByWithRelationInput = {
   verificationCheckCount?: Prisma.SortOrder
   consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  verificationOverrideExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  verificationOverrideReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  verifiedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
   canonicalDomain?: Prisma.SortOrderInput | Prisma.SortOrder
   trustScore?: Prisma.SortOrderInput | Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
+  importBatchId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   publisher?: Prisma.PublisherOrderByWithRelationInput
@@ -451,6 +489,8 @@ export type WebsiteOrderByWithRelationInput = {
   orderItems?: Prisma.OrderItemOrderByRelationAggregateInput
   marketplaceListings?: Prisma.MarketplaceListingOrderByRelationAggregateInput
   websiteIntegrations?: Prisma.WebsiteIntegrationOrderByRelationAggregateInput
+  metricsHistory?: Prisma.WebsiteMetricOrderByRelationAggregateInput
+  importBatch?: Prisma.WebsiteImportBatchOrderByWithRelationInput
 }
 
 export type WebsiteWhereUniqueInput = Prisma.AtLeast<{
@@ -480,9 +520,13 @@ export type WebsiteWhereUniqueInput = Prisma.AtLeast<{
   verificationCheckCount?: Prisma.IntFilter<"Website"> | number
   consecutiveFailures?: Prisma.IntFilter<"Website"> | number
   verificationFailureReason?: Prisma.StringNullableFilter<"Website"> | string | null
+  verificationOverrideExpiresAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  verificationOverrideReason?: Prisma.StringNullableFilter<"Website"> | string | null
+  verifiedByUserId?: Prisma.StringNullableFilter<"Website"> | string | null
   canonicalDomain?: Prisma.StringNullableFilter<"Website"> | string | null
   trustScore?: Prisma.IntNullableFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntFilter<"Website"> | number
+  importBatchId?: Prisma.StringNullableFilter<"Website"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   publisher?: Prisma.XOR<Prisma.PublisherNullableScalarRelationFilter, Prisma.PublisherWhereInput> | null
@@ -491,6 +535,8 @@ export type WebsiteWhereUniqueInput = Prisma.AtLeast<{
   orderItems?: Prisma.OrderItemListRelationFilter
   marketplaceListings?: Prisma.MarketplaceListingListRelationFilter
   websiteIntegrations?: Prisma.WebsiteIntegrationListRelationFilter
+  metricsHistory?: Prisma.WebsiteMetricListRelationFilter
+  importBatch?: Prisma.XOR<Prisma.WebsiteImportBatchNullableScalarRelationFilter, Prisma.WebsiteImportBatchWhereInput> | null
 }, "id" | "url">
 
 export type WebsiteOrderByWithAggregationInput = {
@@ -517,9 +563,13 @@ export type WebsiteOrderByWithAggregationInput = {
   verificationCheckCount?: Prisma.SortOrder
   consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  verificationOverrideExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  verificationOverrideReason?: Prisma.SortOrderInput | Prisma.SortOrder
+  verifiedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
   canonicalDomain?: Prisma.SortOrderInput | Prisma.SortOrder
   trustScore?: Prisma.SortOrderInput | Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
+  importBatchId?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.WebsiteCountOrderByAggregateInput
@@ -556,9 +606,13 @@ export type WebsiteScalarWhereWithAggregatesInput = {
   verificationCheckCount?: Prisma.IntWithAggregatesFilter<"Website"> | number
   consecutiveFailures?: Prisma.IntWithAggregatesFilter<"Website"> | number
   verificationFailureReason?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
+  verificationOverrideExpiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Website"> | Date | string | null
+  verificationOverrideReason?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
+  verifiedByUserId?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
   canonicalDomain?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
   trustScore?: Prisma.IntNullableWithAggregatesFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntWithAggregatesFilter<"Website"> | number
+  importBatchId?: Prisma.StringNullableWithAggregatesFilter<"Website"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Website"> | Date | string
 }
@@ -585,6 +639,9 @@ export type WebsiteCreateInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
@@ -596,6 +653,8 @@ export type WebsiteCreateInput = {
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+  importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
 }
 
 export type WebsiteUncheckedCreateInput = {
@@ -622,15 +681,20 @@ export type WebsiteUncheckedCreateInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteUpdateInput = {
@@ -655,6 +719,9 @@ export type WebsiteUpdateInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
@@ -666,6 +733,8 @@ export type WebsiteUpdateInput = {
   orderItems?: Prisma.OrderItemUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+  importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
 }
 
 export type WebsiteUncheckedUpdateInput = {
@@ -692,15 +761,20 @@ export type WebsiteUncheckedUpdateInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateManyInput = {
@@ -727,9 +801,13 @@ export type WebsiteCreateManyInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -756,6 +834,9 @@ export type WebsiteUpdateManyMutationInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
@@ -787,9 +868,13 @@ export type WebsiteUncheckedUpdateManyInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -828,9 +913,13 @@ export type WebsiteCountOrderByAggregateInput = {
   verificationCheckCount?: Prisma.SortOrder
   consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrder
+  verificationOverrideExpiresAt?: Prisma.SortOrder
+  verificationOverrideReason?: Prisma.SortOrder
+  verifiedByUserId?: Prisma.SortOrder
   canonicalDomain?: Prisma.SortOrder
   trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
+  importBatchId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -865,9 +954,13 @@ export type WebsiteMaxOrderByAggregateInput = {
   verificationCheckCount?: Prisma.SortOrder
   consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrder
+  verificationOverrideExpiresAt?: Prisma.SortOrder
+  verificationOverrideReason?: Prisma.SortOrder
+  verifiedByUserId?: Prisma.SortOrder
   canonicalDomain?: Prisma.SortOrder
   trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
+  importBatchId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -895,9 +988,13 @@ export type WebsiteMinOrderByAggregateInput = {
   verificationCheckCount?: Prisma.SortOrder
   consecutiveFailures?: Prisma.SortOrder
   verificationFailureReason?: Prisma.SortOrder
+  verificationOverrideExpiresAt?: Prisma.SortOrder
+  verificationOverrideReason?: Prisma.SortOrder
+  verifiedByUserId?: Prisma.SortOrder
   canonicalDomain?: Prisma.SortOrder
   trustScore?: Prisma.SortOrder
   verificationVersion?: Prisma.SortOrder
+  importBatchId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -909,14 +1006,14 @@ export type WebsiteSumOrderByAggregateInput = {
   verificationVersion?: Prisma.SortOrder
 }
 
-export type WebsiteNullableScalarRelationFilter = {
-  is?: Prisma.WebsiteWhereInput | null
-  isNot?: Prisma.WebsiteWhereInput | null
-}
-
 export type WebsiteScalarRelationFilter = {
   is?: Prisma.WebsiteWhereInput
   isNot?: Prisma.WebsiteWhereInput
+}
+
+export type WebsiteNullableScalarRelationFilter = {
+  is?: Prisma.WebsiteWhereInput | null
+  isNot?: Prisma.WebsiteWhereInput | null
 }
 
 export type WebsiteCreateNestedManyWithoutManagedByInput = {
@@ -1031,6 +1128,62 @@ export type NullableIntFieldUpdateOperationsInput = {
   divide?: number
 }
 
+export type WebsiteCreateNestedOneWithoutMetricsHistoryInput = {
+  create?: Prisma.XOR<Prisma.WebsiteCreateWithoutMetricsHistoryInput, Prisma.WebsiteUncheckedCreateWithoutMetricsHistoryInput>
+  connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutMetricsHistoryInput
+  connect?: Prisma.WebsiteWhereUniqueInput
+}
+
+export type WebsiteUpdateOneRequiredWithoutMetricsHistoryNestedInput = {
+  create?: Prisma.XOR<Prisma.WebsiteCreateWithoutMetricsHistoryInput, Prisma.WebsiteUncheckedCreateWithoutMetricsHistoryInput>
+  connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutMetricsHistoryInput
+  upsert?: Prisma.WebsiteUpsertWithoutMetricsHistoryInput
+  connect?: Prisma.WebsiteWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WebsiteUpdateToOneWithWhereWithoutMetricsHistoryInput, Prisma.WebsiteUpdateWithoutMetricsHistoryInput>, Prisma.WebsiteUncheckedUpdateWithoutMetricsHistoryInput>
+}
+
+export type WebsiteCreateNestedManyWithoutImportBatchInput = {
+  create?: Prisma.XOR<Prisma.WebsiteCreateWithoutImportBatchInput, Prisma.WebsiteUncheckedCreateWithoutImportBatchInput> | Prisma.WebsiteCreateWithoutImportBatchInput[] | Prisma.WebsiteUncheckedCreateWithoutImportBatchInput[]
+  connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutImportBatchInput | Prisma.WebsiteCreateOrConnectWithoutImportBatchInput[]
+  createMany?: Prisma.WebsiteCreateManyImportBatchInputEnvelope
+  connect?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+}
+
+export type WebsiteUncheckedCreateNestedManyWithoutImportBatchInput = {
+  create?: Prisma.XOR<Prisma.WebsiteCreateWithoutImportBatchInput, Prisma.WebsiteUncheckedCreateWithoutImportBatchInput> | Prisma.WebsiteCreateWithoutImportBatchInput[] | Prisma.WebsiteUncheckedCreateWithoutImportBatchInput[]
+  connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutImportBatchInput | Prisma.WebsiteCreateOrConnectWithoutImportBatchInput[]
+  createMany?: Prisma.WebsiteCreateManyImportBatchInputEnvelope
+  connect?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+}
+
+export type WebsiteUpdateManyWithoutImportBatchNestedInput = {
+  create?: Prisma.XOR<Prisma.WebsiteCreateWithoutImportBatchInput, Prisma.WebsiteUncheckedCreateWithoutImportBatchInput> | Prisma.WebsiteCreateWithoutImportBatchInput[] | Prisma.WebsiteUncheckedCreateWithoutImportBatchInput[]
+  connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutImportBatchInput | Prisma.WebsiteCreateOrConnectWithoutImportBatchInput[]
+  upsert?: Prisma.WebsiteUpsertWithWhereUniqueWithoutImportBatchInput | Prisma.WebsiteUpsertWithWhereUniqueWithoutImportBatchInput[]
+  createMany?: Prisma.WebsiteCreateManyImportBatchInputEnvelope
+  set?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+  disconnect?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+  delete?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+  connect?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+  update?: Prisma.WebsiteUpdateWithWhereUniqueWithoutImportBatchInput | Prisma.WebsiteUpdateWithWhereUniqueWithoutImportBatchInput[]
+  updateMany?: Prisma.WebsiteUpdateManyWithWhereWithoutImportBatchInput | Prisma.WebsiteUpdateManyWithWhereWithoutImportBatchInput[]
+  deleteMany?: Prisma.WebsiteScalarWhereInput | Prisma.WebsiteScalarWhereInput[]
+}
+
+export type WebsiteUncheckedUpdateManyWithoutImportBatchNestedInput = {
+  create?: Prisma.XOR<Prisma.WebsiteCreateWithoutImportBatchInput, Prisma.WebsiteUncheckedCreateWithoutImportBatchInput> | Prisma.WebsiteCreateWithoutImportBatchInput[] | Prisma.WebsiteUncheckedCreateWithoutImportBatchInput[]
+  connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutImportBatchInput | Prisma.WebsiteCreateOrConnectWithoutImportBatchInput[]
+  upsert?: Prisma.WebsiteUpsertWithWhereUniqueWithoutImportBatchInput | Prisma.WebsiteUpsertWithWhereUniqueWithoutImportBatchInput[]
+  createMany?: Prisma.WebsiteCreateManyImportBatchInputEnvelope
+  set?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+  disconnect?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+  delete?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+  connect?: Prisma.WebsiteWhereUniqueInput | Prisma.WebsiteWhereUniqueInput[]
+  update?: Prisma.WebsiteUpdateWithWhereUniqueWithoutImportBatchInput | Prisma.WebsiteUpdateWithWhereUniqueWithoutImportBatchInput[]
+  updateMany?: Prisma.WebsiteUpdateManyWithWhereWithoutImportBatchInput | Prisma.WebsiteUpdateManyWithWhereWithoutImportBatchInput[]
+  deleteMany?: Prisma.WebsiteScalarWhereInput | Prisma.WebsiteScalarWhereInput[]
+}
+
 export type WebsiteCreateNestedOneWithoutOrdersInput = {
   create?: Prisma.XOR<Prisma.WebsiteCreateWithoutOrdersInput, Prisma.WebsiteUncheckedCreateWithoutOrdersInput>
   connectOrCreate?: Prisma.WebsiteCreateOrConnectWithoutOrdersInput
@@ -1115,6 +1268,9 @@ export type WebsiteCreateWithoutManagedByInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
@@ -1125,6 +1281,8 @@ export type WebsiteCreateWithoutManagedByInput = {
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+  importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
 }
 
 export type WebsiteUncheckedCreateWithoutManagedByInput = {
@@ -1150,15 +1308,20 @@ export type WebsiteUncheckedCreateWithoutManagedByInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutManagedByInput = {
@@ -1214,9 +1377,13 @@ export type WebsiteScalarWhereInput = {
   verificationCheckCount?: Prisma.IntFilter<"Website"> | number
   consecutiveFailures?: Prisma.IntFilter<"Website"> | number
   verificationFailureReason?: Prisma.StringNullableFilter<"Website"> | string | null
+  verificationOverrideExpiresAt?: Prisma.DateTimeNullableFilter<"Website"> | Date | string | null
+  verificationOverrideReason?: Prisma.StringNullableFilter<"Website"> | string | null
+  verifiedByUserId?: Prisma.StringNullableFilter<"Website"> | string | null
   canonicalDomain?: Prisma.StringNullableFilter<"Website"> | string | null
   trustScore?: Prisma.IntNullableFilter<"Website"> | number | null
   verificationVersion?: Prisma.IntFilter<"Website"> | number
+  importBatchId?: Prisma.StringNullableFilter<"Website"> | string | null
   createdAt?: Prisma.DateTimeFilter<"Website"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Website"> | Date | string
 }
@@ -1243,6 +1410,9 @@ export type WebsiteCreateWithoutPublisherInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
@@ -1253,6 +1423,8 @@ export type WebsiteCreateWithoutPublisherInput = {
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+  importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
 }
 
 export type WebsiteUncheckedCreateWithoutPublisherInput = {
@@ -1278,15 +1450,20 @@ export type WebsiteUncheckedCreateWithoutPublisherInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutPublisherInput = {
@@ -1315,6 +1492,282 @@ export type WebsiteUpdateManyWithWhereWithoutPublisherInput = {
   data: Prisma.XOR<Prisma.WebsiteUpdateManyMutationInput, Prisma.WebsiteUncheckedUpdateManyWithoutPublisherInput>
 }
 
+export type WebsiteCreateWithoutMetricsHistoryInput = {
+  id?: string
+  url: string
+  domain?: string | null
+  name?: string | null
+  category?: string | null
+  language?: string | null
+  country?: string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: boolean
+  ownershipType?: $Enums.WebsiteOwnershipType
+  verificationStatus?: $Enums.WebsiteVerificationStatus
+  verificationMethod?: $Enums.VerificationMethod | null
+  verificationToken?: string | null
+  activeVerifiedToken?: string | null
+  verifiedAt?: Date | string | null
+  lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
+  verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
+  verificationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
+  managedBy?: Prisma.UserCreateNestedOneWithoutManagedWebsitesInput
+  orders?: Prisma.OrderCreateNestedManyWithoutWebsiteInput
+  orderItems?: Prisma.OrderItemCreateNestedManyWithoutWebsiteInput
+  marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
+  importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
+}
+
+export type WebsiteUncheckedCreateWithoutMetricsHistoryInput = {
+  id?: string
+  url: string
+  domain?: string | null
+  name?: string | null
+  category?: string | null
+  language?: string | null
+  country?: string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: boolean
+  publisherId?: string | null
+  ownershipType?: $Enums.WebsiteOwnershipType
+  managedByUserId?: string | null
+  verificationStatus?: $Enums.WebsiteVerificationStatus
+  verificationMethod?: $Enums.VerificationMethod | null
+  verificationToken?: string | null
+  activeVerifiedToken?: string | null
+  verifiedAt?: Date | string | null
+  lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
+  verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
+  verificationVersion?: number
+  importBatchId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
+  orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+}
+
+export type WebsiteCreateOrConnectWithoutMetricsHistoryInput = {
+  where: Prisma.WebsiteWhereUniqueInput
+  create: Prisma.XOR<Prisma.WebsiteCreateWithoutMetricsHistoryInput, Prisma.WebsiteUncheckedCreateWithoutMetricsHistoryInput>
+}
+
+export type WebsiteUpsertWithoutMetricsHistoryInput = {
+  update: Prisma.XOR<Prisma.WebsiteUpdateWithoutMetricsHistoryInput, Prisma.WebsiteUncheckedUpdateWithoutMetricsHistoryInput>
+  create: Prisma.XOR<Prisma.WebsiteCreateWithoutMetricsHistoryInput, Prisma.WebsiteUncheckedCreateWithoutMetricsHistoryInput>
+  where?: Prisma.WebsiteWhereInput
+}
+
+export type WebsiteUpdateToOneWithWhereWithoutMetricsHistoryInput = {
+  where?: Prisma.WebsiteWhereInput
+  data: Prisma.XOR<Prisma.WebsiteUpdateWithoutMetricsHistoryInput, Prisma.WebsiteUncheckedUpdateWithoutMetricsHistoryInput>
+}
+
+export type WebsiteUpdateWithoutMetricsHistoryInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  url?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ownershipType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
+  verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
+  verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
+  verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
+  managedBy?: Prisma.UserUpdateOneWithoutManagedWebsitesNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutWebsiteNestedInput
+  orderItems?: Prisma.OrderItemUpdateManyWithoutWebsiteNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
+  importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
+}
+
+export type WebsiteUncheckedUpdateWithoutMetricsHistoryInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  url?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownershipType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  managedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
+  verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
+  verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
+  verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
+  orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+}
+
+export type WebsiteCreateWithoutImportBatchInput = {
+  id?: string
+  url: string
+  domain?: string | null
+  name?: string | null
+  category?: string | null
+  language?: string | null
+  country?: string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: boolean
+  ownershipType?: $Enums.WebsiteOwnershipType
+  verificationStatus?: $Enums.WebsiteVerificationStatus
+  verificationMethod?: $Enums.VerificationMethod | null
+  verificationToken?: string | null
+  activeVerifiedToken?: string | null
+  verifiedAt?: Date | string | null
+  lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
+  verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
+  verificationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  publisher?: Prisma.PublisherCreateNestedOneWithoutWebsitesInput
+  managedBy?: Prisma.UserCreateNestedOneWithoutManagedWebsitesInput
+  orders?: Prisma.OrderCreateNestedManyWithoutWebsiteInput
+  orderItems?: Prisma.OrderItemCreateNestedManyWithoutWebsiteInput
+  marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+}
+
+export type WebsiteUncheckedCreateWithoutImportBatchInput = {
+  id?: string
+  url: string
+  domain?: string | null
+  name?: string | null
+  category?: string | null
+  language?: string | null
+  country?: string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: boolean
+  publisherId?: string | null
+  ownershipType?: $Enums.WebsiteOwnershipType
+  managedByUserId?: string | null
+  verificationStatus?: $Enums.WebsiteVerificationStatus
+  verificationMethod?: $Enums.VerificationMethod | null
+  verificationToken?: string | null
+  activeVerifiedToken?: string | null
+  verifiedAt?: Date | string | null
+  lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
+  verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
+  verificationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
+  orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
+}
+
+export type WebsiteCreateOrConnectWithoutImportBatchInput = {
+  where: Prisma.WebsiteWhereUniqueInput
+  create: Prisma.XOR<Prisma.WebsiteCreateWithoutImportBatchInput, Prisma.WebsiteUncheckedCreateWithoutImportBatchInput>
+}
+
+export type WebsiteCreateManyImportBatchInputEnvelope = {
+  data: Prisma.WebsiteCreateManyImportBatchInput | Prisma.WebsiteCreateManyImportBatchInput[]
+  skipDuplicates?: boolean
+}
+
+export type WebsiteUpsertWithWhereUniqueWithoutImportBatchInput = {
+  where: Prisma.WebsiteWhereUniqueInput
+  update: Prisma.XOR<Prisma.WebsiteUpdateWithoutImportBatchInput, Prisma.WebsiteUncheckedUpdateWithoutImportBatchInput>
+  create: Prisma.XOR<Prisma.WebsiteCreateWithoutImportBatchInput, Prisma.WebsiteUncheckedCreateWithoutImportBatchInput>
+}
+
+export type WebsiteUpdateWithWhereUniqueWithoutImportBatchInput = {
+  where: Prisma.WebsiteWhereUniqueInput
+  data: Prisma.XOR<Prisma.WebsiteUpdateWithoutImportBatchInput, Prisma.WebsiteUncheckedUpdateWithoutImportBatchInput>
+}
+
+export type WebsiteUpdateManyWithWhereWithoutImportBatchInput = {
+  where: Prisma.WebsiteScalarWhereInput
+  data: Prisma.XOR<Prisma.WebsiteUpdateManyMutationInput, Prisma.WebsiteUncheckedUpdateManyWithoutImportBatchInput>
+}
+
 export type WebsiteCreateWithoutOrdersInput = {
   id?: string
   url: string
@@ -1337,6 +1790,9 @@ export type WebsiteCreateWithoutOrdersInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
@@ -1347,6 +1803,8 @@ export type WebsiteCreateWithoutOrdersInput = {
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+  importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
 }
 
 export type WebsiteUncheckedCreateWithoutOrdersInput = {
@@ -1373,14 +1831,19 @@ export type WebsiteUncheckedCreateWithoutOrdersInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutOrdersInput = {
@@ -1421,6 +1884,9 @@ export type WebsiteUpdateWithoutOrdersInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1431,6 +1897,8 @@ export type WebsiteUpdateWithoutOrdersInput = {
   orderItems?: Prisma.OrderItemUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+  importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutOrdersInput = {
@@ -1457,14 +1925,19 @@ export type WebsiteUncheckedUpdateWithoutOrdersInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateWithoutOrderItemsInput = {
@@ -1489,6 +1962,9 @@ export type WebsiteCreateWithoutOrderItemsInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
@@ -1499,6 +1975,8 @@ export type WebsiteCreateWithoutOrderItemsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+  importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
 }
 
 export type WebsiteUncheckedCreateWithoutOrderItemsInput = {
@@ -1525,14 +2003,19 @@ export type WebsiteUncheckedCreateWithoutOrderItemsInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutOrderItemsInput = {
@@ -1573,6 +2056,9 @@ export type WebsiteUpdateWithoutOrderItemsInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1583,6 +2069,8 @@ export type WebsiteUpdateWithoutOrderItemsInput = {
   orders?: Prisma.OrderUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+  importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutOrderItemsInput = {
@@ -1609,14 +2097,19 @@ export type WebsiteUncheckedUpdateWithoutOrderItemsInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateWithoutMarketplaceListingsInput = {
@@ -1641,6 +2134,9 @@ export type WebsiteCreateWithoutMarketplaceListingsInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
@@ -1651,6 +2147,8 @@ export type WebsiteCreateWithoutMarketplaceListingsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+  importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
 }
 
 export type WebsiteUncheckedCreateWithoutMarketplaceListingsInput = {
@@ -1677,14 +2175,19 @@ export type WebsiteUncheckedCreateWithoutMarketplaceListingsInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutMarketplaceListingsInput = {
@@ -1725,6 +2228,9 @@ export type WebsiteUpdateWithoutMarketplaceListingsInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1735,6 +2241,8 @@ export type WebsiteUpdateWithoutMarketplaceListingsInput = {
   orders?: Prisma.OrderUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+  importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutMarketplaceListingsInput = {
@@ -1761,14 +2269,19 @@ export type WebsiteUncheckedUpdateWithoutMarketplaceListingsInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateWithoutWebsiteIntegrationsInput = {
@@ -1793,6 +2306,9 @@ export type WebsiteCreateWithoutWebsiteIntegrationsInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
@@ -1803,6 +2319,8 @@ export type WebsiteCreateWithoutWebsiteIntegrationsInput = {
   orders?: Prisma.OrderCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricCreateNestedManyWithoutWebsiteInput
+  importBatch?: Prisma.WebsiteImportBatchCreateNestedOneWithoutWebsitesInput
 }
 
 export type WebsiteUncheckedCreateWithoutWebsiteIntegrationsInput = {
@@ -1829,14 +2347,19 @@ export type WebsiteUncheckedCreateWithoutWebsiteIntegrationsInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutWebsiteInput
   orderItems?: Prisma.OrderItemUncheckedCreateNestedManyWithoutWebsiteInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedCreateNestedManyWithoutWebsiteInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedCreateNestedManyWithoutWebsiteInput
 }
 
 export type WebsiteCreateOrConnectWithoutWebsiteIntegrationsInput = {
@@ -1877,6 +2400,9 @@ export type WebsiteUpdateWithoutWebsiteIntegrationsInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1887,6 +2413,8 @@ export type WebsiteUpdateWithoutWebsiteIntegrationsInput = {
   orders?: Prisma.OrderUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+  importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutWebsiteIntegrationsInput = {
@@ -1913,14 +2441,19 @@ export type WebsiteUncheckedUpdateWithoutWebsiteIntegrationsInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteCreateManyManagedByInput = {
@@ -1946,9 +2479,13 @@ export type WebsiteCreateManyManagedByInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -1975,6 +2512,9 @@ export type WebsiteUpdateWithoutManagedByInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
@@ -1985,6 +2525,8 @@ export type WebsiteUpdateWithoutManagedByInput = {
   orderItems?: Prisma.OrderItemUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+  importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutManagedByInput = {
@@ -2010,15 +2552,20 @@ export type WebsiteUncheckedUpdateWithoutManagedByInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateManyWithoutManagedByInput = {
@@ -2044,9 +2591,13 @@ export type WebsiteUncheckedUpdateManyWithoutManagedByInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -2074,9 +2625,13 @@ export type WebsiteCreateManyPublisherInput = {
   verificationCheckCount?: number
   consecutiveFailures?: number
   verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
   canonicalDomain?: string | null
   trustScore?: number | null
   verificationVersion?: number
+  importBatchId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -2103,6 +2658,9 @@ export type WebsiteUpdateWithoutPublisherInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
@@ -2113,6 +2671,8 @@ export type WebsiteUpdateWithoutPublisherInput = {
   orderItems?: Prisma.OrderItemUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+  importBatch?: Prisma.WebsiteImportBatchUpdateOneWithoutWebsitesNestedInput
 }
 
 export type WebsiteUncheckedUpdateWithoutPublisherInput = {
@@ -2138,15 +2698,20 @@ export type WebsiteUncheckedUpdateWithoutPublisherInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
   orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
   marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
   websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
 }
 
 export type WebsiteUncheckedUpdateManyWithoutPublisherInput = {
@@ -2172,6 +2737,156 @@ export type WebsiteUncheckedUpdateManyWithoutPublisherInput = {
   verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
   consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
   verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  importBatchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type WebsiteCreateManyImportBatchInput = {
+  id?: string
+  url: string
+  domain?: string | null
+  name?: string | null
+  category?: string | null
+  language?: string | null
+  country?: string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: boolean
+  publisherId?: string | null
+  ownershipType?: $Enums.WebsiteOwnershipType
+  managedByUserId?: string | null
+  verificationStatus?: $Enums.WebsiteVerificationStatus
+  verificationMethod?: $Enums.VerificationMethod | null
+  verificationToken?: string | null
+  activeVerifiedToken?: string | null
+  verifiedAt?: Date | string | null
+  lastVerificationCheckAt?: Date | string | null
+  lastSuccessfulVerificationAt?: Date | string | null
+  lastVerificationRequestAt?: Date | string | null
+  verificationCheckCount?: number
+  consecutiveFailures?: number
+  verificationFailureReason?: string | null
+  verificationOverrideExpiresAt?: Date | string | null
+  verificationOverrideReason?: string | null
+  verifiedByUserId?: string | null
+  canonicalDomain?: string | null
+  trustScore?: number | null
+  verificationVersion?: number
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type WebsiteUpdateWithoutImportBatchInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  url?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  ownershipType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
+  verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
+  verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
+  verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  publisher?: Prisma.PublisherUpdateOneWithoutWebsitesNestedInput
+  managedBy?: Prisma.UserUpdateOneWithoutManagedWebsitesNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutWebsiteNestedInput
+  orderItems?: Prisma.OrderItemUpdateManyWithoutWebsiteNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUpdateManyWithoutWebsiteNestedInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUpdateManyWithoutWebsiteNestedInput
+}
+
+export type WebsiteUncheckedUpdateWithoutImportBatchInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  url?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownershipType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  managedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
+  verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
+  verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
+  verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutWebsiteNestedInput
+  orderItems?: Prisma.OrderItemUncheckedUpdateManyWithoutWebsiteNestedInput
+  marketplaceListings?: Prisma.MarketplaceListingUncheckedUpdateManyWithoutWebsiteNestedInput
+  websiteIntegrations?: Prisma.WebsiteIntegrationUncheckedUpdateManyWithoutWebsiteNestedInput
+  metricsHistory?: Prisma.WebsiteMetricUncheckedUpdateManyWithoutWebsiteNestedInput
+}
+
+export type WebsiteUncheckedUpdateManyWithoutImportBatchInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  url?: Prisma.StringFieldUpdateOperationsInput | string
+  domain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  name?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  category?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  language?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  country?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  metrics?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  publisherId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  ownershipType?: Prisma.EnumWebsiteOwnershipTypeFieldUpdateOperationsInput | $Enums.WebsiteOwnershipType
+  managedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationStatus?: Prisma.EnumWebsiteVerificationStatusFieldUpdateOperationsInput | $Enums.WebsiteVerificationStatus
+  verificationMethod?: Prisma.NullableEnumVerificationMethodFieldUpdateOperationsInput | $Enums.VerificationMethod | null
+  verificationToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  activeVerifiedToken?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationCheckAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastSuccessfulVerificationAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  lastVerificationRequestAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationCheckCount?: Prisma.IntFieldUpdateOperationsInput | number
+  consecutiveFailures?: Prisma.IntFieldUpdateOperationsInput | number
+  verificationFailureReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verificationOverrideExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verificationOverrideReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifiedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   canonicalDomain?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   trustScore?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   verificationVersion?: Prisma.IntFieldUpdateOperationsInput | number
@@ -2189,6 +2904,7 @@ export type WebsiteCountOutputType = {
   orderItems: number
   marketplaceListings: number
   websiteIntegrations: number
+  metricsHistory: number
 }
 
 export type WebsiteCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2196,6 +2912,7 @@ export type WebsiteCountOutputTypeSelect<ExtArgs extends runtime.Types.Extension
   orderItems?: boolean | WebsiteCountOutputTypeCountOrderItemsArgs
   marketplaceListings?: boolean | WebsiteCountOutputTypeCountMarketplaceListingsArgs
   websiteIntegrations?: boolean | WebsiteCountOutputTypeCountWebsiteIntegrationsArgs
+  metricsHistory?: boolean | WebsiteCountOutputTypeCountMetricsHistoryArgs
 }
 
 /**
@@ -2236,6 +2953,13 @@ export type WebsiteCountOutputTypeCountWebsiteIntegrationsArgs<ExtArgs extends r
   where?: Prisma.WebsiteIntegrationWhereInput
 }
 
+/**
+ * WebsiteCountOutputType without action
+ */
+export type WebsiteCountOutputTypeCountMetricsHistoryArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WebsiteMetricWhereInput
+}
+
 
 export type WebsiteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2261,9 +2985,13 @@ export type WebsiteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   verificationCheckCount?: boolean
   consecutiveFailures?: boolean
   verificationFailureReason?: boolean
+  verificationOverrideExpiresAt?: boolean
+  verificationOverrideReason?: boolean
+  verifiedByUserId?: boolean
   canonicalDomain?: boolean
   trustScore?: boolean
   verificationVersion?: boolean
+  importBatchId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
@@ -2272,6 +3000,8 @@ export type WebsiteSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   orderItems?: boolean | Prisma.Website$orderItemsArgs<ExtArgs>
   marketplaceListings?: boolean | Prisma.Website$marketplaceListingsArgs<ExtArgs>
   websiteIntegrations?: boolean | Prisma.Website$websiteIntegrationsArgs<ExtArgs>
+  metricsHistory?: boolean | Prisma.Website$metricsHistoryArgs<ExtArgs>
+  importBatch?: boolean | Prisma.Website$importBatchArgs<ExtArgs>
   _count?: boolean | Prisma.WebsiteCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["website"]>
 
@@ -2299,13 +3029,18 @@ export type WebsiteSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Exten
   verificationCheckCount?: boolean
   consecutiveFailures?: boolean
   verificationFailureReason?: boolean
+  verificationOverrideExpiresAt?: boolean
+  verificationOverrideReason?: boolean
+  verifiedByUserId?: boolean
   canonicalDomain?: boolean
   trustScore?: boolean
   verificationVersion?: boolean
+  importBatchId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
   managedBy?: boolean | Prisma.Website$managedByArgs<ExtArgs>
+  importBatch?: boolean | Prisma.Website$importBatchArgs<ExtArgs>
 }, ExtArgs["result"]["website"]>
 
 export type WebsiteSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -2332,13 +3067,18 @@ export type WebsiteSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Exten
   verificationCheckCount?: boolean
   consecutiveFailures?: boolean
   verificationFailureReason?: boolean
+  verificationOverrideExpiresAt?: boolean
+  verificationOverrideReason?: boolean
+  verifiedByUserId?: boolean
   canonicalDomain?: boolean
   trustScore?: boolean
   verificationVersion?: boolean
+  importBatchId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
   managedBy?: boolean | Prisma.Website$managedByArgs<ExtArgs>
+  importBatch?: boolean | Prisma.Website$importBatchArgs<ExtArgs>
 }, ExtArgs["result"]["website"]>
 
 export type WebsiteSelectScalar = {
@@ -2365,14 +3105,18 @@ export type WebsiteSelectScalar = {
   verificationCheckCount?: boolean
   consecutiveFailures?: boolean
   verificationFailureReason?: boolean
+  verificationOverrideExpiresAt?: boolean
+  verificationOverrideReason?: boolean
+  verifiedByUserId?: boolean
   canonicalDomain?: boolean
   trustScore?: boolean
   verificationVersion?: boolean
+  importBatchId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type WebsiteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "url" | "domain" | "name" | "category" | "language" | "country" | "metrics" | "isActive" | "publisherId" | "ownershipType" | "managedByUserId" | "verificationStatus" | "verificationMethod" | "verificationToken" | "activeVerifiedToken" | "verifiedAt" | "lastVerificationCheckAt" | "lastSuccessfulVerificationAt" | "lastVerificationRequestAt" | "verificationCheckCount" | "consecutiveFailures" | "verificationFailureReason" | "canonicalDomain" | "trustScore" | "verificationVersion" | "createdAt" | "updatedAt", ExtArgs["result"]["website"]>
+export type WebsiteOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "url" | "domain" | "name" | "category" | "language" | "country" | "metrics" | "isActive" | "publisherId" | "ownershipType" | "managedByUserId" | "verificationStatus" | "verificationMethod" | "verificationToken" | "activeVerifiedToken" | "verifiedAt" | "lastVerificationCheckAt" | "lastSuccessfulVerificationAt" | "lastVerificationRequestAt" | "verificationCheckCount" | "consecutiveFailures" | "verificationFailureReason" | "verificationOverrideExpiresAt" | "verificationOverrideReason" | "verifiedByUserId" | "canonicalDomain" | "trustScore" | "verificationVersion" | "importBatchId" | "createdAt" | "updatedAt", ExtArgs["result"]["website"]>
 export type WebsiteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
   managedBy?: boolean | Prisma.Website$managedByArgs<ExtArgs>
@@ -2380,15 +3124,19 @@ export type WebsiteInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs
   orderItems?: boolean | Prisma.Website$orderItemsArgs<ExtArgs>
   marketplaceListings?: boolean | Prisma.Website$marketplaceListingsArgs<ExtArgs>
   websiteIntegrations?: boolean | Prisma.Website$websiteIntegrationsArgs<ExtArgs>
+  metricsHistory?: boolean | Prisma.Website$metricsHistoryArgs<ExtArgs>
+  importBatch?: boolean | Prisma.Website$importBatchArgs<ExtArgs>
   _count?: boolean | Prisma.WebsiteCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WebsiteIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
   managedBy?: boolean | Prisma.Website$managedByArgs<ExtArgs>
+  importBatch?: boolean | Prisma.Website$importBatchArgs<ExtArgs>
 }
 export type WebsiteIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   publisher?: boolean | Prisma.Website$publisherArgs<ExtArgs>
   managedBy?: boolean | Prisma.Website$managedByArgs<ExtArgs>
+  importBatch?: boolean | Prisma.Website$importBatchArgs<ExtArgs>
 }
 
 export type $WebsitePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2400,6 +3148,8 @@ export type $WebsitePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     orderItems: Prisma.$OrderItemPayload<ExtArgs>[]
     marketplaceListings: Prisma.$MarketplaceListingPayload<ExtArgs>[]
     websiteIntegrations: Prisma.$WebsiteIntegrationPayload<ExtArgs>[]
+    metricsHistory: Prisma.$WebsiteMetricPayload<ExtArgs>[]
+    importBatch: Prisma.$WebsiteImportBatchPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2425,9 +3175,13 @@ export type $WebsitePayload<ExtArgs extends runtime.Types.Extensions.InternalArg
     verificationCheckCount: number
     consecutiveFailures: number
     verificationFailureReason: string | null
+    verificationOverrideExpiresAt: Date | null
+    verificationOverrideReason: string | null
+    verifiedByUserId: string | null
     canonicalDomain: string | null
     trustScore: number | null
     verificationVersion: number
+    importBatchId: string | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["website"]>
@@ -2830,6 +3584,8 @@ export interface Prisma__WebsiteClient<T, Null = never, ExtArgs extends runtime.
   orderItems<T extends Prisma.Website$orderItemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Website$orderItemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marketplaceListings<T extends Prisma.Website$marketplaceListingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Website$marketplaceListingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   websiteIntegrations<T extends Prisma.Website$websiteIntegrationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Website$websiteIntegrationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebsiteIntegrationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  metricsHistory<T extends Prisma.Website$metricsHistoryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Website$metricsHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WebsiteMetricPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  importBatch<T extends Prisma.Website$importBatchArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Website$importBatchArgs<ExtArgs>>): Prisma.Prisma__WebsiteImportBatchClient<runtime.Types.Result.GetResult<Prisma.$WebsiteImportBatchPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2882,9 +3638,13 @@ export interface WebsiteFieldRefs {
   readonly verificationCheckCount: Prisma.FieldRef<"Website", 'Int'>
   readonly consecutiveFailures: Prisma.FieldRef<"Website", 'Int'>
   readonly verificationFailureReason: Prisma.FieldRef<"Website", 'String'>
+  readonly verificationOverrideExpiresAt: Prisma.FieldRef<"Website", 'DateTime'>
+  readonly verificationOverrideReason: Prisma.FieldRef<"Website", 'String'>
+  readonly verifiedByUserId: Prisma.FieldRef<"Website", 'String'>
   readonly canonicalDomain: Prisma.FieldRef<"Website", 'String'>
   readonly trustScore: Prisma.FieldRef<"Website", 'Int'>
   readonly verificationVersion: Prisma.FieldRef<"Website", 'Int'>
+  readonly importBatchId: Prisma.FieldRef<"Website", 'String'>
   readonly createdAt: Prisma.FieldRef<"Website", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Website", 'DateTime'>
 }
@@ -3419,6 +4179,49 @@ export type Website$websiteIntegrationsArgs<ExtArgs extends runtime.Types.Extens
   take?: number
   skip?: number
   distinct?: Prisma.WebsiteIntegrationScalarFieldEnum | Prisma.WebsiteIntegrationScalarFieldEnum[]
+}
+
+/**
+ * Website.metricsHistory
+ */
+export type Website$metricsHistoryArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WebsiteMetric
+   */
+  select?: Prisma.WebsiteMetricSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WebsiteMetric
+   */
+  omit?: Prisma.WebsiteMetricOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WebsiteMetricInclude<ExtArgs> | null
+  where?: Prisma.WebsiteMetricWhereInput
+  orderBy?: Prisma.WebsiteMetricOrderByWithRelationInput | Prisma.WebsiteMetricOrderByWithRelationInput[]
+  cursor?: Prisma.WebsiteMetricWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WebsiteMetricScalarFieldEnum | Prisma.WebsiteMetricScalarFieldEnum[]
+}
+
+/**
+ * Website.importBatch
+ */
+export type Website$importBatchArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WebsiteImportBatch
+   */
+  select?: Prisma.WebsiteImportBatchSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WebsiteImportBatch
+   */
+  omit?: Prisma.WebsiteImportBatchOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WebsiteImportBatchInclude<ExtArgs> | null
+  where?: Prisma.WebsiteImportBatchWhereInput
 }
 
 /**

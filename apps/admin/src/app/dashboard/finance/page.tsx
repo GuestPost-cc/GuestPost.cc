@@ -47,6 +47,7 @@ import Link from "next/link"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { Suspense, useState } from "react"
 import { toast } from "sonner"
+import { AdminPage, AdminPageHeader } from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
@@ -785,22 +786,21 @@ function FinancePageInner() {
       .reduce((total, row) => total + row.count, 0) ?? 0
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Finance Center</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Review evidence, approve eligible funds, execute payouts, and
-            investigate financial integrity.
-          </p>
-        </div>
-        <Button variant="outline" asChild>
-          <Link href="/dashboard">
-            Finance workbench
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Finance center"
+        description="Review evidence, approve eligible funds, execute payouts, and investigate financial integrity."
+        eyebrow="Financial operations"
+        icon={DollarSign}
+        actions={
+          <Button variant="outline" asChild>
+            <Link href="/dashboard">
+              Finance workbench
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        }
+      />
 
       <TabNav
         tabs={TABS}
@@ -1490,6 +1490,6 @@ function FinancePageInner() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPage>
   )
 }

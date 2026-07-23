@@ -35,6 +35,7 @@ import {
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
+import { AdminPage, AdminPageHeader } from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { getOrderBadgeVariant } from "../../../lib/order-status-badge-variant"
 
@@ -253,52 +254,47 @@ export function OperationsWorkbench() {
   const overview = data?.overview
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <PackageSearch className="h-4 w-4" />
-            </span>
-            <h1 className="text-3xl font-bold tracking-tight">
-              Operations Workbench
-            </h1>
-          </div>
-          <p className="mt-2 max-w-3xl text-muted-foreground">
-            Fulfillment, assigned Support, verification, and platform inventory
-            requiring your attention.
-          </p>
-          <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            Live operational queue
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow="Live operational queue"
+        title="Operations workbench"
+        description="Fulfillment, assigned Support, verification, and platform inventory requiring your attention."
+        icon={PackageSearch}
+        badges={
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             {data?.generatedAt ? (
               <span>
-                · Updated{" "}
-                {formatDistanceToNowStrict(new Date(data.generatedAt))} ago
+                Updated {formatDistanceToNowStrict(new Date(data.generatedAt))}{" "}
+                ago
               </span>
-            ) : null}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => query.refetch()}
-            disabled={query.isFetching}
-            title="Refresh Operations workbench"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
-            />
-          </Button>
-          <Button asChild>
-            <Link href="/dashboard/fulfillment">
-              Open My Fulfillment
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      </div>
+            ) : (
+              "Live"
+            )}
+          </span>
+        }
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
+              title="Refresh Operations workbench"
+            >
+              <RefreshCw
+                className={`h-4 w-4 ${query.isFetching ? "animate-spin" : ""}`}
+              />
+            </Button>
+            <Button asChild>
+              <Link href="/dashboard/fulfillment">
+                Open My Fulfillment
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
@@ -585,6 +581,6 @@ export function OperationsWorkbench() {
           </CardContent>
         </Card>
       </div>
-    </div>
+    </AdminPage>
   )
 }
