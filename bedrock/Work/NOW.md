@@ -732,3 +732,15 @@ data.
 - Campaign list and detail actions now enter the marketplace with a canonical campaign context instead of opening the retired duplicate order form.
 - Marketplace listing and service navigation preserves that context, and the order form submits it only when it matches a campaign returned by the tenant-scoped campaign API.
 - The legacy `/dashboard/orders/new` page is now a fail-closed compatibility redirect that accepts the historical query name without retaining a second order-creation path.
+
+## Completed 2026-07-24: order lifecycle pull request
+
+- Draft PR #78 contains the order lifecycle, reconciliation, article
+  provenance, role visibility, secure marketplace entry, and campaign handoff
+  work completed after PR #77.
+- PR #78 is intentionally stacked on PR #77 to keep its review diff isolated.
+  Retarget it to `main` only after PR #77 merges.
+- Full manually dispatched GitHub CI passed, including dependency policy and
+  audit, migrations, typechecking, Biome, ESLint, repository health, API unit
+  and integration tests, package tests, UI coverage, and all production
+  builds.

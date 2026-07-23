@@ -1,7 +1,7 @@
 # Order lifecycle integrity
 
-Status: implemented and locally validated; stacked draft PR and GitHub CI are
-pending.
+Status: implemented and locally validated; published as stacked draft PR #78.
+The full manually dispatched GitHub CI workflow is green.
 
 Completed:
 
@@ -22,5 +22,5 @@ Validated:
 
 Next:
 
-- Publish the stacked draft PR and require GitHub CI before retargeting it to
-  `main`.
+- Keep PR #78 based on PR #77 until #77 merges, then retarget #78 to `main`
+  and require the normal pull-request CI check before review completion.
