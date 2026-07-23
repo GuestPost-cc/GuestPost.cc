@@ -7,8 +7,8 @@ real_knowledge_path: /Users/shohan/Desktop/GuestPost/guestpost-platform/bedrock
 local_pointer_path: ./bedrock
 onboarding: complete
 last_bootstrap: 2026-06-09T00:13:59Z
-last_backfill_import: 2026-07-23
-last_project_sync: 2026-07-23T12:00:53Z
+last_backfill_import: 2026-07-24
+last_project_sync: 2026-07-23T23:39:12Z
 last_compaction: 2026-06-11
 last_validation: 2026-07-16T10:45:50Z
 last_validation_result: warn
@@ -33,7 +33,7 @@ last_system_refresh: 2026-07-16T14:54:05Z
 
 - Last bootstrap: `2026-06-09T00:13:59Z`
 - Last backfill/import: `2026-07-23`
-- Last project sync: `2026-07-23T12:00:53Z`
+- Last project sync: `2026-07-23T23:39:12Z`
 - Last compaction: `2026-06-11`
 - Last validation: `2026-07-16T10:45:50Z` (`warn`)
 - Last doctor: `2026-07-16T10:38:34Z` (`error`)

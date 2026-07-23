@@ -6,6 +6,7 @@ import {
   type OrderStatus,
 } from "@guestpost/shared"
 import { AlertTriangle, Check } from "lucide-react"
+import { getOrderStatusPresentation } from "../lib/status-presentation"
 import { cn } from "../lib/utils"
 
 export interface OrderLifecycleProgressProps {
@@ -57,6 +58,7 @@ export function OrderLifecycleProgress({
       </div>
     )
   }
+  const currentStatus = getOrderStatusPresentation(status as OrderStatus)
 
   return (
     <div className={cn("overflow-x-auto pb-1", className)}>
@@ -65,8 +67,9 @@ export function OrderLifecycleProgress({
         className="flex min-w-[680px] items-start"
       >
         {ORDER_LIFECYCLE_STAGES.map((stage, index) => {
-          const complete = index < current
-          const active = index === current
+          const complete =
+            index < current || (status === "COMPLETED" && index === current)
+          const active = index === current && !complete
           return (
             <li
               key={stage.key}
@@ -106,6 +109,12 @@ export function OrderLifecycleProgress({
           )
         })}
       </ol>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Current status:{" "}
+        <span className="font-medium text-foreground">
+          {currentStatus.label}
+        </span>
+      </p>
     </div>
   )
 }

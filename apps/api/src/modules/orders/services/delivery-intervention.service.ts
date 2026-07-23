@@ -132,43 +132,63 @@ export class DeliveryInterventionService {
         `Only FAILED or MANUAL_REVIEW deliveries can be manually approved (is ${version.verificationStatus})`,
       )
     }
-    const upd = await this.prisma.orderDeliveryVersion.updateMany({
-      where: {
-        id: version.id,
-        verificationVersion: version.verificationVersion,
-      },
-      data: {
-        interventionStatus: "APPROVED",
-        verificationFailureReason: null,
-        verificationVersion: version.verificationVersion + 1,
-      },
-    })
-    if (upd.count === 0)
-      throw new ConflictException(
-        "Delivery was modified by another request. Retry.",
+    await this.prisma.$transaction(async (tx: any) => {
+      const upd = await tx.orderDeliveryVersion.updateMany({
+        where: {
+          id: version.id,
+          verificationVersion: version.verificationVersion,
+        },
+        data: {
+          interventionStatus: "APPROVED",
+          verificationFailureReason: null,
+          verificationVersion: version.verificationVersion + 1,
+        },
+      })
+      if (upd.count === 0) {
+        throw new ConflictException(
+          "Delivery was modified by another request. Retry.",
+        )
+      }
+
+      const orderUpdate = await tx.order.updateMany({
+        where: { id: order.id, status: "PUBLISHED", version: order.version },
+        data: {
+          status: "VERIFIED",
+          verifiedAt: new Date(),
+          verifiedBy: userId,
+          verifyMethod: "MANUAL_ADMIN",
+          version: { increment: 1 },
+        },
+      })
+      if (orderUpdate.count === 0) {
+        throw new ConflictException(
+          "Order was modified by another request. Refresh and retry.",
+        )
+      }
+
+      await tx.orderEvent.create({
+        data: {
+          orderId: order.id,
+          eventType: "VERIFIED_MANUAL",
+          actorId: userId,
+          message: "Delivery manually verified by staff",
+          metadata: { deliveryVersionId: version.id, reason: r },
+        },
+      })
+      await this.audit.log(
+        {
+          action: "ORDER_DELIVERY_MANUAL_APPROVED",
+          entityType: "OrderDeliveryVersion",
+          entityId: version.id,
+          metadata: this.deliveryAuditMeta(order, version, {
+            reason: r,
+            roleAtTime: role,
+          }),
+          userId,
+          organizationId: order.organizationId,
+        },
+        tx,
       )
-
-    // Approving makes the delivery settlement-eligible; mirror order to VERIFIED.
-    await this.prisma.order.updateMany({
-      where: { id: order.id, status: "PUBLISHED" },
-      data: {
-        status: "VERIFIED",
-        verifiedAt: new Date(),
-        verifiedBy: userId,
-        verifyMethod: "MANUAL_ADMIN",
-      },
-    })
-
-    await this.audit.log({
-      action: "ORDER_DELIVERY_MANUAL_APPROVED",
-      entityType: "OrderDeliveryVersion",
-      entityId: version.id,
-      metadata: this.deliveryAuditMeta(order, version, {
-        reason: r,
-        roleAtTime: role,
-      }),
-      userId,
-      organizationId: order.organizationId,
     })
     await this.notifyOrderParties(
       order,
@@ -188,32 +208,46 @@ export class DeliveryInterventionService {
     const r = this.requireReason(reason)
     const { version, order } =
       await this.loadVersionWithOrder(deliveryVersionId)
-    const upd = await this.prisma.orderDeliveryVersion.updateMany({
-      where: {
-        id: version.id,
-        verificationVersion: version.verificationVersion,
-      },
-      data: {
-        interventionStatus: "REJECTED",
-        verificationFailureReason: r,
-        verificationVersion: version.verificationVersion + 1,
-      },
-    })
-    if (upd.count === 0)
-      throw new ConflictException(
-        "Delivery was modified by another request. Retry.",
+    await this.prisma.$transaction(async (tx: any) => {
+      const upd = await tx.orderDeliveryVersion.updateMany({
+        where: {
+          id: version.id,
+          verificationVersion: version.verificationVersion,
+        },
+        data: {
+          interventionStatus: "REJECTED",
+          verificationFailureReason: r,
+          verificationVersion: version.verificationVersion + 1,
+        },
+      })
+      if (upd.count === 0) {
+        throw new ConflictException(
+          "Delivery was modified by another request. Retry.",
+        )
+      }
+      await tx.orderEvent.create({
+        data: {
+          orderId: order.id,
+          eventType: "VERIFICATION_ESCALATED",
+          actorId: userId,
+          message: "Delivery rejected during manual verification",
+          metadata: { deliveryVersionId: version.id, reason: r },
+        },
+      })
+      await this.audit.log(
+        {
+          action: "ORDER_DELIVERY_MANUAL_REJECTED",
+          entityType: "OrderDeliveryVersion",
+          entityId: version.id,
+          metadata: this.deliveryAuditMeta(order, version, {
+            reason: r,
+            roleAtTime: role,
+          }),
+          userId,
+          organizationId: order.organizationId,
+        },
+        tx,
       )
-
-    await this.audit.log({
-      action: "ORDER_DELIVERY_MANUAL_REJECTED",
-      entityType: "OrderDeliveryVersion",
-      entityId: version.id,
-      metadata: this.deliveryAuditMeta(order, version, {
-        reason: r,
-        roleAtTime: role,
-      }),
-      userId,
-      organizationId: order.organizationId,
     })
     await this.notifyOrderParties(
       order,
@@ -242,46 +276,102 @@ export class DeliveryInterventionService {
     const { version, order } =
       await this.loadVersionWithOrder(deliveryVersionId)
 
-    const upd = await this.prisma.orderDeliveryVersion.updateMany({
-      where: {
-        id: version.id,
-        verificationVersion: version.verificationVersion,
-      },
-      data: {
-        verificationStatus: targetStatus,
-        interventionStatus: "OVERRIDDEN",
-        verificationFailureReason: targetStatus === "FAILED" ? r : null,
-        verificationVersion: version.verificationVersion + 1,
-      },
-    })
-    if (upd.count === 0)
-      throw new ConflictException(
-        "Delivery was modified by another request. Retry.",
+    if (
+      targetStatus === "FAILED" &&
+      ["DELIVERED", "SETTLED", "COMPLETED"].includes(order.status)
+    ) {
+      throw new BadRequestException(
+        "A financially final order cannot be moved back by verification override",
       )
-
-    if (targetStatus === "VERIFIED") {
-      await this.prisma.order.updateMany({
-        where: { id: order.id, status: "PUBLISHED" },
-        data: {
-          status: "VERIFIED",
-          verifiedAt: new Date(),
-          verifiedBy: userId,
-          verifyMethod: "MANUAL_ADMIN",
-        },
-      })
     }
 
-    await this.audit.log({
-      action: "ORDER_DELIVERY_OVERRIDDEN",
-      entityType: "OrderDeliveryVersion",
-      entityId: version.id,
-      metadata: this.deliveryAuditMeta(order, version, {
-        reason: r,
-        targetStatus,
-        roleAtTime: role,
-      }),
-      userId,
-      organizationId: order.organizationId,
+    await this.prisma.$transaction(async (tx: any) => {
+      const upd = await tx.orderDeliveryVersion.updateMany({
+        where: {
+          id: version.id,
+          verificationVersion: version.verificationVersion,
+        },
+        data: {
+          verificationStatus: targetStatus,
+          interventionStatus: "OVERRIDDEN",
+          verificationFailureReason: targetStatus === "FAILED" ? r : null,
+          verificationVersion: version.verificationVersion + 1,
+        },
+      })
+      if (upd.count === 0) {
+        throw new ConflictException(
+          "Delivery was modified by another request. Retry.",
+        )
+      }
+
+      if (targetStatus === "VERIFIED") {
+        const orderUpdate = await tx.order.updateMany({
+          where: { id: order.id, status: "PUBLISHED", version: order.version },
+          data: {
+            status: "VERIFIED",
+            verifiedAt: new Date(),
+            verifiedBy: userId,
+            verifyMethod: "MANUAL_ADMIN",
+            version: { increment: 1 },
+          },
+        })
+        if (orderUpdate.count === 0) {
+          throw new ConflictException(
+            "Order was modified by another request. Refresh and retry.",
+          )
+        }
+      } else if (order.status === "VERIFIED") {
+        const orderUpdate = await tx.order.updateMany({
+          where: { id: order.id, status: "VERIFIED", version: order.version },
+          data: {
+            status: "PUBLISHED",
+            verifiedAt: null,
+            verifiedBy: null,
+            verifyMethod: null,
+            version: { increment: 1 },
+          },
+        })
+        if (orderUpdate.count === 0) {
+          throw new ConflictException(
+            "Order was modified by another request. Refresh and retry.",
+          )
+        }
+      }
+
+      await tx.orderEvent.create({
+        data: {
+          orderId: order.id,
+          eventType:
+            targetStatus === "VERIFIED"
+              ? "VERIFIED_MANUAL"
+              : "VERIFICATION_ESCALATED",
+          actorId: userId,
+          message:
+            targetStatus === "VERIFIED"
+              ? "Delivery verification overridden to verified"
+              : "Delivery verification overridden to failed",
+          metadata: {
+            deliveryVersionId: version.id,
+            reason: r,
+            targetStatus,
+          },
+        },
+      })
+      await this.audit.log(
+        {
+          action: "ORDER_DELIVERY_OVERRIDDEN",
+          entityType: "OrderDeliveryVersion",
+          entityId: version.id,
+          metadata: this.deliveryAuditMeta(order, version, {
+            reason: r,
+            targetStatus,
+            roleAtTime: role,
+          }),
+          userId,
+          organizationId: order.organizationId,
+        },
+        tx,
+      )
     })
     await this.notifyOrderParties(
       order,

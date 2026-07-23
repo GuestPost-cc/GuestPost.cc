@@ -94,6 +94,7 @@ export const ModelName = {
   PayoutBatch: 'PayoutBatch',
   ApiKey: 'ApiKey',
   ContentOrder: 'ContentOrder',
+  OrderArticleVersion: 'OrderArticleVersion',
   Revision: 'Revision',
   Report: 'Report',
   PlatformRevenue: 'PlatformRevenue',
@@ -942,6 +943,25 @@ export const ContentOrderScalarFieldEnum = {
 } as const
 
 export type ContentOrderScalarFieldEnum = (typeof ContentOrderScalarFieldEnum)[keyof typeof ContentOrderScalarFieldEnum]
+
+
+export const OrderArticleVersionScalarFieldEnum = {
+  id: 'id',
+  orderId: 'orderId',
+  version: 'version',
+  source: 'source',
+  purpose: 'purpose',
+  title: 'title',
+  body: 'body',
+  format: 'format',
+  checksum: 'checksum',
+  wordCount: 'wordCount',
+  createdByUserId: 'createdByUserId',
+  supersedesId: 'supersedesId',
+  createdAt: 'createdAt'
+} as const
+
+export type OrderArticleVersionScalarFieldEnum = (typeof OrderArticleVersionScalarFieldEnum)[keyof typeof OrderArticleVersionScalarFieldEnum]
 
 
 export const RevisionScalarFieldEnum = {

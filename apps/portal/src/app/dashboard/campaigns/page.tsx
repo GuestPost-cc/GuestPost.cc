@@ -326,7 +326,7 @@ export default function CampaignsPage() {
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
                           <Link
-                            href={`/dashboard/orders/new?campaign=${campaign.id}`}
+                            href={`/dashboard/marketplace?campaignId=${encodeURIComponent(campaign.id)}`}
                           >
                             <Plus className="mr-2 h-4 w-4" />
                             Add Order

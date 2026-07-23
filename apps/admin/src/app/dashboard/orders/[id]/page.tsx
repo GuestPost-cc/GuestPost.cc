@@ -19,6 +19,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  getOrderEventPresentation,
   getOrderStatusPresentation,
   Input,
   Label,
@@ -105,45 +106,6 @@ const statusConfig: Record<
   DISPUTED: { icon: AlertCircle, description: "Order disputed" },
 }
 
-const eventLabels: Record<string, string> = {
-  ORDER_CREATED: "Order created",
-  PAYMENT_RECEIVED: "Payment received",
-  ASSIGNED: "Writer assigned",
-  CONTENT_SUBMITTED: "Content submitted",
-  CONTENT_APPROVED: "Content approved",
-  PUBLISHED: "Published live",
-  VERIFIED: "Verified",
-  UNDER_REVIEW: "Sent for review",
-  DELIVERED: "Delivered",
-  SETTLED: "Settlement processed",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-  REFUNDED: "Refunded",
-  DISPUTED: "Dispute opened",
-  REJECTED: "Rejected",
-  VERIFIED_AUTO: "Automatically verified",
-  VERIFIED_MANUAL: "Manually verified by admin",
-  AUTO_ACCEPTED: "Auto-accepted (review window expired)",
-  REVIEW_REMINDER: "Review reminder sent",
-  VERIFICATION_ESCALATED: "Verification escalated",
-  DISPUTE_OPENED: "Dispute opened",
-  DISPUTE_RESOLVED: "Dispute resolved",
-  FORCE_CANCELLED: "Force cancelled by admin",
-  REFUND_ISSUED: "Refund issued by admin",
-  SETTLEMENT_CREATED: "Settlement created",
-  ORDER_CANCELLED: "Order cancelled",
-  PAYMENT_CAPTURED: "Payment captured",
-  PAYMENT_SUBMITTED: "Payment submitted",
-  ORDER_ACCEPTED: "Order accepted",
-  CONTENT_MARKED_READY: "Content marked ready",
-  CONTENT_SUBMITTED_FOR_REVIEW: "Content submitted for review",
-  REVISION_REQUESTED: "Revision requested",
-  PUBLICATION_MARKED: "Publication marked",
-  DELIVERY_CONFIRMED: "Delivery confirmed",
-  ITEM_ADDED: "Item added",
-  ITEM_REMOVED: "Item removed",
-}
-
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 type TimelineEvent = AdminOrderTimelineEvent
@@ -199,9 +161,11 @@ function formatDateTime(value: string | null | undefined): string {
 // ─── Sub-components ─────────────────────────────────────────────────────────
 
 function OrderTimeline({ events }: { events: TimelineEvent[] }) {
-  const sortedEvents = [...events].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  )
+  const sortedEvents = [...events].sort((a, b) => {
+    const right = new Date(b.createdAt).getTime()
+    const left = new Date(a.createdAt).getTime()
+    return (Number.isNaN(right) ? 0 : right) - (Number.isNaN(left) ? 0 : left)
+  })
 
   if (sortedEvents.length === 0) {
     return (
@@ -219,6 +183,8 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
           const config = statusConfig[event.eventType] || statusConfig.DRAFT
           const Icon = config.icon
           const isLatest = index === 0
+          const timestamp = new Date(event.createdAt)
+          const validTimestamp = !Number.isNaN(timestamp.getTime())
 
           return (
             <div key={event.id} className="relative pl-10">
@@ -233,11 +199,7 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
               </div>
               <div className="flex flex-col">
                 <span className="font-medium">
-                  {eventLabels[event.eventType] ||
-                    event.eventType
-                      .replace(/_/g, " ")
-                      .toLowerCase()
-                      .replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {getOrderEventPresentation(event.eventType).label}
                 </span>
                 {(() => {
                   const detail = eventDetail(event)
@@ -249,11 +211,11 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
                 })()}
                 <span
                   className="mt-0.5 text-xs text-muted-foreground"
-                  title={format(new Date(event.createdAt), "PPpp")}
+                  title={validTimestamp ? format(timestamp, "PPpp") : undefined}
                 >
-                  {formatDistanceToNow(new Date(event.createdAt), {
-                    addSuffix: true,
-                  })}
+                  {validTimestamp
+                    ? formatDistanceToNow(timestamp, { addSuffix: true })
+                    : "Time unavailable"}
                 </span>
               </div>
             </div>
@@ -331,6 +293,14 @@ export default function OrderDetailPage() {
   } = useQuery<AdminOrderDetailResponse>({
     queryKey: ["admin", "order", id],
     queryFn: () => api.admin.getOrderById(id),
+    refetchInterval: (query) => {
+      const current = query.state.data as AdminOrderDetailResponse | undefined
+      return current &&
+        ["COMPLETED", "CANCELLED", "REFUNDED"].includes(current.status)
+        ? false
+        : 10_000
+    },
+    refetchOnWindowFocus: true,
   })
 
   const refreshOrder = () => {

@@ -491,6 +491,18 @@ export interface OperationsOrderDetail extends OperationsInboxOrder {
     deliverable: string | null
     status: string
   } | null
+  articleVersions: Array<{
+    id: string
+    version: number
+    source: "CUSTOMER" | "PUBLISHER" | "OPERATIONS"
+    purpose: "SOURCE_ARTICLE" | "FINAL_SUBMISSION"
+    title: string | null
+    body: string
+    format: "PLAIN_TEXT" | "MARKDOWN"
+    wordCount: number
+    supersedesId: string | null
+    createdAt: string
+  }>
   revisions: Array<{
     id: string
     notes: string | null

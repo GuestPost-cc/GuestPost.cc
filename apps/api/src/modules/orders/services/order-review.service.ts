@@ -124,18 +124,41 @@ export class OrderReviewService {
       : null
   }
 
-  async getReview(orderId: string, organizationId: string) {
+  async getReview(
+    orderId: string,
+    access: {
+      organizationId?: string | null
+      publisherId?: string | null
+    },
+  ) {
+    const ownershipScope = access.organizationId
+      ? { organizationId: access.organizationId }
+      : access.publisherId
+        ? { website: { publisherId: access.publisherId } }
+        : null
+    if (!ownershipScope) throw new NotFoundException("Order not found")
+
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, organizationId },
+      where: { id: orderId, ...ownershipScope },
       select: { id: true },
     })
     if (!order) throw new NotFoundException("Order not found")
     return this.prisma.orderReview.findUnique({ where: { orderId } })
   }
 
-  private async transition(orderId: string, fromVersion: number, data: any) {
-    const r = await this.prisma.order.updateMany({
-      where: { id: orderId, version: fromVersion },
+  private async transition(
+    orderId: string,
+    fromVersion: number,
+    data: any,
+    expectedStatus?: string,
+    prisma: any = this.prisma,
+  ) {
+    const r = await prisma.order.updateMany({
+      where: {
+        id: orderId,
+        version: fromVersion,
+        ...(expectedStatus ? { status: expectedStatus as any } : {}),
+      },
       data: { ...data, version: { increment: 1 } },
     })
     if (r.count === 0) {
@@ -143,7 +166,7 @@ export class OrderReviewService {
         "Order was modified by another request. Retry.",
       )
     }
-    return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
+    return prisma.order.findUniqueOrThrow({ where: { id: orderId } })
   }
 
   async approveContent(
@@ -176,17 +199,23 @@ export class OrderReviewService {
       )
     }
 
-    const updated = await this.transition(orderId, order.version, {
-      status: "APPROVED",
-    })
-
-    await this.prisma.orderEvent.create({
-      data: {
+    const updated = await this.prisma.$transaction(async (tx: any) => {
+      const fresh = await this.transition(
         orderId,
-        eventType: "CONTENT_APPROVED",
-        actorId: userId,
-        message: `Content approved by customer`,
-      },
+        order.version,
+        { status: "APPROVED" },
+        "CUSTOMER_REVIEW",
+        tx,
+      )
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "CONTENT_APPROVED",
+          actorId: userId,
+          message: "Content approved by customer",
+        },
+      })
+      return fresh
     })
 
     await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
@@ -239,35 +268,44 @@ export class OrderReviewService {
       )
     }
 
-    const updated = await this.transition(orderId, order.version, {
-      status: "CONTENT_REQUESTED",
-      revisionCount: { increment: 1 },
-    })
-
-    await this.prisma.revision.create({
-      data: { orderId, notes, status: "REQUESTED" },
-    })
-
-    await this.prisma.orderEvent.create({
-      data: {
+    const updated = await this.prisma.$transaction(async (tx: any) => {
+      const fresh = await this.transition(
         orderId,
-        eventType: "REVISION_REQUESTED",
-        actorId: userId,
-        message: `Revision requested: ${notes}`,
-        metadata: { revisionNumber: order.revisionCount + 1, notes },
-      },
-    })
-
-    await this.audit.log({
-      action: "REVISION_REQUESTED",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: {
-        ...orderEventMetadata(order),
-        revisionNumber: order.revisionCount + 1,
-      },
-      userId,
-      organizationId,
+        order.version,
+        {
+          status: "CONTENT_REQUESTED",
+          revisionCount: { increment: 1 },
+        },
+        "CUSTOMER_REVIEW",
+        tx,
+      )
+      await tx.revision.create({
+        data: { orderId, notes, status: "REQUESTED" },
+      })
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "REVISION_REQUESTED",
+          actorId: userId,
+          message: `Revision requested: ${notes}`,
+          metadata: { revisionNumber: order.revisionCount + 1, notes },
+        },
+      })
+      await this.audit.log(
+        {
+          action: "REVISION_REQUESTED",
+          entityType: "Order",
+          entityId: orderId,
+          metadata: {
+            ...orderEventMetadata(order),
+            revisionNumber: order.revisionCount + 1,
+          },
+          userId,
+          organizationId,
+        },
+        tx,
+      )
+      return fresh
     })
 
     return updated

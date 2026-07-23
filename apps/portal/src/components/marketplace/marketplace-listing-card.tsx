@@ -1,3 +1,5 @@
+"use client"
+
 import type { MarketplaceListing } from "@guestpost/api-client"
 import {
   LISTING_LINK_TYPE_LABELS,
@@ -15,6 +17,7 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { useSearchParams } from "next/navigation"
 import {
   availableServices,
   displayWebsiteHost,
@@ -37,6 +40,7 @@ export function MarketplaceListingCard({
   canViewUrls: boolean
   serviceTypeFilter?: string
 }) {
+  const campaignId = useSearchParams()?.get("campaignId")
   const image = listingImage(listing)
   const services = availableServices(listing)
   const matchingService = serviceTypeFilter
@@ -56,7 +60,11 @@ export function MarketplaceListingCard({
 
   return (
     <Link
-      href={`/dashboard/marketplace/${listing.slug}`}
+      href={
+        campaignId
+          ? `/dashboard/marketplace/${listing.slug}?campaignId=${encodeURIComponent(campaignId)}`
+          : `/dashboard/marketplace/${listing.slug}`
+      }
       aria-label={`View ${listing.title}`}
       className="group flex h-full flex-col overflow-hidden rounded-2xl border bg-card shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >

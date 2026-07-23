@@ -595,6 +595,19 @@ Built the website detail `/dashboard/websites/[id]` page that completes the inte
 
 ## Current Focus
 
+### Secure customer order creation and article provenance
+
+The marketplace order form now presents the service contract, server-projected
+website access state, structured brief, article responsibility, campaign,
+price/currency, turnaround, revisions, warranty, and requirements in one
+responsive workspace. It submits idempotency and reviewed-quote assertions.
+
+Customer source articles and publisher/Operations final submissions now use
+`OrderArticleVersion`; customer, publisher, and Operations detail pages render
+the relevant immutable history as safe text. Migration
+`20260723180000_order_article_versions` must be applied and the Prisma client
+generated before deploying the API and role applications.
+
 The hybrid worker rewrite is merged through PR #57 and its main-branch CI is
 green. The payout reference preflight returned no duplicates, the additive
 inbox migration is deployed to the Neon test database, and all worker modes
@@ -705,3 +718,17 @@ data.
   and the explicit Northflank service/job configuration; the repository
   intentionally defaults to compatibility `all` mode until that
   operator-controlled cutover occurs.
+
+## Completed 2026-07-24: order lifecycle hardening and local validation
+
+- Prisma Client generated and `20260723180000_order_article_versions` applied to the local database.
+- Customer, publisher, and Operations order pages now expose canonical lifecycle, timeline metadata, and role-relevant article history.
+- Fixed publisher delivery-proof/review null-organization failures, post-create zero-total response snapshots, itemless listing-service pricing, service-query loss on login, and stale Next development output causing nested-route 404s.
+- Full validation is green: 12 shared suites/108 tests; 99 API suites/997 tests; focused production builds passed; live role API and development-route smoke checks passed.
+- Local smoke orders: `cmrxyiub900047pukwa0vbvu2` (platform, paid, customer article) and `cmrxym4uf000f7pukbk1usr8a` (publisher, paid, customer article).
+
+## Completed 2026-07-24: campaign marketplace handoff cleanup
+
+- Campaign list and detail actions now enter the marketplace with a canonical campaign context instead of opening the retired duplicate order form.
+- Marketplace listing and service navigation preserves that context, and the order form submits it only when it matches a campaign returned by the tenant-scoped campaign API.
+- The legacy `/dashboard/orders/new` page is now a fail-closed compatibility redirect that accepts the historical query name without retaining a second order-creation path.

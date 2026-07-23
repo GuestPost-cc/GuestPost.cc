@@ -185,6 +185,34 @@ describe("runReconciliation with mock prisma", () => {
     expect(completenessIssues[0].severity).toBe("critical")
   })
 
+  it("accepts a completed platform order with balanced platform revenue", async () => {
+    const prisma = mockPrisma()
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: "platform-complete-1",
+        status: "COMPLETED",
+        amount: "100.00",
+        fulfillmentChannel: "PLATFORM",
+        website: { ownershipType: "PLATFORM" },
+        settlements: [],
+        platformRevenue: {
+          id: "revenue-1",
+          amount: "100.00",
+          platformFee: "10.00",
+          netRevenue: "90.00",
+          reversedAt: null,
+        },
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+    expect(
+      report.settlementDrift.some(
+        (row) => row.entityId === "platform-complete-1",
+      ),
+    ).toBe(false)
+  })
+
   it("detects unmatched PURCHASE transactions", async () => {
     const prisma = mockPrisma()
     prisma.transaction.findMany.mockResolvedValue([

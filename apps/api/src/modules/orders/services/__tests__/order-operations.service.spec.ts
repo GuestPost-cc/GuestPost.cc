@@ -43,6 +43,13 @@ describe("OrderOperationsService", () => {
       },
       orderEvent: { create: jest.fn() },
       contentOrder: { upsert: jest.fn() },
+      orderArticleVersion: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation(({ data }) => ({
+          id: "article-version-1",
+          ...data,
+        })),
+      },
       fulfillmentAssignment: {
         findFirst: jest.fn().mockResolvedValue({
           id: "fa-1",

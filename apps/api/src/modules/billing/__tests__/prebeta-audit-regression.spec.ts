@@ -42,6 +42,7 @@ function makePrismaMock() {
     "auditLog",
     "marketplaceListing",
     "service",
+    "website",
     // Phase 6 — production orders.service.ts calls tx.listingService.findUnique
     // on the snapshot path; F-3 needs this model to be on the mock.
     "listingService",
@@ -588,6 +589,10 @@ describe("F-3: tenant-scoped order idempotency", () => {
           idempotencyKey: "key-1",
         },
       },
+      include: {
+        items: true,
+        articleVersions: true,
+      },
     })
     expect(prisma.order.create).not.toHaveBeenCalled()
   })
@@ -622,6 +627,17 @@ describe("F-3: tenant-scoped order idempotency", () => {
       id: "order-B",
       organizationId: "org-B",
     })
+    prisma.website.findUnique.mockResolvedValue({
+      ownershipType: "PUBLISHER",
+      verificationStatus: "VERIFIED",
+    })
+    prisma.order.findUniqueOrThrow.mockResolvedValue({
+      id: "order-B",
+      organizationId: "org-B",
+      amount: 500,
+      items: [{ id: "item-B", price: 500 }],
+      articleVersions: [],
+    })
 
     const result = await service.createOrder(
       {
@@ -630,6 +646,12 @@ describe("F-3: tenant-scoped order idempotency", () => {
         organizationId: "org-B",
         idempotencyKey: "key-1",
         listingServiceId: "ls-B", // Phase 6 snapshot requirement
+        briefData: {
+          title: "Tenant B guest post",
+          topic: "A complete topic for tenant-scoped idempotency validation",
+          targetUrl: "https://tenant-b.example/target",
+          anchorText: "Tenant B anchor",
+        },
       } as any,
       "u2",
     )

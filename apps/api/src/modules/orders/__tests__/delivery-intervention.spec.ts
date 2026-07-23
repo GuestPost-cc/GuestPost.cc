@@ -79,6 +79,7 @@ describe("DeliveryInterventionService", () => {
       )
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: "ORDER_DELIVERY_MANUAL_APPROVED" }),
+        prisma,
       )
     })
     it("rejects a short reason", async () => {
@@ -114,6 +115,7 @@ describe("DeliveryInterventionService", () => {
       expect(r.status).toBe("VERIFIED")
       expect(audit.log).toHaveBeenCalledWith(
         expect.objectContaining({ action: "ORDER_DELIVERY_OVERRIDDEN" }),
+        prisma,
       )
     })
     it("forbids non-SUPER_ADMIN", async () => {

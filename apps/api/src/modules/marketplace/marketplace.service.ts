@@ -12,6 +12,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common"
+import { canCustomerViewWebsite } from "../../common/customer-website-access"
 import { PrismaService } from "../../common/prisma.service"
 import {
   hasCompleteListingPolicy,
@@ -82,8 +83,11 @@ export class MarketplaceService {
   // The raw row leaked publisher email/tier/org, internal ids, and raw
   // provider metric dumps (semrush/traffic) to anyone scraping the public
   // marketplace. Whitelist what a buyer legitimately needs to see.
-  private toPublicListing(listing: any) {
+  private toPublicListing(listing: any, websiteUnlocked = false) {
     const {
+      websiteUrl,
+      sampleUrl,
+      signupUrl,
       organizationId,
       publisherId,
       semrushData,
@@ -149,6 +153,13 @@ export class MarketplaceService {
 
     return {
       ...rest,
+      websiteUrl: websiteUnlocked ? websiteUrl : null,
+      sampleUrl: websiteUnlocked ? sampleUrl : null,
+      signupUrl: websiteUnlocked ? signupUrl : null,
+      websiteAccess: {
+        unlocked: websiteUnlocked,
+        reason: websiteUnlocked ? "DEPOSIT_VERIFIED" : "FIRST_DEPOSIT_REQUIRED",
+      },
       status,
       lifecyclePhase,
       priceFrom,
@@ -244,7 +255,11 @@ export class MarketplaceService {
   // LISTING CRUD
   // =============================================================================
 
-  async searchListings(dto: SearchListingsDto) {
+  async searchListings(dto: SearchListingsDto, organizationId?: string | null) {
+    const websiteUnlocked = await canCustomerViewWebsite(
+      this.prisma,
+      organizationId,
+    )
     const {
       query,
       category,
@@ -456,13 +471,16 @@ export class MarketplaceService {
           ? listing.reviews.reduce((sum, r) => sum + r.rating, 0) /
             listing.reviews.length
           : null
-      return this.toPublicListing({
-        ...listing,
-        tags: listing.tags.map((t) => t.tag),
-        image: listing.images[0]?.url || null,
-        reviewCount: listing.reviews.length,
-        avgRating,
-      })
+      return this.toPublicListing(
+        {
+          ...listing,
+          tags: listing.tags.map((t) => t.tag),
+          image: listing.images[0]?.url || null,
+          reviewCount: listing.reviews.length,
+          avgRating,
+        },
+        websiteUnlocked,
+      )
     })
 
     return {
@@ -827,7 +845,15 @@ export class MarketplaceService {
     }
   }
 
-  async getListing(slug: string, userId?: string) {
+  async getListing(
+    slug: string,
+    userId?: string,
+    organizationId?: string | null,
+  ) {
+    const websiteUnlocked = await canCustomerViewWebsite(
+      this.prisma,
+      organizationId,
+    )
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { slug },
       include: {
@@ -944,25 +970,31 @@ export class MarketplaceService {
     }
 
     return {
-      ...this.toPublicListing({
-        ...listing,
-        tags: listing.tags.map((t) => t.tag),
-        avgRating,
-        reviewCount: listing.reviews.length,
-        isFavorited,
-      }),
+      ...this.toPublicListing(
+        {
+          ...listing,
+          tags: listing.tags.map((t) => t.tag),
+          avgRating,
+          reviewCount: listing.reviews.length,
+          isFavorited,
+        },
+        websiteUnlocked,
+      ),
       relatedListings: relatedListings.map((l) =>
-        this.toPublicListing({
-          ...l,
-          tags: l.tags.map((t) => t.tag),
-          image: l.images[0]?.url || null,
-          reviewCount: l.reviews.length,
-          avgRating:
-            l.reviews.length > 0
-              ? l.reviews.reduce((sum, review) => sum + review.rating, 0) /
-                l.reviews.length
-              : null,
-        }),
+        this.toPublicListing(
+          {
+            ...l,
+            tags: l.tags.map((t) => t.tag),
+            image: l.images[0]?.url || null,
+            reviewCount: l.reviews.length,
+            avgRating:
+              l.reviews.length > 0
+                ? l.reviews.reduce((sum, review) => sum + review.rating, 0) /
+                  l.reviews.length
+                : null,
+          },
+          websiteUnlocked,
+        ),
       ),
     }
   }

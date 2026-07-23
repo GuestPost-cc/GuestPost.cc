@@ -44,7 +44,10 @@ export default function CheckoutPage({
   const { mutate: proceedToPayment, isPending: isProcessing } = useMutation({
     mutationFn: () => api.orders.submitPayment(resolvedParams.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orders"] })
+      queryClient.invalidateQueries({ queryKey: ["customer-orders"] })
+      queryClient.invalidateQueries({
+        queryKey: ["order", resolvedParams.id],
+      })
       queryClient.invalidateQueries({ queryKey: ["wallet"] })
       toast.success("Payment submitted successfully")
       window.location.href = `/dashboard/orders/${resolvedParams.id}`

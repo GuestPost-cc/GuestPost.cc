@@ -27,6 +27,24 @@ class OrderItemDto {
 }
 
 export class CreateOrderDto {
+  @IsOptional()
+  expectedListingServiceVersion?: unknown
+
+  @IsOptional()
+  expectedPrice?: unknown
+
+  @IsOptional()
+  expectedCurrency?: unknown
+
+  @IsOptional()
+  articleTitle?: unknown
+
+  @IsOptional()
+  articleBody?: unknown
+
+  @IsOptional()
+  articleFormat?: unknown
+
   @IsEnum(ServiceType)
   type: ServiceType
 

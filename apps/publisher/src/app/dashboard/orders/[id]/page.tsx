@@ -1,8 +1,12 @@
 "use client"
 
-import type { CancellationReasonCode } from "@guestpost/api-client"
+import type {
+  CancellationReasonCode,
+  OrderResponse,
+} from "@guestpost/api-client"
 import type { OrderStatus } from "@guestpost/shared"
 import {
+  Badge,
   BriefRenderer,
   Button,
   Card,
@@ -45,6 +49,7 @@ import {
   MessageSquare,
   RefreshCw,
   ShieldCheck,
+  UserPlus,
   XCircle,
 } from "lucide-react"
 import Link from "next/link"
@@ -118,6 +123,80 @@ const eventLabels: Record<string, string> = {
   CONTENT_SUBMITTED_FOR_REVIEW: "Submitted for review",
   ORDER_ACCEPTED: "Order accepted by you",
   PAYMENT_CAPTURED: "Payment captured",
+  VERIFIED_MANUAL: "Manually verified by admin",
+  VERIFICATION_ESCALATED_TO_ADMIN: "Verification escalated to admin",
+  DISPUTE_OPENED: "Dispute opened",
+  DISPUTE_RESOLVED: "Dispute resolved",
+  REFUND_ISSUED: "Refund issued",
+}
+
+const eventIcons = {
+  ORDER_CREATED: FileText,
+  PAYMENT_RECEIVED: Check,
+  ASSIGNED: UserPlus,
+  CONTENT_SUBMITTED: FileText,
+  CONTENT_APPROVED: Check,
+  PUBLISHED: Check,
+  VERIFIED: CheckCircle,
+  UNDER_REVIEW: Clock,
+  DELIVERED: CheckCircle,
+  SETTLED: CheckCircle,
+  COMPLETED: CheckCircle,
+  CANCELLED: XCircle,
+  REFUNDED: RefreshCw,
+  DISPUTED: AlertCircle,
+  REJECTED: XCircle,
+  VERIFIED_AUTO: CheckCircle,
+  VERIFIED_MANUAL: ShieldCheck,
+  AUTO_ACCEPTED: CheckCircle,
+  REVIEW_REMINDER: MessageSquare,
+  VERIFICATION_ESCALATED: AlertCircle,
+  VERIFICATION_ESCALATED_TO_ADMIN: AlertCircle,
+  DISPUTE_OPENED: AlertCircle,
+  DISPUTE_RESOLVED: ShieldCheck,
+  SETTLEMENT_CREATED: CheckCircle,
+  PUBLICATION_MARKED: CheckCircle,
+  DELIVERY_CONFIRMED: CheckCircle,
+  CONTENT_MARKED_READY: FileText,
+  CONTENT_SUBMITTED_FOR_REVIEW: FileText,
+  ORDER_ACCEPTED: CheckCircle,
+  PAYMENT_CAPTURED: Check,
+  REFUND_ISSUED: RefreshCw,
+}
+
+interface TimelineEvent {
+  id: string
+  eventType: string
+  message?: string | null
+  metadata: Record<string, unknown> | null
+  createdAt: string
+}
+
+// Human one-liner for a timeline event — prefer server-provided message.
+// When unavailable, reconstruct key details from metadata for audit visibility.
+function eventDetail(event: TimelineEvent): string | null {
+  const m = (event.metadata ?? {}) as Record<string, unknown>
+  if (event.message?.trim()) return event.message.trim()
+
+  const parts: string[] = []
+  const url = m.publishedUrl ?? m.url
+  if (url) parts.push(`Published at ${String(url)}`)
+  if (m.reason) parts.push(`Reason: ${String(m.reason)}`)
+  if (m.notes) parts.push(String(m.notes))
+  if (m.newStatus)
+    parts.push(
+      `Status → ${String(m.newStatus).replace(/_/g, " ").toLowerCase()}`,
+    )
+  if (typeof m.amount === "number")
+    parts.push(`Amount: $${m.amount.toLocaleString()}`)
+  if (typeof m.publisherAmount === "number")
+    parts.push(`Publisher payout: $${m.publisherAmount.toLocaleString()}`)
+  if (m.version != null && url == null) parts.push(`Revision v${m.version}`)
+  if (m.assignedTo) parts.push(`Assigned to ${String(m.assignedTo)}`)
+  if (m.adminName) parts.push(`By ${String(m.adminName)}`)
+  if (m.action)
+    parts.push(`Action: ${String(m.action).replace(/_/g, " ").toLowerCase()}`)
+  return parts.length ? parts.join(" · ") : null
 }
 
 function OrderProgress({ status }: { status: string }) {
@@ -158,24 +237,110 @@ function OrderDetailSkeleton() {
   )
 }
 
-function TimelineItem({ event, isLast }: { event: any; isLast: boolean }) {
+function TimelineItem({
+  event,
+  isLast,
+}: {
+  event: TimelineEvent
+  isLast: boolean
+}) {
   const label =
-    eventLabels[event.eventType] ?? event.eventType.replace(/_/g, " ")
+    eventLabels[event.eventType] ??
+    event.eventType
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  const iconEntry =
+    event.eventType in eventIcons
+      ? (eventIcons as Record<string, React.ElementType>)[event.eventType]
+      : Clock
+  const detail = eventDetail(event)
+  const createdAtDate = new Date(event.createdAt)
+  const createdAtLabel = Number.isNaN(createdAtDate.getTime())
+    ? "Time unavailable"
+    : format(createdAtDate, "PPpp")
+  const distanceLabel = Number.isNaN(createdAtDate.getTime())
+    ? "Time unavailable"
+    : formatDistanceToNow(createdAtDate, { addSuffix: true })
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10">
-          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+          {(() => {
+            const Icon = iconEntry
+            return <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+          })()}
         </div>
         {!isLast && <div className="h-full w-px bg-border" />}
       </div>
       <div className="flex-1 pb-4">
         <p className="text-sm font-medium">{label}</p>
+        {detail ? (
+          <p className="text-xs text-muted-foreground">{detail}</p>
+        ) : null}
         <p className="text-xs text-muted-foreground">
-          {formatDistanceToNow(new Date(event.createdAt), { addSuffix: true })}
+          <span title={createdAtLabel}>{distanceLabel}</span>
         </p>
       </div>
     </div>
+  )
+}
+
+function OrderArticleVersions({
+  articles,
+}: {
+  articles: OrderResponse["articleVersions"]
+}) {
+  if (articles.length === 0) return null
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <FileText className="h-4 w-4" /> Article versions
+        </CardTitle>
+        <CardDescription>
+          Customer source material is preserved separately from your final
+          submissions.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {articles.map((article) => {
+          const timestamp = new Date(article.createdAt)
+          return (
+            <section
+              key={article.id}
+              className="overflow-hidden rounded-xl border"
+            >
+              <header className="flex flex-wrap items-start justify-between gap-3 bg-muted/40 px-4 py-3">
+                <div>
+                  <p className="font-semibold">
+                    {article.purpose === "SOURCE_ARTICLE"
+                      ? "Customer source article"
+                      : "Publisher submission"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Version {article.version} · {article.wordCount} words
+                  </p>
+                </div>
+                <time className="text-xs text-muted-foreground">
+                  {Number.isNaN(timestamp.getTime())
+                    ? "Time unavailable"
+                    : timestamp.toLocaleString()}
+                </time>
+              </header>
+              {article.title && (
+                <p className="border-b px-4 py-3 font-medium">
+                  {article.title}
+                </p>
+              )}
+              <div className="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-4 text-sm leading-7">
+                {article.body}
+              </div>
+            </section>
+          )
+        })}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -198,6 +363,14 @@ export default function OrderDetailPage() {
   } = useQuery<any>({
     queryKey: ["order", orderId],
     queryFn: () => api.orders.getById(orderId),
+    refetchInterval: (query) => {
+      const current = query.state.data as { status?: string } | undefined
+      return current?.status &&
+        ["COMPLETED", "CANCELLED", "REFUNDED"].includes(current.status)
+        ? false
+        : 10_000
+    },
+    refetchOnWindowFocus: true,
   })
 
   const { data: cancellationPreview } = useQuery({
@@ -224,12 +397,18 @@ export default function OrderDetailPage() {
   const { data: events = [] } = useQuery({
     queryKey: ["order-events", orderId],
     queryFn: () => api.orders.getEvents(orderId),
+    refetchInterval: 10_000,
+    refetchOnWindowFocus: true,
   })
 
   const refreshOrder = () => {
     queryClient.invalidateQueries({ queryKey: ["order", orderId] })
     queryClient.invalidateQueries({ queryKey: ["order-proof", orderId] })
     queryClient.invalidateQueries({ queryKey: ["order-events", orderId] })
+    queryClient.invalidateQueries({ queryKey: ["publisher-orders"] })
+    queryClient.invalidateQueries({
+      queryKey: ["order-cancellation-preview", orderId],
+    })
   }
 
   const acceptMutation = useMutation({
@@ -310,11 +489,8 @@ export default function OrderDetailPage() {
   })
 
   const contentSubmitMutation = useMutation({
-    mutationFn: async (data: { content: string }) => {
-      await api.orders.submitContent(orderId, data.content)
-      await api.orders.markContentReady(orderId)
-      await api.orders.submitForReview(orderId)
-    },
+    mutationFn: (data: { content: string }) =>
+      api.orders.submitContentForReview(orderId, data.content),
     onSuccess: () => {
       toast.success("Content submitted")
       refreshOrder()
@@ -367,10 +543,14 @@ export default function OrderDetailPage() {
   )[0]
   const allEvents = [
     ...(events.length > 0 ? events : (order.events ?? [])),
-  ].sort(
-    (a: any, b: any) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  )
+  ].sort((left: any, right: any) => {
+    const rightDate = new Date(right.createdAt)
+    const leftDate = new Date(left.createdAt)
+    return (
+      (Number.isNaN(rightDate.getTime()) ? 0 : rightDate.getTime()) -
+      (Number.isNaN(leftDate.getTime()) ? 0 : leftDate.getTime())
+    )
+  })
   const hasPrimaryAction =
     canAccept ||
     canSubmitContent ||
@@ -561,6 +741,7 @@ export default function OrderDetailPage() {
               />
             </CardContent>
           </Card>
+          <OrderArticleVersions articles={order.articleVersions ?? []} />
 
           {/* Accept Order */}
           {canAccept && (
@@ -808,7 +989,14 @@ export default function OrderDetailPage() {
                     <span className="text-xs text-muted-foreground">
                       Status:
                     </span>
-                    <StatusBadge status={s.status} />
+                    <Badge variant="secondary">
+                      {String(s.status)
+                        .replaceAll("_", " ")
+                        .toLowerCase()
+                        .replace(/\b\w/g, (character: string) =>
+                          character.toUpperCase(),
+                        )}
+                    </Badge>
                     {s.releasePolicy && (
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${

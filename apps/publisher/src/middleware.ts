@@ -12,7 +12,7 @@ export const config = {
 
 export function middleware(request: NextRequest) {
   const result = requiresAuthRedirect(
-    request.nextUrl.pathname,
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
     getSessionCookieValue((name) => request.cookies.get(name)),
     PUBLISHER_MIDDLEWARE_CONFIG,
   )

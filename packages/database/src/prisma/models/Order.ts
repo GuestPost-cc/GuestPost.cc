@@ -517,6 +517,7 @@ export type OrderWhereInput = {
   listing?: Prisma.XOR<Prisma.MarketplaceListingNullableScalarRelationFilter, Prisma.MarketplaceListingWhereInput> | null
   listingService?: Prisma.XOR<Prisma.ListingServiceNullableScalarRelationFilter, Prisma.ListingServiceWhereInput> | null
   contentOrder?: Prisma.XOR<Prisma.ContentOrderNullableScalarRelationFilter, Prisma.ContentOrderWhereInput> | null
+  articleVersions?: Prisma.OrderArticleVersionListRelationFilter
   revisions?: Prisma.RevisionListRelationFilter
   reports?: Prisma.ReportListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
@@ -584,6 +585,7 @@ export type OrderOrderByWithRelationInput = {
   listing?: Prisma.MarketplaceListingOrderByWithRelationInput
   listingService?: Prisma.ListingServiceOrderByWithRelationInput
   contentOrder?: Prisma.ContentOrderOrderByWithRelationInput
+  articleVersions?: Prisma.OrderArticleVersionOrderByRelationAggregateInput
   revisions?: Prisma.RevisionOrderByRelationAggregateInput
   reports?: Prisma.ReportOrderByRelationAggregateInput
   transactions?: Prisma.TransactionOrderByRelationAggregateInput
@@ -655,6 +657,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   listing?: Prisma.XOR<Prisma.MarketplaceListingNullableScalarRelationFilter, Prisma.MarketplaceListingWhereInput> | null
   listingService?: Prisma.XOR<Prisma.ListingServiceNullableScalarRelationFilter, Prisma.ListingServiceWhereInput> | null
   contentOrder?: Prisma.XOR<Prisma.ContentOrderNullableScalarRelationFilter, Prisma.ContentOrderWhereInput> | null
+  articleVersions?: Prisma.OrderArticleVersionListRelationFilter
   revisions?: Prisma.RevisionListRelationFilter
   reports?: Prisma.ReportListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
@@ -808,6 +811,7 @@ export type OrderCreateInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -867,6 +871,7 @@ export type OrderUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -926,6 +931,7 @@ export type OrderUpdateInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -985,6 +991,7 @@ export type OrderUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -1725,6 +1732,20 @@ export type OrderUpdateOneRequiredWithoutContentOrderNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutContentOrderInput, Prisma.OrderUpdateWithoutContentOrderInput>, Prisma.OrderUncheckedUpdateWithoutContentOrderInput>
 }
 
+export type OrderCreateNestedOneWithoutArticleVersionsInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutArticleVersionsInput, Prisma.OrderUncheckedCreateWithoutArticleVersionsInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutArticleVersionsInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
+export type OrderUpdateOneRequiredWithoutArticleVersionsNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutArticleVersionsInput, Prisma.OrderUncheckedCreateWithoutArticleVersionsInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutArticleVersionsInput
+  upsert?: Prisma.OrderUpsertWithoutArticleVersionsInput
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutArticleVersionsInput, Prisma.OrderUpdateWithoutArticleVersionsInput>, Prisma.OrderUncheckedUpdateWithoutArticleVersionsInput>
+}
+
 export type OrderCreateNestedOneWithoutRevisionsInput = {
   create?: Prisma.XOR<Prisma.OrderCreateWithoutRevisionsInput, Prisma.OrderUncheckedCreateWithoutRevisionsInput>
   connectOrCreate?: Prisma.OrderCreateOrConnectWithoutRevisionsInput
@@ -1924,6 +1945,7 @@ export type OrderCreateWithoutCustomerInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -1982,6 +2004,7 @@ export type OrderUncheckedCreateWithoutCustomerInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -2050,6 +2073,7 @@ export type OrderCreateWithoutAssigneeInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -2108,6 +2132,7 @@ export type OrderUncheckedCreateWithoutAssigneeInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -2254,6 +2279,7 @@ export type OrderCreateWithoutOrganizationInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -2312,6 +2338,7 @@ export type OrderUncheckedCreateWithoutOrganizationInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -2396,6 +2423,7 @@ export type OrderCreateWithoutWebsiteInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -2454,6 +2482,7 @@ export type OrderUncheckedCreateWithoutWebsiteInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -2538,6 +2567,7 @@ export type OrderCreateWithoutCampaignInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -2596,6 +2626,7 @@ export type OrderUncheckedCreateWithoutCampaignInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -2681,6 +2712,7 @@ export type OrderCreateWithoutItemsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -2739,6 +2771,7 @@ export type OrderUncheckedCreateWithoutItemsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -2813,6 +2846,7 @@ export type OrderUpdateWithoutItemsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -2871,6 +2905,7 @@ export type OrderUncheckedUpdateWithoutItemsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -2929,6 +2964,7 @@ export type OrderCreateWithoutEventsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -2987,6 +3023,7 @@ export type OrderUncheckedCreateWithoutEventsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -3061,6 +3098,7 @@ export type OrderUpdateWithoutEventsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -3119,6 +3157,7 @@ export type OrderUncheckedUpdateWithoutEventsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -3177,6 +3216,7 @@ export type OrderCreateWithoutDisputeInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -3235,6 +3275,7 @@ export type OrderUncheckedCreateWithoutDisputeInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -3309,6 +3350,7 @@ export type OrderUpdateWithoutDisputeInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -3367,6 +3409,7 @@ export type OrderUncheckedUpdateWithoutDisputeInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -3425,6 +3468,7 @@ export type OrderCreateWithoutCancellationRequestsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -3483,6 +3527,7 @@ export type OrderUncheckedCreateWithoutCancellationRequestsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -3557,6 +3602,7 @@ export type OrderUpdateWithoutCancellationRequestsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -3615,6 +3661,7 @@ export type OrderUncheckedUpdateWithoutCancellationRequestsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -3673,6 +3720,7 @@ export type OrderCreateWithoutSettlementsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -3731,6 +3779,7 @@ export type OrderUncheckedCreateWithoutSettlementsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -3805,6 +3854,7 @@ export type OrderUpdateWithoutSettlementsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -3863,6 +3913,7 @@ export type OrderUncheckedUpdateWithoutSettlementsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -3921,6 +3972,7 @@ export type OrderCreateWithoutFulfillmentAssignmentsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -3979,6 +4031,7 @@ export type OrderUncheckedCreateWithoutFulfillmentAssignmentsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -4053,6 +4106,7 @@ export type OrderUpdateWithoutFulfillmentAssignmentsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -4111,6 +4165,7 @@ export type OrderUncheckedUpdateWithoutFulfillmentAssignmentsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -4169,6 +4224,7 @@ export type OrderCreateWithoutDeliveryVersionsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -4227,6 +4283,7 @@ export type OrderUncheckedCreateWithoutDeliveryVersionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -4289,6 +4346,7 @@ export type OrderCreateWithoutActiveDeliveryVersionInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -4347,6 +4405,7 @@ export type OrderUncheckedCreateWithoutActiveDeliveryVersionInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -4422,6 +4481,7 @@ export type OrderUpdateWithoutDeliveryVersionsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -4480,6 +4540,7 @@ export type OrderUncheckedUpdateWithoutDeliveryVersionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -4548,6 +4609,7 @@ export type OrderUpdateWithoutActiveDeliveryVersionInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -4606,6 +4668,7 @@ export type OrderUncheckedUpdateWithoutActiveDeliveryVersionInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -4665,6 +4728,7 @@ export type OrderCreateWithoutFraudFlagsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -4723,6 +4787,7 @@ export type OrderUncheckedCreateWithoutFraudFlagsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -4797,6 +4862,7 @@ export type OrderUpdateWithoutFraudFlagsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -4855,6 +4921,7 @@ export type OrderUncheckedUpdateWithoutFraudFlagsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -4913,6 +4980,7 @@ export type OrderCreateWithoutReviewInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -4971,6 +5039,7 @@ export type OrderUncheckedCreateWithoutReviewInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -5045,6 +5114,7 @@ export type OrderUpdateWithoutReviewInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -5103,6 +5173,7 @@ export type OrderUncheckedUpdateWithoutReviewInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -5161,6 +5232,7 @@ export type OrderCreateWithoutWithdrawalAllocationsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -5219,6 +5291,7 @@ export type OrderUncheckedCreateWithoutWithdrawalAllocationsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -5293,6 +5366,7 @@ export type OrderUpdateWithoutWithdrawalAllocationsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -5351,6 +5425,7 @@ export type OrderUncheckedUpdateWithoutWithdrawalAllocationsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -5408,6 +5483,7 @@ export type OrderCreateWithoutContentOrderInput = {
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -5466,6 +5542,7 @@ export type OrderUncheckedCreateWithoutContentOrderInput = {
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Date | string
   updatedAt?: Date | string
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -5540,6 +5617,7 @@ export type OrderUpdateWithoutContentOrderInput = {
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -5598,6 +5676,259 @@ export type OrderUncheckedUpdateWithoutContentOrderInput = {
   briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUncheckedUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUncheckedUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUncheckedUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUncheckedUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUncheckedUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedUpdateManyWithoutOrderNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedUpdateManyWithoutOrderNestedInput
+}
+
+export type OrderCreateWithoutArticleVersionsInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  idempotencyKey?: string | null
+  version?: number
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  customer: Prisma.UserCreateNestedOneWithoutOwnedOrdersInput
+  assignee?: Prisma.UserCreateNestedOneWithoutAssignedOrdersInput
+  website?: Prisma.WebsiteCreateNestedOneWithoutOrdersInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionCreateNestedOneWithoutActiveOrderInput
+  organization: Prisma.OrganizationCreateNestedOneWithoutOrdersInput
+  campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
+  listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
+  listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
+  contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestCreateNestedManyWithoutOrderInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationCreateNestedManyWithoutOrderInput
+}
+
+export type OrderUncheckedCreateWithoutArticleVersionsInput = {
+  id?: string
+  type: $Enums.ServiceType
+  status?: $Enums.OrderStatus
+  amount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: string
+  paymentStatus?: $Enums.PaymentStatus
+  title?: string | null
+  instructions?: string | null
+  targetUrl?: string | null
+  anchorText?: string | null
+  publishedUrl?: string | null
+  publishedAt?: Date | string | null
+  verifiedAt?: Date | string | null
+  verifiedBy?: string | null
+  verifyMethod?: $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Date | string | null
+  deliveryAcceptedMethod?: $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Date | string | null
+  revisionCount?: number
+  customerId: string
+  assigneeId?: string | null
+  websiteId?: string | null
+  organizationId: string
+  campaignId?: string | null
+  idempotencyKey?: string | null
+  version?: number
+  activeDeliveryVersionId?: string | null
+  listingId?: string | null
+  listingServiceId?: string | null
+  fulfillmentChannel?: $Enums.FulfillmentChannel | null
+  turnaroundDays?: number | null
+  warrantyDays?: number | null
+  submittedAt?: Date | string | null
+  acceptedAt?: Date | string | null
+  fulfillmentDueAt?: Date | string | null
+  warrantyEndsAt?: Date | string | null
+  refundResponsibility?: $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
+  reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
+  items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
+  events?: Prisma.OrderEventUncheckedCreateNestedManyWithoutOrderInput
+  settlements?: Prisma.SettlementUncheckedCreateNestedManyWithoutOrderInput
+  dispute?: Prisma.OrderDisputeUncheckedCreateNestedOneWithoutOrderInput
+  platformRevenue?: Prisma.PlatformRevenueUncheckedCreateNestedOneWithoutOrderInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUncheckedCreateNestedManyWithoutOrderInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUncheckedCreateNestedManyWithoutOrderInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUncheckedCreateNestedManyWithoutOrderInput
+  tickets?: Prisma.TicketUncheckedCreateNestedManyWithoutOrderInput
+  review?: Prisma.OrderReviewUncheckedCreateNestedOneWithoutOrderInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUncheckedCreateNestedManyWithoutOrderInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUncheckedCreateNestedManyWithoutOrderInput
+}
+
+export type OrderCreateOrConnectWithoutArticleVersionsInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutArticleVersionsInput, Prisma.OrderUncheckedCreateWithoutArticleVersionsInput>
+}
+
+export type OrderUpsertWithoutArticleVersionsInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutArticleVersionsInput, Prisma.OrderUncheckedUpdateWithoutArticleVersionsInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutArticleVersionsInput, Prisma.OrderUncheckedCreateWithoutArticleVersionsInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutArticleVersionsInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutArticleVersionsInput, Prisma.OrderUncheckedUpdateWithoutArticleVersionsInput>
+}
+
+export type OrderUpdateWithoutArticleVersionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  customer?: Prisma.UserUpdateOneRequiredWithoutOwnedOrdersNestedInput
+  assignee?: Prisma.UserUpdateOneWithoutAssignedOrdersNestedInput
+  website?: Prisma.WebsiteUpdateOneWithoutOrdersNestedInput
+  activeDeliveryVersion?: Prisma.OrderDeliveryVersionUpdateOneWithoutActiveOrderNestedInput
+  organization?: Prisma.OrganizationUpdateOneRequiredWithoutOrdersNestedInput
+  campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
+  listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
+  listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
+  contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
+  reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
+  items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
+  events?: Prisma.OrderEventUpdateManyWithoutOrderNestedInput
+  settlements?: Prisma.SettlementUpdateManyWithoutOrderNestedInput
+  dispute?: Prisma.OrderDisputeUpdateOneWithoutOrderNestedInput
+  platformRevenue?: Prisma.PlatformRevenueUpdateOneWithoutOrderNestedInput
+  deliveryVersions?: Prisma.OrderDeliveryVersionUpdateManyWithoutOrderNestedInput
+  fulfillmentAssignments?: Prisma.FulfillmentAssignmentUpdateManyWithoutOrderNestedInput
+  fraudFlags?: Prisma.DeliveryFraudFlagUpdateManyWithoutOrderNestedInput
+  tickets?: Prisma.TicketUpdateManyWithoutOrderNestedInput
+  review?: Prisma.OrderReviewUpdateOneWithoutOrderNestedInput
+  cancellationRequests?: Prisma.OrderCancellationRequestUpdateManyWithoutOrderNestedInput
+  withdrawalAllocations?: Prisma.WithdrawalAllocationUpdateManyWithoutOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutArticleVersionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumServiceTypeFieldUpdateOperationsInput | $Enums.ServiceType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  amount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currency?: Prisma.StringFieldUpdateOperationsInput | string
+  paymentStatus?: Prisma.EnumPaymentStatusFieldUpdateOperationsInput | $Enums.PaymentStatus
+  title?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  instructions?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  targetUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  anchorText?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  publishedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  verifiedBy?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  verifyMethod?: Prisma.NullableEnumDeliveryVerificationMethodFieldUpdateOperationsInput | $Enums.DeliveryVerificationMethod | null
+  autoAcceptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  deliveryAcceptedMethod?: Prisma.NullableEnumDeliveryAcceptedMethodFieldUpdateOperationsInput | $Enums.DeliveryAcceptedMethod | null
+  deliveredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  revisionCount?: Prisma.IntFieldUpdateOperationsInput | number
+  customerId?: Prisma.StringFieldUpdateOperationsInput | string
+  assigneeId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  organizationId?: Prisma.StringFieldUpdateOperationsInput | string
+  campaignId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  version?: Prisma.IntFieldUpdateOperationsInput | number
+  activeDeliveryVersionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  listingId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  listingServiceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fulfillmentChannel?: Prisma.NullableEnumFulfillmentChannelFieldUpdateOperationsInput | $Enums.FulfillmentChannel | null
+  turnaroundDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  warrantyDays?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  acceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  fulfillmentDueAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  warrantyEndsAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  refundResponsibility?: Prisma.NullableEnumCancellationResponsibilityFieldUpdateOperationsInput | $Enums.CancellationResponsibility | null
+  briefData?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -5657,6 +5988,7 @@ export type OrderCreateWithoutRevisionsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
@@ -5715,6 +6047,7 @@ export type OrderUncheckedCreateWithoutRevisionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
@@ -5789,6 +6122,7 @@ export type OrderUpdateWithoutRevisionsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
@@ -5847,6 +6181,7 @@ export type OrderUncheckedUpdateWithoutRevisionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
@@ -5905,6 +6240,7 @@ export type OrderCreateWithoutReportsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
@@ -5963,6 +6299,7 @@ export type OrderUncheckedCreateWithoutReportsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
@@ -6037,6 +6374,7 @@ export type OrderUpdateWithoutReportsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
@@ -6095,6 +6433,7 @@ export type OrderUncheckedUpdateWithoutReportsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
@@ -6153,6 +6492,7 @@ export type OrderCreateWithoutPlatformRevenueInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -6211,6 +6551,7 @@ export type OrderUncheckedCreateWithoutPlatformRevenueInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -6285,6 +6626,7 @@ export type OrderUpdateWithoutPlatformRevenueInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -6343,6 +6685,7 @@ export type OrderUncheckedUpdateWithoutPlatformRevenueInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -6401,6 +6744,7 @@ export type OrderCreateWithoutTransactionsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemCreateNestedManyWithoutOrderInput
@@ -6459,6 +6803,7 @@ export type OrderUncheckedCreateWithoutTransactionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   items?: Prisma.OrderItemUncheckedCreateNestedManyWithoutOrderInput
@@ -6533,6 +6878,7 @@ export type OrderUpdateWithoutTransactionsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUpdateManyWithoutOrderNestedInput
@@ -6591,6 +6937,7 @@ export type OrderUncheckedUpdateWithoutTransactionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   items?: Prisma.OrderItemUncheckedUpdateManyWithoutOrderNestedInput
@@ -6649,6 +6996,7 @@ export type OrderCreateWithoutTicketsInput = {
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -6707,6 +7055,7 @@ export type OrderUncheckedCreateWithoutTicketsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -6781,6 +7130,7 @@ export type OrderUpdateWithoutTicketsInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -6839,6 +7189,7 @@ export type OrderUncheckedUpdateWithoutTicketsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -6896,6 +7247,7 @@ export type OrderCreateWithoutListingInput = {
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listingService?: Prisma.ListingServiceCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -6954,6 +7306,7 @@ export type OrderUncheckedCreateWithoutListingInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -7038,6 +7391,7 @@ export type OrderCreateWithoutListingServiceInput = {
   campaign?: Prisma.CampaignCreateNestedOneWithoutOrdersInput
   listing?: Prisma.MarketplaceListingCreateNestedOneWithoutOrdersInput
   contentOrder?: Prisma.ContentOrderCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutOrderInput
@@ -7096,6 +7450,7 @@ export type OrderUncheckedCreateWithoutListingServiceInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   contentOrder?: Prisma.ContentOrderUncheckedCreateNestedOneWithoutOrderInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedCreateNestedManyWithoutOrderInput
   revisions?: Prisma.RevisionUncheckedCreateNestedManyWithoutOrderInput
   reports?: Prisma.ReportUncheckedCreateNestedManyWithoutOrderInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutOrderInput
@@ -7264,6 +7619,7 @@ export type OrderUpdateWithoutCustomerInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -7322,6 +7678,7 @@ export type OrderUncheckedUpdateWithoutCustomerInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -7422,6 +7779,7 @@ export type OrderUpdateWithoutAssigneeInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -7480,6 +7838,7 @@ export type OrderUncheckedUpdateWithoutAssigneeInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -7622,6 +7981,7 @@ export type OrderUpdateWithoutOrganizationInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -7680,6 +8040,7 @@ export type OrderUncheckedUpdateWithoutOrganizationInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -7822,6 +8183,7 @@ export type OrderUpdateWithoutWebsiteInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -7880,6 +8242,7 @@ export type OrderUncheckedUpdateWithoutWebsiteInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -8022,6 +8385,7 @@ export type OrderUpdateWithoutCampaignInput = {
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -8080,6 +8444,7 @@ export type OrderUncheckedUpdateWithoutCampaignInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -8222,6 +8587,7 @@ export type OrderUpdateWithoutListingInput = {
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listingService?: Prisma.ListingServiceUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -8280,6 +8646,7 @@ export type OrderUncheckedUpdateWithoutListingInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -8422,6 +8789,7 @@ export type OrderUpdateWithoutListingServiceInput = {
   campaign?: Prisma.CampaignUpdateOneWithoutOrdersNestedInput
   listing?: Prisma.MarketplaceListingUpdateOneWithoutOrdersNestedInput
   contentOrder?: Prisma.ContentOrderUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutOrderNestedInput
@@ -8480,6 +8848,7 @@ export type OrderUncheckedUpdateWithoutListingServiceInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   contentOrder?: Prisma.ContentOrderUncheckedUpdateOneWithoutOrderNestedInput
+  articleVersions?: Prisma.OrderArticleVersionUncheckedUpdateManyWithoutOrderNestedInput
   revisions?: Prisma.RevisionUncheckedUpdateManyWithoutOrderNestedInput
   reports?: Prisma.ReportUncheckedUpdateManyWithoutOrderNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutOrderNestedInput
@@ -8545,6 +8914,7 @@ export type OrderUncheckedUpdateManyWithoutListingServiceInput = {
  */
 
 export type OrderCountOutputType = {
+  articleVersions: number
   revisions: number
   reports: number
   transactions: number
@@ -8560,6 +8930,7 @@ export type OrderCountOutputType = {
 }
 
 export type OrderCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  articleVersions?: boolean | OrderCountOutputTypeCountArticleVersionsArgs
   revisions?: boolean | OrderCountOutputTypeCountRevisionsArgs
   reports?: boolean | OrderCountOutputTypeCountReportsArgs
   transactions?: boolean | OrderCountOutputTypeCountTransactionsArgs
@@ -8582,6 +8953,13 @@ export type OrderCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extens
    * Select specific fields to fetch from the OrderCountOutputType
    */
   select?: Prisma.OrderCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * OrderCountOutputType without action
+ */
+export type OrderCountOutputTypeCountArticleVersionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.OrderArticleVersionWhereInput
 }
 
 /**
@@ -8719,6 +9097,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   listing?: boolean | Prisma.Order$listingArgs<ExtArgs>
   listingService?: boolean | Prisma.Order$listingServiceArgs<ExtArgs>
   contentOrder?: boolean | Prisma.Order$contentOrderArgs<ExtArgs>
+  articleVersions?: boolean | Prisma.Order$articleVersionsArgs<ExtArgs>
   revisions?: boolean | Prisma.Order$revisionsArgs<ExtArgs>
   reports?: boolean | Prisma.Order$reportsArgs<ExtArgs>
   transactions?: boolean | Prisma.Order$transactionsArgs<ExtArgs>
@@ -8893,6 +9272,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   listing?: boolean | Prisma.Order$listingArgs<ExtArgs>
   listingService?: boolean | Prisma.Order$listingServiceArgs<ExtArgs>
   contentOrder?: boolean | Prisma.Order$contentOrderArgs<ExtArgs>
+  articleVersions?: boolean | Prisma.Order$articleVersionsArgs<ExtArgs>
   revisions?: boolean | Prisma.Order$revisionsArgs<ExtArgs>
   reports?: boolean | Prisma.Order$reportsArgs<ExtArgs>
   transactions?: boolean | Prisma.Order$transactionsArgs<ExtArgs>
@@ -8943,6 +9323,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     listing: Prisma.$MarketplaceListingPayload<ExtArgs> | null
     listingService: Prisma.$ListingServicePayload<ExtArgs> | null
     contentOrder: Prisma.$ContentOrderPayload<ExtArgs> | null
+    articleVersions: Prisma.$OrderArticleVersionPayload<ExtArgs>[]
     revisions: Prisma.$RevisionPayload<ExtArgs>[]
     reports: Prisma.$ReportPayload<ExtArgs>[]
     transactions: Prisma.$TransactionPayload<ExtArgs>[]
@@ -9403,6 +9784,7 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   listing<T extends Prisma.Order$listingArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$listingArgs<ExtArgs>>): Prisma.Prisma__MarketplaceListingClient<runtime.Types.Result.GetResult<Prisma.$MarketplaceListingPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   listingService<T extends Prisma.Order$listingServiceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$listingServiceArgs<ExtArgs>>): Prisma.Prisma__ListingServiceClient<runtime.Types.Result.GetResult<Prisma.$ListingServicePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   contentOrder<T extends Prisma.Order$contentOrderArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$contentOrderArgs<ExtArgs>>): Prisma.Prisma__ContentOrderClient<runtime.Types.Result.GetResult<Prisma.$ContentOrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  articleVersions<T extends Prisma.Order$articleVersionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$articleVersionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderArticleVersionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   revisions<T extends Prisma.Order$revisionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$revisionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RevisionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   reports<T extends Prisma.Order$reportsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$reportsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ReportPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   transactions<T extends Prisma.Order$transactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$transactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -10018,6 +10400,30 @@ export type Order$contentOrderArgs<ExtArgs extends runtime.Types.Extensions.Inte
    */
   include?: Prisma.ContentOrderInclude<ExtArgs> | null
   where?: Prisma.ContentOrderWhereInput
+}
+
+/**
+ * Order.articleVersions
+ */
+export type Order$articleVersionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the OrderArticleVersion
+   */
+  select?: Prisma.OrderArticleVersionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the OrderArticleVersion
+   */
+  omit?: Prisma.OrderArticleVersionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.OrderArticleVersionInclude<ExtArgs> | null
+  where?: Prisma.OrderArticleVersionWhereInput
+  orderBy?: Prisma.OrderArticleVersionOrderByWithRelationInput | Prisma.OrderArticleVersionOrderByWithRelationInput[]
+  cursor?: Prisma.OrderArticleVersionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.OrderArticleVersionScalarFieldEnum | Prisma.OrderArticleVersionScalarFieldEnum[]
 }
 
 /**

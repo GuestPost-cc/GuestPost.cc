@@ -132,6 +132,7 @@ export class OrdersController {
     return this.orders.getOrder(
       id,
       user.userType === "PUBLISHER" ? null : user.organizationId,
+      user.userType,
     )
   }
 
@@ -143,8 +144,33 @@ export class OrdersController {
     const order = await this.orders.getOrder(
       id,
       user.userType === "PUBLISHER" ? null : user.organizationId,
+      user.userType,
     )
     return order.events
+  }
+
+  @Post(":id/submit-content-for-review")
+  @UseGuards(OrderOwnershipGuard)
+  @ActorType("PUBLISHER")
+  @RequireOrderOwnership()
+  submitContentForReview(
+    @Param("id") id: string,
+    @Body() body: { content?: string },
+    @CurrentUser() user: any,
+  ) {
+    const content = body.content?.trim()
+    if (!content) throw new BadRequestException("Content is required")
+    if (content.length > 500_000) {
+      throw new BadRequestException(
+        "Content must be 500,000 characters or fewer",
+      )
+    }
+    return this.fulfillment.submitContentForReview(
+      id,
+      user.publisherId,
+      user.id,
+      content,
+    )
   }
 
   @Post(":id/items")
@@ -310,7 +336,10 @@ export class OrdersController {
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
   getReview(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.review.getReview(id, user.organizationId)
+    return this.review.getReview(id, {
+      organizationId: user.userType === "CUSTOMER" ? user.organizationId : null,
+      publisherId: user.userType === "PUBLISHER" ? user.publisherId : null,
+    })
   }
 
   // Manual fallback: customer accepts the delivery when the automated check
@@ -335,7 +364,10 @@ export class OrdersController {
   @ActorType("CUSTOMER", "PUBLISHER")
   @RequireOrderOwnership()
   deliveryProof(@Param("id") id: string, @CurrentUser() user: any) {
-    return this.delivery.deliveryProof(id, user.organizationId)
+    return this.delivery.deliveryProof(id, {
+      organizationId: user.userType === "CUSTOMER" ? user.organizationId : null,
+      publisherId: user.userType === "PUBLISHER" ? user.publisherId : null,
+    })
   }
 
   @Post(":id/dispute")
