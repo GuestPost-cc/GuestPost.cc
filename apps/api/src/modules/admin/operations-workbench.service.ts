@@ -544,7 +544,6 @@ export class OperationsWorkbenchService {
         totalAssigned: summary.totalAssigned,
         claimed: summary.claimed,
         completed: summary.completed,
-        salesByCurrency: summary.salesByCurrency,
       },
       resolution: {
         cancellations: cancellationCount,

@@ -82,6 +82,7 @@ describe("OrdersService create financial integrity", () => {
       "customer-1",
     )
 
+    expect(tx.orderItem.create).toHaveBeenCalledTimes(1)
     expect(tx.orderItem.create).toHaveBeenCalledWith({
       data: {
         orderId: "order-1",

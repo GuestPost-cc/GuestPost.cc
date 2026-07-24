@@ -735,12 +735,14 @@ data.
 
 ## Completed 2026-07-24: order lifecycle pull request
 
-- Draft PR #78 contains the order lifecycle, reconciliation, article
+- PR #78 contains the order lifecycle, reconciliation, article
   provenance, role visibility, secure marketplace entry, and campaign handoff
   work completed after PR #77.
-- PR #78 is intentionally stacked on PR #77 to keep its review diff isolated.
-  Retarget it to `main` only after PR #77 merges.
-- Full manually dispatched GitHub CI passed, including dependency policy and
-  audit, migrations, typechecking, Biome, ESLint, repository health, API unit
-  and integration tests, package tests, UI coverage, and all production
-  builds.
+- PR #78 was rebased onto merged PR #77 and its additive article-version
+  migration was backed up, rehearsed, and applied to the Neon test database;
+  migration status is 44/44 with no unfinished migrations.
+- Review remediation makes delivery concurrency retryable, closes publisher
+  content-submission RBAC, aligns the article limit, removes financial values
+  from Operations fulfillment responses, and reports real platform-revenue
+  drift. Focused regressions, 100 API suites/1,001 tests, 12 shared suites/109
+  tests, repository checks, and affected production builds pass locally.

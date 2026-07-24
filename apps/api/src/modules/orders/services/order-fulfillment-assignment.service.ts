@@ -260,9 +260,8 @@ export class OrderFulfillmentAssignmentService {
         status: true,
         order: {
           select: {
-            amount: true,
-            currency: true,
             status: true,
+            ...(isOperations ? {} : { amount: true, currency: true }),
           },
         },
       },
@@ -282,10 +281,13 @@ export class OrderFulfillmentAssignmentService {
         ["DELIVERED", "SETTLED", "COMPLETED"].includes(assignment.order.status),
     )
     const salesByCurrency: Record<string, number> = {}
-    for (const assignment of delivered) {
-      const currency = assignment.order.currency ?? "USD"
-      salesByCurrency[currency] =
-        (salesByCurrency[currency] ?? 0) + Number(assignment.order.amount ?? 0)
+    if (!isOperations) {
+      for (const assignment of delivered) {
+        const currency = assignment.order.currency ?? "USD"
+        salesByCurrency[currency] =
+          (salesByCurrency[currency] ?? 0) +
+          Number(assignment.order.amount ?? 0)
+      }
     }
 
     const claimAudits = await this.prisma.auditLog.findMany({
@@ -313,7 +315,7 @@ export class OrderFulfillmentAssignmentService {
       totalAssigned: assignmentByOrder.size,
       claimed,
       completed: delivered.length,
-      salesByCurrency,
+      ...(isOperations ? {} : { salesByCurrency }),
     }
   }
 
@@ -463,7 +465,7 @@ export class OrderFulfillmentAssignmentService {
             totalAssigned: 0,
             claimed: 0,
             completed: 0,
-            salesByCurrency: {},
+            ...(user.staffRole === "OPERATIONS" ? {} : { salesByCurrency: {} }),
           }),
     ])
 
@@ -475,7 +477,9 @@ export class OrderFulfillmentAssignmentService {
           order.cancellationRequests?.length === 0 &&
           ACTIVE_FULFILLMENT_STATUSES.includes(order.status as any)
         return {
-          ...order,
+          ...(user.staffRole === "OPERATIONS"
+            ? projectOperationsOrder(order)
+            : order),
           claimable,
           canProgress:
             user.staffRole === "SUPER_ADMIN" ||

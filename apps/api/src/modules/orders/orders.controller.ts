@@ -150,7 +150,8 @@ export class OrdersController {
   }
 
   @Post(":id/submit-content-for-review")
-  @UseGuards(OrderOwnershipGuard)
+  @UseGuards(MemberRolesGuard, OrderOwnershipGuard)
+  @MemberRoles("PUBLISHER_OWNER", "PUBLISHER_MEMBER")
   @ActorType("PUBLISHER")
   @RequireOrderOwnership()
   submitContentForReview(
@@ -160,9 +161,9 @@ export class OrdersController {
   ) {
     const content = body.content?.trim()
     if (!content) throw new BadRequestException("Content is required")
-    if (content.length > 500_000) {
+    if (content.length > 200_000) {
       throw new BadRequestException(
-        "Content must be 500,000 characters or fewer",
+        "Content must be 200,000 characters or fewer",
       )
     }
     return this.fulfillment.submitContentForReview(

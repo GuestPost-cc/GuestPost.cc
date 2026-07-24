@@ -1058,10 +1058,12 @@ function FulfillmentOrderPageInner() {
               <CardTitle className="text-base">Order metadata</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">Order value</span>
-                <span>{formatMoney(order.amount, order.currency)}</span>
-              </div>
+              {order.amount !== undefined && order.currency !== undefined && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Order value</span>
+                  <span>{formatMoney(order.amount, order.currency)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">Status</span>
                 <StatusBadge status={order.status} />

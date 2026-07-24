@@ -601,7 +601,11 @@ export async function runDeliveryVerification(
       error instanceof Error &&
       error.name === "DeliveryVerificationVersionConflict"
     ) {
-      return { skipped: "version_conflict" }
+      // A concurrent order or delivery transition means this verification did
+      // not commit. Propagate the conflict so BullMQ retries the job instead
+      // of recording a successful-but-skipped completion that could leave the
+      // delivery stuck in PENDING/RETRYING indefinitely.
+      throw error
     }
     throw error
   }

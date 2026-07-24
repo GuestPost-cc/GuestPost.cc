@@ -213,6 +213,41 @@ describe("runReconciliation with mock prisma", () => {
     ).toBe(false)
   })
 
+  it("reports the platform revenue discrepancy rather than the gross amount", async () => {
+    const prisma = mockPrisma()
+    prisma.order.findMany.mockResolvedValue([
+      {
+        id: "platform-mismatch-1",
+        status: "COMPLETED",
+        amount: "100.00",
+        fulfillmentChannel: "PLATFORM",
+        website: { ownershipType: "PLATFORM" },
+        settlements: [],
+        platformRevenue: {
+          id: "revenue-1",
+          amount: "95.00",
+          platformFee: "10.00",
+          netRevenue: "90.00",
+          reversedAt: null,
+        },
+      },
+    ])
+
+    const report = await runReconciliation(prisma as any)
+    const issue = report.settlementDrift.find(
+      (row) => row.code === ReconciliationCode.PLATFORM_REVENUE_AMOUNT_MISMATCH,
+    )
+
+    expect(issue).toMatchObject({
+      entityId: "platform-mismatch-1",
+      amount: "5.00",
+      metadata: {
+        expectedAmount: "100.00",
+        actualAmount: "95.00",
+      },
+    })
+  })
+
   it("detects unmatched PURCHASE transactions", async () => {
     const prisma = mockPrisma()
     prisma.transaction.findMany.mockResolvedValue([

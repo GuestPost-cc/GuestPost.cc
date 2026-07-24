@@ -20,7 +20,6 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  CircleDollarSign,
   ClipboardCheck,
   ClipboardList,
   FileCheck2,
@@ -68,18 +67,6 @@ function priorityVariant(priority: AdminOperationsWorkbenchAction["priority"]) {
   if (priority === "CRITICAL") return "destructive" as const
   if (priority === "HIGH") return "secondary" as const
   return "outline" as const
-}
-
-function formatMoney(values: Record<string, number> | undefined) {
-  const entries = Object.entries(values ?? {})
-  if (entries.length === 0) return "$0.00"
-  return entries
-    .map(([currency, amount]) =>
-      new Intl.NumberFormat("en-US", { style: "currency", currency }).format(
-        amount,
-      ),
-    )
-    .join(" + ")
 }
 
 function KpiCard({
@@ -569,12 +556,12 @@ export function OperationsWorkbench() {
                 </div>
               </div>
               <div>
-                <CircleDollarSign className="mx-auto h-4 w-4 text-muted-foreground" />
-                <div
-                  className="mt-1 truncate text-xs font-semibold"
-                  title={formatMoney(data?.fulfillment.salesByCurrency)}
-                >
-                  {formatMoney(data?.fulfillment.salesByCurrency)}
+                <ShieldCheck className="mx-auto h-4 w-4 text-muted-foreground" />
+                <div className="mt-1 text-xs font-semibold">
+                  {data?.fulfillment.verificationTotal ?? 0}
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  Verification
                 </div>
               </div>
             </div>

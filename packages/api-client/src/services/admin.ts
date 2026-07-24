@@ -348,8 +348,10 @@ export interface OperationsInboxOrder {
   type: ServiceType
   title: string | null
   status: OrderStatus
-  amount: string | number | null
-  currency: string
+  /** Super Admin only. Omitted from Operations responses. */
+  amount?: string | number | null
+  /** Super Admin only. Omitted from Operations responses. */
+  currency?: string
   version: number
   turnaroundDays: number | null
   fulfillmentDueAt: string | null
@@ -389,7 +391,8 @@ export interface OperationsInboxResponse
     totalAssigned: number
     claimed: number
     completed: number
-    salesByCurrency: MoneyByCurrency
+    /** Super Admin only. Omitted from Operations responses. */
+    salesByCurrency?: MoneyByCurrency
   } | null
 }
 
@@ -456,7 +459,6 @@ export interface AdminOperationsWorkbenchResponse {
     totalAssigned: number
     claimed: number
     completed: number
-    salesByCurrency: MoneyByCurrency
   }
   resolution: {
     cancellations: number

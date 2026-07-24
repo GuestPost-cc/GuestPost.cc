@@ -783,6 +783,14 @@ async function checkSettlementDrift(
           toScaled(o.platformRevenue.platformFee) +
           toScaled(o.platformRevenue.netRevenue)
         if (expectedGross !== actualGross || actualGross !== splitGross) {
+          const orderGrossDelta =
+            expectedGross >= actualGross
+              ? expectedGross - actualGross
+              : actualGross - expectedGross
+          const splitDelta =
+            actualGross >= splitGross
+              ? actualGross - splitGross
+              : splitGross - actualGross
           drift.push(
             makeRow({
               severity: "critical",
@@ -791,7 +799,9 @@ async function checkSettlementDrift(
               code: ReconciliationCode.PLATFORM_REVENUE_AMOUNT_MISMATCH,
               entityId: o.id,
               entityType: "Order",
-              amount: fromScaled(actualGross),
+              amount: fromScaled(
+                orderGrossDelta >= splitDelta ? orderGrossDelta : splitDelta,
+              ),
               message: `Platform revenue for order ${o.id.slice(0, 8)} does not reconcile to the order gross and revenue split`,
               metadata: {
                 expectedAmount: fromScaled(expectedGross),
