@@ -670,7 +670,16 @@ export default function ListingDetailPage() {
               {selectedService ? (
                 <Button asChild size="lg" className="mt-2 w-full">
                   <Link
-                    href={`/dashboard/marketplace/${listing.slug}/order?service=${selectedService.id}`}
+                    href={(() => {
+                      const params = new URLSearchParams({
+                        service: selectedService.id,
+                      })
+                      const campaignId = searchParams?.get("campaignId")
+                      if (campaignId) {
+                        params.set("campaignId", campaignId)
+                      }
+                      return `/dashboard/marketplace/${listing.slug}/order?${params.toString()}`
+                    })()}
                   >
                     Continue with {serviceLabel(selectedService.serviceType)}
                     <ArrowRight className="ml-2 h-4 w-4" />

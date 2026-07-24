@@ -165,21 +165,50 @@ function PaginationBar({
 }
 
 const MODULE_DEFS = [
-  { key: "walletDrift", label: "Wallet Drift", icon: DollarSign },
-  { key: "publisherDrift", label: "Publisher Balance Drift", icon: Users },
-  { key: "settlementDrift", label: "Settlement Integrity", icon: Scale },
+  {
+    key: "walletDrift",
+    label: "Wallet Drift",
+    description: "Compares cached customer wallet balances with ledger totals.",
+    icon: DollarSign,
+  },
+  {
+    key: "publisherDrift",
+    label: "Publisher Balance Drift",
+    description: "Compares publisher balances with settlement ledger credits.",
+    icon: Users,
+  },
+  {
+    key: "settlementDrift",
+    label: "Settlement and Revenue Integrity",
+    description:
+      "Validates publisher settlements and platform revenue by fulfillment route.",
+    icon: Scale,
+  },
   {
     key: "orderPaymentRecon",
     label: "Order Payment Reconciliation",
+    description: "Matches paid orders to wallet purchase transactions.",
     icon: CreditCard,
   },
-  { key: "refundRecon", label: "Refund Reconciliation", icon: RefreshCw },
+  {
+    key: "refundRecon",
+    label: "Refund Reconciliation",
+    description: "Matches refund states, ledger entries, and money reversals.",
+    icon: RefreshCw,
+  },
   {
     key: "stuckFinancialOrders",
     label: "Stuck Financial Orders",
+    description:
+      "Finds paid or delivered orders missing their next money record.",
     icon: AlertCircle,
   },
-  { key: "stuckPayouts", label: "Stuck Payouts", icon: XCircle },
+  {
+    key: "stuckPayouts",
+    label: "Stuck Payouts",
+    description: "Finds stale, orphaned, or duplicate payout executions.",
+    icon: XCircle,
+  },
 ] as const
 
 const SETTLEMENT_GROUPS = [
@@ -204,11 +233,13 @@ function SeverityDot({ severity }: { severity: string }) {
 
 function ModuleCard({
   label,
+  description,
   icon: Icon,
   counts,
   onClick,
 }: {
   label: string
+  description: string
   icon: React.ComponentType<{ className?: string }>
   counts: { critical: number; warning: number; info: number }
   onClick: () => void
@@ -233,6 +264,7 @@ function ModuleCard({
         <Icon className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">{label}</span>
       </div>
+      <p className="text-xs leading-5 text-muted-foreground">{description}</p>
       {total === 0 ? (
         <span className="text-xs text-emerald-500">All clear</span>
       ) : (
@@ -309,6 +341,21 @@ function ReconciliationDashboard({
 
   return (
     <div className="space-y-6">
+      <Card className="border-blue-500/20 bg-blue-500/5">
+        <CardHeader>
+          <CardTitle className="text-base">How reconciliation works</CardTitle>
+          <CardDescription className="leading-6">
+            This is a read-only integrity scan. It recomputes balances from
+            immutable ledger records, matches payments and refunds to orders,
+            and checks the final financial record by route: publisher orders
+            require one active settlement, while platform-handled orders require
+            unreversed platform revenue whose gross equals both the order value
+            and the fee plus net-revenue split. A finding never changes money
+            automatically; staff must inspect the linked entity and use an
+            approved correction workflow.
+          </CardDescription>
+        </CardHeader>
+      </Card>
       {/* ── Status bar ── */}
       <Card className="border-border/50">
         <CardContent className="flex items-center justify-between p-4">
@@ -403,6 +450,7 @@ function ReconciliationDashboard({
             <ModuleCard
               key={def.key}
               label={def.label}
+              description={def.description}
               icon={def.icon}
               counts={counts}
               onClick={() => {
@@ -498,7 +546,10 @@ function ReconciliationDashboard({
                     <TableHead>Entity</TableHead>
                     <TableHead>Code</TableHead>
                     <TableHead>Amount</TableHead>
+                    <TableHead>Expected</TableHead>
+                    <TableHead>Actual</TableHead>
                     <TableHead>Message</TableHead>
+                    <TableHead>Action</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -519,12 +570,40 @@ function ReconciliationDashboard({
                         </Badge>
                       </TableCell>
                       <TableCell className="tabular-nums text-xs">
-                        {row.amount
-                          ? `$${Number(row.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                          : "—"}
+                        {row.amount ?? "-"}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-xs">
+                        {row.metadata?.expectedAmount ??
+                          row.metadata?.expectedStatus ??
+                          "-"}
+                      </TableCell>
+                      <TableCell className="tabular-nums text-xs">
+                        {row.metadata?.actualAmount ??
+                          row.metadata?.actualStatus ??
+                          "-"}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground max-w-md">
-                        {row.message}
+                        <p>{row.message}</p>
+                        <p className="mt-1 text-[10px]">
+                          Detected{" "}
+                          {row.detectedAt
+                            ? format(new Date(row.detectedAt), "PPpp")
+                            : "time unavailable"}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        {row.action?.type === "order" ? (
+                          <Button variant="outline" size="sm" asChild>
+                            <Link href={`/dashboard/orders/${row.action.id}`}>
+                              Inspect
+                              <ArrowRight className="ml-1 h-3 w-3" />
+                            </Link>
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            Review {row.entityType}
+                          </span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -164,5 +164,6 @@ describe("OperationsWorkbenchService", () => {
       }),
     )
     expect(JSON.stringify(result)).not.toContain("email")
+    expect(result.fulfillment).not.toHaveProperty("salesByCurrency")
   })
 })

@@ -651,6 +651,31 @@ export const DeliveryInterventionStatus = {
 export type DeliveryInterventionStatus = (typeof DeliveryInterventionStatus)[keyof typeof DeliveryInterventionStatus]
 
 
+export const OrderArticleSource = {
+  CUSTOMER: 'CUSTOMER',
+  PUBLISHER: 'PUBLISHER',
+  OPERATIONS: 'OPERATIONS'
+} as const
+
+export type OrderArticleSource = (typeof OrderArticleSource)[keyof typeof OrderArticleSource]
+
+
+export const OrderArticlePurpose = {
+  SOURCE_ARTICLE: 'SOURCE_ARTICLE',
+  FINAL_SUBMISSION: 'FINAL_SUBMISSION'
+} as const
+
+export type OrderArticlePurpose = (typeof OrderArticlePurpose)[keyof typeof OrderArticlePurpose]
+
+
+export const OrderArticleFormat = {
+  PLAIN_TEXT: 'PLAIN_TEXT',
+  MARKDOWN: 'MARKDOWN'
+} as const
+
+export type OrderArticleFormat = (typeof OrderArticleFormat)[keyof typeof OrderArticleFormat]
+
+
 export const TransactionType = {
   DEPOSIT: 'DEPOSIT',
   PURCHASE: 'PURCHASE',

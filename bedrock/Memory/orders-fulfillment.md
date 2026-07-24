@@ -152,6 +152,30 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 
 - `Order.briefData` — what the **customer** submitted as the brief (Phase 6).
 - `ContentOrder` table — what the **publisher** submitted as the content deliverable (`title`, `brief`, `deliverable`, `status`). Live read path via `order.submittedContent` in the api-client → portal order detail. Originally on the Phase 7 drop list, then reclassified as live and kept.
+- `OrderArticleVersion` keeps customer source articles and publisher/Operations
+  final submissions as immutable, checksum-addressed versions. Article bodies
+  never enter `OrderEvent.metadata`; events carry only provenance and integrity
+  references. Customer source content is created atomically with the DRAFT
+  order but does not advance lifecycle status.
+- Publisher and Operations direct-order reads fail closed for DRAFT and
+  PENDING_PAYMENT orders, preventing pre-payment source-article disclosure.
+  Finance projections do not include article bodies.
+
+## Order creation contract hardening (2026-07-24)
+
+- Campaign IDs are validated against the active customer organization before
+  connection.
+- Structured briefs are mandatory and canonical target URL/anchor values come
+  from the validated brief.
+- Listing service price, currency, version, availability, website, turnaround,
+  warranty, and fulfillment channel remain server-derived. New clients submit
+  the reviewed quote and receive `REQUOTE_REQUIRED` if it changed.
+- Customer retries reuse an organization-scoped idempotency key.
+- Guest-post buyers may submit a plain-text/Markdown source article during
+  creation. The body is capped at 200,000 characters and rendered as text.
+- Target keywords accept comma/newline strings or arrays, trim and
+  case-insensitively deduplicate, and reject more than 20 or more than 80
+  characters per keyword without silent truncation.
 
 ## Sub-Services
 
@@ -205,3 +229,12 @@ All Order-scoped `audit.log({entityType:"Order"|"Settlement"|…})` callsites sp
 
 - `apps/api/src/modules/orders/` — controller + services
 - `apps/api/src/modules/orders/services/__tests__/`
+
+## 2026-07-24 order article and financial-integrity hardening
+
+- Customer source articles are stored as immutable `OrderArticleVersion` rows and exposed only through tenant/role-scoped order reads.
+- Customer and publisher proof/review reads use organization ownership or website publisher ownership; missing scope fails closed with `Order not found`.
+- Listing-service order creation always derives at least one priced placement item when a client omits `items`, preventing zero-total paid orders.
+- Create and idempotency-replay responses return the persisted post-total order with items and article versions, not the initial zero-value draft snapshot.
+- Local migration `20260723180000_order_article_versions` was applied successfully.
+- Validation: shared 108/108 tests, API 997/997 tests, focused shared/API/admin/portal/publisher builds, and live customer/publisher/Operations role flows passed.

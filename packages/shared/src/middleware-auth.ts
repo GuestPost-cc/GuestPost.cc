@@ -37,12 +37,13 @@ export interface MiddlewareAuthConfig {
 }
 
 export function requiresAuthRedirect(
-  pathname: string,
+  requestPath: string,
   sessionCookie: string | null | undefined,
   config: MiddlewareAuthConfig,
 ):
   | { needsRedirect: true; signInPath: string; redirect?: string }
   | { needsRedirect: false } {
+  const pathname = requestPath.split("?", 1)[0]
   const isProtected = config.protectedPaths.some((p) => pathname.startsWith(p))
   if (!isProtected) return { needsRedirect: false }
 
@@ -50,7 +51,7 @@ export function requiresAuthRedirect(
     return {
       needsRedirect: true,
       signInPath: config.signInPath,
-      redirect: pathname,
+      redirect: requestPath,
     }
   }
 

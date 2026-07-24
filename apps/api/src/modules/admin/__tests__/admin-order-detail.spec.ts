@@ -138,6 +138,13 @@ describe("AdminService — order detail", () => {
           metadata: { internal: "secret" },
           createdAt: new Date("2026-07-20T00:00:00.000Z"),
         },
+        {
+          id: "event-2",
+          eventType: "ORDER_SUBMITTED",
+          message: "Submitted",
+          metadata: null,
+          createdAt: new Date("2026-07-20T00:01:00.000Z"),
+        },
       ],
       activeDeliveryVersion: null,
       settlements: [

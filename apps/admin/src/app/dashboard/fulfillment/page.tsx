@@ -212,11 +212,21 @@ function FulfillmentPageInner() {
     { label: "Overdue", value: summary?.overdue ?? 0, Icon: AlertTriangle },
     { label: "Claimed", value: summary?.claimed ?? 0, Icon: CheckCircle2 },
     { label: "Completed", value: summary?.completed ?? 0, Icon: Clock3 },
-    {
-      label: "Delivered sales",
-      value: formatMoney(summary?.salesByCurrency),
-      Icon: CircleDollarSign,
-    },
+    ...(user?.staffRole === "OPERATIONS"
+      ? [
+          {
+            label: "Verification",
+            value: summary?.verificationTotal ?? 0,
+            Icon: ClipboardList,
+          },
+        ]
+      : [
+          {
+            label: "Delivered sales",
+            value: formatMoney(summary?.salesByCurrency),
+            Icon: CircleDollarSign,
+          },
+        ]),
   ]
 
   if (query.error) {

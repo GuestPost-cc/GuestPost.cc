@@ -21,6 +21,12 @@ export interface CreateOrderData {
   instructions?: string
   campaignId?: string
   idempotencyKey?: string
+  expectedListingServiceVersion?: number
+  expectedPrice?: number
+  expectedCurrency?: string
+  articleTitle?: string
+  articleBody?: string
+  articleFormat?: "PLAIN_TEXT" | "MARKDOWN"
   // Phase 2 preferred: the customer's locked pick from the listing detail
   // page. When present, the server snapshots price/TAT/serviceType/channel
   // from this row and ignores any drift. Required in Phase 4.
@@ -52,7 +58,7 @@ interface RawOrderItem {
   anchorText: string | null
   price: string | number | null
   status: OrderStatus
-  website?: { id: string; url: string } | null
+  website?: { id: string; url: string | null } | null
   publications?: RawPublication[]
 }
 
@@ -81,7 +87,7 @@ interface RawOrder {
   fulfillmentDueAt: string | null
   warrantyEndsAt: string | null
   briefData: Record<string, unknown> | null
-  website?: { id: string; url: string; name?: string | null } | null
+  website?: { id: string; url: string | null; name?: string | null } | null
   items?: RawOrderItem[]
   events?: Array<{
     id: string
@@ -97,6 +103,19 @@ interface RawOrder {
     deliverable: string | null
     status: string
   } | null
+  articleVersions?: Array<{
+    id: string
+    version: number
+    source: "CUSTOMER" | "PUBLISHER" | "OPERATIONS"
+    purpose: "SOURCE_ARTICLE" | "FINAL_SUBMISSION"
+    title: string | null
+    body: string
+    format: "PLAIN_TEXT" | "MARKDOWN"
+    checksum: string
+    wordCount: number
+    supersedesId: string | null
+    createdAt: string
+  }>
   revisions?: Array<{
     id: string
     notes: string | null
@@ -124,7 +143,7 @@ export interface OrderResponse {
   publishedUrl: string | null
   campaignId: string | null
   campaign: { id: string; name: string } | null
-  website: { id: string; url: string; name?: string | null } | null
+  website: { id: string; url: string | null; name?: string | null } | null
   items: Array<{
     id: string
     // Derived from the order row — service type/topic live on the Order,
@@ -136,7 +155,7 @@ export interface OrderResponse {
     targetUrl: string | null
     anchorText: string | null
     status: OrderStatus
-    website: { id: string; url: string } | null
+    website: { id: string; url: string | null } | null
     publications: Array<{
       id: string
       publishedUrl: string | null
@@ -154,6 +173,19 @@ export interface OrderResponse {
     deliverable: string | null
     status: string
   } | null
+  articleVersions: Array<{
+    id: string
+    version: number
+    source: "CUSTOMER" | "PUBLISHER" | "OPERATIONS"
+    purpose: "SOURCE_ARTICLE" | "FINAL_SUBMISSION"
+    title: string | null
+    body: string
+    format: "PLAIN_TEXT" | "MARKDOWN"
+    checksum: string
+    wordCount: number
+    supersedesId: string | null
+    createdAt: string
+  }>
   revisions: Array<{
     id: string
     notes: string | null
@@ -307,6 +339,19 @@ function normalizeOrder(raw: RawOrder): OrderResponse {
           status: raw.contentOrder.status,
         }
       : null,
+    articleVersions: (raw.articleVersions ?? []).map((article) => ({
+      id: article.id,
+      version: article.version,
+      source: article.source,
+      purpose: article.purpose,
+      title: article.title ?? null,
+      body: article.body,
+      format: article.format,
+      checksum: article.checksum,
+      wordCount: article.wordCount,
+      supersedesId: article.supersedesId ?? null,
+      createdAt: article.createdAt,
+    })),
     revisions: (raw.revisions ?? []).map((r) => ({
       id: r.id,
       notes: r.notes ?? null,
@@ -422,7 +467,13 @@ export class OrdersService {
 
   getEvents(id: string) {
     return this.client.get<
-      Array<{ id: string; eventType: OrderEventType; createdAt: string }>
+      Array<{
+        id: string
+        eventType: OrderEventType
+        message: string | null
+        metadata: Record<string, unknown> | null
+        createdAt: string
+      }>
     >(`/orders/${id}/events`)
   }
 
@@ -502,6 +553,14 @@ export class OrdersService {
   async submitForReview(id: string) {
     const raw = await this.client.post<RawOrder>(
       `/orders/${id}/submit-for-review`,
+    )
+    return normalizeOrder(raw)
+  }
+
+  async submitContentForReview(id: string, content: string) {
+    const raw = await this.client.post<RawOrder>(
+      `/orders/${id}/submit-content-for-review`,
+      { json: { content } },
     )
     return normalizeOrder(raw)
   }

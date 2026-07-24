@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common"
 import { PrismaService } from "../../../common/prisma.service"
 import { AuditService } from "../../audit/audit.service"
+import { projectOperationsOrder } from "../order-visibility"
 import { OrderCancellationService } from "./order-cancellation.service"
 
 const ACTIVE_ASSIGNMENT_STATUSES = ["ASSIGNED", "IN_PROGRESS"] as const
@@ -259,9 +260,8 @@ export class OrderFulfillmentAssignmentService {
         status: true,
         order: {
           select: {
-            amount: true,
-            currency: true,
             status: true,
+            ...(isOperations ? {} : { amount: true, currency: true }),
           },
         },
       },
@@ -281,10 +281,13 @@ export class OrderFulfillmentAssignmentService {
         ["DELIVERED", "SETTLED", "COMPLETED"].includes(assignment.order.status),
     )
     const salesByCurrency: Record<string, number> = {}
-    for (const assignment of delivered) {
-      const currency = assignment.order.currency ?? "USD"
-      salesByCurrency[currency] =
-        (salesByCurrency[currency] ?? 0) + Number(assignment.order.amount ?? 0)
+    if (!isOperations) {
+      for (const assignment of delivered) {
+        const currency = assignment.order.currency ?? "USD"
+        salesByCurrency[currency] =
+          (salesByCurrency[currency] ?? 0) +
+          Number(assignment.order.amount ?? 0)
+      }
     }
 
     const claimAudits = await this.prisma.auditLog.findMany({
@@ -312,7 +315,7 @@ export class OrderFulfillmentAssignmentService {
       totalAssigned: assignmentByOrder.size,
       claimed,
       completed: delivered.length,
-      salesByCurrency,
+      ...(isOperations ? {} : { salesByCurrency }),
     }
   }
 
@@ -462,7 +465,7 @@ export class OrderFulfillmentAssignmentService {
             totalAssigned: 0,
             claimed: 0,
             completed: 0,
-            salesByCurrency: {},
+            ...(user.staffRole === "OPERATIONS" ? {} : { salesByCurrency: {} }),
           }),
     ])
 
@@ -474,7 +477,9 @@ export class OrderFulfillmentAssignmentService {
           order.cancellationRequests?.length === 0 &&
           ACTIVE_FULFILLMENT_STATUSES.includes(order.status as any)
         return {
-          ...order,
+          ...(user.staffRole === "OPERATIONS"
+            ? projectOperationsOrder(order)
+            : order),
           claimable,
           canProgress:
             user.staffRole === "SUPER_ADMIN" ||
@@ -524,8 +529,23 @@ export class OrderFulfillmentAssignmentService {
           },
         },
         contentOrder: true,
+        articleVersions: {
+          orderBy: [{ purpose: "asc" }, { version: "desc" }],
+          select: {
+            id: true,
+            version: true,
+            source: true,
+            purpose: true,
+            title: true,
+            body: true,
+            format: true,
+            wordCount: true,
+            supersedesId: true,
+            createdAt: true,
+          },
+        },
         revisions: { orderBy: { createdAt: "desc" } },
-        events: { orderBy: { createdAt: "desc" }, take: 100 },
+        events: { orderBy: { createdAt: "desc" } },
         fulfillmentAssignments: { orderBy: { createdAt: "desc" } },
         activeDeliveryVersion: {
           include: {
@@ -535,7 +555,6 @@ export class OrderFulfillmentAssignmentService {
         },
         cancellationRequests: {
           orderBy: { createdAt: "desc" },
-          take: 5,
         },
       },
     })
@@ -545,6 +564,9 @@ export class OrderFulfillmentAssignmentService {
       order.fulfillmentChannel ??
       (order.website?.ownershipType === "PLATFORM" ? "PLATFORM" : "PUBLISHER")
     if (channel !== "PLATFORM") throw new NotFoundException("Order not found")
+    if (order.status === "DRAFT" || order.status === "PENDING_PAYMENT") {
+      throw new NotFoundException("Order not found")
+    }
 
     const activeAssignment = order.fulfillmentAssignments.find((assignment) =>
       ACTIVE_ASSIGNMENT_STATUSES.includes(assignment.status as any),
@@ -573,7 +595,7 @@ export class OrderFulfillmentAssignmentService {
     }
 
     return {
-      ...order,
+      ...projectOperationsOrder(order),
       access: {
         claimable,
         canProgress: user.staffRole === "SUPER_ADMIN" || ownsActiveAssignment,

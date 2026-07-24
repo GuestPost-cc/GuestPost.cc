@@ -14,7 +14,13 @@
 // resolver) because the parent wizard already manages state and the server
 // validates definitively on submit. Local validation here is best-effort.
 
-import { BRIEF_FIELDS, type ServiceTypeKey } from "@guestpost/shared"
+import {
+  BRIEF_FIELDS,
+  normalizeTargetKeywordsInput,
+  type ServiceTypeKey,
+  TARGET_KEYWORD_LIMIT,
+  TARGET_KEYWORD_MAX_LENGTH,
+} from "@guestpost/shared"
 import {
   Input,
   Label,
@@ -49,14 +55,6 @@ export function BriefForm({ serviceType, value, onChange }: BriefFormProps) {
     setState(next)
     onChange(next)
   }
-
-  // Tag-list helper: comma OR newline-separated → trimmed array.
-  const parseTags = (raw: string) =>
-    raw
-      .split(/[,\n]/)
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .slice(0, 50)
 
   return (
     <div className="space-y-4">
@@ -127,12 +125,10 @@ export function BriefForm({ serviceType, value, onChange }: BriefFormProps) {
             </Select>
           )}
           {f.widget === "tags" && (
-            <Textarea
+            <KeywordInput
               id={`brief-${f.name}`}
-              rows={2}
-              placeholder="Comma or newline separated"
-              value={(state[f.name] as string[] | undefined)?.join(", ") ?? ""}
-              onChange={(e) => update(f.name, parseTags(e.target.value))}
+              value={(state[f.name] as string[] | undefined) ?? []}
+              onChange={(keywords) => update(f.name, keywords)}
             />
           )}
           {f.widget === "address" && (
@@ -146,6 +142,77 @@ export function BriefForm({ serviceType, value, onChange }: BriefFormProps) {
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+function KeywordInput({
+  id,
+  value,
+  onChange,
+}: {
+  id: string
+  value: string[]
+  onChange(value: string[]): void
+}) {
+  const [raw, setRaw] = useState(() => value.join(", "))
+  const [focused, setFocused] = useState(false)
+  const normalized = normalizeTargetKeywordsInput(raw)
+  const keywords = Array.isArray(normalized)
+    ? normalized.filter((value): value is string => typeof value === "string")
+    : []
+  const tooMany = keywords.length > TARGET_KEYWORD_LIMIT
+  const longKeyword = keywords.find(
+    (keyword) => keyword.length > TARGET_KEYWORD_MAX_LENGTH,
+  )
+  const error = tooMany
+    ? `Use no more than ${TARGET_KEYWORD_LIMIT} target keywords.`
+    : longKeyword
+      ? `Each keyword must be ${TARGET_KEYWORD_MAX_LENGTH} characters or fewer.`
+      : null
+  const errorId = `${id}-error`
+
+  useEffect(() => {
+    if (!focused) setRaw(value.join(", "))
+  }, [focused, value])
+
+  return (
+    <div className="space-y-1.5">
+      <Textarea
+        id={id}
+        rows={2}
+        placeholder="Type keywords separated by commas or new lines"
+        value={raw}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : undefined}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false)
+          setRaw(keywords.join(", "))
+        }}
+        onChange={(event) => {
+          const nextRaw = event.target.value
+          setRaw(nextRaw)
+          const next = normalizeTargetKeywordsInput(nextRaw)
+          onChange(Array.isArray(next) ? (next as string[]) : [])
+        }}
+      />
+      <div className="flex items-center justify-between gap-3 text-xs">
+        <span
+          id={errorId}
+          className={error ? "text-destructive" : "text-muted-foreground"}
+          role={error ? "alert" : undefined}
+        >
+          {error ?? "Duplicates are removed automatically."}
+        </span>
+        <span
+          className={
+            tooMany ? "font-medium text-destructive" : "text-muted-foreground"
+          }
+        >
+          {keywords.length}/{TARGET_KEYWORD_LIMIT}
+        </span>
+      </div>
     </div>
   )
 }

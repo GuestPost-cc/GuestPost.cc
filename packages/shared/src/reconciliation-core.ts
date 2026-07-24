@@ -84,6 +84,10 @@ export enum ReconciliationCode {
   DEPOSIT_LEDGER_WITHOUT_SUCCESS = "DEPOSIT_LEDGER_WITHOUT_SUCCESS",
   WITHDRAWAL_ALLOCATION_MISMATCH = "WITHDRAWAL_ALLOCATION_MISMATCH",
   STRIPE_COMPLETED_WITHOUT_BANK_PAYOUT = "STRIPE_COMPLETED_WITHOUT_BANK_PAYOUT",
+  PLATFORM_REVENUE_MISSING = "PLATFORM_REVENUE_MISSING",
+  PLATFORM_REVENUE_UNEXPECTED_SETTLEMENT = "PLATFORM_REVENUE_UNEXPECTED_SETTLEMENT",
+  PLATFORM_REVENUE_AMOUNT_MISMATCH = "PLATFORM_REVENUE_AMOUNT_MISMATCH",
+  PLATFORM_REVENUE_REVERSED_FINAL_ORDER = "PLATFORM_REVENUE_REVERSED_FINAL_ORDER",
 }
 
 export enum ReconciliationCategory {
@@ -332,21 +336,22 @@ interface DriftStats {
   checkedPublishers: number
 }
 
-function generateRowId(): string {
-  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto
-  if (typeof c?.randomUUID === "function") return c.randomUUID()
-  const hex = "0123456789abcdef"
-  let out = ""
-  for (let i = 0; i < 32; i++) out += hex[Math.floor(Math.random() * 16)]
-  return `${out.slice(0, 8)}-${out.slice(8, 12)}-4${out.slice(13, 16)}-${out.slice(16, 20)}-${out.slice(20, 32)}`
-}
-
 function makeRow(
   overrides: Omit<DriftRow, "id" | "detectedAt"> & { id?: string },
 ): DriftRow {
+  const stableId = [
+    overrides.code,
+    overrides.entityType,
+    overrides.entityId,
+    overrides.group ?? "all",
+    overrides.metadata?.transactionId ??
+      overrides.metadata?.settlementId ??
+      overrides.metadata?.payoutExecutionId ??
+      "",
+  ].join(":")
   return {
     ...overrides,
-    id: overrides.id ?? generateRowId(),
+    id: overrides.id ?? stableId,
     detectedAt: new Date().toISOString(),
   }
 }
@@ -694,17 +699,121 @@ async function checkSettlementDrift(
 
   // ── 3c. Completeness ─────────────────────────────────────────────────────
 
-  // Completed/settled orders with 0 or >1 settlements
+  // Completed publisher orders require exactly one active settlement.
+  // Platform-handled orders intentionally have no publisher settlement and
+  // instead require one unreversed PlatformRevenue record.
   const completedOrders = await prisma.order.findMany({
     where: { status: { in: ["SETTLED", "COMPLETED"] } },
     select: {
       id: true,
       status: true,
-      settlements: { select: { id: true } },
+      amount: true,
+      fulfillmentChannel: true,
+      website: { select: { ownershipType: true } },
+      settlements: {
+        where: { status: { not: "CANCELLED" } },
+        select: { id: true },
+      },
+      platformRevenue: {
+        select: {
+          id: true,
+          amount: true,
+          platformFee: true,
+          netRevenue: true,
+          reversedAt: true,
+        },
+      },
     },
   })
   for (const o of completedOrders) {
-    if (o.settlements.length === 0) {
+    const platformOrder =
+      o.fulfillmentChannel === "PLATFORM" ||
+      (o.fulfillmentChannel == null && o.website?.ownershipType === "PLATFORM")
+    if (platformOrder) {
+      if (o.settlements.length > 0) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.SETTLEMENT,
+            group: SettlementIntegrityGroup.COMPLETENESS,
+            code: ReconciliationCode.PLATFORM_REVENUE_UNEXPECTED_SETTLEMENT,
+            entityId: o.id,
+            entityType: "Order",
+            message: `Platform order ${o.id.slice(0, 8)} has an unexpected publisher settlement`,
+            metadata: {
+              duplicateCount: o.settlements.length,
+              orderId: o.id,
+            },
+            action: { type: "order", id: o.id },
+          }),
+        )
+      }
+      if (!o.platformRevenue) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.SETTLEMENT,
+            group: SettlementIntegrityGroup.COMPLETENESS,
+            code: ReconciliationCode.PLATFORM_REVENUE_MISSING,
+            entityId: o.id,
+            entityType: "Order",
+            message: `Platform order ${o.id.slice(0, 8)} is ${o.status} but has no revenue record`,
+            metadata: { orderId: o.id },
+            action: { type: "order", id: o.id },
+          }),
+        )
+      } else if (o.platformRevenue.reversedAt) {
+        drift.push(
+          makeRow({
+            severity: "critical",
+            category: ReconciliationCategory.SETTLEMENT,
+            group: SettlementIntegrityGroup.COMPLETENESS,
+            code: ReconciliationCode.PLATFORM_REVENUE_REVERSED_FINAL_ORDER,
+            entityId: o.id,
+            entityType: "Order",
+            message: `Platform order ${o.id.slice(0, 8)} is final but its revenue is reversed`,
+            metadata: { orderId: o.id },
+            action: { type: "order", id: o.id },
+          }),
+        )
+      } else {
+        const expectedGross = toScaled(o.amount)
+        const actualGross = toScaled(o.platformRevenue.amount)
+        const splitGross =
+          toScaled(o.platformRevenue.platformFee) +
+          toScaled(o.platformRevenue.netRevenue)
+        if (expectedGross !== actualGross || actualGross !== splitGross) {
+          const orderGrossDelta =
+            expectedGross >= actualGross
+              ? expectedGross - actualGross
+              : actualGross - expectedGross
+          const splitDelta =
+            actualGross >= splitGross
+              ? actualGross - splitGross
+              : splitGross - actualGross
+          drift.push(
+            makeRow({
+              severity: "critical",
+              category: ReconciliationCategory.SETTLEMENT,
+              group: SettlementIntegrityGroup.AMOUNT,
+              code: ReconciliationCode.PLATFORM_REVENUE_AMOUNT_MISMATCH,
+              entityId: o.id,
+              entityType: "Order",
+              amount: fromScaled(
+                orderGrossDelta >= splitDelta ? orderGrossDelta : splitDelta,
+              ),
+              message: `Platform revenue for order ${o.id.slice(0, 8)} does not reconcile to the order gross and revenue split`,
+              metadata: {
+                expectedAmount: fromScaled(expectedGross),
+                actualAmount: fromScaled(actualGross),
+                orderId: o.id,
+              },
+              action: { type: "order", id: o.id },
+            }),
+          )
+        }
+      }
+    } else if (o.settlements.length === 0) {
       drift.push(
         makeRow({
           severity: "critical",

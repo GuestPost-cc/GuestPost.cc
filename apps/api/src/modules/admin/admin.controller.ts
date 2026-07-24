@@ -264,9 +264,15 @@ export class AdminController {
 
   // Financial drift detector — balances vs transaction history, stuck orders
   @StaffRoles("SUPER_ADMIN", "FINANCE")
+  @Get("reconciliation/history")
+  reconciliationHistory(@Query("take") take?: string) {
+    return this.reconciliation.history(parsePagination(take).take)
+  }
+
+  @StaffRoles("SUPER_ADMIN", "FINANCE")
   @Get("reconciliation")
-  runReconciliation() {
-    return this.reconciliation.run()
+  runReconciliation(@CurrentUser() user: any) {
+    return this.reconciliation.run(user.id)
   }
 
   // Phase 7.1 — PlatformRevenue dashboard. Category B (Financial); matches the

@@ -20,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
   ErrorState,
+  getOrderEventPresentation,
   getOrderStatusPresentation,
   Input,
   Label,
@@ -112,28 +113,6 @@ const statusConfig: Record<
   DISPUTED: { icon: AlertCircle, description: "Order disputed" },
 }
 
-const eventLabels: Record<string, string> = {
-  ORDER_CREATED: "Order created",
-  PAYMENT_RECEIVED: "Payment received",
-  ASSIGNED: "Writer assigned",
-  CONTENT_SUBMITTED: "Content submitted",
-  CONTENT_APPROVED: "Content approved",
-  PUBLISHED: "Published live",
-  VERIFIED: "Verified",
-  UNDER_REVIEW: "Sent for review",
-  DELIVERED: "Delivered",
-  SETTLED: "Settlement processed",
-  COMPLETED: "Completed",
-  CANCELLED: "Cancelled",
-  REFUNDED: "Refunded",
-  DISPUTED: "Dispute opened",
-  REJECTED: "Rejected",
-  VERIFIED_AUTO: "Automatically verified",
-  AUTO_ACCEPTED: "Auto-accepted (review window expired)",
-  REVIEW_REMINDER: "Review reminder sent",
-  VERIFICATION_ESCALATED: "Verification escalated to admin",
-}
-
 interface TimelineEvent {
   id: string
   eventType: string
@@ -160,8 +139,6 @@ function eventDetail(event: TimelineEvent): string | null {
     )
   if (typeof m.amount === "number")
     parts.push(`Amount: $${m.amount.toLocaleString()}`)
-  if (typeof m.publisherAmount === "number")
-    parts.push(`Publisher payout: $${m.publisherAmount.toLocaleString()}`)
   if (m.version != null && url == null) parts.push(`Revision v${m.version}`)
   return parts.length ? parts.join(" · ") : null
 }
@@ -237,9 +214,11 @@ function fileEntries(files: unknown): Array<{ url: string; name: string }> {
 }
 
 function OrderTimeline({ events }: { events: TimelineEvent[] }) {
-  const sortedEvents = [...events].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  )
+  const sortedEvents = [...events].sort((a, b) => {
+    const right = new Date(b.createdAt).getTime()
+    const left = new Date(a.createdAt).getTime()
+    return (Number.isNaN(right) ? 0 : right) - (Number.isNaN(left) ? 0 : left)
+  })
 
   return (
     <div className="relative">
@@ -249,6 +228,8 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
           const config = statusConfig[event.eventType] || statusConfig.DRAFT
           const Icon = config.icon
           const isLatest = index === 0
+          const timestamp = new Date(event.createdAt)
+          const validTimestamp = !Number.isNaN(timestamp.getTime())
 
           return (
             <div key={event.id} className="relative pl-10">
@@ -263,11 +244,7 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
               </div>
               <div className="flex flex-col">
                 <span className="font-medium">
-                  {eventLabels[event.eventType] ||
-                    event.eventType
-                      .replace(/_/g, " ")
-                      .toLowerCase()
-                      .replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {getOrderEventPresentation(event.eventType).label}
                 </span>
                 {(() => {
                   const detail = eventDetail(event)
@@ -279,11 +256,11 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
                 })()}
                 <span
                   className="mt-0.5 text-xs text-muted-foreground"
-                  title={format(new Date(event.createdAt), "PPpp")}
+                  title={validTimestamp ? format(timestamp, "PPpp") : undefined}
                 >
-                  {formatDistanceToNow(new Date(event.createdAt), {
-                    addSuffix: true,
-                  })}
+                  {validTimestamp
+                    ? formatDistanceToNow(timestamp, { addSuffix: true })
+                    : "Time unavailable"}
                 </span>
               </div>
             </div>
@@ -344,6 +321,64 @@ function OrderDetailSkeleton() {
   )
 }
 
+function OrderArticleVersions({
+  articles,
+}: {
+  articles: OrderResponse["articleVersions"]
+}) {
+  if (articles.length === 0) return null
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Article history</CardTitle>
+        <CardDescription>
+          Your source article and each fulfiller submission remain distinct and
+          versioned.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {articles.map((article) => {
+          const timestamp = new Date(article.createdAt)
+          return (
+            <section
+              key={article.id}
+              className="overflow-hidden rounded-xl border"
+            >
+              <header className="flex flex-wrap items-start justify-between gap-3 bg-muted/40 px-4 py-3">
+                <div>
+                  <p className="font-semibold">
+                    {article.purpose === "SOURCE_ARTICLE"
+                      ? "Your submitted article"
+                      : article.source === "OPERATIONS"
+                        ? "Platform final submission"
+                        : "Publisher final submission"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Version {article.version} · {article.wordCount} words
+                  </p>
+                </div>
+                <time className="text-xs text-muted-foreground">
+                  {Number.isNaN(timestamp.getTime())
+                    ? "Time unavailable"
+                    : timestamp.toLocaleString()}
+                </time>
+              </header>
+              {article.title && (
+                <p className="border-b px-4 py-3 font-medium">
+                  {article.title}
+                </p>
+              )}
+              <div className="max-h-96 overflow-auto whitespace-pre-wrap break-words px-4 py-4 text-sm leading-7">
+                {article.body}
+              </div>
+            </section>
+          )
+        })}
+      </CardContent>
+    </Card>
+  )
+}
+
 export default function OrderDetailPage({
   params,
 }: {
@@ -375,6 +410,14 @@ export default function OrderDetailPage({
   } = useQuery<OrderResponse>({
     queryKey: ["order", resolvedParams.id],
     queryFn: () => api.orders.getById(resolvedParams.id),
+    refetchInterval: (query) => {
+      const current = query.state.data as OrderResponse | undefined
+      return current &&
+        ["COMPLETED", "CANCELLED", "REFUNDED"].includes(current.status)
+        ? false
+        : 10_000
+    },
+    refetchOnWindowFocus: true,
   })
 
   const { data: cancellationPreview, isLoading: cancellationPreviewLoading } =
@@ -434,6 +477,7 @@ export default function OrderDetailPage({
       queryClient.invalidateQueries({
         queryKey: ["order-review", resolvedParams.id],
       })
+      queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })
     },
     onError: (e: Error) => toast.error(e.message || "Failed to submit review"),
   })
@@ -463,7 +507,10 @@ export default function OrderDetailPage({
           : "Order cancelled and refund processed",
       )
       queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })
-      queryClient.invalidateQueries({ queryKey: ["orders"] })
+      queryClient.invalidateQueries({ queryKey: ["customer-orders"] })
+      queryClient.invalidateQueries({
+        queryKey: ["order-cancellation-preview", resolvedParams.id],
+      })
       setShowCancelDialog(false)
       setCancelNote("")
     },
@@ -524,7 +571,7 @@ export default function OrderDetailPage({
     onSuccess: () => {
       toast.success("Dispute opened — our team will review it")
       queryClient.invalidateQueries({ queryKey: ["order", resolvedParams.id] })
-      queryClient.invalidateQueries({ queryKey: ["orders"] })
+      queryClient.invalidateQueries({ queryKey: ["customer-orders"] })
       setShowDisputeDialog(false)
       setDisputeReason("")
     },
@@ -538,7 +585,7 @@ export default function OrderDetailPage({
     queryClient.invalidateQueries({
       queryKey: ["order-proof", resolvedParams.id],
     })
-    queryClient.invalidateQueries({ queryKey: ["orders"] })
+    queryClient.invalidateQueries({ queryKey: ["customer-orders"] })
   }
 
   const approveContentMutation = useMutation({
@@ -1119,6 +1166,7 @@ export default function OrderDetailPage({
               </CardContent>
             </Card>
           )}
+          <OrderArticleVersions articles={order.articleVersions ?? []} />
           {(() => {
             const sc = order.submittedContent
             const hasContent = sc && (sc.deliverable || sc.brief)

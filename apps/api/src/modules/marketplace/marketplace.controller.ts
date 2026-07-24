@@ -39,13 +39,20 @@ export class MarketplaceController {
   // =============================================================================
 
   @Get("listings")
-  async searchListings(@Query() query: SearchListingsDto) {
-    return this.marketplaceService.searchListings(query)
+  async searchListings(
+    @Query() query: SearchListingsDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.marketplaceService.searchListings(query, user.organizationId)
   }
 
   @Get("listings/:slug")
   async getListing(@Param("slug") slug: string, @CurrentUser() user: any) {
-    return this.marketplaceService.getListing(slug, user.id)
+    return this.marketplaceService.getListing(
+      slug,
+      user.id,
+      user.organizationId,
+    )
   }
 
   // Lightweight service-menu endpoint for the order-creation flow's service
@@ -80,19 +87,23 @@ export class MarketplaceController {
     @Query("page") page?: string,
     @Query("limit") limit?: string,
     @Query("sortBy") sortBy?: string,
+    @CurrentUser() user?: any,
   ) {
     // Phase 7: `type: "PUBLISHER_WEBSITE"` used to filter against the
     // deprecated ListingType enum. The post-Phase-7 contract is that ANY
     // APPROVED listing with ≥1 AVAILABLE service is a marketplace
     // placement; the search default returns all such listings.
-    return this.marketplaceService.searchListings({
-      query,
-      category,
-      minDR: minDR ? parseInt(minDR, 10) : undefined,
-      page: page ? parseInt(page, 10) : 1,
-      limit: limit ? parseInt(limit, 10) : 20,
-      sortBy: sortBy as any,
-    })
+    return this.marketplaceService.searchListings(
+      {
+        query,
+        category,
+        minDR: minDR ? parseInt(minDR, 10) : undefined,
+        page: page ? parseInt(page, 10) : 1,
+        limit: limit ? parseInt(limit, 10) : 20,
+        sortBy: sortBy as any,
+      },
+      user?.organizationId,
+    )
   }
 
   @Get("stats")

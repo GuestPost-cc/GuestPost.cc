@@ -43,6 +43,8 @@ export interface DeliveryDeps {
   ) => void | Promise<void>
 }
 
+type AnyPrisma = DeliveryDeps["prisma"]
+
 export interface DeliveryVerifyResult {
   skipped?: string
   status?: string
@@ -368,37 +370,46 @@ export async function runDeliveryVerification(
     const reason = fetched.error
       ? `Fetch error: ${fetched.error}`
       : `HTTP ${fetched.status} after redirects`
-    const upd = await prisma.orderDeliveryVersion.updateMany({
-      where: { id: version.id, verificationVersion: expectedVersion },
-      data: {
-        verificationStatus: "MANUAL_REVIEW",
-        verificationFailureReason: reason,
-        verificationVersion: expectedVersion + 1,
-      },
-    })
-    if (upd.count === 0) return { skipped: "version_conflict" }
-    await audit(prisma, "ORDER_DELIVERY_ESCALATED", order, version, null, {
-      reason,
-      manualReview: true,
-      httpStatus: fetched.status,
-      error: fetched.error ?? null,
-      redirectChain: fetched.redirectChain,
-    })
-    await prisma.orderEvent.create({
-      data: {
-        orderId: order.id,
-        eventType: "VERIFICATION_ESCALATED",
-        actorId: null,
-        message: `Verification escalated to manual review: ${reason}`,
-        metadata: {
-          deliveryVersionId: version.id,
-          reason,
-          httpStatus: fetched.status,
-          error: fetched.error ?? null,
-          redirectChain: fetched.redirectChain,
+    const runInTransaction =
+      typeof prisma.$transaction === "function"
+        ? (work: (tx: AnyPrisma) => Promise<boolean>) =>
+            prisma.$transaction(work)
+        : (work: (tx: AnyPrisma) => Promise<boolean>) => work(prisma)
+    const committed = await runInTransaction(async (tx) => {
+      const upd = await tx.orderDeliveryVersion.updateMany({
+        where: { id: version.id, verificationVersion: expectedVersion },
+        data: {
+          verificationStatus: "MANUAL_REVIEW",
+          verificationFailureReason: reason,
+          verificationVersion: expectedVersion + 1,
         },
-      },
+      })
+      if (upd.count === 0) return false
+      await audit(tx, "ORDER_DELIVERY_ESCALATED", order, version, null, {
+        reason,
+        manualReview: true,
+        httpStatus: fetched.status,
+        error: fetched.error ?? null,
+        redirectChain: fetched.redirectChain,
+      })
+      await tx.orderEvent.create({
+        data: {
+          orderId: order.id,
+          eventType: "VERIFICATION_ESCALATED",
+          actorId: null,
+          message: `Verification escalated to manual review: ${reason}`,
+          metadata: {
+            deliveryVersionId: version.id,
+            reason,
+            httpStatus: fetched.status,
+            error: fetched.error ?? null,
+            redirectChain: fetched.redirectChain,
+          },
+        },
+      })
+      return true
     })
+    if (!committed) return { skipped: "version_conflict" }
     const ids = await staffIds(prisma)
     await notifyUsers(
       prisma,
@@ -496,42 +507,84 @@ export async function runDeliveryVerification(
         .filter(Boolean)
         .join("; ") || "link verification failed"
 
-  const upd = await prisma.orderDeliveryVersion.updateMany({
-    where: { id: version.id, verificationVersion: expectedVersion },
-    data: {
-      verificationStatus: newStatus,
-      verificationFailureReason: failureReason,
-      verificationVersion: expectedVersion + 1,
-    },
-  })
-  if (upd.count === 0) return { skipped: "version_conflict" }
-
-  // Fraud detection runs on every checked delivery (runs before the
-  // order status flip so events can reference fraud outcomes).
+  // Fraud detection runs on every checked delivery before the atomic state
+  // transition so the canonical event can include the resulting flags.
   const fraudTypes = await runFraudDetection(deps, order, version, analysis)
 
-  // Mirror onto the order (denormalized) when verified + currently published.
-  if (pass) {
-    const reviewWindowMs =
-      defaultWorkflowConfig.reviewWindowDays * 24 * 60 * 60 * 1000
-    const autoAcceptAt = new Date(now.getTime() + reviewWindowMs)
-    await prisma.order.updateMany({
-      where: { id: order.id, status: "PUBLISHED" },
-      data: {
-        status: "VERIFIED",
-        verifiedAt: now,
-        verifiedBy: "system",
-        verifyMethod: "AUTO",
-        autoAcceptAt,
-      },
-    })
-    await prisma.orderEvent.create({
-      data: {
-        orderId: order.id,
-        eventType: "VERIFIED_AUTO",
-        actorId: "system",
-        message: `Delivery auto-verified — review window expires ${autoAcceptAt.toISOString()}`,
-        metadata: {
+  const runInTransaction =
+    typeof prisma.$transaction === "function"
+      ? (work: (tx: AnyPrisma) => Promise<void>) => prisma.$transaction(work)
+      : (work: (tx: AnyPrisma) => Promise<void>) => work(prisma)
+  try {
+    await runInTransaction(async (tx) => {
+      const upd = await tx.orderDeliveryVersion.updateMany({
+        where: { id: version.id, verificationVersion: expectedVersion },
+        data: {
+          verificationStatus: newStatus,
+          verificationFailureReason: failureReason,
+          verificationVersion: expectedVersion + 1,
+        },
+      })
+      if (upd.count === 0) {
+        const conflict = new Error("delivery verification version conflict")
+        conflict.name = "DeliveryVerificationVersionConflict"
+        throw conflict
+      }
+
+      let autoAcceptAt: Date | null = null
+      if (pass) {
+        const reviewWindowMs =
+          defaultWorkflowConfig.reviewWindowDays * 24 * 60 * 60 * 1000
+        autoAcceptAt = new Date(now.getTime() + reviewWindowMs)
+        const orderUpdate = await tx.order.updateMany({
+          where: {
+            id: order.id,
+            status: "PUBLISHED",
+            version: order.version,
+          },
+          data: {
+            status: "VERIFIED",
+            verifiedAt: now,
+            verifiedBy: null,
+            verifyMethod: "AUTO",
+            autoAcceptAt,
+            version: { increment: 1 },
+          },
+        })
+        if (orderUpdate.count === 0) {
+          const conflict = new Error("order verification version conflict")
+          conflict.name = "DeliveryVerificationVersionConflict"
+          throw conflict
+        }
+      }
+
+      await tx.orderEvent.create({
+        data: {
+          orderId: order.id,
+          eventType: pass ? "VERIFIED_AUTO" : "VERIFICATION_ESCALATED",
+          actorId: null,
+          message: pass
+            ? `Delivery auto-verified; review window expires ${autoAcceptAt?.toISOString()}`
+            : "Delivery verification failed and requires attention",
+          metadata: {
+            httpStatus: fetched.status,
+            resolvedUrl: fetched.finalUrl,
+            targetUrlMatched: analysis.targetUrlMatched,
+            anchorFound: analysis.anchorFound,
+            htmlHash,
+            snapshotStored,
+            fraudTypes,
+            reason: failureReason,
+          },
+        },
+      })
+      await audit(
+        tx,
+        pass ? "ORDER_DELIVERY_AUTO_VERIFIED" : "ORDER_DELIVERY_AUTO_FAILED",
+        order,
+        version,
+        null,
+        {
           httpStatus: fetched.status,
           resolvedUrl: fetched.finalUrl,
           targetUrlMatched: analysis.targetUrlMatched,
@@ -539,30 +592,26 @@ export async function runDeliveryVerification(
           htmlHash,
           snapshotStored,
           fraudTypes,
+          reason: failureReason,
         },
-      },
+      )
     })
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.name === "DeliveryVerificationVersionConflict"
+    ) {
+      // A concurrent order or delivery transition means this verification did
+      // not commit. Propagate the conflict so BullMQ retries the job instead
+      // of recording a successful-but-skipped completion that could leave the
+      // delivery stuck in PENDING/RETRYING indefinitely.
+      throw error
+    }
+    throw error
   }
 
-  // Audit + notify
-  await audit(
-    prisma,
-    pass ? "ORDER_DELIVERY_AUTO_VERIFIED" : "ORDER_DELIVERY_AUTO_FAILED",
-    order,
-    version,
-    null,
-    {
-      httpStatus: fetched.status,
-      resolvedUrl: fetched.finalUrl,
-      targetUrlMatched: analysis.targetUrlMatched,
-      anchorFound: analysis.anchorFound,
-      htmlHash,
-      snapshotStored,
-      fraudTypes,
-      reason: failureReason,
-    },
-  )
-
+  // Notifications are intentionally after commit. They are retryable side
+  // effects and must never make an order/event transaction roll back.
   const ownerIds = await publisherOwnerIds(prisma, order.website?.publisherId)
   if (pass) {
     await notifyUsers(

@@ -210,6 +210,11 @@ export {
 export type { UseSessionExpiredReturn } from "./components/use-session-expired"
 export { useSessionExpired } from "./components/use-session-expired"
 export { downloadCsv } from "./lib/csv"
+export type { OrderEventPresentation } from "./lib/order-event-presentation"
+export {
+  getOrderEventPresentation,
+  ORDER_EVENT_PRESENTATION,
+} from "./lib/order-event-presentation"
 export type {
   StatusPresentation,
   StatusVariant,

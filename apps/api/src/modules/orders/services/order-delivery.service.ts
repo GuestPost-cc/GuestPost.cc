@@ -205,9 +205,22 @@ export class OrderDeliveryService {
 
   // Customer-safe delivery proof — verification results as booleans, no internal
   // evidence (HTML hashes, object keys, fraud flags stay staff-only).
-  async deliveryProof(orderId: string, organizationId: string) {
+  async deliveryProof(
+    orderId: string,
+    access: {
+      organizationId?: string | null
+      publisherId?: string | null
+    },
+  ) {
+    const ownershipScope = access.organizationId
+      ? { organizationId: access.organizationId }
+      : access.publisherId
+        ? { website: { publisherId: access.publisherId } }
+        : null
+    if (!ownershipScope) throw new NotFoundException("Order not found")
+
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, organizationId },
+      where: { id: orderId, ...ownershipScope },
       include: { website: { select: { ownershipType: true } } },
     })
     if (!order) throw new NotFoundException("Order not found")

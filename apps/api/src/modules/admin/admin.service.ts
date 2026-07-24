@@ -74,6 +74,17 @@ interface AdminOrderListParams {
 
 type IntegrityCheckStatus = "PASS" | "WARN" | "FAIL" | "NOT_APPLICABLE"
 
+function financialUnits(value: unknown): bigint | null {
+  const text = String(value ?? "")
+  if (!/^-?\d+(?:\.\d+)?$/.test(text)) return null
+  const negative = text.startsWith("-")
+  const [whole, fraction = ""] = (negative ? text.slice(1) : text).split(".")
+  const units =
+    BigInt(whole) * 1_000_000_000_000n +
+    BigInt((fraction + "000000000000").slice(0, 12))
+  return negative ? -units : units
+}
+
 function buildOrderIntegrityReport(
   order: any,
   activeAssignment: any,
@@ -199,7 +210,24 @@ function buildOrderIntegrityReport(
   const financiallyFinal = ["DELIVERED", "SETTLED", "COMPLETED"].includes(
     order.status,
   )
-  const latestSettlement = order.settlements?.[0]
+  const activeSettlements = (order.settlements ?? []).filter(
+    (settlement: any) => settlement.status !== "CANCELLED",
+  )
+  const latestSettlement = activeSettlements[0]
+  const platformGross = financialUnits(order.platformRevenue?.amount)
+  const platformSplit =
+    financialUnits(order.platformRevenue?.platformFee) != null &&
+    financialUnits(order.platformRevenue?.netRevenue) != null
+      ? financialUnits(order.platformRevenue.platformFee)! +
+        financialUnits(order.platformRevenue.netRevenue)!
+      : null
+  const orderGross = financialUnits(order.amount)
+  const platformRevenueBalanced =
+    platformGross != null &&
+    platformSplit != null &&
+    orderGross != null &&
+    platformGross === platformSplit &&
+    platformGross === orderGross
   checks.push(
     exception || !financiallyFinal
       ? {
@@ -209,37 +237,104 @@ function buildOrderIntegrityReport(
           message: "A final financial record is not required at this stage.",
         }
       : platformChannel
-        ? order.platformRevenue
+        ? latestSettlement
           ? {
-              key: "FINANCIAL_RECORD",
-              label: "Financial record",
-              status: "PASS",
-              message: "Platform revenue was recorded for the completed route.",
-            }
-          : {
               key: "FINANCIAL_RECORD",
               label: "Financial record",
               status: "FAIL",
               message:
-                "The final platform route is missing its revenue record.",
+                "A platform route has an unexpected publisher settlement.",
             }
-        : latestSettlement
+          : !order.platformRevenue
+            ? {
+                key: "FINANCIAL_RECORD",
+                label: "Financial record",
+                status: "FAIL",
+                message:
+                  "The final platform route is missing its revenue record.",
+              }
+            : order.platformRevenue.reversedAt
+              ? {
+                  key: "FINANCIAL_RECORD",
+                  label: "Financial record",
+                  status: "FAIL",
+                  message:
+                    "The final platform route has a reversed revenue record.",
+                }
+              : !platformRevenueBalanced
+                ? {
+                    key: "FINANCIAL_RECORD",
+                    label: "Financial record",
+                    status: "FAIL",
+                    message:
+                      "Platform revenue does not equal the order gross and fee plus net-revenue split.",
+                  }
+                : {
+                    key: "FINANCIAL_RECORD",
+                    label: "Financial record",
+                    status: "PASS",
+                    message:
+                      "Platform revenue reconciles to the order gross and revenue split.",
+                  }
+        : activeSettlements.length > 1
           ? {
-              key: "FINANCIAL_RECORD",
-              label: "Financial record",
-              status: "PASS",
-              message: "A publisher settlement record is linked to this order.",
-            }
-          : {
               key: "FINANCIAL_RECORD",
               label: "Financial record",
               status: "FAIL",
               message:
-                "The final publisher route is missing its settlement record.",
-            },
+                "The publisher route has multiple active settlement records.",
+            }
+          : latestSettlement
+            ? {
+                key: "FINANCIAL_RECORD",
+                label: "Financial record",
+                status: "PASS",
+                message:
+                  "A publisher settlement record is linked to this order.",
+              }
+            : {
+                key: "FINANCIAL_RECORD",
+                label: "Financial record",
+                status: "FAIL",
+                message:
+                  "The final publisher route is missing its settlement record.",
+              },
   )
 
   const latestEvent = order.events?.[0]
+  const expectedMilestoneEvent: Record<string, string> = {
+    PAID: "PAYMENT_CAPTURED",
+    SUBMITTED: "ORDER_SUBMITTED",
+    ACCEPTED: "ORDER_ACCEPTED",
+    CUSTOMER_REVIEW: "CONTENT_SUBMITTED_FOR_REVIEW",
+    APPROVED: "CONTENT_APPROVED",
+    PUBLISHED: "PUBLICATION_MARKED",
+    VERIFIED: "VERIFIED_AUTO",
+    DELIVERED: "DELIVERY_CONFIRMED",
+    SETTLED: "SETTLED",
+    COMPLETED: "SETTLED",
+    CANCELLED: "ORDER_CANCELLED",
+    REFUNDED: "REFUNDED",
+    DISPUTED: "DISPUTE_OPENED",
+  }
+  const expectedEvent = expectedMilestoneEvent[order.status]
+  const acceptedMilestoneEvents =
+    order.status === "COMPLETED"
+      ? platformChannel
+        ? ["DELIVERY_CONFIRMED", "AUTO_ACCEPTED"]
+        : ["SETTLED", "AUTO_ACCEPTED"]
+      : order.status === "VERIFIED"
+        ? ["VERIFIED_AUTO", "VERIFIED_MANUAL"]
+        : order.status === "REFUNDED"
+          ? ["REFUNDED", "REFUND_ISSUED"]
+          : expectedEvent
+            ? [expectedEvent]
+            : []
+  const hasExpectedEvent =
+    acceptedMilestoneEvents.length === 0 ||
+    order.events?.some((event: any) =>
+      acceptedMilestoneEvents.includes(event.eventType),
+    )
   const eventPredatesOrder =
     latestEvent &&
     new Date(latestEvent.createdAt).getTime() <
@@ -252,24 +347,36 @@ function buildOrderIntegrityReport(
           status: "FAIL",
           message: "No lifecycle event is recorded for this order.",
         }
-      : eventPredatesOrder
+      : !hasExpectedEvent
         ? {
             key: "EVENT_CHAIN",
             label: "Lifecycle audit trail",
-            status: "WARN",
-            message: "The latest event timestamp predates the order record.",
+            status: "FAIL",
+            message: `The ${order.status} state is missing its canonical lifecycle event.`,
           }
-        : {
-            key: "EVENT_CHAIN",
-            label: "Lifecycle audit trail",
-            status: "PASS",
-            message: `${order.events.length} lifecycle event${order.events.length === 1 ? "" : "s"} recorded.`,
-          },
+        : eventPredatesOrder
+          ? {
+              key: "EVENT_CHAIN",
+              label: "Lifecycle audit trail",
+              status: "WARN",
+              message: "The latest event timestamp predates the order record.",
+            }
+          : {
+              key: "EVENT_CHAIN",
+              label: "Lifecycle audit trail",
+              status: "PASS",
+              message: `${order.events.length} lifecycle event${order.events.length === 1 ? "" : "s"} recorded.`,
+            },
   )
 
-  const activeHold = order.dispute
+  const activeDispute =
+    order.dispute && ["OPEN", "UNDER_REVIEW"].includes(order.dispute.status)
+  const activeCancellation = order.cancellationRequests?.find((request: any) =>
+    ["REQUESTED", "CONTESTED", "ESCALATED"].includes(request.status),
+  )
+  const activeHold = activeDispute
     ? "An active dispute pauses normal progression."
-    : order.cancellationRequests?.[0]
+    : activeCancellation
       ? "An active cancellation request pauses normal progression."
       : null
   checks.push(
@@ -1548,6 +1655,21 @@ export class AdminService {
           select: { id: true, status: true },
         },
         contentOrder: true,
+        articleVersions: {
+          orderBy: [{ purpose: "asc" }, { version: "desc" }],
+          select: {
+            id: true,
+            version: true,
+            source: true,
+            purpose: true,
+            title: true,
+            body: true,
+            format: true,
+            wordCount: true,
+            supersedesId: true,
+            createdAt: true,
+          },
+        },
         revisions: true,
         platformRevenue: true,
         fulfillmentAssignments: {
@@ -1565,6 +1687,7 @@ export class AdminService {
     const role: StaffRole = user?.staffRole ?? "SUPER_ADMIN"
     const isSuperAdmin = role === "SUPER_ADMIN"
     const canViewFinancials = role !== "OPERATIONS"
+    const canViewOrderContent = role === "OPERATIONS" || isSuperAdmin
 
     const approverIds = [
       ...new Set(
@@ -1623,8 +1746,10 @@ export class AdminService {
       status: order.status,
       paymentStatus: order.paymentStatus,
       fulfillmentChannel: order.fulfillmentChannel,
-      amount: order.amount,
-      currency: order.currency,
+      ...(canViewFinancials && {
+        amount: order.amount,
+        currency: order.currency,
+      }),
       fulfillmentDueAt: order.fulfillmentDueAt,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
@@ -1698,6 +1823,9 @@ export class AdminService {
             updatedAt: order.contentOrder.updatedAt,
           }
         : null,
+      ...(canViewOrderContent && {
+        articleVersions: order.articleVersions,
+      }),
       revisions: (order.revisions ?? []).map((revision) => ({
         id: revision.id,
         status: revision.status,
@@ -1707,7 +1835,18 @@ export class AdminService {
       events: (order.events ?? []).map((event) => ({
         id: event.id,
         eventType: event.eventType,
-        message: event.message,
+        message:
+          role === "OPERATIONS" &&
+          [
+            "PAYMENT_SUBMITTED",
+            "PAYMENT_CAPTURED",
+            "SETTLEMENT_CREATED",
+            "SETTLED",
+            "REFUND_ISSUED",
+            "REFUNDED",
+          ].includes(event.eventType)
+            ? "Financial lifecycle event recorded"
+            : event.message,
         ...(isSuperAdmin && { metadata: event.metadata }),
         createdAt: event.createdAt,
       })),
@@ -1848,7 +1987,19 @@ export class AdminService {
       this.prisma.order.count({ where }),
     ])
 
-    return { orders, pagination: { take, skip, total } }
+    const visibleOrders =
+      user?.staffRole === "OPERATIONS"
+        ? orders.map(({ amount: _amount, currency: _currency, ...order }) => ({
+            ...order,
+            customer: order.customer
+              ? {
+                  id: order.customer.id,
+                  name: order.customer.name,
+                }
+              : null,
+          }))
+        : orders
+    return { orders: visibleOrders, pagination: { take, skip, total } }
   }
 
   async manualVerify(orderId: string, method: string, userId: string) {

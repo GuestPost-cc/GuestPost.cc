@@ -194,6 +194,66 @@ describe("OrderFulfillmentAssignmentService", () => {
     ])
   })
 
+  it("omits financial fields from Operations inbox items and summaries", async () => {
+    prisma.order.findMany.mockResolvedValue([
+      {
+        ...platformOrder,
+        amount: "125.00",
+        currency: "USD",
+        events: [],
+        fulfillmentAssignments: [],
+        cancellationRequests: [],
+      },
+    ])
+    prisma.order.count.mockResolvedValue(1)
+    prisma.fulfillmentAssignment.findMany.mockResolvedValue([
+      {
+        orderId: "order-1",
+        assignedToUserId: "ops-1",
+        status: "DELIVERED",
+        order: {
+          status: "COMPLETED",
+          amount: "125.00",
+          currency: "USD",
+        },
+      },
+    ])
+
+    const result = await service.operationsInbox({
+      id: "ops-1",
+      staffRole: "OPERATIONS",
+    })
+
+    expect(result.items[0]).not.toHaveProperty("amount")
+    expect(result.items[0]).not.toHaveProperty("currency")
+    expect(result.summary).not.toHaveProperty("salesByCurrency")
+  })
+
+  it("keeps financial summaries available to Super Admin", async () => {
+    prisma.fulfillmentAssignment.findMany.mockResolvedValue([
+      {
+        orderId: "order-1",
+        assignedToUserId: "ops-1",
+        status: "DELIVERED",
+        order: {
+          status: "COMPLETED",
+          amount: "125.00",
+          currency: "USD",
+        },
+      },
+    ])
+
+    const result = await service.operationsInbox({
+      id: "admin-1",
+      staffRole: "SUPER_ADMIN",
+    })
+
+    expect(result.summary).toMatchObject({
+      completed: 1,
+      salesByCurrency: { USD: 125 },
+    })
+  })
+
   it("does not advertise cancellation-held orders as claimable", async () => {
     await service.operationsInbox(
       { id: "ops-1", staffRole: "OPERATIONS" },

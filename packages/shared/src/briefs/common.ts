@@ -2,6 +2,11 @@
 // per-service files only encode what makes that service unique.
 
 import { z } from "zod"
+import {
+  normalizeTargetKeywordsInput,
+  TARGET_KEYWORD_LIMIT,
+  TARGET_KEYWORD_MAX_LENGTH,
+} from "./keywords"
 
 // Anchor text: the clickable phrase inserted in the destination article.
 // Cap matches the legacy Order.anchorText 200-char column.
@@ -34,14 +39,24 @@ export const notesSchema = z
 // Comma-or-newline separated keywords are accepted in the UI but the schema
 // stores a clean string array. Cap each keyword at 80 chars; cap list at 20.
 export const targetKeywordsSchema = z
-  .array(
+  .preprocess(
+    normalizeTargetKeywordsInput,
     z
-      .string()
-      .trim()
-      .min(1, "Keyword cannot be empty")
-      .max(80, "Each keyword must be 80 characters or fewer"),
+      .array(
+        z
+          .string()
+          .trim()
+          .min(1, "Keyword cannot be empty")
+          .max(
+            TARGET_KEYWORD_MAX_LENGTH,
+            `Each keyword must be ${TARGET_KEYWORD_MAX_LENGTH} characters or fewer`,
+          ),
+      )
+      .max(
+        TARGET_KEYWORD_LIMIT,
+        `Up to ${TARGET_KEYWORD_LIMIT} target keywords`,
+      ),
   )
-  .max(20, "Up to 20 target keywords")
   .optional()
 
 // Word count: positive integer with sane upper bound to reject typos

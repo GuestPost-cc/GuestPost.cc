@@ -4,6 +4,7 @@ import type {
   CancellationReasonCode,
   OperationsOrderDetail,
 } from "@guestpost/api-client"
+import { type OrderStatus } from "@guestpost/shared"
 import {
   Badge,
   Button,
@@ -18,8 +19,10 @@ import {
   DialogHeader,
   DialogTitle,
   ErrorState,
+  getOrderStatusPresentation,
   Input,
   Label,
+  OrderLifecycleProgress,
   Select,
   SelectContent,
   SelectItem,
@@ -28,6 +31,7 @@ import {
   Separator,
   Skeleton,
   Textarea,
+  StatusBadge as UIStatusBadge,
 } from "@guestpost/ui"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format, formatDistanceToNowStrict, isPast } from "date-fns"
@@ -83,59 +87,215 @@ const activeCancellationStatuses = new Set([
   "APPROVED",
 ])
 
-const steps = [
-  { label: "Accept", statuses: ["SUBMITTED"] },
-  {
-    label: "Create content",
-    statuses: [
-      "ACCEPTED",
-      "CONTENT_REQUESTED",
-      "CONTENT_CREATION",
-      "CONTENT_READY",
-    ],
-  },
-  { label: "Customer review", statuses: ["CUSTOMER_REVIEW"] },
-  { label: "Publish", statuses: ["APPROVED"] },
-  { label: "Verify", statuses: ["PUBLISHED", "VERIFIED", "DELIVERED"] },
-  { label: "Complete", statuses: ["SETTLED", "COMPLETED"] },
-]
-
-function currentStep(status: string) {
-  const index = steps.findIndex((step) => step.statuses.includes(status))
-  return index === -1 ? steps.length - 1 : index
+const eventLabels: Record<string, string> = {
+  ORDER_CREATED: "Order created",
+  PAYMENT_RECEIVED: "Payment received",
+  ASSIGNED: "Writer assigned",
+  CONTENT_SUBMITTED: "Content submitted",
+  CONTENT_APPROVED: "Content approved",
+  PUBLISHED: "Published live",
+  VERIFIED: "Verified",
+  UNDER_REVIEW: "Sent for review",
+  DELIVERED: "Delivered",
+  SETTLED: "Settlement processed",
+  COMPLETED: "Completed",
+  CANCELLED: "Cancelled",
+  REFUNDED: "Refunded",
+  DISPUTED: "Dispute opened",
+  REJECTED: "Rejected",
+  VERIFIED_AUTO: "Automatically verified",
+  VERIFIED_MANUAL: "Manually verified by admin",
+  AUTO_ACCEPTED: "Auto-accepted (review window expired)",
+  REVIEW_REMINDER: "Review reminder sent",
+  VERIFICATION_ESCALATED: "Verification escalated",
+  DISPUTE_OPENED: "Dispute opened",
+  DISPUTE_RESOLVED: "Dispute resolved",
+  FORCE_CANCELLED: "Force cancelled by admin",
+  REFUND_ISSUED: "Refund issued by admin",
+  SETTLEMENT_CREATED: "Settlement created",
+  ORDER_CANCELLED: "Order cancelled",
+  PAYMENT_CAPTURED: "Payment captured",
+  PAYMENT_SUBMITTED: "Payment submitted",
+  ORDER_ACCEPTED: "Order accepted",
+  CONTENT_MARKED_READY: "Content marked ready",
+  CONTENT_SUBMITTED_FOR_REVIEW: "Content submitted for review",
+  REVISION_REQUESTED: "Revision requested",
+  PUBLICATION_MARKED: "Publication marked",
+  DELIVERY_CONFIRMED: "Delivery confirmed",
+  ITEM_ADDED: "Item added",
+  ITEM_REMOVED: "Item removed",
 }
 
-function WorkflowSteps({ status }: { status: string }) {
-  const active = currentStep(status)
+const eventIcons = {
+  ORDER_CREATED: FileText,
+  PAYMENT_RECEIVED: Check,
+  ASSIGNED: UserPlus,
+  CONTENT_SUBMITTED: FileText,
+  CONTENT_APPROVED: Check,
+  PUBLISHED: Check,
+  VERIFIED: CheckCircle2,
+  UNDER_REVIEW: Clock3,
+  DELIVERED: CheckCircle2,
+  SETTLED: CheckCircle2,
+  COMPLETED: CheckCircle2,
+  CANCELLED: XCircle,
+  REFUNDED: RefreshCw,
+  DISPUTED: AlertCircle,
+  REJECTED: XCircle,
+  VERIFIED_AUTO: CheckCircle2,
+  VERIFIED_MANUAL: CheckCircle2,
+  AUTO_ACCEPTED: CheckCircle2,
+  REVIEW_REMINDER: MessageSquare,
+  VERIFICATION_ESCALATED: AlertCircle,
+  DISPUTE_OPENED: AlertCircle,
+  DISPUTE_RESOLVED: ShieldCheck,
+  FORCE_CANCELLED: XCircle,
+  REFUND_ISSUED: RefreshCw,
+  SETTLEMENT_CREATED: CheckCircle2,
+  ORDER_CANCELLED: XCircle,
+  PAYMENT_CAPTURED: Check,
+  PAYMENT_SUBMITTED: Check,
+  ORDER_ACCEPTED: Check,
+  CONTENT_MARKED_READY: FileText,
+  CONTENT_SUBMITTED_FOR_REVIEW: FileText,
+  REVISION_REQUESTED: MessageSquare,
+  PUBLICATION_MARKED: CheckCircle2,
+  DELIVERY_CONFIRMED: CheckCircle2,
+  ITEM_ADDED: FileText,
+  ITEM_REMOVED: FileText,
+}
+
+function formatMoney(value: string | number | null, currency: string): string {
+  if (value == null) return "—"
+  const amount = typeof value === "string" ? Number(value) : value
+  if (!Number.isFinite(amount)) return "—"
+  return `${currency} ${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+function formatDateTime(value: string | null | undefined): string {
+  if (!value) return "Time unavailable"
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? "Time unavailable" : format(date, "PPp")
+}
+
+function eventDetail(event: {
+  message?: string | null
+  metadata?: Record<string, unknown> | null
+  eventType: string
+}): string | null {
+  if (event.message?.trim()) return event.message.trim()
+
+  const m = (event.metadata ?? {}) as Record<string, unknown>
+  const parts: string[] = []
+  const url = m.publishedUrl ?? m.url
+
+  if (url) parts.push(`Published at ${String(url)}`)
+  if (m.reason) parts.push(`Reason: ${String(m.reason)}`)
+  if (m.notes) parts.push(String(m.notes))
+  if (m.newStatus)
+    parts.push(
+      `Status → ${String(m.newStatus).replace(/_/g, " ").toLowerCase()}`,
+    )
+  if (typeof m.amount === "number") {
+    parts.push(`Amount: $${m.amount.toLocaleString()}`)
+  }
+  if (m.assignedTo) parts.push(`Assigned to ${String(m.assignedTo)}`)
+  if (m.adminName) parts.push(`By ${String(m.adminName)}`)
+  if (m.version != null) parts.push(`Revision v${m.version}`)
+  if (m.action)
+    parts.push(`Action: ${String(m.action).replace(/_/g, " ").toLowerCase()}`)
+  return parts.length ? parts.join(" · ") : null
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const p = getOrderStatusPresentation(status as OrderStatus)
+  return <UIStatusBadge variant={p.variant}>{p.label}</UIStatusBadge>
+}
+
+function OrderTimeline({
+  events,
+}: {
+  events: OperationsOrderDetail["events"]
+}) {
+  const sortedEvents = [...events].sort(
+    (left, right) =>
+      (Number.isNaN(new Date(right.createdAt).getTime())
+        ? 0
+        : new Date(right.createdAt).getTime()) -
+      (Number.isNaN(new Date(left.createdAt).getTime())
+        ? 0
+        : new Date(left.createdAt).getTime()),
+  )
+
+  if (!sortedEvents.length) {
+    return (
+      <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+        No timeline events are visible for your role yet.
+      </p>
+    )
+  }
+
   return (
-    <div className="overflow-x-auto pb-2">
-      <div className="grid min-w-[680px] grid-cols-6 gap-2">
-        {steps.map((step, index) => {
-          const complete = index < active
-          const current = index === active
+    <div className="relative">
+      <div className="absolute left-4 top-0 h-full w-px bg-border" />
+      <div className="space-y-6">
+        {sortedEvents.map((event, index) => {
+          const isLatest = index === 0
+          const iconKey = event.eventType
+          const iconEntry =
+            event.eventType in eventIcons
+              ? (eventIcons as Record<string, typeof Check>)[iconKey]
+              : Check
+          const detail = eventDetail(event)
+          const createdAt = new Date(event.createdAt)
+          const createdAtLabel = Number.isNaN(createdAt.getTime())
+            ? "Time unavailable"
+            : formatDateTime(event.createdAt)
+          const distanceLabel = Number.isNaN(createdAt.getTime())
+            ? "Time unavailable"
+            : formatDistanceToNowStrict(createdAt, { addSuffix: true })
+
           return (
-            <div key={step.label} className="min-w-0">
+            <div key={event.id} className="relative pl-10">
               <div
-                className={`h-1.5 rounded-full ${
-                  complete || current ? "bg-primary" : "bg-muted"
+                className={`absolute left-2.5 top-1 flex h-5 w-5 items-center justify-center rounded-full ${
+                  isLatest ? "bg-primary" : "bg-muted"
                 }`}
-              />
-              <div className="mt-2 flex items-center gap-1.5 text-xs">
-                {complete ? (
-                  <Check className="h-3.5 w-3.5 text-primary" />
-                ) : (
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      current ? "bg-primary" : "bg-muted-foreground/30"
-                    }`}
-                  />
-                )}
+              >
+                {(() => {
+                  const Icon = iconEntry
+                  return (
+                    <Icon
+                      className={`h-3 w-3 ${
+                        isLatest
+                          ? "text-primary-foreground"
+                          : "text-muted-foreground"
+                      }`}
+                    />
+                  )
+                })()}
+              </div>
+              <div className="flex flex-col">
+                <span className="font-medium">
+                  {eventLabels[event.eventType] ||
+                    event.eventType
+                      .replace(/_/g, " ")
+                      .toLowerCase()
+                      .replace(/\b\w/g, (c) => c.toUpperCase())}
+                </span>
+                {detail ? (
+                  <span className="mt-0.5 break-words text-sm text-muted-foreground">
+                    {detail}
+                  </span>
+                ) : null}
                 <span
-                  className={
-                    current ? "font-semibold" : "text-muted-foreground"
-                  }
+                  className="mt-0.5 text-xs text-muted-foreground"
+                  title={createdAtLabel}
                 >
-                  {step.label}
+                  {distanceLabel}
                 </span>
               </div>
             </div>
@@ -150,6 +310,58 @@ function formatBrief(brief: Record<string, unknown> | null) {
   if (!brief) return []
   return Object.entries(brief).filter(
     ([, value]) => value !== null && value !== undefined && value !== "",
+  )
+}
+
+function OrderArticleVersions({
+  articles,
+}: {
+  articles: OperationsOrderDetail["articleVersions"]
+}) {
+  if (articles.length === 0) return null
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Article versions</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {articles.map((article) => {
+          const timestamp = new Date(article.createdAt)
+          return (
+            <section
+              key={article.id}
+              className="overflow-hidden rounded-lg border"
+            >
+              <header className="flex flex-wrap items-start justify-between gap-3 bg-muted/40 px-3 py-2">
+                <div>
+                  <p className="text-sm font-semibold">
+                    {article.purpose === "SOURCE_ARTICLE"
+                      ? "Customer source article"
+                      : "Operations submission"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Version {article.version} · {article.wordCount} words
+                  </p>
+                </div>
+                <time className="text-xs text-muted-foreground">
+                  {Number.isNaN(timestamp.getTime())
+                    ? "Time unavailable"
+                    : timestamp.toLocaleString()}
+                </time>
+              </header>
+              {article.title && (
+                <p className="border-b px-3 py-2 text-sm font-medium">
+                  {article.title}
+                </p>
+              )}
+              <div className="max-h-80 overflow-auto whitespace-pre-wrap break-words px-3 py-3 text-sm leading-6">
+                {article.body}
+              </div>
+            </section>
+          )
+        })}
+      </CardContent>
+    </Card>
   )
 }
 
@@ -501,7 +713,7 @@ function FulfillmentOrderPageInner() {
         icon={Upload}
         badges={
           <>
-            <Badge variant="outline">{order.status.replaceAll("_", " ")}</Badge>
+            <StatusBadge status={order.status} />
             <Badge variant="secondary">Platform fulfilled</Badge>
           </>
         }
@@ -534,7 +746,17 @@ function FulfillmentOrderPageInner() {
         }
       />
 
-      <WorkflowSteps status={order.status} />
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Lifecycle progress</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Canonical stage map and current progress checkpoint
+          </p>
+        </CardHeader>
+        <CardContent className="overflow-x-auto pb-6">
+          <OrderLifecycleProgress status={order.status} />
+        </CardContent>
+      </Card>
 
       {activeCancellation && (
         <div className="border border-destructive/30 bg-destructive/5 p-4">
@@ -814,33 +1036,7 @@ function FulfillmentOrderPageInner() {
               <CardTitle className="text-lg">Activity</CardTitle>
             </CardHeader>
             <CardContent>
-              {order.events.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No activity yet.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {order.events.slice(0, 12).map((event, index) => (
-                    <div key={event.id} className="flex gap-3">
-                      <div className="flex flex-col items-center">
-                        <span className="mt-1.5 h-2 w-2 rounded-full bg-primary" />
-                        {index < Math.min(order.events.length, 12) - 1 && (
-                          <span className="mt-1 h-full w-px bg-border" />
-                        )}
-                      </div>
-                      <div className="min-w-0 pb-3">
-                        <div className="text-sm font-medium">
-                          {event.message ||
-                            event.eventType.replaceAll("_", " ")}
-                        </div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          {format(new Date(event.createdAt), "MMM d, yyyy, p")}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <OrderTimeline events={order.events} />
             </CardContent>
           </Card>
         </div>
@@ -852,6 +1048,42 @@ function FulfillmentOrderPageInner() {
             </CardHeader>
             <CardContent>
               <OrderContext order={order} />
+            </CardContent>
+          </Card>
+
+          <OrderArticleVersions articles={order.articleVersions ?? []} />
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Order metadata</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {order.amount !== undefined && order.currency !== undefined && (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Order value</span>
+                  <span>{formatMoney(order.amount, order.currency)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Status</span>
+                <StatusBadge status={order.status} />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Customer</span>
+                <span>{order.customer?.name ?? "Unknown"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Organization</span>
+                <span>{order.organization?.name ?? "Unknown"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Accepted</span>
+                <span>{formatDateTime(order.acceptedAt)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Created</span>
+                <span>{formatDateTime(order.createdAt)}</span>
+              </div>
             </CardContent>
           </Card>
 

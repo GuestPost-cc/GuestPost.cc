@@ -188,7 +188,9 @@ export default function CampaignDetailPage({
         </div>
 
         <Button asChild>
-          <Link href={`/dashboard/orders/new?campaign=${campaign.id}`}>
+          <Link
+            href={`/dashboard/marketplace?campaignId=${encodeURIComponent(campaign.id)}`}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Order
           </Link>
@@ -260,7 +262,9 @@ export default function CampaignDetailPage({
                 Add your first order to this campaign
               </p>
               <Button className="mt-4" asChild>
-                <Link href={`/dashboard/orders/new?campaign=${campaign.id}`}>
+                <Link
+                  href={`/dashboard/marketplace?campaignId=${encodeURIComponent(campaign.id)}`}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Add Order
                 </Link>

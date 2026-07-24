@@ -951,6 +951,7 @@ model Order {
   listing                MarketplaceListing?        @relation(fields: [listingId], references: [id])
   listingService         ListingService?            @relation(fields: [listingServiceId], references: [id])
   contentOrder           ContentOrder?
+  articleVersions        OrderArticleVersion[]
   revisions              Revision[]
   reports                Report[]
   transactions           Transaction[]
@@ -1621,6 +1622,47 @@ model ContentOrder {
   updatedAt   DateTime           @updatedAt
 
   order Order @relation(fields: [orderId], references: [id])
+}
+
+enum OrderArticleSource {
+  CUSTOMER
+  PUBLISHER
+  OPERATIONS
+}
+
+enum OrderArticlePurpose {
+  SOURCE_ARTICLE
+  FINAL_SUBMISSION
+}
+
+enum OrderArticleFormat {
+  PLAIN_TEXT
+  MARKDOWN
+}
+
+model OrderArticleVersion {
+  id              String              @id @default(cuid())
+  orderId         String
+  version         Int
+  source          OrderArticleSource
+  purpose         OrderArticlePurpose
+  title           String?             @db.VarChar(200)
+  body            String              @db.Text
+  format          OrderArticleFormat  @default(MARKDOWN)
+  checksum        String              @db.VarChar(64)
+  wordCount       Int
+  createdByUserId String
+  supersedesId    String?
+  createdAt       DateTime            @default(now())
+
+  order        Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supersedes   OrderArticleVersion?  @relation("ArticleVersionHistory", fields: [supersedesId], references: [id], onDelete: SetNull)
+  supersededBy OrderArticleVersion[] @relation("ArticleVersionHistory")
+
+  @@unique([orderId, source, purpose, version])
+  @@index([orderId, purpose, createdAt])
+  @@index([createdByUserId])
+  @@index([supersedesId])
 }
 
 model Revision {

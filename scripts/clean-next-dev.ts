@@ -4,12 +4,12 @@ import { join } from "node:path"
 const appsDir = join(__dirname, "..", "apps")
 const devOutputDirs = readdirSync(appsDir, { withFileTypes: true })
   .filter((entry) => entry.isDirectory())
-  .map((entry) => join(appsDir, entry.name, ".next", "dev"))
+  .map((entry) => join(appsDir, entry.name, ".next"))
   .filter(existsSync)
 
 for (const dir of devOutputDirs) {
   rmSync(dir, { recursive: true, force: true })
-  console.log(`Removed stale Next.js development output: ${dir}`)
+  console.log(`Removed stale Next.js output before development: ${dir}`)
 }
 
 if (devOutputDirs.length === 0) {

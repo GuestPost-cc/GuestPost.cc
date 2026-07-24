@@ -114,7 +114,22 @@ Buyer marketplace ownership labels use brand-separated colors everywhere: PLATFO
 
 ## Buyer URL Visibility (2026-07-13)
 
-The buyer portal blurs a publisher website URL until the customer has made a successful deposit. A positive balance or any recorded `DEPOSIT` transaction unlocks it permanently; an order draft alone does not. This is a portal presentation rule, not a replacement for server-side authorization.
+The buyer portal withholds a publisher website URL until the customer's
+organization has verified successful-deposit evidence. The API is the
+authoritative disclosure boundary; a positive balance, unverified ledger row,
+or order draft does not unlock the URL.
+
+### Server-authoritative URL projection (2026-07-24)
+
+Marketplace search/detail and customer order projections now resolve permanent
+website access from an organization-scoped successful `DepositAttempt`, with a
+verified legacy `DEPOSIT` ledger-row fallback for credits created before the
+attempt model.
+`SUCCEEDED`, `PARTIALLY_REFUNDED`, and `REFUNDED` prove that a successful
+deposit occurred. Locked responses omit the real website/sample/signup URL and
+return an explicit access reason; CSS blur is never a secrecy boundary.
+Publisher and authorized staff order views retain the website needed for
+fulfillment.
 
 ## Buyer Marketplace Decision Flow (2026-07-18)
 
@@ -153,3 +168,10 @@ Platform websites start `VERIFIED` because DNS ownership verification is not req
 ## Key Files
 
 - `apps/api/src/modules/marketplace/`
+
+## 2026-07-24 secure order entry validation
+
+- Marketplace order links preserve the selected `service` query through authentication redirects.
+- Target keywords accept comma/newline-separated input, enforce shared limits, trim and deduplicate without silent truncation.
+- Website URL disclosure is decided by the API from verified organization deposit evidence; locked responses do not include the raw URL.
+- Customer-supplied guest-post articles are accepted with the validated brief and remain separately versioned from fulfiller submissions.

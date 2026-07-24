@@ -32,4 +32,21 @@ describe("middleware auth helpers", () => {
       }),
     ).toEqual({ needsRedirect: false })
   })
+
+  it("preserves the full query string in an unauthenticated return path", () => {
+    expect(
+      requiresAuthRedirect(
+        "/dashboard/marketplace/site/order?service=service-1",
+        null,
+        {
+          signInPath: "/",
+          protectedPaths: ["/dashboard"],
+        },
+      ),
+    ).toEqual({
+      needsRedirect: true,
+      signInPath: "/",
+      redirect: "/dashboard/marketplace/site/order?service=service-1",
+    })
+  })
 })

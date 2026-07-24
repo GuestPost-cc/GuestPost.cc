@@ -244,6 +244,20 @@ describe("runDeliveryVerification", () => {
     )
   })
 
+  it("throws a version conflict so the queue retries instead of silently completing", async () => {
+    prisma.order.updateMany.mockResolvedValue({ count: 0 })
+
+    await expect(
+      runDeliveryVerification(
+        { prisma, fetchUrl: fetcher(goodHtml), putObject },
+        "v1",
+      ),
+    ).rejects.toMatchObject({
+      name: "DeliveryVerificationVersionConflict",
+      message: "order verification version conflict",
+    })
+  })
+
   it("FAILS on target URL mismatch and flags TARGET_MISMATCH", async () => {
     const html = `<a href="https://client.com/wrong">best product</a>`
     const res = await runDeliveryVerification(

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { OrderStatus, Prisma, ServiceType } from "@guestpost/database"
 import { UnknownServiceTypeError, validateBrief } from "@guestpost/shared"
 import {
@@ -7,7 +8,14 @@ import {
   NotFoundException,
 } from "@nestjs/common"
 import { ZodError } from "zod"
+import { canCustomerViewWebsite } from "../../common/customer-website-access"
 import { PrismaService } from "../../common/prisma.service"
+import { projectExternalOrder } from "./order-visibility"
+
+const CREATE_ORDER_RESULT_INCLUDE = {
+  items: true,
+  articleVersions: true,
+} satisfies Prisma.OrderInclude
 
 @Injectable()
 export class OrdersService {
@@ -22,6 +30,12 @@ export class OrdersService {
       organizationId: string
       campaignId?: string
       idempotencyKey?: string
+      expectedListingServiceVersion?: unknown
+      expectedPrice?: unknown
+      expectedCurrency?: unknown
+      articleTitle?: unknown
+      articleBody?: unknown
+      articleFormat?: unknown
       targetUrl?: string
       anchorText?: string
       // Phase 2 preferred: the customer's locked pick from the listing detail
@@ -65,8 +79,25 @@ export class OrdersService {
               idempotencyKey: data.idempotencyKey,
             },
           },
+          include: CREATE_ORDER_RESULT_INCLUDE,
         })
         if (existing) return existing
+      }
+
+      if (data.campaignId) {
+        const campaign = await tx.campaign.findFirst({
+          where: {
+            id: data.campaignId,
+            organizationId: data.organizationId,
+          },
+          select: { id: true },
+        })
+        if (!campaign) {
+          throw new BadRequestException({
+            code: "CAMPAIGN_NOT_FOUND",
+            message: "Campaign is unavailable for this organization",
+          })
+        }
       }
 
       // ── Phase 2 snapshot: resolve listingService → listing → website ────
@@ -87,6 +118,7 @@ export class OrdersService {
         turnaroundDays: number | null
         warrantyDays: number | null
         snapshotPrice: number | null
+        snapshotCurrency: string | null
         snapshotServiceType: string | null
         websiteId: string | null
         // Phase 6.5: carry the site's default Ops owner through so we can
@@ -99,6 +131,7 @@ export class OrdersService {
         turnaroundDays: null,
         warrantyDays: null,
         snapshotPrice: null,
+        snapshotCurrency: null,
         snapshotServiceType: null,
         websiteId: firstItem?.websiteId ?? null,
         managedByUserId: null,
@@ -156,6 +189,54 @@ export class OrdersService {
             "Item websiteId does not match the listing's website",
           )
         }
+        const quoteFields = [
+          data.expectedListingServiceVersion,
+          data.expectedPrice,
+          data.expectedCurrency,
+        ]
+        if (quoteFields.some((value) => value !== undefined)) {
+          const expectedVersion = Number(data.expectedListingServiceVersion)
+          let expectedPrice: Prisma.Decimal
+          try {
+            expectedPrice = new Prisma.Decimal(String(data.expectedPrice))
+          } catch {
+            throw new BadRequestException({
+              code: "QUOTE_INVALID",
+              message: "The reviewed service quote is invalid",
+            })
+          }
+          const expectedCurrency =
+            typeof data.expectedCurrency === "string"
+              ? data.expectedCurrency.trim().toUpperCase()
+              : ""
+          if (
+            !Number.isInteger(expectedVersion) ||
+            !expectedPrice.isFinite() ||
+            expectedPrice.isNegative() ||
+            !/^[A-Z]{3}$/.test(expectedCurrency)
+          ) {
+            throw new BadRequestException({
+              code: "QUOTE_INVALID",
+              message: "The reviewed service quote is invalid",
+            })
+          }
+          if (
+            expectedVersion !== ls.version ||
+            !expectedPrice.equals(ls.price) ||
+            expectedCurrency !== ls.currency.toUpperCase()
+          ) {
+            throw new ConflictException({
+              code: "REQUOTE_REQUIRED",
+              message:
+                "The service price or terms changed. Review the updated quote before ordering.",
+              quote: {
+                version: ls.version,
+                price: ls.price.toString(),
+                currency: ls.currency,
+              },
+            })
+          }
+        }
         snapshot = {
           listingId: ls.listingId,
           listingServiceId: ls.id,
@@ -164,6 +245,7 @@ export class OrdersService {
           turnaroundDays: ls.turnaroundDays,
           warrantyDays: ls.warrantyDays,
           snapshotPrice: Number(ls.price),
+          snapshotCurrency: ls.currency,
           snapshotServiceType: ls.serviceType,
           websiteId: site?.id ?? firstItem?.websiteId ?? null,
           managedByUserId: site?.managedByUserId ?? null,
@@ -197,6 +279,7 @@ export class OrdersService {
               turnaroundDays: ls.turnaroundDays,
               warrantyDays: ls.warrantyDays,
               snapshotPrice: Number(ls.price),
+              snapshotCurrency: ls.currency,
               snapshotServiceType: ls.serviceType,
               websiteId: firstItem.websiteId,
               managedByUserId: listing.website?.managedByUserId ?? null,
@@ -231,7 +314,12 @@ export class OrdersService {
       // shape/typing validation happens via Zod and any ZodError surfaces
       // as a 400 with the field path.
       let validatedBrief: Prisma.InputJsonValue | null = null
-      if (data.briefData !== undefined && data.briefData !== null) {
+      if (data.briefData === undefined || data.briefData === null) {
+        throw new BadRequestException({
+          code: "BRIEF_REQUIRED",
+          message: "A structured service brief is required",
+        })
+      } else {
         const serviceTypeForBrief = snapshot.snapshotServiceType ?? data.type
         try {
           validatedBrief = validateBrief(
@@ -259,6 +347,70 @@ export class OrdersService {
         }
       }
 
+      const briefRecord =
+        validatedBrief && typeof validatedBrief === "object"
+          ? (validatedBrief as Record<string, unknown>)
+          : {}
+      const canonicalTargetUrl =
+        typeof briefRecord.targetUrl === "string"
+          ? briefRecord.targetUrl
+          : (data.targetUrl ?? firstItem?.targetUrl ?? null)
+      const canonicalAnchorText =
+        typeof briefRecord.anchorText === "string"
+          ? briefRecord.anchorText
+          : (data.anchorText ?? firstItem?.anchorText ?? null)
+
+      let article:
+        | {
+            title: string | null
+            body: string
+            format: "PLAIN_TEXT" | "MARKDOWN"
+          }
+        | undefined
+      if (data.articleBody !== undefined && data.articleBody !== null) {
+        if (snapshot.snapshotServiceType !== "GUEST_POST") {
+          throw new BadRequestException({
+            code: "ARTICLE_NOT_SUPPORTED",
+            message:
+              "Customer-supplied articles are supported only for guest-post orders",
+          })
+        }
+        if (typeof data.articleBody !== "string") {
+          throw new BadRequestException("Article body must be text")
+        }
+        const body = data.articleBody.trim()
+        if (body.length === 0 || body.length > 200_000) {
+          throw new BadRequestException(
+            "Article body must be between 1 and 200,000 characters",
+          )
+        }
+        const title =
+          data.articleTitle === undefined || data.articleTitle === null
+            ? null
+            : typeof data.articleTitle === "string"
+              ? data.articleTitle.trim()
+              : null
+        if (data.articleTitle != null && title === null) {
+          throw new BadRequestException("Article title must be text")
+        }
+        if (title && title.length > 200) {
+          throw new BadRequestException(
+            "Article title must be 200 characters or fewer",
+          )
+        }
+        const format =
+          data.articleFormat === undefined
+            ? "MARKDOWN"
+            : data.articleFormat === "MARKDOWN" ||
+                data.articleFormat === "PLAIN_TEXT"
+              ? data.articleFormat
+              : null
+        if (!format) {
+          throw new BadRequestException("Unsupported article format")
+        }
+        article = { title: title || null, body, format }
+      }
+
       // Order-level website link is required for publisher fulfillment
       // (acceptOrder matches on order.website.publisherId)
       const order = await tx.order.create({
@@ -271,11 +423,12 @@ export class OrdersService {
           campaignId: data.campaignId,
           idempotencyKey: data.idempotencyKey ?? null,
           websiteId: snapshot.websiteId,
-          targetUrl: data.targetUrl ?? firstItem?.targetUrl ?? null,
-          anchorText: data.anchorText ?? firstItem?.anchorText ?? null,
+          targetUrl: canonicalTargetUrl,
+          anchorText: canonicalAnchorText,
           status: "DRAFT",
           paymentStatus: "PENDING",
           amount: 0,
+          currency: snapshot.snapshotCurrency ?? "USD",
           // Phase 2 snapshot columns — see the resolveSnapshot block above.
           listingId: snapshot.listingId,
           listingServiceId: snapshot.listingServiceId,
@@ -287,62 +440,90 @@ export class OrdersService {
         },
       })
 
-      if (data.items && data.items.length > 0) {
-        let total = 0
-        for (const item of data.items) {
-          let price: number
-          // Use tx (not this.prisma) — a separate connection here while the
-          // transaction holds its own deadlocks the pool under concurrency.
-          if (item.websiteId) {
-            // Block orders on a revoked domain — defence in depth beyond listing
-            // pause (a REVOKED publisher site may never take new orders).
-            const site = await tx.website.findUnique({
-              where: { id: item.websiteId },
-              select: { verificationStatus: true, ownershipType: true },
-            })
-            if (
-              site?.ownershipType === "PUBLISHER" &&
-              site.verificationStatus === "REVOKED"
-            ) {
-              throw new BadRequestException({
-                code: "WEBSITE_REVOKED",
-                message: `Website ${item.websiteId} ownership is revoked and cannot take new orders`,
-              })
-            }
-            // Post-Phase-4: snapshot.snapshotPrice is always set (the order
-            // already failed if listingServiceId was unresolvable above), so
-            // the listing-level fallback is gone.
-            if (snapshot.snapshotPrice == null) {
-              throw new BadRequestException(
-                "Internal: order snapshot missing price",
-              )
-            }
-            price = snapshot.snapshotPrice
-          } else {
-            // Orders without a website are no longer accepted — the
-            // listingServiceId snapshot always implies a website.
-            throw new BadRequestException(
-              "Order items must reference a website",
-            )
-          }
-
-          await tx.orderItem.create({
+      const articleVersion = article
+        ? await tx.orderArticleVersion.create({
             data: {
               orderId: order.id,
-              websiteId: item.websiteId,
-              targetUrl: item.targetUrl,
-              anchorText: item.anchorText,
-              price,
-              status: "PENDING_PAYMENT",
+              version: 1,
+              source: "CUSTOMER",
+              purpose: "SOURCE_ARTICLE",
+              title: article.title,
+              body: article.body,
+              format: article.format,
+              checksum: createHash("sha256")
+                .update(article.body, "utf8")
+                .digest("hex"),
+              wordCount: article.body.split(/\s+/).filter(Boolean).length,
+              createdByUserId: userId,
             },
           })
-          total += price
+        : null
+
+      // A listing-service purchase always represents at least one placement.
+      // Derive the canonical item when an older or direct API client omits the
+      // items array so a paid order can never be created with a zero total.
+      const orderItems = data.items && data.items.length > 0 ? data.items : [{}]
+      let total = 0
+      for (const item of orderItems) {
+        let price: number
+        if (
+          item.websiteId &&
+          snapshot.websiteId &&
+          item.websiteId !== snapshot.websiteId
+        ) {
+          throw new BadRequestException(
+            "Item websiteId does not match the selected service",
+          )
         }
-        await tx.order.update({
-          where: { id: order.id },
-          data: { amount: total },
+        // Use tx (not this.prisma) — a separate connection here while the
+        // transaction holds its own deadlocks the pool under concurrency.
+        if (snapshot.websiteId) {
+          // Block orders on a revoked domain — defence in depth beyond listing
+          // pause (a REVOKED publisher site may never take new orders).
+          const site = await tx.website.findUnique({
+            where: { id: snapshot.websiteId },
+            select: { verificationStatus: true, ownershipType: true },
+          })
+          if (
+            site?.ownershipType === "PUBLISHER" &&
+            site.verificationStatus === "REVOKED"
+          ) {
+            throw new BadRequestException({
+              code: "WEBSITE_REVOKED",
+              message: `Website ${snapshot.websiteId} ownership is revoked and cannot take new orders`,
+            })
+          }
+          // Post-Phase-4: snapshot.snapshotPrice is always set (the order
+          // already failed if listingServiceId was unresolvable above), so
+          // the listing-level fallback is gone.
+          if (snapshot.snapshotPrice == null) {
+            throw new BadRequestException(
+              "Internal: order snapshot missing price",
+            )
+          }
+          price = snapshot.snapshotPrice
+        } else {
+          // Orders without a website are no longer accepted — the
+          // listingServiceId snapshot always implies a website.
+          throw new BadRequestException("Order items must reference a website")
+        }
+
+        await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            websiteId: snapshot.websiteId,
+            targetUrl: canonicalTargetUrl,
+            anchorText: canonicalAnchorText,
+            price,
+            status: "PENDING_PAYMENT",
+          },
         })
+        total += price
       }
+      await tx.order.update({
+        where: { id: order.id },
+        data: { amount: total },
+      })
 
       // ── Phase 6.5: auto-assign PLATFORM orders to the site's Ops owner ──
       //
@@ -395,7 +576,29 @@ export class OrdersService {
         },
       })
 
-      return order
+      if (articleVersion) {
+        await tx.orderEvent.create({
+          data: {
+            orderId: order.id,
+            eventType: "CONTENT_SUBMITTED",
+            actorId: userId,
+            message: "Customer supplied a source article with the order",
+            metadata: {
+              articleVersionId: articleVersion.id,
+              source: "CUSTOMER",
+              purpose: "SOURCE_ARTICLE",
+              version: articleVersion.version,
+              checksum: articleVersion.checksum,
+              wordCount: articleVersion.wordCount,
+            },
+          },
+        })
+      }
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: order.id },
+        include: CREATE_ORDER_RESULT_INCLUDE,
+      })
     })
   }
 
@@ -545,23 +748,53 @@ export class OrdersService {
   // organizationId is null for publisher callers — OrderOwnershipGuard has
   // already verified the order's website belongs to their publisher account,
   // and a null org filter is a Prisma validation error (500), not a no-op.
-  async getOrder(id: string, organizationId?: string | null) {
+  async getOrder(
+    id: string,
+    organizationId?: string | null,
+    actor: "CUSTOMER" | "PUBLISHER" = "CUSTOMER",
+  ) {
     const order = await this.prisma.order.findFirst({
       where: organizationId ? { id, organizationId } : { id },
       include: {
         items: { include: { publications: true } },
         events: { orderBy: { createdAt: "desc" } },
         contentOrder: true,
+        articleVersions: {
+          orderBy: [{ purpose: "asc" }, { version: "desc" }],
+          select: {
+            id: true,
+            version: true,
+            source: true,
+            purpose: true,
+            title: true,
+            body: true,
+            format: true,
+            checksum: true,
+            wordCount: true,
+            createdByUserId: true,
+            supersedesId: true,
+            createdAt: true,
+          },
+        },
         revisions: true,
         reports: true,
         website: true,
         settlements: { include: { approvals: true } },
         dispute: true,
-        cancellationRequests: { orderBy: { createdAt: "desc" }, take: 10 },
+        cancellationRequests: { orderBy: { createdAt: "desc" } },
       },
     })
     if (!order) throw new NotFoundException(`Order ${id} not found`)
-    return order
+    if (
+      actor === "PUBLISHER" &&
+      (order.status === "DRAFT" || order.status === "PENDING_PAYMENT")
+    ) {
+      throw new NotFoundException(`Order ${id} not found`)
+    }
+    const websiteUnlocked =
+      actor === "PUBLISHER" ||
+      (await canCustomerViewWebsite(this.prisma, organizationId))
+    return projectExternalOrder(order, actor, websiteUnlocked)
   }
 
   async listOrders(
@@ -664,7 +897,18 @@ export class OrdersService {
       }),
       this.prisma.order.count({ where }),
     ])
-    return { items, total, take, skip }
+    const websiteUnlocked = await canCustomerViewWebsite(
+      this.prisma,
+      organizationId,
+    )
+    return {
+      items: items.map((order) =>
+        projectExternalOrder(order, "CUSTOMER", websiteUnlocked),
+      ),
+      total,
+      take,
+      skip,
+    }
   }
 
   async listPublisherOrders(publisherId: string, take = 50, skip = 0) {
@@ -686,6 +930,11 @@ export class OrdersService {
       }),
       this.prisma.order.count({ where }),
     ])
-    return { items, total, take, skip }
+    return {
+      items: items.map((order) => projectExternalOrder(order, "PUBLISHER")),
+      total,
+      take,
+      skip,
+    }
   }
 }

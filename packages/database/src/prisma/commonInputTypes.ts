@@ -1225,6 +1225,57 @@ export type EnumContentOrderStatusWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumContentOrderStatusFilter<$PrismaModel>
 }
 
+export type EnumOrderArticleSourceFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticleSource | Prisma.EnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticleSource[] | Prisma.ListEnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticleSource[] | Prisma.ListEnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticleSourceFilter<$PrismaModel> | $Enums.OrderArticleSource
+}
+
+export type EnumOrderArticlePurposeFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticlePurpose | Prisma.EnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticlePurpose[] | Prisma.ListEnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticlePurpose[] | Prisma.ListEnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticlePurposeFilter<$PrismaModel> | $Enums.OrderArticlePurpose
+}
+
+export type EnumOrderArticleFormatFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticleFormat | Prisma.EnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticleFormat[] | Prisma.ListEnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticleFormat[] | Prisma.ListEnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticleFormatFilter<$PrismaModel> | $Enums.OrderArticleFormat
+}
+
+export type EnumOrderArticleSourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticleSource | Prisma.EnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticleSource[] | Prisma.ListEnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticleSource[] | Prisma.ListEnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticleSourceWithAggregatesFilter<$PrismaModel> | $Enums.OrderArticleSource
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderArticleSourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderArticleSourceFilter<$PrismaModel>
+}
+
+export type EnumOrderArticlePurposeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticlePurpose | Prisma.EnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticlePurpose[] | Prisma.ListEnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticlePurpose[] | Prisma.ListEnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticlePurposeWithAggregatesFilter<$PrismaModel> | $Enums.OrderArticlePurpose
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderArticlePurposeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderArticlePurposeFilter<$PrismaModel>
+}
+
+export type EnumOrderArticleFormatWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticleFormat | Prisma.EnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticleFormat[] | Prisma.ListEnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticleFormat[] | Prisma.ListEnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticleFormatWithAggregatesFilter<$PrismaModel> | $Enums.OrderArticleFormat
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderArticleFormatFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderArticleFormatFilter<$PrismaModel>
+}
+
 export type EnumRevisionStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.RevisionStatus | Prisma.EnumRevisionStatusFieldRefInput<$PrismaModel>
   in?: $Enums.RevisionStatus[] | Prisma.ListEnumRevisionStatusFieldRefInput<$PrismaModel>
@@ -2817,6 +2868,57 @@ export type NestedEnumContentOrderStatusWithAggregatesFilter<$PrismaModel = neve
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumContentOrderStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumContentOrderStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumOrderArticleSourceFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticleSource | Prisma.EnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticleSource[] | Prisma.ListEnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticleSource[] | Prisma.ListEnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticleSourceFilter<$PrismaModel> | $Enums.OrderArticleSource
+}
+
+export type NestedEnumOrderArticlePurposeFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticlePurpose | Prisma.EnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticlePurpose[] | Prisma.ListEnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticlePurpose[] | Prisma.ListEnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticlePurposeFilter<$PrismaModel> | $Enums.OrderArticlePurpose
+}
+
+export type NestedEnumOrderArticleFormatFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticleFormat | Prisma.EnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticleFormat[] | Prisma.ListEnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticleFormat[] | Prisma.ListEnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticleFormatFilter<$PrismaModel> | $Enums.OrderArticleFormat
+}
+
+export type NestedEnumOrderArticleSourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticleSource | Prisma.EnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticleSource[] | Prisma.ListEnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticleSource[] | Prisma.ListEnumOrderArticleSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticleSourceWithAggregatesFilter<$PrismaModel> | $Enums.OrderArticleSource
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderArticleSourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderArticleSourceFilter<$PrismaModel>
+}
+
+export type NestedEnumOrderArticlePurposeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticlePurpose | Prisma.EnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticlePurpose[] | Prisma.ListEnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticlePurpose[] | Prisma.ListEnumOrderArticlePurposeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticlePurposeWithAggregatesFilter<$PrismaModel> | $Enums.OrderArticlePurpose
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderArticlePurposeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderArticlePurposeFilter<$PrismaModel>
+}
+
+export type NestedEnumOrderArticleFormatWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.OrderArticleFormat | Prisma.EnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  in?: $Enums.OrderArticleFormat[] | Prisma.ListEnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  notIn?: $Enums.OrderArticleFormat[] | Prisma.ListEnumOrderArticleFormatFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumOrderArticleFormatWithAggregatesFilter<$PrismaModel> | $Enums.OrderArticleFormat
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumOrderArticleFormatFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumOrderArticleFormatFilter<$PrismaModel>
 }
 
 export type NestedEnumRevisionStatusFilter<$PrismaModel = never> = {

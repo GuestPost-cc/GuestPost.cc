@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { orderEventMetadata, QUEUES } from "@guestpost/shared"
 import {
   BadRequestException,
@@ -22,13 +23,54 @@ export class OrderOperationsService {
     private readonly cancellation: OrderCancellationService,
   ) {}
 
+  private async createFinalArticleVersion(
+    tx: any,
+    orderId: string,
+    userId: string,
+    content?: string,
+  ) {
+    const body = content?.trim()
+    if (!body) return null
+    if (body.length > 200_000) {
+      throw new BadRequestException(
+        "Content must be 200,000 characters or fewer",
+      )
+    }
+    const checksum = createHash("sha256").update(body, "utf8").digest("hex")
+    const latest = await tx.orderArticleVersion.findFirst({
+      where: {
+        orderId,
+        source: "OPERATIONS",
+        purpose: "FINAL_SUBMISSION",
+      },
+      orderBy: { version: "desc" },
+      select: { id: true, version: true, checksum: true },
+    })
+    if (latest?.checksum === checksum) return latest
+    return tx.orderArticleVersion.create({
+      data: {
+        orderId,
+        version: (latest?.version ?? 0) + 1,
+        source: "OPERATIONS",
+        purpose: "FINAL_SUBMISSION",
+        body,
+        format: "MARKDOWN",
+        checksum,
+        wordCount: body.split(/\s+/).filter(Boolean).length,
+        createdByUserId: userId,
+        supersedesId: latest?.id ?? null,
+      },
+    })
+  }
+
   private async transition(
     orderId: string,
     fromVersion: number,
     expectedStatus: string,
     data: any,
+    prisma: any = this.prisma,
   ) {
-    const r = await this.prisma.order.updateMany({
+    const r = await prisma.order.updateMany({
       where: {
         id: orderId,
         version: fromVersion,
@@ -41,7 +83,7 @@ export class OrderOperationsService {
         "Order was modified by another request. Retry.",
       )
     }
-    return this.prisma.order.findUniqueOrThrow({ where: { id: orderId } })
+    return prisma.order.findUniqueOrThrow({ where: { id: orderId } })
   }
 
   private async assertPlatformOrder(orderId: string) {
@@ -226,13 +268,23 @@ export class OrderOperationsService {
         },
         update: { brief: content, status: "IN_PROGRESS" },
       })
+      const articleVersion = await this.createFinalArticleVersion(
+        tx,
+        orderId,
+        userId,
+        content,
+      )
       await tx.orderEvent.create({
         data: {
           orderId,
           eventType: "CONTENT_SUBMITTED",
           actorId: userId,
           message: `Content draft saved by operations`,
-          metadata: { hasContent: !!content },
+          metadata: {
+            hasContent: !!content,
+            articleVersionId: articleVersion?.id,
+            version: articleVersion?.version,
+          },
         },
       })
       await this.audit.log(
@@ -303,13 +355,24 @@ export class OrderOperationsService {
         },
         update: { brief: content, status: "IN_PROGRESS" },
       })
+      const articleVersion = await this.createFinalArticleVersion(
+        tx,
+        orderId,
+        userId,
+        content,
+      )
       await tx.orderEvent.create({
         data: {
           orderId,
           eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
           actorId: userId,
           message: `Content submitted for review by operations`,
-          metadata: { hasContent: true, fromStatus: order.status },
+          metadata: {
+            hasContent: true,
+            fromStatus: order.status,
+            articleVersionId: articleVersion?.id,
+            version: articleVersion?.version,
+          },
         },
       })
       await this.audit.log(
@@ -342,34 +405,35 @@ export class OrderOperationsService {
       throw new BadRequestException("Order must be in CONTENT_CREATION status")
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    const updated = await this.transition(
-      orderId,
-      order.version,
-      "CONTENT_CREATION",
-      {
-        status: "CONTENT_READY",
-      },
-    )
-
-    await this.prisma.orderEvent.create({
-      data: {
+    return this.prisma.$transaction(async (tx: any) => {
+      const updated = await this.transition(
         orderId,
-        eventType: "CONTENT_MARKED_READY",
-        actorId: userId,
-        message: `Content marked ready by operations`,
-      },
+        order.version,
+        "CONTENT_CREATION",
+        { status: "CONTENT_READY" },
+        tx,
+      )
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "CONTENT_MARKED_READY",
+          actorId: userId,
+          message: "Content marked ready by operations",
+        },
+      })
+      await this.audit.log(
+        {
+          action: "CONTENT_MARKED_READY",
+          entityType: "Order",
+          entityId: orderId,
+          metadata: { ...orderEventMetadata(order), fromStatus: order.status },
+          userId,
+          organizationId: order.organizationId,
+        },
+        tx,
+      )
+      return updated
     })
-
-    await this.audit.log({
-      action: "CONTENT_MARKED_READY",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: { ...orderEventMetadata(order), fromStatus: order.status },
-      userId,
-      organizationId: order.organizationId,
-    })
-
-    return updated
   }
 
   async submitForReview(orderId: string, userId: string, staffRole: string) {
@@ -381,14 +445,35 @@ export class OrderOperationsService {
       )
     await this.cancellation.assertNoActiveCancellation(orderId)
 
-    const updated = await this.transition(
-      orderId,
-      order.version,
-      "CONTENT_READY",
-      {
-        status: "CUSTOMER_REVIEW",
-      },
-    )
+    const updated = await this.prisma.$transaction(async (tx: any) => {
+      const fresh = await this.transition(
+        orderId,
+        order.version,
+        "CONTENT_READY",
+        { status: "CUSTOMER_REVIEW" },
+        tx,
+      )
+      await tx.orderEvent.create({
+        data: {
+          orderId,
+          eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
+          actorId: userId,
+          message: "Content submitted for review by operations",
+        },
+      })
+      await this.audit.log(
+        {
+          action: "CONTENT_SUBMITTED_FOR_REVIEW",
+          entityType: "Order",
+          entityId: orderId,
+          metadata: { ...orderEventMetadata(order), fromStatus: order.status },
+          userId,
+          organizationId: order.organizationId,
+        },
+        tx,
+      )
+      return fresh
+    })
 
     await this.queue.addJob(QUEUES.NOTIFICATION, "push-in-app", {
       userId: order.customerId,
@@ -396,25 +481,6 @@ export class OrderOperationsService {
       type: "CONTENT_READY_FOR_REVIEW",
       message: "Your content is ready for review",
     })
-
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId,
-        eventType: "CONTENT_SUBMITTED_FOR_REVIEW",
-        actorId: userId,
-        message: `Content submitted for review by operations`,
-      },
-    })
-
-    await this.audit.log({
-      action: "CONTENT_SUBMITTED_FOR_REVIEW",
-      entityType: "Order",
-      entityId: orderId,
-      metadata: { ...orderEventMetadata(order), fromStatus: order.status },
-      userId,
-      organizationId: order.organizationId,
-    })
-
     return updated
   }
 
