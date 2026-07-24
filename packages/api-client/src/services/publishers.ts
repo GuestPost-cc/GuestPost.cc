@@ -51,6 +51,7 @@ export interface PublisherWebsiteResponse {
   language?: string | null
   category?: string | null
   metrics?: { dr?: number; traffic?: number } | null
+  domainMetrics?: WebsiteDomainMetrics
   isActive: boolean
   verificationStatus:
     | "PENDING_VERIFICATION"
@@ -58,6 +59,8 @@ export interface PublisherWebsiteResponse {
     | "VERIFICATION_FAILED"
     | "REVOKED"
   verifiedAt?: string | null
+  verificationMethod?: "DNS_TXT" | "SUPER_ADMIN_OVERRIDE" | null
+  verificationOverrideExpiresAt?: string | null
   verificationFailureReason?: string | null
   lastVerificationRequestAt?: string | null
   lastVerificationCheckAt?: string | null
@@ -73,6 +76,31 @@ export interface PublisherWebsiteResponse {
   gscIntegration?: any
   gscAccountExists?: boolean
   websiteIntegrations?: any[]
+}
+
+export interface WebsiteMetricValue {
+  value: number
+  source: string
+  status: "CURRENT" | "STALE" | "UNAVAILABLE"
+  measuredAt: string
+  collectedAt: string
+  expiresAt?: string | null
+}
+
+export interface WebsiteDomainMetrics {
+  ahrefsDomainRating?: WebsiteMetricValue
+  ahrefsOrganicTraffic?: WebsiteMetricValue
+  mozDomainAuthority?: WebsiteMetricValue
+  openPageRank?: WebsiteMetricValue
+  openPageRankGlobalRank?: WebsiteMetricValue
+  openPageRankReferringDomains?: WebsiteMetricValue
+}
+
+export interface UpdateManualWebsiteMetricsInput {
+  ahrefsOrganicTraffic: number
+  ahrefsTrafficAsOf: string
+  mozDomainAuthority: number
+  mozDomainAuthorityAsOf: string
 }
 
 export interface CreatePublisherWebsiteInput {
@@ -97,6 +125,7 @@ export interface CreatePublisherWebsiteInput {
   googleNews: boolean
   markedSponsored: boolean
   foreignLanguageAllowed: boolean
+  manualMetrics: UpdateManualWebsiteMetricsInput
   initialService?: {
     serviceType: string
     price: number
@@ -162,6 +191,17 @@ export class PublishersService {
   verifyWebsite(publisherId: string, websiteId: string): Promise<any> {
     return this.client.post(
       `/publishers/${publisherId}/websites/${websiteId}/verify`,
+    )
+  }
+
+  updateManualWebsiteMetrics(
+    publisherId: string,
+    websiteId: string,
+    data: UpdateManualWebsiteMetricsInput,
+  ): Promise<WebsiteDomainMetrics> {
+    return this.client.put<WebsiteDomainMetrics>(
+      `/publishers/${publisherId}/websites/${websiteId}/metrics/manual`,
+      { json: data as unknown as Record<string, unknown> },
     )
   }
 }

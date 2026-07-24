@@ -14,6 +14,8 @@ const PRODUCTION_REQUIRED = ["QUEUE_SIGNING_SECRET"] as const
 const OPTIONAL_WARN = [
   // Without SENTRY_DSN, the worker still runs — Sentry just no-ops.
   "SENTRY_DSN",
+  "AHREFS_API_KEY",
+  "OPENPAGERANK_API_KEY",
 ] as const
 
 export function validateEnv(): void {

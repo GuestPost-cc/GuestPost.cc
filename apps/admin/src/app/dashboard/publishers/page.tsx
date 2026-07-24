@@ -24,6 +24,12 @@ import { format } from "date-fns"
 import { AlertCircle, Newspaper, RefreshCw, Search } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminEmptyState,
+  AdminFilterBar,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
@@ -106,27 +112,42 @@ function PublishersPageInner() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Publishers</h1>
-        <p className="text-muted-foreground">
-          Publisher accounts, balances, and trust tier (tier controls withdrawal
-          hold windows)
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow={
+          isSuperAdmin ? "Publisher governance" : "Finance publisher view"
+        }
+        title="Publishers"
+        description={
+          isSuperAdmin
+            ? "Review publisher health, balances, website inventory, trust evidence, and tier governance."
+            : "Review publisher balances, debt, settlement activity, and trust status without changing governance controls."
+        }
+        icon={Newspaper}
+      />
 
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          placeholder="Search by name or email..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value)
-            setPage(1)
-          }}
-          className="pl-9"
-        />
-      </div>
+      <AdminFilterBar
+        activeCount={Number(Boolean(search))}
+        resultCount={pagination.total}
+        resultLabel={pagination.total === 1 ? "publisher" : "publishers"}
+        onClear={() => {
+          setSearch("")
+          setPage(1)
+        }}
+      >
+        <div className="relative min-w-0 flex-1 lg:max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by name or email..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              setPage(1)
+            }}
+            className="bg-background pl-9"
+          />
+        </div>
+      </AdminFilterBar>
 
       <Card>
         <CardContent className="p-0">
@@ -137,15 +158,14 @@ function PublishersPageInner() {
               ))}
             </div>
           ) : publishers.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Newspaper className="h-12 w-12 text-muted-foreground/50" />
-              <h3 className="mt-4 text-lg font-medium">No publishers found</h3>
-              <p className="text-sm text-muted-foreground">
-                {search
-                  ? "Try a different search"
-                  : "No publishers registered yet"}
-              </p>
-            </div>
+            <AdminEmptyState
+              title="No publishers found"
+              description={
+                search
+                  ? "Try a different search or clear the active filter."
+                  : "No publisher accounts are available in this workspace."
+              }
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -304,6 +324,6 @@ function PublishersPageInner() {
           </Button>
         </div>
       )}
-    </div>
+    </AdminPage>
   )
 }

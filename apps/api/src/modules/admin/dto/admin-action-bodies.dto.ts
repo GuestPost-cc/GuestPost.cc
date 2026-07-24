@@ -2,12 +2,14 @@ import { CancellationResponsibility } from "@guestpost/database"
 import {
   ArrayMaxSize,
   ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsDateString,
   IsEmail,
   IsEnum,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -321,6 +323,38 @@ export class ReassignWebsiteDto {
 export class PauseWebsiteDto {
   @IsBoolean()
   paused!: boolean
+}
+
+export class PreviewWebsiteImportDto {
+  @IsString()
+  @MaxLength(64)
+  publisherId!: string
+}
+
+export class CommitWebsiteImportDto {
+  @IsString()
+  @MinLength(16)
+  @MaxLength(128)
+  idempotencyKey!: string
+}
+
+export class ForceVerifyWebsitesDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @ArrayUnique()
+  @IsString({ each: true })
+  websiteIds!: string[]
+
+  @IsString()
+  @MinLength(20)
+  @MaxLength(1_000)
+  reason!: string
+
+  @IsInt()
+  @Min(1)
+  @Max(90)
+  expiresInDays!: number
 }
 
 // ── Support ────────────────────────────────────────────────────────────────

@@ -68,6 +68,12 @@ import {
 import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
@@ -94,6 +100,10 @@ const EMPTY_CREATE_FORM = {
   googleNews: false,
   markedSponsored: false,
   foreignLanguageAllowed: false,
+  ahrefsOrganicTraffic: "",
+  ahrefsTrafficAsOf: new Date().toISOString().slice(0, 10),
+  mozDomainAuthority: "",
+  mozDomainAuthorityAsOf: new Date().toISOString().slice(0, 10),
 }
 
 type CreateWebsiteField =
@@ -104,6 +114,10 @@ type CreateWebsiteField =
   | "categoryIds"
   | "language"
   | "country"
+  | "ahrefsOrganicTraffic"
+  | "ahrefsTrafficAsOf"
+  | "mozDomainAuthority"
+  | "mozDomainAuthorityAsOf"
 
 type CreateWebsiteErrors = Partial<Record<CreateWebsiteField, string>>
 
@@ -230,6 +244,39 @@ function PlatformWebsitesPageInner() {
     ) {
       nextErrors.language = "Choose a supported primary language."
     }
+    const traffic = Number(createForm.ahrefsOrganicTraffic)
+    if (
+      !Number.isSafeInteger(traffic) ||
+      traffic < 0 ||
+      traffic > 2_147_483_647
+    ) {
+      nextErrors.ahrefsOrganicTraffic =
+        "Enter a whole number from 0 to 2,147,483,647."
+    }
+    const mozDa = Number(createForm.mozDomainAuthority)
+    if (!Number.isInteger(mozDa) || mozDa < 0 || mozDa > 100) {
+      nextErrors.mozDomainAuthority = "Enter a whole number from 0 to 100."
+    }
+    const today = new Date().toISOString().slice(0, 10)
+    const freshAfter = new Date()
+    freshAfter.setUTCDate(freshAfter.getUTCDate() - 90)
+    const freshAfterValue = freshAfter.toISOString().slice(0, 10)
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(createForm.ahrefsTrafficAsOf) ||
+      createForm.ahrefsTrafficAsOf > today ||
+      createForm.ahrefsTrafficAsOf < freshAfterValue
+    ) {
+      nextErrors.ahrefsTrafficAsOf =
+        "Choose a real date within the last 90 days."
+    }
+    if (
+      !/^\d{4}-\d{2}-\d{2}$/.test(createForm.mozDomainAuthorityAsOf) ||
+      createForm.mozDomainAuthorityAsOf > today ||
+      createForm.mozDomainAuthorityAsOf < freshAfterValue
+    ) {
+      nextErrors.mozDomainAuthorityAsOf =
+        "Choose a real date within the last 90 days."
+    }
 
     return nextErrors
   }
@@ -262,6 +309,12 @@ function PlatformWebsitesPageInner() {
         googleNews: createForm.googleNews,
         markedSponsored: createForm.markedSponsored,
         foreignLanguageAllowed: createForm.foreignLanguageAllowed,
+        manualMetrics: {
+          ahrefsOrganicTraffic: Number(createForm.ahrefsOrganicTraffic),
+          ahrefsTrafficAsOf: createForm.ahrefsTrafficAsOf,
+          mozDomainAuthority: Number(createForm.mozDomainAuthority),
+          mozDomainAuthorityAsOf: createForm.mozDomainAuthorityAsOf,
+        },
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin", "platform-websites"] })
@@ -326,58 +379,43 @@ function PlatformWebsitesPageInner() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Platform Websites
-          </h1>
-          <p className="mt-1 max-w-3xl text-muted-foreground">
-            {isSuperAdmin
-              ? "Create each domain once, manage its single listing and services, connect Google data, and route new work to Operations."
-              : "Create platform websites assigned to you, manage their listing services and Google data, and receive their new orders automatically."}
-          </p>
-        </div>
-        <Button onClick={() => setShowCreate(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Create Website
-        </Button>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Platform websites"
+        description={
+          isSuperAdmin
+            ? "Create each domain once, manage its listing and services, connect Google data, and route new work to Operations."
+            : "Create assigned platform websites, manage listing services and Google data, and receive their new orders automatically."
+        }
+        eyebrow="Owned inventory"
+        icon={Globe2}
+        actions={
+          <Button onClick={() => setShowCreate(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Create website
+          </Button>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardContent className="flex items-center gap-3 p-5">
-            <div className="rounded-lg bg-primary/10 p-2 text-primary">
-              <Globe2 className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-semibold">{websites.length}</p>
-              <p className="text-sm text-muted-foreground">Platform sites</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-5">
-            <div className="rounded-lg bg-emerald-500/10 p-2 text-emerald-600">
-              <UserRound className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-semibold">{assignedCount}</p>
-              <p className="text-sm text-muted-foreground">Assigned</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 p-5">
-            <div className="rounded-lg bg-amber-500/10 p-2 text-amber-600">
-              <Inbox className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-semibold">{unassignedCount}</p>
-              <p className="text-sm text-muted-foreground">Shared queue</p>
-            </div>
-          </CardContent>
-        </Card>
+        <AdminMetricCard
+          label="Platform sites"
+          value={websites.length}
+          icon={Globe2}
+          tone="info"
+        />
+        <AdminMetricCard
+          label="Assigned"
+          value={assignedCount}
+          icon={UserRound}
+          tone="success"
+        />
+        <AdminMetricCard
+          label="Shared queue"
+          value={unassignedCount}
+          icon={Inbox}
+          tone="warning"
+        />
       </div>
 
       <Card>
@@ -498,11 +536,11 @@ function PlatformWebsitesPageInner() {
                 ))}
                 {websites.length === 0 && (
                   <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center text-muted-foreground py-6"
-                    >
-                      No platform websites.
+                    <TableCell colSpan={5} className="p-0">
+                      <AdminEmptyState
+                        title="No platform websites"
+                        description="Create a platform-owned website to start managing inventory and routing work."
+                      />
                     </TableCell>
                   </TableRow>
                 )}
@@ -919,6 +957,116 @@ function PlatformWebsitesPageInner() {
                 </p>
               )}
             </div>
+            <div className="rounded-xl border bg-muted/20 p-4">
+              <div className="mb-4">
+                <p className="font-medium">Manual domain metrics *</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  Enter current Ahrefs organic traffic and Moz Domain Authority.
+                  Ahrefs DR and OpenPageRank are collected securely after the
+                  website is created. Manual values expire after 90 days and
+                  retain their source history.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="platform-ahrefs-traffic">
+                    Ahrefs organic traffic
+                  </Label>
+                  <Input
+                    id="platform-ahrefs-traffic"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1}
+                    value={createForm.ahrefsOrganicTraffic}
+                    aria-invalid={Boolean(createErrors.ahrefsOrganicTraffic)}
+                    onChange={(event) => {
+                      setCreateForm({
+                        ...createForm,
+                        ahrefsOrganicTraffic: event.target.value,
+                      })
+                      clearCreateError("ahrefsOrganicTraffic")
+                    }}
+                  />
+                  {createErrors.ahrefsOrganicTraffic ? (
+                    <p className="text-xs text-destructive">
+                      {createErrors.ahrefsOrganicTraffic}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="platform-ahrefs-as-of">
+                    Ahrefs measured on
+                  </Label>
+                  <Input
+                    id="platform-ahrefs-as-of"
+                    type="date"
+                    max={new Date().toISOString().slice(0, 10)}
+                    value={createForm.ahrefsTrafficAsOf}
+                    aria-invalid={Boolean(createErrors.ahrefsTrafficAsOf)}
+                    onChange={(event) => {
+                      setCreateForm({
+                        ...createForm,
+                        ahrefsTrafficAsOf: event.target.value,
+                      })
+                      clearCreateError("ahrefsTrafficAsOf")
+                    }}
+                  />
+                  {createErrors.ahrefsTrafficAsOf ? (
+                    <p className="text-xs text-destructive">
+                      {createErrors.ahrefsTrafficAsOf}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="platform-moz-da">Moz Domain Authority</Label>
+                  <Input
+                    id="platform-moz-da"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={createForm.mozDomainAuthority}
+                    aria-invalid={Boolean(createErrors.mozDomainAuthority)}
+                    onChange={(event) => {
+                      setCreateForm({
+                        ...createForm,
+                        mozDomainAuthority: event.target.value,
+                      })
+                      clearCreateError("mozDomainAuthority")
+                    }}
+                  />
+                  {createErrors.mozDomainAuthority ? (
+                    <p className="text-xs text-destructive">
+                      {createErrors.mozDomainAuthority}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="platform-moz-as-of">Moz measured on</Label>
+                  <Input
+                    id="platform-moz-as-of"
+                    type="date"
+                    max={new Date().toISOString().slice(0, 10)}
+                    value={createForm.mozDomainAuthorityAsOf}
+                    aria-invalid={Boolean(createErrors.mozDomainAuthorityAsOf)}
+                    onChange={(event) => {
+                      setCreateForm({
+                        ...createForm,
+                        mozDomainAuthorityAsOf: event.target.value,
+                      })
+                      clearCreateError("mozDomainAuthorityAsOf")
+                    }}
+                  />
+                  {createErrors.mozDomainAuthorityAsOf ? (
+                    <p className="text-xs text-destructive">
+                      {createErrors.mozDomainAuthorityAsOf}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
                 <div className="flex items-center justify-between gap-2">
@@ -1145,6 +1293,6 @@ function PlatformWebsitesPageInner() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPage>
   )
 }

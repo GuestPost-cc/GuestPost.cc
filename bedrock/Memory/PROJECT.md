@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-07-22
+updated: 2026-07-23
 ---
 
 # GuestPost.cc
@@ -54,7 +54,7 @@ Open/partial items require architectural design discussion.
 
 ## Service Architecture
 
-- **apps/api** — NestJS REST API, 937 unit tests + integration tests
+- **apps/api** — NestJS REST API, 985 unit tests + integration tests
 - **apps/worker** — BullMQ queue processor
 - **apps/portal** — Buyer-facing dashboard
 - **apps/admin** — Admin dashboard
@@ -68,6 +68,26 @@ Open/partial items require architectural design discussion.
 ## Key Patterns
 
 - Controllers are thin; business logic lives in dedicated services
+- Admin workspace metric values accept arbitrary React content (including
+  block-level loading skeletons), so `AdminMetricCard` renders its value region
+  with a non-phrasing container rather than a paragraph to preserve valid HTML
+  and hydration integrity.
+- Publisher website CSV import treats the website URL and global domain
+  uniqueness as row-blocking identity boundaries. Unsupported optional cells
+  are normalized to blank with row warnings; category values are skipped
+  individually, manual metric value/date pairs are skipped together, and an
+  invalid initial-service group never prevents the draft website from being
+  imported. Preview normalizes both canonical and legacy `www.` identities;
+  commit isolates every importable row so a duplicate/error sibling produces a
+  partial batch without rolling back valid websites.
+- Publisher website enlistment requires fresh publisher-supplied Ahrefs
+  organic traffic and Moz Domain Authority. Both source-aware metric rows,
+  their compatibility listing values, the draft website/listing, and the
+  metric audit event are created atomically; Ahrefs Domain Rating and
+  OpenPageRank remain server-only post-commit worker lookups.
+- OpenPageRank collection uses the bearer-authenticated Keywords Everywhere
+  bulk endpoint with history disabled, a 100-domain cap, strict response/date/
+  domain validation, fixed-host HTTPS, redirect refusal, timeout, and body cap.
 - Stripe webhook timestamp validation via shared `assertWebhookTimestampFresh`
 - Redis pub/sub for cross-pod auth context invalidation
 - Account suspension is an audited lifecycle rather than a boolean toggle: Super Admin records a reason and internal note, every database session is revoked atomically, temporary expiry restores eligibility but never resurrects a session, and the final active Super Admin or an Operations user with active assignments cannot be suspended.
@@ -92,6 +112,17 @@ Open/partial items require architectural design discussion.
   deposit and Connect webhook secrets, independent feature kill switches, and
   a second opt-in gate for live keys. Stripe Connect is USD-only until an
   additional currency is deliberately certified end to end.
+- Staging PostgreSQL runtime access uses a dedicated least-privilege role with
+  DML-only application grants, bounded statement/idle-transaction timeouts,
+  pooled runtime connections, and no ownership credentials in Render or
+  Northflank. Schema migrations use a separate administrative path; rotating
+  the database-owner password must not interrupt API, frontend, worker, or job
+  workloads.
+- Stripe staging uses one restricted API key plus three non-reused webhook
+  signing boundaries: customer deposits, platform transfers, and connected-
+  account payouts. Deposit and Connect capabilities are enabled independently;
+  Connect remains disabled until an internal publisher completes hosted
+  sandbox onboarding and the Transfer-to-bank-Payout lifecycle is certified.
 - Worker deliveries verified via shared `delivery-verification` module (24 tests)
 - The worker uses a hybrid free-tier topology: Northflank continuously runs
   only the four latency-sensitive BullMQ queues in `realtime` mode; a
@@ -104,8 +135,10 @@ Open/partial items require architectural design discussion.
 - Publisher integrations are a top-level dashboard area at `/dashboard/integrations`, separate from Settings; sidebar active-state matching uses path-segment boundaries to avoid selecting Settings for integration pages.
 - Publisher website ownership is proven via DNS TXT verification, not Google Search Console. GSC links search performance data after OAuth. DNS verification jobs require the worker queue process, and GSC OAuth requires `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, plus an authorized redirect URI matching `${API_BASE_URL}/integrations/GOOGLE_SEARCH_CONSOLE/callback`.
 - Google OAuth identity is independent of the signed-in GuestPost identity. OAuth always presents Google's account chooser; credentials are encrypted and scoped by integration owner so the same Google account can be connected separately by a publisher and the platform. Callback return paths are app-relative and resolved server-side against the configured publisher/admin origins.
-- Platform websites skip DNS and are created with one DRAFT platform listing in the same transaction. An Operations-created site is forcibly assigned to its creator, and new platform orders use that assignment automatically. GSC/GA4 credentials are isolated by platform website; Super Admin and the assigned Operations owner can connect, link, unlink, and sync from the site page.
-- Marketplace listings select 1–7 reviewed categories through `MarketplaceListingCategory`, exactly one controlled primary language, and one value for each placement-policy field. Publisher/platform forms cannot write performance metrics; GSC supplies 30-day clicks/impressions and GA4 supplies 30-day sessions/users/pageviews for buyer-safe marketplace summaries.
+- Platform websites skip DNS and are created with one DRAFT platform listing plus required current staff-manual Ahrefs traffic/Moz DA in the same transaction; Ahrefs DR/OpenPageRank collection is queued after commit. An Operations-created site is forcibly assigned to its creator, and new platform orders use that assignment automatically. GSC/GA4 credentials are isolated by platform website; Super Admin and the assigned Operations owner can connect, link, unlink, and sync from the site page.
+- Marketplace listings select 1–7 reviewed categories through `MarketplaceListingCategory`, exactly one controlled primary language, and one value for each placement-policy field. GSC supplies 30-day clicks/impressions and GA4 supplies 30-day sessions/users/pageviews for buyer-safe marketplace summaries; publishers can enter only the explicitly manual Ahrefs traffic and Moz DA fields.
+- Website authority/traffic metrics are source-aware records with revision history. Ahrefs free DR and OpenPageRank are worker-collected; Ahrefs organic traffic and Moz DA are publisher/admin-supplied and must be at most 90 days old before moderation submission. GSC/GA4 groups are omitted from public listing responses unless that provider has an active website link with at least one successful sync.
+- Publisher inventory CSV import is Super Admin-only, actor/idempotency-bound, and creates one publisher Website plus one DRAFT listing per valid row. Raw files are not persisted. Temporary TXT verification is a separate audited `SUPER_ADMIN_OVERRIDE` with mandatory expiry; it never approves a listing, real DNS proof replaces it, and the ownership sweep revokes it at expiry.
 - Publisher and platform website creation share a browser-safe enlistment validator and repeat the same checks at the API boundary: only public root HTTP(S) URLs are accepted; listing titles cannot be URLs/domains; title, description, name, and country reject HTML/control characters; category IDs are unique and limited to 1–7. Creation DTO validation remains the first boundary, and service validation protects direct/internal callers.
 - Shared `CommandItem` disabled styling must target `data-disabled=true`, because cmdk renders `data-disabled=false` on enabled options; a presence-only selector blocks pointer input across every shared multi-select.
 - Order cancellation is a dedicated domain workflow, not a generic status mutation. `packages/shared/src/order-cancellation-policy.ts` owns the stage/channel decision matrix and `OrderCancellationRequest` retains structured case history.
@@ -133,6 +166,10 @@ Open/partial items require architectural design discussion.
 - The Super Admin overview is a read-only command center backed by `GET /admin/command-center`. It returns exact server-side workflow counts, a bounded priority queue, lifecycle/health/finance summaries, and sanitized audit activity. The route is `SUPER_ADMIN`-only, sends private no-store headers, excludes audit metadata and decrypted payout data, and leaves all high-impact decisions in the existing reasoned and audited workspaces. Operations and Finance keep their separate role-focused overviews.
 - The Finance overview is a Support-first money-operations workbench backed by `GET /admin/finance-workbench`. It is restricted to Finance and Super Admin, uses exact database aggregates and Prisma Decimal money math, returns a bounded server-prioritized decision queue, and exposes only allowlisted/sanitized finance activity. Payout credentials, provider configuration, raw execution errors, audit metadata, and decrypted payout data never enter the overview response; all money mutations remain in the existing reasoned and audited Finance workspaces.
 - The Operations overview is an assignment-focused workbench backed by `GET /admin/operations-workbench`. It is restricted to Operations and Super Admin and combines assigned/claimable platform fulfillment, assigned platform Support, operational cancellations and disputes, delivery/domain verification, moderation, and assigned-site readiness into one bounded server-prioritized queue. Only fulfillment is claimable inline; all other decisions deep-link to their existing authorized workspaces. Operations order list/detail reads use the same assignment, assigned-Support, and operational-exception scope and return sanitized contextual identities rather than global-directory or finance data.
+- All Admin routes share Admin-only workspace primitives for responsive page boundaries, task-oriented headers, semantic KPI colors, filter state/result summaries, notices, status badges, and empty states. Super Admin, Operations, and Finance retain violet, blue, and emerald shell accents respectively. These presentation conventions never replace route guards or server authorization; direct access remains fail-closed and sensitive decisions stay in their existing reasoned and audited workflows. The durable design contract is documented in `docs/ADMIN_WORKSPACE_UX.md`.
+- The shared Admin order monitor is server-paginated with exact role-scoped totals and role-visible search fields. Its detail response uses explicit projections: Operations receives assignment/exception context without customer contacts, publisher trust/contact data, settlements, or event metadata; Finance receives settlement evidence without customer contacts or event metadata. Dedicated dispute, cancellation, verification, fulfillment, and settlement workspaces retain mutations, while Super Admin force cancellation requires a meaningful audit reason, exact full-ID confirmation, optimistic concurrency, and server authorization.
+- Customer, publisher, and staff order details share one canonical seven-stage lifecycle component. The Admin detail projection adds a server-derived integrity report for route, assignment, delivery evidence, financial-record presence, lifecycle events, and exception holds without exposing hidden amounts or raw metadata.
+- Admin Marketplace list/detail reads are explicit staff projections available to Super Admin, Operations, and read-only Finance. Finance cannot call marketplace mutations; Operations moderation/service actions remain constrained by route guards and assigned platform ownership. Marketplace staff views show publisher basics and source-aware Ahrefs/Moz/OpenPageRank values for publisher and platform inventory while omitting raw provider payloads, credentials, and internal fulfillment settings.
 
 ## Seed Script (`scripts/seed.ts`)
 

@@ -19,7 +19,9 @@ import {
   DialogHeader,
   DialogTitle,
   ErrorState,
+  Input,
   IntegrationStatusBadge,
+  Label,
   LoadingState,
   ProviderBadge,
   ReconnectBanner,
@@ -42,7 +44,7 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { PublisherListingManager } from "../../../../components/marketplace/publisher-listing-manager"
 import { api } from "../../../../lib/api"
@@ -97,6 +99,12 @@ export default function WebsiteDetailPage() {
   const [showDisconnect, setShowDisconnect] = useState(false)
   const [verifyInstructions, setVerifyInstructions] =
     useState<VerifyInstructions | null>(null)
+  const [manualMetrics, setManualMetrics] = useState({
+    ahrefsOrganicTraffic: "",
+    ahrefsTrafficAsOf: new Date().toISOString().slice(0, 10),
+    mozDomainAuthority: "",
+    mozDomainAuthorityAsOf: new Date().toISOString().slice(0, 10),
+  })
 
   const { data: website, isLoading, error, refetch } = useWebsite(websiteId)
 
@@ -143,6 +151,56 @@ export default function WebsiteDetailPage() {
       toast.error(err?.message ?? "Failed to request DNS verification")
     },
   })
+  const manualMetricsMutation = useMutation({
+    mutationFn: async () => {
+      if (!publisherId) throw new Error("Not authenticated")
+      const ahrefsOrganicTraffic = Number(manualMetrics.ahrefsOrganicTraffic)
+      const mozDomainAuthority = Number(manualMetrics.mozDomainAuthority)
+      if (!Number.isInteger(ahrefsOrganicTraffic) || ahrefsOrganicTraffic < 0) {
+        throw new Error("Ahrefs organic traffic must be a whole number")
+      }
+      if (
+        !Number.isInteger(mozDomainAuthority) ||
+        mozDomainAuthority < 0 ||
+        mozDomainAuthority > 100
+      ) {
+        throw new Error("Moz Domain Authority must be between 0 and 100")
+      }
+      return api.publishers.updateManualWebsiteMetrics(publisherId, websiteId, {
+        ahrefsOrganicTraffic,
+        ahrefsTrafficAsOf: manualMetrics.ahrefsTrafficAsOf,
+        mozDomainAuthority,
+        mozDomainAuthorityAsOf: manualMetrics.mozDomainAuthorityAsOf,
+      })
+    },
+    onSuccess: () => {
+      toast.success("Manual metrics updated")
+      queryClient.invalidateQueries({ queryKey: ["website", websiteId] })
+      queryClient.invalidateQueries({ queryKey: ["publisher-websites"] })
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || "Failed to update metrics"),
+  })
+
+  useEffect(() => {
+    if (!website?.domainMetrics) return
+    const traffic = website.domainMetrics.ahrefsOrganicTraffic
+    const moz = website.domainMetrics.mozDomainAuthority
+    setManualMetrics((current) => ({
+      ahrefsOrganicTraffic:
+        traffic?.value !== undefined
+          ? String(traffic.value)
+          : current.ahrefsOrganicTraffic,
+      ahrefsTrafficAsOf:
+        traffic?.measuredAt?.slice(0, 10) ?? current.ahrefsTrafficAsOf,
+      mozDomainAuthority:
+        moz?.value !== undefined
+          ? String(moz.value)
+          : current.mozDomainAuthority,
+      mozDomainAuthorityAsOf:
+        moz?.measuredAt?.slice(0, 10) ?? current.mozDomainAuthorityAsOf,
+    }))
+  }, [website?.domainMetrics])
 
   const resources = (resourcesData?.resources ?? []) as Array<{
     externalResourceId: string
@@ -280,6 +338,8 @@ export default function WebsiteDetailPage() {
     VERIFY_BADGE[website.verificationStatus ?? "PENDING_VERIFICATION"] ??
     VERIFY_BADGE.PENDING_VERIFICATION
   const isDomainVerified = website.verificationStatus === "VERIFIED"
+  const isTemporaryOverride =
+    isDomainVerified && website.verificationMethod === "SUPER_ADMIN_OVERRIDE"
   const domainInstructions =
     verifyInstructions ?? website.verificationInstructions ?? null
 
@@ -325,6 +385,155 @@ export default function WebsiteDetailPage() {
           </div>
         </div>
       </div>
+
+      <section className="space-y-4">
+        <h2 className="text-lg font-semibold">Domain metrics</h2>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Authority and traffic</CardTitle>
+            <CardDescription>
+              Ahrefs traffic and Moz DA are publisher-supplied and must be
+              refreshed at least every 90 days before review. Provider metrics
+              refresh automatically when their API keys are configured.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <MetricReading
+                label="Ahrefs Domain Rating"
+                metric={website.domainMetrics?.ahrefsDomainRating}
+              />
+              <MetricReading
+                label="Open PageRank"
+                metric={website.domainMetrics?.openPageRank}
+              />
+              <MetricReading
+                label="Ahrefs organic traffic"
+                metric={website.domainMetrics?.ahrefsOrganicTraffic}
+              />
+              <MetricReading
+                label="Moz Domain Authority"
+                metric={website.domainMetrics?.mozDomainAuthority}
+              />
+            </div>
+
+            <div className="grid gap-4 border-t pt-5 md:grid-cols-2">
+              <div className="space-y-3 rounded-lg border p-4">
+                <div>
+                  <p className="font-medium">Ahrefs organic traffic</p>
+                  <p className="text-xs text-muted-foreground">
+                    Enter the current organic traffic shown in your Ahrefs
+                    account.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ahrefs-traffic">
+                    Monthly organic traffic
+                  </Label>
+                  <Input
+                    id="ahrefs-traffic"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={manualMetrics.ahrefsOrganicTraffic}
+                    onChange={(event) =>
+                      setManualMetrics((current) => ({
+                        ...current,
+                        ahrefsOrganicTraffic: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ahrefs-as-of">Measured on</Label>
+                  <Input
+                    id="ahrefs-as-of"
+                    type="date"
+                    max={new Date().toISOString().slice(0, 10)}
+                    value={manualMetrics.ahrefsTrafficAsOf}
+                    onChange={(event) =>
+                      setManualMetrics((current) => ({
+                        ...current,
+                        ahrefsTrafficAsOf: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="space-y-3 rounded-lg border p-4">
+                <div>
+                  <p className="font-medium">Moz Domain Authority</p>
+                  <p className="text-xs text-muted-foreground">
+                    Enter the current DA value shown in your Moz account.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="moz-da">Domain Authority (0–100)</Label>
+                  <Input
+                    id="moz-da"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={manualMetrics.mozDomainAuthority}
+                    onChange={(event) =>
+                      setManualMetrics((current) => ({
+                        ...current,
+                        mozDomainAuthority: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="moz-as-of">Measured on</Label>
+                  <Input
+                    id="moz-as-of"
+                    type="date"
+                    max={new Date().toISOString().slice(0, 10)}
+                    value={manualMetrics.mozDomainAuthorityAsOf}
+                    onChange={(event) =>
+                      setManualMetrics((current) => ({
+                        ...current,
+                        mozDomainAuthorityAsOf: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-muted-foreground">
+                Provider attribution:{" "}
+                <a
+                  className="underline underline-offset-2"
+                  href="https://ahrefs.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Domain Rating by Ahrefs
+                </a>
+                {" · "}
+                <a
+                  className="underline underline-offset-2"
+                  href="https://openpagerank.keywordseverywhere.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Open PageRank
+                </a>
+              </p>
+              <Button
+                onClick={() => manualMetricsMutation.mutate()}
+                disabled={manualMetricsMutation.isPending}
+              >
+                {manualMetricsMutation.isPending
+                  ? "Saving…"
+                  : "Save manual metrics"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
 
       {website.listing ? (
         <PublisherListingManager
@@ -400,79 +609,100 @@ export default function WebsiteDetailPage() {
               </div>
             </div>
 
-            {website.verificationFailureReason && !isDomainVerified && (
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
-                <p className="font-medium text-destructive">
-                  Verification issue
+            {isTemporaryOverride && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+                <p className="font-medium text-amber-700 dark:text-amber-400">
+                  Temporary Super Admin verification
                 </p>
                 <p className="mt-1 text-muted-foreground">
-                  {website.verificationFailureReason}
+                  This verification expires
+                  {website.verificationOverrideExpiresAt
+                    ? ` on ${new Date(website.verificationOverrideExpiresAt).toLocaleString()}`
+                    : " automatically"}
+                  . Publish the TXT record and re-check DNS to replace it with
+                  permanent ownership proof.
                 </p>
               </div>
             )}
 
-            {!isDomainVerified && domainInstructions && (
-              <div className="space-y-3 rounded-lg border bg-muted/40 p-4 text-sm">
-                <p className="text-muted-foreground">
-                  Add this DNS TXT record at your domain registrar, then use
-                  Re-check DNS. The worker processes verification
-                  asynchronously.
-                </p>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Type
-                  </span>
-                  <code className="font-mono">{domainInstructions.type}</code>
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Host / Name
-                  </span>
-                  <code className="font-mono">{domainInstructions.host}</code>
-                </div>
-                <div className="flex items-start justify-between gap-3">
-                  <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Value
-                  </span>
-                  <div className="flex items-center gap-2 text-right">
-                    <code className="break-all font-mono">
-                      {domainInstructions.value}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Copy TXT value"
-                      onClick={() => {
-                        navigator.clipboard.writeText(domainInstructions.value)
-                        toast.success("Copied TXT value")
-                      }}
-                    >
-                      <Copy className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </div>
-                </div>
-                {domainInstructions.note && (
-                  <p className="text-xs text-muted-foreground">
-                    {domainInstructions.note}
+            {website.verificationFailureReason &&
+              (!isDomainVerified || isTemporaryOverride) && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                  <p className="font-medium text-destructive">
+                    Verification issue
                   </p>
-                )}
-              </div>
-            )}
+                  <p className="mt-1 text-muted-foreground">
+                    {website.verificationFailureReason}
+                  </p>
+                </div>
+              )}
 
-            {!isDomainVerified && !domainInstructions && (
-              <p className="text-sm text-muted-foreground">
-                Request verification to generate DNS TXT instructions for this
-                domain.
-              </p>
-            )}
+            {(!isDomainVerified || isTemporaryOverride) &&
+              domainInstructions && (
+                <div className="space-y-3 rounded-lg border bg-muted/40 p-4 text-sm">
+                  <p className="text-muted-foreground">
+                    Add this DNS TXT record at your domain registrar, then use
+                    Re-check DNS. The worker processes verification
+                    asynchronously.
+                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Type
+                    </span>
+                    <code className="font-mono">{domainInstructions.type}</code>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Host / Name
+                    </span>
+                    <code className="font-mono">{domainInstructions.host}</code>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                      Value
+                    </span>
+                    <div className="flex items-center gap-2 text-right">
+                      <code className="break-all font-mono">
+                        {domainInstructions.value}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        title="Copy TXT value"
+                        onClick={() => {
+                          navigator.clipboard.writeText(
+                            domainInstructions.value,
+                          )
+                          toast.success("Copied TXT value")
+                        }}
+                      >
+                        <Copy className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </div>
+                  {domainInstructions.note && (
+                    <p className="text-xs text-muted-foreground">
+                      {domainInstructions.note}
+                    </p>
+                  )}
+                </div>
+              )}
 
-            {isDomainVerified && website.verifiedAt && (
+            {(!isDomainVerified || isTemporaryOverride) &&
+              !domainInstructions && (
+                <p className="text-sm text-muted-foreground">
+                  Request verification to generate DNS TXT instructions for this
+                  domain.
+                </p>
+              )}
+
+            {isDomainVerified && website.verifiedAt && !isTemporaryOverride && (
               <p className="text-sm text-muted-foreground">
                 Verified on {new Date(website.verifiedAt).toLocaleString()}.
               </p>
             )}
 
-            {!isDomainVerified && (
+            {(!isDomainVerified || isTemporaryOverride) && (
               <Button
                 variant="outline"
                 onClick={() => verifyMutation.mutate()}
@@ -833,6 +1063,32 @@ export default function WebsiteDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+function MetricReading({
+  label,
+  metric,
+}: {
+  label: string
+  metric?: {
+    value: number
+    status: string
+    measuredAt: string
+  }
+}) {
+  return (
+    <div className="rounded-lg border p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 text-xl font-semibold">
+        {metric ? metric.value.toLocaleString() : "—"}
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        {metric
+          ? `${metric.status === "STALE" ? "Needs refresh" : "Current"} · ${new Date(metric.measuredAt).toLocaleDateString()}`
+          : "Not available yet"}
+      </p>
     </div>
   )
 }

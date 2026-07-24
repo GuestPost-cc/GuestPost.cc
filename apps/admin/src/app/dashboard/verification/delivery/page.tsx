@@ -24,7 +24,6 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import {
-  CheckCircle2,
   ExternalLink,
   RefreshCw,
   ShieldCheck,
@@ -34,6 +33,11 @@ import {
 import Link from "next/link"
 import { Fragment, useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminEmptyState,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../../components/admin-workspace"
 import { api } from "../../../../lib/api"
 import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
 
@@ -126,22 +130,24 @@ function DeliveryVerificationQueuePageInner() {
   const items = queue ?? []
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">
-            Delivery Verification Queue
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Deliveries that failed automated checks or need manual review,
-            sorted by priority.
-          </p>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow="Evidence review queue"
+        title="Delivery verification"
+        description="Review deliveries that failed automated checks or require manual evidence review, ordered by priority."
+        icon={ShieldCheck}
+        actions={
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+        }
+        badges={
+          !isLoading ? (
+            <Badge variant="secondary">{items.length} queued</Badge>
+          ) : null
+        }
+      />
 
       {isLoading ? (
         <Skeleton className="h-64 w-full" />
@@ -153,14 +159,10 @@ function DeliveryVerificationQueuePageInner() {
         />
       ) : items.length === 0 ? (
         <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-            <CheckCircle2 className="h-12 w-12 text-green-500 mb-4" />
-            <p className="text-lg font-medium">No deliveries need review</p>
-            <p className="text-muted-foreground text-sm">
-              Failed and manual-review deliveries will appear here
-              automatically.
-            </p>
-          </CardContent>
+          <AdminEmptyState
+            title="No deliveries need review"
+            description="Failed and manual-review deliveries will appear here automatically."
+          />
         </Card>
       ) : (
         <Card>
@@ -576,6 +578,6 @@ function DeliveryVerificationQueuePageInner() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPage>
   )
 }

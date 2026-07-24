@@ -37,7 +37,9 @@ manage withdrawals and payouts, inspect revenue and reconciliation, and
 approve financial cancellation/refund stages.
 
 Finance cannot browse global Users or customer Organizations and cannot manage
-platform inventory or fulfillment.
+platform inventory or fulfillment. It receives read-only marketplace listing
+context when that evidence is needed to investigate an order, settlement, or
+reconciliation issue.
 
 ## Capability Matrix
 
@@ -50,7 +52,7 @@ platform inventory or fulfillment.
 | Publishers | Read and governance | No global directory | Read, tier, balances, debt, settlement and withdrawal context |
 | Staff roles and Operations roster | Full management/read | No roster access | No access |
 | Platform websites | Create, view all, manage, reassign | Create and manage assigned sites | No access |
-| Marketplace inventory | Full moderation and platform inventory management | Operational moderation and inventory management | No admin marketplace access |
+| Marketplace inventory | Full moderation and platform inventory management | Operational moderation and assigned-inventory management | Read-only listing, publisher, price, service, and metric context; no moderation or inventory mutation |
 | Platform fulfillment queue | View all, claim as break-glass, assign/reassign | Assigned orders plus unassigned claimable orders; claim self | No access |
 | Platform delivery | Full break-glass progression | Deliver only with an active assignment to self | Read only where required for a financial work item |
 | Orders, disputes, cancellations | Full | Assigned/claimable fulfillment, assigned-Support orders, and active operational exception contexts | Financial actions and contextual reads |
@@ -78,6 +80,27 @@ platform inventory or fulfillment.
   active order and ticket assignments are not silently migrated.
 - New platform orders for an assigned site receive an automatic active
   fulfillment assignment to that site's Operations owner.
+- New platform sites require current staff-supplied Ahrefs organic traffic and
+  Moz Domain Authority in the same transaction as the site/listing aggregate.
+  Ahrefs DR and OpenPageRank collection is queued after commit. Provenance and
+  freshness use the same model as publisher inventory; API collection failure
+  never rolls back the durable aggregate.
+
+## Marketplace Staff Context
+
+- Marketplace list, stats, and detail reads are available to all staff roles.
+  Finance is explicitly read-only; every mutation route remains unavailable to
+  Finance regardless of client rendering.
+- Operations may moderate listing status. Service changes still require either
+  Super Admin or the assigned Operations owner of a platform site. Publisher
+  contacts and Operations email addresses are withheld from Operations and
+  Finance; Super Admin receives them only in explicit staff projections.
+- Staff listing responses are allowlisted projections. They exclude raw metric
+  provider payloads, integration credentials, internal fulfillment settings,
+  and unrestricted related records.
+- Domain metrics expose value, source, status, measured time, and collection
+  time. GSC and GA4 appear only when that website has a visible linked data
+  source; otherwise those sections remain absent.
 
 ## Platform Fulfillment
 
@@ -112,8 +135,17 @@ platform inventory or fulfillment.
   who completed it, while another operator's direct order ID is hidden.
 - Operations direct-order reads apply the same scope as the order monitor.
   Unrelated guessed IDs return not found, and the response omits customer and
-  staff emails, settlements, platform revenue, event metadata, and other
-  finance or audit-only details.
+  staff/publisher contact fields, customer user type, publisher tier/trust,
+  settlements, platform revenue, event metadata, and other finance or
+  audit-only details. Finance receives settlement evidence but not customer
+  contact/user-type fields or order-event metadata. Only Super Admin receives
+  those global-oversight identifiers.
+- Customer, publisher, and staff order pages render one canonical seven-stage
+  lifecycle from `@guestpost/shared`. Exception states stay off the happy-path
+  rail. Admin detail responses also include a server-derived integrity report
+  for route ownership, assignment, delivery evidence, financial record,
+  lifecycle events, and exception holds; the report exposes check outcomes,
+  not hidden financial values or sensitive metadata.
 - A platform-fulfilled order recognizes the full order amount as platform
   revenue. It does not create a publisher settlement or publisher payout.
 

@@ -17,9 +17,12 @@
 .env
 .env.development
 .env.local
+# Local handoff file containing third-party API credentials.
+MSC.txt
 .idea/
 .next/
 .opencode
+.pnpm-store/
 .turbo/
 .vscode/
 apps/*/src/**/*.js

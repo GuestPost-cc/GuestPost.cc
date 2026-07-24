@@ -62,6 +62,12 @@ import {
 } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminEmptyState,
+  AdminFilterBar,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../lib/use-require-role"
@@ -710,7 +716,15 @@ function StaffDirectory() {
         ))}
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <AdminFilterBar
+        activeCount={(search ? 1 : 0) + (role !== "all" ? 1 : 0)}
+        resultCount={items.length}
+        resultLabel="staff"
+        onClear={() => {
+          setSearch("")
+          setRole("all")
+        }}
+      >
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -734,7 +748,7 @@ function StaffDirectory() {
             <SelectItem value="FINANCE">Finance</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </AdminFilterBar>
 
       <Card>
         <CardContent className="p-0">
@@ -745,9 +759,10 @@ function StaffDirectory() {
               ))}
             </div>
           ) : items.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">
-              No staff members found.
-            </div>
+            <AdminEmptyState
+              title="No staff members found"
+              description="No staff account matches the selected role and search."
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -925,7 +940,16 @@ function ExternalUserDirectory({ type }: { type: "PUBLISHER" | "CUSTOMER" }) {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <AdminFilterBar
+        activeCount={(search ? 1 : 0) + (statusFilter !== "all" ? 1 : 0)}
+        resultCount={total}
+        resultLabel={`${type.toLowerCase()}${total === 1 ? "" : "s"}`}
+        onClear={() => {
+          setSearch("")
+          setStatusFilter("all")
+          setPage(1)
+        }}
+      >
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -954,7 +978,7 @@ function ExternalUserDirectory({ type }: { type: "PUBLISHER" | "CUSTOMER" }) {
             <SelectItem value="suspended">Suspended</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </AdminFilterBar>
       <Card>
         <CardContent className="p-0">
           {query.isLoading ? (
@@ -964,9 +988,10 @@ function ExternalUserDirectory({ type }: { type: "PUBLISHER" | "CUSTOMER" }) {
               ))}
             </div>
           ) : users.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground">
-              No users found.
-            </div>
+            <AdminEmptyState
+              title="No users found"
+              description={`No ${type.toLowerCase()} account matches the current filters.`}
+            />
           ) : (
             <Table>
               <TableHeader>
@@ -1133,22 +1158,19 @@ export default function UsersPage() {
   if (loading) return null
   if (!allowed) return <ForbiddenPage requires="Super Admin" />
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="flex items-center gap-2 text-3xl font-bold">
-            <Shield className="h-7 w-7" />
-            Users & Staff
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Staff access, workload, financial activity, and account oversight.
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Create staff
-        </Button>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Users & staff"
+        description="Manage staff access and review workload, financial activity, and external account status."
+        eyebrow="Identity & access"
+        icon={Shield}
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Create staff
+          </Button>
+        }
+      />
 
       <Tabs
         value={tab}
@@ -1166,6 +1188,6 @@ export default function UsersPage() {
       {tab === "customers" && <ExternalUserDirectory type="CUSTOMER" />}
 
       <CreateStaffDialog open={createOpen} onOpenChange={setCreateOpen} />
-    </div>
+    </AdminPage>
   )
 }

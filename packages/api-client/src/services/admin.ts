@@ -7,6 +7,7 @@ import type {
   WithdrawalStatus,
 } from "@guestpost/shared"
 import type { HttpClient, RequestOptions } from "../client"
+import type { PublicDomainMetrics } from "./marketplace"
 import type {
   CancellationMutationData,
   CancellationPreviewResponse,
@@ -580,7 +581,7 @@ export interface AdminOrderTimelineEvent {
   id: string
   eventType: string
   message?: string | null
-  metadata: Record<string, unknown> | null
+  metadata?: Record<string, unknown> | null
   createdAt: string
 }
 
@@ -591,21 +592,38 @@ export interface AdminOrderDetailResponse {
   instructions: string | null
   status: OrderStatus
   paymentStatus: string
+  fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
   amount: string | number | null
   currency: string
+  fulfillmentDueAt: string | null
   createdAt: string
   updatedAt: string
   version: number
   autoAcceptAt: string | null
   verifyMethod: string | null
   deliveryAcceptedMethod: string | null
-  organization?: { id: string; name: string; slug: string } | null
+  lifecycle: {
+    stageKey: string | null
+    stageLabel: string | null
+    stageIndex: number | null
+    isException: boolean
+  }
+  integrity: {
+    state: "HEALTHY" | "ATTENTION" | "BLOCKED"
+    checks: Array<{
+      key: string
+      label: string
+      status: "PASS" | "WARN" | "FAIL" | "NOT_APPLICABLE"
+      message: string
+    }>
+  }
+  organization?: { id: string; name: string; slug?: string } | null
   events: AdminOrderTimelineEvent[]
   customer?: {
     id: string
     name: string | null
-    email: string
-    userType: string
+    email?: string
+    userType?: string
   } | null
   website?: {
     id: string
@@ -614,12 +632,12 @@ export interface AdminOrderDetailResponse {
     managedBy?: {
       id: string
       name: string | null
-      email: string
+      email?: string
     } | null
     publisher?: {
       id: string
       name: string | null
-      email: string | null
+      email?: string | null
       tier?: string
       profile?: { trustScore: number | null } | null
     } | null
@@ -629,6 +647,20 @@ export interface AdminOrderDetailResponse {
     targetUrl: string | null
     anchorText: string | null
     website: { id: string; url: string } | null
+  }>
+  content?: {
+    id: string
+    title: string
+    status: string
+    hasBrief: boolean
+    hasDeliverable: boolean
+    updatedAt: string
+  } | null
+  revisions?: Array<{
+    id: string
+    status: string
+    createdAt: string
+    updatedAt: string
   }>
   activeDeliveryVersion?: {
     id: string
@@ -644,6 +676,7 @@ export interface AdminOrderDetailResponse {
       createdAt: string
     }>
     screenshotUrl: string | null
+    verificationFailureReason?: string | null
     evidence: Array<{
       id: string
       httpStatus: number
@@ -668,13 +701,30 @@ export interface AdminOrderDetailResponse {
       approvedByUser: {
         id: string
         name: string | null
-        email: string
+        email?: string
       } | null
       roleAtTime: string
       approvedAt: string
     }>
   }>
   dispute?: { id: string; status: string } | null
+  cancellation?: { id: string; status: string } | null
+  activeAssignment?: {
+    id: string
+    status: string
+    assignedAt: string
+    completedAt: string | null
+    assignedToUserId?: string
+    assignedToCurrentUser: boolean
+  } | null
+  access: {
+    role: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE"
+    canForceCancel: boolean
+    canManageDispute: boolean
+    canReviewDelivery: boolean
+    canViewFinancials: boolean
+    canWorkFulfillment: boolean
+  }
 }
 
 export interface AdminCancellationRequestResponse
@@ -693,17 +743,60 @@ export interface AdminCancellationRequestResponse
 
 export interface AdminOrderResponse {
   id: string
+  version: number
   type: string
+  title: string | null
   status: OrderStatus
   paymentStatus: string
   amount: number | null
   currency: string
+  fulfillmentChannel: "PUBLISHER" | "PLATFORM" | null
+  fulfillmentDueAt: string | null
+  autoAcceptAt: string | null
   createdAt: string
-  customer: { id: string; name: string | null; email: string } | null
-  website: { id: string; url: string } | null
-  items?: Array<{
-    website: { id: string; url: string } | null
-  }>
+  updatedAt: string
+  organization: { id: string; name: string } | null
+  customer: {
+    id: string
+    name: string | null
+    email?: string
+  } | null
+  website: {
+    id: string
+    url: string
+    name: string | null
+    ownershipType: "PUBLISHER" | "PLATFORM"
+    verificationStatus: string
+    publisher: { id: string; name: string | null } | null
+    managedBy: { id: string; name: string | null } | null
+  } | null
+  activeDelivery: { verificationStatus: string } | null
+  activeAssignment: {
+    status: string
+    assignedToCurrentUser: boolean
+  } | null
+  dispute: { id: string; status: string } | null
+  cancellation: { id: string; status: string } | null
+  settlement: {
+    id: string
+    status: SettlementStatus
+    reviewEndsAt: string | null
+  } | null
+}
+
+export type AdminOrderFocus = "all" | "attention" | "active" | "completed"
+
+export interface AdminOrderListResponse {
+  items: AdminOrderResponse[]
+  total: number
+  take: number
+  skip: number
+  summary: {
+    total: number
+    attention: number
+    active: number
+    completed: number
+  }
 }
 
 export interface AdminOpsStaffResponse {
@@ -773,6 +866,169 @@ export interface AdminPlatformWebsiteResponse {
     syncedAt: string | null
   }>
   createdAt: string
+}
+
+export interface AdminMarketplacePublisherSummary {
+  id: string
+  name: string
+  tier: string
+  email?: string | null
+  profile: {
+    rating: number | null
+    totalReviews: number
+    responseTime: number | null
+    completionRate: number | null
+    trustScore: number | null
+  } | null
+}
+
+export interface AdminMarketplaceServiceRow {
+  id: string
+  serviceType: string
+  price: number
+  currency: string
+  turnaroundDays: number
+  revisionRounds: number
+  warrantyDays?: number | null
+  availability: "AVAILABLE" | "PAUSED" | "WAITLIST"
+  version: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AdminMarketplaceListingRow {
+  id: string
+  title: string
+  slug: string
+  status: string
+  priceFrom: number | null
+  currency: string
+  ownerType: "PUBLISHER" | "PLATFORM"
+  fulfillmentType: "INTERNAL" | "PUBLISHER" | "HYBRID"
+  featured: boolean
+  verified: boolean
+  categories: Array<{ id: string; name: string; slug: string }>
+  category?: { id: string; name: string; slug: string } | null
+  organization?: { name: string } | null
+  publisher: AdminMarketplacePublisherSummary | null
+  serviceTypes: string[]
+  websiteVerificationStatus: string | null
+  websiteVerifiedAt: string | null
+  websiteDomain: string | null
+  websiteUrl: string | null
+  websiteManagedBy: {
+    id: string
+    name: string | null
+    email?: string
+  } | null
+  domainMetrics?: PublicDomainMetrics
+  services: AdminMarketplaceServiceRow[]
+  createdAt: string
+}
+
+export interface AdminMarketplaceListingDetail
+  extends Omit<
+    AdminMarketplaceListingRow,
+    | "websiteVerificationStatus"
+    | "websiteVerifiedAt"
+    | "websiteDomain"
+    | "websiteManagedBy"
+  > {
+  description: string
+  shortDescription?: string | null
+  country?: string | null
+  language?: string | null
+  websiteUrl: string | null
+  sampleUrl?: string | null
+  sportsGamingAllowed?: boolean | null
+  pharmacyAllowed?: boolean | null
+  cryptoAllowed?: boolean | null
+  backlinkCount?: number | null
+  linkType?: string | null
+  linkValidity?: string | null
+  googleNews?: boolean | null
+  markedSponsored?: boolean | null
+  foreignLanguageAllowed?: boolean | null
+  tags: Array<{ id: string; name: string; slug: string }>
+  images: Array<{ url: string; isPrimary: boolean }>
+  website: {
+    id: string
+    url: string
+    domain: string | null
+    ownershipType: "PUBLISHER" | "PLATFORM"
+    verificationStatus: string
+    verifiedAt: string | null
+    managedBy: {
+      id: string
+      name: string | null
+      email?: string
+    } | null
+    integrations: Array<{
+      provider: string
+      status: string
+      integrationStatus: string
+      syncedAt: string | null
+    }>
+  } | null
+  reviews: Array<{
+    id: string
+    rating: number
+    title?: string | null
+    content: string
+    createdAt: string
+    user: { name: string | null; image: string | null }
+  }>
+  reviewCount: number
+  updatedAt: string
+  access: {
+    role: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE"
+    canModerate: boolean
+    canManageGlobalFlags: boolean
+    canManageServices: boolean
+  }
+}
+
+export type WebsiteImportRowStatus =
+  | "READY"
+  | "WARNING"
+  | "ERROR"
+  | "CREATED"
+  | "SKIPPED"
+  | "FAILED"
+
+export interface WebsiteImportRowResponse {
+  id: string
+  rowNumber: number
+  canonicalDomain: string | null
+  status: WebsiteImportRowStatus
+  errors: string[]
+  warnings: string[]
+  websiteId: string | null
+}
+
+export interface WebsiteImportBatchResponse {
+  id: string
+  publisherId: string
+  organizationId: string
+  fileName: string
+  status:
+    | "PREVIEWED"
+    | "COMMITTING"
+    | "COMPLETED"
+    | "PARTIAL"
+    | "FAILED"
+    | "CANCELLED"
+  totalRows: number
+  readyRows: number
+  warningRows: number
+  errorRows: number
+  createdRows: number
+  skippedRows: number
+  failedRows: number
+  committedAt: string | null
+  createdAt: string
+  publisher?: { id: string; name: string | null; email: string | null }
+  rows?: WebsiteImportRowResponse[]
 }
 
 export interface AdminSettlementResponse {
@@ -908,8 +1164,24 @@ export class AdminService {
     >("/admin/organizations")
   }
 
-  listOrders() {
-    return this.client.get<AdminOrderResponse[]>("/admin/orders")
+  listOrders(params?: {
+    search?: string
+    status?: OrderStatus | "all"
+    channel?: "PUBLISHER" | "PLATFORM" | "all"
+    focus?: AdminOrderFocus
+    take?: number
+    skip?: number
+  }) {
+    const normalizedParams = params
+      ? {
+          ...params,
+          status: params.status === "all" ? undefined : params.status,
+          channel: params.channel === "all" ? undefined : params.channel,
+        }
+      : undefined
+    return this.client.get<AdminOrderListResponse>("/admin/orders", {
+      params: normalizedParams as Record<string, string | number | undefined>,
+    } as RequestOptions)
   }
 
   getOrderById(id: string) {
@@ -1099,6 +1371,12 @@ export class AdminService {
     return this.client.get<{
       totalListings: number
       activeListings: number
+      pendingListings: number
+      draftListings: number
+      pausedListings: number
+      needsAttention: number
+      platformListings: number
+      publisherListings: number
       totalReviews: number
       avgRating: number
     }>("/admin/marketplace/stats")
@@ -1113,50 +1391,7 @@ export class AdminService {
     limit?: number
   }) {
     return this.client.get<{
-      listings: Array<{
-        id: string
-        title: string
-        slug: string
-        type: string
-        status: string
-        price: number
-        priceFrom: number | null
-        currency: string
-        domainRating?: number
-        traffic?: number
-        ownerType: "PUBLISHER" | "PLATFORM"
-        fulfillmentType: "INTERNAL" | "PUBLISHER" | "HYBRID"
-        featured: boolean
-        verified: boolean
-        category?: { name: string }
-        organization?: { name: string }
-        publisher?: { name: string }
-        serviceTypes: string[]
-        websiteVerificationStatus: string | null
-        websiteVerifiedAt: string | null
-        websiteDomain: string | null
-        websiteUrl: string | null
-        websiteManagedBy: {
-          id: string
-          name: string | null
-          email: string
-        } | null
-        services: Array<{
-          id: string
-          serviceType: string
-          name: string | null
-          price: number
-          turnaroundDays: number
-          revisionRounds: number
-          warrantyDays?: number | null
-          availability: string
-          currency: string
-          version: number
-          createdAt: string
-          updatedAt: string
-        }>
-        createdAt: string
-      }>
+      listings: AdminMarketplaceListingRow[]
       pagination: {
         page: number
         limit: number
@@ -1210,9 +1445,51 @@ export class AdminService {
     googleNews: boolean
     markedSponsored: boolean
     foreignLanguageAllowed: boolean
+    manualMetrics: {
+      ahrefsOrganicTraffic: number
+      ahrefsTrafficAsOf: string
+      mozDomainAuthority: number
+      mozDomainAuthorityAsOf: string
+    }
     managedByUserId?: string
   }) {
     return this.client.post<any>("/admin/websites", { json: data })
+  }
+  previewWebsiteImport(publisherId: string, file: File) {
+    const body = new FormData()
+    body.set("publisherId", publisherId)
+    body.set("file", file)
+    return this.client.post<WebsiteImportBatchResponse>(
+      "/admin/websites/import/preview",
+      { body },
+    )
+  }
+  commitWebsiteImport(batchId: string, idempotencyKey: string) {
+    return this.client.post<WebsiteImportBatchResponse>(
+      `/admin/websites/import/${batchId}/commit`,
+      { json: { idempotencyKey } },
+    )
+  }
+  getWebsiteImport(batchId: string) {
+    return this.client.get<WebsiteImportBatchResponse>(
+      `/admin/websites/import/${batchId}`,
+    )
+  }
+  listWebsiteImports() {
+    return this.client.get<WebsiteImportBatchResponse[]>(
+      "/admin/websites/imports/history",
+    )
+  }
+  forceVerifyWebsites(data: {
+    websiteIds: string[]
+    reason: string
+    expiresInDays: number
+  }) {
+    return this.client.post<{
+      verified: number
+      expiresAt: string
+      websites: Array<{ id: string; domain: string | null }>
+    }>("/admin/websites/force-verify", { json: data })
   }
   getPlatformWebsite(websiteId: string) {
     return this.client.get<AdminPlatformWebsiteResponse>(
@@ -1284,7 +1561,9 @@ export class AdminService {
 
   // Staff listing preview by slug — returns the listing in any status.
   getListingBySlug(slug: string) {
-    return this.client.get<any>(`/admin/marketplace/listings/by-slug/${slug}`)
+    return this.client.get<AdminMarketplaceListingDetail>(
+      `/admin/marketplace/listings/by-slug/${slug}`,
+    )
   }
 
   // Admin service management (routes through marketplace service with staff flag)

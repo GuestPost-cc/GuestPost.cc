@@ -19,6 +19,10 @@ import {
   ShieldCheck,
 } from "lucide-react"
 import { use } from "react"
+import {
+  AdminPage,
+  AdminPageHeader,
+} from "../../../../../components/admin-workspace"
 import { api } from "../../../../../lib/api"
 
 // Dispute evidence package — reviewers see the complete, immutable history
@@ -45,16 +49,13 @@ export default function DisputeEvidencePage({
   if (isLoading || !data) return <Skeleton className="h-96 w-full" />
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <ScrollText className="h-7 w-7" /> Dispute Evidence Package
-        </h1>
-        <p className="text-muted-foreground">
-          Immutable delivery history, verification evidence, snapshots, and
-          audit trail.
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        title="Dispute evidence package"
+        description="Review immutable delivery history, verification evidence, snapshots, fraud signals, and the audit trail."
+        eyebrow="Forensic review"
+        icon={ScrollText}
+      />
 
       {data.dispute && (
         <Card>
@@ -219,6 +220,6 @@ export default function DisputeEvidencePage({
           ))}
         </CardContent>
       </Card>
-    </div>
+    </AdminPage>
   )
 }

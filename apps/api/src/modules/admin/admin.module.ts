@@ -13,6 +13,7 @@ import { FinanceWorkbenchService } from "./finance-workbench.service"
 import { OperationsWorkbenchService } from "./operations-workbench.service"
 import { ReconciliationService } from "./reconciliation.service"
 import { AdminVerificationQueueService } from "./verification-queue.service"
+import { WebsiteImportService } from "./website-import/website-import.service"
 import { WebsiteVerificationService } from "./website-verification.service"
 
 @Module({
@@ -33,6 +34,7 @@ import { WebsiteVerificationService } from "./website-verification.service"
     ReconciliationService,
     RevenueService,
     WebsiteVerificationService,
+    WebsiteImportService,
     PermissionsGuard,
   ],
 })

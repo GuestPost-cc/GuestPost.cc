@@ -1,7 +1,7 @@
 ---
 note_type: risks
 project: guestpost-platform
-updated: 2026-07-20
+updated: 2026-07-23
 ---
 
 # Risks
@@ -9,6 +9,15 @@ updated: 2026-07-20
 Updated 2026-07-20 after the Stripe-first provider-neutral finance groundwork. All historical audit findings at Medium severity or above are closed; the remaining items are staging gates, strategic/long-horizon risks, and operator-action follow-ups. Original 2026-06-11 architecture review risks are reassessed below.
 
 The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-06-15.md` §11 Remediation Log. This file keeps the strategic risk register skimmable.
+
+## Current local-work risk
+
+- **Legacy platform inventory can have incomplete domain metrics.** Platform
+  websites created before the staff-manual metric migration may legitimately
+  show missing Ahrefs traffic, Moz DA, Ahrefs DR, or OpenPageRank states until
+  staff reviews and backfills them. New platform-site creation fails closed on
+  the required manual evidence and queues both automated providers, so this is
+  a legacy data-completeness issue rather than an authorization bypass.
 
 ## Closed in this batch (no longer active)
 
@@ -57,21 +66,42 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 
 ### Critical / High that survived this batch
 
-- **URGENT — historical Render blueprint exposed a database credential.** The active `render.yml` uses Render secret prompts for `DATABASE_URL`, but an earlier committed Blueprint revision contained an inline Neon credential. Treat that credential as exposed: it was rotated in Neon during staging setup, and the new value must remain only in Render. Assess whether Git history/repository access needs containment before production. Do not copy the credential into tickets, logs, or Bedrock notes.
+- **Manual Ahrefs traffic and Moz DA are publisher assertions, not verified
+  provider measurements.** The platform labels their provenance, enforces
+  90-day freshness, retains revisions, and audits the actor, but moderation
+  must still treat them as self-reported until paid provider adapters replace
+  those sources.
+- **OpenPageRank remains an external quota/provider dependency.** The adapter
+  now follows the current Keywords Everywhere bearer-authenticated
+  `POST /v1/domains/bulk` contract and passed a live local key smoke test.
+  Fixed-host calls, strict response/date/domain validation, isolated provider
+  failures, and the provider-neutral metric store contain future contract or
+  quota changes; continue monitoring provider notices.
+- **Temporary website verification is a high-impact Super Admin capability.**
+  It is restricted to Super Admin, requires a reason and bounded expiry, is
+  atomically audited, never approves listings, and is revoked by the ownership
+  sweep. Production monitoring should alert on every override creation and
+  expiry; the scheduled sweep must remain enabled.
+
+- **Historical Render blueprint exposed a database credential.** The active
+  `render.yml` uses secret prompts, every runtime now uses the restricted
+  `guestpost_runtime` role, and the former Neon owner password was invalidated
+  after a healthy cutover. The old value still exists in Git history, so assess
+  repository-history/access containment before production. Do not copy any
+  credential into tickets, logs, or Bedrock notes.
 - **Redis auth-limit capacity is exhausted in the current staging provider account.** The application now degrades to a bounded per-instance email limiter instead of returning authentication 500s or failing open, but the fallback is not cluster-global. Reset/upgrade the Redis request quota and add capacity alerts so normal cross-pod enforcement is restored before production traffic.
 - **On-demand wake is best-effort by design.** A bad Northflank endpoint/token
   can increase report, trust, integration, or payout-webhook processing latency.
   It cannot be the only trigger: the documented 10-minute catch-up schedule and
   alerts on oldest pending work are required for production.
-- **Payout uniqueness migration needs a data preflight.** The new unique
-  `(providerId, providerExecutionId)` index intentionally fails if historical
-  duplicate provider references exist. Run the documented duplicate query and
-  resolve any result through provider-side reconciliation before migration.
-- **The Stripe finance migration has not been replayed on a clean database from
-  this host.** Prisma format, validate, generate, and package builds pass, but
-  the local host has neither PostgreSQL/`psql` nor a running Docker daemon. A
-  backup, clean migration replay, duplicate/reference preflight, and post-deploy
-  reconciliation are mandatory before either Stripe feature flag is enabled.
+- **Stripe deposits are not certified until the provider-to-ledger loop is
+  observed.** The migration was rehearsed on an isolated Neon branch, the
+  payout-reference preflight was clean, production was migrated from a backup,
+  and runtime health is proven. The staging restricted key was expired during
+  final credential containment and both Stripe execution flags are false. A
+  replacement least-privilege key plus a user-initiated sandbox Checkout must
+  still produce one verified webhook, one wallet credit, one ledger row, and a
+  safe duplicate replay before deposit testing is considered complete.
 - **Stripe test mode is not live-readiness evidence.** The platform's legal
   entity/country, connected-account availability, payout currency, business
   profile, descriptor behavior, and bank statement rendering must be accepted

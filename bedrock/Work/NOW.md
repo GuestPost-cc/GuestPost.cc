@@ -1,8 +1,115 @@
 # Current Status
 
-**Phase**: The free-tier hybrid worker rollout is live on Northflank and Render, and Stripe-first provider-neutral finance groundwork is implemented and locally verified. Both Stripe feature flags remain off. The next finance step is a controlled Neon staging migration plus Stripe test-mode webhook and sandbox certification. Existing Admin-auth and GSC/GA4 deployment follow-ups remain open.
+**Phase**: PR #61 is merged and exact commit `442304f` is live across all five Render services and all three Northflank worker workloads. The Neon staging database is migrated through the Stripe-first finance migration and every runtime uses a restricted application role; the former owner password was rotated after cutover. Stripe webhook destinations are active, but both deposit and Connect execution remain fail-closed pending replacement of the staging restricted key and a user-initiated sandbox checkout. Existing Admin-auth and GSC/GA4 deployment follow-ups remain open.
 
 **Reconciled through**: Git commit `8cd5f2b` (358 commits total). The catch-up covers the 93 commits after the previous 265-commit history boundary at `d907b3d`; see `History/timeline/2026-07-16-catchup.md`.
+
+## Current Local Work: Staff Marketplace And Canonical Order Integrity
+
+- Rebuilt the Admin marketplace list and detail workflows for Super Admin,
+  Operations, and Finance with consistent filters, responsive cards/tables,
+  publisher or platform-owner context, service summaries, and source-aware
+  Ahrefs, Moz, and OpenPageRank freshness states.
+- Finance marketplace access is contextual and read-only. Operations retains
+  only assigned platform-service actions, while moderation and global flags
+  remain explicitly role-gated. Staff projections omit publisher contact data
+  outside Super Admin and never expose service fulfillment settings.
+- Platform-owned site creation now requires fresh manual Ahrefs traffic and Moz
+  DA evidence in the same transaction as the site/listing, then queues the same
+  Ahrefs DR and OpenPageRank providers used for publisher inventory.
+- Added one shared seven-stage order lifecycle across Admin, customer, and
+  publisher detail pages. Admin detail now includes a role-safe integrity report
+  covering routing, assignment, delivery evidence, financial records, event
+  history, and dispute/cancellation holds without widening sensitive data.
+- Added focused lifecycle, RBAC, projection, platform-metric, and integrity
+  regression coverage. Signed-in Operations browser checks passed for desktop
+  and 390-pixel marketplace layouts, listing details, the platform metric form,
+  and order integrity; the pass also caught and fixed Decimal/string price
+  rendering at the API/UI boundary.
+- Full local CI-equivalent validation passes on current `main`: 97 API unit
+  suites / 993 tests, 9 API integration suites / 17 tests, 12 shared suites /
+  106 tests, 3 API-client suites / 50 tests, 11 worker tests, and 9 UI test files
+  / 67 tests with coverage. TypeScript, Biome, ESLint, dependency-cruise, a
+  clean 43-migration replay, and all 12 production builds pass. The dependency
+  audit initially exposed newly published Next.js advisories; all consumers
+  were upgraded to 16.2.11 and the production audit now reports no known
+  vulnerabilities.
+
+## Current Local Work: Admin Staff Workspace Redesign
+
+- Added an Admin-only workspace component system for consistent page framing,
+  task-oriented headers, semantic KPI colors, filter/result surfaces, notices,
+  status badges, and empty states.
+- Updated the shared shell with role-specific Super Admin, Operations, and
+  Finance accents, clearer scope context, grouped navigation, active states,
+  responsive overflow protection, and a fail-closed state for STAFF accounts
+  without a staff role.
+- Migrated all 25 Admin overview, list, governance, inventory, finance,
+  settings, and detail routes to the shared page boundary. Role-specific data,
+  navigation, actions, route guards, API contracts, and ownership scopes are
+  unchanged.
+- Added `docs/ADMIN_WORKSPACE_UX.md` as the durable role, color, responsive,
+  workflow, and security contract for future Admin work.
+- Rebuilt the shared Admin order monitor around exact server pagination,
+  role-specific attention/active/history totals, role-visible search, concise
+  responsive order cards/tables, and links into the correct protected workflow.
+- Reworked order detail into a role-aware decision page with next-action
+  guidance, lifecycle KPIs, verification and settlement evidence, safe optional
+  identity rendering, non-enumerating out-of-scope errors, and a strengthened
+  Super Admin force-cancel confirmation.
+- Tightened list/detail API projections so Operations never receives customer
+  contacts, publisher trust/contact details, settlement context, or event
+  metadata, while Finance retains only the financial evidence needed for its
+  workflow. Added focused API and API-client regression coverage.
+- Local validation: Admin production build, typecheck, lint, and focused Biome
+  checks pass; 6 focused Admin guard, RBAC, scoping, and workbench suites pass
+  49 tests. Signed-in browser checks pass for Super Admin, Operations, and
+  Finance; unavailable navigation is absent, Operations direct Finance access
+  fails closed, no runtime console errors were observed, and tested
+  390/768/1,440-pixel layouts have no document-level horizontal overflow.
+- Order-workflow validation: all 96 API unit suites pass (989 tests), all three
+  API-client suites pass (50 tests), Admin lint/typecheck and the final
+  production build pass, and focused order/cancellation suites pass 27 tests.
+  A signed-in Operations browser smoke test passes for the role-scoped order
+  monitor, an authorized detail, a guessed out-of-scope ID, and document-width
+  overflow at the available 1,181-pixel viewport.
+
+## Current Local Work: Domain Metrics and Publisher Import
+
+- Implemented source-aware `WebsiteMetric` current values plus immutable
+  replacement revisions, with a migration and generated Prisma client.
+- Added worker adapters for Ahrefs free Domain Rating and OpenPageRank, fixed
+  HTTPS destinations, response caps/timeouts, normalized value validation,
+  creation/import wake-ups, and a monthly refresh sweep.
+- Added required publisher/admin manual Ahrefs organic traffic and Moz DA with
+  90-day moderation freshness, transactional audit, publisher detail UI, and
+  required measurement fields in the site-enlistment form. New publisher
+  websites now persist manual metrics atomically with the website and listing.
+- Updated OpenPageRank to the current bearer-authenticated Keywords Everywhere
+  bulk API contract. Local Ahrefs and OpenPageRank keys are configured in the
+  ignored development environment; one-domain live smoke calls passed for both
+  providers without exposing credentials.
+- Public listing projections now include safe source-specific metrics and omit
+  GSC/GA4 groups unless that exact provider link is active and has synced.
+- Added the Super Admin CSV template/preview/commit/history UI and API. Imports
+  are publisher-bound, row-transactional, idempotent, draft-only, and retain no
+  raw CSV. Temporary forced verification is separately confirmed, reasoned,
+  audited, expiring, replaceable by DNS proof, and auto-revoked by the sweep.
+- Expanded the import page with all 26 accepted column contracts, live active
+  category slugs, supported languages, additional CSV instructions, explicit
+  skip semantics, and an accessible spaced file picker. Unsupported optional
+  cells now import as warnings with only those values skipped; invalid website
+  identity, duplicate domains, and malformed CSV remain blocking. The page is
+  now compact and responsive, uses expandable references/mobile result cards,
+  limits default history to five batches, and has no document-level horizontal
+  overflow at 390, 768, 1,024, or 1,440 pixels, including expanded guidance and
+  a loaded result batch.
+- Added mixed-batch regression coverage proving that an existing domain is
+  rejected independently while another importable row is created and reported
+  in a `PARTIAL` batch. Preview also recognizes legacy `www.` stored domains.
+- Validation is included in the full CI-equivalent pass above. The two new
+  migrations replay cleanly from an empty PostgreSQL database; an end-to-end
+  mixed CSV import remains a manual staging gate before release.
 
 ## Recently Completed
 
@@ -27,6 +134,39 @@
 - Validation: PR #72 passed dependency review, policy and audit checks,
   migration replay, type/lint checks, API and package tests, UI coverage, and
   all production builds before merge.
+
+### Neon Cutover And Stripe Staging Rollout
+
+- Created expiring pre-rollout backup and migration-rehearsal branches from the
+  Neon `production` branch. Replayed
+  `20260720090000_stripe_first_finance_groundwork` transactionally on the
+  rehearsal branch before applying it to production with its Prisma checksum.
+- Verified the four finance tables, three enums, four database checks, inactive
+  Stripe provider seed, and zero invalid wallet/withdrawal balances after the
+  production migration.
+- Created `guestpost_runtime` with database connect, schema usage, application
+  table DML, sequence access, function execution, matching default privileges,
+  a 30-second statement timeout, and a 60-second idle-transaction timeout.
+  Render's five services and Northflank's service plus two jobs use this pooled
+  runtime role; only the API holds the direct URL for migration tooling.
+- Rotated the Neon owner password after API readiness, worker 1/1 health, and
+  fresh successful five- and ten-minute job executions proved that no runtime
+  depended on owner access. Post-rotation API readiness reports both PostgreSQL
+  and Redis healthy.
+- Configured a Stripe sandbox with one restricted test key and distinct webhook
+  destinations/secrets for deposits, platform transfers, and connected-account
+  payouts. Exact event allowlists, test/live mode checks, secret non-reuse, and
+  independent deposit/Connect/live-mode kill switches remain enforced.
+- During final verification, the active restricted-key value became visible in
+  an operator-only dashboard transcript. It was expired immediately, the
+  deposit flag was returned to false, the expired key was removed from Render,
+  and the unused exposed standard secret was expired as well. Stripe's
+  dashboard did not permit automated creation of the replacement; no exposed
+  key remains trusted by the rollout.
+- PR #61 passed CI run #350, was squash-merged as `442304f`, and the same commit
+  is live on the Render API, portal, publisher, admin, website, Northflank
+  realtime worker, on-demand job, and maintenance dispatcher. Both scheduled
+  job lanes completed fresh successful runs on that commit.
 
 ### Stripe-First Provider-Neutral Finance Groundwork
 
@@ -299,8 +439,8 @@
   made cross-staff assignment Super Admin-only, validated active Operations
   targets, and fixed claim so it cannot cancel or steal an existing assignment.
 - Removed Operations access to settlement list/detail and Finance access to
-  admin marketplace/platform-site inventory. Preserved contextual identity
-  snippets inside authorized work items.
+  platform-site management. Finance retains read-only marketplace list/detail
+  context, with no moderation, inventory-management, or contact-data access.
 - Aligned admin navigation, deep-link guards, action visibility, Finance
   settlement approval, support copy, and overview KPIs. Fixed the marketplace
   Platform/Publisher/All filter query-key bug and removed unsupported
@@ -526,18 +666,19 @@ data.
 
 ## Next Actions
 
-1. **Hybrid worker cutover** — merge the free-tier dispatcher follow-up only after GitHub CI passes, then deploy the Render API plus the paused Northflank realtime service, on-demand/catch-up job, and maintenance dispatcher with forbid-concurrency behavior.
-2. **Redis quota validation** — configure the dedicated staging `QUEUE_REDIS_URL` through deployment secrets and monitor commands/day for at least 24 hours after the hybrid cutover before treating the cost model as validated.
-3. **Customer workbench release** — review, commit, push, and open the customer workbench PR (stacked on the publisher workbench commit); confirm the full GitHub CI gate before merging.
-4. **Google integration staging pass** — authorize the production callback URI, connect a Google account different from the GuestPost login, discover/link GSC and GA4 properties for one publisher and one platform site, then verify daily rows and their buyer-safe 30-day listing summaries are written only to the selected website mappings.
-5. **Auth IP warning follow-up** — Render logs now show Better Auth falling back to a shared per-path rate-limit bucket when no trusted client IP header is resolved; configure Better Auth trusted proxy/IP headers before production hardening.
-6. **OAuth configuration** — authorize the deployed Google redirect URI `https://api.guestpost.pro.bd/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback` plus any localhost callback still needed for development.
-7. **Historical credential containment** — the exposed Neon password was rotated, but the old value remains in git history. Assess whether repository history/access containment is needed before production.
-8. **Reporting expansion** — build on the completed GSC/GA4 ingestion
+1. **Stripe deposit certification** — manually create the replacement restricted test key with only Checkout Sessions (platform Write), Accounts (platform Write), Account Links (platform Write), Transfers (platform Write), and Payouts (Connect Write); place it in Render without copying it into docs/logs; then re-enable deposits and complete one user-initiated sandbox Checkout. Verify the exact webhook, one-and-only-one wallet credit and ledger row, and a safe duplicate replay before treating deposits as certified.
+2. **Stripe Connect certification** — keep `STRIPE_CONNECT_ENABLED=false` and the database provider inactive until an internal publisher completes hosted sandbox onboarding. Then certify platform Transfer, connected-account Payout, failure/reversal handling, fee disclosure, notifications, reconciliation, and statement-text behavior before enabling any broader cohort.
+3. **Live-mode gate** — keep `STRIPE_LIVE_MODE_ENABLED=false`; complete legal entity, country/currency, business-profile, descriptor, webhook, restricted-key, bank-statement, incident, and rollback reviews in a separate production change.
+4. **Redis quota validation** — monitor dedicated staging `QUEUE_REDIS_URL` commands/day for at least 24 hours after the hybrid cutover before treating the cost model as validated.
+5. **Google integration staging pass** — authorize the production callback URI, connect a Google account different from the GuestPost login, discover/link GSC and GA4 properties for one publisher and one platform site, then verify daily rows and their buyer-safe 30-day listing summaries are written only to the selected website mappings.
+6. **Auth IP warning follow-up** — Render logs now show Better Auth falling back to a shared per-path rate-limit bucket when no trusted client IP header is resolved; configure Better Auth trusted proxy/IP headers before production hardening.
+7. **OAuth configuration** — authorize the deployed Google redirect URI `https://api.guestpost.pro.bd/api/v1/integrations/GOOGLE_SEARCH_CONSOLE/callback` plus any localhost callback still needed for development.
+8. **Historical credential containment** — the exposed Neon owner credential was invalidated, but the old value remains in git history. Assess whether repository history/access containment is needed before production.
+9. **Reporting expansion** — build on the completed GSC/GA4 ingestion
    - Pagination, configurable date windows, historical imports, and retry observability
    - Owner reporting endpoints (`GET /websites/:id/metrics`)
    - GSC/GA4 KPI cards and historical trend charts
-8. **Additional providers** — Bing Webmaster Tools
+10. **Additional providers** — Bing Webmaster Tools
 
 ## Backlog (Future Cleanup)
 

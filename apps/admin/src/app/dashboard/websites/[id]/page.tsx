@@ -53,6 +53,10 @@ import {
 import Link from "next/link"
 import { use, useEffect, useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminPage,
+  AdminPageHeader,
+} from "../../../../components/admin-workspace"
 import { api } from "../../../../lib/api"
 import { useAuth } from "../../../../lib/auth"
 import { ForbiddenPage, useRequireRole } from "../../../../lib/use-require-role"
@@ -238,35 +242,36 @@ function PlatformWebsiteDetailPageInner({
   )
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <Button variant="ghost" size="sm" asChild className="-ml-3 mb-2">
-            <Link href="/dashboard/websites">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Platform Websites
-            </Link>
-          </Button>
-          <h1 className="text-3xl font-bold tracking-tight">
-            {website.name || website.domain || website.url}
-          </h1>
-          <a
-            href={website.url}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-          >
-            {website.url}
-            <ExternalLink className="h-3.5 w-3.5" />
-          </a>
-        </div>
-        <div className="flex gap-2">
-          <Badge variant={website.isActive ? "success" : "secondary"}>
-            {website.isActive ? "Active website" : "Paused website"}
-          </Badge>
-          <Badge variant="outline">DNS not required</Badge>
-        </div>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        title={website.name || website.domain || website.url}
+        description={website.url}
+        eyebrow="Platform website"
+        icon={BarChart3}
+        badges={
+          <>
+            <Badge variant={website.isActive ? "success" : "secondary"}>
+              {website.isActive ? "Active website" : "Paused website"}
+            </Badge>
+            <Badge variant="outline">DNS not required</Badge>
+          </>
+        }
+        actions={
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/websites">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Platform websites
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <a href={website.url} target="_blank" rel="noreferrer">
+                Open website <ExternalLink className="ml-2 h-3.5 w-3.5" />
+              </a>
+            </Button>
+          </>
+        }
+      />
 
       <Card>
         <CardHeader>
@@ -327,7 +332,7 @@ function PlatformWebsiteDetailPageInner({
           )}
         </CardContent>
       </Card>
-    </div>
+    </AdminPage>
   )
 }
 

@@ -21,6 +21,27 @@ export interface ListingAttribution {
   label: string
 }
 
+export interface PublicDomainMetricValue {
+  value: number
+  source: string
+  status: "CURRENT" | "STALE" | "UNAVAILABLE"
+  measuredAt: string
+  collectedAt: string
+}
+
+export interface PublicDomainMetrics {
+  ahrefs: {
+    domainRating?: PublicDomainMetricValue
+    organicTraffic?: PublicDomainMetricValue
+  }
+  moz: { domainAuthority?: PublicDomainMetricValue }
+  openPageRank: {
+    pageRank?: PublicDomainMetricValue
+    globalRank?: PublicDomainMetricValue
+    referringDomains?: PublicDomainMetricValue
+  }
+}
+
 export interface MarketplaceListing {
   id: string
   title: string
@@ -53,6 +74,7 @@ export interface MarketplaceListing {
     gsc?: { clicks: number; impressions: number }
     ga4?: { sessions: number; users: number; pageviews: number }
   }
+  domainMetrics?: PublicDomainMetrics
   referringDomains?: number
   spamScore?: number
   country?: string

@@ -261,8 +261,8 @@ export default function WebsitesPage() {
         return {
           id: s.id,
           url: s.url || "",
-          domainRating: s.metrics?.dr || 0,
-          monthlyTraffic: s.metrics?.traffic || 0,
+          domainRating: s.domainMetrics?.ahrefsDomainRating?.value,
+          monthlyTraffic: s.domainMetrics?.ahrefsOrganicTraffic?.value,
           country: s.country || "",
           language: s.language || undefined,
           price: prices.length > 0 ? Math.min(...prices) : 0,
@@ -519,7 +519,7 @@ export default function WebsitesPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    {site.monthlyTraffic
+                    {site.monthlyTraffic != null
                       ? site.monthlyTraffic.toLocaleString()
                       : "—"}
                   </TableCell>

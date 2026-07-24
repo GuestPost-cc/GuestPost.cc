@@ -17,6 +17,9 @@ export interface VerificationDeps {
   prisma: any
   checkDns: DnsChecker
   now?: () => Date
+  // The sweep itself may run daily to expire overrides promptly; real DNS
+  // checks remain on this slower cadence.
+  dnsRecheckAfterMs?: number
   // Optional hook to trigger event-driven publisher trust recompute.
   onTrustEvent?: (
     publisherId: string | null | undefined,
@@ -80,7 +83,10 @@ export async function runWebsiteVerify(
   if (!website) return { skipped: "not_found" }
   if (!website.publisherId || !website.verificationToken)
     return { skipped: "no_token" }
-  if (website.verificationStatus === "VERIFIED")
+  if (
+    website.verificationStatus === "VERIFIED" &&
+    website.verificationMethod !== "SUPER_ADMIN_OVERRIDE"
+  )
     return { skipped: "already_verified" }
 
   const publisher = await prisma.publisher.findUnique({
@@ -100,6 +106,7 @@ export async function runWebsiteVerify(
       where: { id: website.id, verificationVersion: expectedVersion },
       data: {
         verificationStatus: "VERIFIED",
+        verificationMethod: "DNS_TXT",
         verifiedAt: now,
         lastVerificationCheckAt: now,
         lastSuccessfulVerificationAt: now,
@@ -108,6 +115,9 @@ export async function runWebsiteVerify(
         verificationCheckCount: { increment: 1 },
         consecutiveFailures: 0,
         verificationFailureReason: null,
+        verificationOverrideExpiresAt: null,
+        verificationOverrideReason: null,
+        verifiedByUserId: null,
         verificationVersion: expectedVersion + 1,
       },
     })
@@ -157,6 +167,47 @@ export async function runWebsiteVerify(
   }
 
   const reason = result.reason ?? "Verification TXT record not found"
+
+  // A failed voluntary TXT attempt must not prematurely destroy a still-live
+  // Super Admin override. The scheduled sweep remains the authority that
+  // revokes the override at its recorded expiry.
+  if (
+    website.verificationMethod === "SUPER_ADMIN_OVERRIDE" &&
+    website.verificationOverrideExpiresAt &&
+    new Date(website.verificationOverrideExpiresAt).getTime() > now.getTime()
+  ) {
+    const upd = await prisma.website.updateMany({
+      where: { id: website.id, verificationVersion: expectedVersion },
+      data: {
+        lastVerificationCheckAt: now,
+        verificationCheckCount: { increment: 1 },
+        verificationFailureReason: reason,
+      },
+    })
+    if (upd.count === 0) return { skipped: "version_conflict" }
+    await prisma.auditLog.create({
+      data: {
+        action: "WEBSITE_TXT_VERIFICATION_FAILED_OVERRIDE_RETAINED",
+        entityType: "Website",
+        entityId: website.id,
+        metadata: {
+          domain: website.domain,
+          publisherId: website.publisherId,
+          organizationId,
+          reason,
+          overrideExpiresAt: website.verificationOverrideExpiresAt,
+        },
+        userId: actorUserId ?? null,
+        organizationId,
+      },
+    })
+    return {
+      ok: false,
+      status: "VERIFIED",
+      reason: "TXT record not found; temporary override remains active",
+    }
+  }
+
   const upd = await prisma.website.updateMany({
     where: { id: website.id, verificationVersion: expectedVersion },
     data: {
@@ -253,8 +304,34 @@ export async function runWebsiteReverifySweep(
   deps: VerificationDeps,
 ): Promise<SweepResult> {
   const { prisma, checkDns } = deps
+  const sweepNow = (deps.now ?? (() => new Date()))()
+  const dnsCutoff = new Date(
+    sweepNow.getTime() - (deps.dnsRecheckAfterMs ?? 30 * 86_400_000),
+  )
   const sites = await prisma.website.findMany({
-    where: { verificationStatus: "VERIFIED", publisherId: { not: null } },
+    where: {
+      verificationStatus: "VERIFIED",
+      publisherId: { not: null },
+      OR: [
+        { verificationMethod: "SUPER_ADMIN_OVERRIDE" },
+        {
+          AND: [
+            {
+              OR: [
+                { verificationMethod: "DNS_TXT" },
+                { verificationMethod: null },
+              ],
+            },
+            {
+              OR: [
+                { lastVerificationCheckAt: null },
+                { lastVerificationCheckAt: { lte: dnsCutoff } },
+              ],
+            },
+          ],
+        },
+      ],
+    },
     select: { id: true },
   })
 
@@ -265,16 +342,70 @@ export async function runWebsiteReverifySweep(
     const website = await prisma.website.findUnique({ where: { id } })
     if (!website?.publisherId) continue
     if (website.verificationStatus !== "VERIFIED") continue
-    // Re-check the token actually proven present in DNS (survives rotation).
-    const checkToken = website.activeVerifiedToken ?? website.verificationToken
-    if (!checkToken) continue
 
     const publisher = await prisma.publisher.findUnique({
       where: { id: website.publisherId },
     })
     const organizationId = publisher?.organizationId ?? null
     const expectedVersion = website.verificationVersion
-    const now = (deps.now ?? (() => new Date()))()
+    const now = sweepNow
+
+    // Break-glass verification has its own deterministic expiry. It is never
+    // evaluated as DNS evidence and cannot silently become permanent.
+    if (website.verificationMethod === "SUPER_ADMIN_OVERRIDE") {
+      const expiresAt = website.verificationOverrideExpiresAt
+        ? new Date(website.verificationOverrideExpiresAt)
+        : null
+      if (expiresAt && expiresAt.getTime() > now.getTime()) continue
+
+      const reason = expiresAt
+        ? "Super Admin verification override expired"
+        : "Super Admin verification override has no valid expiry"
+      const upd = await prisma.website.updateMany({
+        where: {
+          id: website.id,
+          verificationVersion: expectedVersion,
+          verificationStatus: "VERIFIED",
+          verificationMethod: "SUPER_ADMIN_OVERRIDE",
+        },
+        data: {
+          verificationStatus: "REVOKED",
+          lastVerificationCheckAt: now,
+          verificationFailureReason: reason,
+          verificationVersion: expectedVersion + 1,
+        },
+      })
+      if (upd.count === 0) continue
+      revoked++
+      await prisma.auditLog.create({
+        data: {
+          action: "WEBSITE_DOMAIN_VERIFICATION_OVERRIDE_EXPIRED",
+          entityType: "Website",
+          entityId: website.id,
+          metadata: {
+            domain: website.domain,
+            publisherId: website.publisherId,
+            organizationId,
+            reason,
+            overrideExpiresAt: expiresAt,
+            verifiedByUserId: website.verifiedByUserId,
+          },
+          userId: null,
+          organizationId,
+        },
+      })
+      await enforceRevocation(prisma, website, organizationId)
+      await deps.onTrustEvent?.(
+        website.publisherId,
+        "WEBSITE_REVOKED",
+        `temporary verification for ${website.domain ?? website.url} expired`,
+      )
+      continue
+    }
+
+    // Re-check the token actually proven present in DNS (survives rotation).
+    const checkToken = website.activeVerifiedToken ?? website.verificationToken
+    if (!checkToken) continue
 
     let result: DnsCheckResult
     try {

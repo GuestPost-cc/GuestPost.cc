@@ -23,6 +23,7 @@ import {
   getOrderStatusPresentation,
   Input,
   Label,
+  OrderLifecycleProgress,
   Select,
   SelectContent,
   SelectItem,
@@ -303,98 +304,6 @@ function StatusBadge({ status }: { status: string }) {
       <Icon className="h-3.5 w-3.5" />
       {p.label}
     </UIStatusBadge>
-  )
-}
-
-// Visual lifecycle so the customer always knows where the order stands.
-const PROGRESS_STEPS = [
-  { label: "Payment", statuses: ["DRAFT", "PENDING_PAYMENT", "PAID"] },
-  {
-    label: "Content",
-    statuses: [
-      "SUBMITTED",
-      "ACCEPTED",
-      "CONTENT_REQUESTED",
-      "CONTENT_CREATION",
-      "CONTENT_READY",
-    ],
-  },
-  { label: "Review", statuses: ["CUSTOMER_REVIEW", "APPROVED"] },
-  { label: "Published", statuses: ["PUBLISHED"] },
-  { label: "Verified", statuses: ["VERIFIED"] },
-  { label: "Delivered", statuses: ["DELIVERED"] },
-  { label: "Complete", statuses: ["SETTLED", "COMPLETED"] },
-]
-
-function OrderProgress({ status }: { status: string }) {
-  // Off-track states get a banner instead of a progress bar.
-  if (
-    status === "CANCELLED" ||
-    status === "REFUNDED" ||
-    status === "DISPUTED"
-  ) {
-    const map: Record<string, { text: string; cls: string }> = {
-      CANCELLED: {
-        text: "This order was cancelled.",
-        cls: "bg-gray-100 text-gray-700",
-      },
-      REFUNDED: {
-        text: "This order was refunded.",
-        cls: "bg-orange-100 text-orange-700",
-      },
-      DISPUTED: {
-        text: "A dispute is open — settlement to the publisher is paused while we review.",
-        cls: "bg-red-100 text-red-700",
-      },
-    }
-    const m = map[status]
-    return (
-      <div className={`rounded-lg px-4 py-3 text-sm font-medium ${m.cls}`}>
-        {m.text}
-      </div>
-    )
-  }
-
-  let current = PROGRESS_STEPS.findIndex((s) => s.statuses.includes(status))
-  if (current === -1) current = 0
-
-  return (
-    <div className="flex items-center">
-      {PROGRESS_STEPS.map((step, i) => {
-        const done = i < current
-        const active = i === current
-        return (
-          <div
-            key={step.label}
-            className="flex flex-1 items-center last:flex-none"
-          >
-            <div className="flex flex-col items-center gap-1.5">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                  done
-                    ? "bg-primary text-primary-foreground"
-                    : active
-                      ? "bg-primary/15 text-primary ring-2 ring-primary"
-                      : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {done ? <CheckCircle className="h-4 w-4" /> : i + 1}
-              </div>
-              <span
-                className={`text-[11px] ${active ? "font-medium text-foreground" : "text-muted-foreground"}`}
-              >
-                {step.label}
-              </span>
-            </div>
-            {i < PROGRESS_STEPS.length - 1 && (
-              <div
-                className={`mx-1 h-0.5 flex-1 ${done ? "bg-primary" : "bg-muted"}`}
-              />
-            )}
-          </div>
-        )
-      })}
-    </div>
   )
 }
 
@@ -864,7 +773,7 @@ export default function OrderDetailPage({
 
       <Card>
         <CardContent className="pt-6">
-          <OrderProgress status={order.status} />
+          <OrderLifecycleProgress status={order.status} />
         </CardContent>
       </Card>
 

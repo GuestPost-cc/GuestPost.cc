@@ -145,6 +145,8 @@ export type {
   NotificationBellProps,
 } from "./components/notification-bell"
 export { NotificationBell } from "./components/notification-bell"
+export type { OrderLifecycleProgressProps } from "./components/order-lifecycle-progress"
+export { OrderLifecycleProgress } from "./components/order-lifecycle-progress"
 export { PageHeader } from "./components/page-header"
 export type { PasswordInputProps } from "./components/password-input"
 export { PasswordInput } from "./components/password-input"

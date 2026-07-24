@@ -5,8 +5,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -43,6 +41,12 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminFilterBar,
+  AdminMetricCard,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../components/admin-workspace"
 import { api } from "../../../lib/api"
 import { useAuth } from "../../../lib/auth"
 
@@ -128,51 +132,43 @@ export default function DisputesPage() {
   const counts = data?.counts ?? { open: 0, underReview: 0, active: 0 }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Scale className="h-7 w-7" /> Disputes
-        </h1>
-        <p className="text-muted-foreground">
-          Customer disputes pause settlement until resolved. Review evidence,
-          then restore, refund, or reject.
-        </p>
-      </div>
+    <AdminPage>
+      <AdminPageHeader
+        eyebrow="Protected resolution workflow"
+        title="Disputes"
+        description="Customer disputes pause settlement until resolved. Operations reviews evidence; Finance or Super Admin approves refund outcomes."
+        icon={Scale}
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-1.5">
-              <AlertTriangle className="h-4 w-4 text-red-500" /> Open
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{counts.open}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-1.5">
-              <Clock className="h-4 w-4 text-amber-500" /> Under Review
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{counts.underReview}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Active total</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{counts.active}</div>
-          </CardContent>
-        </Card>
+        <AdminMetricCard
+          label="Open"
+          value={counts.open}
+          icon={AlertTriangle}
+          tone={counts.open > 0 ? "danger" : "success"}
+        />
+        <AdminMetricCard
+          label="Under review"
+          value={counts.underReview}
+          icon={Clock}
+          tone={counts.underReview > 0 ? "warning" : "success"}
+        />
+        <AdminMetricCard
+          label="Active total"
+          value={counts.active}
+          icon={Scale}
+          tone={counts.active > 0 ? "info" : "success"}
+        />
       </div>
 
-      <div className="flex items-center gap-3">
+      <AdminFilterBar
+        activeCount={status === "all" ? 0 : 1}
+        resultCount={items.length}
+        resultLabel={items.length === 1 ? "dispute" : "disputes"}
+        onClear={() => setStatus("all")}
+      >
         <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full bg-background sm:w-56">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -184,7 +180,7 @@ export default function DisputesPage() {
             <SelectItem value="RESOLVED_RESTORED">Restored</SelectItem>
           </SelectContent>
         </Select>
-      </div>
+      </AdminFilterBar>
 
       <Card>
         <CardContent className="p-0">
@@ -442,6 +438,6 @@ export default function DisputesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPage>
   )
 }

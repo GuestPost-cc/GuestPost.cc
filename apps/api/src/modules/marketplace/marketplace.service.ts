@@ -3,6 +3,7 @@ import {
   Prisma,
   ServiceAvailability,
   type ServiceType,
+  WebsiteMetricKey,
 } from "@guestpost/database"
 import { computeListingPhase, QUEUES } from "@guestpost/shared"
 import {
@@ -19,6 +20,7 @@ import {
 } from "../../common/utils/marketplace-categories"
 import { slugify } from "../../common/utils/slugify"
 import { QueueService } from "../queues/queue.service"
+import { serializeMarketplaceDomainMetrics } from "../websites/website-metrics.service"
 import {
   AddToSavedListDto,
   CreateListingDto,
@@ -38,6 +40,15 @@ type ListingWriteActor = {
   staffRole?: string | null
 }
 
+const publicWebsiteInclude = {
+  metricsHistory: true,
+  websiteIntegrations: {
+    include: {
+      integration: { select: { provider: true, status: true } },
+    },
+  },
+} satisfies Prisma.WebsiteInclude
+
 // Phase 7: the LISTING_TYPE_TO_SERVICE_TYPE bridge map was removed. Clients
 // now send `services[]` directly; the legacy single-service shape is gone.
 
@@ -47,6 +58,25 @@ export class MarketplaceService {
     private readonly prisma: PrismaService,
     private readonly queue: QueueService,
   ) {}
+
+  private hasVisibleGoogleConnection(website: any, provider: string) {
+    return Boolean(
+      website?.websiteIntegrations?.some(
+        (link: any) =>
+          link.integration?.provider === provider &&
+          link.integration?.status === "ACTIVE" &&
+          ["CONNECTED", "SYNCING", "OUT_OF_SYNC"].includes(link.status) &&
+          link.syncedAt,
+      ),
+    )
+  }
+
+  private projectDomainMetrics(website: any) {
+    const metrics = Array.isArray(website?.metricsHistory)
+      ? website.metricsHistory
+      : []
+    return serializeMarketplaceDomainMetrics(metrics)
+  }
 
   // Strips internal/sensitive fields before a listing leaves a PUBLIC route.
   // The raw row leaked publisher email/tier/org, internal ids, and raw
@@ -96,6 +126,7 @@ export class MarketplaceService {
       new Set(availableServices.map((s: any) => s.serviceType)),
     )
     const gscMetrics =
+      this.hasVisibleGoogleConnection(website, "GOOGLE_SEARCH_CONSOLE") &&
       metricsData &&
       typeof metricsData === "object" &&
       (metricsData as any).source === "GSC"
@@ -105,6 +136,7 @@ export class MarketplaceService {
           }
         : undefined
     const ga4Metrics =
+      this.hasVisibleGoogleConnection(website, "GOOGLE_ANALYTICS") &&
       trafficData &&
       typeof trafficData === "object" &&
       (trafficData as any).source === "GA4"
@@ -129,6 +161,7 @@ export class MarketplaceService {
         gscMetrics || ga4Metrics
           ? { periodDays: 30, gsc: gscMetrics, ga4: ga4Metrics }
           : undefined,
+      domainMetrics: this.projectDomainMetrics(website),
       // Listing-level attribution: PLATFORM-owned listings render as
       // "Listed by GuestPost.cc"; PUBLISHER-owned expose the publisher card.
       ownerType,
@@ -171,7 +204,7 @@ export class MarketplaceService {
   // (autoAccept, internalSlaHours, …) and must never leave the API surface.
   private toPublicListingService(service: any) {
     const { fulfillmentSettings, ...rest } = service
-    return rest
+    return { ...rest, price: Number(rest.price) }
   }
 
   private withCategoryProjection(listing: any) {
@@ -375,7 +408,7 @@ export class MarketplaceService {
       images: { where: { isPrimary: true }, take: 1 },
       reviews: { where: { status: "APPROVED" }, select: { rating: true } },
       publisher: { include: { profile: true } },
-      website: true,
+      website: { include: publicWebsiteInclude },
       // Card view: surface only AVAILABLE services so listing cards can
       // show "from $X" / service chips without leaking paused/waitlist.
       services: {
@@ -635,7 +668,13 @@ export class MarketplaceService {
   // Staff preview — fetch a listing by slug in ANY status (pending/draft/
   // rejected/paused/archived) for moderation. No public status gate, no view
   // tracking. Authorization is enforced by the StaffRoles guard on the route.
-  async getListingForStaff(slug: string) {
+  async getListingForStaff(
+    slug: string,
+    user: {
+      id: string
+      staffRole: "SUPER_ADMIN" | "OPERATIONS" | "FINANCE"
+    },
+  ) {
     const listing = await this.prisma.marketplaceListing.findUnique({
       where: { slug },
       include: {
@@ -648,14 +687,144 @@ export class MarketplaceService {
           take: 10,
         },
         publisher: { include: { profile: true } },
-        website: true,
+        organization: { select: { id: true, name: true } },
+        website: {
+          include: {
+            ...publicWebsiteInclude,
+            managedBy: { select: { id: true, name: true, email: true } },
+          },
+        },
         // Staff sees ALL services regardless of availability, so reviewers
         // can spot paused/waitlist rows and judge the listing holistically.
         services: { orderBy: [{ availability: "asc" }, { price: "asc" }] },
       },
     })
     if (!listing) throw new NotFoundException("Listing not found")
-    return { ...this.withCategoryProjection(listing), relatedListings: [] }
+    const categories = listing.categories.map((link) => link.category)
+    const availableServices = listing.services.filter(
+      (service) => service.availability === "AVAILABLE",
+    )
+    const isSuperAdmin = user.staffRole === "SUPER_ADMIN"
+    const canModerate = user.staffRole !== "FINANCE"
+    const website = listing.website
+    const canManageServices =
+      isSuperAdmin ||
+      (user.staffRole === "OPERATIONS" &&
+        listing.ownerType === "PLATFORM" &&
+        website?.managedByUserId === user.id)
+
+    return {
+      id: listing.id,
+      title: listing.title,
+      slug: listing.slug,
+      description: listing.description,
+      shortDescription: listing.shortDescription,
+      status: listing.status,
+      ownerType: listing.ownerType,
+      fulfillmentType: listing.fulfillmentType,
+      currency: listing.currency,
+      priceFrom:
+        availableServices.length > 0
+          ? Math.min(
+              ...availableServices.map((service) => Number(service.price)),
+            )
+          : null,
+      serviceTypes: Array.from(
+        new Set(availableServices.map((service) => service.serviceType)),
+      ),
+      featured: listing.featured,
+      verified: listing.verified,
+      country: listing.country,
+      language: listing.language,
+      websiteUrl: listing.websiteUrl,
+      sampleUrl: listing.sampleUrl,
+      sportsGamingAllowed: listing.sportsGamingAllowed,
+      pharmacyAllowed: listing.pharmacyAllowed,
+      cryptoAllowed: listing.cryptoAllowed,
+      backlinkCount: listing.backlinkCount,
+      linkType: listing.linkType,
+      linkValidity: listing.linkValidity,
+      googleNews: listing.googleNews,
+      markedSponsored: listing.markedSponsored,
+      foreignLanguageAllowed: listing.foreignLanguageAllowed,
+      categories,
+      category: categories[0] ?? null,
+      tags: listing.tags.map((link) => link.tag),
+      images: listing.images.map((image) => ({
+        url: image.url,
+        isPrimary: image.isPrimary,
+      })),
+      domainMetrics: this.projectDomainMetrics(website),
+      publisher:
+        listing.ownerType === "PLATFORM" || !listing.publisher
+          ? null
+          : {
+              id: listing.publisher.id,
+              name: listing.publisher.name,
+              tier: listing.publisher.tier,
+              ...(isSuperAdmin && { email: listing.publisher.email }),
+              profile: listing.publisher.profile
+                ? {
+                    rating: listing.publisher.profile.rating,
+                    totalReviews: listing.publisher.profile.totalReviews,
+                    responseTime: listing.publisher.profile.responseTime,
+                    completionRate: listing.publisher.profile.completionRate,
+                    trustScore: listing.publisher.profile.trustScore,
+                  }
+                : null,
+            },
+      organization: listing.organization,
+      website: website
+        ? {
+            id: website.id,
+            url: website.url,
+            domain: website.domain,
+            ownershipType: website.ownershipType,
+            verificationStatus: website.verificationStatus,
+            verifiedAt: website.verifiedAt,
+            managedBy:
+              user.staffRole === "FINANCE" || !website.managedBy
+                ? null
+                : {
+                    id: website.managedBy.id,
+                    name: website.managedBy.name,
+                    ...(isSuperAdmin && { email: website.managedBy.email }),
+                  },
+            integrations: website.websiteIntegrations
+              .filter((link) =>
+                ["GOOGLE_SEARCH_CONSOLE", "GOOGLE_ANALYTICS"].includes(
+                  link.integration.provider,
+                ),
+              )
+              .map((link) => ({
+                provider: link.integration.provider,
+                status: link.status,
+                integrationStatus: link.integration.status,
+                syncedAt: link.syncedAt,
+              })),
+          }
+        : null,
+      services: listing.services.map((service) =>
+        this.toPublicListingService(service),
+      ),
+      reviews: listing.reviews.map((review) => ({
+        id: review.id,
+        rating: review.rating,
+        title: review.title,
+        content: review.content,
+        createdAt: review.createdAt,
+        user: { name: review.user.name, image: review.user.image },
+      })),
+      reviewCount: listing.reviews.length,
+      createdAt: listing.createdAt,
+      updatedAt: listing.updatedAt,
+      access: {
+        role: user.staffRole,
+        canModerate,
+        canManageGlobalFlags: isSuperAdmin,
+        canManageServices,
+      },
+    }
   }
 
   async getListing(slug: string, userId?: string) {
@@ -672,7 +841,7 @@ export class MarketplaceService {
           take: 10,
         },
         publisher: { include: { profile: true } },
-        website: true,
+        website: { include: publicWebsiteInclude },
         // Detail page surfaces AVAILABLE + WAITLIST (so buyers can register
         // interest via the favorite-with-serviceType waitlist path) but never
         // PAUSED (publisher temporarily took it offline).
@@ -749,7 +918,7 @@ export class MarketplaceService {
           select: { rating: true },
         },
         publisher: { include: { profile: true } },
-        website: true,
+        website: { include: publicWebsiteInclude },
         services: {
           where: { availability: "AVAILABLE" },
           orderBy: { price: "asc" },
@@ -1425,6 +1594,28 @@ export class MarketplaceService {
           "Add a buyer-facing listing description of no more than 500 characters before submitting.",
       })
     }
+    const manualMetrics = await this.prisma.websiteMetric.findMany({
+      where: {
+        websiteId: listing.websiteId!,
+        key: {
+          in: [
+            WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+            WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
+          ],
+        },
+        source: { in: ["PUBLISHER_MANUAL", "ADMIN_IMPORT"] },
+        status: "CURRENT",
+        measuredAt: { gte: new Date(Date.now() - 90 * 86_400_000) },
+      },
+      select: { key: true },
+    })
+    if (new Set(manualMetrics.map((metric) => metric.key)).size < 2) {
+      throw new BadRequestException({
+        code: "MANUAL_METRICS_REQUIRED",
+        message:
+          "Add current Ahrefs organic traffic and Moz Domain Authority before submitting.",
+      })
+    }
 
     const res = await this.prisma.marketplaceListing.updateMany({
       where: {
@@ -1710,13 +1901,19 @@ export class MarketplaceService {
 
   async getFavorites(userId: string) {
     const favorites = await this.prisma.marketplaceFavorite.findMany({
-      where: { userId },
+      where: { userId, listing: { status: ListingStatus.APPROVED } },
       include: {
         listing: {
           include: {
             categories: { include: { category: true } },
             images: { where: { isPrimary: true }, take: 1 },
             tags: { include: { tag: true } },
+            reviews: {
+              where: { status: "APPROVED" },
+              select: { rating: true },
+            },
+            publisher: { include: { profile: true } },
+            website: { include: publicWebsiteInclude },
             // Phase 7.12 (#20): include services so the favorites page can
             // compute price-from-services. The listing-level `price` column
             // was dropped in Phase 7; without `services` the page falls
@@ -1743,7 +1940,19 @@ export class MarketplaceService {
     })
     return favorites.map((favorite) => ({
       ...favorite,
-      listing: this.withCategoryProjection(favorite.listing),
+      listing: this.toPublicListing({
+        ...favorite.listing,
+        tags: favorite.listing.tags.map((item) => item.tag),
+        image: favorite.listing.images[0]?.url ?? null,
+        reviewCount: favorite.listing.reviews.length,
+        avgRating:
+          favorite.listing.reviews.length > 0
+            ? favorite.listing.reviews.reduce(
+                (sum, review) => sum + review.rating,
+                0,
+              ) / favorite.listing.reviews.length
+            : null,
+      }),
     }))
   }
 
@@ -1991,6 +2200,12 @@ export class MarketplaceService {
             verifiedAt: true,
             domain: true,
             url: true,
+            metricsHistory: true,
+            websiteIntegrations: {
+              include: {
+                integration: { select: { provider: true, status: true } },
+              },
+            },
           },
         },
         services: {

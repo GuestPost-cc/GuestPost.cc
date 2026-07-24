@@ -1,5 +1,7 @@
 import {
   CancellationRequestStatus,
+  FulfillmentChannel,
+  OrderStatus,
   SettlementStatus,
   WithdrawalStatus,
 } from "@guestpost/database"
@@ -18,8 +20,11 @@ import {
   Query,
   Req,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from "@nestjs/common"
+import { FileInterceptor } from "@nestjs/platform-express"
 import { Request, Response } from "express"
 import { CurrentUser } from "../../common/decorators/current-user.decorator"
 import { Permissions } from "../../common/decorators/permissions.decorator"
@@ -55,12 +60,15 @@ import { AdminService } from "./admin.service"
 import { CommandCenterService } from "./command-center.service"
 import {
   BulkRetryVerificationDto,
+  CommitWebsiteImportDto,
   CreateStaffDto,
   ExecuteWithdrawalDto,
+  ForceVerifyWebsitesDto,
   ManualVerifyDto,
   MarkPlatformPublishedDto,
   MarkVerifiedDto,
   PauseWebsiteDto,
+  PreviewWebsiteImportDto,
   ReassignWebsiteDto,
   RejectVerificationDto,
   RequestReverifyDto,
@@ -89,6 +97,8 @@ import { FinanceWorkbenchService } from "./finance-workbench.service"
 import { OperationsWorkbenchService } from "./operations-workbench.service"
 import { ReconciliationService } from "./reconciliation.service"
 import { AdminVerificationQueueService } from "./verification-queue.service"
+import { websiteImportTemplateCsv } from "./website-import/csv-parser"
+import { WebsiteImportService } from "./website-import/website-import.service"
 import { WebsiteVerificationService } from "./website-verification.service"
 
 // Build the staff actor from the authenticated user. The matrix lives in
@@ -175,6 +185,7 @@ export class AdminController {
     private readonly commandCenter: CommandCenterService,
     private readonly financeWorkbench: FinanceWorkbenchService,
     private readonly operationsWorkbench: OperationsWorkbenchService,
+    private readonly websiteImport: WebsiteImportService,
   ) {}
 
   @Get("command-center")
@@ -391,10 +402,44 @@ export class AdminController {
   listOrders(
     @Query("take") take?: string,
     @Query("skip") skip?: string,
+    @Query("search") search?: string,
+    @Query("status") status?: string,
+    @Query("channel") channel?: string,
+    @Query("focus") focus?: string,
     @CurrentUser() user?: any,
   ) {
     const { take: t, skip: s } = parsePagination(take, skip)
-    return this.admin.listOrders(t, s, user)
+    const normalizedSearch = search?.trim()
+    if (normalizedSearch && normalizedSearch.length > 200) {
+      throw new BadRequestException(
+        "Order search must be 200 characters or less",
+      )
+    }
+    if (status && !Object.values(OrderStatus).includes(status as OrderStatus)) {
+      throw new BadRequestException("Invalid order status")
+    }
+    if (
+      channel &&
+      !Object.values(FulfillmentChannel).includes(channel as FulfillmentChannel)
+    ) {
+      throw new BadRequestException("Invalid fulfillment channel")
+    }
+    const allowedFocus = ["all", "attention", "active", "completed"] as const
+    if (
+      focus &&
+      !allowedFocus.includes(focus as (typeof allowedFocus)[number])
+    ) {
+      throw new BadRequestException("Invalid order focus")
+    }
+    return this.admin.listOrders({
+      take: t,
+      skip: s,
+      search: normalizedSearch,
+      status: status as OrderStatus | undefined,
+      channel: channel as FulfillmentChannel | undefined,
+      focus: focus as (typeof allowedFocus)[number] | undefined,
+      user,
+    })
   }
 
   @Get("orders/:id")
@@ -1035,7 +1080,7 @@ export class AdminController {
   }
 
   @Get("marketplace/listings")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   listMarketplaceListings(
     @Query("status") status?: string,
     @Query("type") type?: string,
@@ -1043,6 +1088,7 @@ export class AdminController {
     @Query("ownerType") ownerType?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @CurrentUser() user?: any,
   ) {
     return this.admin.listMarketplaceListings({
       status,
@@ -1051,20 +1097,21 @@ export class AdminController {
       ownerType,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
+      user,
     })
   }
 
   @Get("marketplace/stats")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
   getMarketplaceStats() {
     return this.admin.getMarketplaceStats()
   }
 
   // Staff listing preview — any status (for moderation of pending/draft/etc).
   @Get("marketplace/listings/by-slug/:slug")
-  @StaffRoles("SUPER_ADMIN", "OPERATIONS")
-  getListingForStaff(@Param("slug") slug: string) {
-    return this.marketplace.getListingForStaff(slug)
+  @StaffRoles("SUPER_ADMIN", "OPERATIONS", "FINANCE")
+  getListingForStaff(@Param("slug") slug: string, @CurrentUser() user: any) {
+    return this.marketplace.getListingForStaff(slug, user)
   }
 
   // Platform service inventory may be maintained by the assigned Operations
@@ -1152,6 +1199,73 @@ export class AdminController {
   }
 
   // ─── WEBSITE MANAGEMENT ────────────────────────────
+
+  @StaffRoles("SUPER_ADMIN")
+  @Get("websites/import/template")
+  downloadWebsiteImportTemplate(@Res() res: Response) {
+    res.setHeader("Content-Type", "text/csv; charset=utf-8")
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="publisher-websites-template.csv"',
+    )
+    res.setHeader("Cache-Control", "no-store")
+    res.send(websiteImportTemplateCsv())
+  }
+
+  @StaffRoles("SUPER_ADMIN")
+  @Post("websites/import/preview")
+  @UseInterceptors(
+    FileInterceptor("file", {
+      limits: { fileSize: 2 * 1024 * 1024, files: 1 },
+    }),
+  )
+  previewWebsiteImport(
+    @UploadedFile()
+    file: {
+      originalname?: string
+      buffer?: Buffer
+      size?: number
+      mimetype?: string
+    },
+    @Body() body: PreviewWebsiteImportDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.websiteImport.preview(file, body.publisherId, user)
+  }
+
+  @StaffRoles("SUPER_ADMIN")
+  @Post("websites/import/:batchId/commit")
+  commitWebsiteImport(
+    @Param("batchId") batchId: string,
+    @Body() body: CommitWebsiteImportDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.websiteImport.commit(batchId, body.idempotencyKey, user)
+  }
+
+  @StaffRoles("SUPER_ADMIN")
+  @Get("websites/import/:batchId")
+  getWebsiteImport(
+    @Param("batchId") batchId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.websiteImport.getBatch(batchId, user)
+  }
+
+  @StaffRoles("SUPER_ADMIN")
+  @Get("websites/imports/history")
+  listWebsiteImports(@CurrentUser() user: any) {
+    return this.websiteImport.listBatches(user)
+  }
+
+  @StaffRoles("SUPER_ADMIN")
+  @Post("websites/force-verify")
+  forceVerifyWebsites(
+    @Body() body: ForceVerifyWebsitesDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.websiteVerification.forceVerifyWebsites(body, user)
+  }
 
   @StaffRoles("SUPER_ADMIN", "OPERATIONS")
   @Post("websites")

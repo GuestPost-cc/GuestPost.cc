@@ -1,11 +1,23 @@
 import { hashPassword } from "@better-auth/utils/password"
 import {
+  FulfillmentChannel,
   ListingStatus,
+  OrderStatus,
   type Prisma,
+  WebsiteMetricKey,
+  WebsiteMetricProvider,
+  WebsiteMetricSource,
   WebsiteOwnershipType,
   WebsiteVerificationStatus,
 } from "@guestpost/database"
-import { StaffRole, validateWebsiteEnlistmentInput } from "@guestpost/shared"
+import {
+  getOrderLifecycleStage,
+  getOrderLifecycleStageIndex,
+  isOrderLifecycleException,
+  QUEUES,
+  StaffRole,
+  validateWebsiteEnlistmentInput,
+} from "@guestpost/shared"
 import {
   BadRequestException,
   ConflictException,
@@ -23,6 +35,13 @@ import {
 } from "../../common/utils/marketplace-categories"
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
+import {
+  assertManualMetricValues,
+  assertMeasurementDate,
+  manualMetricExpiry,
+  serializeMarketplaceDomainMetrics,
+  upsertWebsiteMetric,
+} from "../websites/website-metrics.service"
 
 const VALID_STAFF_ROLES: StaffRole[] = ["SUPER_ADMIN", "OPERATIONS", "FINANCE"]
 
@@ -39,6 +58,253 @@ interface SuspendUserInput {
   reasonCode: SuspensionReason
   internalNote: string
   expiresAt?: string
+}
+
+type AdminOrderFocus = "all" | "attention" | "active" | "completed"
+
+interface AdminOrderListParams {
+  take?: number
+  skip?: number
+  search?: string
+  status?: OrderStatus
+  channel?: FulfillmentChannel
+  focus?: AdminOrderFocus
+  user?: { id: string; staffRole: StaffRole }
+}
+
+type IntegrityCheckStatus = "PASS" | "WARN" | "FAIL" | "NOT_APPLICABLE"
+
+function buildOrderIntegrityReport(
+  order: any,
+  activeAssignment: any,
+  platformChannel: boolean,
+) {
+  const checks: Array<{
+    key: string
+    label: string
+    status: IntegrityCheckStatus
+    message: string
+  }> = []
+  const exception = isOrderLifecycleException(order.status)
+  const expectedChannel = order.website?.ownershipType ?? null
+  const actualChannel =
+    order.fulfillmentChannel ?? order.website?.ownershipType ?? null
+
+  checks.push(
+    !order.website
+      ? {
+          key: "ROUTING",
+          label: "Fulfillment routing",
+          status: "WARN",
+          message: "The order has no website context to verify its route.",
+        }
+      : expectedChannel && actualChannel !== expectedChannel
+        ? {
+            key: "ROUTING",
+            label: "Fulfillment routing",
+            status: "FAIL",
+            message:
+              "The stored fulfillment channel conflicts with website ownership.",
+          }
+        : {
+            key: "ROUTING",
+            label: "Fulfillment routing",
+            status: "PASS",
+            message: "Fulfillment channel and website ownership agree.",
+          },
+  )
+
+  const claimableStatuses: string[] = [
+    "SUBMITTED",
+    "ACCEPTED",
+    "CONTENT_REQUESTED",
+    "CONTENT_CREATION",
+    "CONTENT_READY",
+    "CUSTOMER_REVIEW",
+    "APPROVED",
+  ]
+  checks.push(
+    !platformChannel
+      ? {
+          key: "ASSIGNMENT",
+          label: "Operations assignment",
+          status: "NOT_APPLICABLE",
+          message: "Publisher fulfillment does not require an Ops assignment.",
+        }
+      : exception || !claimableStatuses.includes(order.status)
+        ? {
+            key: "ASSIGNMENT",
+            label: "Operations assignment",
+            status: "NOT_APPLICABLE",
+            message:
+              "No active Operations assignment is required at this stage.",
+          }
+        : activeAssignment
+          ? {
+              key: "ASSIGNMENT",
+              label: "Operations assignment",
+              status: "PASS",
+              message: "An active fulfillment assignment is recorded.",
+            }
+          : {
+              key: "ASSIGNMENT",
+              label: "Operations assignment",
+              status: "WARN",
+              message:
+                "This platform order is still available in the shared queue.",
+            },
+  )
+
+  const deliveryRequired = [
+    "PUBLISHED",
+    "VERIFIED",
+    "DELIVERED",
+    "SETTLED",
+    "COMPLETED",
+  ].includes(order.status)
+  checks.push(
+    exception || !deliveryRequired
+      ? {
+          key: "DELIVERY",
+          label: "Delivery evidence",
+          status: "NOT_APPLICABLE",
+          message: "Delivery evidence is not required at this lifecycle stage.",
+        }
+      : !order.activeDeliveryVersion?.publishedUrl
+        ? {
+            key: "DELIVERY",
+            label: "Delivery evidence",
+            status: "FAIL",
+            message: "The order stage requires an active published URL.",
+          }
+        : ["FAILED", "MANUAL_REVIEW"].includes(
+              order.activeDeliveryVersion.verificationStatus,
+            )
+          ? {
+              key: "DELIVERY",
+              label: "Delivery evidence",
+              status: "WARN",
+              message:
+                "Delivery evidence exists but verification needs review.",
+            }
+          : {
+              key: "DELIVERY",
+              label: "Delivery evidence",
+              status: "PASS",
+              message:
+                "The active delivery has a published URL and evidence state.",
+            },
+  )
+
+  const financiallyFinal = ["DELIVERED", "SETTLED", "COMPLETED"].includes(
+    order.status,
+  )
+  const latestSettlement = order.settlements?.[0]
+  checks.push(
+    exception || !financiallyFinal
+      ? {
+          key: "FINANCIAL_RECORD",
+          label: "Financial record",
+          status: "NOT_APPLICABLE",
+          message: "A final financial record is not required at this stage.",
+        }
+      : platformChannel
+        ? order.platformRevenue
+          ? {
+              key: "FINANCIAL_RECORD",
+              label: "Financial record",
+              status: "PASS",
+              message: "Platform revenue was recorded for the completed route.",
+            }
+          : {
+              key: "FINANCIAL_RECORD",
+              label: "Financial record",
+              status: "FAIL",
+              message:
+                "The final platform route is missing its revenue record.",
+            }
+        : latestSettlement
+          ? {
+              key: "FINANCIAL_RECORD",
+              label: "Financial record",
+              status: "PASS",
+              message: "A publisher settlement record is linked to this order.",
+            }
+          : {
+              key: "FINANCIAL_RECORD",
+              label: "Financial record",
+              status: "FAIL",
+              message:
+                "The final publisher route is missing its settlement record.",
+            },
+  )
+
+  const latestEvent = order.events?.[0]
+  const eventPredatesOrder =
+    latestEvent &&
+    new Date(latestEvent.createdAt).getTime() <
+      new Date(order.createdAt).getTime()
+  checks.push(
+    !latestEvent
+      ? {
+          key: "EVENT_CHAIN",
+          label: "Lifecycle audit trail",
+          status: "FAIL",
+          message: "No lifecycle event is recorded for this order.",
+        }
+      : eventPredatesOrder
+        ? {
+            key: "EVENT_CHAIN",
+            label: "Lifecycle audit trail",
+            status: "WARN",
+            message: "The latest event timestamp predates the order record.",
+          }
+        : {
+            key: "EVENT_CHAIN",
+            label: "Lifecycle audit trail",
+            status: "PASS",
+            message: `${order.events.length} lifecycle event${order.events.length === 1 ? "" : "s"} recorded.`,
+          },
+  )
+
+  const activeHold = order.dispute
+    ? "An active dispute pauses normal progression."
+    : order.cancellationRequests?.[0]
+      ? "An active cancellation request pauses normal progression."
+      : null
+  checks.push(
+    activeHold
+      ? {
+          key: "ACTIVE_HOLD",
+          label: "Exception hold",
+          status: "WARN",
+          message: activeHold,
+        }
+      : {
+          key: "ACTIVE_HOLD",
+          label: "Exception hold",
+          status: "PASS",
+          message: "No active dispute or cancellation hold is recorded.",
+        },
+  )
+
+  const state = checks.some((check) => check.status === "FAIL")
+    ? "BLOCKED"
+    : checks.some((check) => check.status === "WARN")
+      ? "ATTENTION"
+      : "HEALTHY"
+  const stage = getOrderLifecycleStage(order.status)
+
+  return {
+    state,
+    checks,
+    lifecycle: {
+      stageKey: stage?.key ?? null,
+      stageLabel: stage?.label ?? null,
+      stageIndex: getOrderLifecycleStageIndex(order.status),
+      isException: exception,
+    },
+  }
 }
 
 @Injectable()
@@ -899,46 +1165,317 @@ export class AdminService {
     }
   }
 
-  async listOrders(take = 50, skip = 0, user?: any) {
+  private adminOrderAttentionScope(
+    role: StaffRole = "SUPER_ADMIN",
+  ): Prisma.OrderWhereInput {
+    const operational: Prisma.OrderWhereInput[] = [
+      {
+        dispute: {
+          is: { status: { in: ["OPEN", "UNDER_REVIEW"] } },
+        },
+      },
+      {
+        cancellationRequests: {
+          some: {
+            status: {
+              in: ["REQUESTED", "UNDER_REVIEW", "ESCALATED", "DISPUTED"],
+            },
+          },
+        },
+      },
+      {
+        activeDeliveryVersion: {
+          is: { verificationStatus: { in: ["FAILED", "MANUAL_REVIEW"] } },
+        },
+      },
+      {
+        fulfillmentDueAt: { lt: new Date() },
+        status: {
+          notIn: ["SETTLED", "COMPLETED", "CANCELLED", "REFUNDED"],
+        },
+      },
+    ]
+    const financial: Prisma.OrderWhereInput[] = [
+      {
+        settlements: {
+          some: {
+            status: {
+              in: ["PENDING", "UNDER_REVIEW", "CUSTOMER_APPROVED"],
+            },
+          },
+        },
+      },
+      {
+        cancellationRequests: {
+          some: { status: { in: ["PENDING_FINANCE", "ESCALATED"] } },
+        },
+      },
+      {
+        dispute: {
+          is: { status: { in: ["OPEN", "UNDER_REVIEW"] } },
+        },
+      },
+    ]
+
+    return {
+      OR:
+        role === "OPERATIONS"
+          ? operational
+          : role === "FINANCE"
+            ? financial
+            : [...operational, ...financial],
+    }
+  }
+
+  private adminOrderFocusScope(
+    focus: AdminOrderFocus,
+    role: StaffRole,
+  ): Prisma.OrderWhereInput | null {
+    if (focus === "attention") return this.adminOrderAttentionScope(role)
+    if (focus === "active") {
+      return {
+        status: {
+          notIn: ["SETTLED", "COMPLETED", "CANCELLED", "REFUNDED"],
+        },
+      }
+    }
+    if (focus === "completed") {
+      return {
+        status: { in: ["SETTLED", "COMPLETED", "CANCELLED", "REFUNDED"] },
+      }
+    }
+    return null
+  }
+
+  async listOrders(params: AdminOrderListParams = {}) {
     // Phase 6.7 — explicit projection. The previous `include: { website: true }`
     // leaked Website.verificationToken (the DNS-TXT verification secret) to
     // every Finance/Ops staffer. Customer is also narrowed (no banReason,
     // no emailVerified internal field). Org excludes the opaque `settings`
     // JSON. None of these are required for refund / dispute / fulfillment
     // investigations — they exist on the Order row directly via FKs.
-    const isOperations = user?.staffRole === "OPERATIONS"
+    const {
+      take = 20,
+      skip = 0,
+      search,
+      status,
+      channel,
+      focus = "all",
+      user,
+    } = params
+    const role = user?.staffRole ?? "SUPER_ADMIN"
+    const isSuperAdmin = role === "SUPER_ADMIN"
+    const canViewFinancials = role !== "OPERATIONS"
+    const baseScope: Prisma.OrderWhereInput =
+      role === "OPERATIONS" ? this.operationsOrderScope(user!.id) : {}
+    const filters: Prisma.OrderWhereInput[] = [baseScope]
+    const normalizedSearch = search?.trim()
 
-    return this.prisma.order.findMany({
-      where: isOperations ? this.operationsOrderScope(user.id) : undefined,
-      orderBy: { createdAt: "desc" },
+    if (normalizedSearch) {
+      const visibleSearchFields: Prisma.OrderWhereInput[] = [
+        { id: { contains: normalizedSearch, mode: "insensitive" } },
+        { title: { contains: normalizedSearch, mode: "insensitive" } },
+        {
+          customer: {
+            is: {
+              name: { contains: normalizedSearch, mode: "insensitive" },
+            },
+          },
+        },
+        {
+          organization: {
+            is: {
+              name: { contains: normalizedSearch, mode: "insensitive" },
+            },
+          },
+        },
+        {
+          website: {
+            is: {
+              OR: [
+                { url: { contains: normalizedSearch, mode: "insensitive" } },
+                { name: { contains: normalizedSearch, mode: "insensitive" } },
+              ],
+            },
+          },
+        },
+      ]
+      if (isSuperAdmin) {
+        visibleSearchFields.push({
+          customer: {
+            is: {
+              email: { contains: normalizedSearch, mode: "insensitive" },
+            },
+          },
+        })
+      }
+      filters.push({ OR: visibleSearchFields })
+    }
+
+    if (status) filters.push({ status })
+    if (channel) {
+      filters.push({
+        OR: [
+          { fulfillmentChannel: channel },
+          {
+            fulfillmentChannel: null,
+            website: {
+              is: {
+                ownershipType:
+                  channel === "PLATFORM" ? "PLATFORM" : "PUBLISHER",
+              },
+            },
+          },
+        ],
+      })
+    }
+    const focusScope = this.adminOrderFocusScope(focus, role)
+    if (focusScope) filters.push(focusScope)
+
+    const where: Prisma.OrderWhereInput = { AND: filters }
+    const activeScope = this.adminOrderFocusScope("active", role)!
+    const completedScope = this.adminOrderFocusScope("completed", role)!
+    const attentionScope = this.adminOrderAttentionScope(role)
+
+    const [orders, total, scopedTotal, attention, active, completed] =
+      await Promise.all([
+        this.prisma.order.findMany({
+          where,
+          orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+          take,
+          skip,
+          select: {
+            id: true,
+            version: true,
+            type: true,
+            title: true,
+            status: true,
+            paymentStatus: true,
+            amount: true,
+            currency: true,
+            fulfillmentChannel: true,
+            fulfillmentDueAt: true,
+            autoAcceptAt: true,
+            createdAt: true,
+            updatedAt: true,
+            organization: { select: { id: true, name: true } },
+            customer: {
+              select: {
+                id: true,
+                name: true,
+                ...(isSuperAdmin && { email: true }),
+              },
+            },
+            website: {
+              select: {
+                id: true,
+                url: true,
+                name: true,
+                ownershipType: true,
+                verificationStatus: true,
+                publisher: { select: { id: true, name: true } },
+                managedBy: { select: { id: true, name: true } },
+              },
+            },
+            activeDeliveryVersion: {
+              select: { verificationStatus: true },
+            },
+            fulfillmentAssignments: {
+              where: { status: { in: ["ASSIGNED", "IN_PROGRESS"] } },
+              orderBy: { assignedAt: "desc" },
+              take: 1,
+              select: { assignedToUserId: true, status: true },
+            },
+            dispute: { select: { id: true, status: true } },
+            cancellationRequests: {
+              where: {
+                status: {
+                  in: [
+                    "REQUESTED",
+                    "UNDER_REVIEW",
+                    "PENDING_FINANCE",
+                    "ESCALATED",
+                    "DISPUTED",
+                  ],
+                },
+              },
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { id: true, status: true },
+            },
+            settlements: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { id: true, status: true, reviewEndsAt: true },
+            },
+          },
+        }),
+        this.prisma.order.count({ where }),
+        this.prisma.order.count({ where: baseScope }),
+        this.prisma.order.count({
+          where: { AND: [baseScope, attentionScope] },
+        }),
+        this.prisma.order.count({ where: { AND: [baseScope, activeScope] } }),
+        this.prisma.order.count({
+          where: { AND: [baseScope, completedScope] },
+        }),
+      ])
+
+    return {
+      items: orders.map((order) => {
+        const assignment = order.fulfillmentAssignments[0]
+        return {
+          id: order.id,
+          version: order.version,
+          type: order.type,
+          title: order.title,
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          amount: order.amount,
+          currency: order.currency,
+          fulfillmentChannel: order.fulfillmentChannel,
+          fulfillmentDueAt: order.fulfillmentDueAt,
+          autoAcceptAt: order.autoAcceptAt,
+          createdAt: order.createdAt,
+          updatedAt: order.updatedAt,
+          organization: order.organization
+            ? { id: order.organization.id, name: order.organization.name }
+            : null,
+          customer: order.customer
+            ? {
+                id: order.customer.id,
+                name: order.customer.name,
+                ...(isSuperAdmin && { email: order.customer.email }),
+              }
+            : null,
+          website: order.website
+            ? {
+                id: order.website.id,
+                url: order.website.url,
+                name: order.website.name,
+                ownershipType: order.website.ownershipType,
+                verificationStatus: order.website.verificationStatus,
+                publisher: order.website.publisher,
+                managedBy: order.website.managedBy,
+              }
+            : null,
+          activeDelivery: order.activeDeliveryVersion,
+          activeAssignment: assignment
+            ? {
+                status: assignment.status,
+                assignedToCurrentUser: assignment.assignedToUserId === user?.id,
+              }
+            : null,
+          dispute: order.dispute,
+          cancellation: order.cancellationRequests[0] ?? null,
+          settlement: canViewFinancials ? (order.settlements[0] ?? null) : null,
+        }
+      }),
+      total,
       take,
       skip,
-      include: {
-        organization: {
-          select: {
-            id: true,
-            name: true,
-            ...(!isOperations && { slug: true }),
-          },
-        },
-        customer: {
-          select: {
-            id: true,
-            name: true,
-            ...(!isOperations && { email: true, userType: true }),
-          },
-        },
-        website: {
-          select: {
-            id: true,
-            url: true,
-            name: true,
-            ownershipType: true,
-            verificationStatus: true,
-          },
-        },
-      },
-    })
+      summary: { total: scopedTotal, attention, active, completed },
+    }
   }
 
   async getOrder(id: string, user?: any) {
@@ -994,6 +1531,22 @@ export class AdminService {
           },
         },
         dispute: true,
+        cancellationRequests: {
+          where: {
+            status: {
+              in: [
+                "REQUESTED",
+                "UNDER_REVIEW",
+                "PENDING_FINANCE",
+                "ESCALATED",
+                "DISPUTED",
+              ],
+            },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, status: true },
+        },
         contentOrder: true,
         revisions: true,
         platformRevenue: true,
@@ -1009,92 +1562,233 @@ export class AdminService {
       },
     })
     if (!order) throw new NotFoundException(`Order ${id} not found`)
-
-    if (user?.staffRole === "OPERATIONS") {
-      return {
-        ...order,
-        organization: order.organization
-          ? { id: order.organization.id, name: order.organization.name }
-          : null,
-        customer: order.customer
-          ? { id: order.customer.id, name: order.customer.name }
-          : null,
-        website: order.website
-          ? {
-              id: order.website.id,
-              url: order.website.url,
-              name: order.website.name,
-              ownershipType: order.website.ownershipType,
-              verificationStatus: order.website.verificationStatus,
-              publisher: order.website.publisher
-                ? {
-                    id: order.website.publisher.id,
-                    name: order.website.publisher.name,
-                  }
-                : null,
-              managedBy: order.website.managedBy
-                ? {
-                    id: order.website.managedBy.id,
-                    name: order.website.managedBy.name,
-                  }
-                : null,
-            }
-          : null,
-        items: order.items.map((item) => ({
-          ...item,
-          website: item.website
-            ? { id: item.website.id, url: item.website.url }
-            : null,
-        })),
-        events: order.events.map((event) => ({
-          id: event.id,
-          eventType: event.eventType,
-          actorId: event.actorId,
-          message: event.message,
-          createdAt: event.createdAt,
-        })),
-        activeDeliveryVersion: order.activeDeliveryVersion
-          ? {
-              ...order.activeDeliveryVersion,
-              adminVerifiedBy: order.activeDeliveryVersion.adminVerifiedBy
-                ? {
-                    id: order.activeDeliveryVersion.adminVerifiedBy.id,
-                    name: order.activeDeliveryVersion.adminVerifiedBy.name,
-                  }
-                : null,
-            }
-          : null,
-        settlements: [],
-        platformRevenue: null,
-      }
-    }
+    const role: StaffRole = user?.staffRole ?? "SUPER_ADMIN"
+    const isSuperAdmin = role === "SUPER_ADMIN"
+    const canViewFinancials = role !== "OPERATIONS"
 
     const approverIds = [
       ...new Set(
-        order.settlements.flatMap((settlement) =>
+        (order.settlements ?? []).flatMap((settlement) =>
           settlement.approvals
             .map((approval) => approval.approvedBy)
             .filter((approvedBy) => !approvedBy.startsWith("SYSTEM_")),
         ),
       ),
     ]
-    const approvers = approverIds.length
-      ? await this.prisma.user.findMany({
-          where: { id: { in: approverIds } },
-          select: { id: true, name: true, email: true },
-        })
-      : []
+    const approvers =
+      canViewFinancials && approverIds.length
+        ? await this.prisma.user.findMany({
+            where: { id: { in: approverIds } },
+            select: {
+              id: true,
+              name: true,
+              ...(isSuperAdmin && { email: true }),
+            },
+          })
+        : []
     const approverById = new Map(approvers.map((user) => [user.id, user]))
+    const activeAssignment = (order.fulfillmentAssignments ?? []).find(
+      (assignment) =>
+        assignment.status === "ASSIGNED" || assignment.status === "IN_PROGRESS",
+    )
+    const platformChannel =
+      order.fulfillmentChannel === "PLATFORM" ||
+      (order.fulfillmentChannel == null &&
+        order.website?.ownershipType === "PLATFORM")
+    const claimableStatuses = [
+      "SUBMITTED",
+      "ACCEPTED",
+      "CONTENT_REQUESTED",
+      "CONTENT_CREATION",
+      "CONTENT_READY",
+      "CUSTOMER_REVIEW",
+      "APPROVED",
+    ]
+    const operationsCanWork =
+      role === "OPERATIONS" &&
+      platformChannel &&
+      (activeAssignment?.assignedToUserId === user?.id ||
+        (!activeAssignment && claimableStatuses.includes(order.status)))
+    const integrity = buildOrderIntegrityReport(
+      order,
+      activeAssignment,
+      platformChannel,
+    )
 
     return {
-      ...order,
-      settlements: order.settlements.map((settlement) => ({
-        ...settlement,
-        approvals: settlement.approvals.map((approval) => ({
-          ...approval,
-          approvedByUser: approverById.get(approval.approvedBy) ?? null,
-        })),
+      id: order.id,
+      type: order.type,
+      title: order.title,
+      instructions: order.instructions,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      fulfillmentChannel: order.fulfillmentChannel,
+      amount: order.amount,
+      currency: order.currency,
+      fulfillmentDueAt: order.fulfillmentDueAt,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      version: order.version,
+      autoAcceptAt: order.autoAcceptAt,
+      verifyMethod: order.verifyMethod,
+      deliveryAcceptedMethod: order.deliveryAcceptedMethod,
+      lifecycle: integrity.lifecycle,
+      integrity: { state: integrity.state, checks: integrity.checks },
+      organization: order.organization
+        ? {
+            id: order.organization.id,
+            name: order.organization.name,
+            ...(isSuperAdmin && { slug: order.organization.slug }),
+          }
+        : null,
+      customer: order.customer
+        ? {
+            id: order.customer.id,
+            name: order.customer.name,
+            ...(isSuperAdmin && {
+              email: order.customer.email,
+              userType: order.customer.userType,
+            }),
+          }
+        : null,
+      website: order.website
+        ? {
+            id: order.website.id,
+            url: order.website.url,
+            name: order.website.name,
+            ownershipType: order.website.ownershipType,
+            verificationStatus: order.website.verificationStatus,
+            publisher: order.website.publisher
+              ? {
+                  id: order.website.publisher.id,
+                  name: order.website.publisher.name,
+                  ...(role !== "OPERATIONS" && {
+                    email: order.website.publisher.email,
+                    tier: order.website.publisher.tier,
+                    profile: order.website.publisher.profile,
+                  }),
+                }
+              : null,
+            managedBy: order.website.managedBy
+              ? {
+                  id: order.website.managedBy.id,
+                  name: order.website.managedBy.name,
+                  ...(isSuperAdmin && {
+                    email: order.website.managedBy.email,
+                  }),
+                }
+              : null,
+          }
+        : null,
+      items: (order.items ?? []).map((item) => ({
+        id: item.id,
+        targetUrl: item.targetUrl,
+        anchorText: item.anchorText,
+        website: item.website
+          ? { id: item.website.id, url: item.website.url }
+          : null,
       })),
+      content: order.contentOrder
+        ? {
+            id: order.contentOrder.id,
+            title: order.contentOrder.title,
+            status: order.contentOrder.status,
+            hasBrief: Boolean(order.contentOrder.brief),
+            hasDeliverable: Boolean(order.contentOrder.deliverable),
+            updatedAt: order.contentOrder.updatedAt,
+          }
+        : null,
+      revisions: (order.revisions ?? []).map((revision) => ({
+        id: revision.id,
+        status: revision.status,
+        createdAt: revision.createdAt,
+        updatedAt: revision.updatedAt,
+      })),
+      events: (order.events ?? []).map((event) => ({
+        id: event.id,
+        eventType: event.eventType,
+        message: event.message,
+        ...(isSuperAdmin && { metadata: event.metadata }),
+        createdAt: event.createdAt,
+      })),
+      activeDeliveryVersion: order.activeDeliveryVersion
+        ? {
+            id: order.activeDeliveryVersion.id,
+            publishedUrl: order.activeDeliveryVersion.publishedUrl,
+            verificationStatus: order.activeDeliveryVersion.verificationStatus,
+            verificationFailureReason:
+              order.activeDeliveryVersion.verificationFailureReason,
+            adminVerifiedBy: order.activeDeliveryVersion.adminVerifiedBy
+              ? {
+                  id: order.activeDeliveryVersion.adminVerifiedBy.id,
+                  name: order.activeDeliveryVersion.adminVerifiedBy.name,
+                }
+              : null,
+            adminOverrideReason:
+              order.activeDeliveryVersion.adminOverrideReason,
+            adminVerifiedNotes: order.activeDeliveryVersion.adminVerifiedNotes,
+            fraudFlags: order.activeDeliveryVersion.fraudFlags.map((flag) => ({
+              id: flag.id,
+              type: flag.type,
+              details: flag.details,
+              createdAt: flag.createdAt,
+            })),
+            screenshotUrl: order.activeDeliveryVersion.screenshotUrl,
+            evidence: order.activeDeliveryVersion.evidence.map((evidence) => ({
+              id: evidence.id,
+              httpStatus: evidence.httpStatus,
+              anchorFound: evidence.anchorFound,
+              linkFound: evidence.linkFound,
+              targetUrlMatched: evidence.targetUrlMatched,
+              checkedAt: evidence.checkedAt,
+            })),
+          }
+        : null,
+      settlements: canViewFinancials
+        ? (order.settlements ?? []).map((settlement) => ({
+            id: settlement.id,
+            status: settlement.status,
+            grossAmount: settlement.grossAmount,
+            platformFee: settlement.platformFee,
+            publisherAmount: settlement.publisherAmount,
+            releasePolicy: settlement.releasePolicy,
+            reviewEndsAt: settlement.reviewEndsAt,
+            approvals: settlement.approvals.map((approval) => ({
+              id: approval.id,
+              type: approval.type,
+              approvedBy: approval.approvedBy,
+              roleAtTime: approval.roleAtTime,
+              approvedAt: approval.approvedAt,
+              approvedByUser: approverById.get(approval.approvedBy) ?? null,
+            })),
+          }))
+        : [],
+      dispute: order.dispute
+        ? { id: order.dispute.id, status: order.dispute.status }
+        : null,
+      cancellation: order.cancellationRequests?.[0] ?? null,
+      activeAssignment: activeAssignment
+        ? {
+            id: activeAssignment.id,
+            status: activeAssignment.status,
+            assignedAt: activeAssignment.assignedAt,
+            completedAt: activeAssignment.completedAt,
+            ...(isSuperAdmin && {
+              assignedToUserId: activeAssignment.assignedToUserId,
+            }),
+            assignedToCurrentUser:
+              activeAssignment.assignedToUserId === user?.id,
+          }
+        : null,
+      access: {
+        role,
+        canForceCancel: isSuperAdmin,
+        canManageDispute: true,
+        canReviewDelivery: role !== "FINANCE",
+        canViewFinancials,
+        canWorkFulfillment:
+          platformChannel && (isSuperAdmin || operationsCanWork),
+      },
     }
   }
 
@@ -1215,12 +1909,40 @@ export class AdminService {
     ownerType?: string
     page?: number
     limit?: number
+    user?: { id: string; staffRole: StaffRole }
   }) {
     const page = Number.isFinite(params.page) ? Math.max(1, params.page!) : 1
     const limit = Number.isFinite(params.limit)
       ? Math.min(100, Math.max(1, params.limit!))
       : 20
     const where: any = {}
+    if (
+      params.status &&
+      !Object.values(ListingStatus).includes(params.status as ListingStatus)
+    ) {
+      throw new BadRequestException("Invalid marketplace status filter")
+    }
+    const serviceTypes = [
+      "GUEST_POST",
+      "NICHE_EDIT",
+      "EDITORIAL_LINK",
+      "OUTREACH_LINK",
+      "LOCAL_CITATION",
+      "FOUNDATION_LINK",
+      "BLOG_ARTICLE",
+      "SEO_CONTENT",
+    ]
+    if (params.type && !serviceTypes.includes(params.type)) {
+      throw new BadRequestException("Invalid marketplace service filter")
+    }
+    if (
+      params.ownerType &&
+      !Object.values(WebsiteOwnershipType).includes(
+        params.ownerType as WebsiteOwnershipType,
+      )
+    ) {
+      throw new BadRequestException("Invalid marketplace owner filter")
+    }
     if (params.status) where.status = params.status
     if (params.type)
       where.services = {
@@ -1253,7 +1975,23 @@ export class AdminService {
             },
           },
           organization: { select: { name: true } },
-          publisher: { select: { name: true } },
+          publisher: {
+            select: {
+              id: true,
+              name: true,
+              tier: true,
+              email: true,
+              profile: {
+                select: {
+                  rating: true,
+                  totalReviews: true,
+                  responseTime: true,
+                  completionRate: true,
+                  trustScore: true,
+                },
+              },
+            },
+          },
           website: {
             select: {
               id: true,
@@ -1261,6 +1999,8 @@ export class AdminService {
               domain: true,
               verificationStatus: true,
               verifiedAt: true,
+              ownershipType: true,
+              metricsHistory: true,
               managedByUserId: true,
               managedBy: {
                 select: { id: true, name: true, email: true },
@@ -1285,6 +2025,7 @@ export class AdminService {
         const available = l.services.filter(
           (s) => s.availability === "AVAILABLE",
         )
+        const isSuperAdmin = params.user?.staffRole === "SUPER_ADMIN"
         return {
           id: l.id,
           title: l.title,
@@ -1307,12 +2048,29 @@ export class AdminService {
           categories: l.categories.map((item) => item.category),
           category: l.categories[0]?.category ?? null,
           organization: l.organization,
-          publisher: l.publisher,
+          publisher: l.publisher
+            ? {
+                id: l.publisher.id,
+                name: l.publisher.name,
+                tier: l.publisher.tier,
+                ...(isSuperAdmin && { email: l.publisher.email }),
+                profile: l.publisher.profile,
+              }
+            : null,
           websiteVerificationStatus: l.website?.verificationStatus ?? null,
           websiteVerifiedAt: l.website?.verifiedAt?.toISOString() ?? null,
           websiteDomain: l.website?.domain ?? null,
           websiteUrl: l.website?.url ?? null,
-          websiteManagedBy: l.website?.managedBy ?? null,
+          websiteManagedBy: l.website?.managedBy
+            ? {
+                id: l.website.managedBy.id,
+                name: l.website.managedBy.name,
+                ...(isSuperAdmin && { email: l.website.managedBy.email }),
+              }
+            : null,
+          domainMetrics: serializeMarketplaceDomainMetrics(
+            l.website?.metricsHistory ?? [],
+          ),
           createdAt: l.createdAt.toISOString(),
           // Phase 7: ALL service rows for the Manage Services dialog
           services: l.services.map((s) => ({
@@ -1335,18 +2093,48 @@ export class AdminService {
   }
 
   async getMarketplaceStats() {
-    const [totalListings, activeListings, totalReviews, avgRating] =
-      await Promise.all([
-        this.prisma.marketplaceListing.count(),
-        this.prisma.marketplaceListing.count({
-          where: { status: ListingStatus.APPROVED },
-        }),
-        this.prisma.marketplaceReview.count(),
-        this.prisma.marketplaceReview.aggregate({ _avg: { rating: true } }),
-      ])
+    const [
+      totalListings,
+      activeListings,
+      pendingListings,
+      draftListings,
+      pausedListings,
+      platformListings,
+      publisherListings,
+      totalReviews,
+      avgRating,
+    ] = await Promise.all([
+      this.prisma.marketplaceListing.count(),
+      this.prisma.marketplaceListing.count({
+        where: { status: ListingStatus.APPROVED },
+      }),
+      this.prisma.marketplaceListing.count({
+        where: { status: ListingStatus.PENDING_REVIEW },
+      }),
+      this.prisma.marketplaceListing.count({
+        where: { status: ListingStatus.DRAFT },
+      }),
+      this.prisma.marketplaceListing.count({
+        where: { status: ListingStatus.PAUSED },
+      }),
+      this.prisma.marketplaceListing.count({
+        where: { ownerType: WebsiteOwnershipType.PLATFORM },
+      }),
+      this.prisma.marketplaceListing.count({
+        where: { ownerType: WebsiteOwnershipType.PUBLISHER },
+      }),
+      this.prisma.marketplaceReview.count(),
+      this.prisma.marketplaceReview.aggregate({ _avg: { rating: true } }),
+    ])
     return {
       totalListings,
       activeListings,
+      pendingListings,
+      draftListings,
+      pausedListings,
+      needsAttention: pendingListings + pausedListings,
+      platformListings,
+      publisherListings,
       totalReviews,
       avgRating: avgRating._avg.rating ?? 0,
     }
@@ -1575,6 +2363,24 @@ export class AdminService {
       throw new BadRequestException(inputIssue)
     }
 
+    if (!dto.manualMetrics) {
+      throw new BadRequestException({
+        code: "MANUAL_METRICS_REQUIRED",
+        message: "Ahrefs organic traffic and Moz Domain Authority are required",
+      })
+    }
+    assertManualMetricValues(dto.manualMetrics)
+    const ahrefsTrafficAsOf = assertMeasurementDate(
+      dto.manualMetrics.ahrefsTrafficAsOf,
+      "manualMetrics.ahrefsTrafficAsOf",
+      { requireFresh: true },
+    )
+    const mozDomainAuthorityAsOf = assertMeasurementDate(
+      dto.manualMetrics.mozDomainAuthorityAsOf,
+      "manualMetrics.mozDomainAuthorityAsOf",
+      { requireFresh: true },
+    )
+
     const domain = normalizeDomain(dto.url)
     const canonicalDomain = domain
     const existing = await this.prisma.website.findFirst({
@@ -1653,6 +2459,8 @@ export class AdminService {
             organizationId: null,
             publisherId: null,
             ownerType: "PLATFORM",
+            traffic: dto.manualMetrics.ahrefsOrganicTraffic,
+            domainAuthority: dto.manualMetrics.mozDomainAuthority,
             sportsGamingAllowed: dto.sportsGamingAllowed,
             pharmacyAllowed: dto.pharmacyAllowed,
             cryptoAllowed: dto.cryptoAllowed,
@@ -1669,6 +2477,44 @@ export class AdminService {
             },
           },
         })
+
+        await upsertWebsiteMetric(tx, {
+          websiteId: createdWebsite.id,
+          key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+          provider: WebsiteMetricProvider.AHREFS,
+          source: WebsiteMetricSource.STAFF_MANUAL,
+          value: dto.manualMetrics.ahrefsOrganicTraffic,
+          measuredAt: ahrefsTrafficAsOf,
+          expiresAt: manualMetricExpiry(ahrefsTrafficAsOf),
+          enteredByUserId: user.id,
+        })
+        await upsertWebsiteMetric(tx, {
+          websiteId: createdWebsite.id,
+          key: WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
+          provider: WebsiteMetricProvider.MOZ,
+          source: WebsiteMetricSource.STAFF_MANUAL,
+          value: dto.manualMetrics.mozDomainAuthority,
+          measuredAt: mozDomainAuthorityAsOf,
+          expiresAt: manualMetricExpiry(mozDomainAuthorityAsOf),
+          enteredByUserId: user.id,
+        })
+        await this.audit.log(
+          {
+            action: "WEBSITE_MANUAL_METRICS_CREATED",
+            entityType: "Website",
+            entityId: createdWebsite.id,
+            metadata: {
+              ahrefsOrganicTraffic: dto.manualMetrics.ahrefsOrganicTraffic,
+              ahrefsTrafficAsOf: ahrefsTrafficAsOf.toISOString(),
+              mozDomainAuthority: dto.manualMetrics.mozDomainAuthority,
+              mozDomainAuthorityAsOf: mozDomainAuthorityAsOf.toISOString(),
+              source: "STAFF_MANUAL",
+            },
+            userId: user.id,
+            organizationId: null,
+          },
+          tx,
+        )
 
         return { ...createdWebsite, listing }
       })
@@ -1690,6 +2536,18 @@ export class AdminService {
       userId: user.id,
       organizationId: null,
     })
+
+    try {
+      await this.queue.addJob(
+        QUEUES.DOMAIN_METRICS,
+        "domain-metrics-sync",
+        { websiteIds: [website.id], trigger: "PLATFORM_WEBSITE_CREATED" },
+        { jobId: `domain-metrics-${website.id}` },
+      )
+    } catch {
+      // Provider availability must not roll back the durable website aggregate.
+      // Scheduled/backfill collection will retry Ahrefs DR and OpenPageRank.
+    }
 
     return website
   }

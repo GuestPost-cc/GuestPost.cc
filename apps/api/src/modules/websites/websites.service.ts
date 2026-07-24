@@ -1,4 +1,10 @@
-import { ListingFulfillmentType, ListingStatus } from "@guestpost/database"
+import {
+  ListingFulfillmentType,
+  ListingStatus,
+  WebsiteMetricKey,
+  WebsiteMetricProvider,
+  WebsiteMetricSource,
+} from "@guestpost/database"
 import {
   generateVerificationToken,
   QUEUES,
@@ -21,6 +27,14 @@ import {
 import { AuditService } from "../audit/audit.service"
 import { QueueService } from "../queues/queue.service"
 import { CreateWebsiteDto, UpdateWebsiteDto } from "./dto/websites.dto"
+import {
+  assertManualMetricValues,
+  assertMeasurementDate,
+  manualMetricExpiry,
+  manualMetricFreshAfter,
+  serializeWebsiteMetrics,
+  upsertWebsiteMetric,
+} from "./website-metrics.service"
 
 @Injectable()
 export class WebsitesService {
@@ -59,6 +73,24 @@ export class WebsitesService {
     if (inputIssue) {
       throw new BadRequestException(inputIssue)
     }
+
+    if (!dto.manualMetrics) {
+      throw new BadRequestException({
+        code: "MANUAL_METRICS_REQUIRED",
+        message: "Ahrefs organic traffic and Moz Domain Authority are required",
+      })
+    }
+    assertManualMetricValues(dto.manualMetrics)
+    const ahrefsTrafficAsOf = assertMeasurementDate(
+      dto.manualMetrics.ahrefsTrafficAsOf,
+      "manualMetrics.ahrefsTrafficAsOf",
+      { requireFresh: true },
+    )
+    const mozDomainAuthorityAsOf = assertMeasurementDate(
+      dto.manualMetrics.mozDomainAuthorityAsOf,
+      "manualMetrics.mozDomainAuthorityAsOf",
+      { requireFresh: true },
+    )
 
     // Canonical domain = dedupe + ownership-uniqueness key (protocol/path/www
     // stripped, lowercase, punycode). www.example.com and example.com collapse.
@@ -154,6 +186,8 @@ export class WebsitesService {
             websiteId: w.id,
             organizationId,
             ownerType: "PUBLISHER",
+            traffic: dto.manualMetrics.ahrefsOrganicTraffic,
+            domainAuthority: dto.manualMetrics.mozDomainAuthority,
             sportsGamingAllowed: dto.sportsGamingAllowed,
             pharmacyAllowed: dto.pharmacyAllowed,
             cryptoAllowed: dto.cryptoAllowed,
@@ -185,6 +219,44 @@ export class WebsitesService {
               : undefined,
           },
         })
+
+        await upsertWebsiteMetric(tx, {
+          websiteId: w.id,
+          key: WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+          provider: WebsiteMetricProvider.AHREFS,
+          source: WebsiteMetricSource.PUBLISHER_MANUAL,
+          value: dto.manualMetrics.ahrefsOrganicTraffic,
+          measuredAt: ahrefsTrafficAsOf,
+          expiresAt: manualMetricExpiry(ahrefsTrafficAsOf),
+          enteredByUserId: user.id,
+        })
+        await upsertWebsiteMetric(tx, {
+          websiteId: w.id,
+          key: WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
+          provider: WebsiteMetricProvider.MOZ,
+          source: WebsiteMetricSource.PUBLISHER_MANUAL,
+          value: dto.manualMetrics.mozDomainAuthority,
+          measuredAt: mozDomainAuthorityAsOf,
+          expiresAt: manualMetricExpiry(mozDomainAuthorityAsOf),
+          enteredByUserId: user.id,
+        })
+        await this.audit.log(
+          {
+            action: "WEBSITE_MANUAL_METRICS_CREATED",
+            entityType: "Website",
+            entityId: w.id,
+            metadata: {
+              ahrefsOrganicTraffic: dto.manualMetrics.ahrefsOrganicTraffic,
+              ahrefsTrafficAsOf: ahrefsTrafficAsOf.toISOString(),
+              mozDomainAuthority: dto.manualMetrics.mozDomainAuthority,
+              mozDomainAuthorityAsOf: mozDomainAuthorityAsOf.toISOString(),
+              source: "PUBLISHER_MANUAL",
+            },
+            userId: user.id,
+            organizationId,
+          },
+          tx,
+        )
 
         return w
       })
@@ -234,6 +306,19 @@ export class WebsitesService {
       organizationId,
     })
 
+    // The website transaction is already durable. External provider failures
+    // must never roll it back, so enqueue best-effort after commit.
+    try {
+      await this.queue.addJob(
+        QUEUES.DOMAIN_METRICS,
+        "domain-metrics-sync",
+        { websiteIds: [website.id], trigger: "WEBSITE_CREATED" },
+        { jobId: `domain-metrics-${website.id}` },
+      )
+    } catch {
+      // Scheduled/backfill sync can recover; creation remains successful.
+    }
+
     return website
   }
 
@@ -255,7 +340,10 @@ export class WebsitesService {
       where: { id, publisherId },
     })
     if (!website) throw new NotFoundException("Website not found")
-    if (website.verificationStatus === "VERIFIED") {
+    if (
+      website.verificationStatus === "VERIFIED" &&
+      website.verificationMethod !== "SUPER_ADMIN_OVERRIDE"
+    ) {
       throw new BadRequestException("Website is already verified")
     }
     let verificationToken = website.verificationToken
@@ -264,9 +352,13 @@ export class WebsitesService {
       await this.prisma.website.update({
         where: { id: website.id },
         data: {
-          verificationMethod: "DNS_TXT",
           verificationToken,
-          verificationStatus: "PENDING_VERIFICATION",
+          ...(website.verificationMethod === "SUPER_ADMIN_OVERRIDE"
+            ? {}
+            : {
+                verificationMethod: "DNS_TXT" as const,
+                verificationStatus: "PENDING_VERIFICATION" as const,
+              }),
           verificationFailureReason: null,
         },
       })
@@ -436,6 +528,7 @@ export class WebsitesService {
     const website = await this.prisma.website.findFirst({
       where: { id: websiteId, publisherId },
       include: {
+        metricsHistory: { orderBy: { key: "asc" } },
         websiteIntegrations: {
           include: {
             integration: true,
@@ -513,7 +606,12 @@ export class WebsitesService {
         }
       : null
 
-    const { websiteIntegrations, marketplaceListings, ...rest } = website
+    const {
+      websiteIntegrations,
+      marketplaceListings,
+      metricsHistory,
+      ...rest
+    } = website
     const listing = marketplaceListings?.[0]
 
     return {
@@ -526,7 +624,9 @@ export class WebsitesService {
       lastSuccessfulVerificationAt:
         rest.lastSuccessfulVerificationAt?.toISOString() ?? null,
       verificationInstructions:
-        rest.verificationStatus !== "VERIFIED" && rest.verificationToken
+        (rest.verificationStatus !== "VERIFIED" ||
+          rest.verificationMethod === "SUPER_ADMIN_OVERRIDE") &&
+        rest.verificationToken
           ? {
               type: "DNS_TXT",
               host: "@",
@@ -536,6 +636,7 @@ export class WebsitesService {
           : null,
       createdAt: rest.createdAt.toISOString(),
       updatedAt: rest.updatedAt.toISOString(),
+      domainMetrics: serializeWebsiteMetrics(metricsHistory),
       websiteIntegrations: websiteIntegrations.map((wi) => ({
         id: wi.id,
         integrationId: wi.integrationId,
@@ -588,6 +689,7 @@ export class WebsitesService {
     const websites = await this.prisma.website.findMany({
       where: { publisherId },
       include: {
+        metricsHistory: { orderBy: { key: "asc" } },
         // Phase 7: legacy price + turnaroundDays selectors were dropped.
         // Surface the AVAILABLE services so callers can render per-service
         // price/TAT directly.
@@ -624,6 +726,8 @@ export class WebsitesService {
     })
     return websites.map((website) => ({
       ...website,
+      domainMetrics: serializeWebsiteMetrics(website.metricsHistory),
+      metricsHistory: undefined,
       marketplaceListings: website.marketplaceListings.map((listing) => {
         const categories = listing.categories.map((item) => item.category)
         return { ...listing, categories, category: categories[0] ?? null }
@@ -748,6 +852,29 @@ export class WebsitesService {
         code: "LISTING_DESCRIPTION_REQUIRED",
         message:
           "Add a listing description of no more than 500 characters before submitting",
+      })
+    }
+
+    const requiredManualMetrics = await this.prisma.websiteMetric.findMany({
+      where: {
+        websiteId: id,
+        key: {
+          in: [
+            WebsiteMetricKey.AHREFS_ORGANIC_TRAFFIC,
+            WebsiteMetricKey.MOZ_DOMAIN_AUTHORITY,
+          ],
+        },
+        source: { in: ["PUBLISHER_MANUAL", "ADMIN_IMPORT"] },
+        status: "CURRENT",
+        measuredAt: { gte: manualMetricFreshAfter() },
+      },
+      select: { key: true },
+    })
+    if (new Set(requiredManualMetrics.map((metric) => metric.key)).size < 2) {
+      throw new BadRequestException({
+        code: "MANUAL_METRICS_REQUIRED",
+        message:
+          "Add current Ahrefs organic traffic and Moz Domain Authority before submitting",
       })
     }
 

@@ -38,6 +38,7 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  Gauge,
   Globe2,
   Layers3,
   ShieldCheck,
@@ -85,6 +86,51 @@ const optionalNumber = (minimum: number) =>
     z.coerce.number().min(minimum).optional(),
   )
 
+const requiredWholeNumber = (label: string, minimum: number, maximum: number) =>
+  z.preprocess(
+    (value) =>
+      value === "" || value == null || value === undefined
+        ? undefined
+        : Number(value),
+    z
+      .number({ error: `${label} is required` })
+      .int(`${label} must be a whole number`)
+      .min(minimum, `${label} must be at least ${minimum}`)
+      .max(maximum, `${label} must be no more than ${maximum}`),
+  )
+
+function utcDateValue(date = new Date()) {
+  return date.toISOString().slice(0, 10)
+}
+
+function metricFreshCutoffValue() {
+  const cutoff = new Date()
+  cutoff.setUTCHours(0, 0, 0, 0)
+  cutoff.setUTCDate(cutoff.getUTCDate() - 90)
+  return utcDateValue(cutoff)
+}
+
+const metricDate = (label: string) =>
+  z
+    .string()
+    .min(1, `${label} is required`)
+    .regex(/^\d{4}-\d{2}-\d{2}$/, `${label} must use YYYY-MM-DD`)
+    .refine((value) => {
+      const parsed = new Date(`${value}T00:00:00.000Z`)
+      return (
+        Number.isFinite(parsed.getTime()) &&
+        parsed.toISOString().slice(0, 10) === value
+      )
+    }, `${label} must be a real calendar date`)
+    .refine(
+      (value) => value <= utcDateValue(),
+      `${label} cannot be in the future`,
+    )
+    .refine(
+      (value) => value >= metricFreshCutoffValue(),
+      `${label} must be within the last 90 days`,
+    )
+
 const websiteSchema = z
   .object({
     url: z.string().trim().min(1, "Website URL is required").max(2048),
@@ -102,6 +148,14 @@ const websiteSchema = z
         (value) => MARKETPLACE_LANGUAGES.some((language) => language === value),
         "Choose a supported language",
       ),
+    ahrefsOrganicTraffic: requiredWholeNumber(
+      "Ahrefs organic traffic",
+      0,
+      2_147_483_647,
+    ),
+    ahrefsTrafficAsOf: metricDate("Ahrefs measurement date"),
+    mozDomainAuthority: requiredWholeNumber("Moz Domain Authority", 0, 100),
+    mozDomainAuthorityAsOf: metricDate("Moz measurement date"),
     listingTitle: z
       .string()
       .trim()
@@ -198,6 +252,8 @@ export default function NewWebsitePage() {
       googleNews: "no",
       markedSponsored: "no",
       foreignLanguageAllowed: "no",
+      ahrefsTrafficAsOf: utcDateValue(),
+      mozDomainAuthorityAsOf: utcDateValue(),
     },
   })
   const description = watch("description") ?? ""
@@ -222,6 +278,12 @@ export default function NewWebsitePage() {
         googleNews: data.googleNews === "yes",
         markedSponsored: data.markedSponsored === "yes",
         foreignLanguageAllowed: data.foreignLanguageAllowed === "yes",
+        manualMetrics: {
+          ahrefsOrganicTraffic: data.ahrefsOrganicTraffic,
+          ahrefsTrafficAsOf: data.ahrefsTrafficAsOf,
+          mozDomainAuthority: data.mozDomainAuthority,
+          mozDomainAuthorityAsOf: data.mozDomainAuthorityAsOf,
+        },
         initialService:
           data.addInitialService && data.price != null
             ? {
@@ -362,10 +424,145 @@ export default function NewWebsitePage() {
                 />
               </div>
               <p className="rounded-lg border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-                Search and traffic metrics are imported from the Google Search
-                Console and GA4 properties you link after enlistment; they are
-                not self-reported here.
+                Google Search Console and GA4 are optional connections added
+                after enlistment. Their metric groups stay hidden until the
+                corresponding property is connected and has synced.
               </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gauge className="h-5 w-5 text-blue-600" /> Domain metrics
+              </CardTitle>
+              <CardDescription>
+                Enter the two publisher-supplied values now. Provider API
+                metrics are fetched securely after the website is created.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-5 sm:grid-cols-2">
+                <Field
+                  label="Ahrefs organic traffic"
+                  htmlFor="ahrefs-organic-traffic"
+                  required
+                  error={errors.ahrefsOrganicTraffic?.message}
+                  description="Use the current whole-number organic traffic value shown in your Ahrefs account."
+                >
+                  <Input
+                    id="ahrefs-organic-traffic"
+                    type="number"
+                    min={0}
+                    max={2_147_483_647}
+                    step={1}
+                    inputMode="numeric"
+                    placeholder="12500"
+                    aria-invalid={Boolean(errors.ahrefsOrganicTraffic)}
+                    className={
+                      errors.ahrefsOrganicTraffic
+                        ? "border-destructive"
+                        : undefined
+                    }
+                    {...register("ahrefsOrganicTraffic")}
+                  />
+                </Field>
+                <Field
+                  label="Ahrefs measurement date"
+                  htmlFor="ahrefs-traffic-as-of"
+                  required
+                  error={errors.ahrefsTrafficAsOf?.message}
+                  description="The date this traffic value was observed; it must be within the last 90 days."
+                >
+                  <Input
+                    id="ahrefs-traffic-as-of"
+                    type="date"
+                    min={metricFreshCutoffValue()}
+                    max={utcDateValue()}
+                    aria-invalid={Boolean(errors.ahrefsTrafficAsOf)}
+                    className={
+                      errors.ahrefsTrafficAsOf
+                        ? "border-destructive"
+                        : undefined
+                    }
+                    {...register("ahrefsTrafficAsOf")}
+                  />
+                </Field>
+                <Field
+                  label="Moz Domain Authority"
+                  htmlFor="moz-domain-authority"
+                  required
+                  error={errors.mozDomainAuthority?.message}
+                  description="Enter the whole-number DA value shown in your Moz account, from 0 to 100."
+                >
+                  <Input
+                    id="moz-domain-authority"
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={1}
+                    inputMode="numeric"
+                    placeholder="54"
+                    aria-invalid={Boolean(errors.mozDomainAuthority)}
+                    className={
+                      errors.mozDomainAuthority
+                        ? "border-destructive"
+                        : undefined
+                    }
+                    {...register("mozDomainAuthority")}
+                  />
+                </Field>
+                <Field
+                  label="Moz measurement date"
+                  htmlFor="moz-da-as-of"
+                  required
+                  error={errors.mozDomainAuthorityAsOf?.message}
+                  description="The date this DA value was observed; it must be within the last 90 days."
+                >
+                  <Input
+                    id="moz-da-as-of"
+                    type="date"
+                    min={metricFreshCutoffValue()}
+                    max={utcDateValue()}
+                    aria-invalid={Boolean(errors.mozDomainAuthorityAsOf)}
+                    className={
+                      errors.mozDomainAuthorityAsOf
+                        ? "border-destructive"
+                        : undefined
+                    }
+                    {...register("mozDomainAuthorityAsOf")}
+                  />
+                </Field>
+              </div>
+
+              <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4 dark:border-blue-950 dark:bg-blue-950/20">
+                <p className="text-sm font-medium">Collected automatically</p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  After enlistment, the worker queues Ahrefs Domain Rating and
+                  OpenPageRank, Global Rank, and referring-domain lookups. API
+                  keys remain server-only and are never sent to this browser.
+                  Temporary provider or quota failures do not lose your draft;
+                  the scheduled refresh can retry them.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs">
+                  <a
+                    href="https://ahrefs.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-blue-700 underline underline-offset-4 dark:text-blue-300"
+                  >
+                    Domain Rating by Ahrefs
+                  </a>
+                  <a
+                    href="https://openpagerank.keywordseverywhere.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-blue-700 underline underline-offset-4 dark:text-blue-300"
+                  >
+                    OpenPageRank
+                  </a>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -688,6 +885,11 @@ export default function NewWebsitePage() {
                 Icon={CheckCircle2}
                 title="One site, one listing"
                 description="The listing is created atomically with this website."
+              />
+              <ReadinessItem
+                Icon={Gauge}
+                title="Metrics start together"
+                description="Manual values are saved atomically and provider lookups are queued."
               />
               <ReadinessItem
                 Icon={ShieldCheck}

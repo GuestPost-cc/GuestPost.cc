@@ -15,6 +15,7 @@ export const QUEUES = {
   AUTO_ACCEPT: "auto-accept",
   INTEGRATION_SYNC: "integration-sync",
   INTEGRATION_DISCOVERY: "integration-discovery",
+  DOMAIN_METRICS: "domain-metrics",
 } as const
 
 export type QueueName = (typeof QUEUES)[keyof typeof QUEUES]
@@ -88,5 +89,8 @@ export const QUEUE_JOBS = {
   },
   [QUEUES.INTEGRATION_DISCOVERY]: {
     DISCOVER: "discover",
+  },
+  [QUEUES.DOMAIN_METRICS]: {
+    SYNC: "domain-metrics-sync",
   },
 } as const

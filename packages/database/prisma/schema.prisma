@@ -442,6 +442,7 @@ model User {
   legalAcceptances              LegalAcceptance[]
   suspendedBy                   User?                  @relation("UserSuspensionsIssued", fields: [suspendedByUserId], references: [id], onDelete: SetNull)
   suspensionsIssued             User[]                 @relation("UserSuspensionsIssued")
+  websiteImportBatches          WebsiteImportBatch[]
 
   @@index([userType, banned])
   @@index([suspendedByUserId])
@@ -534,19 +535,20 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  memberships         Membership[]
-  teams               Team[]
-  publishers          Publisher[]
-  campaigns           Campaign[]
-  wallets             Wallet[]
-  orders              Order[]
-  tickets             Ticket[]
-  notifications       Notification[]
-  auditLogs           AuditLog[]
-  apiKeys             ApiKey[]
-  marketplaceListings MarketplaceListing[]
-  activeContexts      ActiveContext[]
-  depositAttempts     DepositAttempt[]
+  memberships          Membership[]
+  teams                Team[]
+  publishers           Publisher[]
+  campaigns            Campaign[]
+  wallets              Wallet[]
+  orders               Order[]
+  tickets              Ticket[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  apiKeys              ApiKey[]
+  marketplaceListings  MarketplaceListing[]
+  activeContexts       ActiveContext[]
+  depositAttempts      DepositAttempt[]
+  websiteImportBatches WebsiteImportBatch[]
 }
 
 enum MembershipStatus {
@@ -634,6 +636,7 @@ model Publisher {
   orderReviews         OrderReview[]
   tickets              Ticket[]                   @relation("TicketPublisher")
   providerAccounts     PublisherProviderAccount[]
+  websiteImportBatches WebsiteImportBatch[]
 
   @@index([organizationId])
 }
@@ -647,6 +650,56 @@ enum WebsiteVerificationStatus {
 
 enum VerificationMethod {
   DNS_TXT
+  SUPER_ADMIN_OVERRIDE
+}
+
+enum WebsiteMetricKey {
+  AHREFS_DOMAIN_RATING
+  AHREFS_ORGANIC_TRAFFIC
+  MOZ_DOMAIN_AUTHORITY
+  OPEN_PAGE_RANK
+  OPEN_PAGE_RANK_GLOBAL_RANK
+  OPEN_PAGE_RANK_REFERRING_DOMAINS
+}
+
+enum WebsiteMetricProvider {
+  AHREFS
+  MOZ
+  OPEN_PAGE_RANK
+}
+
+enum WebsiteMetricSource {
+  AHREFS_FREE_API
+  AHREFS_PAID_API
+  MOZ_PAID_API
+  OPEN_PAGE_RANK_API
+  PUBLISHER_MANUAL
+  STAFF_MANUAL
+  ADMIN_IMPORT
+}
+
+enum WebsiteMetricStatus {
+  CURRENT
+  STALE
+  UNAVAILABLE
+}
+
+enum WebsiteImportStatus {
+  PREVIEWED
+  COMMITTING
+  COMPLETED
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+enum WebsiteImportRowStatus {
+  READY
+  WARNING
+  ERROR
+  CREATED
+  SKIPPED
+  FAILED
 }
 
 model Website {
@@ -674,30 +727,37 @@ model Website {
   // Publisher sites start PENDING_VERIFICATION and must prove control via a
   // DNS TXT record before any listing on them can be approved. Platform sites
   // are created VERIFIED (the platform owns them).
-  verificationStatus           WebsiteVerificationStatus @default(PENDING_VERIFICATION)
-  verificationMethod           VerificationMethod?
+  verificationStatus            WebsiteVerificationStatus @default(PENDING_VERIFICATION)
+  verificationMethod            VerificationMethod?
   // Token the publisher must currently publish in DNS (next verification cycle).
-  verificationToken            String?
+  verificationToken             String?
   // Token actually proven present in DNS — what the periodic sweep re-checks.
   // Kept separate from verificationToken so rotation never false-revokes a
   // domain whose published TXT still holds the previously-proven secret.
-  activeVerifiedToken          String?
-  verifiedAt                   DateTime?
-  lastVerificationCheckAt      DateTime?
-  lastSuccessfulVerificationAt DateTime?
-  lastVerificationRequestAt    DateTime?
-  verificationCheckCount       Int                       @default(0)
+  activeVerifiedToken           String?
+  verifiedAt                    DateTime?
+  lastVerificationCheckAt       DateTime?
+  lastSuccessfulVerificationAt  DateTime?
+  lastVerificationRequestAt     DateTime?
+  verificationCheckCount        Int                       @default(0)
   // Consecutive failed health checks. 3 in a row -> REVOKED (transient-tolerant).
-  consecutiveFailures          Int                       @default(0)
-  verificationFailureReason    String?
+  consecutiveFailures           Int                       @default(0)
+  verificationFailureReason     String?
+  // Break-glass verification never pretends that DNS proof occurred. The
+  // expiry makes the override temporary unless a later real TXT check
+  // replaces it.
+  verificationOverrideExpiresAt DateTime?
+  verificationOverrideReason    String?
+  verifiedByUserId              String?
   // Canonical apex domain (protocol/path/www stripped, lowercase, punycode).
   // Unique across publisher and platform inventory. This is the durable
   // domain identity used to ensure one site/listing family per domain.
-  canonicalDomain              String?
+  canonicalDomain               String?
   // Internal moderation trust score 0-100 (never exposed publicly).
-  trustScore                   Int?
+  trustScore                    Int?
   // Optimistic-lock guard for worker transitions
-  verificationVersion          Int                       @default(0)
+  verificationVersion           Int                       @default(0)
+  importBatchId                 String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -708,6 +768,8 @@ model Website {
   orderItems          OrderItem[]
   marketplaceListings MarketplaceListing[]
   websiteIntegrations WebsiteIntegration[]
+  metricsHistory      WebsiteMetric[]
+  importBatch         WebsiteImportBatch?  @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
 
   @@index([publisherId])
   @@index([isActive])
@@ -718,6 +780,113 @@ model Website {
   @@index([verificationStatus])
   @@index([verifiedAt])
   @@index([managedByUserId, ownershipType])
+  @@index([importBatchId])
+  @@index([verificationOverrideExpiresAt])
+}
+
+// Canonical current value for each source-specific website metric. Provider
+// payloads are normalized before persistence; raw responses never enter the
+// marketplace read model. WebsiteMetricRevision retains every replacement.
+model WebsiteMetric {
+  id              String                @id @default(cuid())
+  websiteId       String
+  key             WebsiteMetricKey
+  provider        WebsiteMetricProvider
+  source          WebsiteMetricSource
+  status          WebsiteMetricStatus   @default(CURRENT)
+  value           Decimal               @db.Decimal(20, 4)
+  measuredAt      DateTime
+  collectedAt     DateTime              @default(now())
+  expiresAt       DateTime?
+  enteredByUserId String?
+  importBatchId   String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  website   Website                 @relation(fields: [websiteId], references: [id], onDelete: Cascade)
+  revisions WebsiteMetricRevision[]
+
+  @@unique([websiteId, key])
+  @@index([key, value])
+  @@index([source, status])
+  @@index([expiresAt])
+  @@index([importBatchId])
+}
+
+model WebsiteMetricRevision {
+  id              String                @id @default(cuid())
+  metricId        String
+  websiteId       String
+  key             WebsiteMetricKey
+  provider        WebsiteMetricProvider
+  source          WebsiteMetricSource
+  status          WebsiteMetricStatus
+  value           Decimal               @db.Decimal(20, 4)
+  measuredAt      DateTime
+  collectedAt     DateTime
+  expiresAt       DateTime?
+  enteredByUserId String?
+  importBatchId   String?
+  metadata        Json?
+  recordedAt      DateTime              @default(now())
+
+  metric WebsiteMetric @relation(fields: [metricId], references: [id], onDelete: Cascade)
+
+  @@index([metricId, recordedAt])
+  @@index([websiteId, key, recordedAt])
+}
+
+model WebsiteImportBatch {
+  id             String              @id @default(cuid())
+  publisherId    String
+  organizationId String
+  actorUserId    String
+  idempotencyKey String?
+  fileName       String
+  fileHash       String
+  status         WebsiteImportStatus @default(PREVIEWED)
+  totalRows      Int                 @default(0)
+  readyRows      Int                 @default(0)
+  warningRows    Int                 @default(0)
+  errorRows      Int                 @default(0)
+  createdRows    Int                 @default(0)
+  skippedRows    Int                 @default(0)
+  failedRows     Int                 @default(0)
+  committedAt    DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  publisher    Publisher          @relation(fields: [publisherId], references: [id], onDelete: Restrict)
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  actor        User               @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+  rows         WebsiteImportRow[]
+  websites     Website[]
+
+  @@unique([actorUserId, idempotencyKey])
+  @@index([publisherId, createdAt])
+  @@index([status, createdAt])
+  @@index([fileHash])
+}
+
+model WebsiteImportRow {
+  id              String                 @id @default(cuid())
+  batchId         String
+  rowNumber       Int
+  canonicalDomain String?
+  status          WebsiteImportRowStatus
+  normalizedData  Json?
+  errors          String[]               @default([])
+  warnings        String[]               @default([])
+  websiteId       String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  batch WebsiteImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId, status])
+  @@index([canonicalDomain])
+  @@index([websiteId])
 }
 
 model Order {

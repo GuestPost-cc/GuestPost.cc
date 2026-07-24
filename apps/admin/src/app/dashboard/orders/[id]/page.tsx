@@ -20,6 +20,9 @@ import {
   DialogHeader,
   DialogTitle,
   getOrderStatusPresentation,
+  Input,
+  Label,
+  OrderLifecycleProgress,
   Select,
   SelectContent,
   SelectItem,
@@ -35,6 +38,7 @@ import {
   AlertCircle,
   ArrowLeft,
   Ban,
+  CalendarClock,
   Check,
   CheckCircle,
   Clock,
@@ -42,6 +46,7 @@ import {
   ExternalLink,
   FileText,
   RefreshCw,
+  Route,
   Scale,
   ShieldCheck,
   User,
@@ -49,11 +54,17 @@ import {
   XCircle,
 } from "lucide-react"
 import Link from "next/link"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
+import {
+  AdminEmptyState,
+  AdminMetricCard,
+  AdminNotice,
+  AdminPage,
+  AdminPageHeader,
+} from "../../../../components/admin-workspace"
 import { api } from "../../../../lib/api"
-import { useAuth } from "../../../../lib/auth"
 import { getOrderBadgeVariant } from "../../../../lib/order-status-badge-variant"
 
 // ─── Status presentation ─────────────────────────────────────────────────────
@@ -169,7 +180,7 @@ const SYSTEM_APPROVER_LABELS: Record<string, string> = {
 function approvalActorLabel(approval: {
   type: string
   approvedBy: string
-  approvedByUser: { name: string | null; email: string } | null
+  approvedByUser: { name: string | null; email?: string } | null
 }): string {
   return (
     approval.approvedByUser?.name ||
@@ -191,6 +202,14 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
   const sortedEvents = [...events].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   )
+
+  if (sortedEvents.length === 0) {
+    return (
+      <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+        No timeline events are visible for your role yet.
+      </p>
+    )
+  }
 
   return (
     <div className="relative">
@@ -223,7 +242,7 @@ function OrderTimeline({ events }: { events: TimelineEvent[] }) {
                 {(() => {
                   const detail = eventDetail(event)
                   return detail ? (
-                    <span className="mt-0.5 text-sm text-muted-foreground break-words">
+                    <span className="mt-0.5 break-words text-sm text-muted-foreground">
                       {detail}
                     </span>
                   ) : null
@@ -251,96 +270,6 @@ function StatusBadge({ status }: { status: string }) {
     <UIStatusBadge variant={p.variant} className="gap-1.5">
       {p.label}
     </UIStatusBadge>
-  )
-}
-
-const PROGRESS_STEPS = [
-  { label: "Payment", statuses: ["DRAFT", "PENDING_PAYMENT", "PAID"] },
-  {
-    label: "Content",
-    statuses: [
-      "SUBMITTED",
-      "ACCEPTED",
-      "CONTENT_REQUESTED",
-      "CONTENT_CREATION",
-      "CONTENT_READY",
-    ],
-  },
-  { label: "Review", statuses: ["CUSTOMER_REVIEW", "APPROVED"] },
-  { label: "Published", statuses: ["PUBLISHED"] },
-  { label: "Verified", statuses: ["VERIFIED"] },
-  { label: "Delivered", statuses: ["DELIVERED"] },
-  { label: "Complete", statuses: ["SETTLED", "COMPLETED"] },
-]
-
-function OrderProgress({ status }: { status: string }) {
-  if (
-    status === "CANCELLED" ||
-    status === "REFUNDED" ||
-    status === "DISPUTED"
-  ) {
-    const map: Record<string, { text: string; cls: string }> = {
-      CANCELLED: {
-        text: "This order was cancelled.",
-        cls: "bg-gray-100 text-gray-700",
-      },
-      REFUNDED: {
-        text: "This order was refunded.",
-        cls: "bg-orange-100 text-orange-700",
-      },
-      DISPUTED: {
-        text: "A dispute is open — settlement to the publisher is paused while we review.",
-        cls: "bg-red-100 text-red-700",
-      },
-    }
-    const m = map[status]
-    return (
-      <div className={`rounded-lg px-4 py-3 text-sm font-medium ${m.cls}`}>
-        {m.text}
-      </div>
-    )
-  }
-
-  let current = PROGRESS_STEPS.findIndex((s) => s.statuses.includes(status))
-  if (current === -1) current = 0
-
-  return (
-    <div className="flex items-center">
-      {PROGRESS_STEPS.map((step, i) => {
-        const done = i < current
-        const active = i === current
-        return (
-          <div
-            key={step.label}
-            className="flex flex-1 items-center last:flex-none"
-          >
-            <div className="flex flex-col items-center gap-1.5">
-              <div
-                className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
-                  done
-                    ? "bg-primary text-primary-foreground"
-                    : active
-                      ? "bg-primary/15 text-primary ring-2 ring-primary"
-                      : "bg-muted text-muted-foreground"
-                }`}
-              >
-                {done ? <CheckCircle className="h-4 w-4" /> : i + 1}
-              </div>
-              <span
-                className={`text-[11px] ${active ? "font-medium text-foreground" : "text-muted-foreground"}`}
-              >
-                {step.label}
-              </span>
-            </div>
-            {i < PROGRESS_STEPS.length - 1 && (
-              <div
-                className={`mx-1 h-0.5 flex-1 ${done ? "bg-primary" : "bg-muted"}`}
-              />
-            )}
-          </div>
-        )
-      })}
-    </div>
   )
 }
 
@@ -388,13 +317,11 @@ const TERMINAL = ["CANCELLED", "REFUNDED"]
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
   const queryClient = useQueryClient()
-  const { user } = useAuth()
-  const router = useRouter()
 
-  const isSuperAdmin = user?.staffRole === "SUPER_ADMIN"
   const [action, setAction] = useState<null | "cancel">(null)
   const [reason, setReason] = useState("")
   const [responsibility, setResponsibility] = useState("SYSTEM")
+  const [confirmationOrderId, setConfirmationOrderId] = useState("")
 
   const {
     data: order,
@@ -418,16 +345,20 @@ export default function OrderDetailPage() {
         note: reasonText,
         expectedVersion: order!.version,
         idempotencyKey: `admin-${id}-${order!.version}`,
-        confirmationOrderId: id,
+        confirmationOrderId: confirmationOrderId.trim(),
         responsibility,
       }),
     onSuccess: () => {
       toast.success("Order force-cancelled")
       setAction(null)
       setReason("")
+      setConfirmationOrderId("")
       refreshOrder()
     },
-    onError: (e: any) => toast.error(e?.message || "Action failed"),
+    onError: (e: any) => {
+      toast.error(e?.message || "Action failed")
+      refreshOrder()
+    },
   })
 
   if (isLoading) {
@@ -446,112 +377,382 @@ export default function OrderDetailPage() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <AlertCircle className="h-12 w-12 text-destructive" />
-        <h2 className="mt-4 text-xl font-semibold">Failed to load order</h2>
-        <p className="mt-2 text-muted-foreground">{(error as Error).message}</p>
-        <Button className="mt-4" onClick={() => refetch()}>
-          Retry
-        </Button>
-      </div>
+      <AdminPage>
+        <AdminPageHeader
+          eyebrow="Role-protected order context"
+          title="Order unavailable"
+          description="This order may not exist, may no longer be visible in your assigned scope, or could not be loaded safely."
+          icon={AlertCircle}
+        />
+        <Card>
+          <AdminEmptyState
+            title="No order context available"
+            description="Return to the scoped order monitor or retry. For security, this page does not reveal whether an out-of-scope order exists."
+            action={
+              <div className="flex flex-wrap justify-center gap-2">
+                <Button variant="outline" asChild>
+                  <Link href="/dashboard/orders">Back to orders</Link>
+                </Button>
+                <Button onClick={() => refetch()}>Retry</Button>
+              </div>
+            }
+          />
+        </Card>
+      </AdminPage>
     )
   }
 
   if (!order) {
     return (
-      <div className="flex flex-col items-center justify-center py-12">
-        <AlertCircle className="h-12 w-12 text-destructive" />
-        <h2 className="mt-4 text-xl font-semibold">Order Not Found</h2>
-        <p className="mt-2 text-muted-foreground">
-          The order you&apos;re looking for doesn&apos;t exist.
-        </p>
-        <Button className="mt-4" asChild>
-          <Link href="/dashboard/orders">View All Orders</Link>
-        </Button>
-      </div>
+      <AdminPage>
+        <Card>
+          <AdminEmptyState
+            title="Order unavailable"
+            description="The order is not available in your current role scope."
+            action={
+              <Button asChild>
+                <Link href="/dashboard/orders">Back to orders</Link>
+              </Button>
+            }
+          />
+        </Card>
+      </AdminPage>
     )
   }
 
   const currentStatusConfig = statusConfig[order.status] || statusConfig.DRAFT
   const currentStatusIcon = currentStatusConfig.icon
 
-  const showCancel = isSuperAdmin && !TERMINAL.includes(order.status)
+  const role = order.access.role
+  const showCancel =
+    order.access.canForceCancel && !TERMINAL.includes(order.status)
 
   const ownershipType = order.website?.ownershipType
   const isPlatformOwned = ownershipType === "PLATFORM"
 
-  const showVerificationLink = ["FAILED", "MANUAL_REVIEW"].includes(
+  const verificationNeedsReview = ["FAILED", "MANUAL_REVIEW"].includes(
     order.activeDeliveryVersion?.verificationStatus ?? "",
   )
   const hasDispute = !!order.dispute
+  const hasCancellation = !!order.cancellation
 
   const activeDelivery = order.activeDeliveryVersion
   const latestEvidence = activeDelivery?.evidence?.[0] ?? null
   const settlements = order.settlements?.length ? order.settlements : null
+  const currentSettlement = settlements?.[0] ?? null
+  const roleEyebrow =
+    role === "SUPER_ADMIN"
+      ? "Platform order oversight"
+      : role === "OPERATIONS"
+        ? "Operations order context"
+        : "Financial order context"
+  const routeLabel =
+    order.fulfillmentChannel ??
+    (order.website?.ownershipType === "PLATFORM"
+      ? "PLATFORM"
+      : order.website?.ownershipType === "PUBLISHER"
+        ? "PUBLISHER"
+        : "UNASSIGNED")
+  const assignmentLabel = order.activeAssignment?.assignedToCurrentUser
+    ? "Assigned to you"
+    : order.access.canWorkFulfillment
+      ? "Available to work"
+      : "Context only"
+  const nextDeadline = [
+    "SETTLED",
+    "COMPLETED",
+    "CANCELLED",
+    "REFUNDED",
+  ].includes(order.status)
+    ? null
+    : (order.fulfillmentDueAt ?? order.autoAcceptAt)
 
   return (
-    <div className="space-y-6">
-      {/* ── Navigation Header ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link href="/dashboard/orders">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight">
-                Order #{order.id.slice(0, 8)}
-              </h1>
-              <StatusBadge status={order.status} />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Created {format(new Date(order.createdAt), "PPp")}
-            </p>
-          </div>
-        </div>
+    <AdminPage>
+      <AdminPageHeader
+        title={`Order #${order.id.slice(0, 8)}`}
+        description={`${order.title || order.type.replaceAll("_", " ").toLowerCase()} · Created ${format(new Date(order.createdAt), "PPp")}`}
+        eyebrow={roleEyebrow}
+        icon={FileText}
+        badges={<StatusBadge status={order.status} />}
+        actions={
+          <>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/orders">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Orders
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+          </>
+        }
+      />
+
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard
+          label="Fulfillment route"
+          value={
+            routeLabel === "PLATFORM"
+              ? "Platform"
+              : routeLabel === "PUBLISHER"
+                ? "Publisher"
+                : "Unassigned"
+          }
+          description={order.website?.url || "Website unavailable"}
+          icon={Route}
+          tone="info"
+        />
+        <AdminMetricCard
+          label="Customer"
+          value={order.customer?.name || "Unnamed"}
+          description={order.organization?.name || "Individual account"}
+          icon={User}
+        />
+        {order.access.canViewFinancials ? (
+          <AdminMetricCard
+            label="Order amount"
+            value={
+              order.amount == null
+                ? "—"
+                : `${order.currency} ${Number(order.amount).toFixed(2)}`
+            }
+            description={`Payment: ${order.paymentStatus.replaceAll("_", " ").toLowerCase()}`}
+            icon={DollarSign}
+            tone="success"
+          />
+        ) : (
+          <AdminMetricCard
+            label="Operations access"
+            value={assignmentLabel}
+            description="Derived from assignment and exception scope"
+            icon={Users}
+            tone={order.access.canWorkFulfillment ? "success" : "neutral"}
+          />
+        )}
+        <AdminMetricCard
+          label="Next deadline"
+          value={nextDeadline ? format(new Date(nextDeadline), "PP") : "None"}
+          description={
+            nextDeadline
+              ? formatDistanceToNow(new Date(nextDeadline), { addSuffix: true })
+              : "No active lifecycle deadline"
+          }
+          icon={CalendarClock}
+          tone={nextDeadline ? "warning" : "neutral"}
+        />
       </div>
 
-      {/* ── Action Buttons Bar ────────────────────────────────────────────── */}
-      {(showCancel || showVerificationLink || hasDispute) && (
-        <div className="flex flex-wrap items-center gap-2">
-          {showCancel && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => {
-                setAction("cancel")
-                setReason("")
-              }}
-            >
-              <Ban className="mr-2 h-4 w-4" />
-              Force Cancel
+      {hasDispute ? (
+        <AdminNotice title="Dispute is the active decision path" tone="danger">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <p>
+              Settlement and normal fulfillment decisions should remain paused
+              until the dispute is resolved in its audited workspace.
+            </p>
+            {order.access.canManageDispute ? (
+              <Button variant="outline" size="sm" className="shrink-0" asChild>
+                <Link href="/dashboard/disputes">
+                  <Scale className="mr-2 h-4 w-4" /> Manage dispute
+                </Link>
+              </Button>
+            ) : null}
+          </div>
+        </AdminNotice>
+      ) : hasCancellation ? (
+        <AdminNotice
+          title="Cancellation request needs coordinated review"
+          tone="warning"
+        >
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <p>
+              Continue this decision in Cancellations so responsibility,
+              approval, and refund effects stay in one audit trail.
+            </p>
+            <Button variant="outline" size="sm" className="shrink-0" asChild>
+              <Link href="/dashboard/cancellations">Review cancellation</Link>
             </Button>
-          )}
-          {showVerificationLink && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/verification/delivery">
-                <ShieldCheck className="mr-2 h-4 w-4" />
-                Review Delivery Verification
+          </div>
+        </AdminNotice>
+      ) : verificationNeedsReview ? (
+        <AdminNotice
+          title="Delivery verification needs attention"
+          tone="warning"
+        >
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <p>
+              {order.access.canReviewDelivery
+                ? "Review the evidence before progressing this order."
+                : "Verification blocks the money flow. Review the evidence below and coordinate with Operations."}
+            </p>
+            {order.access.canReviewDelivery ? (
+              <Button variant="outline" size="sm" className="shrink-0" asChild>
+                <Link href="/dashboard/verification/delivery">
+                  <ShieldCheck className="mr-2 h-4 w-4" /> Review evidence
+                </Link>
+              </Button>
+            ) : null}
+          </div>
+        </AdminNotice>
+      ) : order.access.canWorkFulfillment ? (
+        <AdminNotice
+          title="Fulfillment workspace is the next action"
+          tone="info"
+        >
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <p>
+              Use the protected fulfillment workspace to claim or progress the
+              order; this page remains the complete lifecycle context.
+            </p>
+            <Button size="sm" className="shrink-0" asChild>
+              <Link href={`/dashboard/fulfillment/${order.id}`}>
+                Open fulfillment
               </Link>
             </Button>
-          )}
-          {hasDispute && (
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/disputes">
-                <Scale className="mr-2 h-4 w-4" />
-                Manage Dispute
+          </div>
+        </AdminNotice>
+      ) : role === "FINANCE" && currentSettlement ? (
+        <AdminNotice
+          title="Settlement evidence is ready for financial review"
+          tone="info"
+        >
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <p>
+              Inspect verification, approvals, and publisher amounts here, then
+              complete the decision in Settlement Review.
+            </p>
+            <Button size="sm" className="shrink-0" asChild>
+              <Link href="/dashboard/finance/settlement-review">
+                Open settlement review
               </Link>
             </Button>
-          )}
-        </div>
+          </div>
+        </AdminNotice>
+      ) : (
+        <AdminNotice title="Lifecycle context is current" tone="success">
+          No protected intervention is required from your role. Use the timeline
+          and evidence below to understand the order’s current state.
+        </AdminNotice>
       )}
+
+      {showCancel ? (
+        <div className="flex flex-col justify-between gap-3 rounded-xl border border-red-200/80 bg-red-50/30 p-4 sm:flex-row sm:items-center dark:border-red-900 dark:bg-red-950/10">
+          <div>
+            <p className="text-sm font-semibold">Emergency intervention</p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Force cancellation is a Super Admin break-glass action. Normal
+              cancellation and dispute workflows should be used first.
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            className="shrink-0"
+            onClick={() => {
+              setAction("cancel")
+              setReason("")
+              setConfirmationOrderId("")
+            }}
+          >
+            <Ban className="mr-2 h-4 w-4" /> Force cancel
+          </Button>
+        </div>
+      ) : null}
 
       {/* ── Progress Bar ──────────────────────────────────────────────────── */}
       <Card>
-        <CardContent className="pt-6">
-          <OrderProgress status={order.status} />
+        <CardHeader>
+          <CardTitle className="text-base">Lifecycle progress</CardTitle>
+          <CardDescription>
+            Current stage and completed order milestones
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto pb-6">
+          <OrderLifecycleProgress status={order.status} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+            <div>
+              <CardTitle className="text-base">
+                Lifecycle integrity report
+              </CardTitle>
+              <CardDescription>
+                Server-derived routing, evidence, assignment, audit, and
+                financial consistency checks
+              </CardDescription>
+            </div>
+            <Badge
+              variant={
+                order.integrity.state === "HEALTHY"
+                  ? "success"
+                  : order.integrity.state === "BLOCKED"
+                    ? "destructive"
+                    : "warning"
+              }
+            >
+              {order.integrity.state.toLowerCase()}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {order.integrity.checks.map((check) => (
+              <div key={check.key} className="rounded-xl border p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-sm font-medium">{check.label}</p>
+                  <Badge
+                    variant={
+                      check.status === "PASS"
+                        ? "success"
+                        : check.status === "FAIL"
+                          ? "destructive"
+                          : check.status === "WARN"
+                            ? "warning"
+                            : "secondary"
+                    }
+                  >
+                    {check.status.replaceAll("_", " ").toLowerCase()}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                  {check.message}
+                </p>
+              </div>
+            ))}
+          </div>
+          <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div>
+              <p className="text-xs text-muted-foreground">Canonical stage</p>
+              <p className="mt-1 text-sm font-medium">
+                {order.lifecycle.stageLabel ?? "Exception path"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Order version</p>
+              <p className="mt-1 font-mono text-sm font-medium">
+                v{order.version}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Payment status</p>
+              <p className="mt-1 text-sm font-medium">
+                {order.paymentStatus.replaceAll("_", " ").toLowerCase()}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Assignment</p>
+              <p className="mt-1 text-sm font-medium">
+                {order.activeAssignment
+                  ? `${order.activeAssignment.status.replaceAll("_", " ").toLowerCase()} · ${formatDateTime(order.activeAssignment.assignedAt)}`
+                  : "No active assignment"}
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -561,7 +762,7 @@ export default function OrderDetailPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
-                <User className="h-4 w-4" /> Customer Info
+                <User className="h-4 w-4" /> Customer &amp; organization
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -573,18 +774,22 @@ export default function OrderDetailPage() {
                       {order.customer.name || "—"}
                     </p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Email</p>
-                    <p className="text-sm font-medium">
-                      {order.customer.email}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">User Type</p>
-                    <p className="text-sm font-medium capitalize">
-                      {order.customer.userType.toLowerCase()}
-                    </p>
-                  </div>
+                  {order.customer.email ? (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Email</p>
+                      <p className="break-all text-sm font-medium">
+                        {order.customer.email}
+                      </p>
+                    </div>
+                  ) : null}
+                  {order.customer.userType ? (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">User Type</p>
+                      <p className="text-sm font-medium capitalize">
+                        {order.customer.userType.toLowerCase()}
+                      </p>
+                    </div>
+                  ) : null}
                   {order.organization?.name && (
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">
@@ -595,6 +800,12 @@ export default function OrderDetailPage() {
                       </p>
                     </div>
                   )}
+                  {!order.customer.email && !order.customer.userType ? (
+                    <p className="text-xs leading-5 text-muted-foreground sm:col-span-2">
+                      Direct customer identifiers are protected by your current
+                      role policy.
+                    </p>
+                  ) : null}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">
@@ -622,12 +833,14 @@ export default function OrderDetailPage() {
                         {order.website.managedBy.name || "—"}
                       </p>
                     </div>
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Email</p>
-                      <p className="text-sm font-medium">
-                        {order.website.managedBy.email}
-                      </p>
-                    </div>
+                    {order.website.managedBy.email ? (
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">Email</p>
+                        <p className="break-all text-sm font-medium">
+                          {order.website.managedBy.email}
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">
@@ -642,12 +855,14 @@ export default function OrderDetailPage() {
                       {order.website.publisher.name || "—"}
                     </p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Email</p>
-                    <p className="text-sm font-medium">
-                      {order.website.publisher.email || "—"}
-                    </p>
-                  </div>
+                  {order.website.publisher.email ? (
+                    <div className="space-y-1">
+                      <p className="text-xs text-muted-foreground">Email</p>
+                      <p className="break-all text-sm font-medium">
+                        {order.website.publisher.email}
+                      </p>
+                    </div>
+                  ) : null}
                   {order.website.publisher.tier && (
                     <div className="space-y-1">
                       <p className="text-xs text-muted-foreground">Tier</p>
@@ -691,16 +906,18 @@ export default function OrderDetailPage() {
                     {order.type.replace(/_/g, " ").toLowerCase()}
                   </p>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">
-                    Amount + Currency
-                  </p>
-                  <p className="font-medium font-mono">
-                    {order.amount != null
-                      ? `${order.currency} ${Number(order.amount).toFixed(2)}`
-                      : "—"}
-                  </p>
-                </div>
+                {order.access.canViewFinancials ? (
+                  <div className="space-y-1">
+                    <p className="text-sm text-muted-foreground">
+                      Amount + Currency
+                    </p>
+                    <p className="font-mono font-medium">
+                      {order.amount != null
+                        ? `${order.currency} ${Number(order.amount).toFixed(2)}`
+                        : "—"}
+                    </p>
+                  </div>
+                ) : null}
                 {order.title && (
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Title</p>
@@ -783,6 +1000,101 @@ export default function OrderDetailPage() {
                   </span>
                 </div>
               )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">
+                Order items &amp; content state
+              </CardTitle>
+              <CardDescription>
+                Complete item routing, anchor requirements, and revision summary
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {order.items?.length ? (
+                <div className="space-y-3">
+                  {order.items.map((item, index) => (
+                    <div key={item.id} className="rounded-xl border p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-semibold">
+                          Item {index + 1}
+                        </p>
+                        <Badge variant="outline">
+                          {item.website?.url || "Website unavailable"}
+                        </Badge>
+                      </div>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Target URL
+                          </p>
+                          {item.targetUrl ? (
+                            <a
+                              href={item.targetUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-1 inline-flex items-center gap-1 break-all text-sm font-medium text-primary hover:underline"
+                            >
+                              {item.targetUrl}
+                              <ExternalLink className="h-3 w-3 shrink-0" />
+                            </a>
+                          ) : (
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              Not provided
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">
+                            Anchor text
+                          </p>
+                          <p className="mt-1 text-sm font-medium">
+                            {item.anchorText || "Not provided"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+                  No order items are linked to this order.
+                </p>
+              )}
+
+              <div className="grid gap-3 border-t pt-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Content record
+                  </p>
+                  <p className="mt-1 text-sm font-medium">
+                    {order.content?.status.replaceAll("_", " ").toLowerCase() ||
+                      "Not created"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Brief</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {order.content?.hasBrief ? "Recorded" : "Not recorded"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Deliverable</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {order.content?.hasDeliverable
+                      ? "Recorded"
+                      : "Not recorded"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Revisions</p>
+                  <p className="mt-1 text-sm font-medium">
+                    {order.revisions?.length ?? 0} recorded
+                  </p>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -918,14 +1230,14 @@ export default function OrderDetailPage() {
                         {activeDelivery.fraudFlags.map((ff: any) => (
                           <div
                             key={ff.id}
-                            className="flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-red-700"
+                            className="flex min-w-0 flex-wrap items-center gap-1 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-red-700"
                           >
                             <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                             <span className="font-medium capitalize">
                               {ff.type.replace(/_/g, " ")}
                             </span>
                             {ff.details && (
-                              <span className="text-red-600">
+                              <span className="min-w-0 break-all text-red-600">
                                 {typeof ff.details === "string"
                                   ? ff.details
                                   : JSON.stringify(ff.details)}
@@ -1138,6 +1450,7 @@ export default function OrderDetailPage() {
           if (!o) {
             setAction(null)
             setReason("")
+            setConfirmationOrderId("")
           }
         }}
       >
@@ -1150,38 +1463,70 @@ export default function OrderDetailPage() {
               Disputes.
             </DialogDescription>
           </DialogHeader>
-          <Textarea
-            placeholder="Reason (recorded in the audit trail)..."
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={3}
-            maxLength={1000}
-          />
-          <Select value={responsibility} onValueChange={setResponsibility}>
-            <SelectTrigger>
-              <SelectValue placeholder="Who is responsible?" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="CUSTOMER">Customer</SelectItem>
-              <SelectItem value="PUBLISHER">Publisher</SelectItem>
-              <SelectItem value="PLATFORM">Platform</SelectItem>
-              <SelectItem value="SHARED">Shared</SelectItem>
-              <SelectItem value="SYSTEM">System</SelectItem>
-            </SelectContent>
-          </Select>
+          <AdminNotice title="Break-glass action" tone="danger">
+            The exact order ID and a meaningful audit reason are required. The
+            server will also reject stale order versions and unauthorized roles.
+          </AdminNotice>
+          <div className="space-y-2">
+            <Label htmlFor="force-cancel-reason">Audit reason</Label>
+            <Textarea
+              id="force-cancel-reason"
+              placeholder="Describe the verified legal, security, or platform emergency..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={4}
+              maxLength={1000}
+            />
+            <p className="text-xs text-muted-foreground">
+              Minimum 20 characters · {reason.trim().length}/1000
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="force-cancel-responsibility">Responsibility</Label>
+            <Select value={responsibility} onValueChange={setResponsibility}>
+              <SelectTrigger id="force-cancel-responsibility">
+                <SelectValue placeholder="Who is responsible?" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="CUSTOMER">Customer</SelectItem>
+                <SelectItem value="PUBLISHER">Publisher</SelectItem>
+                <SelectItem value="PLATFORM">Platform</SelectItem>
+                <SelectItem value="SHARED">Shared</SelectItem>
+                <SelectItem value="SYSTEM">System</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="force-cancel-confirmation">
+              Type the complete order ID to confirm
+            </Label>
+            <Input
+              id="force-cancel-confirmation"
+              value={confirmationOrderId}
+              onChange={(event) => setConfirmationOrderId(event.target.value)}
+              placeholder={order.id}
+              autoComplete="off"
+              spellCheck={false}
+            />
+          </div>
           <DialogFooter>
             <Button
               variant="outline"
               onClick={() => {
                 setAction(null)
                 setReason("")
+                setConfirmationOrderId("")
               }}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
-              disabled={intervene.isPending || reason.trim().length < 3}
+              disabled={
+                intervene.isPending ||
+                reason.trim().length < 20 ||
+                confirmationOrderId.trim() !== order.id
+              }
               onClick={() =>
                 action && intervene.mutate({ reasonText: reason.trim() })
               }
@@ -1191,6 +1536,6 @@ export default function OrderDetailPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </AdminPage>
   )
 }
