@@ -719,6 +719,18 @@ data.
   intentionally defaults to compatibility `all` mode until that
   operator-controlled cutover occurs.
 
+## Completed 2026-07-28: transitive dependency audit remediation
+
+- PR #79's production audit surfaced newly published advisories in the existing
+  transitive dependency graph: GHSA-mh99-v99m-4gvg for brace-expansion and
+  GHSA-5qjj-4xww-7phc for Valibot.
+- With explicit operator approval, the current PR temporarily raises
+  `minimatch@10.2.5>brace-expansion` to 5.0.8 and Valibot to 1.4.2 without
+  changing the repository's dependency governance rules.
+- Updated the dependency-policy floors and runbook. Dependency compatibility,
+  the production audit, all 12 workspace typechecks, and all 12 production
+  builds pass locally. GitHub CI must still pass on the pushed commit.
+
 ## Completed 2026-07-28: registry-driven public documentation
 
 - Added one typed documentation registry as the source of truth for guide

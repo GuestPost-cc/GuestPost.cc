@@ -24,6 +24,10 @@ updated: 2026-07-28
 - Security updates bypass routine cooldowns. CI requires dependency review,
   the resolved-version compatibility policy, a production audit, migrations,
   tests, and all production builds.
+- Current transitive advisory floors include `brace-expansion@5.0.8` for the
+  5.x line and `valibot@1.4.2`. Both are temporary workspace overrides until
+  upstream ranges carry the patched releases; CI enforces their minimum
+  versions through `.github/dependency-policy.json`.
 - `main` requires the `build-and-test` check, one code-owner approval, resolved
   review threads, and squash merges. Merged remote branches are deleted
   automatically.
