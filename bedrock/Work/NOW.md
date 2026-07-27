@@ -729,7 +729,8 @@ data.
   changing the repository's dependency governance rules.
 - Updated the dependency-policy floors and runbook. Dependency compatibility,
   the production audit, all 12 workspace typechecks, and all 12 production
-  builds pass locally. GitHub CI must still pass on the pushed commit.
+  builds pass locally. GitHub `build-and-test` passed all required stages on
+  commit `8912c6b`.
 
 ## Completed 2026-07-28: registry-driven public documentation
 
