@@ -719,6 +719,45 @@ data.
   intentionally defaults to compatibility `all` mode until that
   operator-controlled cutover occurs.
 
+## Completed 2026-07-28: registry-driven public documentation
+
+- Added one typed documentation registry as the source of truth for guide
+  metadata, grouping, navigation, discovery, and concise footer inclusion.
+- Added a shared server-rendered documentation shell with a bounded sticky
+  desktop sidebar, native mobile disclosure, exact active states, breadcrumbs,
+  updated dates, and previous/next navigation.
+- Migrated all public documentation pages to the shared shell without weakening
+  the distinction between product guidance and controlling legal policies.
+- `sitemap.xml` and `llms.txt` now derive documentation links from the registry;
+  `robots.txt` continues to advertise the sitemap and exclude auth utilities.
+- Added `pnpm check:website-docs` and included it in `pnpm repo:check` so missing,
+  duplicate, unregistered, or incorrectly grouped documentation routes fail the
+  repository standard check.
+- Updated `docs/PUBLIC_WEBSITE.md` and the root README with the maintenance and
+  security contract. Validation commands were not run in this implementation
+  session.
+
+## Completed 2026-07-27: public website trust and security redesign
+
+- Rebuilt the port-3000 public site around a mobile-first editorial trust
+  system with separate client/server chrome, truthful placement and settlement
+  language, explicit platform-owned responsibility, and reduced-motion-safe
+  animation.
+- Removed unsupported logos, subscription pricing conflicts, inactive PayPal
+  claims, and hard-coded publisher-fee marketing. `/blog` now permanently
+  redirects to the configurable WordPress journal subdomain.
+- Added canonical site configuration, stable sitemap/robots/LLM discovery,
+  social metadata, manifest, `security.txt`, nonce-based CSP, hardened browser
+  headers, and no-store/no-index auth boundaries.
+- Expanded the documentation hub with order lifecycle, payments and settlement,
+  listing ownership, fraud protection, and account security references.
+- Expanded Terms, Privacy, Refund, Acceptable Use, and Cookie policies and
+  advanced the immutable Terms version to `2026-07-27-v2`.
+- Website ESLint and TypeScript checks pass; the production build generated all
+  26 routes and registered the security proxy successfully.
+- `docs/PUBLIC_WEBSITE.md` is the durable architecture, content, security,
+  WordPress, discovery, responsive-design, legal-gate, and release runbook.
+
 ## Completed 2026-07-24: order lifecycle hardening and local validation
 
 - Prisma Client generated and `20260723180000_order_article_versions` applied to the local database.

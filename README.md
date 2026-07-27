@@ -8,7 +8,7 @@ A comprehensive guest post marketplace platform for SEO link building campaigns.
 
 | App | Port | Description |
 |-----|------|-------------|
-| `website` | 3000 | Marketing landing page with features, pricing, testimonials |
+| `website` | 3000 | Public marketing, pricing, documentation, legal, and auth entry site |
 | `portal` | 3001 | Customer dashboard for managing guest post campaigns |
 | `publisher` | 3002 | Publisher dashboard for managing orders and payouts |
 | `admin` | 3003 | Admin dashboard for platform management |
@@ -32,7 +32,7 @@ A comprehensive guest post marketplace platform for SEO link building campaigns.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15 (App Router), React 19, TypeScript
+- **Frontend**: Next.js 16 (App Router), React 19, TypeScript
 - **Backend**: NestJS, Prisma ORM, PostgreSQL
 - **Infrastructure**: Docker (PostgreSQL, Redis, MinIO, Mailpit, Traefik)
 - **Package Manager**: pnpm with Turborepo
@@ -83,11 +83,18 @@ pnpm dev:portal      # 3001
 pnpm dev:publisher   # 3002
 pnpm dev:admin       # 3003
 pnpm dev:worker
+
+# Verify that every public documentation route is registered
+pnpm check:website-docs
 ```
 
 `pnpm dev:*` is wired through Turborepo with `dependsOn: ["^build"]`, so workspace
 dependencies (`@guestpost/database`, `@guestpost/shared`, …) are built before the
 target app starts.
+
+Public website architecture, documentation maintenance, discovery endpoints,
+security boundaries, and release checks are documented in
+[`docs/PUBLIC_WEBSITE.md`](docs/PUBLIC_WEBSITE.md).
 
 When you change the Prisma schema, regenerate the client:
 
@@ -118,6 +125,10 @@ The minimum required keys (already present in `.env.example`):
 | `QUEUE_REDIS_URL`    | Optional dedicated BullMQ Redis (falls back above)    |
 | `JWT_SECRET`         | Better Auth / JWT signing key                        |
 | `NEXT_PUBLIC_API_URL`| Public API origin used by the frontends              |
+| `NEXT_PUBLIC_WEBSITE_URL` | Canonical public website origin                |
+| `NEXT_PUBLIC_BLOG_URL` | Independently hosted WordPress journal origin      |
+| `NEXT_PUBLIC_PORTAL_URL` | Customer application origin                     |
+| `NEXT_PUBLIC_PUBLISHER_URL` | Publisher application origin                 |
 
 > **Note:** `dotenv` does **not** expand `${POSTGRES_USER}`-style placeholders.
 > Always inline literal values in `DATABASE_URL`.
@@ -163,6 +174,11 @@ guestpost-platform/
 
 Production worker lanes, payout recovery, and Northflank job setup are covered
 in [`docs/WORKER_ARCHITECTURE.md`](docs/WORKER_ARCHITECTURE.md).
+
+The port `3000` design system, content rules, WordPress boundary, security
+headers, CSP, crawler files, legal launch gate, and release checklist are
+documented in
+[`docs/PUBLIC_WEBSITE.md`](docs/PUBLIC_WEBSITE.md).
 
 ## Key Features
 

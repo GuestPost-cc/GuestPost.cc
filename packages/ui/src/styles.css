@@ -4,6 +4,7 @@
 @source "../../../apps/portal/src";
 @source "../../../apps/publisher/src";
 @source "../../../apps/admin/src";
+@source "../../../apps/website/src";
 
 @theme {
   --color-border: hsl(var(--border));

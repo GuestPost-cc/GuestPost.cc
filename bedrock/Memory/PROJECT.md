@@ -1,7 +1,7 @@
 ---
 note_type: project-memory
 project: guestpost-platform
-updated: 2026-07-23
+updated: 2026-07-28
 ---
 
 # GuestPost.cc
@@ -67,6 +67,26 @@ Open/partial items require architectural design discussion.
 
 ## Key Patterns
 
+- The public website uses separate client header and server footer components,
+  a website-scoped editorial trust theme, server-first marketing pages, and
+  reduced-motion-safe CSS animation. Canonical site/blog/account origins and
+  indexable routes live in `apps/website/src/lib/site-config.ts`; the journal
+  is hosted independently at the configured WordPress subdomain. The durable
+  maintenance and release contract is `docs/PUBLIC_WEBSITE.md`.
+- Public documentation is registry-driven. `apps/website/src/lib/docs-registry.ts`
+  controls the responsive sidebar, mobile navigation, overview cards,
+  breadcrumbs, previous/next links, footer selection, sitemap entries, and the
+  generated `llms.txt` response. `scripts/check-website-docs.ts` fails when the
+  registry and App Router pages drift and runs within `pnpm repo:check`. Legal
+  pages remain separate controlling documents.
+- Public discovery includes canonical metadata, a stable sitemap, restrictive
+  robots rules for auth utilities, `llms.txt`, a web manifest, an exact social
+  card, and RFC 9116 `security.txt`. A nonce-based CSP is applied by the Next.js
+  proxy, while auth and recovery routes are no-store and no-index.
+- Public commercial language uses reserved platform balances rather than
+  claiming a regulated escrow arrangement, never hard-codes the configurable
+  publisher fee, and advertises only provider availability shown in the
+  authenticated account workflow.
 - Controllers are thin; business logic lives in dedicated services
 - Admin workspace metric values accept arbitrary React content (including
   block-level loading skeletons), so `AdminMetricCard` renders its value region

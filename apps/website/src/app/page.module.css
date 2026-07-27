@@ -1,0 +1,202 @@
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(110 231 183 / 0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgb(110 231 183 / 0.08);
+  }
+}
+
+.hero {
+  position: relative;
+  background:
+    radial-gradient(circle at 78% 24%, rgb(167 243 208 / 0.2), transparent 28rem),
+    radial-gradient(circle at 16% 60%, rgb(186 230 253 / 0.26), transparent 30rem),
+    linear-gradient(180deg, hsl(var(--background)), hsl(42 28% 94%));
+}
+
+.hero::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  opacity: 0.32;
+  background-image:
+    linear-gradient(rgb(12 27 42 / 0.055) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(12 27 42 / 0.055) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, black, transparent 88%);
+}
+
+.reveal {
+  animation: reveal 680ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.delayOne {
+  animation-delay: 120ms;
+}
+
+.controlPanel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 1.75rem;
+  color: hsl(var(--primary-foreground));
+  background:
+    linear-gradient(140deg, rgb(255 255 255 / 0.04), transparent 44%),
+    hsl(var(--primary));
+  box-shadow: 0 28px 70px -35px rgb(8 24 40 / 0.6);
+}
+
+.controlPanel::after {
+  position: absolute;
+  right: -5rem;
+  bottom: -7rem;
+  width: 16rem;
+  height: 16rem;
+  pointer-events: none;
+  content: "";
+  border-radius: 999px;
+  background: rgb(110 231 183 / 0.08);
+  filter: blur(20px);
+}
+
+.statusDot {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 999px;
+  background: rgb(110 231 183);
+  animation: pulse 2.6s ease-in-out infinite;
+}
+
+.trustRailGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.trustRailCell {
+  display: flex;
+  min-height: 5.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 1rem;
+  text-align: center;
+}
+
+.trustRailCell:nth-child(-n + 2) {
+  border-bottom: 1px solid rgb(255 255 255 / 0.1);
+}
+
+.trustRailCell:nth-child(odd) {
+  border-right: 1px solid rgb(255 255 255 / 0.1);
+}
+
+.editorialCard {
+  transition:
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 360ms ease,
+    box-shadow 360ms ease;
+}
+
+.editorialCard:hover {
+  transform: translateY(-4px);
+  border-color: hsl(var(--foreground) / 0.24);
+  box-shadow: 0 22px 50px -38px rgb(8 24 40 / 0.5);
+}
+
+.workflowList {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.workflowItem {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  gap: 1rem;
+  padding-block: 1.5rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.securitySection {
+  background:
+    radial-gradient(circle at 95% 0%, rgb(167 243 208 / 0.24), transparent 25rem),
+    linear-gradient(135deg, hsl(202 34% 94%), hsl(42 30% 95%));
+}
+
+.finalCta {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 12% 20%, rgb(110 231 183 / 0.12), transparent 18rem),
+    radial-gradient(circle at 88% 82%, rgb(125 211 252 / 0.11), transparent 20rem),
+    hsl(var(--primary));
+}
+
+.finalCta::before {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  content: "";
+  opacity: 0.12;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.18) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+.finalCta > * {
+  position: relative;
+}
+
+@media (max-width: 639px) {
+  .hero::before {
+    background-size: 40px 40px;
+  }
+
+  .workflowItem {
+    grid-template-columns: 2rem 1fr;
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .trustRailGrid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .trustRailCell:nth-child(n) {
+    border-bottom: 0;
+    border-right: 0;
+  }
+
+  .trustRailCell:not(:last-child) {
+    border-right: 1px solid rgb(255 255 255 / 0.1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .statusDot {
+    animation: none;
+  }
+
+  .editorialCard {
+    transition: none;
+  }
+
+  .editorialCard:hover {
+    transform: none;
+  }
+}
