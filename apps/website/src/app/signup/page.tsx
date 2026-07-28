@@ -20,14 +20,10 @@ import {
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { Suspense, useEffect, useMemo, useState } from "react"
-
-const DESTINATIONS = {
-  customer: process.env.NEXT_PUBLIC_PORTAL_URL ?? "http://localhost:3001",
-  publisher: process.env.NEXT_PUBLIC_PUBLISHER_URL ?? "http://localhost:3002",
-} as const
+import { ACCOUNT_DESTINATIONS } from "../../lib/site-config"
 
 function destination(audience: PublicAuthAudience, path: string): string {
-  return new URL(path, DESTINATIONS[audience]).toString()
+  return new URL(path, ACCOUNT_DESTINATIONS[audience]).toString()
 }
 
 function SignupContent() {

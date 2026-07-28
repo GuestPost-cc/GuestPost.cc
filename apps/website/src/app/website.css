@@ -1,0 +1,85 @@
+@source "../";
+
+:root {
+  --background: 42 33% 97%;
+  --foreground: 211 56% 10%;
+  --card: 42 50% 99%;
+  --card-foreground: 211 56% 10%;
+  --popover: 42 50% 99%;
+  --popover-foreground: 211 56% 10%;
+  --primary: 211 56% 10%;
+  --primary-foreground: 42 50% 98%;
+  --secondary: 202 30% 91%;
+  --secondary-foreground: 211 56% 13%;
+  --muted: 42 20% 92%;
+  --muted-foreground: 212 14% 39%;
+  --accent: 164 42% 89%;
+  --accent-foreground: 166 67% 19%;
+  --border: 211 20% 83%;
+  --input: 211 20% 83%;
+  --ring: 202 81% 35%;
+  --surface-1: 42 25% 94%;
+  --radius: 0.75rem;
+  --font-body: "Avenir Next", "Century Gothic", "Trebuchet MS", sans-serif;
+  --font-display: "Iowan Old Style", "Baskerville", "Times New Roman", serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  min-width: 320px;
+  font-family: var(--font-body);
+  text-rendering: optimizeLegibility;
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+h1,
+h2,
+.font-display {
+  font-family: var(--font-display);
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+::selection {
+  background: hsl(164 42% 78%);
+  color: hsl(211 56% 10%);
+}
+
+:focus-visible {
+  outline: 3px solid hsl(var(--ring) / 0.45);
+  outline-offset: 3px;
+}
+
+@keyframes site-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.site-reveal {
+  animation: site-reveal 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .site-reveal {
+    animation: none;
+  }
+}

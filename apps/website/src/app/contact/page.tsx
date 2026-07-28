@@ -1,11 +1,14 @@
 import type { Metadata } from "next"
 import { ProsePage } from "../../components/prose-page"
-import { PORTAL_URL } from "../../components/site-chrome"
+import { PORTAL_URL, PUBLISHER_URL } from "../../components/site-chrome"
 
 export const metadata: Metadata = {
-  title: "Contact | GuestPost",
+  title: "Contact",
   description:
     "Get in touch with the GuestPost team — support, publisher relations, and general inquiries.",
+  alternates: {
+    canonical: "/contact",
+  },
 }
 
 export default function ContactPage() {
@@ -14,20 +17,30 @@ export default function ContactPage() {
       title="Contact"
       subtitle="We answer fast — most tickets get a first response within one business day."
     >
-      <h2>Customers &amp; publishers</h2>
+      <h2>Authenticated support</h2>
       <p>
         The fastest channel is the in-app support center: sign in and open a
         ticket from your dashboard. Tickets are tracked, threaded, and visible
-        to our whole operations team.
+        to the authorized support team.
       </p>
-      <p>
-        <a
-          className="text-primary underline-offset-4 hover:underline"
-          href={`${PORTAL_URL}/dashboard/support`}
-        >
-          Open a support ticket →
-        </a>
-      </p>
+      <ul>
+        <li>
+          <a
+            className="text-primary underline-offset-4 hover:underline"
+            href={`${PORTAL_URL}/dashboard/support`}
+          >
+            Customer support center
+          </a>
+        </li>
+        <li>
+          <a
+            className="text-primary underline-offset-4 hover:underline"
+            href={`${PUBLISHER_URL}/dashboard/support`}
+          >
+            Publisher support center
+          </a>
+        </li>
+      </ul>
       <h2>General inquiries</h2>
       <p>
         Email{" "}

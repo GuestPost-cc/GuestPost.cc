@@ -115,6 +115,17 @@ The canonical per-finding tracker is `bedrock/Views/audits/platform-audit-2026-0
 - ~~3 pre-existing failing test specs skipped in CI~~ — **CLOSED** by Phase 7.7.y (PR #4, commits `aa8cd55`+`74c8d51`+`b670493`). All 3 specs run again; `testPathIgnorePatterns` back at jest default.
 - **Phase 7.7 A1 dev DB drift (operator action required)**: pre-existing dev DB has 5 missing migration files from 2026-06-13; Phase 7.7 A1 migration was NOT applied to dev (operator opted to skip). Must apply on staging/prod via `prisma migrate deploy` (clean history) + record EXPLAIN ANALYZE planner-uses-index proof + before/after counts in the audit §11 Phase 7.7 entry. Until prod cutover, requestId column queries seq-scan (or return empty for pre-7.7 rows).
 
+### Public website legal launch gate
+
+- **The production contracting entity and jurisdiction are not yet confirmed.**
+  The public Terms and Privacy Policy deliberately do not invent a registered
+  entity, address, governing law, dispute forum, privacy representative, or
+  jurisdiction-specific retention periods. Paid production launch remains
+  blocked until the operator supplies those facts and qualified counsel
+  approves the entity-specific disclosures. Product controls and contractual
+  wording cannot eliminate non-excludable liability for the platform's own
+  fraud, gross negligence, willful misconduct, or statutory obligations.
+
 ### Pre-existing risks unchanged by this batch (still on the radar)
 
 - **No double-entry ledger.** Reconciliation core (`packages/shared/src/reconciliation-core.ts`) is the interim drift detector; single-entry bookkeeping remains. Money conservation is provable via reconciliation; accounting audit will eventually require dual-entry escrow / revenue accounts. Medium-term re-architecture.

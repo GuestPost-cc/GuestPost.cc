@@ -164,5 +164,6 @@ upstream range catches up. Current advisory floors are:
 - Hono Node Server 2.0.5 for GHSA-frvp-7c67-39w9
 - DOMPurify 3.4.12 for GHSA-c2j3-45gr-mqc4
 - shell-quote 1.9.0 for GHSA-395f-4hp3-45gv
-- brace-expansion 1.1.16, 2.1.2, or 5.0.7 according to the resolved
-  major line for GHSA-3jxr-9vmj-r5cp
+- brace-expansion 5.0.8 for GHSA-3jxr-9vmj-r5cp and
+  GHSA-mh99-v99m-4gvg
+- Valibot 1.4.2 for GHSA-5qjj-4xww-7phc

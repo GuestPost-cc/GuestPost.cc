@@ -1,169 +1,237 @@
 import { Button } from "@guestpost/ui"
 import {
   ArrowRight,
-  Clock,
-  DollarSign,
+  BadgeCheck,
+  Banknote,
   FileCheck2,
+  Globe2,
   ShieldCheck,
-  Wallet,
 } from "lucide-react"
 import type { Metadata } from "next"
+import Link from "next/link"
 import { SiteFooter, SiteHeader } from "../../components/site-chrome"
 
 export const metadata: Metadata = {
-  title: "For Publishers — Monetize Your Website | GuestPost",
+  title: "For Publishers",
   description:
-    "List your websites, receive vetted guest post orders, and get paid on a protected settlement schedule. Free to join, no exclusivity.",
+    "List controlled websites, review funded orders, deliver against recorded requirements, and follow a documented settlement path.",
+  alternates: {
+    canonical: "/publishers",
+  },
 }
 
 const steps = [
   {
-    icon: FileCheck2,
-    title: "Add your websites",
-    text: "Register your sites and create listings with your own pricing. Our team reviews every listing before it goes live.",
+    icon: Globe2,
+    title: "Prove site control",
+    text: "Add a root website, complete the required ownership checks, and provide current listing information.",
   },
   {
-    icon: Clock,
-    title: "Receive orders",
-    text: "Customers order through the marketplace with funds already escrowed — no chasing invoices, no unpaid work.",
+    icon: FileCheck2,
+    title: "Submit for review",
+    text: "Define services, pricing, turnaround, and placement rules. Listings are reviewed before marketplace approval.",
   },
   {
     icon: ShieldCheck,
-    title: "Deliver and get verified",
-    text: "Publish the content, mark it delivered. Verification confirms the placement is live before settlement starts.",
+    title: "Accept clear work",
+    text: "Review the funded order, customer brief, article responsibility, and recorded service terms before accepting.",
   },
   {
-    icon: Wallet,
-    title: "Settle and withdraw",
-    text: "Your share lands in your withdrawable balance after dual approval. Withdraw by bank transfer, PayPal, or Wise.",
+    icon: Banknote,
+    title: "Deliver and settle",
+    text: "Submit the publication evidence. Verification and the review state determine when funds become withdrawable.",
   },
-]
+] as const
 
 const faqs = [
   {
-    q: "What does it cost to join?",
-    a: "Nothing. Joining and listing are free — the platform takes a percentage of each completed order, deducted automatically at settlement. You set your own prices.",
+    question: "What does it cost to list?",
+    answer:
+      "Creating an account and submitting a listing does not require a subscription. The applicable platform fee is disclosed in the publisher workflow and recorded with settlement.",
   },
   {
-    q: "When do I get paid?",
-    a: "Settlement begins once the customer confirms delivery (or the review window lapses). New publishers have a short payout-hold window for fraud protection; established publishers are upgraded to faster tiers.",
+    question: "Can I decline an order?",
+    answer:
+      "Yes. Review the brief and service requirements before acceptance. Once accepted, cancellations follow the recorded order and cancellation policy.",
   },
   {
-    q: "What if a customer disputes an order?",
-    a: "Disputes pause settlement while our operations team reviews. You'll see the dispute reason and can respond — most disputes resolve within days.",
+    question: "When does a balance become withdrawable?",
+    answer:
+      "After the required delivery verification, customer review or applicable review window, and settlement controls are complete. Holds may apply when a dispute, chargeback, fraud signal, or provider uncertainty is active.",
   },
   {
-    q: "Do I keep control over what gets published?",
-    a: "Completely. You accept or decline every order, and nothing goes live on your site except what you publish yourself.",
+    question: "Which payout methods are available?",
+    answer:
+      "Availability depends on the currently enabled provider, account eligibility, currency, and rollout status. The publisher account is the source of truth; unavailable methods are not advertised as active.",
   },
   {
-    q: "Which payout methods are supported?",
-    a: "Bank transfer, PayPal, and Wise. Payout details are stored encrypted and are visible only to you and — under audited access — the finance team.",
+    question: "Who controls what is published?",
+    answer:
+      "The publisher controls its website and decides whether to accept an order. The publisher remains responsible for lawful, accurate, and policy-compliant publication on publisher-owned listings.",
   },
-]
+] as const
 
 export default function PublishersPage() {
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
       <main className="flex-1">
-        <section className="border-b py-24 text-center">
-          <div className="container max-w-3xl">
-            <h1 className="text-4xl font-bold tracking-tight lg:text-5xl">
-              Turn your website&apos;s authority into reliable revenue
-            </h1>
-            <p className="mt-4 text-lg text-muted-foreground">
-              GuestPost brings you vetted, prepaid guest post orders. Funds are
-              escrowed before you lift a finger, and settlement is protected by
-              a verified-delivery workflow.
-            </p>
-            <div className="mt-8 flex justify-center gap-4">
-              <Button size="lg" asChild>
-                <a href="/signup?audience=publisher">
-                  Join as a Publisher <ArrowRight className="ml-2 h-4 w-4" />
-                </a>
+        <section className="relative overflow-hidden border-b bg-primary text-primary-foreground">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_80%_20%,rgba(110,231,183,.14),transparent_28rem)]" />
+          <div className="container site-reveal relative grid gap-12 py-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-end lg:py-28">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-200/70">
+                Publisher operations
+              </p>
+              <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-[0.94] tracking-[-0.045em] sm:text-7xl">
+                Turn controlled inventory into accountable revenue.
+              </h1>
+              <p className="mt-6 max-w-2xl text-lg leading-8 text-primary-foreground/65">
+                Receive structured orders backed by reserved funds, keep
+                publication control, and move through verification and
+                settlement without off-platform invoice chasing.
+              </p>
+              <Button
+                size="lg"
+                variant="secondary"
+                asChild
+                className="mt-9 rounded-xl"
+              >
+                <Link href="/signup?audience=publisher">
+                  Create publisher workspace
+                  <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+                </Link>
               </Button>
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">
-              Free to join · You set your prices · No exclusivity
+            <div className="grid gap-3 rounded-[1.75rem] border border-primary-foreground/12 bg-primary-foreground/5 p-5 backdrop-blur sm:p-7">
+              {[
+                "Website ownership verification",
+                "Listing moderation before approval",
+                "Order requirements recorded before acceptance",
+                "Evidence-based delivery and dispute handling",
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-3 rounded-xl bg-primary-foreground/6 px-4 py-3 text-sm text-primary-foreground/75"
+                >
+                  <BadgeCheck
+                    className="h-4 w-4 shrink-0 text-emerald-200"
+                    aria-hidden="true"
+                  />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="container py-20 sm:py-24">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Publisher lifecycle
             </p>
+            <h2 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
+              From site control to withdrawable balance.
+            </h2>
           </div>
-        </section>
-
-        <section className="container py-20">
-          <h2 className="text-center text-3xl font-bold">How it works</h2>
-          <div className="mt-12 grid gap-8 md:grid-cols-4">
-            {steps.map((s, i) => (
-              <div key={s.title} className="relative rounded-xl border p-6">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                  <s.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div className="absolute right-4 top-4 text-4xl font-bold text-muted-foreground/10">
-                  {i + 1}
-                </div>
-                <h3 className="mt-4 font-semibold">{s.title}</h3>
-                <p className="mt-2 text-sm text-muted-foreground">{s.text}</p>
-              </div>
+          <ol className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {steps.map((step, index) => (
+              <li
+                key={step.title}
+                className="relative rounded-2xl border bg-card p-6 transition-transform duration-300 hover:-translate-y-1"
+              >
+                <span className="absolute right-5 top-5 font-mono text-xs text-muted-foreground">
+                  0{index + 1}
+                </span>
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent text-accent-foreground">
+                  <step.icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <h3 className="mt-6 text-xl font-semibold">{step.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                  {step.text}
+                </p>
+              </li>
             ))}
-          </div>
+          </ol>
         </section>
 
-        <section className="border-y bg-muted/30 py-20">
-          <div className="container grid items-center gap-12 md:grid-cols-2">
+        <section className="border-y bg-card py-20 sm:py-24">
+          <div className="container grid gap-10 lg:grid-cols-2 lg:items-center">
             <div>
-              <h2 className="text-3xl font-bold">
-                Payments built like a fintech, not a forum
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                Your responsibilities
+              </p>
+              <h2 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
+                Control stays with you. Accountability does too.
               </h2>
-              <ul className="mt-6 space-y-4 text-muted-foreground">
-                <li className="flex gap-3">
-                  <DollarSign className="h-5 w-5 shrink-0 text-primary" />{" "}
-                  Customer funds are captured into escrow before an order ever
-                  reaches you.
-                </li>
-                <li className="flex gap-3">
-                  <ShieldCheck className="h-5 w-5 shrink-0 text-primary" />{" "}
-                  Every settlement and withdrawal is double-entry tracked and
-                  reconciled hourly.
-                </li>
-                <li className="flex gap-3">
-                  <Wallet className="h-5 w-5 shrink-0 text-primary" /> Payout
-                  details are AES-256 encrypted; raw access requires an audited,
-                  explicitly granted permission.
-                </li>
+              <p className="mt-5 max-w-xl leading-7 text-muted-foreground">
+                On publisher-owned listings, you are responsible for site
+                control, accurate listing information, publication legality,
+                intellectual-property compliance, and delivery against the
+                accepted service.
+              </p>
+              <Link
+                href="/legal/acceptable-use"
+                className="mt-7 inline-flex items-center gap-2 text-sm font-semibold hover:text-accent-foreground"
+              >
+                Review marketplace standards
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </Link>
+            </div>
+            <div className="rounded-[1.75rem] bg-muted/55 p-7 sm:p-10">
+              <h3 className="font-body text-xl font-semibold">
+                GuestPost remains responsible for
+              </h3>
+              <ul className="mt-6 space-y-4">
+                {[
+                  "Moderation and marketplace access controls",
+                  "Recording order scope and financial states",
+                  "Delivery evidence and review workflows",
+                  "Platform dispute, refund, and settlement operations",
+                ].map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-sm">
+                    <ShieldCheck
+                      className="mt-0.5 h-4 w-4 shrink-0 text-accent-foreground"
+                      aria-hidden="true"
+                    />
+                    {item}
+                  </li>
+                ))}
               </ul>
             </div>
-            <div className="rounded-xl border bg-background p-8">
-              <h3 className="font-semibold">Earnings flow</h3>
-              <ol className="mt-4 space-y-3 text-sm text-muted-foreground">
-                <li>1. Order accepted — funds already escrowed</li>
-                <li>2. Content published &amp; verified live</li>
-                <li>3. Delivery confirmed → settlement created</li>
-                <li>4. Dual approval → your share becomes withdrawable</li>
-                <li>5. Withdraw → paid via your chosen method</li>
-              </ol>
-            </div>
           </div>
         </section>
 
-        <section className="container max-w-3xl py-20">
-          <h2 className="text-center text-3xl font-bold">
-            Frequently asked questions
-          </h2>
-          <div className="mt-10 space-y-6">
-            {faqs.map((f) => (
-              <details key={f.q} className="group rounded-lg border p-5">
-                <summary className="cursor-pointer font-medium marker:content-none">
-                  {f.q}
+        <section className="container max-w-4xl py-20 sm:py-24">
+          <div className="text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Publisher questions
+            </p>
+            <h2 className="mt-5 text-4xl font-semibold tracking-tight sm:text-5xl">
+              Read before you list.
+            </h2>
+          </div>
+          <div className="mt-10 space-y-3">
+            {faqs.map((faq) => (
+              <details
+                key={faq.question}
+                className="group rounded-2xl border bg-card px-5 py-4 open:shadow-sm sm:px-6"
+              >
+                <summary className="min-h-11 cursor-pointer content-center font-semibold marker:text-muted-foreground">
+                  {faq.question}
                 </summary>
-                <p className="mt-3 text-sm text-muted-foreground">{f.a}</p>
+                <p className="pb-3 pt-2 text-sm leading-7 text-muted-foreground">
+                  {faq.answer}
+                </p>
               </details>
             ))}
           </div>
-          <div className="mt-12 text-center">
-            <Button size="lg" asChild>
-              <a href="/signup?audience=publisher">
-                Start earning <ArrowRight className="ml-2 h-4 w-4" />
-              </a>
+          <div className="mt-10 text-center">
+            <Button size="lg" asChild className="rounded-xl">
+              <Link href="/signup?audience=publisher">
+                Start publisher onboarding
+                <ArrowRight className="ml-2 h-4 w-4" aria-hidden="true" />
+              </Link>
             </Button>
           </div>
         </section>

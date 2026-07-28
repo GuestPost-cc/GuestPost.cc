@@ -2,16 +2,19 @@ import type { Metadata } from "next"
 import { ProsePage } from "../../components/prose-page"
 
 export const metadata: Metadata = {
-  title: "About | GuestPost",
+  title: "About",
   description:
-    "GuestPost is a managed marketplace connecting brands with vetted publishers — built on escrowed payments and verified delivery.",
+    "GuestPost is a managed marketplace connecting customers with reviewed publisher inventory through recorded orders and verified delivery.",
+  alternates: {
+    canonical: "/about",
+  },
 }
 
 export default function AboutPage() {
   return (
     <ProsePage
       title="About GuestPost"
-      subtitle="A marketplace where link building works like commerce — with escrow, verification, and accountability."
+      subtitle="A marketplace where guest-post work follows recorded requirements, verified delivery, and accountable settlement."
     >
       <p>
         Guest posting has historically run on spreadsheets, DMs, and trust.
@@ -22,8 +25,8 @@ export default function AboutPage() {
       <h2>What makes us different</h2>
       <ul>
         <li>
-          <strong>Escrowed orders</strong> — customer funds are captured before
-          work starts and released only after verified delivery.
+          <strong>Funded orders</strong> — required customer funds are reserved
+          against accepted work and settlement follows the verified order state.
         </li>
         <li>
           <strong>Verified placements</strong> — every order passes a
@@ -38,8 +41,9 @@ export default function AboutPage() {
           moderation team before it can sell.
         </li>
         <li>
-          <strong>Financial-grade bookkeeping</strong> — every cent is ledgered
-          and reconciled hourly against transaction history.
+          <strong>Durable financial records</strong> — money movements are
+          recorded through explicit wallet, ledger, settlement, and payout
+          states.
         </li>
       </ul>
       <h2>Who it serves</h2>
