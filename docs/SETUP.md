@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- **Node.js** >= 18 (use [fnm](https://github.com/Schniz/fnm) or nvm)
+- **Node.js** >= 20.9 (use [fnm](https://github.com/Schniz/fnm) or nvm)
 - **pnpm** >= 8 (install via `corepack enable && corepack prepare pnpm@latest --activate`)
 - **Docker** (for local Postgres + Redis)
 - **Git**

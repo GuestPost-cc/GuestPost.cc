@@ -46,7 +46,7 @@ A comprehensive guest post marketplace platform for SEO link building campaigns.
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20.9+
 - pnpm 11+
 - Docker (Compose v2)
 

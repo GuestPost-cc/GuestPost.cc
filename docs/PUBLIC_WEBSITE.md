@@ -272,7 +272,7 @@ Material changes require a new version.
 |---|---|
 | XML sitemap | `apps/website/src/app/sitemap.ts` |
 | Robots policy | `apps/website/src/app/robots.ts` |
-| LLM reference | `apps/website/public/llms.txt` |
+| LLM reference | `apps/website/src/app/llms.txt/route.ts` |
 | Web manifest | `apps/website/src/app/manifest.ts` |
 | Social preview | `apps/website/public/og.png` |
 | Root metadata | `apps/website/src/app/layout.tsx` |
@@ -387,12 +387,12 @@ Before release:
 
 ## Current Validation Record
 
-The 2026-07-27 redesign passed:
+The current 2026-07-28 website passed:
 
 - Website ESLint
 - Website TypeScript checking
 - Next.js production build
-- Static generation of 26 routes
+- Static generation of 27 routes
 - Desktop checks at `1199px` and `1237px`
 - Mobile checks at `390px` and `621px`
 - Header, hero, trust rail, primary touch-target, footer, and overflow checks

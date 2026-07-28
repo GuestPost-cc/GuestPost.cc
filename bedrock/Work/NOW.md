@@ -725,8 +725,8 @@ data.
   transitive dependency graph: GHSA-mh99-v99m-4gvg for brace-expansion and
   GHSA-5qjj-4xww-7phc for Valibot.
 - With explicit operator approval, the current PR temporarily raises
-  `minimatch@10.2.5>brace-expansion` to 5.0.8 and Valibot to 1.4.2 without
-  changing the repository's dependency governance rules.
+  affected brace-expansion paths to 3.0.3 or 5.0.8 and Valibot to 1.4.2
+  without changing the repository's dependency governance rules.
 - Updated the dependency-policy floors and runbook. Dependency compatibility,
   the production audit, all 12 workspace typechecks, and all 12 production
   builds pass locally. GitHub `build-and-test` passed all required stages on
@@ -767,7 +767,7 @@ data.
 - Expanded Terms, Privacy, Refund, Acceptable Use, and Cookie policies and
   advanced the immutable Terms version to `2026-07-27-v2`.
 - Website ESLint and TypeScript checks pass; the production build generated all
-  26 routes and registered the security proxy successfully.
+  27 routes and registered the security proxy successfully.
 - `docs/PUBLIC_WEBSITE.md` is the durable architecture, content, security,
   WordPress, discovery, responsive-design, legal-gate, and release runbook.
 

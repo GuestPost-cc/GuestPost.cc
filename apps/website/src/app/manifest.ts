@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next"
+import { SITE_DESCRIPTION, SITE_NAME } from "../lib/site-config"
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "GuestPost",
-    short_name: "GuestPost",
-    description:
-      "Managed guest-post placements with verified delivery and controlled settlement.",
+    name: SITE_NAME,
+    short_name: SITE_NAME,
+    description: SITE_DESCRIPTION,
     start_url: "/",
     display: "standalone",
     background_color: "#f7f5ef",

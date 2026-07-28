@@ -66,10 +66,7 @@
     {
       "package": "brace-expansion",
       "minimumVersionsByMajor": {
-        "1": "1.1.16",
-        "2": "2.1.2",
-        "3": "5.0.8",
-        "4": "5.0.8",
+        "3": "3.0.3",
         "5": "5.0.8"
       },
       "reason": "GHSA-3jxr-9vmj-r5cp and GHSA-mh99-v99m-4gvg require patched floors for every affected major line."
