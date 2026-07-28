@@ -725,8 +725,8 @@ data.
   transitive dependency graph: GHSA-mh99-v99m-4gvg for brace-expansion and
   GHSA-5qjj-4xww-7phc for Valibot.
 - With explicit operator approval, the current PR temporarily raises
-  affected brace-expansion paths to 3.0.3 or 5.0.8 and Valibot to 1.4.2
-  without changing the repository's dependency governance rules.
+  affected brace-expansion paths to 5.0.8 and Valibot to 1.4.2 without
+  changing the repository's dependency governance rules.
 - Updated the dependency-policy floors and runbook. Dependency compatibility,
   the production audit, all 12 workspace typechecks, and all 12 production
   builds pass locally. GitHub `build-and-test` passed all required stages on

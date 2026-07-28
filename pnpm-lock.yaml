@@ -6,7 +6,7 @@ settings:
 
 overrides:
   '@hono/node-server': 2.0.10
-  minimatch@3.1.5>brace-expansion: 3.0.3
+  minimatch@3.1.5>brace-expansion: 5.0.8
   minimatch@10.2.5>brace-expansion: 5.0.8
   dompurify: 3.4.12
   fast-uri: 3.1.4
@@ -3944,10 +3944,6 @@ packages:
     peerDependencies:
       '@babel/core': ^7.0.0
 
-  balanced-match@3.0.1:
-    resolution: {integrity: sha512-vjtV3hiLqYDNRoiAv0zC4QaGAMPomEoq83PRmYIofPswwZurCeWR5LByXm7SyoL0Zh5+2z0+HC7jG8gSZJUh0w==}
-    engines: {node: '>= 16'}
-
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
     engines: {node: 18 || 20 || >=22}
@@ -4048,11 +4044,6 @@ packages:
 
   bowser@2.14.1:
     resolution: {integrity: sha512-tzPjzCxygAKWFOJP011oxFHs57HzIhOEracIgAePE4pqB3LikALKnSzUyU4MGs9/iCEUuHlAJTjTc5M+u7YEGg==}
-
-  brace-expansion@3.0.3:
-    resolution: {integrity: sha512-xQyYUquSHjoi1tv3qxXzeurpdBuBNAk3SdgMQAoIcaTtXizcUsJxqW/jqUh1EOJvXACXrAsuG0DWuP+gdSLTzQ==}
-    engines: {node: '>= 18'}
-    deprecated: contains bloat files
 
   brace-expansion@5.0.8:
     resolution: {integrity: sha512-JZyDyq3D4AUifKTPOB7DELf6XsB3WdPuNxCtob1vFXPsSXhdAiHBWJ/tJ8HAc9aH84BK+5JFZLNkJKx3G9kzQg==}
@@ -10475,8 +10466,6 @@ snapshots:
       babel-plugin-jest-hoist: 29.6.3
       babel-preset-current-node-syntax: 1.2.0(@babel/core@7.29.7)
 
-  balanced-match@3.0.1: {}
-
   balanced-match@4.0.4: {}
 
   base64-js@1.5.1: {}
@@ -10553,10 +10542,6 @@ snapshots:
   boolbase@1.0.0: {}
 
   bowser@2.14.1: {}
-
-  brace-expansion@3.0.3:
-    dependencies:
-      balanced-match: 3.0.1
 
   brace-expansion@5.0.8:
     dependencies:
@@ -12417,7 +12402,7 @@ snapshots:
 
   minimatch@3.1.5:
     dependencies:
-      brace-expansion: 3.0.3
+      brace-expansion: 5.0.8
 
   minimist@1.2.8: {}
 
