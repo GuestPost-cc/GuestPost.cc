@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "better-auth": "^1.6.23",
-    "ioredis": "^5.4.1",
+    "ioredis": "^5.11.1",
     "@guestpost/database": "workspace:*",
     "@guestpost/shared": "workspace:*"
   },
