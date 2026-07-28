@@ -1,5 +1,6 @@
 import { cn } from "@guestpost/ui"
 import type { Metadata } from "next"
+import { connection } from "next/server"
 import "@guestpost/ui/styles.css"
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "../lib/site-config"
 import "./website.css"
@@ -49,11 +50,15 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // A fresh CSP nonce is generated for every request. Keep the root dynamic so
+  // Next.js can apply that nonce to its framework and inline scripts.
+  await connection()
+
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body className={cn("min-h-screen bg-background antialiased")}>
